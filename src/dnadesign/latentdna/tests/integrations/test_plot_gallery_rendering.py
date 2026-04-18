@@ -75,8 +75,11 @@ def _write_workspace_config(workspace_dir: Path) -> None:
                         "panel_titles": ["panel a", "panel b"],
                         "x_column": "wildtype_margin_ethanol_vs_control",
                         "y_column": "wildtype_margin_cipro_vs_control",
-                        "color_column": "design_family",
-                        "shape_column": "sig35_variant",
+                        "default_hue": "design_family",
+                        "hue_options": [
+                            {"column": "design_family", "label": "Design family", "type": "categorical"},
+                            {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
+                        ],
                         "annotation": {"reference_set": "promoter_wildtype_primary"},
                         "semantics_ref": "plot_semantics/reference_margin_gallery_wildtype.yaml",
                     },
@@ -314,7 +317,12 @@ def test_plot_gallery_rendering_records_plural_scalar_and_agreement_inputs(tmp_p
     )
     assert reference_manifest["params"]["plot_kind"] == "xy_scatter_grid"
     assert reference_manifest["params"]["scalar_ids"] == ["margin_a", "margin_b"]
-    assert reference_manifest["params"]["shape_column"] == "sig35_variant"
+    assert reference_manifest["params"]["default_hue"] == "design_family"
+    assert [option["column"] for option in reference_manifest["params"]["hue_options"]] == [
+        "design_family",
+        "sig35_variant",
+    ]
+    assert "shape_column" not in reference_manifest["params"]
     assert [entry["id"] for entry in reference_manifest["inputs"]] == ["margin_a", "margin_b"]
     assert reference_manifest["semantics"]["evidence_tier"] == "primary"
     assert reference_manifest["semantics"]["research_question"].startswith("Do promoters move")
@@ -401,9 +409,9 @@ def test_figure_legends_are_reserved_below_the_axes() -> None:
             "ciprofloxacin": "#009E73",
         },
         color_title="design_family",
-        shape_categories=["b", "c"],
-        shape_map={"b": "o", "c": "s"},
-        shape_title="sig35_variant",
+        shape_categories=[],
+        shape_map={},
+        shape_title=None,
     )
     fig.tight_layout(rect=(0.0, bottom_margin, 1.0, 1.0), pad=0.55)
     fig.canvas.draw()
@@ -412,8 +420,10 @@ def test_figure_legends_are_reserved_below_the_axes() -> None:
     axes_box = ax.get_window_extent(renderer)
     legend_boxes = [legend.get_window_extent(renderer) for legend in fig.legends]
 
-    assert bottom_margin >= 0.11
+    assert bottom_margin >= 0.1
+    assert len(fig.legends) == 1
     assert legend_boxes
     assert all(box.y1 <= axes_box.y0 for box in legend_boxes)
+    assert fig.legends[0].get_title().get_visible() is False
 
     plt.close(fig)

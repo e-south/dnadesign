@@ -15,6 +15,8 @@ import marimo as mo
 import numpy as np
 import pandas as pd
 
+from ..labels import humanize_plot_title
+from ..plots.recipes import resolve_plot_spec
 from ..studies.docs_refs import read_docs_ref
 from ..workspaces.loader import load_workspace_config
 from ..workspaces.plot_semantics import resolve_plot_semantics
@@ -23,6 +25,7 @@ from .browser_runtime_compare import (
     render_distance_correlation,
     render_rowwise_distribution,
 )
+from .browser_runtime_plot_review import load_plot_review_frames, render_plot_review_surface
 from .browser_runtime_projection import enrich_projection_frame, render_projection_grid
 from .browser_runtime_support import (
     available_hues_for_frames,
@@ -135,8 +138,10 @@ class BrowserSupport:
 class BrowserRenderers:
     compare_pair_payload: Callable[..., dict[str, object]]
     enrich_projection_frame: Callable[[pd.DataFrame, list[dict[str, object]]], pd.DataFrame]
+    load_plot_review_frames: Callable[..., list[pd.DataFrame]]
     render_distance_correlation: Callable[..., object]
     render_plot_asset: Callable[[Path], object]
+    render_plot_review_surface: Callable[..., object]
     render_projection_grid: Callable[..., object]
     render_rowwise_distribution: Callable[..., object]
 
@@ -152,7 +157,7 @@ class WorkspaceBrowserRuntime:
 
 
 def _humanize_plot_id(plot_id: str) -> str:
-    return plot_id.replace("_", " ").strip().title()
+    return humanize_plot_title(plot_id)
 
 
 def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
@@ -188,27 +193,45 @@ def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
     }
 
 
+def _extract_plot_details(markdown: str) -> str:
+    lines = markdown.splitlines()
+    heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
+    if not heading_indices:
+        return markdown.strip()
+
+    heading_indices.append(len(lines))
+    for start, end in zip(heading_indices, heading_indices[1:], strict=False):
+        title = lines[start][5:].strip()
+        if title.casefold() != "plot details":
+            continue
+        return "\n".join(lines[start + 1 : end]).strip()
+    return ""
+
+
 def resolve_plot_doc_block(
     *,
     plot_id: str,
     deliverable_summary: str,
     parsed_markdown: dict[str, object] | None,
-) -> dict[str, str | None]:
+) -> dict[str, object]:
     plot_sections = parsed_markdown.get("plot_sections", {}) if isinstance(parsed_markdown, dict) else {}
     summary_markdown = (
         str(parsed_markdown.get("summary_markdown") or "").strip() if isinstance(parsed_markdown, dict) else ""
     )
     plot_entry = plot_sections.get(plot_id) if isinstance(plot_sections, dict) else None
     if isinstance(plot_entry, dict):
+        markdown = str(plot_entry.get("markdown") or "").strip()
         return {
             "title": str(plot_entry.get("title") or _humanize_plot_id(plot_id)),
-            "markdown": str(plot_entry.get("markdown") or "").strip(),
+            "markdown": markdown,
+            "plot_details_md": _extract_plot_details(markdown),
             "warning": None,
         }
     fallback_markdown = summary_markdown or deliverable_summary.strip()
     return {
         "title": _humanize_plot_id(plot_id),
         "markdown": fallback_markdown,
+        "plot_details_md": _extract_plot_details(fallback_markdown),
         "warning": f"Missing plot-specific study-doc subsection for `{plot_id}`.",
     }
 
@@ -222,6 +245,33 @@ def resolve_runtime_hue_kinds(
         for column in global_hue_columns
         if str(configured_hue_kinds.get(column)) in _ALLOWED_RUNTIME_HUE_KINDS
     }
+
+
+def _resolve_review_plot_spec(context, *, plot_id: str):
+    return resolve_plot_spec(
+        plots=context.config.plots,
+        plot_id=plot_id,
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        scalar_ids=[],
+        agreement_id=None,
+        agreement_ids=[],
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        shape_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
 
 
 def _plot_review_sections(context, *, output_root: Path, controls: dict[str, object]) -> BrowserPlotReview:
@@ -278,13 +328,16 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
         visibility_tier = str(
             entry.get("visibility_tier") or getattr(context.require_plot(plot_id), "visibility_tier", "primary")
         )
-        badge = "Appendix" if visibility_tier == "appendix" else "Primary"
-        guardrail_text = None
-        guardrails = [str(item).strip() for item in semantics.get("interpretation_guardrails", []) if str(item).strip()]
-        if visibility_tier == "appendix":
-            guardrail_text = "Appendix orientation surface; not primary decision evidence."
-        elif guardrails:
-            guardrail_text = guardrails[0]
+        resolved_spec = _resolve_review_plot_spec(context, plot_id=plot_id)
+        live_render = resolved_spec.kind in {
+            "projection_grid",
+            "xy_scatter_grid",
+            "paired_xy_scatter_grid",
+            "categorical_count",
+            "metric_panel_grid",
+            "distribution_grid",
+            "curve_grid",
+        }
 
         if current_section is None or str(current_section.get("deliverable_id")) != deliverable_id:
             current_section = {
@@ -298,13 +351,14 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
             {
                 "plot_id": plot_id,
                 "title": str(doc_block.get("title") or _humanize_plot_id(plot_id)),
-                "badge": badge,
                 "visibility_tier": visibility_tier,
                 "render_path": render_path,
                 "caption_md": str(semantics.get("caption_md") or "").strip(),
                 "study_doc_md": str(doc_block.get("markdown") or "").strip(),
+                "plot_details_md": str(doc_block.get("plot_details_md") or "").strip(),
                 "study_doc_warning": doc_block.get("warning"),
-                "guardrail_text": guardrail_text,
+                "live_render": live_render,
+                "plot_spec": resolved_spec.model_dump(mode="json"),
             }
         )
 
@@ -437,6 +491,15 @@ def build_workspace_browser_runtime(
 
     enrich_projection_frame_for_output = partial(enrich_projection_frame, output_root=output_root)
     render_plot_asset_for_workspace = partial(render_plot_asset, workspace_dir=workspace_dir)
+    load_plot_review_frames_for_workspace = partial(
+        load_plot_review_frames,
+        output_root=output_root,
+    )
+    render_plot_review_surface_for_workspace = partial(
+        render_plot_review_surface,
+        output_root=output_root,
+        workspace_dir=workspace_dir,
+    )
     render_projection_grid_for_workspace = partial(
         render_projection_grid,
         output_root=output_root,
@@ -515,8 +578,10 @@ def build_workspace_browser_runtime(
         renderers=BrowserRenderers(
             compare_pair_payload=compare_pair_payload_for_output,
             enrich_projection_frame=enrich_projection_frame_for_output,
+            load_plot_review_frames=load_plot_review_frames_for_workspace,
             render_distance_correlation=render_distance_correlation,
             render_plot_asset=render_plot_asset_for_workspace,
+            render_plot_review_surface=render_plot_review_surface_for_workspace,
             render_projection_grid=render_projection_grid_for_workspace,
             render_rowwise_distribution=render_rowwise_distribution,
         ),

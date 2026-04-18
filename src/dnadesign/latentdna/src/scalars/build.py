@@ -16,6 +16,7 @@ from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..io.json_io import read_json, write_json
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_table, write_table
+from ..labels import humanize_label
 from ..metrics.definitions import resolve_metric_definition, validate_metric_registry
 from ..sources.resolver import read_records_table, resolve_source
 from ..views.materialize import _promoter_metadata_value
@@ -1417,78 +1418,119 @@ def build_scalar_artifact(
         source_ids = [
             str(value) for value in _optional_param(params, "source_ids", default=list(context.config.sources))
         ]
-        reference_set_id = _optional_param(params, "reference_set_id", default=None)
+        if not source_ids:
+            raise ContractViolationError("dataset_overview requires at least one source")
+
+        def _dataset_category_label(dimension: str, category: str) -> str:
+            if dimension == "sig35_variant" and category != "control":
+                return f"Variant {category}"
+            return humanize_label(category)
+
+        dimension_specs = [
+            (
+                "provenance",
+                "Provenance",
+                "source_class",
+                [("densegen", 1), ("manual_or_wildtype", 2)],
+            ),
+            (
+                "generation_plan",
+                "Generation plan",
+                "design_family",
+                [
+                    ("background_only", 1),
+                    ("ethanol", 2),
+                    ("ciprofloxacin", 3),
+                    ("ethanol_ciprofloxacin", 4),
+                    ("control", 5),
+                ],
+            ),
+            (
+                "sig35_variant",
+                "Sigma-35 variant",
+                "sig35_variant",
+                [("f", 1), ("d", 2), ("e", 3), ("b", 4), ("c", 5), ("control", 6)],
+            ),
+        ]
         output_rows: list[dict[str, object]] = []
         inputs: list[ScalarInputRef] = []
+        canonical_subject_keys: set[object] | None = None
+        denominator: int | None = None
+        canonical_counts: dict[str, Counter[str]] = {}
         for source_id in source_ids:
             source = context.require_source(source_id)
             resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
-            required_columns = [
-                source.record_key,
-                "usr_label__primary",
-                "densegen__plan",
-                "densegen__required_regulators",
-            ]
-            if reference_set_id is not None and source_id == source_ids[0]:
-                reference_set = context.config.reference_sets[str(reference_set_id)]
-                required_columns.append(reference_set.match_column)
+            population_key = source.subject_key or source.record_key
+            required_columns = list(
+                dict.fromkeys(
+                    [
+                        source.record_key,
+                        population_key,
+                        "usr_label__primary",
+                        "densegen__plan",
+                        "densegen__required_regulators",
+                    ]
+                )
+            )
             table = read_records_table(resolved, columns=required_columns)
             inputs.append(ScalarInputRef(kind="source", artifact_id=source_id, path=resolved.records_path))
             row_dicts = table.to_pylist()
-            output_rows.append(
-                {"category": "scope", "label": source_id, "row_count": len(row_dicts), "source_id": source_id}
-            )
-            for derive_name in ("design_family", "design_regulator_composition", "sig35_variant", "source_class"):
-                counts = Counter(str(_promoter_metadata_value(row, derive=derive_name)) for row in row_dicts)
-                for label, count in sorted(counts.items()):
-                    output_rows.append(
-                        {
-                            "category": derive_name,
-                            "label": label,
-                            "row_count": int(count),
-                            "source_id": source_id,
-                        }
+            source_subject_keys = {row[population_key] for row in row_dicts}
+            if denominator is None:
+                denominator = len(row_dicts)
+                canonical_subject_keys = source_subject_keys
+            else:
+                if len(row_dicts) != denominator:
+                    raise ContractViolationError(
+                        f"dataset_overview requires one shared denominator; {source_id!r} has {len(row_dicts)} rows "
+                        f"but the canonical source has {denominator}"
                     )
-            for view_id, view in context.config.views.items():
-                if getattr(view, "source", None) != source_id:
-                    continue
-                tags = dict(getattr(view, "tags", {}) or {})
+                if source_subject_keys != canonical_subject_keys:
+                    raise ContractViolationError(
+                        f"dataset_overview requires aligned promoter populations; {source_id!r} does not match "
+                        "the canonical source row set"
+                    )
+            source_counts = {
+                dimension: Counter(str(_promoter_metadata_value(row, derive=derive_name)) for row in row_dicts)
+                for dimension, _, derive_name, _ in dimension_specs
+            }
+            if not canonical_counts:
+                canonical_counts = source_counts
+                continue
+            for dimension, counts in source_counts.items():
+                if counts != canonical_counts[dimension]:
+                    raise ContractViolationError(
+                        f"dataset_overview requires matching cohort partitions across sources; {source_id!r} "
+                        f"does not match the canonical counts for {dimension!r}"
+                    )
+
+        assert denominator is not None
+        for dimension, dimension_label, _, category_order in dimension_specs:
+            counts = canonical_counts[dimension]
+            dimension_total = sum(int(counts.get(category, 0)) for category, _ in category_order)
+            if dimension_total != denominator:
+                raise ContractViolationError(
+                    f"dataset_overview dimension {dimension!r} sums to {dimension_total}, expected {denominator}"
+                )
+            for category, order in category_order:
+                count = int(counts.get(category, 0))
+                fraction = count / float(denominator)
                 output_rows.append(
                     {
-                        "category": "scope_model_family",
-                        "label": " ".join(
-                            [
-                                str(tags.get("family", "unknown")),
-                                str(tags.get("model", "unknown")),
-                                str(tags.get("scope", source_id)),
-                            ]
-                        ),
-                        "row_count": len(row_dicts),
-                        "source_id": source_id,
+                        "dimension": dimension,
+                        "dimension_label": dimension_label,
+                        "category": category,
+                        "category_label": _dataset_category_label(dimension, category),
+                        "count": count,
+                        "denominator": denominator,
+                        "fraction": fraction,
+                        "percent": fraction * 100.0,
+                        "order": order,
                     }
                 )
-            if reference_set_id is not None and source_id == source_ids[0]:
-                reference_set = context.config.reference_sets[str(reference_set_id)]
-                match_column = reference_set.match_column
-                if match_column not in table.column_names:
-                    raise ContractViolationError(
-                        f"dataset_overview reference_set column {match_column!r} is missing from source {source_id!r}"
-                    )
-                present_ids = {str(value) for value in table[match_column].combine_chunks().to_pylist()}
-                display_labels = dict(getattr(reference_set, "display_labels", {}) or {})
-                for raw_id in reference_set.ids:
-                    raw_text = str(raw_id)
-                    output_rows.append(
-                        {
-                            "category": "wildtype_reference",
-                            "label": str(display_labels.get(raw_text, raw_text)),
-                            "row_count": 1 if raw_text in present_ids else 0,
-                            "source_id": source_id,
-                        }
-                    )
         table = pa.Table.from_pylist(output_rows)
         write_table(table, artifact_dir / "table.parquet")
-        stats = {"rows": table.num_rows, "sources": len(source_ids)}
+        stats = {"rows": table.num_rows, "sources": len(source_ids), "denominator": denominator}
         return BuiltScalarArtifact(
             artifact_dir=artifact_dir,
             rows=table.num_rows,

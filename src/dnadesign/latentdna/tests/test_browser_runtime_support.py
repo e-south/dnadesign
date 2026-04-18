@@ -12,6 +12,7 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     candidate_hue_columns,
     category_color_map,
     classify_hue_series,
+    draw_reference_labels,
     key_value_table,
     normalize_hue_kind,
     notebook_theme,
@@ -144,6 +145,44 @@ def test_render_plot_asset_wraps_svg_as_data_uri_image(tmp_path: Path) -> None:
     assert "latentdna-plot-asset" in rendered.text
 
 
+def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:
+    frame = pd.DataFrame(
+        {
+            "usr_label__primary": ["spyp", "background_only"],
+            "wildtype_margin_ethanol_vs_control": [0.4, -0.2],
+            "wildtype_margin_cipro_vs_control": [0.25, -0.1],
+        }
+    )
+    fig, ax = plt.subplots()
+
+    draw_reference_labels(
+        ax,
+        frame,
+        reference_labels=["spyp"],
+        x_column="wildtype_margin_ethanol_vs_control",
+        y_column="wildtype_margin_cipro_vs_control",
+    )
+
+    assert len(ax.collections) == 1
+    assert any(text.get_text() == "spyP" for text in ax.texts)
+
+
+def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> None:
+    frame = pd.DataFrame({"usr_label__primary": ["spyp"], "other_metric": [0.4]})
+    fig, ax = plt.subplots()
+
+    draw_reference_labels(
+        ax,
+        frame,
+        reference_labels=["spyp"],
+        x_column="wildtype_margin_ethanol_vs_control",
+        y_column="wildtype_margin_cipro_vs_control",
+    )
+
+    assert len(ax.collections) == 0
+    assert len(ax.texts) == 0
+
+
 def test_key_value_table_formats_summary_values() -> None:
     table = key_value_table([("Deliverables", 7), ("Families", ["intermediate_embedding", "pooled_logits"])])
 
@@ -181,8 +220,9 @@ def test_wrap_plot_title_breaks_long_titles_without_splitting_words() -> None:
     wrapped = wrap_plot_title("intermediate embedding 20b full context 1 kb", width=18)
 
     assert "\n" in wrapped
-    assert "intermediate" in wrapped
-    assert wrapped.endswith("...")
+    assert "Intermediate" in wrapped
+    assert "Construct Context" in wrapped
+    assert "..." not in wrapped
 
 
 def test_classify_hue_series_treats_boolean_values_as_categorical() -> None:

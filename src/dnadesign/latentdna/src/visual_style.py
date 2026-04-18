@@ -4,9 +4,12 @@ Shared visual style primitives for latentdna plots and notebooks.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from textwrap import shorten, wrap
+from textwrap import wrap
+
+from .labels import humanize_label
 
 TEXT_COLOR = "#16202A"
 GRID_COLOR = "#D5DCE4"
@@ -22,11 +25,11 @@ DEFAULT_PLOT_PNG_DPI = 300
 DEFAULT_NOTEBOOK_FIG_DPI = 220
 
 PLOT_SUPTITLE_FONT_SIZE = 15.5
-PLOT_TITLE_FONT_SIZE = 13.0
-PLOT_LABEL_FONT_SIZE = 12.0
-PLOT_TICK_FONT_SIZE = 11.0
-PLOT_LEGEND_FONT_SIZE = 9.5
-PLOT_LEGEND_TITLE_SIZE = 11.0
+PLOT_TITLE_FONT_SIZE = 13.75
+PLOT_LABEL_FONT_SIZE = 12.5
+PLOT_TICK_FONT_SIZE = 11.5
+PLOT_LEGEND_FONT_SIZE = 11.5
+PLOT_LEGEND_TITLE_SIZE = 11.5
 
 PUBLICATION_PALETTE = [
     "#0072B2",
@@ -115,14 +118,21 @@ def scatter_style(row_count: int) -> ScatterStyle:
     return ScatterStyle(point_size=1.7, alpha=0.15, edgecolors="none", linewidths=0.0, rasterized=True)
 
 
+def humanize_display_text(value: object) -> str:
+    text = " ".join(str(value or "").split())
+    if not text:
+        return ""
+    normalized = text
+    if normalized.startswith("log_likelihood_per_token_"):
+        normalized = normalized.replace("log_likelihood_per_token_", "log likelihood per token ")
+    normalized = re.sub(r"\becdf\b", "ECDF", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\s+", " ", normalized).strip(" -")
+    return humanize_label(normalized)
+
+
 def wrap_plot_title(title: object, *, width: int = 28, max_lines: int = 2) -> str:
-    text = " ".join(str(title or "").split())
+    text = humanize_display_text(title)
     if not text:
         return ""
     lines = wrap(text, width=max(width, 10), break_long_words=False, break_on_hyphens=False)
-    if max_lines <= 0 or len(lines) <= max_lines:
-        return "\n".join(lines)
-    visible = lines[:max_lines]
-    trailing = " ".join(lines[max_lines - 1 :])
-    visible[-1] = shorten(trailing, width=max(width, 10), placeholder="...")
-    return "\n".join(visible)
+    return "\n".join(lines)

@@ -108,7 +108,13 @@ def render_selector_cells() -> tuple[str, ...]:
                     if str(_geometry.geometry_control.get("default_family")) in family_values
                     else family_values[0]
                 )
-                _family_options = {value.replace("_", " "): value for value in family_values}
+                _family_options = {
+                    {
+                        "intermediate_embedding": "Intermediate block mean",
+                        "pooled_logits": "Output-layer mean",
+                    }.get(value, value.replace("_", " ")): value
+                    for value in family_values
+                }
                 family_selector = _support.mo.ui.dropdown(
                     options=_family_options,
                     value=(
@@ -140,8 +146,8 @@ def render_selector_cells() -> tuple[str, ...]:
                 )
                 _context_options = {
                     {
-                        "anchor_60bp": "60 bp anchor-only",
-                        "full_context_1kb": "1 kb expanded context",
+                        "anchor_60bp": "60 bp anchor",
+                        "full_context_1kb": "1 kb construct context",
                     }.get(value, value.replace("_", " ")): value
                     for value in context_values
                 }

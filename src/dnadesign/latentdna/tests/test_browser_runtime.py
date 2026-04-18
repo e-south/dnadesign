@@ -24,13 +24,11 @@ Guide text.
 
 ### reference_neighbor_evidence | Reference-neighbor evidence
 
-#### Why this plot exists
+#### Plot details
 
-Neighbor evidence details.
+**Data.** Neighbor evidence details.
 
-#### How to read it
-
-Read the neighborhood metrics directly.
+**Definition.** Read the neighborhood metrics directly.
 """
 
     parsed = _parse_deliverable_markdown(markdown)
@@ -43,6 +41,7 @@ Read the neighborhood metrics directly.
     assert parsed["summary_markdown"] == "Short deliverable summary."
     assert block["title"] == "Reference-neighbor evidence"
     assert "Neighbor evidence details." in str(block["markdown"])
+    assert "**Data.** Neighbor evidence details." in block["plot_details_md"]
     assert block["warning"] is None
 
 
@@ -63,8 +62,9 @@ Deliverable context.
         parsed_markdown=parsed,
     )
 
-    assert block["title"] == "Context Geometry Summary"
+    assert block["title"] == "Context stability summary"
     assert block["markdown"] == "Deliverable fallback summary."
+    assert block["plot_details_md"] == "Deliverable fallback summary."
     assert block["warning"] == "Missing plot-specific study-doc subsection for `context_geometry_summary`."
 
 

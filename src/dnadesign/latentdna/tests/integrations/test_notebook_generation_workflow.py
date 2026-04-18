@@ -313,7 +313,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     notebook_text = notebook_path.read_text(encoding="utf-8")
     assert "import marimo" in notebook_text
     assert "__generated_with" in notebook_text
-    assert 'app = marimo.App(width="full")' in notebook_text
+    assert 'app = marimo.App(width="medium")' in notebook_text
     assert "Atlas workspace notebook" in notebook_text
     assert "load_workspace_notebook_controls(CONTROL_PATH)" in notebook_text
     assert "build_workspace_browser_runtime(" in notebook_text
@@ -331,7 +331,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "parents[3]" not in notebook_text
     assert 'label="Section"' not in notebook_text
     assert 'label="Deliverable"' not in notebook_text
-    assert 'label="Plot"' not in notebook_text
+    assert 'label="Plot"' in notebook_text
     assert 'label="Model"' in notebook_text
     assert 'label="Family"' in notebook_text
     assert 'label="Context"' in notebook_text
@@ -343,10 +343,17 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "Plots" in notebook_text
     assert "Geometry audit" in notebook_text
     assert "Comparison audit" in notebook_text
-    assert "value=default_tab" in notebook_text
+    assert "mo.state(default_tab)" in notebook_text
+    assert "value=active_top_tab" in notebook_text
+    assert "on_change=set_active_top_tab" in notebook_text
     assert "lazy=True" in notebook_text
-    assert "This notebook is for reviewing generated representation-comparison plots" in notebook_text
-    assert "Geometry and Comparison are secondary audit views." in notebook_text
+    assert "This notebook is a downstream LatentDNA comparison surface over the current " in notebook_text
+    assert "`infer_batch_preparation` study snapshot." in notebook_text
+    assert "Point positions are fixed by the saved coordinates" in notebook_text
+    assert "Jump list:" not in notebook_text
+    assert "mo.accordion(" in notebook_text
+    assert "Deliverable: **" not in notebook_text
+    assert "_badge =" not in notebook_text
     assert "Overview" not in notebook_text
     assert "Catalog" not in notebook_text
     assert (notebook_dir / "manifest.json").is_file()

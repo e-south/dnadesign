@@ -16,6 +16,7 @@ import pyarrow.parquet as pq
 from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec
 from ..contracts.plot_semantics import PlotSemantics
+from ..labels import humanize_candidate
 from ..visual_style import (
     DEFAULT_PLOT_PNG_DPI,
     GRID_COLOR,
@@ -23,7 +24,6 @@ from ..visual_style import (
     PLOT_FONT_FAMILY,
     PLOT_LABEL_FONT_SIZE,
     PLOT_LEGEND_FONT_SIZE,
-    PLOT_LEGEND_TITLE_SIZE,
     PLOT_TICK_FONT_SIZE,
     PLOT_TITLE_FONT_SIZE,
     PUBLICATION_PALETTE,
@@ -31,6 +31,7 @@ from ..visual_style import (
     TEXT_COLOR,
     ZERO_LINE_COLOR,
     categorical_color_map,
+    humanize_display_text,
     ordered_categories,
     scatter_style,
     wrap_plot_title,
@@ -88,6 +89,18 @@ def _shape_marker_map(row_groups: list[list[dict]], column: str | None) -> tuple
     return shape_map, categories
 
 
+def _effective_shape_column(spec: ResolvedPlotSpec) -> str | None:
+    if spec.hue_options and spec.kind in {
+        "projection_scatter",
+        "projection_grid",
+        "xy_scatter",
+        "xy_scatter_grid",
+        "paired_xy_scatter_grid",
+    }:
+        return None
+    return spec.shape_column
+
+
 def _table_rows(table_path: Path) -> list[dict]:
     return pq.read_table(table_path).to_pylist()
 
@@ -107,6 +120,40 @@ def _secondary_numeric_column(table: pa.Table, *, primary: str) -> str:
     raise ContractViolationError(
         f"plot rendering requires at least two numeric columns when {primary!r} is used as the first axis"
     )
+
+
+def _candidate_row_label(
+    row: dict[str, object],
+    *,
+    fallback_column: str,
+    include_family: bool = True,
+) -> str:
+    candidate_fields = {
+        key: str(row.get(key) or "").strip()
+        for key in ("candidate_model", "candidate_scope", "candidate_family")
+        if str(row.get(key) or "").strip()
+    }
+    if not include_family:
+        candidate_fields.pop("candidate_family", None)
+    if candidate_fields:
+        return humanize_candidate(candidate_fields)
+    return humanize_display_text(str(row.get(fallback_column) or ""))
+
+
+def _derived_panel_label(identifier: str) -> str:
+    candidate_key = str(identifier or "")
+    for prefix in (
+        "context_geometry_metrics_",
+        "wildtype_reference_margins_",
+        "synthetic_centroid_margins_",
+        "tradeoff_",
+        "pca_",
+    ):
+        if candidate_key.startswith(prefix):
+            candidate_key = candidate_key[len(prefix) :]
+            break
+    candidate_key = candidate_key.replace("_anchor_to_full_context", "")
+    return humanize_candidate(candidate_key)
 
 
 def _apply_axes_style(ax: Any, *, grid: bool, square: bool = False) -> None:
@@ -139,12 +186,11 @@ def _style_legend(legend: Any) -> None:
         return
     title = legend.get_title()
     if title is not None:
-        title.set_fontsize(PLOT_LEGEND_TITLE_SIZE)
-        title.set_fontweight("semibold")
-        title.set_color(TEXT_COLOR)
+        title.set_visible(False)
     for text in legend.get_texts():
         text.set_fontsize(PLOT_LEGEND_FONT_SIZE)
         text.set_color(TEXT_COLOR)
+        text.set_fontfamily(PLOT_FONT_FAMILY)
 
 
 def _legend_handles(plt: Any, categories: list[str], color_map: dict[str, str]) -> list[Any]:
@@ -158,7 +204,7 @@ def _legend_handles(plt: Any, categories: list[str], color_map: dict[str, str]) 
             color=color_map[category],
             markeredgecolor="white",
             markeredgewidth=0.35,
-            label=category,
+            label=humanize_display_text(category),
         )
         for category in categories
     ]
@@ -175,7 +221,7 @@ def _shape_legend_handles(plt: Any, categories: list[str], shape_map: dict[str, 
             markerfacecolor="#7A8794",
             markeredgecolor="#111111",
             color="#7A8794",
-            label=category,
+            label=humanize_display_text(category),
         )
         for category in categories
     ]
@@ -245,7 +291,6 @@ def _add_axis_legends(
     if color_categories and color_title is not None:
         color_legend = ax.legend(
             handles=_legend_handles(plt, color_categories, color_map),
-            title=color_title,
             frameon=False,
             loc="upper left",
         )
@@ -255,7 +300,6 @@ def _add_axis_legends(
             ax.add_artist(color_legend)
         shape_legend = ax.legend(
             handles=_shape_legend_handles(plt, shape_categories, shape_map),
-            title=shape_title,
             frameon=False,
             loc="lower right",
         )
@@ -273,46 +317,29 @@ def _add_figure_legends(
     shape_map: dict[str, str],
     shape_title: str | None,
 ) -> float:
-    legend_specs: list[tuple[list[Any], str, int, int]] = []
+    legend_specs: list[list[Any]] = []
     if color_categories and color_title is not None:
-        color_columns = min(max(len(color_categories), 1), 4)
-        legend_specs.append(
-            (
-                _legend_handles(plt, color_categories, color_map),
-                color_title,
-                color_columns,
-                int(math.ceil(len(color_categories) / color_columns)),
-            )
-        )
+        legend_specs.append(_legend_handles(plt, color_categories, color_map))
     if shape_categories and shape_title is not None:
-        shape_columns = min(max(len(shape_categories), 1), 4)
-        legend_specs.append(
-            (
-                _shape_legend_handles(plt, shape_categories, shape_map),
-                shape_title,
-                shape_columns,
-                int(math.ceil(len(shape_categories) / shape_columns)),
-            )
-        )
+        legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
     if not legend_specs:
         return 0.0
 
-    legend_y = 0.015
-    for handles, title, columns, rows in legend_specs:
+    legend_y = 0.012
+    for handles in legend_specs:
         legend = fig.legend(
             handles=handles,
-            title=title,
             loc="lower center",
             bbox_to_anchor=(0.5, legend_y),
-            ncol=columns,
+            ncol=max(1, len(handles)),
             frameon=False,
             borderaxespad=0.0,
-            columnspacing=1.15,
+            columnspacing=0.95,
             handletextpad=0.45,
         )
         _style_legend(legend)
-        legend_y += 0.055 + (0.038 * max(rows - 1, 0))
-    return min(max(legend_y + 0.022, 0.11), 0.28)
+        legend_y += 0.055
+    return min(max(legend_y + 0.014, 0.1), 0.18)
 
 
 def _selected_label_rows(rows: list[dict], *, label_column: str | None, label_values: list[str]) -> list[dict]:
@@ -580,18 +607,44 @@ def _agreement_summary_metrics(summary: dict[str, object]) -> list[tuple[str, fl
 
 
 def _panel_grid_dimensions(panel_count: int) -> tuple[int, int]:
-    columns = min(2, max(1, panel_count))
+    if panel_count <= 1:
+        return 1, 1
+    if panel_count == 4:
+        return 2, 2
+    if panel_count == 8:
+        return 2, 4
+    columns = min(4, max(1, int(math.ceil(math.sqrt(panel_count)))))
     rows = int(np.ceil(panel_count / columns))
     return rows, columns
 
 
 def _grid_figure_size(panel_count: int, *, square_panels: bool) -> tuple[float, float]:
     if panel_count <= 1:
-        return (5.5, 5.15 if square_panels else 4.85)
+        return (5.15, 5.0 if square_panels else 4.7)
     rows, columns = _panel_grid_dimensions(panel_count)
-    panel_width = 4.55
-    panel_height = 4.2 if square_panels else 3.92
+    panel_width = 4.15 if columns >= 4 else 4.3
+    panel_height = 4.35 if square_panels else 4.05
     return (panel_width * columns, panel_height * rows)
+
+
+def _scatter_axis_label(
+    rows: list[dict[str, object]],
+    *,
+    resolved_column: str,
+    display_column: str,
+) -> str:
+    labels = {str(row.get(display_column) or "").strip() for row in rows if str(row.get(display_column) or "").strip()}
+    if len(labels) == 1:
+        return humanize_display_text(next(iter(labels)))
+    return humanize_display_text(resolved_column)
+
+
+def _wrapped_tick_label(value: object, *, width: int = 16) -> str:
+    return wrap_plot_title(humanize_display_text(str(value)), width=width)
+
+
+def _wrapped_axis_label(value: object, *, width: int = 22) -> str:
+    return wrap_plot_title(humanize_display_text(str(value)), width=width)
 
 
 def _render_xy_panel(
@@ -637,7 +690,7 @@ def _render_xy_panel(
             resolved_y=resolved_y,
             color_column=spec.color_column,
             color_map=color_map,
-            shape_column=spec.shape_column,
+            shape_column=_effective_shape_column(spec),
             shape_map=shape_map,
             point_size=point_style.point_size,
             alpha=point_style.alpha,
@@ -646,8 +699,12 @@ def _render_xy_panel(
             linewidths=point_style.linewidths,
         )
     _add_zero_reference_lines(ax, x_values=x_values, y_values=y_values)
-    ax.set_xlabel(resolved_x)
-    ax.set_ylabel(resolved_y)
+    ax.set_xlabel(
+        _wrapped_axis_label(_scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"))
+    )
+    ax.set_ylabel(
+        _wrapped_axis_label(_scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"))
+    )
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
     _apply_axes_style(ax, grid=True, square=True)
     selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(context, rows, spec=spec)
@@ -723,6 +780,7 @@ def _render_distribution_panel(
     color_column: str | None,
     render_mode: str,
     panel_title: str,
+    square: bool = False,
 ) -> None:
     values = np.asarray([float(row[metric_column]) for row in rows], dtype=np.float32)
     bin_count = max(5, min(30, int(np.sqrt(values.size)) + 1))
@@ -747,11 +805,11 @@ def _render_distribution_panel(
                     category_values,
                     cumulative,
                     where="post",
-                    label=category,
+                    label=humanize_display_text(category),
                     color=PUBLICATION_PALETTE[index % len(PUBLICATION_PALETTE)],
                     linewidth=2.0,
                 )
-            legend = ax.legend(title=color_column, frameon=False)
+            legend = ax.legend(frameon=False)
             _style_legend(legend)
         ax.set_ylabel("ECDF")
     elif render_mode == "violin_box":
@@ -761,7 +819,7 @@ def _render_distribution_panel(
                 body.set_facecolor(PUBLICATION_PALETTE[0])
                 body.set_alpha(0.5)
             ax.boxplot([values], widths=0.18)
-            ax.set_xticks([1], [metric_column])
+            ax.set_xticks([1], [humanize_display_text(metric_column)])
         else:
             if rows and color_column not in rows[0]:
                 raise ContractViolationError(f"distribution color column is missing: {color_column!r}")
@@ -778,8 +836,13 @@ def _render_distribution_panel(
                 body.set_facecolor(PUBLICATION_PALETTE[index % len(PUBLICATION_PALETTE)])
                 body.set_alpha(0.45)
             ax.boxplot(grouped_values, widths=0.18)
-            ax.set_xticks(range(1, len(categories) + 1), categories, rotation=25, ha="right")
-        ax.set_ylabel(metric_column)
+            ax.set_xticks(
+                range(1, len(categories) + 1),
+                [humanize_display_text(category) for category in categories],
+                rotation=25,
+                ha="right",
+            )
+        ax.set_ylabel(_wrapped_axis_label(humanize_display_text(metric_column), width=18))
     else:
         if color_column is None:
             ax.hist(values, bins=bin_count, color=PUBLICATION_PALETTE[0], edgecolor="white", alpha=0.9)
@@ -796,16 +859,16 @@ def _render_distribution_panel(
                     category_values,
                     bins=bin_count,
                     alpha=0.55,
-                    label=category,
+                    label=humanize_display_text(category),
                     color=PUBLICATION_PALETTE[index % len(PUBLICATION_PALETTE)],
                     edgecolor="white",
                 )
-            legend = ax.legend(title=color_column, frameon=False)
+            legend = ax.legend(frameon=False)
             _style_legend(legend)
         ax.set_ylabel("Count")
-    ax.set_xlabel(metric_column)
+    ax.set_xlabel(_wrapped_axis_label(metric_column, width=20))
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
-    _apply_axes_style(ax, grid=True)
+    _apply_axes_style(ax, grid=True, square=square)
 
 
 def _metric_axis_label(
@@ -813,7 +876,16 @@ def _metric_axis_label(
     rows: list[dict[str, object]],
     spec: ResolvedPlotSpec,
 ) -> str:
-    base_label = spec.value_label or spec.value_column or "metric value"
+    base_source = str(spec.value_label or spec.value_column or "metric value")
+    if base_source.strip().casefold() == "metric value" and spec.panel_column is not None:
+        panel_labels = {
+            str(row.get(spec.panel_column) or "").strip()
+            for row in rows
+            if str(row.get(spec.panel_column) or "").strip()
+        }
+        if len(panel_labels) == 1:
+            base_source = next(iter(panel_labels))
+    base_label = humanize_display_text(base_source)
     if spec.unit_column is None:
         return base_label
     units = {
@@ -822,7 +894,7 @@ def _metric_axis_label(
     if len(units) != 1:
         return base_label
     unit = next(iter(units))
-    return f"{base_label} ({unit})"
+    return f"{base_label} ({humanize_display_text(unit)})"
 
 
 def _sorted_metric_rows(rows: list[dict[str, object]], *, spec: ResolvedPlotSpec) -> list[dict[str, object]]:
@@ -850,6 +922,7 @@ def _render_metric_panel(
     spec: ResolvedPlotSpec,
     panel_title: str,
     color_map: dict[str, str],
+    square: bool = False,
 ) -> None:
     if spec.value_column is None:
         raise ContractViolationError("metric_panel_grid rendering requires value_column")
@@ -857,50 +930,134 @@ def _render_metric_panel(
     if label_column is None:
         raise ContractViolationError("metric_panel_grid rendering requires label_column")
     ordered_rows = _sorted_metric_rows(rows, spec=spec)
-    labels = [str(row.get(label_column) or row.get(spec.column_column or label_column) or "") for row in ordered_rows]
+    include_family = not (spec.color_column == "candidate_family")
+    label_width = 11 if include_family else 10
+    labels = [
+        _wrapped_tick_label(
+            _candidate_row_label(
+                row,
+                fallback_column=label_column,
+                include_family=include_family,
+            ),
+            width=label_width,
+        )
+        for row in ordered_rows
+    ]
     values = np.asarray([float(row[spec.value_column]) for row in ordered_rows], dtype=np.float64)
+    grouped_family_bars = (
+        spec.color_column == "candidate_family"
+        and all(str(row.get("candidate_model") or "").strip() for row in ordered_rows)
+        and all(str(row.get("candidate_scope") or "").strip() for row in ordered_rows)
+    )
     if spec.color_column is not None:
         if ordered_rows and spec.color_column not in ordered_rows[0]:
             raise ContractViolationError(f"metric_panel_grid color column is missing: {spec.color_column!r}")
         bar_colors = [color_map[str(row[spec.color_column])] for row in ordered_rows]
     else:
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
-    positions = np.arange(len(ordered_rows), dtype=float)
-    bars = ax.barh(
-        positions,
-        values,
-        color=bar_colors,
-        edgecolor="white",
-        linewidth=0.6,
-        alpha=0.92,
-    )
-    ax.set_yticks(positions, labels)
-    ax.invert_yaxis()
+
+    bar_value_pairs: list[tuple[Any, float]] = []
+    if grouped_family_bars:
+        family_order = ordered_categories([str(row["candidate_family"]) for row in ordered_rows])
+        group_keys = list(
+            dict.fromkeys(
+                (
+                    str(row["candidate_model"]),
+                    str(row["candidate_scope"]),
+                )
+                for row in ordered_rows
+            )
+        )
+        group_labels = [
+            _wrapped_tick_label(
+                humanize_candidate({"candidate_model": model, "candidate_scope": scope}),
+                width=10,
+            )
+            for model, scope in group_keys
+        ]
+        group_positions = np.arange(len(group_keys), dtype=float)
+        group_width = min(0.78, 0.32 * max(len(family_order), 1))
+        bar_width = group_width / max(len(family_order), 1)
+        offsets = np.linspace(
+            -(group_width / 2.0) + (bar_width / 2.0),
+            (group_width / 2.0) - (bar_width / 2.0),
+            max(len(family_order), 1),
+        )
+        for family, offset in zip(family_order, offsets, strict=False):
+            family_rows = {
+                (str(row["candidate_model"]), str(row["candidate_scope"])): row
+                for row in ordered_rows
+                if str(row["candidate_family"]) == family
+            }
+            family_positions: list[float] = []
+            family_values: list[float] = []
+            for group_position, group_key in zip(group_positions, group_keys, strict=False):
+                row = family_rows.get(group_key)
+                if row is None:
+                    continue
+                family_positions.append(float(group_position + offset))
+                family_values.append(float(row[spec.value_column]))
+            family_bars = ax.bar(
+                family_positions,
+                family_values,
+                width=bar_width * 0.9,
+                color=color_map[family],
+                edgecolor="white",
+                linewidth=0.6,
+                alpha=0.92,
+            )
+            bar_value_pairs.extend(zip(family_bars, family_values, strict=True))
+        ax.set_xticks(group_positions, group_labels)
+    else:
+        positions = np.arange(len(ordered_rows), dtype=float)
+        bars = ax.bar(
+            positions,
+            values,
+            color=bar_colors,
+            edgecolor="white",
+            linewidth=0.6,
+            alpha=0.92,
+        )
+        bar_value_pairs.extend(zip(bars, values, strict=True))
+        ax.set_xticks(positions, labels)
+    ax.tick_params(axis="x", pad=6)
     if spec.reference_line is not None:
-        ax.axvline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+        ax.axhline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
     if values.size and float(values.min()) < 0.0 < float(values.max()):
-        ax.axvline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
-    ax.set_xlabel(_metric_axis_label(rows=ordered_rows, spec=spec))
-    ax.set_ylabel("")
+        ax.axhline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+    ax.set_xlabel("")
+    ax.set_ylabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=20))
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
-    _apply_axes_style(ax, grid=True)
+    _apply_axes_style(ax, grid=True, square=square)
     span = float(values.max() - values.min()) if values.size else 0.0
-    offset = max(span * 0.02, 0.02) if span > 0 else 0.02
-    for bar, value in zip(bars, values, strict=True):
-        x_text = value + offset if value >= 0 else value - offset
-        ha = "left" if value >= 0 else "right"
+    offset = max(span * 0.04, 0.02) if span > 0 else 0.02
+    low = min(0.0, float(values.min())) if values.size else 0.0
+    high = max(0.0, float(values.max())) if values.size else 1.0
+    padding = max((high - low) * 0.16, 0.06)
+    ax.set_ylim(low - padding, high + padding)
+    for bar, value in bar_value_pairs:
+        y_text = value + offset if value >= 0 else value - offset
+        va = "bottom" if value >= 0 else "top"
         ax.text(
-            x_text,
-            bar.get_y() + (bar.get_height() / 2.0),
+            bar.get_x() + (bar.get_width() / 2.0),
+            y_text,
             f"{value:.3g}",
-            va="center",
-            ha=ha,
+            va=va,
+            ha="center",
             fontsize=9,
             color=TEXT_COLOR,
         )
 
 
-def _render_curve_panel(ax: Any, *, reducer_id: str, summary: dict[str, object], panel_title: str) -> None:
+def _render_curve_panel(
+    ax: Any,
+    *,
+    reducer_id: str,
+    summary: dict[str, object],
+    panel_title: str,
+    square: bool = False,
+    show_legend: bool = True,
+) -> None:
     ratios = summary.get("explained_variance_ratio")
     if not isinstance(ratios, list) or not ratios:
         raise ContractViolationError(f"curve rendering requires explained_variance_ratio for {reducer_id}")
@@ -920,9 +1077,10 @@ def _render_curve_panel(ax: Any, *, reducer_id: str, summary: dict[str, object],
     ax.set_ylabel("Variance ratio")
     ax.set_ylim(0.0, max(1.0, float(cumulative.max()) * 1.05))
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
-    legend = ax.legend(frameon=False)
-    _style_legend(legend)
-    _apply_axes_style(ax, grid=True)
+    if show_legend:
+        legend = ax.legend(frameon=False)
+        _style_legend(legend)
+    _apply_axes_style(ax, grid=True, square=square)
 
 
 def _inject_svg_accessibility(output_path: Path, *, semantics: PlotSemantics) -> None:
@@ -1046,10 +1204,15 @@ def render_plot_artifact(
 
         fig, ax = plt.subplots(figsize=(2 + 1.5 * len(column_values), 1.5 + 1.2 * len(row_values)))
         image = ax.imshow(grid, cmap="PuOr", norm=norm, aspect="auto")
-        ax.set_xticks(range(len(column_values)), column_values, rotation=30, ha="right")
-        ax.set_yticks(range(len(row_values)), row_values)
-        ax.set_xlabel(column_column)
-        ax.set_ylabel(row_column)
+        ax.set_xticks(
+            range(len(column_values)),
+            [humanize_display_text(value) for value in column_values],
+            rotation=30,
+            ha="right",
+        )
+        ax.set_yticks(range(len(row_values)), [humanize_display_text(value) for value in row_values])
+        ax.set_xlabel(humanize_display_text(column_column))
+        ax.set_ylabel(humanize_display_text(row_column))
         ax.set_title(wrap_plot_title(spec.plot_id, width=24), pad=8)
         for row_index_value in range(len(row_values)):
             for column_index_value in range(len(column_values)):
@@ -1086,7 +1249,8 @@ def render_plot_artifact(
         rows = _table_rows(table_path)
         fig, ax = plt.subplots(figsize=_grid_figure_size(1, square_panels=True))
         color_map, categories = _category_color_map([rows], spec.color_column)
-        shape_map, shape_categories = _shape_marker_map([rows], spec.shape_column)
+        effective_shape_column = _effective_shape_column(spec)
+        shape_map, shape_categories = _shape_marker_map([rows], effective_shape_column)
         annotation_state = _render_xy_panel(
             ax,
             rows,
@@ -1110,7 +1274,7 @@ def render_plot_artifact(
                 color_title=spec.color_column,
                 shape_categories=shape_categories,
                 shape_map=shape_map,
-                shape_title=spec.shape_column,
+                shape_title=effective_shape_column,
             )
     elif spec.kind in {"xy_scatter_grid", "paired_xy_scatter_grid"}:
         scalar_tables: list[tuple[str, list[dict[str, object]], str, str]] = []
@@ -1134,7 +1298,11 @@ def render_plot_artifact(
             squeeze=False,
         )
         color_map, categories = _category_color_map([rows for _, rows, _, _ in scalar_tables], spec.color_column)
-        shape_map, shape_categories = _shape_marker_map([rows for _, rows, _, _ in scalar_tables], spec.shape_column)
+        effective_shape_column = _effective_shape_column(spec)
+        shape_map, shape_categories = _shape_marker_map(
+            [rows for _, rows, _, _ in scalar_tables],
+            effective_shape_column,
+        )
         titles = spec.panel_titles or [scalar_id for scalar_id, _, _, _ in scalar_tables]
         for axis in axes.ravel()[len(scalar_tables) :]:
             axis.axis("off")
@@ -1166,7 +1334,7 @@ def render_plot_artifact(
                 color_title=spec.color_column,
                 shape_categories=shape_categories,
                 shape_map=shape_map,
-                shape_title=spec.shape_column,
+                shape_title=effective_shape_column,
             )
     elif spec.kind == "categorical_count":
         assert spec.scalar_id is not None
@@ -1185,11 +1353,14 @@ def render_plot_artifact(
             if spec.panel_column is not None
             else [None]
         )
-        rows_count, columns = _panel_grid_dimensions(len(panel_values))
+        if len(panel_values) <= 2:
+            rows_count, columns = len(panel_values), 1
+        else:
+            rows_count, columns = _panel_grid_dimensions(len(panel_values))
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=(6.2 * columns, 4.3 * rows_count),
+            figsize=(6.6 * columns, 5.8 * rows_count),
             squeeze=False,
         )
         color_map, categories = _category_color_map([rows], spec.color_column)
@@ -1201,33 +1372,71 @@ def render_plot_artifact(
                 if panel_value is not None and spec.panel_column is not None
                 else rows
             )
+            if panel_rows and "order" in panel_rows[0]:
+                panel_rows = sorted(panel_rows, key=lambda row: float(row.get("order", 0)))
             if spec.color_column is not None:
                 if spec.color_column not in panel_rows[0]:
                     raise ContractViolationError(f"categorical_count color column is missing: {spec.color_column!r}")
                 bar_colors = [color_map[str(row[spec.color_column])] for row in panel_rows]
             else:
                 bar_colors = [PUBLICATION_PALETTE[0]] * len(panel_rows)
-            x_positions = np.arange(len(panel_rows), dtype=float)
-            axis.bar(
-                x_positions,
-                [float(row[spec.value_column]) for row in panel_rows],
+            values = [float(row[spec.value_column]) for row in panel_rows]
+            y_positions = np.arange(len(panel_rows), dtype=float)
+            axis.barh(
+                y_positions,
+                values,
                 color=bar_colors,
                 edgecolor="white",
                 linewidth=0.6,
                 alpha=0.92,
             )
-            axis.set_xticks(
-                x_positions,
-                [str(row[spec.column_column]) for row in panel_rows],
-                rotation=25,
-                ha="right",
+            axis.set_yticks(
+                y_positions,
+                [_wrapped_tick_label(row[spec.column_column], width=22) for row in panel_rows],
             )
-            axis.set_xlabel(spec.column_column or "label")
-            axis.set_ylabel(spec.value_column or "row_count")
+            axis.invert_yaxis()
+            show_as_percent = spec.value_column in {"fraction", "percent"} or all(
+                0.0 <= value <= 1.0 for value in values
+            )
+            axis.set_xlabel(
+                "Percent of N" if show_as_percent else humanize_display_text(spec.value_column or "row_count")
+            )
+            axis.set_ylabel("")
+            denominator_values = {
+                int(float(row["denominator"])) for row in panel_rows if row.get("denominator") is not None
+            }
+            panel_title = wrap_plot_title(str(panel_value) if panel_value is not None else spec.plot_id, width=24)
+            if len(denominator_values) == 1:
+                panel_title = f"{panel_title}\nN = {next(iter(denominator_values)):,}"
             axis.set_title(
-                wrap_plot_title(str(panel_value) if panel_value is not None else spec.plot_id, width=24),
+                panel_title,
                 pad=8,
             )
+            max_value = max(values, default=0.0)
+            axis.set_xlim(0, max_value * 1.12 if max_value > 0 else 1.0)
+            if show_as_percent:
+                from matplotlib.ticker import PercentFormatter
+
+                axis.xaxis.set_major_formatter(PercentFormatter(xmax=1.0 if max_value <= 1.0 else 100.0))
+            for y_position, value in zip(y_positions, values, strict=False):
+                count_text = None
+                if panel_rows[int(y_position)].get("count") is not None:
+                    count_text = f"{int(float(panel_rows[int(y_position)]['count'])):,}"
+                percent_text = None
+                if panel_rows[int(y_position)].get("percent") is not None:
+                    percent_text = f"{float(panel_rows[int(y_position)]['percent']):.1f}%"
+                label_parts = [part for part in [count_text, percent_text] if part is not None]
+                axis.text(
+                    value + (max_value * 0.02 if max_value > 0 else 0.05),
+                    y_position,
+                    " | ".join(label_parts)
+                    if label_parts
+                    else (f"{int(value):,}" if float(value).is_integer() else f"{value:.1f}"),
+                    va="center",
+                    ha="left",
+                    fontsize=9.5,
+                    color=TEXT_COLOR,
+                )
             _apply_axes_style(axis, grid=True)
         grid_legend_bottom_margin = 0.0
         if categories and spec.color_column is not None:
@@ -1249,22 +1458,30 @@ def render_plot_artifact(
         rows = _table_rows(table_path)
         if not rows:
             raise ContractViolationError("metric_panel_grid rendering requires at least one row")
+        resolved_value_column = spec.value_column
+        if resolved_value_column is not None and resolved_value_column not in rows[0]:
+            if "metric_value" in rows[0]:
+                resolved_value_column = "metric_value"
+            elif "row_count" in rows[0]:
+                resolved_value_column = "row_count"
         required_columns = [
             spec.row_column,
             spec.panel_column,
             spec.column_column,
             spec.label_column,
-            spec.value_column,
+            resolved_value_column,
         ]
         missing_columns = [column for column in required_columns if column is not None and column not in rows[0]]
         if missing_columns:
             raise ContractViolationError(f"metric_panel_grid columns are missing: {missing_columns}")
+        resolved_spec = spec.model_copy(update={"value_column": resolved_value_column})
         panel_values = list(dict.fromkeys(str(row[spec.row_column]) for row in rows))
         rows_count, columns = _panel_grid_dimensions(len(panel_values))
+        square_metric_panels = spec.plot_id == "context_geometry_summary"
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=(6.8 * columns, 4.8 * rows_count),
+            figsize=_grid_figure_size(len(panel_values), square_panels=square_metric_panels),
             squeeze=False,
         )
         color_map, categories = _category_color_map([rows], spec.color_column)
@@ -1280,9 +1497,10 @@ def render_plot_artifact(
             _render_metric_panel(
                 axis,
                 rows=panel_rows,
-                spec=spec,
+                spec=resolved_spec,
                 panel_title=panel_title,
                 color_map=color_map,
+                square=square_metric_panels,
             )
         plot_metadata["metric_columns"] = panel_values
         grid_legend_bottom_margin = 0.0
@@ -1312,7 +1530,8 @@ def render_plot_artifact(
         rows = _table_rows(table_path)
         if not rows:
             raise ContractViolationError("distribution rendering requires at least one row")
-        fig, ax = plt.subplots(figsize=(6, 4.5))
+        square_distribution_panel = spec.plot_id == "context_delta_distributions"
+        fig, ax = plt.subplots(figsize=(5.4, 5.2 if square_distribution_panel else 4.8))
         render_mode = spec.render_mode or "histogram"
         _render_distribution_panel(
             ax,
@@ -1321,6 +1540,7 @@ def render_plot_artifact(
             color_column=spec.color_column,
             render_mode=render_mode,
             panel_title=artifact_id,
+            square=square_distribution_panel,
         )
     elif spec.kind == "distribution_grid":
         scalar_tables: list[tuple[str, list[dict[str, object]], str]] = []
@@ -1357,9 +1577,20 @@ def render_plot_artifact(
                 )
             scalar_tables.append((scalar_id, rows, metric_column))
         rows_count, columns = _panel_grid_dimensions(len(scalar_tables))
-        fig, axes = plt.subplots(rows_count, columns, figsize=(6.1 * columns, 4.6 * rows_count), squeeze=False)
+        square_distribution_panels = spec.plot_id == "context_delta_distributions"
+        fig, axes = plt.subplots(
+            rows_count,
+            columns,
+            figsize=_grid_figure_size(len(scalar_tables), square_panels=square_distribution_panels),
+            squeeze=False,
+        )
         titles = spec.panel_titles or [
-            f"{scalar_id} | {metric_column}" for scalar_id, _, metric_column in scalar_tables
+            (
+                f"{_derived_panel_label(scalar_id)} · {humanize_display_text(metric_column)}"
+                if _derived_panel_label(scalar_id)
+                else humanize_display_text(metric_column)
+            )
+            for scalar_id, _, metric_column in scalar_tables
         ]
         for axis in axes.ravel()[len(scalar_tables) :]:
             axis.axis("off")
@@ -1371,6 +1602,7 @@ def render_plot_artifact(
                 color_column=spec.color_column,
                 render_mode=spec.render_mode or "histogram",
                 panel_title=panel_title,
+                square=square_distribution_panels,
             )
         if configured_metric_columns:
             plot_metadata["metric_columns"] = configured_metric_columns
@@ -1379,8 +1611,15 @@ def render_plot_artifact(
         if not reducer_path.exists():
             raise MissingArtifactError(f"reducer artifact is missing for curve rendering: {spec.reducer_id}")
         summary = json.loads(reducer_path.read_text(encoding="utf-8"))
-        fig, ax = plt.subplots(figsize=(6.5, 4.5))
-        _render_curve_panel(ax, reducer_id=str(spec.reducer_id), summary=summary, panel_title=spec.plot_id)
+        square_curve_panel = spec.plot_id == "representation_scree_diagnostic"
+        fig, ax = plt.subplots(figsize=(5.5, 5.3 if square_curve_panel else 4.7))
+        _render_curve_panel(
+            ax,
+            reducer_id=str(spec.reducer_id),
+            summary=summary,
+            panel_title=spec.plot_id,
+            square=square_curve_panel,
+        )
     elif spec.kind == "curve_grid":
         reducer_summaries: list[tuple[str, dict[str, object]]] = []
         for reducer_id in spec.reducer_ids:
@@ -1389,7 +1628,13 @@ def render_plot_artifact(
                 raise MissingArtifactError(f"reducer artifact is missing for curve rendering: {reducer_id}")
             reducer_summaries.append((reducer_id, json.loads(reducer_path.read_text(encoding="utf-8"))))
         rows_count, columns = _panel_grid_dimensions(len(reducer_summaries))
-        fig, axes = plt.subplots(rows_count, columns, figsize=(6.2 * columns, 4.8 * rows_count), squeeze=False)
+        square_curve_panels = spec.plot_id == "representation_scree_diagnostic"
+        fig, axes = plt.subplots(
+            rows_count,
+            columns,
+            figsize=_grid_figure_size(len(reducer_summaries), square_panels=square_curve_panels),
+            squeeze=False,
+        )
         titles = spec.panel_titles or [reducer_id for reducer_id, _ in reducer_summaries]
         for axis in axes.ravel()[len(reducer_summaries) :]:
             axis.axis("off")
@@ -1399,7 +1644,43 @@ def render_plot_artifact(
             titles,
             strict=False,
         ):
-            _render_curve_panel(axis, reducer_id=reducer_id, summary=summary, panel_title=panel_title)
+            _render_curve_panel(
+                axis,
+                reducer_id=reducer_id,
+                summary=summary,
+                panel_title=panel_title,
+                square=square_curve_panels,
+                show_legend=False,
+            )
+        legend = fig.legend(
+            handles=[
+                plt.Line2D(
+                    [],
+                    [],
+                    marker="o",
+                    linewidth=1.8,
+                    color=PUBLICATION_PALETTE[0],
+                    label="Explained variance ratio",
+                ),
+                plt.Line2D(
+                    [],
+                    [],
+                    marker="s",
+                    linewidth=1.8,
+                    color=PUBLICATION_PALETTE[2],
+                    label="Cumulative variance ratio",
+                ),
+            ],
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=2,
+            frameon=False,
+            borderaxespad=0.0,
+            columnspacing=1.1,
+            handletextpad=0.5,
+        )
+        _style_legend(legend)
+        grid_legend_bottom_margin = 0.11
     elif spec.kind == "correspondence_heatmap":
         left_path = context.output_root / "clusters" / spec.left_cluster_id / "assignments.parquet"
         right_path = context.output_root / "clusters" / spec.right_cluster_id / "assignments.parquet"
@@ -1434,10 +1715,15 @@ def render_plot_artifact(
             grid[left_index[left_by_key[key]], right_index[right_by_key[key]]] += 1.0
         fig, ax = plt.subplots(figsize=(2 + 1.2 * len(right_labels), 1.8 + 1.1 * len(left_labels)))
         image = ax.imshow(grid, cmap="cividis", aspect="auto")
-        ax.set_xticks(range(len(right_labels)), [str(label) for label in right_labels], rotation=25, ha="right")
-        ax.set_yticks(range(len(left_labels)), [str(label) for label in left_labels])
-        ax.set_xlabel(spec.right_cluster_id)
-        ax.set_ylabel(spec.left_cluster_id)
+        ax.set_xticks(
+            range(len(right_labels)),
+            [humanize_display_text(str(label)) for label in right_labels],
+            rotation=25,
+            ha="right",
+        )
+        ax.set_yticks(range(len(left_labels)), [humanize_display_text(str(label)) for label in left_labels])
+        ax.set_xlabel(humanize_display_text(spec.right_cluster_id))
+        ax.set_ylabel(humanize_display_text(spec.left_cluster_id))
         ax.set_title(wrap_plot_title(spec.plot_id, width=24), pad=8)
         for row_index in range(len(left_labels)):
             for column_index in range(len(right_labels)):
@@ -1501,7 +1787,8 @@ def render_plot_artifact(
         if spec.kind == "projection_scatter":
             rows = projection_tables[0]
             color_map, categories = _category_color_map([rows], spec.color_column)
-            shape_map, shape_categories = _shape_marker_map([rows], spec.shape_column)
+            effective_shape_column = _effective_shape_column(spec)
+            shape_map, shape_categories = _shape_marker_map([rows], effective_shape_column)
             fig, ax = plt.subplots(figsize=_grid_figure_size(1, square_panels=True))
             point_style = scatter_style(len(rows))
             _scatter_points(
@@ -1511,7 +1798,7 @@ def render_plot_artifact(
                 resolved_y="y",
                 color_column=spec.color_column,
                 color_map=color_map,
-                shape_column=spec.shape_column,
+                shape_column=effective_shape_column,
                 shape_map=shape_map,
                 point_size=point_style.point_size,
                 alpha=point_style.alpha,
@@ -1569,7 +1856,7 @@ def render_plot_artifact(
                 color_title=spec.color_column,
                 shape_categories=shape_categories,
                 shape_map=shape_map,
-                shape_title=spec.shape_column,
+                shape_title=effective_shape_column,
             )
         else:
             columns = min(2, max(1, len(projection_tables)))
@@ -1581,7 +1868,8 @@ def render_plot_artifact(
                 squeeze=False,
             )
             color_map, categories = _category_color_map(projection_tables, spec.color_column)
-            shape_map, shape_categories = _shape_marker_map(projection_tables, spec.shape_column)
+            effective_shape_column = _effective_shape_column(spec)
+            shape_map, shape_categories = _shape_marker_map(projection_tables, effective_shape_column)
             titles = spec.panel_titles or list(spec.projection_ids)
             for axis in axes.ravel()[len(projection_tables) :]:
                 axis.axis("off")
@@ -1600,7 +1888,7 @@ def render_plot_artifact(
                     resolved_y="y",
                     color_column=spec.color_column,
                     color_map=color_map,
-                    shape_column=spec.shape_column,
+                    shape_column=effective_shape_column,
                     shape_map=shape_map,
                     point_size=point_style.point_size,
                     alpha=point_style.alpha,
@@ -1658,17 +1946,24 @@ def render_plot_artifact(
                 color_title=spec.color_column,
                 shape_categories=shape_categories,
                 shape_map=shape_map,
-                shape_title=spec.shape_column,
+                shape_title=effective_shape_column,
             )
     grid_legend_bottom_margin = float(locals().get("grid_legend_bottom_margin", 0.0))
     if (
         spec.kind
-        in {"projection_grid", "xy_scatter_grid", "paired_xy_scatter_grid", "categorical_count", "metric_panel_grid"}
+        in {
+            "projection_grid",
+            "xy_scatter_grid",
+            "paired_xy_scatter_grid",
+            "categorical_count",
+            "metric_panel_grid",
+            "curve_grid",
+        }
         and grid_legend_bottom_margin > 0.0
     ):
-        fig.tight_layout(rect=(0.0, grid_legend_bottom_margin, 1.0, 0.99), pad=0.72)
+        fig.tight_layout(rect=(0.0, grid_legend_bottom_margin, 1.0, 0.995), pad=0.95, h_pad=1.4, w_pad=0.95)
     else:
-        fig.tight_layout(pad=0.72)
+        fig.tight_layout(pad=0.95, h_pad=1.4, w_pad=0.95)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     try:

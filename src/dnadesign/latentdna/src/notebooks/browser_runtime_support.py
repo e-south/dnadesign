@@ -17,17 +17,21 @@ import numpy as np
 import pandas as pd
 
 from ..contracts.notebook import WorkspaceNotebookControls
+from ..labels import humanize_column_name
 from ..visual_style import (
     DEFAULT_NOTEBOOK_FIG_DPI,
     GRID_COLOR,
     NOTEBOOK_FONT_STACK,
     PANEL_BACKGROUND_COLOR,
+    PLOT_FONT_FAMILY,
     PLOT_LABEL_FONT_SIZE,
+    PLOT_LEGEND_FONT_SIZE,
     PLOT_TICK_FONT_SIZE,
     PLOT_TITLE_FONT_SIZE,
     SPINE_COLOR,
     TEXT_COLOR,
     categorical_color_map,
+    humanize_display_text,
     ordered_categories,
 )
 from ..visual_style import scatter_style as shared_scatter_style
@@ -41,7 +45,7 @@ REFERENCE_DISPLAY = {
 PREFERRED_RASTER_PLOT_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 PREFERRED_PLOT_RENDER_SUFFIXES = (".svg", *PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf")
 MAX_INLINE_SVG_BYTES = 5_000_000
-NOTEBOOK_MEDIA_MAX_WIDTH_PX = 900
+NOTEBOOK_MEDIA_MAX_WIDTH_PX = 1080
 
 
 def load_json(path: Path) -> dict[str, object]:
@@ -160,20 +164,6 @@ def notebook_theme():
             margin-inline: auto;
             border-radius: 14px;
             background: var(--latentdna-surface);
-          }}
-
-          .latentdna-scope-note,
-          .latentdna-plot-card,
-          .latentdna-audit-note {{
-            border: 1px solid rgba(92, 104, 116, 0.16);
-            border-radius: 16px;
-            background: rgba(248, 250, 252, 0.92);
-            padding: 1rem 1.1rem;
-          }}
-
-          .latentdna-plot-card {{
-            display: grid;
-            gap: 0.7rem;
           }}
 
           .latentdna-badge {{
@@ -298,14 +288,14 @@ def display_reference_label(value) -> str:
 
 def display_hue_label(column: str) -> str:
     if column.startswith("log_likelihood_per_token_"):
-        return column.replace("log_likelihood_per_token_", "log likelihood per token ").replace("_", " ")
+        return humanize_display_text(column)
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
-        scope = "1 kb expanded-context" if "__template_1kb_" in column else "60 bp anchor-only"
+        scope = "1 kb construct context" if "__template_1kb_" in column else "60 bp anchor"
         return f"{model} log likelihood / token ({scope})"
     if column.startswith("cluster_label__"):
-        return column.replace("cluster_label__", "").replace("_", " ")
-    return column.replace("_", " ")
+        return humanize_display_text(column.replace("cluster_label__", ""))
+    return humanize_column_name(column)
 
 
 def shared_join_key(left: pd.DataFrame, right: pd.DataFrame) -> str | None:
@@ -475,6 +465,7 @@ def style_notebook_axes(ax, *, grid: bool = True, square: bool = False) -> None:
     ax.title.set_color(TEXT_COLOR)
     ax.title.set_fontsize(PLOT_TITLE_FONT_SIZE)
     ax.title.set_fontweight("semibold")
+    ax.title.set_fontfamily(PLOT_FONT_FAMILY)
     ax.margins(x=0.04, y=0.05)
     if square:
         ax.set_box_aspect(1)
@@ -483,15 +474,31 @@ def style_notebook_axes(ax, *, grid: bool = True, square: bool = False) -> None:
         ax.set_axisbelow(True)
 
 
+def style_notebook_legend(legend) -> None:
+    if legend is None:
+        return
+    title = legend.get_title()
+    if title is not None:
+        title.set_visible(False)
+    for text in legend.get_texts():
+        text.set_color(TEXT_COLOR)
+        text.set_fontsize(PLOT_LEGEND_FONT_SIZE)
+        text.set_fontfamily(PLOT_FONT_FAMILY)
+
+
 def draw_reference_labels(
     ax,
     frame: pd.DataFrame,
     *,
     reference_labels: list[str],
+    x_column: str = "x",
+    y_column: str = "y",
     right_padding_px: float = 0.0,
     left_padding_px: float = 0.0,
 ) -> None:
     if frame.empty or "usr_label__primary" not in frame.columns:
+        return
+    if x_column not in frame.columns or y_column not in frame.columns:
         return
     selected = frame[
         frame["usr_label__primary"]
@@ -516,8 +523,8 @@ def draw_reference_labels(
     placed: list[tuple[float, float]] = []
     axes_box = ax.get_window_extent()
     ax.scatter(
-        selected["x"].to_numpy(dtype=float),
-        selected["y"].to_numpy(dtype=float),
+        selected[x_column].to_numpy(dtype=float),
+        selected[y_column].to_numpy(dtype=float),
         c="#111111",
         s=125,
         marker="*",
@@ -526,8 +533,8 @@ def draw_reference_labels(
         zorder=5,
     )
     for row in selected.sort_values("usr_label__primary").to_dict(orient="records"):
-        point_x = float(row["x"])
-        point_y = float(row["y"])
+        point_x = float(row[x_column])
+        point_y = float(row[y_column])
         label = display_reference_label(row["usr_label__primary"])
         display_x, display_y = ax.transData.transform((point_x, point_y))
         target_offset = offsets[0]
@@ -548,7 +555,7 @@ def draw_reference_labels(
             xy=(point_x, point_y),
             xytext=target_offset,
             textcoords="offset points",
-            fontsize=9.5,
+            fontsize=PLOT_TICK_FONT_SIZE,
             fontweight="semibold",
             color=TEXT_COLOR,
             bbox={"boxstyle": "round,pad=0.18", "fc": "white", "ec": "none", "alpha": 0.94},

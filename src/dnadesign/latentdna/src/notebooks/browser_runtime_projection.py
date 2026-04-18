@@ -12,7 +12,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..visual_style import PUBLICATION_PALETTE, TEXT_COLOR, wrap_plot_title
+from ..visual_style import (
+    PUBLICATION_PALETTE,
+    TEXT_COLOR,
+    humanize_display_text,
+    wrap_plot_title,
+)
+from ..visual_style import (
+    scatter_style as shared_scatter_style,
+)
 from .browser_runtime_support import (
     available_hues_for_frames,
     category_color_map,
@@ -21,9 +29,9 @@ from .browser_runtime_support import (
     draw_reference_labels,
     load_table,
     render_matplotlib_figure,
-    scatter_style,
     shared_join_key,
     style_notebook_axes,
+    style_notebook_legend,
 )
 
 
@@ -97,6 +105,18 @@ def _layout_frames(
     return loaded
 
 
+def _panel_grid_dimensions(panel_count: int) -> tuple[int, int]:
+    if panel_count <= 1:
+        return 1, 1
+    if panel_count == 4:
+        return 2, 2
+    if panel_count == 8:
+        return 2, 4
+    columns = min(3, panel_count)
+    rows = int(math.ceil(panel_count / columns))
+    return rows, columns
+
+
 def render_projection_grid(
     panel_specs: list[dict[str, object]],
     *,
@@ -135,14 +155,13 @@ def render_projection_grid(
             effective_hue = None
 
     n_panels = len(panel_specs)
-    ncols = 1 if n_panels == 1 else 2
-    nrows = int(math.ceil(n_panels / ncols))
-    panel_width = 5.7 if n_panels == 1 else 5.2
-    panel_height = 5.1 if n_panels == 1 else 4.6
+    nrows, ncols = _panel_grid_dimensions(n_panels)
+    panel_size = 6.1 if n_panels == 1 else 3.65
+    panel_height = panel_size + (0.1 if n_panels == 1 else 0.16)
     fig, axes = plt.subplots(
         nrows=nrows,
         ncols=ncols,
-        figsize=(panel_width * ncols, panel_height * nrows),
+        figsize=((panel_size * ncols) + 0.45, panel_height * nrows),
     )
     axes_array = np.atleast_1d(axes).reshape(nrows, ncols).ravel()
 
@@ -185,7 +204,6 @@ def render_projection_grid(
     category_map = category_color_map(category_values)
 
     scatter_artist = None
-    legend_rows = 0
     max_title_lines = 1
     for axis_index, (ax, spec, frame) in enumerate(zip(axes_array, panel_specs, resolved_frames, strict=True)):
         if frame.empty or "x" not in frame.columns or "y" not in frame.columns:
@@ -193,15 +211,17 @@ def render_projection_grid(
             ax.set_axis_off()
             continue
 
-        point_size, alpha = scatter_style(len(frame))
+        point_style = shared_scatter_style(len(frame))
         if effective_hue is None or effective_hue not in frame.columns:
             ax.scatter(
                 frame["x"].to_numpy(dtype=float),
                 frame["y"].to_numpy(dtype=float),
                 c=PUBLICATION_PALETTE[0],
-                s=point_size,
-                alpha=alpha,
-                linewidths=0.0,
+                s=point_style.point_size,
+                alpha=point_style.alpha,
+                linewidths=point_style.linewidths,
+                edgecolors=point_style.edgecolors,
+                rasterized=point_style.rasterized,
             )
         elif hue_kind == "continuous":
             hue_series = pd.to_numeric(frame[effective_hue], errors="coerce")
@@ -213,9 +233,11 @@ def render_projection_grid(
                 cmap="cividis",
                 vmin=numeric_vmin,
                 vmax=numeric_vmax,
-                s=point_size,
-                alpha=alpha,
-                linewidths=0.0,
+                s=point_style.point_size,
+                alpha=point_style.alpha,
+                linewidths=point_style.linewidths,
+                edgecolors=point_style.edgecolors,
+                rasterized=point_style.rasterized,
             )
         else:
             hue_series = frame[effective_hue].fillna("NA").astype(str)
@@ -227,60 +249,66 @@ def render_projection_grid(
                     frame.loc[mask, "x"].to_numpy(dtype=float),
                     frame.loc[mask, "y"].to_numpy(dtype=float),
                     c=category_map[category],
-                    s=point_size,
-                    alpha=alpha,
-                    linewidths=0.0,
+                    s=point_style.point_size,
+                    alpha=point_style.alpha,
+                    linewidths=point_style.linewidths,
+                    edgecolors=point_style.edgecolors,
+                    rasterized=point_style.rasterized,
                     label=category,
                 )
 
         wrapped_title = wrap_plot_title(
-            str(spec.get("title") or spec.get("view_id") or f"Panel {axis_index + 1}"),
+            humanize_display_text(str(spec.get("title") or spec.get("view_id") or f"Panel {axis_index + 1}")),
             width=34 if n_panels == 1 else 26,
         )
         max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
         ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
         ax.set_xlabel("Projection 1")
         ax.set_ylabel("Projection 2")
-        style_notebook_axes(ax, grid=True, square=n_panels == 1)
+        style_notebook_axes(ax, grid=True, square=True)
 
     for ax in axes_array[n_panels:]:
         ax.set_axis_off()
 
     bottom_margin = 0.085
     if category_values and effective_hue is not None:
-        legend_columns = min(max(len(category_values), 1), 3)
-        legend_rows = int(math.ceil(len(category_values) / legend_columns))
         legend = fig.legend(
             handles=[
-                plt.Line2D([], [], linestyle="", marker="o", markersize=7, color=category_map[category], label=category)
+                plt.Line2D(
+                    [],
+                    [],
+                    linestyle="",
+                    marker="o",
+                    markersize=7,
+                    color=category_map[category],
+                    label=humanize_display_text(category),
+                )
                 for category in category_values
             ],
             loc="lower center",
             bbox_to_anchor=(0.5, 0.02),
             frameon=False,
-            ncol=legend_columns,
+            ncol=max(1, len(category_values)),
             borderaxespad=0.0,
             columnspacing=0.95,
             handletextpad=0.45,
         )
-        for text in legend.get_texts():
-            text.set_color(TEXT_COLOR)
-            text.set_fontsize(9.5)
-        bottom_margin = 0.18 + (0.055 * max(legend_rows - 1, 0))
+        style_notebook_legend(legend)
+        bottom_margin = 0.11
 
     right_margin = 0.97
     label_right_padding_px = 12.0
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
-        right_margin = 0.84
+        right_margin = 0.82
         label_right_padding_px = 80.0
-    top_margin = 0.9 if max_title_lines > 1 else 0.94
+    top_margin = max(0.8, 0.96 - (0.042 * max(max_title_lines - 1, 0)))
     fig.subplots_adjust(
         left=0.08,
         right=right_margin,
         top=top_margin,
         bottom=bottom_margin,
-        wspace=0.32 if n_panels > 1 else 0.24,
-        hspace=0.46 if n_panels > 1 else 0.32,
+        wspace=0.26 if n_panels > 1 else 0.2,
+        hspace=(0.62 + (0.04 * max(max_title_lines - 1, 0))) if n_panels > 1 else 0.3,
     )
     fig.canvas.draw()
 

@@ -25,7 +25,7 @@ def _render_header() -> str:
 
         __generated_with = "__GENERATED_WITH__"
 
-        app = marimo.App(width="full")
+        app = marimo.App(width="medium")
         """
     )
 

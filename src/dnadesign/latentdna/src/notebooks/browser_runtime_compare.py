@@ -15,6 +15,7 @@ from ..visual_style import (
     PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
+    humanize_display_text,
     wrap_plot_title,
 )
 from .browser_runtime_support import (
@@ -31,6 +32,26 @@ def deterministic_take(length: int, max_rows: int) -> np.ndarray:
     if length <= max_rows:
         return np.arange(length, dtype=np.int64)
     return np.linspace(0, length - 1, num=max_rows, dtype=np.int64)
+
+
+def display_compare_basis(basis_label: str) -> str:
+    text = str(basis_label or "").strip()
+    if not text:
+        return "Unavailable"
+    if text.startswith("alignment:"):
+        return f"Alignment: {humanize_display_text(text.split(':', 1)[1])}"
+    if text.startswith("shared_key:"):
+        return f"Shared key: {humanize_display_text(text.split(':', 1)[1])}"
+    return humanize_display_text(text)
+
+
+def display_sample_strategy(sample_strategy: str) -> str:
+    text = str(sample_strategy or "").strip()
+    if not text:
+        return "Unavailable"
+    if text == "deterministic_even_stride":
+        return "Deterministic even-stride subset"
+    return humanize_display_text(text)
 
 
 def explicit_compare_basis(
@@ -228,8 +249,10 @@ def compare_pair_payload(
     return {
         "status": "ok",
         "basis": basis_label,
+        "basis_display": display_compare_basis(basis_label),
         "rows": int(left_sample.shape[0]),
         "sample_strategy": "deterministic_even_stride",
+        "sample_strategy_display": display_sample_strategy("deterministic_even_stride"),
         "left_dims": int(left_sample.shape[1]),
         "right_dims": int(right_sample.shape[1]),
         "distance_pairs": int(left_distance_values.size),
