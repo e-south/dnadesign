@@ -263,7 +263,7 @@ def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro
     assert "study_stress_ethanol_cipro_pdual10" in pipeline
     assert "densegen:" in pipeline
     assert "analysis_surface:" in pipeline
-    assert "contract_ref: densegen.analysis_surface.v1" in pipeline
+    assert "contract_ref: densegen.analysis_surface.v2" in pipeline
     assert "source: workspace:study_stress_ethanol_cipro" in pipeline
     assert "default_plot_ids:" not in pipeline
     assert "infer_batch_7b_with_notify:" in pipeline
@@ -317,7 +317,7 @@ def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
     journey = _read("src/dnadesign/usr/docs/operations/promoter-evo2-journey.md")
 
     assert "ops progress show usr.data-plane.promoter-study-status --json" in journey
-    assert "ops catalog show latentdna.downstream.promoter-study-representation-comparison" in journey
+    assert "ops catalog show usr.data-plane.promoter-study-status --json" in journey
     assert "multi-source-shared-dataset-assembly.md" in journey
     assert "construct-infer-shared-dataset-runbook.md" in journey
     assert "evo2-promoter-features.md" in journey

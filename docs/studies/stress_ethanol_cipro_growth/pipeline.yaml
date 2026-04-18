@@ -9,7 +9,7 @@ study_pipeline:
     notebook: densegen_run_overview
     analysis_surface:
       source: workspace:study_stress_ethanol_cipro
-      contract_ref: densegen.analysis_surface.v1
+      contract_ref: densegen.analysis_surface.v2
   execution_surfaces:
     construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
     infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro

@@ -13,7 +13,7 @@ Use this page when you need the full promoter-study Evo2 path in one place befor
 If you are checking the live study record, start with [Promoter study status contract](promoter-study-status-contract.md).
 If you need blockers or next-run readiness, switch to `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`.
 
-If you are entering from Ops, use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the current snapshot record and `uv run ops catalog show latentdna.downstream.promoter-study-representation-comparison` for the LatentDNA route contract.
+If you are entering from Ops, use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the current snapshot record and `uv run ops catalog show usr.data-plane.promoter-study-status --json` to inspect its related LatentDNA route entry.
 The study record is the right place for current phase, dataset posture, and downstream handoff state. This route page is for movement between surfaces.
 
 ### Workflow summary

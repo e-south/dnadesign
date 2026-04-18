@@ -61,7 +61,7 @@ def _inspect_densegen_surface(
         densegen_config.get("analysis_surface") if isinstance(densegen_config.get("analysis_surface"), Mapping) else {}
     )
     expected_contract_ref = (
-        _string_or_none(densegen_analysis_surface.get("contract_ref")) or "densegen.analysis_surface.v1"
+        _string_or_none(densegen_analysis_surface.get("contract_ref")) or "densegen.analysis_surface.v2"
     )
     densegen_config_path = _densegen_config_path(study_context=study_context, densegen_config=densegen_config)
     workspace_path = _resolve_repo_path(
