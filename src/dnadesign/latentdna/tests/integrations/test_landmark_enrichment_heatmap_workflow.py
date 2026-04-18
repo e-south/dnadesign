@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase5_enrichment_heatmap_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_landmark_enrichment_heatmap_workflow.py
 
-Phase 5 workflow tests for neighborhood enrichment and heatmap rendering.
+Workflow tests for neighborhood enrichment and heatmap rendering.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -88,7 +88,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
     )
 
 
-def test_phase5_landmark_enrichment_and_heatmap_flow(tmp_path: Path) -> None:
+def test_landmark_enrichment_and_heatmap_flow(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase16_stats_cli_surface_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_stats_cli_surface_workflow.py
 
-Phase 16 workflow tests for view stats, scalar-table joins, and common CLI
+Workflow tests for view stats, scalar-table joins, and common CLI
 preview/quiet behavior.
 
 Module Author(s): OpenAI Codex
@@ -79,7 +79,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "latentdna_phase16_demo", "output_root": "./outputs"},
+                "workspace": {"id": "latentdna_stats_cli_demo", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -93,6 +93,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         "path": bundle_dir.as_posix(),
                         "record_key": "id",
                         "subject_key": "subject_id",
+                        "metadata_include": ["cohort"],
                     },
                     "context_source": {
                         "kind": "parquet",
@@ -100,9 +101,10 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         "record_key": "id",
                         "subject_key": "subject_id",
                         "context_key": "context_id",
+                        "metadata_include": ["label"],
                     },
                 },
-                "metadata": {"include": ["cohort", "label"]},
+                "metadata": {"include": []},
                 "views": {
                     "bundle_view": {
                         "source": "bundle_source",
@@ -162,7 +164,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
     )
 
 
-def test_phase16_view_stats_scalar_join_and_common_cli_flags(tmp_path: Path) -> None:
+def test_view_stats_scalar_join_and_common_cli_flags(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     bundle_dir = tmp_path / "bundle_source"

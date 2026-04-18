@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase14_multiview_extensions_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_multiview_extensions_workflow.py
 
-Phase 14 workflow tests for matrix-bundle views and extended derived/scalar
+Workflow tests for matrix-bundle views and extended derived/scalar
 operations.
 
 Module Author(s): OpenAI Codex
@@ -93,6 +93,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         "path": bundle_dir.as_posix(),
                         "record_key": "id",
                         "subject_key": "subject_id",
+                        "metadata_include": ["cohort"],
                     },
                     "context_source": {
                         "kind": "parquet",
@@ -100,9 +101,10 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         "record_key": "id",
                         "subject_key": "subject_id",
                         "context_key": "context_id",
+                        "metadata_include": ["label"],
                     },
                 },
-                "metadata": {"include": ["cohort", "label"]},
+                "metadata": {"include": []},
                 "views": {
                     "bundle_view": {
                         "source": "bundle_source",
@@ -181,7 +183,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
     )
 
 
-def test_phase14_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
+def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     bundle_dir = tmp_path / "bundle_source"
@@ -303,7 +305,7 @@ def test_phase14_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
     assert "bundle_norm_value" in renamed_table.column_names
 
 
-def test_phase14_matrix_bundle_view_requires_manifest(tmp_path: Path) -> None:
+def test_matrix_bundle_view_requires_manifest(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     bundle_dir = tmp_path / "bundle_source"

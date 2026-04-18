@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase1_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_source_projection_plot_workflow.py
 
-Phase 1 tracer-bullet workflow tests for latentdna.
+Tracer-bullet workflow tests for latentdna source, projection, and plot flows.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -25,6 +25,29 @@ from dnadesign.latentdna.src.cli import app
 _RUNNER = CliRunner()
 
 
+def _write_plot_semantics(workspace_dir: Path, plot_id: str) -> str:
+    semantics_ref = f"plot_semantics/{plot_id}.yaml"
+    semantics_path = workspace_dir / semantics_ref
+    semantics_path.parent.mkdir(parents=True, exist_ok=True)
+    semantics_path.write_text(
+        yaml.safe_dump(
+            {
+                "plot_id": plot_id,
+                "research_question": f"What does {plot_id} show?",
+                "evidence_tier": "qc",
+                "encoding_summary": f"QC fixture semantics for {plot_id}.",
+                "sampling_scope": "Fixture-sized workflow sample.",
+                "interpretation_guardrails": ["Fixture semantics are descriptive only."],
+                "caption_md": f"QC fixture plot for {plot_id}.",
+                "alt_text": f"QC fixture plot for {plot_id}.",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return semantics_ref
+
+
 def _write_usr_dataset(root: Path, dataset: str) -> None:
     dataset_dir = root / dataset
     dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -42,7 +65,20 @@ def _write_usr_dataset(root: Path, dataset: str) -> None:
     pq.write_table(table, dataset_dir / "records.parquet")
 
 
-def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
+def _write_workspace_config(
+    workspace_dir: Path,
+    usr_root: Path,
+    *,
+    metadata_include: list[str] | None = None,
+    reference_sets: dict[str, object] | None = None,
+    plots: dict[str, object] | None = None,
+) -> None:
+    metadata_columns = ["usr_label__primary", "densegen__plan"] if metadata_include is None else metadata_include
+    resolved_plots: dict[str, object] = {}
+    for plot_id, config in (plots or {}).items():
+        plot_config = dict(config)
+        plot_config["semantics_ref"] = plot_config.get("semantics_ref") or _write_plot_semantics(workspace_dir, plot_id)
+        resolved_plots[plot_id] = plot_config
     (workspace_dir / "config.yaml").write_text(
         yaml.safe_dump(
             {
@@ -64,7 +100,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                         "subject_key": "subject_id",
                     }
                 },
-                "metadata": {"include": ["usr_label__primary", "densegen__plan"]},
+                "metadata": {"include": metadata_columns},
                 "views": {
                     "z20_60": {
                         "source": "anchor60",
@@ -74,6 +110,8 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                         "role": "primary",
                     }
                 },
+                "reference_sets": reference_sets or {},
+                "plots": resolved_plots,
             },
             sort_keys=False,
         ),
@@ -81,7 +119,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
     )
 
 
-def test_phase1_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
+def test_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
@@ -192,8 +230,30 @@ def test_phase1_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     assert (plot_dir / "plot.png").is_file()
     assert (plot_dir / "manifest.json").is_file()
 
+    failed_force = _RUNNER.invoke(
+        app,
+        [
+            "plot",
+            "render",
+            "atlas_scatter",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--kind",
+            "projection_scatter",
+            "--projection",
+            "missing_projection",
+            "--force",
+            "--json",
+        ],
+    )
+    assert failed_force.exit_code != 0
+    assert "projection artifact is missing" in failed_force.stdout
+    assert (plot_dir / "plot.svg").is_file()
+    assert (plot_dir / "plot.png").is_file()
+    assert (plot_dir / "manifest.json").is_file()
 
-def test_phase1_plot_render_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
+
+def test_inline_plot_render_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
@@ -266,7 +326,93 @@ def test_phase1_plot_render_force_preserves_existing_artifact_on_failure(tmp_pat
     assert (plot_dir / "plot.png").is_file()
     assert (plot_dir / "manifest.json").is_file()
 
-    failed_force = _RUNNER.invoke(
+
+def test_projection_annotations_work_when_reference_set_columns_are_not_public_metadata(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set")
+    _write_workspace_config(
+        workspace_dir,
+        usr_root,
+        metadata_include=["densegen__plan"],
+        reference_sets={
+            "promoter_wt_core": {
+                "ids": ["spyP", "sulAp"],
+                "match_column": "usr_label__primary",
+                "label_column": "usr_label__primary",
+                "label_mode": "label_and_highlight",
+            }
+        },
+        plots={
+            "atlas_scatter": {
+                "kind": "projection_scatter",
+                "projection": "umap_z20_60",
+                "annotation": {"reference_set": "promoter_wt_core"},
+            }
+        },
+    )
+
+    materialize_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert materialize_result.exit_code == 0, materialize_result.stdout
+
+    view_dir = workspace_dir / "outputs" / "views" / "z20_60"
+    view_rows = pq.read_table(view_dir / "rows.parquet").to_pydict()
+    assert "usr_label__primary" in view_rows
+
+    sample_result = _RUNNER.invoke(
+        app,
+        [
+            "sample",
+            "build",
+            "atlas_sample",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--view",
+            "z20_60",
+            "--strategy",
+            "stratified",
+            "--group-column",
+            "densegen__plan",
+            "--reference-set",
+            "promoter_wt_core",
+            "--n",
+            "6",
+            "--seed",
+            "17",
+            "--json",
+        ],
+    )
+    assert sample_result.exit_code == 0, sample_result.stdout
+
+    projection_result = _RUNNER.invoke(
+        app,
+        [
+            "projection",
+            "fit",
+            "z20_60",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--sample",
+            "atlas_sample",
+            "--run-id",
+            "umap_z20_60",
+            "--seed",
+            "17",
+            "--json",
+        ],
+    )
+    assert projection_result.exit_code == 0, projection_result.stdout
+
+    projection_dir = workspace_dir / "outputs" / "projections" / "umap_z20_60"
+    coords = pq.read_table(projection_dir / "coords.parquet").to_pydict()
+    assert "usr_label__primary" in coords
+    assert {"spyP", "sulAp"}.issubset(set(coords["usr_label__primary"]))
+
+    plot_result = _RUNNER.invoke(
         app,
         [
             "plot",
@@ -274,22 +420,18 @@ def test_phase1_plot_render_force_preserves_existing_artifact_on_failure(tmp_pat
             "atlas_scatter",
             "--workspace",
             workspace_dir.as_posix(),
-            "--kind",
-            "projection_scatter",
-            "--projection",
-            "missing_projection",
-            "--force",
             "--json",
         ],
     )
-    assert failed_force.exit_code != 0
-    assert "projection artifact is missing" in failed_force.stdout
-    assert (plot_dir / "plot.svg").is_file()
-    assert (plot_dir / "plot.png").is_file()
-    assert (plot_dir / "manifest.json").is_file()
+    assert plot_result.exit_code == 0, plot_result.stdout
+
+    plot_manifest = json.loads(
+        (workspace_dir / "outputs" / "plots" / "atlas_scatter" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert plot_manifest["stats"]["reference_set_complete"] is True
 
 
-def test_phase1_view_materialize_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
+def test_view_materialize_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
@@ -332,7 +474,7 @@ def test_phase1_view_materialize_force_preserves_existing_artifact_on_failure(tm
     assert (view_dir / "manifest.json").is_file()
 
 
-def test_phase1_projection_fit_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
+def test_projection_fit_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
@@ -411,7 +553,7 @@ def test_phase1_projection_fit_force_preserves_existing_artifact_on_failure(tmp_
     assert (projection_dir / "manifest.json").is_file()
 
 
-def test_phase1_plot_render_rejects_non_identifier_plot_id(tmp_path: Path) -> None:
+def test_plot_render_rejects_non_identifier_plot_id(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"

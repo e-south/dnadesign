@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase17_downstream_freshness_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_downstream_freshness_workflow.py
 
-Phase 17 workflow tests for downstream freshness/readiness reporting over
+Workflow tests for downstream freshness/readiness reporting over
 table-derived scalars and agreement-summary plots.
 
 Module Author(s): OpenAI Codex
@@ -25,6 +25,29 @@ from dnadesign.latentdna.src.cli import app
 _RUNNER = CliRunner()
 
 
+def _write_plot_semantics(workspace_dir: Path, plot_id: str) -> str:
+    semantics_ref = f"plot_semantics/{plot_id}.yaml"
+    semantics_path = workspace_dir / semantics_ref
+    semantics_path.parent.mkdir(parents=True, exist_ok=True)
+    semantics_path.write_text(
+        yaml.safe_dump(
+            {
+                "plot_id": plot_id,
+                "research_question": f"What does {plot_id} show?",
+                "evidence_tier": "qc",
+                "encoding_summary": f"QC fixture semantics for {plot_id}.",
+                "sampling_scope": "Fixture-sized workflow sample.",
+                "interpretation_guardrails": ["Fixture semantics are descriptive only."],
+                "caption_md": f"QC fixture plot for {plot_id}.",
+                "alt_text": f"QC fixture plot for {plot_id}.",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return semantics_ref
+
+
 def _write_usr_dataset(root: Path, dataset: str, rows: list[dict[str, object]]) -> None:
     dataset_dir = root / dataset
     dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -36,7 +59,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "latentdna_phase17_demo", "output_root": "./outputs"},
+                "workspace": {"id": "latentdna_downstream_freshness_demo", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -83,6 +106,23 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                         "source": "anchor60",
                         "where": {"column": "usr_label__primary", "equals": "sulAp"},
                         "representation": {"mode": "centroid"},
+                    },
+                },
+                "plots": {
+                    "control_distance_margins_distribution": {
+                        "kind": "distribution",
+                        "scalar": "ethanol_vs_cipro",
+                        "value_column": "ethanol_vs_cipro",
+                        "color_column": "densegen__plan",
+                        "semantics_ref": _write_plot_semantics(
+                            workspace_dir,
+                            "control_distance_margins_distribution",
+                        ),
+                    },
+                    "primary_agreement_summary": {
+                        "kind": "agreement_summary",
+                        "agreement": "primary_vs_primary",
+                        "semantics_ref": _write_plot_semantics(workspace_dir, "primary_agreement_summary"),
                     },
                 },
                 "notebooks": {
@@ -156,23 +196,13 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                                 "id": "render_scalar_distribution",
                                 "op": "plot.render",
                                 "depends_on": ["derive_margin_scalar"],
-                                "params": {
-                                    "plot_id": "control_distance_margins_distribution",
-                                    "kind": "distribution",
-                                    "scalar": "ethanol_vs_cipro",
-                                    "value_column": "ethanol_vs_cipro",
-                                    "color_column": "densegen__plan",
-                                },
+                                "params": {"plot_id": "control_distance_margins_distribution"},
                             },
                             {
                                 "id": "render_agreement_summary",
                                 "op": "plot.render",
                                 "depends_on": ["compare_agreement"],
-                                "params": {
-                                    "plot_id": "primary_agreement_summary",
-                                    "kind": "agreement_summary",
-                                    "agreement": "primary_vs_primary",
-                                },
+                                "params": {"plot_id": "primary_agreement_summary"},
                             },
                             {
                                 "id": "generate_agreement_review",
@@ -221,7 +251,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
     )
 
 
-def test_phase17_downstream_freshness_surfaces_stay_ok_when_inputs_are_fresh(tmp_path: Path) -> None:
+def test_downstream_freshness_surfaces_stay_ok_when_inputs_are_fresh(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
@@ -274,7 +304,11 @@ def test_phase17_downstream_freshness_surfaces_stay_ok_when_inputs_are_fresh(tmp
     )
     assert run_result.exit_code == 0, run_result.stdout
     run_payload = json.loads(run_result.stdout)
-    assert run_payload["status"] == "ok"
+    assert run_payload["status"] == "attention"
+    assert any(
+        "default deliverable requires attention before the notebook is end-to-end ready" in warning
+        for warning in run_payload["warnings"]
+    )
 
     status_result = _RUNNER.invoke(
         app,
@@ -313,7 +347,7 @@ def test_phase17_downstream_freshness_surfaces_stay_ok_when_inputs_are_fresh(tmp
             ("plot", "primary_agreement_summary"),
         }
     }
-    assert statuses[("notebook", "agreement_review")] == "ok"
+    assert statuses[("notebook", "agreement_review")] == "attention"
     assert statuses[("scalar_table", "ethanol_vs_cipro")] == "ok"
     assert statuses[("plot", "control_distance_margins_distribution")] == "ok"
     assert statuses[("plot", "primary_agreement_summary")] == "ok"

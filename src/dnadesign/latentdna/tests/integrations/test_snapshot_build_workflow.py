@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase12_snapshot_metadata_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_snapshot_build_workflow.py
 
-Phase 12 workflow tests for snapshot metadata companions.
+Workflow tests for source snapshot row ledgers.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -30,29 +30,27 @@ def _write_usr_dataset(root: Path, dataset: str, rows: list[dict[str, object]]) 
     pq.write_table(pa.Table.from_pylist(rows), dataset_dir / "records.parquet")
 
 
-def test_phase12_snapshot_build_persists_metadata_companion_without_vectors(tmp_path: Path) -> None:
+def test_snapshot_build_persists_key_rows_without_vectors(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
     _write_usr_dataset(
         usr_root,
-        "promoter/demo_context_set",
+        "promoter/demo_anchor_set",
         [
             {
-                "id": "ctx_01",
+                "id": "anchor_01",
                 "subject_id": "subject_01",
-                "context_id": "c1",
                 "usr_label__primary": "spyP",
                 "densegen__plan": "plan_a",
-                "embedding_context_20b": [1.0, 0.0, 0.0],
+                "embedding_anchor_20b": [1.0, 0.0, 0.0],
             },
             {
-                "id": "ctx_02",
+                "id": "anchor_02",
                 "subject_id": "subject_02",
-                "context_id": "c2",
                 "usr_label__primary": "sulAp",
                 "densegen__plan": "plan_b",
-                "embedding_context_20b": [2.0, 0.0, 1.0],
+                "embedding_anchor_20b": [2.0, 0.0, 1.0],
             },
         ],
     )
@@ -69,13 +67,12 @@ def test_phase12_snapshot_build_persists_metadata_companion_without_vectors(tmp_
                     "neighbor_backend": "auto",
                 },
                 "sources": {
-                    "ctx1k": {
+                    "anchor60": {
                         "kind": "usr",
                         "root": usr_root.as_posix(),
-                        "dataset": "promoter/demo_context_set",
+                        "dataset": "promoter/demo_anchor_set",
                         "record_key": "id",
                         "subject_key": "subject_id",
-                        "context_key": "context_id",
                     },
                 },
                 "metadata": {"include": ["usr_label__primary", "densegen__plan"]},
@@ -91,9 +88,9 @@ def test_phase12_snapshot_build_persists_metadata_companion_without_vectors(tmp_
         [
             "snapshot",
             "build",
-            "ctx1k_snapshot",
+            "anchor60_snapshot",
             "--source",
-            "ctx1k",
+            "anchor60",
             "--workspace",
             workspace_dir.as_posix(),
             "--json",
@@ -103,25 +100,7 @@ def test_phase12_snapshot_build_persists_metadata_companion_without_vectors(tmp_
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["artifact_kind"] == "snapshot"
-    snapshot_dir = workspace_dir / "outputs" / "snapshots" / "ctx1k_snapshot"
-    metadata_table = pq.read_table(snapshot_dir / "metadata.parquet")
-    manifest = json.loads((snapshot_dir / "manifest.json").read_text(encoding="utf-8"))
-
-    assert metadata_table.column_names == [
-        "id",
-        "subject_id",
-        "context_id",
-        "usr_label__primary",
-        "densegen__plan",
-    ]
-    assert metadata_table.num_rows == 2
-    assert "embedding_context_20b" not in metadata_table.column_names
-    assert {item["path"] for item in manifest["outputs"]} == {"rows.parquet", "metadata.parquet"}
-    assert manifest["params"]["row_columns"] == ["id", "subject_id", "context_id"]
-    assert manifest["params"]["metadata_columns"] == [
-        "id",
-        "subject_id",
-        "context_id",
-        "usr_label__primary",
-        "densegen__plan",
-    ]
+    snapshot_dir = workspace_dir / "outputs" / "snapshots" / "anchor60_snapshot"
+    rows_table = pq.read_table(snapshot_dir / "rows.parquet")
+    assert rows_table.column_names == ["id", "subject_id"]
+    assert rows_table.num_rows == 2

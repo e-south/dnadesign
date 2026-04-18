@@ -1,0 +1,10 @@
+plot_id: context_shift_reference_plane
+research_question: How do paired anchor and full-context representations shift in the reference-relative margin plane?
+evidence_tier: primary
+encoding_summary: Four-panel paired scatter grid of context-induced ethanol and ciprofloxacin margin deltas, colored by design family and shaped by sig35 variant.
+sampling_scope: Aligned anchor/context pairs.
+interpretation_guardrails:
+  - Each point summarizes an explicit anchor/context pairing.
+  - Context deltas describe movement under added vector context and do not imply downstream task quality by themselves.
+caption_md: Paired context-shift plane for aligned anchor/context promoter pairs.
+alt_text: Four scatter panels showing paired context-induced changes in ethanol-reference and ciprofloxacin-reference margins for aligned promoter pairs.

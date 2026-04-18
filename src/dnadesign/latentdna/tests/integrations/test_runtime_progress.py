@@ -19,13 +19,33 @@ from dnadesign.latentdna.src.cli import app
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.result import CommandResult
 from dnadesign.latentdna.src.services import progress_service, recipe_service
-from dnadesign.latentdna.src.services.catalog_service import workspace_catalog
+from dnadesign.latentdna.src.services.catalog_service import workspace_catalog, workspace_catalog_from_context
 from dnadesign.latentdna.src.services.plot_service import render_plot
 
 _RUNNER = CliRunner()
 
 
 def _write_workspace_config(workspace_dir: Path) -> None:
+    semantics_dir = workspace_dir / "plot_semantics"
+    semantics_dir.mkdir(parents=True, exist_ok=True)
+    (semantics_dir / "atlas.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "plot_id": "atlas",
+                "research_question": "Do both projection panels retain the required reference set?",
+                "evidence_tier": "qc",
+                "encoding_summary": "Two-panel projection grid colored by family.",
+                "sampling_scope": "Full population.",
+                "interpretation_guardrails": [
+                    "Projection geometry is descriptive only.",
+                ],
+                "caption_md": "Reference-set completeness check for projection-grid rendering.",
+                "alt_text": "Two-panel projection grid used to validate reference-set completeness rules.",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     (workspace_dir / "config.yaml").write_text(
         yaml.safe_dump(
             {
@@ -51,6 +71,7 @@ def _write_workspace_config(workspace_dir: Path) -> None:
                 "plots": {
                     "atlas": {
                         "kind": "projection_grid",
+                        "semantics_ref": "./plot_semantics/atlas.yaml",
                         "projections": ["p1", "p2"],
                         "color_column": "family",
                         "annotation": {
@@ -335,12 +356,12 @@ def test_workspace_catalog_prioritizes_missing_over_attention(monkeypatch, tmp_p
         lambda workspace: fake_context,
     )
     monkeypatch.setattr(
-        "dnadesign.latentdna.src.services.catalog_service.deliverable_status",
-        lambda workspace, deliverable_id: statuses[deliverable_id],
+        "dnadesign.latentdna.src.services.catalog_service.deliverable_status_from_context",
+        lambda workspace, deliverable_id, **kwargs: statuses[deliverable_id],
     )
     monkeypatch.setattr(
         "dnadesign.latentdna.src.services.catalog_service.write_plot_index",
-        lambda context: {"plots": []},
+        lambda context, **kwargs: {"plots": []},
     )
 
     payload = workspace_catalog(workspace_dir)
@@ -348,3 +369,105 @@ def test_workspace_catalog_prioritizes_missing_over_attention(monkeypatch, tmp_p
     assert payload["state"] == "missing"
     stored = json.loads((outputs_dir / "catalog.json").read_text(encoding="utf-8"))
     assert stored["state"] == "missing"
+
+
+def test_workspace_catalog_reuses_one_freshness_cache_for_deliverables_and_plot_index(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    outputs_dir = workspace_dir / "outputs"
+    outputs_dir.mkdir(parents=True)
+
+    fake_context = SimpleNamespace(
+        workspace_id="catalog_demo",
+        workspace_dir=workspace_dir,
+        output_root=outputs_dir,
+        config=SimpleNamespace(
+            workspace=SimpleNamespace(title="Catalog demo"),
+            deliverables={"dataset_overview": object()},
+            notebooks={},
+            exports={},
+        ),
+    )
+
+    caches_seen: list[object | None] = []
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.load_workspace_config",
+        lambda workspace: fake_context,
+    )
+
+    def fake_deliverable_status_from_context(context, deliverable_id, *, freshness_cache=None):
+        assert context is fake_context
+        assert deliverable_id == "dataset_overview"
+        caches_seen.append(freshness_cache)
+        return SimpleNamespace(
+            model_dump=lambda mode="json": {"deliverable_id": deliverable_id, "status": "ok"},
+            docs_refs=[],
+            status="ok",
+        )
+
+    def fake_write_plot_index(context, *, freshness_cache=None):
+        assert context is fake_context
+        caches_seen.append(freshness_cache)
+        return {"plots": []}
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.deliverable_status_from_context",
+        fake_deliverable_status_from_context,
+    )
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.write_plot_index",
+        fake_write_plot_index,
+    )
+
+    payload = workspace_catalog(workspace_dir)
+
+    assert payload["state"] == "ok"
+    assert len(caches_seen) == 2
+    assert caches_seen[0] is not None
+    assert caches_seen[0] is caches_seen[1]
+
+
+def test_workspace_catalog_from_context_avoids_workspace_reload(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    outputs_dir = workspace_dir / "outputs"
+    outputs_dir.mkdir(parents=True)
+
+    fake_context = SimpleNamespace(
+        workspace_id="catalog_demo",
+        workspace_dir=workspace_dir,
+        output_root=outputs_dir,
+        config=SimpleNamespace(
+            workspace=SimpleNamespace(title="Catalog demo"),
+            deliverables={"dataset_overview": object()},
+            notebooks={},
+            exports={},
+        ),
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.load_workspace_config",
+        lambda workspace: (_ for _ in ()).throw(AssertionError("workspace reload not expected")),
+    )
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.deliverable_status_from_context",
+        lambda context, deliverable_id, **kwargs: SimpleNamespace(
+            model_dump=lambda mode="json": {"deliverable_id": deliverable_id, "status": "ok"},
+            docs_refs=[],
+            status="ok",
+        ),
+    )
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.write_plot_index",
+        lambda context, **kwargs: {"plots": []},
+    )
+
+    payload = workspace_catalog_from_context(fake_context)
+
+    assert payload["workspace_id"] == "catalog_demo"
+    stored = json.loads((outputs_dir / "catalog.json").read_text(encoding="utf-8"))
+    assert stored["workspace_id"] == "catalog_demo"

@@ -14,9 +14,10 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
-from dnadesign.latentdna.src.services import freshness_service as freshness_service_module
 from dnadesign.latentdna.src.services.deliverable_service import deliverable_status
+from dnadesign.latentdna.src.services.freshness_service import FreshnessCache
 from dnadesign.latentdna.src.services.run_service import list_runs
+from dnadesign.latentdna.src.sources import provenance as provenance_module
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.mock import MockSpec, create_mock_dataset
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
@@ -318,13 +319,76 @@ def test_view_manifest_records_overlay_part_provenance(tmp_path: Path) -> None:
     densegen_part_entries = [
         entry for entry in provenance if entry.get("role") == "overlay_part" and entry.get("namespace") == "densegen"
     ]
+    overlay_entries = [entry for entry in provenance if entry.get("role") == "overlay"]
 
     assert infer_part_entries
     assert densegen_part_entries
+    assert overlay_entries
     assert all(entry["kind"] == "file" for entry in infer_part_entries)
     assert all(Path(str(entry["path"])).suffix == ".parquet" for entry in infer_part_entries)
     assert {tuple(entry.get("columns") or []) for entry in infer_part_entries} == {("infer__x_representation",)}
     assert {tuple(entry.get("columns") or []) for entry in densegen_part_entries} == {("densegen__plan",)}
+    assert all(entry.get("digest_mode") == "inventory" for entry in overlay_entries)
+
+
+def test_view_manifest_records_overlay_ledger_when_explicit_contract_enabled(tmp_path: Path) -> None:
+    workspace_dir, usr_root = _build_overlay_backed_workspace(tmp_path)
+    dataset = Dataset(usr_root, "promoter/demo_anchor_set")
+    infer_ledger = dataset.write_overlay_digest_ledger("infer")
+    densegen_ledger = dataset.write_overlay_digest_ledger("densegen")
+
+    materialize_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert materialize_result.exit_code == 0, materialize_result.stdout
+
+    manifest_path = workspace_dir / "outputs" / "views" / "z20_60" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    provenance = manifest["source_provenance"]
+
+    overlay_entries = [entry for entry in provenance if entry.get("role") == "overlay"]
+    ledger_entries = [entry for entry in provenance if entry.get("role") == "overlay_ledger"]
+    overlay_part_entries = [entry for entry in provenance if entry.get("role") == "overlay_part"]
+
+    assert overlay_entries
+    assert all(entry.get("digest_mode") == "inventory" for entry in overlay_entries)
+    assert {Path(str(entry["path"])).resolve() for entry in ledger_entries} == {
+        infer_ledger.resolve(),
+        densegen_ledger.resolve(),
+    }
+    assert overlay_part_entries == []
+
+
+def test_deliverable_status_avoids_overlay_part_hashes_when_ledgers_are_enabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_dir, usr_root = _build_overlay_backed_workspace(tmp_path)
+    dataset = Dataset(usr_root, "promoter/demo_anchor_set")
+    dataset.write_overlay_digest_ledger("infer")
+    dataset.write_overlay_digest_ledger("densegen")
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "view_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    original_sha256_path = provenance_module.sha256_path
+    hash_counts: Counter[str] = Counter()
+
+    def counting_sha256_path(path: Path) -> str:
+        hash_counts[Path(path).as_posix()] += 1
+        return original_sha256_path(path)
+
+    monkeypatch.setattr(provenance_module, "sha256_path", counting_sha256_path)
+
+    status = deliverable_status(workspace_dir, "view_bundle")
+
+    assert status.status == "ok"
+    assert any(path.endswith("/digest_ledger.json") for path in hash_counts)
+    assert not any("/_derived/" in path and path.endswith(".parquet") for path in hash_counts)
 
 
 def test_recipe_run_rebuilds_stale_view_after_overlay_change(tmp_path: Path) -> None:
@@ -388,17 +452,48 @@ def test_deliverable_status_hashes_shared_freshness_paths_once_per_call(
     )
     assert run_result.exit_code == 0, run_result.stdout
 
-    original_sha256_path = freshness_service_module.sha256_path
+    original_sha256_path = provenance_module.sha256_path
     hash_counts: Counter[str] = Counter()
 
     def counting_sha256_path(path: Path) -> str:
         hash_counts[Path(path).as_posix()] += 1
         return original_sha256_path(path)
 
-    monkeypatch.setattr(freshness_service_module, "sha256_path", counting_sha256_path)
+    monkeypatch.setattr(provenance_module, "sha256_path", counting_sha256_path)
 
     status = deliverable_status(workspace_dir, "projection_bundle")
     assert status.status == "ok"
+    assert hash_counts
+    assert max(hash_counts.values()) == 1
+
+
+def test_deliverable_status_reuses_shared_freshness_cache_across_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_dir = _build_projection_bundle_workspace(tmp_path)
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "projection_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    original_sha256_path = provenance_module.sha256_path
+    hash_counts: Counter[str] = Counter()
+
+    def counting_sha256_path(path: Path) -> str:
+        hash_counts[Path(path).as_posix()] += 1
+        return original_sha256_path(path)
+
+    monkeypatch.setattr(provenance_module, "sha256_path", counting_sha256_path)
+
+    freshness_cache = FreshnessCache()
+    first = deliverable_status(workspace_dir, "projection_bundle", freshness_cache=freshness_cache)
+    second = deliverable_status(workspace_dir, "projection_bundle", freshness_cache=freshness_cache)
+
+    assert first.status == "ok"
+    assert second.status == "ok"
     assert hash_counts
     assert max(hash_counts.values()) == 1
 
@@ -415,14 +510,14 @@ def test_runs_list_hashes_shared_freshness_paths_once_per_call(
     )
     assert run_result.exit_code == 0, run_result.stdout
 
-    original_sha256_path = freshness_service_module.sha256_path
+    original_sha256_path = provenance_module.sha256_path
     hash_counts: Counter[str] = Counter()
 
     def counting_sha256_path(path: Path) -> str:
         hash_counts[Path(path).as_posix()] += 1
         return original_sha256_path(path)
 
-    monkeypatch.setattr(freshness_service_module, "sha256_path", counting_sha256_path)
+    monkeypatch.setattr(provenance_module, "sha256_path", counting_sha256_path)
 
     runs_payload = list_runs(workspace_dir)
     assert any(run["artifact_id"] == "umap_z20_60" for run in runs_payload["runs"])

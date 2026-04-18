@@ -26,6 +26,7 @@ def test_latentdna_root_keeps_progressive_disclosure_directories() -> None:
     latentdna_root = _latentdna_root()
     assert (latentdna_root / "README.md").is_file()
     assert (latentdna_root / "docs").is_dir()
+    assert (latentdna_root / "ops").is_dir()
     assert (latentdna_root / "docs" / "reference").is_dir()
     assert (latentdna_root / "docs" / "dev").is_dir()
     assert (latentdna_root / "src").is_dir()
@@ -42,6 +43,7 @@ def test_latentdna_root_keeps_minimal_top_level_surface() -> None:
     assert observed == {
         "README.md",
         "docs",
+        "ops",
         "src",
         "tests",
         "workspaces",
@@ -86,3 +88,9 @@ def test_latentdna_package_data_uses_workspace_shape_globs() -> None:
     assert '"dnadesign.latentdna"' in pyproject
     assert "workspaces/templates/*/*.yaml" in pyproject
     assert "workspaces/templates/*/*.md" in pyproject
+
+
+def test_latentdna_integration_tests_use_descriptive_module_names() -> None:
+    integrations_dir = _latentdna_root() / "tests" / "integrations"
+    legacy_modules = sorted(path.name for path in integrations_dir.glob("test_phase*.py"))
+    assert legacy_modules == []

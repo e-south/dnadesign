@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase13_plot_diagnostics_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_plot_diagnostics_workflow.py
 
-Phase 13 workflow tests for the remaining read-only plot kinds.
+Workflow tests for the remaining read-only plot kinds.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -22,6 +22,29 @@ from typer.testing import CliRunner
 from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
+
+
+def _write_plot_semantics(workspace_dir: Path, plot_id: str) -> str:
+    semantics_ref = f"plot_semantics/{plot_id}.yaml"
+    semantics_path = workspace_dir / semantics_ref
+    semantics_path.parent.mkdir(parents=True, exist_ok=True)
+    semantics_path.write_text(
+        yaml.safe_dump(
+            {
+                "plot_id": plot_id,
+                "research_question": f"What does {plot_id} show?",
+                "evidence_tier": "qc",
+                "encoding_summary": f"QC fixture semantics for {plot_id}.",
+                "sampling_scope": "Fixture-sized workflow sample.",
+                "interpretation_guardrails": ["Fixture semantics are descriptive only."],
+                "caption_md": f"QC fixture plot for {plot_id}.",
+                "alt_text": f"QC fixture plot for {plot_id}.",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return semantics_ref
 
 
 def _write_usr_dataset(root: Path, dataset: str, rows: list[dict[str, object]]) -> None:
@@ -81,16 +104,19 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                         "x_column": "d_spy_p",
                         "y_column": "d_sul_ap",
                         "color_column": "densegen__plan",
+                        "semantics_ref": _write_plot_semantics(workspace_dir, "primary_landmark_scatter"),
                     },
                     "spy_distance_distribution": {
                         "kind": "distribution",
                         "distance": "primary_landmark_distances",
                         "value_column": "d_spy_p",
                         "color_column": "densegen__plan",
+                        "semantics_ref": _write_plot_semantics(workspace_dir, "spy_distance_distribution"),
                     },
                     "primary_agreement_summary": {
                         "kind": "agreement_summary",
                         "agreement": "primary_vs_primary",
+                        "semantics_ref": _write_plot_semantics(workspace_dir, "primary_agreement_summary"),
                     },
                 },
             },
@@ -100,7 +126,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
     )
 
 
-def test_phase13_distance_distribution_and_agreement_summary_plots(tmp_path: Path) -> None:
+def test_distance_distribution_and_agreement_summary_plots(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
@@ -310,7 +336,7 @@ def test_phase13_distance_distribution_and_agreement_summary_plots(tmp_path: Pat
     assert agreement_manifest["params"]["agreement_id"] == "primary_vs_primary"
 
 
-def test_phase13_plot_render_rejects_mixed_named_and_inline_specs(tmp_path: Path) -> None:
+def test_plot_render_rejects_mixed_named_and_inline_specs(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"

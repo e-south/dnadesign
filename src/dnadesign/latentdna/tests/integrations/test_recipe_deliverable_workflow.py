@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/tests/integrations/test_phase6_recipe_deliverable_workflow.py
+src/dnadesign/latentdna/tests/integrations/test_recipe_deliverable_workflow.py
 
-Phase 6 workflow tests for recipe orchestration and deliverable status/run.
+Workflow tests for recipe orchestration and deliverable status/run.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -23,6 +23,29 @@ from typer.testing import CliRunner
 from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
+
+
+def _write_plot_semantics(workspace_dir: Path, plot_id: str) -> str:
+    semantics_ref = f"plot_semantics/{plot_id}.yaml"
+    semantics_path = workspace_dir / semantics_ref
+    semantics_path.parent.mkdir(parents=True, exist_ok=True)
+    semantics_path.write_text(
+        yaml.safe_dump(
+            {
+                "plot_id": plot_id,
+                "research_question": f"What does {plot_id} show?",
+                "evidence_tier": "qc",
+                "encoding_summary": f"QC fixture semantics for {plot_id}.",
+                "sampling_scope": "Fixture-sized workflow sample.",
+                "interpretation_guardrails": ["Fixture semantics are descriptive only."],
+                "caption_md": f"QC fixture plot for {plot_id}.",
+                "alt_text": f"QC fixture plot for {plot_id}.",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return semantics_ref
 
 
 def _write_usr_dataset(root: Path, dataset: str, rows: list[dict[str, object]]) -> None:
@@ -67,6 +90,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                     "atlas_demo_plot": {
                         "kind": "projection_scatter",
                         "projection": "umap_z20_60",
+                        "semantics_ref": _write_plot_semantics(workspace_dir, "atlas_demo_plot"),
                     }
                 },
                 "recipes": {
@@ -133,7 +157,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
     )
 
 
-def test_phase6_recipe_and_deliverable_flow(tmp_path: Path) -> None:
+def test_recipe_and_deliverable_flow(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     usr_root = tmp_path / "usr_root"
