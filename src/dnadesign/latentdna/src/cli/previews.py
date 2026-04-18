@@ -441,7 +441,10 @@ def preview_plot_render(
     render_mode: str | None,
     label_column: str | None,
     label_values: list[str],
-    force: bool,
+    shape_column: str | None = None,
+    scalar_ids: list[str] | None = None,
+    agreement_ids: list[str] | None = None,
+    force: bool = False,
 ) -> dict[str, Any]:
     context, spec = resolve_plot_request(
         workspace,
@@ -460,9 +463,12 @@ def preview_plot_render(
         x_column=x_column,
         y_column=y_column,
         color_column=color_column,
+        shape_column=shape_column,
         render_mode=render_mode,
         label_column=label_column,
         label_values=label_values,
+        scalar_ids=scalar_ids,
+        agreement_ids=agreement_ids,
     )
     output_dir = artifact_dir(context, artifact_kind="plot", artifact_id=plot_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="plot", force=force)

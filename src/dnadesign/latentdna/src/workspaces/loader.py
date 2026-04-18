@@ -24,7 +24,7 @@ from ..contracts.workspace import (
     WorkspaceConfig,
 )
 from ..io.json_io import read_json
-from .paths import has_legacy_output_entries, legacy_output_root, resolve_workspace_path
+from .paths import resolve_workspace_path
 from .validation import validate_workspace_config
 
 
@@ -33,6 +33,7 @@ class WorkspaceContext:
     workspace_dir: Path
     config_path: Path
     config: WorkspaceConfig
+    _output_root: Path
 
     @property
     def workspace_id(self) -> str:
@@ -40,33 +41,11 @@ class WorkspaceContext:
 
     @property
     def output_root(self) -> Path:
-        candidate = Path(self.config.workspace.output_root)
-        if not candidate.is_absolute():
-            candidate = self.workspace_dir / candidate
-        resolved = candidate.resolve()
-        if self.workspace_dir.resolve() not in resolved.parents and resolved != self.workspace_dir.resolve():
-            raise WorkspaceValidationError(f"workspace output root must stay inside the workspace: {resolved}")
-        return resolved
-
-    @property
-    def legacy_output_root(self) -> Path:
-        return legacy_output_root(self.workspace_dir)
+        return self._output_root
 
     @property
     def analysis_dtype(self) -> str:
         return self.config.defaults.analysis_dtype
-
-    def assert_no_legacy_outputs(self) -> None:
-        legacy_output_root = self.legacy_output_root
-        if self.output_root == legacy_output_root:
-            raise WorkspaceValidationError(
-                f"legacy output_root is not supported for latentdna workspaces: {legacy_output_root}; use ./outputs"
-            )
-        if has_legacy_output_entries(legacy_output_root):
-            raise WorkspaceValidationError(
-                "legacy output tree is not supported for latentdna workspaces; remove "
-                f"{legacy_output_root} before running latentdna commands"
-            )
 
     def require_source(self, source_id: str):
         if source_id not in self.config.sources:
@@ -139,7 +118,7 @@ class WorkspaceContext:
         return read_json(path)
 
 
-def load_workspace_config(workspace: str | Path, *, allow_legacy_outputs: bool = False) -> WorkspaceContext:
+def load_workspace_config(workspace: str | Path, *, validate_plot_semantics: bool = False) -> WorkspaceContext:
     workspace_dir = resolve_workspace_path(workspace)
     config_path = workspace_dir / "config.yaml"
     if not config_path.exists():
@@ -147,7 +126,28 @@ def load_workspace_config(workspace: str | Path, *, allow_legacy_outputs: bool =
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     config = WorkspaceConfig.model_validate(payload)
     validate_workspace_config(config)
-    context = WorkspaceContext(workspace_dir=workspace_dir, config_path=config_path, config=config)
-    if not allow_legacy_outputs:
-        context.assert_no_legacy_outputs()
+    context = WorkspaceContext(
+        workspace_dir=workspace_dir,
+        config_path=config_path,
+        config=config,
+        _output_root=_resolve_output_root(workspace_dir=workspace_dir, config=config),
+    )
+    if validate_plot_semantics:
+        from .plot_semantics import validate_plot_semantics_sidecars
+
+        validate_plot_semantics_sidecars(context)
     return context
+
+
+def _resolve_output_root(*, workspace_dir: Path, config: WorkspaceConfig) -> Path:
+    candidate = Path(config.workspace.output_root)
+    if not candidate.is_absolute():
+        candidate = workspace_dir / candidate
+    resolved = candidate.resolve()
+    workspace_root = workspace_dir.resolve()
+    if workspace_root not in resolved.parents and resolved != workspace_root:
+        raise WorkspaceValidationError(f"workspace output root must stay inside the workspace: {resolved}")
+    required = (workspace_root / "outputs").resolve()
+    if resolved != required:
+        raise WorkspaceValidationError(f"workspace output_root must resolve to {required}; got {resolved}")
+    return resolved

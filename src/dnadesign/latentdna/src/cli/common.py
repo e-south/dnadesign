@@ -49,8 +49,8 @@ def emit(payload: Any, *, format_name: str, quiet: bool = False) -> None:
 
 
 def resolve_progress_mode(progress_mode: str) -> str:
-    if progress_mode not in {"none", "human", "json"}:
-        raise typer.BadParameter("progress must be one of: none, human, json")
+    if progress_mode not in {"none", "text", "json"}:
+        raise typer.BadParameter("progress must be one of: none, text, json")
     return progress_mode
 
 
@@ -58,7 +58,7 @@ def progress_sink_for_mode(progress_mode: str):
     mode = resolve_progress_mode(progress_mode)
     if mode == "none":
         return None
-    if mode == "human":
+    if mode == "text":
         return lambda event: typer.echo(_render_progress_event(event), err=True)
     return lambda event: typer.echo(json.dumps(event, sort_keys=False))
 

@@ -14,10 +14,11 @@ import pyarrow.parquet as pq
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.workspace import MatrixBundleSourceConfig, ParquetSourceConfig, SourceConfig, USRSourceConfig
-from ..io.hashing import sha256_path, sha256_payload
+from ..io.hashing import sha256_payload
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_row_count, read_schema, read_table
 from . import parquet_source, usr_source
+from .provenance import source_provenance_digest
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,7 +221,7 @@ def source_digest(
     serialized: list[dict[str, object]] = []
     input_digests: dict[str, str] = {}
     for entry in entries:
-        digest = sha256_path(Path(str(entry["path"])))
+        digest = source_provenance_digest(entry)
         item = dict(entry)
         item["digest"] = digest
         serialized.append(item)
@@ -234,6 +235,7 @@ def source_digest(
                 "path": item["path"],
                 "namespace": item.get("namespace"),
                 "columns": item.get("columns"),
+                "digest_mode": item.get("digest_mode"),
                 "digest": item["digest"],
             }
             for item in serialized

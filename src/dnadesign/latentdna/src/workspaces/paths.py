@@ -22,6 +22,10 @@ def builtin_templates_dir() -> Path:
     return project_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "templates"
 
 
+def builtin_workspaces_dir() -> Path:
+    return project_root() / "src" / "dnadesign" / "latentdna" / "workspaces"
+
+
 def resolve_repo_path(path: str | Path) -> Path:
     candidate = Path(path)
     if candidate.is_absolute():
@@ -50,18 +54,10 @@ def resolve_workspace_path(workspace: str | Path) -> Path:
     cwd_candidate = Path.cwd() / candidate
     if cwd_candidate.is_dir():
         return cwd_candidate.resolve()
+    root_candidate = default_workspace_root()[0] / candidate
+    if root_candidate.is_dir():
+        return root_candidate.resolve()
+    builtin_candidate = builtin_workspaces_dir() / candidate
+    if builtin_candidate.is_dir():
+        return builtin_candidate.resolve()
     raise WorkspaceValidationError(f"workspace not found: {workspace}")
-
-
-def legacy_output_root(workspace_dir: Path) -> Path:
-    return (workspace_dir / "outputs" / "latentdna").resolve()
-
-
-def has_legacy_output_entries(path: Path) -> bool:
-    if not path.exists():
-        return False
-    for candidate in path.rglob("*"):
-        if candidate.name.startswith("."):
-            continue
-        return True
-    return False

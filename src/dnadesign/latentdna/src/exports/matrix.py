@@ -23,6 +23,7 @@ from ..workspaces.loader import WorkspaceContext
 @dataclass(frozen=True, slots=True)
 class ExportBlockPayload:
     matrix: np.ndarray
+    rows_table: pa.Table
     feature_rows: list[dict[str, object]]
     block_row: list[dict[str, object]]
 
@@ -131,6 +132,36 @@ def _project_rows_to_alignment(
     return index_groups
 
 
+def _project_metadata_to_alignment_rows(
+    alignment_rows: pa.Table,
+    candidate_rows: pa.Table,
+    *,
+    index_groups: list[list[int]],
+    label: str,
+) -> pa.Table:
+    if len(index_groups) != alignment_rows.num_rows:
+        raise ContractViolationError(
+            f"{label} alignment projection produced {len(index_groups)} index groups for {alignment_rows.num_rows} rows"
+        )
+    projected = alignment_rows
+    for field in candidate_rows.schema:
+        column_name = field.name
+        if column_name in projected.column_names:
+            continue
+        source_values = candidate_rows[column_name].to_pylist()
+        projected_values: list[object] = []
+        for indices in index_groups:
+            first_value = source_values[indices[0]]
+            for index in indices[1:]:
+                if source_values[index] != first_value:
+                    raise ContractViolationError(
+                        f"{label} metadata column {column_name!r} disagrees within aligned rows"
+                    )
+            projected_values.append(first_value)
+        projected = projected.append_column(column_name, pa.array(projected_values, type=field.type))
+    return projected
+
+
 def resolve_export_basis(context: WorkspaceContext, *, export_id: str) -> tuple[Path, pa.Table]:
     export = context.require_export(export_id)
     return _resolve_rows_artifact(context, export.row_basis)
@@ -173,7 +204,12 @@ def _reduced_view_block_payload(
             [aggregate_rows(matrix, indices, mode=block.alignment_aggregation) for indices in index_groups]
         ).astype(np.float32, copy=False)
         matrix = np.ascontiguousarray(matrix)
-        rows_table = aligned_rows
+        rows_table = _project_metadata_to_alignment_rows(
+            aligned_rows,
+            rows_table,
+            index_groups=index_groups,
+            label=f"export block {block.block_id}",
+        )
     _assert_row_alignment(basis_table, rows_table, label=f"export block {block.block_id}")
     feature_rows = [
         {
@@ -183,11 +219,14 @@ def _reduced_view_block_payload(
             "feature_order": feature_order + 1,
             "source_artifact_id": block.source,
             "source_column": f"component_{feature_order + 1:03d}",
+            "allowed_use": block.allowed_use,
+            "leakage_notes": list(block.leakage_notes),
         }
         for feature_order in range(matrix.shape[1])
     ]
     return ExportBlockPayload(
         matrix=matrix,
+        rows_table=rows_table,
         feature_rows=feature_rows,
         block_row=[
             {
@@ -198,6 +237,8 @@ def _reduced_view_block_payload(
                 "alignment_id": block.alignment,
                 "alignment_path": None if alignment_path is None else alignment_path.as_posix(),
                 "alignment_aggregation": block.alignment_aggregation if block.alignment is not None else None,
+                "allowed_use": block.allowed_use,
+                "leakage_notes": list(block.leakage_notes),
             }
         ],
     )
@@ -242,7 +283,12 @@ def _table_columns_block_payload(
         matrix = np.vstack(
             [aggregate_rows(matrix, indices, mode=block.alignment_aggregation) for indices in index_groups]
         )
-        rows_table = aligned_rows
+        rows_table = _project_metadata_to_alignment_rows(
+            aligned_rows,
+            rows_table,
+            index_groups=index_groups,
+            label=f"export block {block.block_id}",
+        )
     _assert_row_alignment(basis_table, rows_table, label=f"export block {block.block_id}")
     feature_rows = []
     for feature_order, column in enumerate(block.columns, start=1):
@@ -255,10 +301,13 @@ def _table_columns_block_payload(
                 "feature_order": feature_order,
                 "source_artifact_id": block.source,
                 "source_column": column,
+                "allowed_use": block.allowed_use,
+                "leakage_notes": list(block.leakage_notes),
             }
         )
     return ExportBlockPayload(
         matrix=np.ascontiguousarray(matrix, dtype=np.float32),
+        rows_table=rows_table,
         feature_rows=feature_rows,
         block_row=[
             {
@@ -269,6 +318,8 @@ def _table_columns_block_payload(
                 "alignment_id": block.alignment,
                 "alignment_path": None if alignment_path is None else alignment_path.as_posix(),
                 "alignment_aggregation": block.alignment_aggregation if block.alignment is not None else None,
+                "allowed_use": block.allowed_use,
+                "leakage_notes": list(block.leakage_notes),
             }
         ],
     )
@@ -307,12 +358,49 @@ def resolve_export_blocks(
     return basis_path, basis_table, blocks
 
 
+def _append_metadata_columns(
+    basis_table: pa.Table,
+    *,
+    blocks: list[ExportBlockPayload],
+    required_columns: list[str],
+) -> pa.Table:
+    if not required_columns:
+        return basis_table
+    enriched = basis_table
+    for column in required_columns:
+        if column in enriched.column_names:
+            continue
+        candidates = [block.rows_table[column] for block in blocks if column in block.rows_table.column_names]
+        if not candidates:
+            raise ContractViolationError(f"export rows are missing required metadata column: {column}")
+        candidate_values = [candidate.to_pylist() for candidate in candidates]
+        merged_values: list[object] = []
+        for row_index in range(len(candidate_values[0])):
+            chosen = None
+            chosen_set = False
+            for values in candidate_values:
+                value = values[row_index]
+                if value is None:
+                    continue
+                if not chosen_set:
+                    chosen = value
+                    chosen_set = True
+                    continue
+                if value != chosen:
+                    raise ContractViolationError(f"export metadata column {column!r} disagrees across aligned blocks")
+            merged_values.append(chosen)
+        enriched = enriched.append_column(column, pa.array(merged_values))
+    return enriched
+
+
 def build_export_matrix_artifact(
     context: WorkspaceContext,
     *,
     export_id: str,
 ) -> tuple[Path, Path, int, int, list[dict[str, object]], list[dict[str, object]]]:
     basis_path, basis_table, blocks = resolve_export_blocks(context, export_id=export_id)
+    export = context.require_export(export_id)
+    basis_table = _append_metadata_columns(basis_table, blocks=blocks, required_columns=list(export.metadata_columns))
     matrices = [block.matrix for block in blocks]
     feature_rows = [row for block in blocks for row in block.feature_rows]
     block_rows = [row for block in blocks for row in block.block_row]
@@ -320,7 +408,6 @@ def build_export_matrix_artifact(
     duplicates = sorted(name for name, count in Counter(feature_names).items() if count > 1)
     if duplicates:
         raise ContractViolationError(f"export {export_id} defines duplicate feature names: {duplicates[:5]}")
-    export = context.require_export(export_id)
     export_matrix = np.ascontiguousarray(np.column_stack(matrices), dtype=export.matrix_dtype or context.analysis_dtype)
     export_dir = context.output_root / "exports" / export_id
     write_matrix(export_dir / "matrix.npy", export_matrix)

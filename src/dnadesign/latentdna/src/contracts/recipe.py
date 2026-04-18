@@ -23,6 +23,7 @@ SUPPORTED_RECIPE_OPS: frozenset[str] = frozenset(
         "plot.render",
         "projection.fit",
         "sample.build",
+        "scalar.build",
         "scalar.derive",
         "snapshot.build",
         "view.derive",
@@ -79,6 +80,8 @@ def expected_step_artifacts(op: str, params: dict[str, Any]) -> list[tuple[str, 
         return [("projection", str(require_param("projection_id", "run_id")))]
     if op == "sample.build":
         return [("sample_set", str(require_param("sample_id", "sample")))]
+    if op == "scalar.build":
+        return [("scalar_table", str(require_param("scalar_id", "scalar")))]
     if op == "scalar.derive":
         return [("scalar_table", str(require_param("scalar_id", "scalar")))]
     if op == "snapshot.build":

@@ -11,12 +11,12 @@ from ..agreements.compare import compare_agreement_artifact
 from ..contracts.errors import ArtifactConflictError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
 from ..sources.resolver import resolve_source
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
+from ._artifact_inputs import artifact_input_from_path, dependency_artifact_input
 
 
 def compare_agreement(
@@ -58,25 +58,29 @@ def compare_agreement(
     if left_neighbors_id is not None and right_neighbors_id is not None:
         inputs.extend(
             [
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="neighbor_set",
-                    id=left_neighbors_id,
-                    digest=sha256_file(context.output_root / "neighbors" / left_neighbors_id / "indices.npy"),
+                    artifact_id=left_neighbors_id,
+                    path=context.output_root / "neighbors" / left_neighbors_id / "indices.npy",
                 ),
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="neighbor_rows",
-                    id=left_neighbors_id,
-                    digest=sha256_file(context.output_root / "neighbors" / left_neighbors_id / "rows.parquet"),
+                    artifact_id=left_neighbors_id,
+                    path=context.output_root / "neighbors" / left_neighbors_id / "rows.parquet",
                 ),
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="neighbor_set",
-                    id=right_neighbors_id,
-                    digest=sha256_file(context.output_root / "neighbors" / right_neighbors_id / "indices.npy"),
+                    artifact_id=right_neighbors_id,
+                    path=context.output_root / "neighbors" / right_neighbors_id / "indices.npy",
                 ),
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="neighbor_rows",
-                    id=right_neighbors_id,
-                    digest=sha256_file(context.output_root / "neighbors" / right_neighbors_id / "rows.parquet"),
+                    artifact_id=right_neighbors_id,
+                    path=context.output_root / "neighbors" / right_neighbors_id / "rows.parquet",
                 ),
             ]
         )
@@ -89,15 +93,17 @@ def compare_agreement(
     if left_cluster_id is not None and right_cluster_id is not None:
         inputs.extend(
             [
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="cluster_set",
-                    id=left_cluster_id,
-                    digest=sha256_file(context.output_root / "clusters" / left_cluster_id / "assignments.parquet"),
+                    artifact_id=left_cluster_id,
+                    path=context.output_root / "clusters" / left_cluster_id / "assignments.parquet",
                 ),
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="cluster_set",
-                    id=right_cluster_id,
-                    digest=sha256_file(context.output_root / "clusters" / right_cluster_id / "assignments.parquet"),
+                    artifact_id=right_cluster_id,
+                    path=context.output_root / "clusters" / right_cluster_id / "assignments.parquet",
                 ),
             ]
         )
@@ -120,11 +126,7 @@ def compare_agreement(
             resolved_source = resolve_source(landmark.source, source, workspace_dir=context.workspace_dir)
             if resolved_source.records_path is not None:
                 inputs.append(
-                    ArtifactInput(
-                        kind="landmark_source",
-                        id=landmark.source,
-                        digest=sha256_file(resolved_source.records_path),
-                    )
+                    artifact_input_from_path("landmark_source", landmark.source, resolved_source.records_path)
                 )
 
     manifest = ArtifactManifest(

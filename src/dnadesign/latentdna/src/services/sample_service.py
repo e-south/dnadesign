@@ -10,12 +10,12 @@ from pathlib import Path
 from ..contracts.errors import ArtifactConflictError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
 from ..samples.build import build_sample_artifact
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
+from ._artifact_inputs import dependency_artifact_input
 
 
 def build_sample(
@@ -60,22 +60,25 @@ def build_sample(
         input_digests = {}
         for input_sample_id in input_sample_ids or []:
             input_path = context.output_root / "samples" / input_sample_id / "rows.parquet"
-            input_digest = sha256_file(input_path)
-            input_entries.append(
-                ArtifactInput(
-                    kind="sample_set",
-                    id=input_sample_id,
-                    digest=input_digest,
-                    path=input_path.as_posix(),
-                )
+            input_entry = dependency_artifact_input(
+                context,
+                kind="sample_set",
+                artifact_id=input_sample_id,
+                path=input_path,
             )
-            input_digests[f"sample_set:{input_sample_id}"] = input_digest
+            input_entries.append(input_entry)
+            input_digests[f"sample_set:{input_sample_id}"] = input_entry.digest
     else:
         assert view_id is not None
         input_path = context.output_root / "views" / view_id / "rows.parquet"
-        input_digest = sha256_file(input_path)
-        input_entries = [ArtifactInput(kind="view_rows", id=view_id, digest=input_digest, path=input_path.as_posix())]
-        input_digests = {"view_rows": input_digest}
+        input_entry = dependency_artifact_input(
+            context,
+            kind="view_rows",
+            artifact_id=view_id,
+            path=input_path,
+        )
+        input_entries = [input_entry]
+        input_digests = {"view_rows": input_entry.digest}
     manifest = ArtifactManifest(
         artifact_kind="sample_set",
         artifact_id=sample_id,

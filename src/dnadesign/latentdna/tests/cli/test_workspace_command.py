@@ -87,8 +87,10 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                 "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_20b__template_1kb_20b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean:list<float32>",
             ]
         ),
@@ -199,6 +201,10 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     [[0.7, 0.6], [0.5, 0.4], [0.3, 0.2]],
                     type=pa.list_(pa.float32()),
                 ),
+                ("infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean"): pa.array(
+                    [[1.9, 1.8], [1.7, 1.6], [1.5, 1.4]],
+                    type=pa.list_(pa.float32()),
+                ),
                 ("infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean"): pa.array(
                     [[2.0, 1.9], [1.8, 1.7], [1.6, 1.5]],
                     type=pa.list_(pa.float32()),
@@ -207,6 +213,10 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean"
                 ): pa.array(
                     [[1.6, 1.5], [1.4, 1.3], [1.2, 1.1]],
+                    type=pa.list_(pa.float32()),
+                ),
+                ("infer__evo2_20b__template_1kb_20b_features__output_layer_mean__seq_mean"): pa.array(
+                    [[2.4, 2.3], [2.2, 2.1], [2.0, 1.9]],
                     type=pa.list_(pa.float32()),
                 ),
                 ("infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean"): pa.array(
@@ -273,7 +283,7 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert "latentdna validate workspace" in output
 
 
-def test_workspace_init_from_study_dir_hydrates_committee_template(tmp_path: Path) -> None:
+def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_template(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     study_dir = tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth"
     study_dir.mkdir(parents=True)
@@ -311,7 +321,7 @@ def test_workspace_init_from_study_dir_hydrates_committee_template(tmp_path: Pat
             "--workspace",
             workspace_dir.as_posix(),
             "--template",
-            "landmark_atlas_committee",
+            "promoter_reference_margin_benchmark",
             "--from-study-dir",
             study_dir.as_posix(),
             "--json",
@@ -327,10 +337,10 @@ def test_workspace_init_from_study_dir_hydrates_committee_template(tmp_path: Pat
 
     config_payload = yaml.safe_load((workspace_dir / "config.yaml").read_text(encoding="utf-8"))
     expected_usr_root = Path(relpath(usr_root.resolve(), workspace_dir.resolve())).as_posix()
-    assert config_payload["sources"]["anchor60"]["root"] == expected_usr_root
-    assert config_payload["sources"]["anchor60"]["dataset"] == "promoter/test_anchor"
-    assert config_payload["sources"]["ctx1k"]["root"] == expected_usr_root
-    assert config_payload["sources"]["ctx1k"]["dataset"] == "promoter/test_contexts"
+    assert config_payload["sources"]["anchor_60bp"]["root"] == expected_usr_root
+    assert config_payload["sources"]["anchor_60bp"]["dataset"] == "promoter/test_anchor"
+    assert config_payload["sources"]["full_context_1kb"]["root"] == expected_usr_root
+    assert config_payload["sources"]["full_context_1kb"]["dataset"] == "promoter/test_contexts"
     assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
     assert config_payload["study_binding"]["docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
 
@@ -490,7 +500,7 @@ def test_inspect_and_validate_workspace_use_usr_overlay_columns(tmp_path: Path) 
                         "tags": {"model": "demo"},
                         "role": "primary",
                     },
-                    "z20_1k_anchor": {
+                    "intermediate_embedding_20b_full_context_1kb": {
                         "source": "ctx1k",
                         "vector": {"kind": "column", "name": "infer__x_representation"},
                         "coordinate_space_id": "shared_space",
@@ -525,7 +535,9 @@ def test_inspect_and_validate_workspace_use_usr_overlay_columns(tmp_path: Path) 
     assert ctx_detail["required_columns"] == ["id", "construct__anchor_id", "construct__context_id"]
 
 
-def test_workspace_init_committee_template_validates_with_realish_promoter_study_data(tmp_path: Path) -> None:
+def test_workspace_init_promoter_reference_margin_template_validates_with_realish_promoter_study_data(
+    tmp_path: Path,
+) -> None:
     usr_root = _build_committee_usr_sources(tmp_path)
     study_dir = tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth"
     study_dir.mkdir(parents=True)
@@ -563,7 +575,7 @@ def test_workspace_init_committee_template_validates_with_realish_promoter_study
             "--workspace",
             workspace_dir.as_posix(),
             "--template",
-            "landmark_atlas_committee",
+            "promoter_reference_margin_benchmark",
             "--from-study-dir",
             study_dir.as_posix(),
             "--json",
@@ -578,31 +590,57 @@ def test_workspace_init_committee_template_validates_with_realish_promoter_study
     assert validate_result.exit_code == 0, validate_result.stdout
     validate_payload = yaml.safe_load(validate_result.stdout)
     assert validate_payload["status"] == "ok"
-    plan_cohort = next(detail for detail in validate_payload["cohort_details"] if detail["cohort_id"] == "plan")
-    assert plan_cohort["column"] == "densegen__plan"
-    z7_view = next(detail for detail in validate_payload["view_details"] if detail["view_id"] == "z7_60")
+    z7_view = next(
+        detail
+        for detail in validate_payload["view_details"]
+        if detail["view_id"] == "intermediate_embedding_7b_anchor_60bp"
+    )
     assert z7_view["vector_column"].endswith("block26_mlp_out__seq_mean")
 
     materialize_result = _RUNNER.invoke(
         app,
-        ["view", "materialize", "z7_60", "--workspace", workspace_dir.as_posix(), "--json"],
+        [
+            "view",
+            "materialize",
+            "intermediate_embedding_7b_anchor_60bp",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--json",
+        ],
     )
     assert materialize_result.exit_code == 0, materialize_result.stdout
+
+    post_materialize_validate_result = _RUNNER.invoke(
+        app,
+        ["validate", "workspace", "--workspace", workspace_dir.as_posix(), "--deep", "--json"],
+    )
+    assert post_materialize_validate_result.exit_code == 0, post_materialize_validate_result.stdout
+    post_materialize_validate_payload = yaml.safe_load(post_materialize_validate_result.stdout)
+    assert post_materialize_validate_payload["status"] == "ok"
+    materialized_view_detail = next(
+        detail
+        for detail in post_materialize_validate_payload["view_details"]
+        if detail["view_id"] == "intermediate_embedding_7b_anchor_60bp"
+    )
+    assert materialized_view_detail["materialized"] is True
+    assert "design_family" in materialized_view_detail["materialized_row_columns"]
+    assert "sig35_variant" in materialized_view_detail["materialized_row_columns"]
+    assert "densegen__plan" not in materialized_view_detail["materialized_row_columns"]
 
     sample_result = _RUNNER.invoke(
         app,
         [
             "sample",
             "build",
-            "atlas_sample",
+            "reference_margin_sample",
             "--workspace",
             workspace_dir.as_posix(),
             "--view",
-            "z7_60",
+            "intermediate_embedding_7b_anchor_60bp",
             "--strategy",
             "stratified",
             "--group-column",
-            "densegen__plan",
+            "design_family",
             "--n",
             "2",
             "--seed",
@@ -701,11 +739,10 @@ def test_workspace_refresh_removes_local_outputs_and_preserves_sources(tmp_path:
     (workspace_dir / "outputs" / "catalog.json").write_text("{}", encoding="utf-8")
     (workspace_dir / "outputs" / "runs" / "_staging" / "scratch").mkdir(parents=True)
     (workspace_dir / "outputs" / "runs" / "_staging" / "scratch" / "marker.txt").write_text("tmp", encoding="utf-8")
+    (workspace_dir / "outputs" / "status").mkdir(parents=True)
+    (workspace_dir / "outputs" / "status" / "workspace_snapshot.json").write_text("{}", encoding="utf-8")
     (workspace_dir / "outputs" / "logs" / "audit").mkdir(parents=True)
     (workspace_dir / "outputs" / "logs" / "audit" / "event.json").write_text("{}", encoding="utf-8")
-    (workspace_dir / "outputs" / "latentdna" / "plots").mkdir(parents=True)
-    (workspace_dir / "outputs" / "latentdna" / "plots" / "legacy.txt").write_text("legacy", encoding="utf-8")
-
     result = _RUNNER.invoke(app, ["workspace", "refresh", "--workspace", workspace_dir.as_posix(), "--json"])
 
     assert result.exit_code == 0, result.stdout
@@ -729,17 +766,18 @@ def test_workspace_refresh_removes_local_outputs_and_preserves_sources(tmp_path:
         "snapshots",
         "views",
         "runs",
+        "logs",
         "catalog",
-        "legacy",
+        "status",
     ]
     assert payload["post_refresh_validation"] == "ok"
     assert not (workspace_dir / "outputs" / "views").exists()
     assert not (workspace_dir / "outputs" / "plots").exists()
     assert not (workspace_dir / "outputs" / "catalog.json").exists()
     assert not (workspace_dir / "outputs" / "runs").exists()
-    assert not (workspace_dir / "outputs" / "latentdna").exists()
+    assert not (workspace_dir / "outputs" / "logs").exists()
+    assert not (workspace_dir / "outputs" / "status").exists()
     assert (workspace_dir / "outputs").is_dir()
-    assert (workspace_dir / "outputs" / "logs" / "audit" / "event.json").is_file()
     assert source_path.is_file()
     assert source_path.as_posix() in payload["protected_paths"]
 
@@ -767,9 +805,9 @@ def test_workspace_refresh_dry_run_leaves_outputs_in_place(tmp_path: Path) -> No
         ),
         encoding="utf-8",
     )
-    (workspace_dir / "outputs" / "latentdna" / "notebooks").mkdir(parents=True)
-    (workspace_dir / "outputs" / "latentdna" / "notebooks" / "browser.py").write_text(
-        "print('legacy')", encoding="utf-8"
+    (workspace_dir / "outputs" / "notebooks" / "latent_geometry_browser").mkdir(parents=True)
+    (workspace_dir / "outputs" / "notebooks" / "latent_geometry_browser" / "notebook.py").write_text(
+        "print('browser')", encoding="utf-8"
     )
 
     result = _RUNNER.invoke(
@@ -780,7 +818,7 @@ def test_workspace_refresh_dry_run_leaves_outputs_in_place(tmp_path: Path) -> No
             "--workspace",
             workspace_dir.as_posix(),
             "--target",
-            "legacy",
+            "notebooks",
             "--dry-run",
             "--json",
         ],
@@ -791,17 +829,17 @@ def test_workspace_refresh_dry_run_leaves_outputs_in_place(tmp_path: Path) -> No
     assert payload["dry_run"] is True
     assert payload["post_refresh_validation"] == "skipped"
     assert payload["removed_paths"] == []
-    assert (workspace_dir / "outputs" / "latentdna").exists()
+    assert (workspace_dir / "outputs" / "notebooks" / "latent_geometry_browser").exists()
 
 
-def test_workspace_refresh_rejects_configured_legacy_output_root(tmp_path: Path) -> None:
+def test_workspace_refresh_rejects_noncanonical_output_root(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "demo_latentdna"
     workspace_dir.mkdir(parents=True)
     (workspace_dir / "config.yaml").write_text(
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "demo_latentdna", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs/nested"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -821,4 +859,140 @@ def test_workspace_refresh_rejects_configured_legacy_output_root(tmp_path: Path)
     result = _RUNNER.invoke(app, ["workspace", "refresh", "--workspace", workspace_dir.as_posix(), "--json"])
 
     assert result.exit_code != 0
-    assert "workspace refresh does not support configured legacy output_root" in result.stdout
+    assert "workspace output_root must resolve to" in result.stdout
+
+
+def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_latentdna"
+    workspace_dir.mkdir(parents=True)
+    usr_root = tmp_path / "usr_root"
+    dataset_dir = usr_root / "promoter" / "demo_anchor_set"
+    dataset_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "id": "anchor_01",
+                    "subject_id": "anchor_01",
+                    "usr_label__primary": "spyP",
+                    "design_family": "ethanol",
+                    "sig35_variant": "b",
+                    "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean": [
+                        1.0,
+                        0.0,
+                    ],
+                },
+                {
+                    "id": "anchor_02",
+                    "subject_id": "anchor_02",
+                    "usr_label__primary": "sulAp",
+                    "design_family": "cipro",
+                    "sig35_variant": "c",
+                    "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean": [
+                        0.0,
+                        1.0,
+                    ],
+                },
+            ]
+        ),
+        dataset_dir / "records.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor_60bp": {
+                        "kind": "usr",
+                        "root": usr_root.as_posix(),
+                        "dataset": "promoter/demo_anchor_set",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {"include": ["usr_label__primary", "design_family", "sig35_variant"]},
+                "views": {
+                    "intermediate_embedding_20b_anchor_60bp": {
+                        "source": "anchor_60bp",
+                        "vector": {
+                            "kind": "column",
+                            "name": (
+                                "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__"
+                                "block23_mlp_out__seq_mean"
+                            ),
+                        },
+                        "coordinate_space_id": "evo2_20b_intermediate_block23_mlp_out",
+                        "tags": {
+                            "encoder": "evo2",
+                            "model": "20b",
+                            "family": "intermediate_embedding",
+                            "scope": "anchor_60bp",
+                        },
+                    }
+                },
+                "deliverables": {
+                    "dataset_overview": {
+                        "title": "Dataset overview",
+                        "section": "Dataset",
+                        "question": "What was analyzed?",
+                        "summary": "Compact dataset inventory for the active workspace.",
+                        "recipe": "dataset_overview_recipe",
+                        "requires": {"views": ["intermediate_embedding_20b_anchor_60bp"]},
+                        "outputs": {"views": ["intermediate_embedding_20b_anchor_60bp"]},
+                        "docs_refs": [],
+                        "acceptance_checks": [],
+                    }
+                },
+                "notebooks": {
+                    "latent_geometry_browser": {
+                        "kind": "workspace",
+                        "title": "Latent geometry browser",
+                        "description": "Read-only geometry browser.",
+                        "default_deliverable": "dataset_overview",
+                    }
+                },
+                "recipes": {
+                    "dataset_overview_recipe": {
+                        "steps": [
+                            {
+                                "id": "materialize_anchor",
+                                "op": "view.materialize",
+                                "params": {"view": "intermediate_embedding_20b_anchor_60bp"},
+                            }
+                        ]
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "snapshot",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["workspace_id"] == "demo_latentdna"
+    assert payload["sources"]["anchor_60bp"]["dataset_id"] == "promoter/demo_anchor_set"
+    assert payload["sources"]["anchor_60bp"]["row_count"] == 2
+    assert payload["model_families"] == ["evo2_20b"]
+    assert payload["canonical_views"] == ["intermediate_embedding_20b_anchor_60bp"]
+    assert payload["browser"]["default_geometry_ids"] == ["intermediate_embedding_20b_anchor_60bp"]
+    assert payload["decision_ladder"] == ["dataset_overview"]

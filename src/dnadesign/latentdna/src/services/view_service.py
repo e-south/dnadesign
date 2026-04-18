@@ -12,7 +12,6 @@ from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..contracts.workspace import DerivedViewConfig
 from ..io.artifact_dirs import commit_staged_artifact_dirs, stage_artifact_dir
-from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..io.parquet_io import read_table
 from ..runs.recorder import record_audit
@@ -23,6 +22,7 @@ from ..views.materialize import materialize_view_artifact
 from ..views.reduce import fit_pca_reducer_artifacts
 from ..views.stats import compute_view_stats
 from ..workspaces.loader import load_workspace_config
+from ._artifact_inputs import artifact_input_from_manifest, dependency_artifact_input
 from .memory_service import apply_memory_preflight, evaluate_reduce_preflight
 
 
@@ -145,23 +145,23 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
     input_payload: dict[str, object] = {"view": view_id}
     if view.derive.kind == "vector_difference":
         input_entries = [
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view.derive.left,
-                digest=sha256_file(context.output_root / "views" / view.derive.left / "matrix.npy"),
-                path=(context.output_root / "views" / view.derive.left / "matrix.npy").as_posix(),
+                artifact_id=view.derive.left,
+                path=context.output_root / "views" / view.derive.left / "matrix.npy",
             ),
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view.derive.right,
-                digest=sha256_file(context.output_root / "views" / view.derive.right / "matrix.npy"),
-                path=(context.output_root / "views" / view.derive.right / "matrix.npy").as_posix(),
+                artifact_id=view.derive.right,
+                path=context.output_root / "views" / view.derive.right / "matrix.npy",
             ),
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="alignment_set",
-                id=view.derive.alignment,
-                digest=sha256_file(context.output_root / "alignments" / view.derive.alignment / "mapping.parquet"),
-                path=(context.output_root / "alignments" / view.derive.alignment / "mapping.parquet").as_posix(),
+                artifact_id=view.derive.alignment,
+                path=context.output_root / "alignments" / view.derive.alignment / "mapping.parquet",
             ),
         ]
         params.update(
@@ -179,56 +179,56 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
         }
     elif view.derive.kind == "normalize":
         input_entries = [
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view.derive.view,
-                digest=sha256_file(context.output_root / "views" / view.derive.view / "matrix.npy"),
-                path=(context.output_root / "views" / view.derive.view / "matrix.npy").as_posix(),
+                artifact_id=view.derive.view,
+                path=context.output_root / "views" / view.derive.view / "matrix.npy",
             )
         ]
         params.update({"input_view": view.derive.view, "method": view.derive.method})
         input_payload = {"view": view_id, "input_view": view.derive.view}
     elif view.derive.kind == "aggregate_by_key":
         input_entries = [
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view.derive.view,
-                digest=sha256_file(context.output_root / "views" / view.derive.view / "matrix.npy"),
-                path=(context.output_root / "views" / view.derive.view / "matrix.npy").as_posix(),
+                artifact_id=view.derive.view,
+                path=context.output_root / "views" / view.derive.view / "matrix.npy",
             ),
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_rows",
-                id=view.derive.view,
-                digest=sha256_file(context.output_root / "views" / view.derive.view / "rows.parquet"),
-                path=(context.output_root / "views" / view.derive.view / "rows.parquet").as_posix(),
+                artifact_id=view.derive.view,
+                path=context.output_root / "views" / view.derive.view / "rows.parquet",
             ),
         ]
         params.update({"input_view": view.derive.view, "key": view.derive.key, "aggregation": view.derive.aggregation})
         input_payload = {"view": view_id, "input_view": view.derive.view, "key": view.derive.key}
     elif view.derive.kind == "apply_reducer":
         input_entries = [
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view.derive.view,
-                digest=sha256_file(context.output_root / "views" / view.derive.view / "matrix.npy"),
-                path=(context.output_root / "views" / view.derive.view / "matrix.npy").as_posix(),
+                artifact_id=view.derive.view,
+                path=context.output_root / "views" / view.derive.view / "matrix.npy",
             ),
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="reducer",
-                id=view.derive.reducer,
-                digest=sha256_file(context.output_root / "reducers" / view.derive.reducer / "state.npz"),
-                path=(context.output_root / "reducers" / view.derive.reducer / "state.npz").as_posix(),
+                artifact_id=view.derive.reducer,
+                path=context.output_root / "reducers" / view.derive.reducer / "state.npz",
             ),
         ]
         params.update({"input_view": view.derive.view, "reducer": view.derive.reducer})
         input_payload = {"view": view_id, "input_view": view.derive.view, "reducer": view.derive.reducer}
     else:
         input_entries = [
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=input_view,
-                digest=sha256_file(context.output_root / "views" / input_view / "matrix.npy"),
-                path=(context.output_root / "views" / input_view / "matrix.npy").as_posix(),
+                artifact_id=input_view,
+                path=context.output_root / "views" / input_view / "matrix.npy",
             )
             for input_view in view.derive.inputs
         ]
@@ -344,11 +344,11 @@ def reduce_view(
         command="view reduce",
         status=status,
         inputs=[
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view_id,
-                digest=sha256_file(context.output_root / "views" / view_id / "matrix.npy"),
-                path=(context.output_root / "views" / view_id / "matrix.npy").as_posix(),
+                artifact_id=view_id,
+                path=context.output_root / "views" / view_id / "matrix.npy",
             )
         ],
         params={
@@ -382,17 +382,17 @@ def reduce_view(
             tool_version=__version__,
             command="view reduce",
             inputs=[
-                ArtifactInput(
+                artifact_input_from_manifest(
                     kind="reducer",
-                    id=reducer_id,
-                    digest=sha256_file(reducer_staging_dir / "state.npz"),
-                    path=(reducer_dir / "state.npz").as_posix(),
+                    artifact_id=reducer_id,
+                    digest_path=reducer_staging_dir / "manifest.json",
+                    recorded_path=reducer_dir / "manifest.json",
                 ),
-                ArtifactInput(
+                dependency_artifact_input(
+                    context,
                     kind="view_matrix",
-                    id=view_id,
-                    digest=sha256_file(context.output_root / "views" / view_id / "matrix.npy"),
-                    path=(context.output_root / "views" / view_id / "matrix.npy").as_posix(),
+                    artifact_id=view_id,
+                    path=context.output_root / "views" / view_id / "matrix.npy",
                 ),
             ],
             params={

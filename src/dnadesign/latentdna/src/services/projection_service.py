@@ -8,15 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..contracts.errors import ArtifactConflictError
-from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
+from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..io.artifact_dirs import commit_staged_artifact_dirs, stage_artifact_dir
-from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..projections.fit import fit_projection_artifact
 from ..runs.recorder import record_audit
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
+from ._artifact_inputs import dependency_artifact_input
 from .memory_service import apply_memory_preflight, evaluate_projection_preflight
 
 
@@ -40,6 +40,11 @@ def fit_projection(
     metric_value = metric or context.config.defaults.metric
     preflight = evaluate_projection_preflight(context, view_id=view_id, sample_id=sample_id)
     status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
+    sample_manifest = context.read_manifest(context.output_root / "samples" / sample_id / "manifest.json")
+    sample_params = sample_manifest.get("params", {}) if isinstance(sample_manifest.get("params"), dict) else {}
+    population_rows = int(
+        context.read_manifest(context.output_root / "views" / view_id / "manifest.json")["stats"]["rows"]
+    )
     try:
         artifact_dir, rows = fit_projection_artifact(
             context,
@@ -65,15 +70,17 @@ def fit_projection(
         command="projection fit",
         status=status,
         inputs=[
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="view_matrix",
-                id=view_id,
-                digest=sha256_file(context.output_root / "views" / view_id / "matrix.npy"),
+                artifact_id=view_id,
+                path=context.output_root / "views" / view_id / "matrix.npy",
             ),
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind="sample_set",
-                id=sample_id,
-                digest=sha256_file(context.output_root / "samples" / sample_id / "rows.parquet"),
+                artifact_id=sample_id,
+                path=context.output_root / "samples" / sample_id / "rows.parquet",
             ),
         ],
         params={
@@ -81,10 +88,19 @@ def fit_projection(
             "metric": metric_value,
             "random_seed": seed,
             "dimensionality": 2,
+            "sampling_strategy": sample_params.get("strategy", "unknown"),
+            "projection_role": ("primary" if rows == population_rows else "appendix"),
+            "default_rank": 0 if rows == population_rows else 100,
             "memory_preflight": preflight.as_payload(),
         },
         outputs=[ArtifactOutput(path="coords.parquet", media_type="application/x-parquet")],
-        stats={"rows": rows, "dims": 2},
+        stats={
+            "rows": rows,
+            "dims": 2,
+            "projected_rows": rows,
+            "population_rows": population_rows,
+            "is_full_population": rows == population_rows,
+        },
         warnings=warnings,
     )
     write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))

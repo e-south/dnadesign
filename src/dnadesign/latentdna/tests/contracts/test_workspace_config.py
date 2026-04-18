@@ -16,7 +16,11 @@ import shutil
 import pytest
 from pydantic import ValidationError
 
-from dnadesign.latentdna.src.contracts.errors import CoordinateSpaceError, WorkspaceValidationError
+from dnadesign.latentdna.src.contracts.errors import (
+    ContractViolationError,
+    CoordinateSpaceError,
+    WorkspaceValidationError,
+)
 from dnadesign.latentdna.src.workspaces import load_workspace_config
 from dnadesign.latentdna.src.workspaces.paths import builtin_templates_dir
 
@@ -600,7 +604,7 @@ views:
     coordinate_space_id: shared_space
     tags: {model: demo}
     role: primary
-  delta20:
+  context_shift_demo:
     derive:
       kind: normalize
       view: z20_60
@@ -609,30 +613,30 @@ views:
     tags: {operation: normalize}
     role: primary
 scalars:
-  delta20_norm:
+  context_shift_l2_demo:
     derive:
       kind: vector_norm
-      view: delta20
+      view: context_shift_demo
       norm: l2
 recipes:
-  atlas_recipe:
+  review_recipe:
     steps:
       - id: materialize_view
         op: view.materialize
         params:
           view: z20_60
 deliverables:
-  atlas_demo:
+  review_bundle:
     title: Demo deliverable
-    section: Atlas
+    section: Review
     question: Does the demo deliverable validate?
     summary: Minimal deliverable fixture for recipe-output validation.
-    recipe: atlas_recipe
+    recipe: review_recipe
     requires:
       views: [z20_60]
     outputs:
-      views: [delta20]
-      scalars: [delta20_norm]
+      views: [context_shift_demo]
+      scalars: [context_shift_l2_demo]
     docs_refs: []
     acceptance_checks: []
         """.strip()
@@ -644,24 +648,41 @@ deliverables:
         load_workspace_config(workspace_dir)
 
 
-def test_load_workspace_config_accepts_landmark_atlas_committee_template(tmp_path) -> None:
-    template_dir = builtin_templates_dir() / "landmark_atlas_committee"
+def test_load_workspace_config_accepts_promoter_reference_margin_benchmark_template(tmp_path) -> None:
+    template_dir = builtin_templates_dir() / "promoter_reference_margin_benchmark"
     workspace_dir = tmp_path / "workspace"
     shutil.copytree(template_dir, workspace_dir)
 
     context = load_workspace_config(workspace_dir)
 
-    assert context.workspace_id == "stress_ethanol_cipro_latent_atlas"
-    assert "atlas_2x2_intermediate_main" in context.config.deliverables
-    assert "control_pca_explained_variance_curve" in context.config.deliverables
-    assert "context_shift_primary" in context.config.deliverables
-    assert "agreement_7b_vs_20b" in context.config.deliverables
-    assert "x2_primary_20b" in context.config.deliverables
+    assert context.workspace_id == "promoter_reference_margin_workspace"
+    assert "dataset_overview" in context.config.deliverables
+    assert "reference_margin_analysis" in context.config.deliverables
+    assert "context_geometry_audit" in context.config.deliverables
+    assert "representation_comparison" in context.config.deliverables
+    assert "representation_health_diagnostic" in context.config.deliverables
+    assert "appendix_umap_gallery" in context.config.deliverables
 
 
 def test_load_workspace_config_accepts_notebook_declarations(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
+    (workspace_dir / "plot_semantics").mkdir()
+    (workspace_dir / "plot_semantics" / "appendix_umap_gallery.yaml").write_text(
+        """
+plot_id: appendix_umap_gallery
+research_question: What appendix projection is available for the demo notebook?
+evidence_tier: appendix
+encoding_summary: Demo projection scatter plot for notebook wiring validation.
+sampling_scope: Full population.
+interpretation_guardrails:
+  - This fixture only validates workspace loading.
+caption_md: Demo appendix plot semantics fixture.
+alt_text: Demo appendix plot semantics fixture.
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
     (workspace_dir / "config.yaml").write_text(
         """
 schema_version: latentdna.workspace.v1
@@ -692,49 +713,50 @@ views:
     tags: {model: demo}
     role: primary
 notebooks:
-  atlas_review:
+  latent_geometry_browser:
     kind: workspace
     title: Demo workspace notebook
-    default_deliverable: atlas_review_bundle
+    default_deliverable: appendix_umap_gallery
 plots:
-  atlas_scatter:
+  appendix_umap_gallery:
     kind: projection_scatter
     projection: umap_z20_60
+    semantics_ref: plot_semantics/appendix_umap_gallery.yaml
 deliverables:
-  atlas_review_bundle:
+  appendix_umap_gallery:
     title: Demo workspace deliverable
-    section: Atlas
-    question: Does the atlas render cleanly?
+    section: Appendix
+    question: Does the browser render cleanly?
     summary: Minimal workspace notebook surface.
-    recipe: atlas_recipe
+    recipe: notebook_recipe
     requires:
       views: [z20_60]
     outputs:
-      plots: [atlas_scatter]
-      notebooks: [atlas_review]
+      plots: [appendix_umap_gallery]
+      notebooks: [latent_geometry_browser]
     docs_refs: []
     acceptance_checks: []
 recipes:
-  atlas_recipe:
+  notebook_recipe:
     steps:
-      - id: render_atlas
+      - id: render_appendix
         op: plot.render
         params:
-          plot: atlas_scatter
+          plot: appendix_umap_gallery
       - id: generate_notebook
         op: notebook.generate
-        depends_on: [render_atlas]
+        depends_on: [render_appendix]
         params:
-          notebook: atlas_review
+          notebook: latent_geometry_browser
         """.strip()
         + "\n",
         encoding="utf-8",
     )
 
     context = load_workspace_config(workspace_dir)
-    notebook = context.require_notebook("atlas_review")
+    notebook = context.require_notebook("latent_geometry_browser")
     assert notebook.title == "Demo workspace notebook"
-    assert notebook.default_deliverable == "atlas_review_bundle"
+    assert notebook.default_deliverable == "appendix_umap_gallery"
 
 
 def test_load_workspace_config_rejects_legacy_deliverable_shape(tmp_path) -> None:
@@ -823,7 +845,7 @@ study_binding:
         load_workspace_config(workspace_dir)
 
 
-def test_load_workspace_config_rejects_legacy_output_root_location(tmp_path) -> None:
+def test_load_workspace_config_rejects_noncanonical_output_root_location(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     (workspace_dir / "config.yaml").write_text(
@@ -831,7 +853,7 @@ def test_load_workspace_config_rejects_legacy_output_root_location(tmp_path) -> 
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs/nested
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -846,43 +868,29 @@ metadata:
         encoding="utf-8",
     )
 
-    with pytest.raises(WorkspaceValidationError, match="legacy output_root is not supported"):
-        load_workspace_config(workspace_dir)
-
-
-def test_load_workspace_config_rejects_populated_legacy_output_tree(tmp_path) -> None:
-    workspace_dir = tmp_path / "workspace"
-    workspace_dir.mkdir()
-    (workspace_dir / "config.yaml").write_text(
-        """
-schema_version: latentdna.workspace.v1
-workspace:
-  id: demo
-  output_root: ./outputs
-defaults:
-  analysis_dtype: float32
-  metric: cosine
-  random_seed: 17
-  plot_formats: [svg, png]
-  neighbor_backend: auto
-sources: {}
-metadata:
-  include: []
-        """.strip()
-        + "\n",
-        encoding="utf-8",
-    )
-    legacy_plot_dir = workspace_dir / "outputs" / "latentdna" / "plots" / "atlas_demo"
-    legacy_plot_dir.mkdir(parents=True)
-    (legacy_plot_dir / "manifest.json").write_text("{}", encoding="utf-8")
-
-    with pytest.raises(WorkspaceValidationError, match="legacy output tree is not supported"):
+    with pytest.raises(WorkspaceValidationError, match="workspace output_root must resolve to"):
         load_workspace_config(workspace_dir)
 
 
 def test_load_workspace_config_accepts_plot_registry(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
+    (workspace_dir / "plot_semantics").mkdir()
+    (workspace_dir / "plot_semantics" / "atlas_scatter.yaml").write_text(
+        """
+plot_id: atlas_scatter
+research_question: Does the demo plot registry preserve scatter settings?
+evidence_tier: qc
+encoding_summary: Demo scatter plot used for plot-registry validation.
+sampling_scope: Full population.
+interpretation_guardrails:
+  - Fixture semantics for config validation only.
+caption_md: Demo plot registry semantics.
+alt_text: Demo plot registry semantics.
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
     (workspace_dir / "config.yaml").write_text(
         """
 schema_version: latentdna.workspace.v1
@@ -916,6 +924,7 @@ plots:
   atlas_scatter:
     kind: projection_scatter
     projection: umap_z20_60
+    semantics_ref: plot_semantics/atlas_scatter.yaml
     color_column: usr_label__primary
     label_column: usr_label__primary
     label_values: [spyP, sulAp]
@@ -930,6 +939,71 @@ plots:
     assert plot.projection == "umap_z20_60"
     assert plot.label_column == "usr_label__primary"
     assert plot.label_values == ["spyP", "sulAp"]
+
+
+def test_load_workspace_config_can_skip_plot_semantics_sidecar_validation(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+plots:
+  atlas_scatter:
+    kind: projection_scatter
+    projection: umap_z20_60
+    semantics_ref: plot_semantics/missing.yaml
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+
+    assert context.require_plot("atlas_scatter").semantics_ref == "plot_semantics/missing.yaml"
+
+
+def test_load_workspace_config_can_require_plot_semantics_sidecars_explicitly(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+plots:
+  atlas_scatter:
+    kind: projection_scatter
+    projection: umap_z20_60
+    semantics_ref: plot_semantics/missing.yaml
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ContractViolationError, match="plot semantics sidecar does not exist"):
+        load_workspace_config(workspace_dir, validate_plot_semantics=True)
 
 
 def test_load_workspace_config_rejects_projection_grid_with_misaligned_panel_titles(tmp_path) -> None:
@@ -954,6 +1028,7 @@ plots:
   atlas_grid:
     kind: projection_grid
     projections: [umap_a, umap_b]
+    semantics_ref: plot_semantics/atlas_grid.yaml
     panel_titles: [left only]
         """.strip()
         + "\n",
@@ -986,6 +1061,7 @@ plots:
   atlas_scatter:
     kind: projection_scatter
     projection: umap_z20_60
+    semantics_ref: plot_semantics/atlas_scatter.yaml
     label_values: [spyP]
         """.strip()
         + "\n",
@@ -1017,7 +1093,8 @@ metadata:
 plots:
   bad_distribution:
     kind: distribution
-    scalar: delta20_norm
+    semantics_ref: plot_semantics/bad_distribution.yaml
+    scalar: context_shift_l2_demo
     distance: primary_landmark_distances
         """.strip()
         + "\n",

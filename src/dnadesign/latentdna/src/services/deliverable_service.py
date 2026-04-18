@@ -111,7 +111,7 @@ def _status_from_entries(checks: list[DeliverableEntryStatus], outputs: list[Del
 
 
 def list_deliverables(workspace: str | Path) -> dict[str, object]:
-    context = load_workspace_config(workspace)
+    context = load_workspace_config(workspace, validate_plot_semantics=False)
     deliverables = [
         {
             "deliverable_id": deliverable_id,
@@ -132,10 +132,25 @@ def list_deliverables(workspace: str | Path) -> dict[str, object]:
     }
 
 
-def deliverable_status(workspace: str | Path, deliverable_id: str) -> DeliverableStatusResult:
-    context = load_workspace_config(workspace)
+def deliverable_status(
+    workspace: str | Path,
+    deliverable_id: str,
+    *,
+    freshness_cache: FreshnessCache | None = None,
+) -> DeliverableStatusResult:
+    context = load_workspace_config(workspace, validate_plot_semantics=False)
+    return deliverable_status_from_context(context, deliverable_id, freshness_cache=freshness_cache)
+
+
+def deliverable_status_from_context(
+    context: WorkspaceContext,
+    deliverable_id: str,
+    *,
+    freshness_cache: FreshnessCache | None = None,
+) -> DeliverableStatusResult:
     deliverable = context.require_deliverable(deliverable_id)
-    freshness_cache = FreshnessCache()
+    if freshness_cache is None:
+        freshness_cache = FreshnessCache()
     checks = [
         _entry_status(context, category, item_id, freshness_cache=freshness_cache)
         for category, ids in deliverable.requires.items()
@@ -281,7 +296,7 @@ def run_deliverable(
         artifact_id=deliverable_id,
     )
     progress.succeed()
-    from .catalog_service import workspace_catalog
+    from .catalog_service import workspace_catalog_from_context
 
-    workspace_catalog(context.workspace_dir)
+    workspace_catalog_from_context(context)
     return result

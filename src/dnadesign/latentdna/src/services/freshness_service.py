@@ -7,41 +7,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..io.hashing import sha256_path
+from ..sources.provenance import OVERLAY_INVENTORY_DIGEST_MODE, source_provenance_digest
 from ..workspaces.loader import WorkspaceContext
+from ._artifact_inputs import artifact_kind_for_input_dependency
 from ._artifacts import artifact_exists, artifact_manifest_path
-
-_INPUT_ARTIFACT_KIND_MAP: dict[str, str] = {
-    "agreement_set": "agreement_set",
-    "alignment_set": "alignment_set",
-    "cluster_set": "cluster_set",
-    "distance_set": "distance_set",
-    "enrichment_set": "enrichment_set",
-    "export_bundle": "export_bundle",
-    "neighbor_set": "neighbor_set",
-    "neighbor_rows": "neighbor_set",
-    "notebook": "notebook",
-    "plot": "plot",
-    "projection": "projection",
-    "reducer": "reducer",
-    "reduced_view": "reduced_view",
-    "sample_set": "sample_set",
-    "scalar_table": "scalar_table",
-    "snapshot": "snapshot",
-    "view": "view",
-    "view_matrix": "view",
-    "view_rows": "view",
-}
 
 
 @dataclass(slots=True)
 class FreshnessCache:
     artifact_results: dict[tuple[str, str], dict[str, object]] = field(default_factory=dict)
     path_digests: dict[str, tuple[bool, str | None]] = field(default_factory=dict)
-
-
-def _artifact_kind_for_input(kind: str) -> str | None:
-    return _INPUT_ARTIFACT_KIND_MAP.get(kind)
+    overlay_inventory_digests: dict[str, str] = field(default_factory=dict)
 
 
 def _resolve_path_digest(path: Path, *, cache: FreshnessCache) -> tuple[bool, str | None]:
@@ -52,9 +28,19 @@ def _resolve_path_digest(path: Path, *, cache: FreshnessCache) -> tuple[bool, st
     if not path.exists():
         result = (False, None)
     else:
-        result = (True, sha256_path(path))
+        result = (True, source_provenance_digest({"path": path.as_posix()}))
     cache.path_digests[key] = result
     return result
+
+
+def _resolve_overlay_inventory_digest(path: Path, *, cache: FreshnessCache) -> str:
+    key = path.resolve().as_posix()
+    cached = cache.overlay_inventory_digests.get(key)
+    if cached is not None:
+        return cached
+    digest = source_provenance_digest({"path": key, "digest_mode": OVERLAY_INVENTORY_DIGEST_MODE})
+    cache.overlay_inventory_digests[key] = digest
+    return digest
 
 
 def evaluate_artifact_freshness(
@@ -121,6 +107,8 @@ def evaluate_manifest_freshness(
     checked_any = False
 
     for entry in manifest.get("source_provenance", []) or []:
+        if not isinstance(entry, dict):
+            continue
         path_text = str(entry.get("path") or "")
         recorded_digest = str(entry.get("digest") or "")
         if not path_text or not recorded_digest:
@@ -129,6 +117,19 @@ def evaluate_manifest_freshness(
             continue
         checked_any = True
         path = Path(path_text)
+        digest_mode = str(entry.get("digest_mode") or "")
+        if digest_mode == OVERLAY_INVENTORY_DIGEST_MODE:
+            if not path.exists():
+                known = False
+                reasons.append(f"freshness unknown: source path is missing: {path_text}")
+                continue
+            current_digest = _resolve_overlay_inventory_digest(path, cache=cache)
+            if current_digest != recorded_digest:
+                namespace = str(entry.get("namespace") or entry.get("id") or path.name)
+                reasons.append(
+                    f"stale freshness: source overlay inventory for {artifact_kind}:{artifact_id}: {namespace}"
+                )
+            continue
         path_exists, current_digest = _resolve_path_digest(path, cache=cache)
         if not path_exists:
             known = False
@@ -145,7 +146,13 @@ def evaluate_manifest_freshness(
         input_id = str(input_entry.get("id") or "")
         path_text = input_entry.get("path")
         recorded_digest = str(input_entry.get("digest") or "")
-        if path_text and recorded_digest:
+        upstream_kind = artifact_kind_for_input_dependency(input_kind)
+        use_recorded_path_digest = (
+            path_text is not None
+            and recorded_digest
+            and (upstream_kind is None or Path(str(path_text)).name == "manifest.json")
+        )
+        if use_recorded_path_digest:
             checked_any = True
             path = Path(str(path_text))
             path_exists, current_digest = _resolve_path_digest(path, cache=cache)
@@ -157,13 +164,10 @@ def evaluate_manifest_freshness(
                 if current_digest != recorded_digest:
                     reasons.append(f"stale input digest for {input_kind}:{input_id}")
 
-        upstream_kind = _artifact_kind_for_input(input_kind)
         if upstream_kind is None:
             if not path_text and input_kind not in {"source", "landmark_source"}:
                 known = False
                 reasons.append(f"freshness unknown for input {input_kind}:{input_id}")
-            continue
-        if not artifact_exists(context, artifact_kind=upstream_kind, artifact_id=input_id):
             continue
         checked_any = True
         upstream = evaluate_artifact_freshness(

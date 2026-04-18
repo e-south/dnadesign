@@ -9,9 +9,10 @@ from pathlib import Path
 from ..contracts.errors import MissingArtifactError
 from ..io.json_io import read_json, write_json
 from ..studies.docs_refs import read_docs_ref
-from ..workspaces.loader import load_workspace_config
+from ..workspaces.loader import WorkspaceContext, load_workspace_config
 from ._artifacts import artifact_dir, artifact_exists
-from .deliverable_service import deliverable_status
+from .deliverable_service import deliverable_status_from_context
+from .freshness_service import FreshnessCache
 from .plot_service import write_plot_index
 
 
@@ -25,17 +26,17 @@ def _workspace_state(states: list[str]) -> str:
     return "ok"
 
 
-def workspace_catalog(workspace: str | Path) -> dict[str, object]:
-    context = load_workspace_config(workspace)
+def workspace_catalog_from_context(context: WorkspaceContext) -> dict[str, object]:
     deliverable_rows = []
     docs_refs: list[dict[str, str]] = []
+    freshness_cache = FreshnessCache()
     for deliverable_id in sorted(context.config.deliverables):
-        status = deliverable_status(context.workspace_dir, deliverable_id)
+        status = deliverable_status_from_context(context, deliverable_id, freshness_cache=freshness_cache)
         deliverable_rows.append(status.model_dump(mode="json"))
         for row in status.docs_refs:
             docs_refs.append(row)
 
-    plots_payload = write_plot_index(context)
+    plots_payload = write_plot_index(context, freshness_cache=freshness_cache)
     notebooks = []
     for notebook_id in sorted(context.config.notebooks):
         manifest = _artifact_manifest(
@@ -85,13 +86,19 @@ def workspace_catalog(workspace: str | Path) -> dict[str, object]:
     return payload
 
 
+def workspace_catalog(workspace: str | Path) -> dict[str, object]:
+    context = load_workspace_config(workspace)
+    return workspace_catalog_from_context(context)
+
+
 def explain_workspace(workspace: str | Path) -> dict[str, object]:
-    return workspace_catalog(workspace)
+    context = load_workspace_config(workspace)
+    return workspace_catalog_from_context(context)
 
 
 def explain_deliverable(workspace: str | Path, deliverable_id: str) -> dict[str, object]:
     context = load_workspace_config(workspace)
-    status = deliverable_status(context.workspace_dir, deliverable_id).model_dump(mode="json")
+    status = deliverable_status_from_context(context, deliverable_id).model_dump(mode="json")
     status["docs_context"] = [read_docs_ref(context, row["docs_ref"]) for row in status["docs_refs"]]
     return status
 

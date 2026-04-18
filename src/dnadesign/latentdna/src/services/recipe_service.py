@@ -28,7 +28,7 @@ from .plot_service import render_plot
 from .progress_service import build_run_id, heartbeat_scope, start_run_progress
 from .projection_service import fit_projection
 from .sample_service import build_sample
-from .scalar_service import derive_scalar
+from .scalar_service import build_scalar, derive_scalar
 from .snapshot_service import build_snapshot
 from .view_service import derive_view, materialize_view, reduce_view
 
@@ -99,6 +99,26 @@ def _derive_scalar_step(
 ) -> CommandResult:
     del allow_memory_overage
     return derive_scalar(workspace, str(_require_param(params, "scalar_id", "scalar")), force=force)
+
+
+def _build_scalar_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
+    builder_kind = str(_require_param(params, "kind"))
+    scalar_id = str(_require_param(params, "scalar_id", "scalar"))
+    builder_params = {key: value for key, value in params.items() if key not in {"scalar_id", "scalar", "kind"}}
+    return build_scalar(
+        workspace,
+        scalar_id,
+        builder_kind=builder_kind,
+        params=builder_params,
+        force=force,
+    )
 
 
 def _build_sample_step(
@@ -286,7 +306,9 @@ def _render_plot_step(
         enrichment_id=_optional_param(params, "enrichment_id", "enrichment", default=None),
         distance_id=_optional_param(params, "distance_id", "distance", default=None),
         scalar_id=_optional_param(params, "scalar_id", "scalar", default=None),
+        scalar_ids=_list_param(params, "scalar_ids", "scalars", "scalar_panel"),
         agreement_id=_optional_param(params, "agreement_id", "agreement", default=None),
+        agreement_ids=_list_param(params, "agreement_ids", "agreements", "agreement_panel"),
         reducer_id=_optional_param(params, "reducer_id", "reducer", default=None),
         left_cluster_id=_optional_param(params, "left_cluster_id", "left_cluster", default=None),
         right_cluster_id=_optional_param(params, "right_cluster_id", "right_cluster", default=None),
@@ -294,6 +316,7 @@ def _render_plot_step(
         x_column=_optional_param(params, "x_column", default=None),
         y_column=_optional_param(params, "y_column", default=None),
         color_column=_optional_param(params, "color_column", default=None),
+        shape_column=_optional_param(params, "shape_column", default=None),
         render_mode=_optional_param(params, "render_mode", default=None),
         label_column=_optional_param(params, "label_column", default=None),
         label_values=_list_param(params, "label_values", "label_value"),
@@ -380,6 +403,7 @@ STEP_EXECUTORS: dict[str, Callable[..., CommandResult]] = {
     "plot.render": _render_plot_step,
     "projection.fit": _fit_projection_step,
     "sample.build": _build_sample_step,
+    "scalar.build": _build_scalar_step,
     "scalar.derive": _derive_scalar_step,
     "snapshot.build": _build_snapshot_step,
     "view.derive": _derive_view_step,
@@ -546,7 +570,7 @@ def run_recipe(
     )
     progress.succeed()
     if refresh_catalog:
-        from .catalog_service import workspace_catalog
+        from .catalog_service import workspace_catalog_from_context
 
-        workspace_catalog(context.workspace_dir)
+        workspace_catalog_from_context(context)
     return result

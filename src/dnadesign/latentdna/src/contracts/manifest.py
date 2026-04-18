@@ -40,3 +40,4 @@ class ArtifactManifest(BaseModel):
     outputs: list[ArtifactOutput] = Field(default_factory=list)
     stats: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    semantics: dict[str, Any] | None = None

@@ -40,8 +40,8 @@ def _read_study_datasets(study_dir: Path) -> dict[str, dict[str, Any]]:
 def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, workspace_dir: Path) -> None:
     datasets = _read_study_datasets(study_dir)
     source_role_map = {
-        "anchor60": "merged_anchor_source",
-        "ctx1k": "construct_context",
+        "anchor_60bp": "merged_anchor_source",
+        "full_context_1kb": "construct_context",
     }
     for source_id, role in source_role_map.items():
         source_payload = payload.get("sources", {}).get(source_id)
@@ -58,6 +58,7 @@ def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, wo
             raise WorkspaceValidationError(f"study dataset role {role!r} is missing dataset")
         resolved_usr_root = resolve_repo_path(usr_root)
         source_payload["kind"] = "usr"
+        source_payload.pop("path", None)
         source_payload["root"] = Path(relpath(resolved_usr_root, workspace_dir)).as_posix()
         source_payload["dataset"] = dataset_id
 

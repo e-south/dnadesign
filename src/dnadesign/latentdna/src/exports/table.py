@@ -10,7 +10,7 @@ import pyarrow as pa
 
 from ..io.parquet_io import write_table
 from ..workspaces.loader import WorkspaceContext
-from .matrix import resolve_export_blocks
+from .matrix import _append_metadata_columns, resolve_export_blocks
 
 
 def build_export_table_artifact(
@@ -19,6 +19,8 @@ def build_export_table_artifact(
     export_id: str,
 ) -> tuple[Path, Path, int, int, list[dict[str, object]], list[dict[str, object]]]:
     basis_path, basis_table, blocks = resolve_export_blocks(context, export_id=export_id)
+    export = context.require_export(export_id)
+    basis_table = _append_metadata_columns(basis_table, blocks=blocks, required_columns=list(export.metadata_columns))
 
     arrays = [basis_table[name] for name in basis_table.column_names]
     names = list(basis_table.column_names)

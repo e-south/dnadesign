@@ -13,6 +13,7 @@ from ...services.workspace_service import (
     show_workspace,
     workspace_where,
 )
+from ...services.workspace_snapshot_service import workspace_snapshot
 from ..common import emit, fail, resolve_format
 from ..previews import preview_workspace_init
 
@@ -80,6 +81,20 @@ def show(
 ) -> None:
     try:
         payload = show_workspace(workspace)
+    except Exception as exc:
+        fail(exc)
+    emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)
+
+
+@app.command("snapshot")
+def snapshot(
+    workspace: str = typer.Option(..., "--workspace"),
+    format_name: str = typer.Option("text", "--format"),
+    json_output: bool = typer.Option(False, "--json"),
+    quiet: bool = typer.Option(False, "--quiet"),
+) -> None:
+    try:
+        payload = workspace_snapshot(workspace)
     except Exception as exc:
         fail(exc)
     emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)

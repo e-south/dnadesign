@@ -14,7 +14,7 @@ from ..workspaces.paths import default_workspace_root
 from ..workspaces.scaffold import scaffold_workspace
 from ._artifacts import ARTIFACT_KIND_DIRS
 
-_WORKSPACE_REFRESH_SPECIAL_TARGETS = ("runs", "catalog", "legacy", "logs")
+_WORKSPACE_REFRESH_SPECIAL_TARGETS = ("runs", "catalog", "logs", "status")
 _WORKSPACE_REFRESH_TARGETS = frozenset({"all", *ARTIFACT_KIND_DIRS.values(), *_WORKSPACE_REFRESH_SPECIAL_TARGETS})
 
 
@@ -31,7 +31,7 @@ def init_workspace(
 ) -> dict[str, object]:
     workspace_dir = Path(workspace).resolve()
     scaffold_workspace(workspace_dir=workspace_dir, template=template, from_study_dir=from_study_dir)
-    context = load_workspace_config(workspace_dir)
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=True)
     result = CommandResult(
         command="workspace init",
         workspace_id=context.workspace_id,
@@ -68,7 +68,7 @@ def list_workspaces(root: str | Path | None = None) -> list[dict[str, str]]:
 
 
 def show_workspace(workspace: str | Path) -> dict[str, str | int]:
-    context = load_workspace_config(workspace)
+    context = load_workspace_config(workspace, validate_plot_semantics=False)
     payload: dict[str, str | int | None] = {
         "workspace_id": context.workspace_id,
         "workspace_title": context.config.workspace.title,
@@ -97,8 +97,9 @@ def _resolve_refresh_targets(targets: tuple[str, ...] | list[str] | None) -> lis
         return [
             *sorted(set(ARTIFACT_KIND_DIRS.values())),
             "runs",
+            "logs",
             "catalog",
-            "legacy",
+            "status",
         ]
     return list(dict.fromkeys(requested))
 
@@ -112,8 +113,6 @@ def _assert_workspace_local_path(workspace_dir: Path, candidate: Path) -> Path:
 
 
 def _refresh_target_path(context, target: str) -> Path:
-    if target == "legacy":
-        return context.legacy_output_root
     if target == "catalog":
         return context.output_root / "catalog.json"
     return context.output_root / target
@@ -144,13 +143,7 @@ def refresh_workspace(
     targets: tuple[str, ...] | list[str] | None = None,
     dry_run: bool = False,
 ) -> dict[str, object]:
-    context = load_workspace_config(workspace, allow_legacy_outputs=True)
-    if context.output_root == context.legacy_output_root:
-        raise WorkspaceValidationError(
-            f"workspace refresh does not support configured legacy output_root: {context.legacy_output_root}; "
-            "update workspace.output_root to ./outputs"
-        )
-
+    context = load_workspace_config(workspace)
     resolved_targets = _resolve_refresh_targets(targets)
     planned_paths = [
         _assert_workspace_local_path(context.workspace_dir, _refresh_target_path(context, target))
@@ -167,7 +160,7 @@ def refresh_workspace(
             else:
                 path.unlink()
         context.output_root.mkdir(parents=True, exist_ok=True)
-        load_workspace_config(context.workspace_dir)
+        load_workspace_config(context.workspace_dir, validate_plot_semantics=True)
     source_paths = _source_boundary_paths(context)
     result = CommandResult(
         command="workspace refresh",
@@ -188,6 +181,5 @@ def refresh_workspace(
     payload["planned_removals"] = [path.as_posix() for path in planned_paths]
     payload["removed_paths"] = [] if dry_run else [path.as_posix() for path in existing_paths]
     payload["protected_paths"] = source_paths
-    payload["legacy_output_root"] = context.legacy_output_root.as_posix()
     payload["post_refresh_validation"] = "skipped" if dry_run else "ok"
     return payload

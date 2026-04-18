@@ -8,15 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..contracts.errors import ArtifactConflictError
-from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
+from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..neighbors.fit import fit_neighbor_artifact
 from ..runs.recorder import record_audit
 from ..version import __version__
 from ..views.scopes import matrix_input_digest_path, scope_input_digest_path
 from ..workspaces.loader import load_workspace_config
+from ._artifact_inputs import dependency_artifact_input
 from .memory_service import (
     apply_memory_preflight,
     approximate_backend_warning,
@@ -101,17 +101,17 @@ def fit_neighbors(
         command="neighbors fit",
         status=status,
         inputs=[
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind=matrix_input_kind,
-                id=matrix_input_id,
-                digest=sha256_file(matrix_input_path),
-                path=matrix_input_path.as_posix(),
+                artifact_id=matrix_input_id,
+                path=matrix_input_path,
             ),
-            ArtifactInput(
+            dependency_artifact_input(
+                context,
                 kind=scope_kind_input,
-                id=scope_id_input,
-                digest=sha256_file(scope_digest_path),
-                path=scope_digest_path.as_posix(),
+                artifact_id=scope_id_input,
+                path=scope_digest_path,
             ),
         ],
         params={

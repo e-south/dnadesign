@@ -14,6 +14,7 @@ from ..io.parquet_io import read_schema
 from ..sources.resolver import inspect_source_schema, resolve_source
 from ..workspaces.loader import load_workspace_config
 from ..workspaces.paths import resolve_repo_path
+from ..workspaces.plot_semantics import validate_plot_semantics_sidecars
 
 _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
     "design_family": {"densegen__plan", "usr_label__primary"},
@@ -22,18 +23,10 @@ _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
         "densegen__required_regulators",
         "usr_label__primary",
     },
-    "sigma70_variant": {"densegen__plan", "usr_label__primary"},
+    "sig35_variant": {"densegen__plan", "usr_label__primary"},
     "campaign_prior": {"densegen__plan", "usr_label__primary"},
     "is_control": {"densegen__plan", "usr_label__primary"},
     "source_class": {"densegen__plan", "usr_label__primary"},
-}
-
-_MATERIALIZED_VIEW_METADATA_REQUIRED_COLUMNS = {
-    "densegen__plan",
-    "densegen__required_regulators",
-    "usr_label__primary",
-    "template_id",
-    "construct__template_id",
 }
 
 
@@ -74,7 +67,7 @@ def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
                 "controls_path": controls_path.as_posix(),
                 "schema_version": controls.schema_version,
                 "default_deliverable": context.require_notebook(notebook_id).default_deliverable,
-                "geometries": len(controls.geometry_switchboard.geometries),
+                "geometries": len(controls.geometry_controls.geometries),
             }
         )
         notebook_details.append(detail)
@@ -83,6 +76,7 @@ def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
 
 def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     context = load_workspace_config(workspace)
+    validate_plot_semantics_sidecars(context)
     source_columns: dict[str, set[str]] = {}
     source_details: list[dict[str, object]] = []
     for source_id in sorted(context.config.sources):
@@ -113,6 +107,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     for view_id in sorted(context.config.views):
         view = context.require_view(view_id)
         if isinstance(view, SourceBackedViewConfig):
+            source = context.require_source(view.source)
             columns = source_columns[view.source]
             view_detail = {
                 "view_id": view_id,
@@ -132,25 +127,40 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             matrix_path = view_dir / "matrix.npy"
             if rows_path.is_file() and matrix_path.is_file():
                 materialized_columns = {field.name for field in read_schema(rows_path)}
-                required_materialized_columns = {
+                promoter_cohort_ids = {
+                    cohort_id
+                    for cohort_id, cohort in context.config.cohorts.items()
+                    if isinstance(cohort, PromoterMetadataCohortConfig) and cohort.source == view.source
+                }
+                requested_metadata_columns = {
                     source.record_key,
                     source.subject_key,
                     *(context.config.metadata.include or []),
-                    *(
-                        _MATERIALIZED_VIEW_METADATA_REQUIRED_COLUMNS
-                        if any(
-                            isinstance(cohort, PromoterMetadataCohortConfig) and cohort.source == view.source
-                            for cohort in context.config.cohorts.values()
-                        )
-                        else set()
-                    ),
+                    *(source.metadata_include or []),
+                    *(context.config.metadata.derivations or {}).keys(),
+                    *promoter_cohort_ids,
                 }
+                required_materialized_columns = set(requested_metadata_columns)
+                if "construct_template_id" in requested_metadata_columns and {
+                    "template_id",
+                    "construct__template_id",
+                }.intersection(columns):
+                    required_materialized_columns.add("construct_template_id")
                 if source.context_key is not None:
                     required_materialized_columns.add(source.context_key)
                 missing_materialized_columns = sorted(
                     column
                     for column in required_materialized_columns
-                    if column in columns and column not in materialized_columns
+                    if (
+                        column not in materialized_columns
+                        and (
+                            column in columns
+                            or column == "construct_template_id"
+                            or column in (context.config.metadata.derivations or {})
+                            or column in (source.metadata_include or [])
+                            or column in context.config.cohorts
+                        )
+                    )
                 )
                 if missing_materialized_columns:
                     raise WorkspaceValidationError(
@@ -261,6 +271,7 @@ def validate_workspace(workspace: str | Path, *, deep: bool = False) -> dict[str
     if deep:
         return _deep_validate_workspace(workspace)
     context = load_workspace_config(workspace)
+    validate_plot_semantics_sidecars(context)
     return {
         "schema_version": "latentdna.validation_result.v1",
         "workspace_id": context.workspace_id,

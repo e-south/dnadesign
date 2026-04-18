@@ -48,8 +48,51 @@ class MemoryPolicyConfig(StrictWorkspaceModel):
         return self
 
 
+class MetadataCopyDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["copy"]
+    source: str
+
+
+class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["regex_capture"]
+    source: str
+    pattern: str
+    group: int = 1
+    default: str | None = None
+    normalize: Literal["lower", "upper"] | None = None
+
+
+class MetadataMapValuesDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["map_values"]
+    source: str
+    mapping: dict[str, str] = Field(min_length=1)
+    default: str | None = None
+
+
+class MetadataCoalesceDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["coalesce"]
+    sources: list[str] = Field(min_length=1)
+    default: str | None = None
+
+
+class MetadataConstantDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["constant"]
+    value: str | int | float | bool | None
+
+
+MetadataDerivationConfig = Annotated[
+    MetadataCopyDerivationConfig
+    | MetadataRegexCaptureDerivationConfig
+    | MetadataMapValuesDerivationConfig
+    | MetadataCoalesceDerivationConfig
+    | MetadataConstantDerivationConfig,
+    Field(discriminator="kind"),
+]
+
+
 class MetadataSection(StrictWorkspaceModel):
     include: list[str] = Field(default_factory=list)
+    derivations: dict[str, MetadataDerivationConfig] = Field(default_factory=dict)
 
 
 class SourceBase(StrictWorkspaceModel):
@@ -243,7 +286,7 @@ class PromoterMetadataCohortConfig(StrictWorkspaceModel):
     derive: Literal[
         "design_family",
         "design_regulator_composition",
-        "sigma70_variant",
+        "sig35_variant",
         "campaign_prior",
         "is_control",
         "source_class",
@@ -260,6 +303,8 @@ class ReducedViewExportBlockConfig(StrictWorkspaceModel):
     feature_prefix: str
     alignment: str | None = None
     alignment_aggregation: AggregationMode = "error"
+    allowed_use: Literal["benchmark", "eda_only", "both"] = "benchmark"
+    leakage_notes: list[str] = Field(default_factory=list)
 
 
 class TableColumnsExportBlockConfig(StrictWorkspaceModel):
@@ -270,6 +315,8 @@ class TableColumnsExportBlockConfig(StrictWorkspaceModel):
     feature_prefix: str | None = None
     alignment: str | None = None
     alignment_aggregation: AggregationMode = "error"
+    allowed_use: Literal["benchmark", "eda_only", "both"] = "benchmark"
+    leakage_notes: list[str] = Field(default_factory=list)
 
 
 ExportBlockConfig = Annotated[
@@ -290,6 +337,7 @@ class ReferenceSetConfig(StrictWorkspaceModel):
     match_column: str = "id"
     label_column: str | None = None
     label_mode: Literal["label_and_highlight", "highlight_only"] = "label_and_highlight"
+    display_labels: dict[str, str] = Field(default_factory=dict)
 
 
 class AcceptanceCheckConfig(StrictWorkspaceModel):

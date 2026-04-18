@@ -15,6 +15,7 @@ from ..contracts.errors import ContractViolationError
 from ..contracts.workspace import PromoterMetadataCohortConfig
 from ..io.matrix_io import read_matrix, write_matrix
 from ..io.parquet_io import read_table, write_table
+from ..metadata.derivations import derive_metadata_value
 from ..sources.resolver import (
     ResolvedSource,
     inspect_source_schema,
@@ -25,7 +26,7 @@ from ..sources.resolver import (
 from ..workspaces.loader import WorkspaceContext
 
 _MATERIALIZE_BATCH_SIZE = 2048
-_SIGMA70_PATTERN = re.compile(r"__sigma70_([A-Za-z0-9]+)$")
+_SIG35_PATTERN = re.compile(r"__sig35[=_]([A-Za-z0-9]+)")
 _CONTROL_LABELS = {"spyp", "sulap", "soxsp", "j23105", "spy_p", "sul_ap", "sox_sp"}
 
 
@@ -49,15 +50,21 @@ def _normalized_regulators(value: object) -> list[str]:
 
 def _is_control_row(row: dict[str, object]) -> bool:
     label = (_normalize_text(row.get("usr_label__primary")) or "").lower()
-    template_id = (
-        _normalize_text(row.get("template_id")) or _normalize_text(row.get("construct__template_id")) or ""
-    ).lower()
+    template_id = (_construct_template_id(row) or "").lower()
     plan = _normalize_text(row.get("densegen__plan"))
     if template_id in {"wt", "wildtype", "manual"}:
         return True
     if label in _CONTROL_LABELS:
         return True
     return plan is None
+
+
+def _construct_template_id(row: dict[str, object]) -> str | None:
+    return (
+        _normalize_text(row.get("construct_template_id"))
+        or _normalize_text(row.get("template_id"))
+        or _normalize_text(row.get("construct__template_id"))
+    )
 
 
 def _design_family(row: dict[str, object]) -> str:
@@ -100,14 +107,33 @@ def _design_regulator_composition(row: dict[str, object]) -> str:
     return "unknown"
 
 
-def _sigma70_variant(row: dict[str, object]) -> str:
+def _configured_derivation_value(
+    context: WorkspaceContext,
+    row: dict[str, object],
+    *,
+    column_name: str,
+) -> object:
+    derivation = (context.config.metadata.derivations or {}).get(column_name)
+    if derivation is None:
+        return None
+    return derive_metadata_value(row, derivation)
+
+
+def _sig35_variant(row: dict[str, object], *, context: WorkspaceContext | None = None) -> str:
     if _is_control_row(row):
         return "control"
+    if context is not None:
+        configured = _configured_derivation_value(context, row, column_name="sig35_variant")
+        if configured is not None:
+            text = _normalize_text(configured)
+            return "unknown" if text is None else text.lower()
     plan = _normalize_text(row.get("densegen__plan")) or ""
-    match = _SIGMA70_PATTERN.search(plan)
-    if match is None:
-        return "control" if _is_control_row(row) else "unknown"
-    return match.group(1).lower()
+    match = _SIG35_PATTERN.search(plan)
+    if match is not None:
+        return match.group(1).lower()
+    raise ContractViolationError(
+        "sig35_variant could not be derived for a synthetic promoter row; expected densegen__plan to contain __sig35="
+    )
 
 
 def _campaign_prior(row: dict[str, object]) -> str:
@@ -125,13 +151,13 @@ def _source_class(row: dict[str, object]) -> str:
     return "manual_or_wildtype" if _is_control_row(row) else "densegen"
 
 
-def _promoter_metadata_value(row: dict[str, object], *, derive: str) -> object:
+def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: WorkspaceContext | None = None) -> object:
     if derive == "design_family":
         return _design_family(row)
     if derive == "design_regulator_composition":
         return _design_regulator_composition(row)
-    if derive == "sigma70_variant":
-        return _sigma70_variant(row)
+    if derive == "sig35_variant":
+        return _sig35_variant(row, context=context)
     if derive == "campaign_prior":
         return _campaign_prior(row)
     if derive == "is_control":
@@ -144,13 +170,37 @@ def _promoter_metadata_value(row: dict[str, object], *, derive: str) -> object:
 def _promoter_metadata_columns(
     rows: list[dict[str, object]],
     *,
+    context: WorkspaceContext,
     configs: list[tuple[str, PromoterMetadataCohortConfig]],
 ) -> dict[str, pa.Array]:
     arrays: dict[str, pa.Array] = {}
     for cohort_id, config in configs:
-        values = [_promoter_metadata_value(row, derive=config.derive) for row in rows]
+        values = [_promoter_metadata_value(row, derive=config.derive, context=context) for row in rows]
         arrays[cohort_id] = pa.array(values)
     return arrays
+
+
+def _derived_metadata_value(
+    context: WorkspaceContext,
+    row: dict[str, object],
+    *,
+    column_name: str,
+) -> object:
+    if column_name == "construct_template_id":
+        return _construct_template_id(row)
+    derivation = (context.config.metadata.derivations or {}).get(column_name)
+    if derivation is not None:
+        return derive_metadata_value(row, derivation)
+    raise ContractViolationError(f"metadata column {column_name!r} is requested but no derivation is configured")
+
+
+def _reference_set_metadata_columns(context: WorkspaceContext) -> list[str]:
+    columns: list[str] = []
+    for reference_set in context.config.reference_sets.values():
+        columns.append(reference_set.match_column)
+        if reference_set.label_column:
+            columns.append(reference_set.label_column)
+    return list(dict.fromkeys(column for column in columns if column))
 
 
 def _matrix_from_vector_column(column: pa.Array | pa.ChunkedArray, *, dtype: str, label: str) -> np.ndarray:
@@ -283,12 +333,19 @@ def _materialize_tabular_vector_artifact(
         "template_id",
         "construct__template_id",
     ]
+    reference_set_metadata_columns = _reference_set_metadata_columns(context)
+    requested_metadata_columns = list(
+        dict.fromkeys([*(context.config.metadata.include or []), *(source.metadata_include or [])])
+    )
+    promoter_cohort_ids = {cohort_id for cohort_id, _ in promoter_cohorts}
+    configured_derivation_ids = set((context.config.metadata.derivations or {}).keys())
     metadata_columns = list(
         dict.fromkeys(
             [
                 source.record_key,
                 source.subject_key,
-                *(context.config.metadata.include or []),
+                *requested_metadata_columns,
+                *reference_set_metadata_columns,
                 *promoter_metadata_columns,
             ]
         )
@@ -296,8 +353,36 @@ def _materialize_tabular_vector_artifact(
     if source.context_key:
         metadata_columns.append(source.context_key)
     columns = [name for name in dict.fromkeys([*metadata_columns, vector_column]) if name in available_columns]
-    row_columns = [name for name in columns if name != vector_column]
-    derived_row_columns = [cohort_id for cohort_id, _ in promoter_cohorts]
+    processing_row_columns = [name for name in columns if name != vector_column]
+    output_row_columns = [
+        name
+        for name in dict.fromkeys(
+            [
+                source.record_key,
+                source.subject_key,
+                *requested_metadata_columns,
+                *reference_set_metadata_columns,
+                *([source.context_key] if source.context_key else []),
+            ]
+        )
+        if name in available_columns and name not in {"template_id", "construct__template_id"}
+    ]
+    derived_row_columns: list[str] = []
+    for column_name in requested_metadata_columns:
+        if column_name in output_row_columns:
+            continue
+        if column_name in promoter_cohort_ids:
+            continue
+        if column_name == "construct_template_id" or column_name in configured_derivation_ids:
+            derived_row_columns.append(column_name)
+            continue
+        raise ContractViolationError(
+            f"metadata column {column_name!r} cannot be materialized for view {view_id}: "
+            "it is neither present in the source nor backed by a derivation/cohort"
+        )
+    for cohort_id, _ in promoter_cohorts:
+        if cohort_id not in derived_row_columns:
+            derived_row_columns.append(cohort_id)
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     row_count = int(inspect_source_schema(resolved)["row_count"])
@@ -360,10 +445,26 @@ def _materialize_tabular_vector_artifact(
                 )
             matrix[write_offset:next_offset] = matrix_chunk
 
-            rows_batch = batch.select(row_columns)
+            processing_rows_batch = batch.select(processing_row_columns)
+            row_dicts = processing_rows_batch.to_pylist()
+            rows_batch = batch.select(output_row_columns)
+            for derived_column in [
+                column
+                for column in derived_row_columns
+                if column not in promoter_cohort_ids and column not in rows_batch.column_names
+            ]:
+                rows_batch = rows_batch.append_column(
+                    derived_column,
+                    pa.array([_derived_metadata_value(context, row, column_name=derived_column) for row in row_dicts]),
+                )
             if promoter_cohorts:
-                row_dicts = rows_batch.to_pylist()
-                for cohort_id, array in _promoter_metadata_columns(row_dicts, configs=promoter_cohorts).items():
+                for cohort_id, array in _promoter_metadata_columns(
+                    row_dicts,
+                    context=context,
+                    configs=promoter_cohorts,
+                ).items():
+                    if cohort_id in rows_batch.column_names:
+                        continue
                     rows_batch = rows_batch.append_column(cohort_id, array)
             if row_writer is None:
                 row_writer = pq.ParquetWriter(rows_path, rows_batch.schema)
@@ -382,7 +483,7 @@ def _materialize_tabular_vector_artifact(
         raise ContractViolationError(
             f"view {view_id} materialized {write_offset} rows but source schema reported {row_count}"
         )
-    return artifact_dir, row_count, dims, source.record_key, [*row_columns, *derived_row_columns]
+    return artifact_dir, row_count, dims, source.record_key, [*output_row_columns, *derived_row_columns]
 
 
 def materialize_view_artifact(

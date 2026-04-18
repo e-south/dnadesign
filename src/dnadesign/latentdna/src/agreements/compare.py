@@ -111,6 +111,7 @@ def _compare_neighbor_rows(
                 **row,
                 "method": "knn_overlap",
                 "shared_neighbor_count": shared,
+                "neighbor_overlap_fraction": float(fraction),
                 "overlap_fraction": float(fraction),
             }
         )
@@ -122,6 +123,7 @@ def _compare_neighbor_rows(
         "rows": len(overlap_rows),
         "k": k,
         "mean_shared_neighbor_count": float(np.mean(shared_counts, dtype=np.float64)),
+        "mean_neighbor_overlap_fraction": float(np.mean(overlap_fractions, dtype=np.float64)),
         "mean_overlap_fraction": float(np.mean(overlap_fractions, dtype=np.float64)),
         "min_overlap_fraction": float(np.min(overlap_fractions)),
         "max_overlap_fraction": float(np.max(overlap_fractions)),

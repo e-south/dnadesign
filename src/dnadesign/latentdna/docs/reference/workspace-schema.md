@@ -1,7 +1,7 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-14
+**Last verified:** 2026-04-15
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
@@ -41,6 +41,7 @@ Implemented schema slices:
 - Recipes: thin DAGs over the currently implemented primitive command set
 - Deliverables: user-facing bundles that reference one recipe plus declared prerequisites and outputs
 - Study binding: optional read-only link to one checked-in dnadesign study record through explicit `study_id` and `docs_root` fields, plus readiness vocabulary used by status surfaces
+- Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
 Current runtime limits:
 
@@ -62,10 +63,10 @@ Current runtime limits:
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
 - `notebook generate` currently emits one workspace notebook surface per declared `notebooks.<id>`, with `notebooks.<id>.default_deliverable` selecting the initial catalog focus while all plot, run, and manifest browsing stays read-only.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
-- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study committee template by binding `anchor60` to the study's merged-anchor dataset, `ctx1k` to the construct-context dataset, and writing a typed `study_binding` block.
-- `workspace refresh` clears only workspace-local LatentDNA outputs plus the rejected `outputs/latentdna/` tree; it never mutates upstream `usr` datasets.
+- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study reference-margin template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
+- `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
 - `validate workspace --deep` currently performs schema-only pressure checks against declared sources, views, cohorts, landmarks, and the bound study directory without loading embedding payloads.
 - Deliverable loading now rejects declared outputs that the linked recipe does not actually produce, including config-backed outputs such as `views`, `scalars`, `reducers`, `reduced_views`, and `exports`.
 - Deliverables must now declare explicit semantic fields in config. The runtime no longer hydrates missing `title`, `summary`, `question`, or `section` from legacy `description` and `kind` fields.
 - Deliverable status and run inventory now use recorded input and source digests where available, including export and alignment manifests with explicit path-backed provenance.
-- Fixture-scale benchmark coverage now lives under `tests/perf/test_benchmark_harness.py`; this is a smoke harness, not a replacement for live promoter-study pressure runs.
+- Fixture-scale contract coverage now lives under the checked-in contract and CLI tests for the promoter reference-margin template; these are smoke checks, not a replacement for live promoter-study pressure runs.

@@ -10,6 +10,12 @@ from dnadesign.usr import Dataset
 from dnadesign.usr.dataset import RESERVED_NAMESPACES
 from dnadesign.usr.dataset_overlay_catalog import load_overlay_catalog
 from dnadesign.usr.overlays import overlay_parts
+from dnadesign.usr.src.overlay_digest_ledger import (
+    overlay_digest_ledger_path,
+    write_overlay_digest_ledger,
+)
+
+from .provenance import OVERLAY_INVENTORY_DIGEST_MODE
 
 
 def records_path(root: str, dataset: str, *, workspace_dir: Path) -> Path:
@@ -63,8 +69,23 @@ def source_provenance(
                 "role": "overlay",
                 "namespace": namespace,
                 "columns": overlay_columns,
+                "digest_mode": OVERLAY_INVENTORY_DIGEST_MODE,
             }
         )
+        ledger_path = overlay_digest_ledger_path(path)
+        if ledger_path is not None and ledger_path.is_file():
+            refreshed_ledger_path = write_overlay_digest_ledger(path)
+            entries.append(
+                {
+                    "kind": "file",
+                    "id": f"{namespace}:digest_ledger",
+                    "path": refreshed_ledger_path.as_posix(),
+                    "role": "overlay_ledger",
+                    "namespace": namespace,
+                    "columns": overlay_columns,
+                }
+            )
+            continue
         for part in overlay_parts(path):
             part_path = Path(part)
             part_id = namespace if part_path == path else f"{namespace}:{part_path.name}"

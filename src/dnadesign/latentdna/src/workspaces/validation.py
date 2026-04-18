@@ -192,7 +192,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
                 )
 
     for notebook_id, notebook in config.notebooks.items():
-        _validate_notebook(notebook_id, notebook)
+        _validate_notebook(config, notebook_id, notebook)
 
     for notebook_id, notebook in config.notebooks.items():
         if notebook.default_deliverable not in config.deliverables:
@@ -246,12 +246,31 @@ def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
         raise WorkspaceValidationError(f"recipe {recipe_id} contains a cycle") from exc
 
 
-def _validate_notebook(notebook_id: str, notebook: NotebookConfig) -> None:
+def _validate_notebook(config: WorkspaceConfig, notebook_id: str, notebook: NotebookConfig) -> None:
     assert isinstance(notebook, WorkspaceNotebookConfig)
     validate_identifier(notebook.default_deliverable, label=f"notebook {notebook_id} default deliverable")
+    seen_plot_ids: set[str] = set()
+    for plot_id in notebook.ordered_plots:
+        validate_identifier(plot_id, label=f"notebook {notebook_id} ordered plot")
+        if plot_id in seen_plot_ids:
+            raise WorkspaceValidationError(f"notebook {notebook_id} reuses ordered plot {plot_id!r}")
+        seen_plot_ids.add(plot_id)
+        if plot_id not in config.plots:
+            raise WorkspaceValidationError(f"notebook {notebook_id} references unknown plot {plot_id!r}")
+        visibility_tier = str(getattr(config.plots[plot_id], "visibility_tier", "primary") or "primary")
+        if visibility_tier in {"debug", "hidden"}:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} ordered plot {plot_id!r} must not use visibility_tier {visibility_tier!r}"
+            )
+        if not any(plot_id in deliverable.outputs.get("plots", []) for deliverable in config.deliverables.values()):
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} ordered plot {plot_id!r} is not owned by any deliverable output"
+            )
 
 
 def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
+    if not getattr(plot, "semantics_ref", None):
+        raise WorkspaceValidationError(f"plot {plot_id} must declare semantics_ref")
     if getattr(plot, "annotation", None) is not None:
         annotation = plot.annotation
         assert annotation is not None
@@ -267,7 +286,10 @@ def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
             validate_identifier(projection_id, label=f"plot {plot_id} projection")
         return
     if plot.kind == "heatmap":
-        validate_identifier(plot.enrichment, label=f"plot {plot_id} enrichment")
+        if plot.enrichment is not None:
+            validate_identifier(plot.enrichment, label=f"plot {plot_id} enrichment")
+        if plot.scalar is not None:
+            validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
         return
     if plot.kind == "distance_scatter":
         validate_identifier(plot.distance, label=f"plot {plot_id} distance")
@@ -276,6 +298,20 @@ def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
         for label, value in (("scalar", plot.scalar), ("distance", plot.distance)):
             if value is not None:
                 validate_identifier(value, label=f"plot {plot_id} {label}")
+        return
+    if plot.kind == "xy_scatter_grid":
+        for scalar_id in plot.scalars:
+            validate_identifier(scalar_id, label=f"plot {plot_id} scalar")
+        return
+    if plot.kind == "paired_xy_scatter_grid":
+        for scalar_id in plot.scalars:
+            validate_identifier(scalar_id, label=f"plot {plot_id} scalar")
+        return
+    if plot.kind == "categorical_count":
+        validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
+        return
+    if plot.kind == "metric_panel_grid":
+        validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
         return
     if plot.kind == "distribution":
         for label, value in (
@@ -287,13 +323,25 @@ def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
             if value is not None:
                 validate_identifier(value, label=f"plot {plot_id} {label}")
         return
+    if plot.kind == "distribution_grid":
+        for scalar_id in plot.scalars:
+            validate_identifier(scalar_id, label=f"plot {plot_id} scalar")
+        return
     if plot.kind == "curve":
         if plot.reducer is not None:
             validate_identifier(plot.reducer, label=f"plot {plot_id} reducer")
         return
+    if plot.kind == "curve_grid":
+        for reducer_id in plot.reducers:
+            validate_identifier(reducer_id, label=f"plot {plot_id} reducer")
+        return
     if plot.kind == "correspondence_heatmap":
         validate_identifier(plot.left_cluster, label=f"plot {plot_id} left_cluster")
         validate_identifier(plot.right_cluster, label=f"plot {plot_id} right_cluster")
+        return
+    if plot.kind == "agreement_summary_grid":
+        for agreement_id in plot.agreements:
+            validate_identifier(agreement_id, label=f"plot {plot_id} agreement")
         return
     validate_identifier(plot.agreement, label=f"plot {plot_id} agreement")
 
