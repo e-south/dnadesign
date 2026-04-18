@@ -24,6 +24,7 @@ import pyarrow.parquet as pq
 
 from .duckdb_runtime import connect_duckdb_utc
 from .errors import NamespaceError, SchemaError
+from .overlay_digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
 from .overlays import (
     OVERLAY_META_CREATED,
     OVERLAY_META_KEY,
@@ -1108,17 +1109,23 @@ def write_overlay_part_dataset(
             stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
             promoted_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
             os.replace(file_path, promoted_path)
+            new_parts = [promoted_path]
         else:
             dir_path.mkdir(parents=True, exist_ok=True)
+            new_parts = []
         stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
         part_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
         tmp_path = part_path.with_suffix(".parquet.tmp")
         try:
             pq.write_table(tbl_out, tmp_path, compression=PARQUET_COMPRESSION)
             os.replace(tmp_path, part_path)
+            new_parts.append(part_path)
         finally:
             if tmp_path.exists():
                 tmp_path.unlink(missing_ok=True)
+        ledger_path = overlay_digest_ledger_path(dir_path)
+        if ledger_path is not None and ledger_path.is_file():
+            update_overlay_digest_ledger(dir_path, new_parts=new_parts)
 
         dataset._record_event(
             "write_overlay_part",

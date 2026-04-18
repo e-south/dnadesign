@@ -19,6 +19,7 @@ import pyarrow.parquet as pq
 
 from .errors import NamespaceError, SchemaError
 from .maintenance import require_maintenance
+from .overlay_digest_ledger import write_overlay_digest_ledger
 from .overlays import (
     OVERLAY_META_CREATED,
     OVERLAY_META_REGISTRY_HASH,
@@ -236,3 +237,22 @@ def compact_overlay_namespace(
             actor=ctx.actor,
         )
         return file_path
+
+
+def write_overlay_digest_ledger_namespace(
+    dataset: DatasetOverlayMaintenanceHost,
+    namespace: str,
+) -> Path:
+    dataset._require_exists()
+    dir_path = overlay_dir_path(dataset.dir, namespace)
+    if not dir_path.exists():
+        raise SchemaError(f"Overlay parts not found for namespace '{namespace}'.")
+    if not dir_path.is_dir():
+        raise SchemaError(f"Overlay digest ledger requires a directory overlay for namespace '{namespace}'.")
+    ledger_path = write_overlay_digest_ledger(dir_path)
+    dataset._record_event(
+        "write_overlay_digest_ledger",
+        args={"namespace": namespace, "ledger_path": str(ledger_path)},
+        target_path=next(iter(sorted(dir_path.glob("part-*.parquet")))),
+    )
+    return ledger_path

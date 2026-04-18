@@ -39,6 +39,7 @@ from .dataset_overlay_maintenance import (
     compact_overlay_namespace,
     list_overlay_infos,
     remove_overlay_namespace,
+    write_overlay_digest_ledger_namespace,
 )
 from .dataset_overlay_ops import (
     attach_columns_dataset,
@@ -725,6 +726,9 @@ class Dataset:
 
     def compact_overlay(self, namespace: str) -> Path:
         return compact_overlay_namespace(self, namespace, reserved_namespaces=RESERVED_NAMESPACES)
+
+    def write_overlay_digest_ledger(self, namespace: str) -> Path:
+        return write_overlay_digest_ledger_namespace(self, namespace)
 
     # ---- validation & utils ----
 
