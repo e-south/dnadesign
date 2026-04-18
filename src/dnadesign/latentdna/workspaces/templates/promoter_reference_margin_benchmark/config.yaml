@@ -214,37 +214,42 @@ plots:
     kind: categorical_count
     visibility_tier: primary
     scalar: dataset_overview_counts
-    category_column: category
-    label_column: label
-    value_column: row_count
-    panel_column: source_id
-    color_column: category
+    category_column: dimension
+    label_column: category_label
+    value_column: fraction
+    panel_column: dimension_label
     semantics_ref: plot_semantics/dataset_overview.yaml
   reference_margin_gallery_wildtype:
     kind: xy_scatter_grid
     visibility_tier: primary
     scalars:
-      - wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp
-      - wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb
       - wildtype_reference_margins_intermediate_embedding_7b_anchor_60bp
-      - wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb
-      - wildtype_reference_margins_pooled_logits_20b_anchor_60bp
-      - wildtype_reference_margins_pooled_logits_20b_full_context_1kb
       - wildtype_reference_margins_pooled_logits_7b_anchor_60bp
+      - wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb
       - wildtype_reference_margins_pooled_logits_7b_full_context_1kb
+      - wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp
+      - wildtype_reference_margins_pooled_logits_20b_anchor_60bp
+      - wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb
+      - wildtype_reference_margins_pooled_logits_20b_full_context_1kb
     panel_titles:
-      - intermediate_embedding 20b anchor_60bp
-      - intermediate_embedding 20b full_context_1kb
-      - intermediate_embedding 7b anchor_60bp
-      - intermediate_embedding 7b full_context_1kb
-      - pooled_logits 20b anchor_60bp
-      - pooled_logits 20b full_context_1kb
-      - pooled_logits 7b anchor_60bp
-      - pooled_logits 7b full_context_1kb
+      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · 60 bp anchor · Output-layer mean
+      - Evo 2 7B · 1 kb construct context · Intermediate block mean
+      - Evo 2 7B · 1 kb construct context · Output-layer mean
+      - Evo 2 20B · 60 bp anchor · Intermediate block mean
+      - Evo 2 20B · 60 bp anchor · Output-layer mean
+      - Evo 2 20B · 1 kb construct context · Intermediate block mean
+      - Evo 2 20B · 1 kb construct context · Output-layer mean
     x_column: wildtype_margin_ethanol_vs_control
     y_column: wildtype_margin_cipro_vs_control
-    color_column: design_family
-    shape_column: sig35_variant
+    default_hue: design_family
+    hue_options:
+      - column: design_family
+        label: Design family
+        type: categorical
+      - column: sig35_variant
+        label: Sigma-35 variant
+        type: categorical
     annotation:
       reference_set: promoter_wildtype_primary
     semantics_ref: plot_semantics/reference_margin_gallery_wildtype.yaml
@@ -269,28 +274,40 @@ plots:
     kind: paired_xy_scatter_grid
     visibility_tier: primary
     scalars:
-      - context_geometry_metrics_intermediate_embedding_20b
       - context_geometry_metrics_intermediate_embedding_7b
-      - context_geometry_metrics_pooled_logits_20b
       - context_geometry_metrics_pooled_logits_7b
+      - context_geometry_metrics_intermediate_embedding_20b
+      - context_geometry_metrics_pooled_logits_20b
     panel_titles:
-      - intermediate_embedding 20b
-      - intermediate_embedding 7b
-      - pooled_logits 20b
-      - pooled_logits 7b
+      - Evo 2 7B · Intermediate block mean
+      - Evo 2 7B · Output-layer mean
+      - Evo 2 20B · Intermediate block mean
+      - Evo 2 20B · Output-layer mean
     x_column: context_margin_delta_ethanol
     y_column: context_margin_delta_cipro
-    color_column: design_family
-    shape_column: sig35_variant
+    default_hue: design_family
+    hue_options:
+      - column: design_family
+        label: Design family
+        type: categorical
+      - column: sig35_variant
+        label: Sigma-35 variant
+        type: categorical
+      - column: context_self_cosine
+        label: Context self-cosine
+        type: continuous
+      - column: context_shift_l2
+        label: Context-shift L2 distance
+        type: continuous
     semantics_ref: plot_semantics/context_shift_reference_plane.yaml
   context_delta_distributions:
     kind: distribution_grid
     visibility_tier: primary
     scalars:
-      - context_geometry_metrics_intermediate_embedding_20b
       - context_geometry_metrics_intermediate_embedding_7b
-      - context_geometry_metrics_pooled_logits_20b
       - context_geometry_metrics_pooled_logits_7b
+      - context_geometry_metrics_intermediate_embedding_20b
+      - context_geometry_metrics_pooled_logits_20b
     metric_columns:
       - context_self_cosine
       - context_shift_l2
@@ -325,86 +342,103 @@ plots:
       - tradeoff_dual_context
       - tradeoff_reference_neighbor_context
     panel_titles:
-      - ethanol evidence vs context stability
-      - cipro evidence vs context stability
-      - dual evidence vs context stability
-      - reference-neighbor evidence vs context stability
+      - Ethanol
+      - Ciprofloxacin
+      - Dual
+      - Reference-neighborhood
     x_column: x_metric_value
     y_column: y_metric_value
     color_column: candidate_family
-    shape_column: candidate_model
     semantics_ref: plot_semantics/representation_tradeoff_scatter.yaml
   representation_scree_diagnostic:
     kind: curve_grid
     visibility_tier: primary
     reducers:
-      - pca_intermediate_embedding_20b_anchor_60bp
-      - pca_intermediate_embedding_20b_full_context_1kb
       - pca_intermediate_embedding_7b_anchor_60bp
-      - pca_intermediate_embedding_7b_full_context_1kb
-      - pca_pooled_logits_20b_anchor_60bp
-      - pca_pooled_logits_20b_full_context_1kb
       - pca_pooled_logits_7b_anchor_60bp
+      - pca_intermediate_embedding_7b_full_context_1kb
       - pca_pooled_logits_7b_full_context_1kb
+      - pca_intermediate_embedding_20b_anchor_60bp
+      - pca_pooled_logits_20b_anchor_60bp
+      - pca_intermediate_embedding_20b_full_context_1kb
+      - pca_pooled_logits_20b_full_context_1kb
     panel_titles:
-      - intermediate_embedding 20b anchor_60bp
-      - intermediate_embedding 20b full_context_1kb
-      - intermediate_embedding 7b anchor_60bp
-      - intermediate_embedding 7b full_context_1kb
-      - pooled_logits 20b anchor_60bp
-      - pooled_logits 20b full_context_1kb
-      - pooled_logits 7b anchor_60bp
-      - pooled_logits 7b full_context_1kb
+      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · 60 bp anchor · Output-layer mean
+      - Evo 2 7B · 1 kb construct context · Intermediate block mean
+      - Evo 2 7B · 1 kb construct context · Output-layer mean
+      - Evo 2 20B · 60 bp anchor · Intermediate block mean
+      - Evo 2 20B · 60 bp anchor · Output-layer mean
+      - Evo 2 20B · 1 kb construct context · Intermediate block mean
+      - Evo 2 20B · 1 kb construct context · Output-layer mean
     semantics_ref: plot_semantics/representation_scree_diagnostic.yaml
   reference_margin_gallery_synthetic_centroids:
     kind: xy_scatter_grid
     visibility_tier: appendix
     scalars:
-      - synthetic_centroid_margins_intermediate_embedding_20b_anchor_60bp
-      - synthetic_centroid_margins_intermediate_embedding_20b_full_context_1kb
       - synthetic_centroid_margins_intermediate_embedding_7b_anchor_60bp
-      - synthetic_centroid_margins_intermediate_embedding_7b_full_context_1kb
-      - synthetic_centroid_margins_pooled_logits_20b_anchor_60bp
-      - synthetic_centroid_margins_pooled_logits_20b_full_context_1kb
       - synthetic_centroid_margins_pooled_logits_7b_anchor_60bp
+      - synthetic_centroid_margins_intermediate_embedding_7b_full_context_1kb
       - synthetic_centroid_margins_pooled_logits_7b_full_context_1kb
+      - synthetic_centroid_margins_intermediate_embedding_20b_anchor_60bp
+      - synthetic_centroid_margins_pooled_logits_20b_anchor_60bp
+      - synthetic_centroid_margins_intermediate_embedding_20b_full_context_1kb
+      - synthetic_centroid_margins_pooled_logits_20b_full_context_1kb
     panel_titles:
-      - intermediate_embedding 20b anchor_60bp
-      - intermediate_embedding 20b full_context_1kb
-      - intermediate_embedding 7b anchor_60bp
-      - intermediate_embedding 7b full_context_1kb
-      - pooled_logits 20b anchor_60bp
-      - pooled_logits 20b full_context_1kb
-      - pooled_logits 7b anchor_60bp
-      - pooled_logits 7b full_context_1kb
+      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · 60 bp anchor · Output-layer mean
+      - Evo 2 7B · 1 kb construct context · Intermediate block mean
+      - Evo 2 7B · 1 kb construct context · Output-layer mean
+      - Evo 2 20B · 60 bp anchor · Intermediate block mean
+      - Evo 2 20B · 60 bp anchor · Output-layer mean
+      - Evo 2 20B · 1 kb construct context · Intermediate block mean
+      - Evo 2 20B · 1 kb construct context · Output-layer mean
     x_column: synthetic_margin_ethanol_vs_background
     y_column: synthetic_margin_cipro_vs_background
-    color_column: design_family
-    shape_column: sig35_variant
+    default_hue: design_family
+    hue_options:
+      - column: design_family
+        label: Design family
+        type: categorical
+      - column: sig35_variant
+        label: Sigma-35 variant
+        type: categorical
     semantics_ref: plot_semantics/reference_margin_gallery_synthetic_centroids.yaml
   appendix_umap_gallery:
     kind: projection_grid
     visibility_tier: appendix
     projections:
-      - umap_intermediate_embedding_20b_anchor_60bp
-      - umap_intermediate_embedding_20b_full_context_1kb
       - umap_intermediate_embedding_7b_anchor_60bp
-      - umap_intermediate_embedding_7b_full_context_1kb
-      - umap_pooled_logits_20b_anchor_60bp
-      - umap_pooled_logits_20b_full_context_1kb
       - umap_pooled_logits_7b_anchor_60bp
+      - umap_intermediate_embedding_7b_full_context_1kb
       - umap_pooled_logits_7b_full_context_1kb
+      - umap_intermediate_embedding_20b_anchor_60bp
+      - umap_pooled_logits_20b_anchor_60bp
+      - umap_intermediate_embedding_20b_full_context_1kb
+      - umap_pooled_logits_20b_full_context_1kb
     panel_titles:
-      - intermediate_embedding 20b anchor_60bp
-      - intermediate_embedding 20b full_context_1kb
-      - intermediate_embedding 7b anchor_60bp
-      - intermediate_embedding 7b full_context_1kb
-      - pooled_logits 20b anchor_60bp
-      - pooled_logits 20b full_context_1kb
-      - pooled_logits 7b anchor_60bp
-      - pooled_logits 7b full_context_1kb
-    color_column: design_family
-    shape_column: sig35_variant
+      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · 60 bp anchor · Output-layer mean
+      - Evo 2 7B · 1 kb construct context · Intermediate block mean
+      - Evo 2 7B · 1 kb construct context · Output-layer mean
+      - Evo 2 20B · 60 bp anchor · Intermediate block mean
+      - Evo 2 20B · 60 bp anchor · Output-layer mean
+      - Evo 2 20B · 1 kb construct context · Intermediate block mean
+      - Evo 2 20B · 1 kb construct context · Output-layer mean
+    default_hue: design_family
+    hue_options:
+      - column: design_family
+        label: Design family
+        type: categorical
+      - column: sig35_variant
+        label: Sigma-35 variant
+        type: categorical
+      - column: context_self_cosine
+        label: Context self-cosine
+        type: continuous
+      - column: context_shift_l2
+        label: Context-shift L2 distance
+        type: continuous
     annotation:
       reference_set: promoter_wildtype_primary
     semantics_ref: plot_semantics/appendix_umap_gallery.yaml
@@ -1234,14 +1268,14 @@ recipes:
       - *build_tradeoff_reference_neighbor_context
       - *render_representation_tradeoff_scatter
       - *render_representation_scree_diagnostic
-      - &umap_sample_ie20_anchor {id: build_umap_sample_intermediate_embedding_20b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_20b_anchor_60bp], params: {sample: umap_sample_intermediate_embedding_20b_anchor_60bp, view: intermediate_embedding_20b_anchor_60bp, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_ie20_full {id: build_umap_sample_intermediate_embedding_20b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_20b_full_context_1kb], params: {sample: umap_sample_intermediate_embedding_20b_full_context_1kb, view: intermediate_embedding_20b_full_context_1kb, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_ie7_anchor {id: build_umap_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: umap_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_ie7_full {id: build_umap_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: umap_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_pl20_anchor {id: build_umap_sample_pooled_logits_20b_anchor_60bp, op: sample.build, depends_on: [materialize_pooled_logits_20b_anchor_60bp], params: {sample: umap_sample_pooled_logits_20b_anchor_60bp, view: pooled_logits_20b_anchor_60bp, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_pl20_full {id: build_umap_sample_pooled_logits_20b_full_context_1kb, op: sample.build, depends_on: [materialize_pooled_logits_20b_full_context_1kb], params: {sample: umap_sample_pooled_logits_20b_full_context_1kb, view: pooled_logits_20b_full_context_1kb, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_pl7_anchor {id: build_umap_sample_pooled_logits_7b_anchor_60bp, op: sample.build, depends_on: [materialize_pooled_logits_7b_anchor_60bp], params: {sample: umap_sample_pooled_logits_7b_anchor_60bp, view: pooled_logits_7b_anchor_60bp, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &umap_sample_pl7_full {id: build_umap_sample_pooled_logits_7b_full_context_1kb, op: sample.build, depends_on: [materialize_pooled_logits_7b_full_context_1kb], params: {sample: umap_sample_pooled_logits_7b_full_context_1kb, view: pooled_logits_7b_full_context_1kb, strategy: stratified, n: 1024, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
+      - &umap_sample_ie20_anchor {id: build_umap_sample_intermediate_embedding_20b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_20b_anchor_60bp], params: {sample: umap_sample_intermediate_embedding_20b_anchor_60bp, view: intermediate_embedding_20b_anchor_60bp, strategy: all, seed: 17}}
+      - &umap_sample_ie20_full {id: build_umap_sample_intermediate_embedding_20b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_20b_full_context_1kb], params: {sample: umap_sample_intermediate_embedding_20b_full_context_1kb, view: intermediate_embedding_20b_full_context_1kb, strategy: all, seed: 17}}
+      - &umap_sample_ie7_anchor {id: build_umap_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: umap_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: all, seed: 17}}
+      - &umap_sample_ie7_full {id: build_umap_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: umap_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: all, seed: 17}}
+      - &umap_sample_pl20_anchor {id: build_umap_sample_pooled_logits_20b_anchor_60bp, op: sample.build, depends_on: [materialize_pooled_logits_20b_anchor_60bp], params: {sample: umap_sample_pooled_logits_20b_anchor_60bp, view: pooled_logits_20b_anchor_60bp, strategy: all, seed: 17}}
+      - &umap_sample_pl20_full {id: build_umap_sample_pooled_logits_20b_full_context_1kb, op: sample.build, depends_on: [materialize_pooled_logits_20b_full_context_1kb], params: {sample: umap_sample_pooled_logits_20b_full_context_1kb, view: pooled_logits_20b_full_context_1kb, strategy: all, seed: 17}}
+      - &umap_sample_pl7_anchor {id: build_umap_sample_pooled_logits_7b_anchor_60bp, op: sample.build, depends_on: [materialize_pooled_logits_7b_anchor_60bp], params: {sample: umap_sample_pooled_logits_7b_anchor_60bp, view: pooled_logits_7b_anchor_60bp, strategy: all, seed: 17}}
+      - &umap_sample_pl7_full {id: build_umap_sample_pooled_logits_7b_full_context_1kb, op: sample.build, depends_on: [materialize_pooled_logits_7b_full_context_1kb], params: {sample: umap_sample_pooled_logits_7b_full_context_1kb, view: pooled_logits_7b_full_context_1kb, strategy: all, seed: 17}}
       - &umap_ie20_anchor {id: fit_umap_intermediate_embedding_20b_anchor_60bp, op: projection.fit, depends_on: [build_umap_sample_intermediate_embedding_20b_anchor_60bp], params: {view: intermediate_embedding_20b_anchor_60bp, sample: umap_sample_intermediate_embedding_20b_anchor_60bp, run_id: umap_intermediate_embedding_20b_anchor_60bp, seed: 17}}
       - &umap_ie20_full {id: fit_umap_intermediate_embedding_20b_full_context_1kb, op: projection.fit, depends_on: [build_umap_sample_intermediate_embedding_20b_full_context_1kb], params: {view: intermediate_embedding_20b_full_context_1kb, sample: umap_sample_intermediate_embedding_20b_full_context_1kb, run_id: umap_intermediate_embedding_20b_full_context_1kb, seed: 17}}
       - &umap_ie7_anchor {id: fit_umap_intermediate_embedding_7b_anchor_60bp, op: projection.fit, depends_on: [build_umap_sample_intermediate_embedding_7b_anchor_60bp], params: {view: intermediate_embedding_7b_anchor_60bp, sample: umap_sample_intermediate_embedding_7b_anchor_60bp, run_id: umap_intermediate_embedding_7b_anchor_60bp, seed: 17}}
@@ -1387,10 +1421,10 @@ deliverables:
     docs_refs: []
     acceptance_checks: []
   appendix_umap_gallery:
-    title: Appendix UMAP gallery
-    section: Appendix
-    question: What appendix-only geometry and EDA context should remain visible?
-    summary: Synthetic centroid EDA plus appendix-only projection gallery with explicit caveats.
+    title: UMAP gallery
+    section: Audit
+    question: What secondary geometry surfaces help orient the realized candidate spaces without becoming the decision rule?
+    summary: Synthetic proxy margins plus full-population UMAP orientation panels for the eight realized candidate spaces.
     recipe: appendix_umap_gallery_recipe
     requires:
       views:

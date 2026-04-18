@@ -39,6 +39,23 @@ class StrictPlotModel(BaseModel):
 class PlotBaseConfig(StrictPlotModel):
     semantics_ref: str | None = None
     visibility_tier: Literal["primary", "appendix", "debug", "hidden"] = "primary"
+    default_hue: str | None = None
+    hue_options: list["PlotHueOptionConfig"] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_hue_defaults(self) -> "PlotBaseConfig":
+        if self.default_hue is None:
+            return self
+        allowed = {option.column for option in self.hue_options}
+        if self.hue_options and self.default_hue not in allowed:
+            raise ValueError("plot default_hue must be declared in hue_options")
+        return self
+
+
+class PlotHueOptionConfig(StrictPlotModel):
+    column: Identifier
+    label: str
+    type: Literal["categorical", "binary", "continuous"]
 
 
 class PlotAnnotationConfig(StrictPlotModel):
@@ -373,5 +390,7 @@ class ResolvedPlotSpec(StrictPlotModel):
     value_kind: str | None = None
     value_label: str | None = None
     sort_rule: str | None = None
+    default_hue: str | None = None
+    hue_options: list[PlotHueOptionConfig] = Field(default_factory=list)
     config_id: Identifier | None = None
     semantics_ref: str | None = None

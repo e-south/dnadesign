@@ -1,10 +1,10 @@
 plot_id: appendix_umap_gallery
-research_question: What appendix-only projection context should stay visible for QC and exploration?
+research_question: What full-population UMAP orientation surface helps inspect the eight realized candidate spaces without becoming the decision rule?
 evidence_tier: appendix
-encoding_summary: Eight-panel projection gallery colored by design family and shaped by sig35 variant.
-sampling_scope: Projection-specific populations; sampled and population counts must be checked in the manifest.
+encoding_summary: Eight-panel projection gallery with hue-only overlays across the eight realized candidate spaces.
+sampling_scope: Full-population projection artifacts across the shared 157,164-row promoter set.
 interpretation_guardrails:
-  - UMAP geometry is appendix-only and not a primary decision surface.
+  - UMAP geometry is a secondary orientation surface and not a primary decision surface.
   - Panel shape, rotation, and stretch are not directly comparable across projections.
-caption_md: Appendix-only UMAP gallery with explicit dimensionality-reduction caveats.
-alt_text: Eight projection panels colored by design family and shaped by sig35 variant, shown as appendix-only geometry context.
+caption_md: UMAP gallery with fixed persisted coordinates and hue-only overlays.
+alt_text: Eight full-population UMAP panels with hue-only overlays across the realized candidate spaces.

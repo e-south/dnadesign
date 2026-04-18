@@ -50,14 +50,14 @@ def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() 
         "appendix_umap_gallery",
     ]
     assert geometry_ids == [
-        "intermediate_embedding_20b_anchor_60bp",
-        "intermediate_embedding_20b_full_context_1kb",
         "intermediate_embedding_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_20b_anchor_60bp",
-        "pooled_logits_20b_full_context_1kb",
         "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_full_context_1kb",
         "pooled_logits_7b_full_context_1kb",
+        "intermediate_embedding_20b_anchor_60bp",
+        "pooled_logits_20b_anchor_60bp",
+        "intermediate_embedding_20b_full_context_1kb",
+        "pooled_logits_20b_full_context_1kb",
     ]
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_20b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_20b_full_context_1kb"
@@ -93,14 +93,14 @@ def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() 
         "representation_health_diagnostic",
     ]
     assert snapshot["browser"]["default_geometry_ids"] == [
-        "intermediate_embedding_20b_anchor_60bp",
-        "intermediate_embedding_20b_full_context_1kb",
         "intermediate_embedding_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_20b_anchor_60bp",
-        "pooled_logits_20b_full_context_1kb",
         "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_full_context_1kb",
         "pooled_logits_7b_full_context_1kb",
+        "intermediate_embedding_20b_anchor_60bp",
+        "pooled_logits_20b_anchor_60bp",
+        "intermediate_embedding_20b_full_context_1kb",
+        "pooled_logits_20b_full_context_1kb",
     ]
     assert snapshot["browser"]["preferred_hues"] == [
         "design_family",
@@ -119,18 +119,27 @@ def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() 
     reference_plot = context.config.plots["reference_margin_gallery_wildtype"]
     assert reference_plot.kind == "xy_scatter_grid"
     assert list(reference_plot.scalars) == [
-        "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
         "wildtype_reference_margins_intermediate_embedding_7b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb",
-        "wildtype_reference_margins_pooled_logits_20b_anchor_60bp",
-        "wildtype_reference_margins_pooled_logits_20b_full_context_1kb",
         "wildtype_reference_margins_pooled_logits_7b_anchor_60bp",
+        "wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb",
         "wildtype_reference_margins_pooled_logits_7b_full_context_1kb",
+        "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
+        "wildtype_reference_margins_pooled_logits_20b_anchor_60bp",
+        "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
+        "wildtype_reference_margins_pooled_logits_20b_full_context_1kb",
     ]
+    assert reference_plot.default_hue == "design_family"
+    assert [option.column for option in reference_plot.hue_options] == ["design_family", "sig35_variant"]
 
     context_plane = context.config.plots["context_shift_reference_plane"]
     assert context_plane.kind == "paired_xy_scatter_grid"
+    assert context_plane.default_hue == "design_family"
+    assert [option.column for option in context_plane.hue_options] == [
+        "design_family",
+        "sig35_variant",
+        "context_self_cosine",
+        "context_shift_l2",
+    ]
 
     geometry_summary = context.config.plots["context_geometry_summary"]
     assert geometry_summary.kind == "metric_panel_grid"
@@ -148,7 +157,14 @@ def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() 
     appendix_gallery = context.config.plots["appendix_umap_gallery"]
     assert appendix_gallery.kind == "projection_grid"
     assert appendix_gallery.visibility_tier == "appendix"
-    assert appendix_gallery.shape_column == "sig35_variant"
+    assert appendix_gallery.shape_column is None
+    assert appendix_gallery.default_hue == "design_family"
+    assert [option.column for option in appendix_gallery.hue_options] == [
+        "design_family",
+        "sig35_variant",
+        "context_self_cosine",
+        "context_shift_l2",
+    ]
     assert all(getattr(plot, "semantics_ref", None) for plot in context.config.plots.values())
 
     reference_requirements = context.config.deliverables["reference_margin_analysis"].requires
@@ -225,6 +241,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" in health_step_ids
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" in appendix_steps
+    assert appendix_steps["build_umap_sample_intermediate_embedding_20b_anchor_60bp"].params["strategy"] == "all"
     assert set(appendix_steps["generate_latent_geometry_browser"].depends_on) >= {
         "render_reference_margin_gallery_wildtype",
         "render_reference_neighbor_evidence",

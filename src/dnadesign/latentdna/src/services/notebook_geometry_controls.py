@@ -17,16 +17,17 @@ from ..contracts.notebook import (
 )
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
+from ..labels import humanize_candidate
 
 _CANONICAL_GEOMETRY_ORDER = [
-    "intermediate_embedding_20b_anchor_60bp",
-    "intermediate_embedding_20b_full_context_1kb",
     "intermediate_embedding_7b_anchor_60bp",
-    "intermediate_embedding_7b_full_context_1kb",
-    "pooled_logits_20b_anchor_60bp",
-    "pooled_logits_20b_full_context_1kb",
     "pooled_logits_7b_anchor_60bp",
+    "intermediate_embedding_7b_full_context_1kb",
     "pooled_logits_7b_full_context_1kb",
+    "intermediate_embedding_20b_anchor_60bp",
+    "pooled_logits_20b_anchor_60bp",
+    "intermediate_embedding_20b_full_context_1kb",
+    "pooled_logits_20b_full_context_1kb",
 ]
 
 _PREFERRED_HUES = [
@@ -48,21 +49,24 @@ _PREFERRED_HUES = [
 ]
 
 _FAMILY_LABELS = {
-    "intermediate_embedding": "intermediate embedding",
-    "pooled_logits": "pooled logits",
+    "intermediate_embedding": "Intermediate block mean",
+    "pooled_logits": "Output-layer mean",
 }
 
 _SCOPE_LABELS = {
-    "anchor_60bp": "anchor 60 bp",
-    "full_context_1kb": "full context 1 kb",
+    "anchor_60bp": "60 bp anchor",
+    "full_context_1kb": "1 kb construct context",
 }
 
 
 def _format_view_label(*, model: str | None, family: str | None, scope_name: str | None) -> str:
-    model_text = (model or "unknown").upper()
-    family_text = _FAMILY_LABELS.get(str(family or ""), str(family or "unknown").replace("_", " "))
-    context_text = _SCOPE_LABELS.get(str(scope_name or ""), str(scope_name or "unknown").replace("_", " "))
-    return f"{model_text} {family_text} {context_text}"
+    return humanize_candidate(
+        {
+            "candidate_model": f"evo2_{model}" if model else "",
+            "candidate_scope": scope_name or "",
+            "candidate_family": family or "",
+        }
+    )
 
 
 def _projection_inventory(context) -> dict[str, list[str]]:
@@ -243,19 +247,19 @@ def _layout_presets(geometry_rows: list[WorkspaceNotebookGeometry]) -> list[Work
         presets.append(
             WorkspaceNotebookLayoutPreset(
                 id="appendix_umap_gallery",
-                label="Appendix gallery",
+                label="UMAP gallery",
                 mode="fixed_grid",
-                description="Appendix-grade geometry gallery across the eight canonical study spaces.",
+                description="UMAP gallery across the eight canonical study spaces.",
                 view_ids=_CANONICAL_GEOMETRY_ORDER,
                 panel_titles=[
-                    "20B intermediate embedding anchor 60 bp",
-                    "20B intermediate embedding full context 1 kb",
-                    "7B intermediate embedding anchor 60 bp",
-                    "7B intermediate embedding full context 1 kb",
-                    "20B pooled logits anchor 60 bp",
-                    "20B pooled logits full context 1 kb",
-                    "7B pooled logits anchor 60 bp",
-                    "7B pooled logits full context 1 kb",
+                    "Evo 2 7B · 60 bp anchor · Intermediate block mean",
+                    "Evo 2 7B · 60 bp anchor · Output-layer mean",
+                    "Evo 2 7B · 1 kb construct context · Intermediate block mean",
+                    "Evo 2 7B · 1 kb construct context · Output-layer mean",
+                    "Evo 2 20B · 60 bp anchor · Intermediate block mean",
+                    "Evo 2 20B · 60 bp anchor · Output-layer mean",
+                    "Evo 2 20B · 1 kb construct context · Intermediate block mean",
+                    "Evo 2 20B · 1 kb construct context · Output-layer mean",
                 ],
             )
         )

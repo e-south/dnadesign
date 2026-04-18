@@ -132,11 +132,10 @@ def test_categorical_count_accepts_panelled_count_plots() -> None:
         {
             "kind": "categorical_count",
             "scalar": "dataset_overview_counts",
-            "category_column": "category",
-            "label_column": "label",
-            "value_column": "row_count",
-            "panel_column": "source_id",
-            "color_column": "category",
+            "category_column": "dimension",
+            "label_column": "category_label",
+            "value_column": "fraction",
+            "panel_column": "dimension_label",
         }
     )
 
@@ -166,9 +165,9 @@ def test_categorical_count_accepts_panelled_count_plots() -> None:
 
     assert spec.kind == "categorical_count"
     assert spec.scalar_id == "dataset_overview_counts"
-    assert spec.row_column == "category"
-    assert spec.column_column == "label"
-    assert spec.value_column == "row_count"
+    assert spec.row_column == "dimension"
+    assert spec.column_column == "category_label"
+    assert spec.value_column == "fraction"
 
 
 def test_metric_panel_grid_accepts_candidate_metric_summary_plots() -> None:

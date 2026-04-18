@@ -236,6 +236,10 @@ def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["pair_id_column"] = spec.pair_id_column
     if spec.shape_column is not None:
         payload["shape_column"] = spec.shape_column
+    if spec.default_hue is not None:
+        payload["default_hue"] = spec.default_hue
+    if spec.hue_options:
+        payload["hue_options"] = [option.model_dump(mode="json") for option in spec.hue_options]
     if spec.direction_column is not None:
         payload["direction_column"] = spec.direction_column
     if spec.unit_column is not None:
@@ -299,6 +303,10 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["color_column"] = spec.color_column
     if spec.shape_column is not None:
         params["shape_column"] = spec.shape_column
+    if spec.default_hue is not None:
+        params["default_hue"] = spec.default_hue
+    if spec.hue_options:
+        params["hue_options"] = [option.model_dump(mode="json") for option in spec.hue_options]
     if spec.direction_column is not None:
         params["direction_column"] = spec.direction_column
     if spec.unit_column is not None:

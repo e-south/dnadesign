@@ -73,21 +73,34 @@ def test_reference_margin_template_uses_required_landmarks_and_browser_surface()
     assert all("semantics_ref" in plot for plot in payload["plots"].values())
     assert payload["plots"]["reference_margin_gallery_wildtype"]["kind"] == "xy_scatter_grid"
     assert payload["plots"]["reference_margin_gallery_wildtype"]["scalars"] == [
-        "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
         "wildtype_reference_margins_intermediate_embedding_7b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb",
-        "wildtype_reference_margins_pooled_logits_20b_anchor_60bp",
-        "wildtype_reference_margins_pooled_logits_20b_full_context_1kb",
         "wildtype_reference_margins_pooled_logits_7b_anchor_60bp",
+        "wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb",
         "wildtype_reference_margins_pooled_logits_7b_full_context_1kb",
+        "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
+        "wildtype_reference_margins_pooled_logits_20b_anchor_60bp",
+        "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
+        "wildtype_reference_margins_pooled_logits_20b_full_context_1kb",
+    ]
+    assert payload["plots"]["reference_margin_gallery_wildtype"]["default_hue"] == "design_family"
+    assert [option["column"] for option in payload["plots"]["reference_margin_gallery_wildtype"]["hue_options"]] == [
+        "design_family",
+        "sig35_variant",
     ]
     assert payload["plots"]["reference_neighbor_evidence"]["kind"] == "metric_panel_grid"
     assert payload["plots"]["reference_neighbor_evidence"]["visibility_tier"] == "primary"
     assert "dual_margin_plane" not in payload["plots"]
     assert payload["plots"]["reference_margin_gallery_synthetic_centroids"]["kind"] == "xy_scatter_grid"
     assert payload["plots"]["reference_margin_gallery_synthetic_centroids"]["visibility_tier"] == "appendix"
+    assert payload["plots"]["reference_margin_gallery_synthetic_centroids"]["default_hue"] == "design_family"
     assert payload["plots"]["context_shift_reference_plane"]["kind"] == "paired_xy_scatter_grid"
+    assert payload["plots"]["context_shift_reference_plane"]["default_hue"] == "design_family"
+    assert [option["column"] for option in payload["plots"]["context_shift_reference_plane"]["hue_options"]] == [
+        "design_family",
+        "sig35_variant",
+        "context_self_cosine",
+        "context_shift_l2",
+    ]
     assert payload["plots"]["context_delta_distributions"]["kind"] == "distribution_grid"
     assert payload["plots"]["context_delta_distributions"]["metric_columns"] == [
         "context_self_cosine",
@@ -98,7 +111,13 @@ def test_reference_margin_template_uses_required_landmarks_and_browser_surface()
     assert payload["plots"]["context_geometry_summary"]["kind"] == "metric_panel_grid"
     assert payload["plots"]["representation_tradeoff_scatter"]["kind"] == "xy_scatter_grid"
     assert payload["plots"]["representation_scree_diagnostic"]["kind"] == "curve_grid"
-    assert payload["plots"]["appendix_umap_gallery"]["shape_column"] == "sig35_variant"
+    assert payload["plots"]["appendix_umap_gallery"]["default_hue"] == "design_family"
+    assert [option["column"] for option in payload["plots"]["appendix_umap_gallery"]["hue_options"]] == [
+        "design_family",
+        "sig35_variant",
+        "context_self_cosine",
+        "context_shift_l2",
+    ]
     assert payload["plots"]["appendix_umap_gallery"]["visibility_tier"] == "appendix"
     assert payload["deliverables"]["reference_margin_analysis"]["requires"]["views"] == [
         "intermediate_embedding_20b_anchor_60bp",
@@ -171,6 +190,7 @@ def test_reference_margin_template_recipes_are_self_materializing() -> None:
     assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" in health_step_ids
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" in appendix_steps
+    assert appendix_steps["build_umap_sample_intermediate_embedding_20b_anchor_60bp"]["params"]["strategy"] == "all"
     assert set(appendix_steps["generate_latent_geometry_browser"]["depends_on"]) >= {
         "render_reference_margin_gallery_wildtype",
         "render_reference_neighbor_evidence",

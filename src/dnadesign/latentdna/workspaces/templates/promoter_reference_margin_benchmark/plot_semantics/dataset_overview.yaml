@@ -1,10 +1,10 @@
 plot_id: dataset_overview
 research_question: What is in the dataset?
 evidence_tier: primary
-encoding_summary: Multi-panel count chart across scope, design family, regulator composition, sigma axis, and controls.
-sampling_scope: Full population across declared study scopes.
+encoding_summary: Cohort inventory chart split into provenance, generation plan, and Sigma-35 variant partitions.
+sampling_scope: Full promoter population shared by the paired handoff datasets for this workspace.
 interpretation_guardrails:
-  - Count panels describe inventory and coverage only.
-  - Presence or absence in this figure does not imply modeling readiness by itself.
-caption_md: Dataset inventory with symmetric count accounting across anchor and full-context study scopes.
-alt_text: Multi-panel count chart summarizing the dataset by scope and key study metadata categories.
+  - Each panel uses the same denominator and should be read independently.
+  - This figure inventories cohort balance; it does not compare two different promoter populations.
+caption_md: Proportional cohort inventory across provenance, generation plan, and Sigma-35 variant for the shared promoter population.
+alt_text: Three-panel proportional cohort inventory showing provenance, generation plan, and Sigma-35 variant counts for the shared study population.

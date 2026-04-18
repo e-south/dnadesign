@@ -1,7 +1,7 @@
 plot_id: reference_margin_gallery_wildtype
 research_question: Do promoters move toward the correct wildtype references relative to J23105?
 evidence_tier: primary
-encoding_summary: Eight-panel scatter plot of ethanol-reference and ciprofloxacin-reference cosine margins, colored by design family and shaped by sig35 variant.
+encoding_summary: Eight-panel scatter plot of ethanol-reference and ciprofloxacin-reference cosine margins with hue-only metadata overlays.
 sampling_scope: Full population.
 interpretation_guardrails:
   - Both axes are margins relative to J23105.

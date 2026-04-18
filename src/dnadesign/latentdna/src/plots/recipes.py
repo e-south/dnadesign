@@ -14,17 +14,29 @@ from ..contracts.plot import PlotConfig, ResolvedPlotSpec
 _PLOT_CONFIG_ADAPTER = TypeAdapter(PlotConfig)
 
 
+def _resolved_color_column(config: PlotConfig) -> str | None:
+    return getattr(config, "color_column", None) or getattr(config, "default_hue", None)
+
+
+def _resolved_hue_fields(config: PlotConfig) -> dict[str, object]:
+    return {
+        "default_hue": getattr(config, "default_hue", None),
+        "hue_options": list(getattr(config, "hue_options", []) or []),
+    }
+
+
 def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | None) -> ResolvedPlotSpec:
     if config.kind == "projection_scatter":
         return ResolvedPlotSpec(
             plot_id=plot_id,
             kind=config.kind,
             projection_ids=[config.projection],
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             label_column=config.label_column,
             label_values=list(config.label_values),
             annotation=config.annotation,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -33,12 +45,13 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             plot_id=plot_id,
             kind=config.kind,
             projection_ids=list(config.projections),
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             label_column=config.label_column,
             label_values=list(config.label_values),
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -61,8 +74,9 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             distance_id=config.distance,
             x_column=config.x_column,
             y_column=config.y_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -74,10 +88,11 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             distance_id=config.distance,
             x_column=config.x_column,
             y_column=config.y_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             render_mode=config.render_mode,
             annotation=config.annotation,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -88,11 +103,12 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             scalar_ids=list(config.scalars),
             x_column=config.x_column,
             y_column=config.y_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             render_mode=config.render_mode,
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -103,12 +119,13 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             scalar_ids=list(config.scalars),
             x_column=config.x_column,
             y_column=config.y_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             pair_id_column=config.pair_id_column,
             render_mode=config.render_mode,
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -121,7 +138,8 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             column_column=config.label_column,
             value_column=config.value_column,
             panel_column=config.panel_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -135,7 +153,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             column_column=config.category_column,
             label_column=config.label_column,
             value_column=config.value_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             measure_kind=config.measure_kind,
             value_kind=config.value_kind,
             value_label=config.value_label,
@@ -143,6 +161,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             direction_column=config.direction_column,
             unit_column=config.unit_column,
             reference_line=config.reference_line,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -155,8 +174,9 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             enrichment_id=config.enrichment,
             agreement_id=config.agreement,
             value_column=config.value_column,
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             render_mode=config.render_mode,
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -167,9 +187,10 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             scalar_ids=list(config.scalars),
             metric_columns=list(config.metric_columns or []),
             value_columns=list(config.value_columns or []),
-            color_column=config.color_column,
+            color_column=_resolved_color_column(config),
             render_mode=config.render_mode,
             panel_titles=list(config.panel_titles or []),
+            **_resolved_hue_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
