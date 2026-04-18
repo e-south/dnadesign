@@ -12,6 +12,9 @@ Module Author(s): OpenAI Codex
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -21,8 +24,25 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
+from dnadesign.latentdna.src.services.operation_lock_service import operation_lock_path
 
 _RUNNER = CliRunner()
+_LOCK_HOLDER_SCRIPT = """
+import fcntl
+import pathlib
+import sys
+import time
+
+lock_path = pathlib.Path(sys.argv[1])
+ready_path = pathlib.Path(sys.argv[2])
+stop_path = pathlib.Path(sys.argv[3])
+lock_path.parent.mkdir(parents=True, exist_ok=True)
+with lock_path.open("a+", encoding="utf-8") as handle:
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    ready_path.write_text("ready", encoding="utf-8")
+    while not stop_path.exists():
+        time.sleep(0.05)
+"""
 
 
 def _write_plot_semantics(workspace_dir: Path, plot_id: str) -> str:
@@ -119,6 +139,35 @@ def _write_workspace_config(
     )
 
 
+def _wait_for_file(path: Path, *, timeout_seconds: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if path.exists():
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"timed out waiting for {path}")
+
+
+def _append_projection_recipe(workspace_dir: Path, *, recipe_id: str) -> None:
+    config_path = workspace_dir / "config.yaml"
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload.setdefault("recipes", {})[recipe_id] = {
+        "steps": [
+            {
+                "id": f"{recipe_id}_fit_projection",
+                "op": "projection.fit",
+                "params": {
+                    "view": "z20_60",
+                    "sample": "atlas_sample",
+                    "run_id": "umap_z20_60",
+                    "seed": 17,
+                },
+            }
+        ]
+    }
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
 def test_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -203,6 +252,8 @@ def test_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     coords = pq.read_table(projection_dir / "coords.parquet").to_pydict()
     assert len(coords["x"]) == 10
     assert len(coords["y"]) == 10
+    projection_staging_root = workspace_dir / "outputs" / "runs" / "_staging" / "projections"
+    assert not projection_staging_root.exists() or not any(projection_staging_root.iterdir())
 
     plot_result = _RUNNER.invoke(
         app,
@@ -577,3 +628,149 @@ def test_plot_render_rejects_non_identifier_plot_id(tmp_path: Path) -> None:
     )
     assert invalid_result.exit_code != 0
     assert "plot id must use lowercase snake_case" in invalid_result.stdout
+
+
+def test_projection_fit_rejects_parallel_lock_contention(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set")
+    _write_workspace_config(workspace_dir, usr_root)
+
+    assert (
+        _RUNNER.invoke(
+            app,
+            ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+        ).exit_code
+        == 0
+    )
+    assert (
+        _RUNNER.invoke(
+            app,
+            [
+                "sample",
+                "build",
+                "atlas_sample",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--view",
+                "z20_60",
+                "--strategy",
+                "all",
+                "--json",
+            ],
+        ).exit_code
+        == 0
+    )
+
+    lock_path = operation_lock_path(workspace_dir / "outputs", operation="projection_fit")
+    ready_path = tmp_path / "projection-fit-lock.ready"
+    stop_path = tmp_path / "projection-fit-lock.stop"
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _LOCK_HOLDER_SCRIPT,
+            lock_path.as_posix(),
+            ready_path.as_posix(),
+            stop_path.as_posix(),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        _wait_for_file(ready_path)
+        result = _RUNNER.invoke(
+            app,
+            [
+                "projection",
+                "fit",
+                "z20_60",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--sample",
+                "atlas_sample",
+                "--run-id",
+                "umap_z20_60",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 21
+        assert "another projection fit is already in progress for this workspace" in result.stdout
+        assert "serializes heavy projection fits to avoid aggregate memory pressure" in result.stdout
+    finally:
+        stop_path.write_text("stop", encoding="utf-8")
+        stdout, stderr = holder.communicate(timeout=5)
+        assert holder.returncode == 0, stdout + stderr
+
+
+def test_recipe_run_rejects_parallel_projection_lock_contention(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set")
+    _write_workspace_config(workspace_dir, usr_root)
+    _append_projection_recipe(workspace_dir, recipe_id="projection_recipe")
+
+    assert (
+        _RUNNER.invoke(
+            app,
+            ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+        ).exit_code
+        == 0
+    )
+    assert (
+        _RUNNER.invoke(
+            app,
+            [
+                "sample",
+                "build",
+                "atlas_sample",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--view",
+                "z20_60",
+                "--strategy",
+                "all",
+                "--json",
+            ],
+        ).exit_code
+        == 0
+    )
+
+    lock_path = operation_lock_path(workspace_dir / "outputs", operation="projection_fit")
+    ready_path = tmp_path / "projection-recipe-lock.ready"
+    stop_path = tmp_path / "projection-recipe-lock.stop"
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _LOCK_HOLDER_SCRIPT,
+            lock_path.as_posix(),
+            ready_path.as_posix(),
+            stop_path.as_posix(),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        _wait_for_file(ready_path)
+        result = _RUNNER.invoke(
+            app,
+            [
+                "recipe",
+                "run",
+                "projection_recipe",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--json",
+            ],
+        )
+        assert result.exit_code == 21
+        assert "another projection fit is already in progress for this workspace" in result.stdout
+    finally:
+        stop_path.write_text("stop", encoding="utf-8")
+        stdout, stderr = holder.communicate(timeout=5)
+        assert holder.returncode == 0, stdout + stderr

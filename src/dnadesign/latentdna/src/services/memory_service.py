@@ -176,13 +176,22 @@ def evaluate_projection_preflight(
     sample_id: str,
 ) -> MemoryPreflight:
     rows, dims, dtype, itemsize = _view_metadata(context, view_id=view_id)
+    sample_manifest = context.read_manifest(context.output_root / "samples" / sample_id / "manifest.json")
+    sample_params = sample_manifest.get("params", {}) if isinstance(sample_manifest.get("params"), dict) else {}
+    sample_strategy = str(sample_params.get("strategy", "unknown"))
     sample_rows = _row_count(context.output_root / "samples" / sample_id / "rows.parquet")
     n_neighbors = max(2, min(15, sample_rows - 1))
     base_bytes = _matrix_bytes(rows, dims, itemsize)
     subset_bytes = _matrix_bytes(sample_rows, dims, itemsize)
     graph_bytes = sample_rows * n_neighbors * (8 + 4) * 2
     coords_bytes = sample_rows * 2 * np.dtype(np.float32).itemsize
-    estimated_peak = base_bytes + (subset_bytes * 3) + graph_bytes + coords_bytes
+    if sample_strategy == "all" and sample_rows == rows:
+        working_set_bytes = max(int(base_bytes * 0.75), 1024**3)
+        estimated_peak = base_bytes + working_set_bytes + graph_bytes + coords_bytes
+        notes = ["projection fit reuses the full source view directly for strategy=all samples"]
+    else:
+        estimated_peak = base_bytes + (subset_bytes * 3) + graph_bytes + coords_bytes
+        notes = ["projection fit samples from a fully materialized source view"]
     return _build_preflight(
         context,
         operation="projection fit",
@@ -191,7 +200,7 @@ def evaluate_projection_preflight(
         rows=sample_rows,
         dims=dims,
         dtype=dtype,
-        notes=["projection fit samples from a fully materialized source view"],
+        notes=notes,
     )
 
 

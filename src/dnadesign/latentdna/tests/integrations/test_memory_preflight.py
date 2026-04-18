@@ -123,6 +123,83 @@ def test_view_reduce_memory_preflight_requires_explicit_override(tmp_path: Path,
     assert "--allow-memory-overage" in result.stdout
 
 
+def test_projection_fit_memory_preflight_blocks_before_staging(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = _prepare_workspace(tmp_path)
+    sample_result = _RUNNER.invoke(
+        app,
+        [
+            "sample",
+            "build",
+            "demo_sample",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--view",
+            "z_demo",
+            "--strategy",
+            "all",
+            "--json",
+        ],
+    )
+    assert sample_result.exit_code == 0, sample_result.stdout
+
+    monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 1)
+    result = _RUNNER.invoke(
+        app,
+        [
+            "projection",
+            "fit",
+            "z_demo",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--sample",
+            "demo_sample",
+            "--run-id",
+            "z_demo_umap",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 20
+    assert "--allow-memory-overage" in result.stdout
+    staging_root = workspace_dir / "outputs" / "runs" / "_staging" / "projections"
+    assert not staging_root.exists() or not any(staging_root.iterdir())
+
+
+def test_projection_fit_memory_preflight_accounts_for_full_population_all_sample(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = _prepare_workspace(tmp_path)
+    sample_result = _RUNNER.invoke(
+        app,
+        [
+            "sample",
+            "build",
+            "demo_sample",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--view",
+            "z_demo",
+            "--strategy",
+            "all",
+            "--json",
+        ],
+    )
+    assert sample_result.exit_code == 0, sample_result.stdout
+
+    monkeypatch.setattr(memory_service, "_view_metadata", lambda *args, **kwargs: (157164, 8192, "float32", 4))
+    monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 16 * 1024**3)
+    monkeypatch.setattr(memory_service, "_row_count", lambda *args, **kwargs: 157164)
+
+    context = load_workspace_config(workspace_dir)
+    preflight = memory_service.evaluate_projection_preflight(context, view_id="z_demo", sample_id="demo_sample")
+
+    base_bytes = 157164 * 8192 * 4
+    graph_bytes = 157164 * 15 * (8 + 4) * 2
+    coords_bytes = 157164 * 2 * 4
+    expected = base_bytes + max(int(base_bytes * 0.75), 1024**3) + graph_bytes + coords_bytes
+    assert preflight.estimated_peak_bytes == expected
+    assert preflight.state == "warning"
+    assert "reuses the full source view directly" in preflight.notes[0]
+
+
 def test_view_reduce_memory_preflight_override_records_attention(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = _prepare_workspace(tmp_path)
     monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 1)

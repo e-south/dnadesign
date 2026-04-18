@@ -49,6 +49,10 @@ class MemoryPreflightError(LatentDNAError):
     exit_code = 20
 
 
+class OperationLockError(LatentDNAError):
+    exit_code = 21
+
+
 def exit_code_for_error(exc: Exception) -> int:
     if isinstance(exc, LatentDNAError):
         return exc.exit_code

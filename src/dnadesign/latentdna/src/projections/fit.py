@@ -11,7 +11,7 @@ import pyarrow as pa
 
 from ..contracts.errors import BackendUnavailableError, ContractViolationError
 from ..io.matrix_io import read_matrix
-from ..io.parquet_io import read_table, write_table
+from ..io.parquet_io import read_row_count, read_table, write_table
 from ..workspaces.loader import WorkspaceContext
 
 
@@ -30,7 +30,7 @@ def _ordered_indices(view_rows: list[dict], sample_rows: list[dict], *, record_k
     return indices
 
 
-def fit_projection_artifact(
+def _fit_projection_artifact(
     context: WorkspaceContext,
     *,
     view_id: str,
@@ -46,16 +46,24 @@ def fit_projection_artifact(
         raise BackendUnavailableError(f"UMAP backend is unavailable: {exc}") from exc
 
     view_manifest = context.read_manifest(context.output_root / "views" / view_id / "manifest.json")
+    sample_manifest = context.read_manifest(context.output_root / "samples" / sample_id / "manifest.json")
     record_key = str(view_manifest["params"]["record_key"])
+    sample_params = sample_manifest.get("params", {}) if isinstance(sample_manifest.get("params"), dict) else {}
+    sample_strategy = str(sample_params.get("strategy", "unknown"))
+    sample_rows_path = context.output_root / "samples" / sample_id / "rows.parquet"
 
     matrix = read_matrix(context.output_root / "views" / view_id / "matrix.npy")
     view_rows = read_table(context.output_root / "views" / view_id / "rows.parquet").to_pylist()
-    sample_rows = read_table(context.output_root / "samples" / sample_id / "rows.parquet").to_pylist()
+    use_full_view_directly = sample_strategy == "all" and read_row_count(sample_rows_path) == len(view_rows)
+    if use_full_view_directly:
+        sample_rows = view_rows
+        subset = matrix if matrix.dtype == np.float32 else np.asarray(matrix, dtype=np.float32)
+    else:
+        sample_rows = read_table(sample_rows_path).to_pylist()
+        indices = _ordered_indices(view_rows, sample_rows, record_key=record_key)
+        subset = np.asarray(matrix[indices], dtype=np.float32)
     if len(sample_rows) < 3:
         raise ContractViolationError("projection fitting requires at least 3 sampled rows")
-
-    indices = _ordered_indices(view_rows, sample_rows, record_key=record_key)
-    subset = np.asarray(matrix[indices], dtype=np.float32)
     n_neighbors = max(2, min(15, subset.shape[0] - 1))
     reducer = umap.UMAP(n_components=2, metric=metric, n_neighbors=n_neighbors, random_state=seed)
     coords = reducer.fit_transform(subset)
