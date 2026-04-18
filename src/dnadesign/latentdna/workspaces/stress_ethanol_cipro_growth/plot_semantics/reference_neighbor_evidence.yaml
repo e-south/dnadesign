@@ -1,0 +1,10 @@
+plot_id: reference_neighbor_evidence
+research_question: Do intended promoters place the correct wildtype references inside their high-dimensional neighborhoods?
+evidence_tier: primary
+encoding_summary: Candidate-by-metric bar panels summarizing reference-neighbor rates and median reference-neighbor ranks.
+sampling_scope: High-dimensional neighbor artifacts for the sampled comparison population.
+interpretation_guardrails:
+  - Neighborhood evidence is computed in the full candidate space, not on 2D projections.
+  - Lower reference-neighbor rank is better even when plotted alongside higher-is-better rates.
+caption_md: High-dimensional reference-neighborhood evidence for each candidate representation.
+alt_text: Bar panels comparing candidate representations on reference-in-kNN rate and median reference-neighbor rank.

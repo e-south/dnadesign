@@ -76,7 +76,7 @@ def test_compare_pair_payload_falls_back_to_shared_key_basis(tmp_path: Path) -> 
     assert payload["same_coordinate_space"] is True
     assert payload["metrics"]["distance_spearman"] is not None
     assert payload["metrics"]["linear_cka"] is not None
-    assert payload["metrics"]["mean_knn_overlap"] is not None
+    assert payload["metrics"]["neighbor_set_jaccard"] is not None
     assert payload["rowwise_cosine"] is not None
     assert payload["rowwise_diff_norm"] is not None
 

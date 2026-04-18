@@ -16,6 +16,8 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     title: str
     description: str | None = None
     default_deliverable: str
+    default_surface: Literal["plots", "geometry_audit", "comparison_audit"] = "plots"
+    ordered_plots: list[str] = Field(default_factory=list)
 
 
 class WorkspaceNotebookGeometry(StrictNotebookModel):
@@ -68,7 +70,7 @@ class WorkspaceNotebookCompareMetrics(StrictNotebookModel):
     knn_k: int
 
 
-class WorkspaceNotebookSwitchboardControls(StrictNotebookModel):
+class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     default_model: str
     default_family: str
     default_context: str
@@ -77,6 +79,7 @@ class WorkspaceNotebookSwitchboardControls(StrictNotebookModel):
     default_compare_right: str | None = None
     geometries: list[WorkspaceNotebookGeometry]
     preferred_hues: list[str]
+    hue_kinds: dict[str, Literal["categorical", "binary", "continuous"]] = Field(default_factory=dict)
     joinable_tables: list[WorkspaceNotebookTableRef]
     layout_presets: list[WorkspaceNotebookLayoutPreset]
     comparison_bases: list[WorkspaceNotebookComparisonBasis]
@@ -102,13 +105,27 @@ class WorkspaceNotebookRuntimePaths(StrictNotebookModel):
     health_relative_path: str
 
 
+class WorkspaceNotebookPlotEntry(StrictNotebookModel):
+    plot_id: str
+    deliverable_id: str
+    deliverable_title: str
+    visibility_tier: Literal["primary", "appendix", "debug", "hidden"]
+
+
+class WorkspaceNotebookPlotControls(StrictNotebookModel):
+    default_surface: Literal["plots", "geometry_audit", "comparison_audit"]
+    ordered_plot_ids: list[str]
+    plots: list[WorkspaceNotebookPlotEntry]
+
+
 class WorkspaceNotebookControls(StrictNotebookModel):
-    schema_version: Literal["latentdna.workspace_notebook_controls.v2"]
+    schema_version: Literal["latentdna.workspace_notebook_controls.v4"]
     workspace_id: str
     notebook_id: str
     generated_at: str
     runtime_paths: WorkspaceNotebookRuntimePaths
-    geometry_switchboard: WorkspaceNotebookSwitchboardControls
+    plot_controls: WorkspaceNotebookPlotControls
+    geometry_controls: WorkspaceNotebookGeometryControls
     context_audit: WorkspaceNotebookContextAudit
 
 

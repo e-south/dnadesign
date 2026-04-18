@@ -1,0 +1,10 @@
+plot_id: context_geometry_summary
+research_question: Is context geometry stable enough to support honest comparison across candidate spaces?
+evidence_tier: primary
+encoding_summary: Candidate-by-metric bar panels summarizing context self-cosine, context shift magnitude, neighbor overlap, and distance-correlation stability.
+sampling_scope: Candidate-level summaries over aligned paired populations.
+interpretation_guardrails:
+  - This plot summarizes context metrics and does not show raw pair trajectories.
+  - Metrics with opposite preferred directions should be read by their labels, not by bar height alone.
+caption_md: Honest context-geometry summary across candidate representations.
+alt_text: Bar panels comparing candidate representations on context-stability summary metrics.

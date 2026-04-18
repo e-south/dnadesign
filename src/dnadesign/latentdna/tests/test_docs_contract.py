@@ -1,13 +1,4 @@
-"""
---------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/latentdna/tests/test_docs_contract.py
-
-Documentation routing contracts for latentdna.
-
-Module Author(s): OpenAI Codex
---------------------------------------------------------------------------------
-"""
+"""Documentation routing contracts for LatentDNA."""
 
 from __future__ import annotations
 
@@ -22,214 +13,123 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
-def test_latentdna_readme_routes_to_docs_and_root_index() -> None:
-    readme = (_repo_root() / "src/dnadesign/latentdna/README.md").read_text(encoding="utf-8")
-
-    assert "## Documentation" in readme
-    assert "docs/README.md" in readme
-    assert "workspaces/README.md" in readme
-    assert "docs/reference/cli-contracts.md" in readme
-    assert "docs/reference/workspace-schema.md" in readme
-    assert "docs/reference/source-contract.md" in readme
-    assert "docs/reference/view-contract.md" in readme
-    assert "docs/reference/deliverable-contract.md" in readme
-    assert "docs/reference/performance-budgets.md" in readme
-    assert "docs/workflows/promoter-study-latent-atlas.md" in readme
-    assert "docs/workflows/context-shift.md" in readme
-    assert "docs/workflows/cross-view-agreement.md" in readme
-    assert "docs/workflows/export-opal-x.md" in readme
-    assert "../../../docs/README.md" in readme
-    assert "artifact-first downstream latent analysis surface" in readme
+_TEXT_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".json", ".toml", ".txt", ".svg", ".html"}
 
 
-def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> None:
+def _is_scan_text_file(path: Path) -> bool:
+    return "outputs" not in path.parts and "tests" not in path.parts and path.suffix.lower() in _TEXT_SUFFIXES
+
+
+def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     repo_root = _repo_root()
-    workflow_index = (repo_root / "src/dnadesign/latentdna/docs/README.md").read_text(encoding="utf-8")
-    by_type = (repo_root / "src/dnadesign/latentdna/docs/index.md").read_text(encoding="utf-8")
-    workflow = (repo_root / "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md").read_text(
-        encoding="utf-8"
-    )
-    reference = (repo_root / "src/dnadesign/latentdna/docs/reference/cli-contracts.md").read_text(encoding="utf-8")
+    readme = (repo_root / "src/dnadesign/latentdna/README.md").read_text(encoding="utf-8")
+    docs_index = (repo_root / "src/dnadesign/latentdna/docs/README.md").read_text(encoding="utf-8")
+    workflow = (
+        repo_root / "src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md"
+    ).read_text(encoding="utf-8")
+    cli_contracts = (repo_root / "src/dnadesign/latentdna/docs/reference/cli-contracts.md").read_text(encoding="utf-8")
     workspace_schema = (repo_root / "src/dnadesign/latentdna/docs/reference/workspace-schema.md").read_text(
         encoding="utf-8"
     )
     reference_index = (repo_root / "src/dnadesign/latentdna/docs/reference/README.md").read_text(encoding="utf-8")
-    workflow_router = (repo_root / "src/dnadesign/latentdna/docs/workflows/README.md").read_text(encoding="utf-8")
-    export_workflow = (repo_root / "src/dnadesign/latentdna/docs/workflows/export-opal-x.md").read_text(
-        encoding="utf-8"
-    )
+    operations = (repo_root / "src/dnadesign/latentdna/docs/operations/README.md").read_text(encoding="utf-8")
     workspace_readme = (
         repo_root / "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md"
     ).read_text(encoding="utf-8")
     study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes.md").read_text(encoding="utf-8")
     study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/status.md").read_text(encoding="utf-8")
-    performance = (repo_root / "src/dnadesign/latentdna/docs/reference/performance-budgets.md").read_text(
-        encoding="utf-8"
-    )
-    dev = (repo_root / "src/dnadesign/latentdna/docs/dev/README.md").read_text(encoding="utf-8")
-    journal = (repo_root / "src/dnadesign/latentdna/docs/dev/journal.md").read_text(encoding="utf-8")
 
-    assert "### Start here" in workflow_index
-    assert "### Route map" in workflow_index
-    assert "### Adjacent handoffs" in workflow_index
-    assert "workflows/promoter-study-latent-atlas.md" in workflow_index
-    assert "workflows/context-shift.md" in workflow_index
-    assert "workflows/cross-view-agreement.md" in workflow_index
-    assert "workflows/export-opal-x.md" in workflow_index
-    assert "reference/cli-contracts.md" in workflow_index
-    assert "reference/workspace-schema.md" in workflow_index
-    assert "reference/performance-budgets.md" in workflow_index
-    assert "src/workspaces/__init__.py" in workflow_index
-    assert "CLI command surface" in workflow_index
-    assert "src/cli/app.py" in workflow_index
-    assert "Execution-helper surface" not in workflow_index
-    assert "src/api.py" not in workflow_index
-    assert "src/workspaces/api.py" not in workflow_index
-    assert "../api.py" not in workflow_index
-    assert "../../infer/docs/README.md" in workflow_index
-    assert "../../opal/README.md" in workflow_index
-    assert "../../usr/README.md" in workflow_index
+    assert "comparison layer for `dnadesign`" in readme
+    assert "workspace snapshot contract" in readme.lower()
+    assert "promoter-study representation comparison workflow" in readme.lower()
+    assert "docs/workflows/promoter-study-representation-comparison.md" in readme
 
-    assert "unified [latentdna docs](README.md) index" in by_type
-    assert "Open the latentdna docs index" in by_type
-    assert "promoter-study latent atlas workflow" in by_type
-    assert "cross-view agreement" in by_type
-    assert "performance budgets" in by_type
-
-    assert "Source contract" in reference_index
-    assert "Alignment contract" in reference_index
-    assert "View contract" in reference_index
-    assert "Scalar contract" in reference_index
-    assert "Deliverable contract" in reference_index
-    assert "Performance budgets" in reference_index
-
-    assert "Landmark neighborhoods" in workflow_router
-    assert "Control distances" in workflow_router
-    assert "Context shift" in workflow_router
-    assert "Cross-view agreement" in workflow_router
-    assert "Export to OPAL X bundles" in workflow_router
+    assert "workflows/promoter-study-representation-comparison.md" in docs_index
+    assert "reference/workspace-snapshot-contract.md" in docs_index
+    assert "reference/artifact-naming.md" in docs_index
+    assert "operations/README.md" in docs_index
 
     assert "**Type:** workflow" in workflow
-    assert "**Plane:** downstream-tool" in workflow
+    assert "**Plane:** data-plane" in workflow
+    assert "**Surface role:** downstream-analysis" in workflow
     assert "**Owner-boundary:** latentdna" in workflow
-    assert "**Registry-id:** latentdna.promoter-study.latent-atlas" in workflow
-    assert "### View taxonomy for the active study" in workflow
-    assert "z20_1k_seq" in workflow
-    assert "Treat `z20_60` and `z20_1k_seq` as the primary candidate space" in workflow
-    assert "Treat `z20_60` and `z20_1k_anchor` as the primary candidate space" not in workflow
-    assert "compare `z20_60` to `z20_1k_seq`" in workflow
-    assert "logits7_60" in workflow
-    assert "logits7_1k_anchor" in workflow
-    assert "logits20_60" in workflow
-    assert "logits20_1k_anchor" in workflow
-    assert "pooled logits" in workflow
-    assert "2 x 3" in workflow
-    assert "### First tracer-bullet path" in workflow
-    assert "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth" in workflow
-    assert "uv run latentdna workspace refresh" in workflow
-    assert "uv run latentdna validate workspace" in workflow
-    assert "--deep" in workflow
-    assert "uv run latentdna view materialize z20_60" in workflow
-    assert "uv run latentdna sample build atlas_anchor_sample" in workflow
-    assert "--group-column design_family" in workflow
-    assert "--reference-set promoter_wt_core" in workflow
-    assert "densegen__plan" not in workflow
-    assert "uv run latentdna projection fit z20_60" in workflow
-    assert "uv run latentdna deliverable status atlas_2x2_intermediate_main" in workflow
-    assert "uv run latentdna deliverable run atlas_2x2_intermediate_main" in workflow
-    assert "uv run latentdna deliverable run context_shift_primary" in workflow
-    assert "uv run latentdna deliverable run agreement_7b_vs_20b" in workflow
-    assert "### Context-audit and browser control-plane slice" in workflow
-    assert "uv run latentdna deliverable status geometry_switchboard_20b" in workflow
-    assert "uv run latentdna deliverable run geometry_switchboard_20b" in workflow
-    assert "uv run latentdna deliverable status context_audit_primary_20b" in workflow
-    assert "uv run latentdna deliverable run context_audit_primary_20b" in workflow
-    assert "uv run latentdna view reduce z20_60" in workflow
-    assert "uv run latentdna view reduce z20_1k_anchor" in workflow
-    assert "--reduced-view-id z20_60_anchor_ctx_pc32" in workflow
-    assert "--reduced-view-id z20_1k_anchor_anchor_ctx_pc32" in workflow
-    assert "uv run latentdna neighbors fit leiden_z20_60_knn" in workflow
-    assert "uv run latentdna neighbors fit leiden_z20_1k_anchor_knn" in workflow
-    assert "uv run latentdna cluster fit leiden_z20_60" in workflow
-    assert "uv run latentdna cluster fit leiden_z20_1k_anchor" in workflow
-    assert "--method leiden" in workflow
-    assert "kmeans" not in workflow
-    assert "uv run latentdna deliverable run cluster_correspondence_primary" in workflow
-    assert "uv run latentdna deliverable run control_pca_explained_variance_curve" in workflow
-    assert "uv run latentdna export matrix x2_primary_20b" in workflow
-    assert "uv run latentdna export matrix x3_ablation_7b" in workflow
-    assert "uv run latentdna notebook generate browser" in workflow
-    assert "controls.json" in workflow
-    assert "uv run latentdna notebook smoke" in workflow
-    assert "uv run marimo run" in workflow
-    assert "outputs/notebooks/browser/notebook.py" in workflow
-    assert "outputs/plots" in workflow
-    assert "outputs/latentdna" in workflow
-    assert "--backend exact" not in workflow
+    assert "**Entry artifact:** promoter/stress_ethanol_cipro_anchor_set" in workflow
+    assert (
+        "**Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables" in workflow
+    )
+    assert "reference_margin_analysis" in workflow
+    assert "representation_comparison" in workflow
+    assert "appendix_umap_gallery" in workflow
+    assert "workspace snapshot" in workflow
 
-    assert "x2_primary_20b" in export_workflow
-    assert "x3_ablation_7b" in export_workflow
-    assert "feature names are stable" in export_workflow.lower()
+    assert "`latentdna workspace snapshot`" in cli_contracts
+    assert "`latentdna.workspace_snapshot.v1`" in cli_contracts
+    assert "--progress none|text|json" in cli_contracts
+    assert "Nested output roots are rejected." in cli_contracts
 
-    assert "Treat `z20_60` and `z20_1k_seq` as the primary comparison" in workspace_readme
-    assert "Treat `z20_60` and `z20_1k_anchor` as the primary comparison" not in workspace_readme
-    assert "`z20_60` and `z20_1k_seq` intermediate" in study_routes
-    assert "primary candidate space" in study_routes
-    assert "`z20_60` and `z20_1k_anchor` intermediate embeddings are the primary candidate space" not in study_routes
-    assert "For LatentDNA, treat `z20_60` and `z20_1k_seq` as the primary study question" in study_status
-    assert "For LatentDNA, treat `z20_60` and `z20_1k_anchor` as the primary study question" not in study_status
+    assert "<workspace>/outputs" in workspace_schema
+    assert "promoter-study reference-margin template" in workspace_schema
 
-    assert "### Common flags" in reference
-    assert "### Primitive command groups" in reference
-    assert "`latentdna workspace init`" in reference
-    assert "`latentdna workspace refresh`" in reference
-    assert "`latentdna validate workspace`" in reference
-    assert "`latentdna workspace init --from-study-dir <path>`" in reference
-    assert "`latentdna validate workspace --deep`" in reference
-    assert "`latentdna inspect source`" in reference
-    assert "`latentdna view materialize`" in reference
-    assert "`latentdna view stats`" in reference
-    assert "`latentdna sample build`" in reference
-    assert "`latentdna projection fit`" in reference
-    assert "`latentdna enrich score`" in reference
-    assert "`latentdna plot render`" in reference
-    assert "`latentdna notebook generate`" in reference
-    assert "`latentdna notebook smoke`" in reference
-    assert "`latentdna recipe validate`" in reference
-    assert "`latentdna deliverable status`" in reference
-    assert "`latentdna inspect notebook-health`" in reference
-    assert "`latentdna.command_result.v1`" in reference
-    assert "`latentdna.deliverable_status.v1`" in reference
-    assert "`--quiet`" in reference
-    assert "`--dry-run`" in reference
-    assert "distance_scatter" in reference
-    assert "xy_scatter" in reference
-    assert "distribution" in reference
-    assert "curve" in reference
-    assert "correspondence_heatmap" in reference
-    assert "agreement_summary" in reference
-    assert "workspace-wide plot browser" in reference
-    assert "controls.json" in reference
-    assert "status=attention" in reference
+    assert "Workspace snapshot contract" in reference_index
+    assert "Artifact naming grammar" in reference_index
+    assert "ops/status.registry.yaml" in operations
 
-    assert "outputs/plots" in workspace_schema
-    assert "notebooks.<id>.default_deliverable" in workspace_schema
-    assert "outputs/notebooks/<id>/controls.json" in workspace_schema
-    assert "reference_set" in workspace_schema
-    assert "xy_scatter" in workspace_schema
-    assert "curve" in workspace_schema
-    assert "correspondence_heatmap" in workspace_schema
+    assert "latentdna_binding.yaml" in workspace_readme
+    assert "workspace_snapshot.json" in workspace_readme
+    assert "UMAP role: appendix context only" in workspace_readme
 
-    assert "bench_view_materialize" in performance
-    assert "bench_export_x2" in performance
-    assert "fixture-scale benchmarks" in performance.lower()
+    assert "Primary review path:" in study_routes
+    assert "representation_health_diagnostic" in study_routes
+    assert "appendix_umap_gallery" in study_routes
+    assert (
+        "Snapshot attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`"
+        in study_routes
+    )
+    assert "Plane: `data-plane`" in study_routes
+    assert "Plane: `control-plane`" in study_routes
+    assert "Surface role: `producer`" in study_routes
+    assert "Surface role: `operator`" in study_routes
+    assert "Surface role: `downstream-analysis`" in study_routes
+    assert "Surface role: `decision`" in study_routes
+    assert "Plane: `producer-analysis`" not in study_routes
+    assert "Plane: `execution-surface`" not in study_routes
+    assert "Plane: `downstream-analysis`" not in study_routes
+    assert "Plane: `downstream-tool`" not in study_routes
 
-    assert "development journal" in dev.lower()
-    assert "journal.md" in dev
-    assert "Phase 1" in journal
-    assert "Recipe and Deliverable Slice" in journal
-    assert "Workspace Plot Browser Follow-On Slice" in journal
-    assert "Next steps" in journal
-    assert "explicit CLI entrypoints" in journal
-    assert "the early `api.py` barrel was later removed" in journal
-    assert "public package surface with `api.py`, `cli.py`, and `contracts.py`" not in journal
+    assert "LatentDNA is a downstream comparison surface" in study_status
+    assert (
+        "Current attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`"
+        in study_status
+    )
+    assert "Appendix surfaces remain secondary" in study_status
+
+
+def test_latentdna_docs_remove_legacy_promoter_surface_names() -> None:
+    repo_root = _repo_root()
+    scan_roots = [
+        repo_root / "src/dnadesign/latentdna",
+        repo_root / "docs/studies/stress_ethanol_cipro_growth",
+        repo_root / "src/dnadesign/studies/stress_ethanol_cipro_growth",
+    ]
+    forbidden_tokens = [
+        "".join(["atlas", "_2x2_intermediate_main"]),
+        "".join(["atlas", "_2x3_model_family"]),
+        "".join(["context_shift", "_vs_drag_primary"]),
+        "".join(["geometry", "_switchboard_20b"]),
+        "".join(["x2", "_primary_20b"]),
+        "/".join(["outputs", "latentdna"]),
+        "benchmark_results_summary",
+        "benchmark_feature_matrix",
+        "representation_selection",
+        "selection_state_code",
+    ]
+
+    checked_files: list[Path] = []
+    for root in scan_roots:
+        checked_files.extend(path for path in root.rglob("*") if path.is_file() and _is_scan_text_file(path))
+
+    for forbidden in forbidden_tokens:
+        hits = [
+            path.as_posix() for path in checked_files if forbidden in path.read_text(encoding="utf-8", errors="ignore")
+        ]
+        assert hits == [], f"forbidden legacy token {forbidden!r} still present in: {hits}"

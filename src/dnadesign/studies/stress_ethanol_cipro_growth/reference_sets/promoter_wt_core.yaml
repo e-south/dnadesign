@@ -3,6 +3,5 @@ match_column: usr_label__primary
 ids:
   - spyp
   - sulAp
-  - soxSp
   - J23105
 label_mode: label_and_highlight

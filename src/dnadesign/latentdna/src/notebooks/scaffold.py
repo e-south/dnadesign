@@ -7,7 +7,7 @@ from __future__ import annotations
 from textwrap import dedent
 
 from .scaffold_pages import render_page_cells
-from .scaffold_selectors import render_bootstrap_cell, render_selector_cells
+from .scaffold_selectors import render_bootstrap_cell, render_selector_cells, render_theme_cell
 
 
 def _marimo_version() -> str:
@@ -25,7 +25,7 @@ def _render_header() -> str:
 
         __generated_with = "__GENERATED_WITH__"
 
-        app = marimo.App(width="medium")
+        app = marimo.App(width="full")
         """
     )
 
@@ -44,6 +44,7 @@ def _render_template() -> str:
         [
             _render_header(),
             render_bootstrap_cell(),
+            render_theme_cell(),
             *render_selector_cells(),
             *render_page_cells(),
             _render_footer(),
@@ -58,6 +59,7 @@ def render_workspace_notebook(
     title: str,
     description: str | None,
     default_deliverable: str,
+    default_surface: str,
 ) -> str:
     description_text = description or "Read-only workspace notebook for persisted workspace artifacts."
     template = _render_template()
@@ -68,4 +70,5 @@ def render_workspace_notebook(
         .replace("__WORKSPACE_ID__", repr(workspace_id))
         .replace("__NOTEBOOK_ID__", repr(notebook_id))
         .replace("__DEFAULT_DELIVERABLE__", repr(default_deliverable))
+        .replace("__DEFAULT_SURFACE__", repr(default_surface))
     )

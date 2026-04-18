@@ -32,6 +32,9 @@ It owns:
 
 The plane a command belongs to is not always the same as the plane it observes.
 Example: `ops progress show usr.data-plane.promoter-study-preflight` belongs to the observation plane, but it observes the execution-readiness plane.
+When a route or workflow needs more nuance than the plane enum provides, keep
+`Plane` on the canonical enum and add a separate field such as `Surface role`
+instead of inventing replacement plane names.
 
 ### State semantics
 

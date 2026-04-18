@@ -12,14 +12,14 @@ from ..contracts.errors import ArtifactConflictError, WorkspaceValidationError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.notebook import WorkspaceNotebookConfig, WorkspaceNotebookControls
 from ..contracts.result import CommandResult
-from ..io.hashing import sha256_file
 from ..io.json_io import read_json, write_json
 from ..io.manifest_io import write_manifest
 from ..notebooks.scaffold import render_workspace_notebook
 from ..runs.recorder import record_audit
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
-from ._artifacts import artifact_dir, artifact_exists, artifact_manifest_path
+from ._artifact_inputs import artifact_input_from_manifest
+from ._artifacts import artifact_dir, artifact_manifest_path
 from .notebook_controls_service import build_workspace_notebook_controls_payload
 
 
@@ -31,11 +31,16 @@ def _workspace_notebook_path(context, notebook_id: str) -> Path:
     return _workspace_notebook_dir(context, notebook_id) / "notebook.py"
 
 
-def _default_deliverable_plot_inputs(
-    context, default_deliverable: str
+def _notebook_plot_ids(context, notebook: WorkspaceNotebookConfig) -> list[str]:
+    return list(
+        notebook.ordered_plots or context.require_deliverable(notebook.default_deliverable).outputs.get("plots", [])
+    )
+
+
+def _notebook_plot_inputs(
+    context, notebook: WorkspaceNotebookConfig
 ) -> tuple[list[ArtifactInput], list[str], list[str]]:
-    deliverable = context.require_deliverable(default_deliverable)
-    plot_ids = list(deliverable.outputs.get("plots", []))
+    plot_ids = _notebook_plot_ids(context, notebook)
     inputs: list[ArtifactInput] = []
     missing_plot_ids: list[str] = []
     for plot_id in plot_ids:
@@ -43,17 +48,40 @@ def _default_deliverable_plot_inputs(
         if not manifest_path.exists():
             missing_plot_ids.append(plot_id)
             continue
-        inputs.append(ArtifactInput(kind="plot", id=plot_id, digest=sha256_file(manifest_path)))
+        inputs.append(artifact_input_from_manifest("plot", plot_id, digest_path=manifest_path))
     return inputs, plot_ids, missing_plot_ids
+
+
+def _notebook_plot_output_paths(context, notebook: WorkspaceNotebookConfig) -> list[Path]:
+    output_paths: list[Path] = []
+    for plot_id in _notebook_plot_ids(context, notebook):
+        manifest_path = artifact_manifest_path(context, artifact_kind="plot", artifact_id=plot_id)
+        if not manifest_path.is_file():
+            continue
+        manifest_payload = read_json(manifest_path)
+        plot_dir = manifest_path.parent
+        for output in manifest_payload.get("outputs", []):
+            if not isinstance(output, dict):
+                continue
+            path_text = output.get("path")
+            if isinstance(path_text, str) and path_text.strip():
+                output_paths.append(plot_dir / path_text)
+    return output_paths
+
+
+def _default_deliverable_status(context, default_deliverable: str):
+    from .deliverable_service import deliverable_status_from_context
+
+    return deliverable_status_from_context(context, default_deliverable)
 
 
 def _load_catalog_payload(context) -> dict[str, object]:
     catalog_path = context.output_root / "catalog.json"
     if catalog_path.is_file():
         return read_json(catalog_path)
-    from .catalog_service import workspace_catalog
+    from .catalog_service import workspace_catalog_from_context
 
-    return workspace_catalog(context.workspace_dir)
+    return workspace_catalog_from_context(context)
 
 
 def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = False) -> CommandResult:
@@ -71,18 +99,22 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
 
         shutil.rmtree(notebook_dir)
 
-    inputs, plot_ids, missing_plot_ids = _default_deliverable_plot_inputs(context, notebook.default_deliverable)
+    inputs, plot_ids, missing_plot_ids = _notebook_plot_inputs(context, notebook)
     catalog_payload = _load_catalog_payload(context)
     controls_payload = build_workspace_notebook_controls_payload(context, notebook_id=notebook_id)
-    status = "attention" if missing_plot_ids else "ok"
-    warnings = (
-        [
-            "default deliverable is not fully materialized; "
-            "notebook generated with an explicit degraded main-plot state: " + ", ".join(missing_plot_ids)
-        ]
-        if missing_plot_ids
-        else []
-    )
+    live_default_status = _default_deliverable_status(context, notebook.default_deliverable)
+    status = "ok" if live_default_status.status == "ok" and not missing_plot_ids else "attention"
+    warnings: list[str] = []
+    if missing_plot_ids:
+        warnings.append(
+            "notebook plot-review inventory is not fully materialized; "
+            "notebook generated with an explicit degraded plots state: " + ", ".join(missing_plot_ids)
+        )
+    if live_default_status.status != "ok":
+        warnings.append(
+            "default deliverable requires attention before the notebook is end-to-end ready: "
+            + "; ".join(str(message) for message in live_default_status.warnings or [live_default_status.status])
+        )
 
     notebook_dir.mkdir(parents=True, exist_ok=True)
     notebook_path.write_text(
@@ -92,6 +124,7 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
             title=notebook.title,
             description=notebook.description,
             default_deliverable=notebook.default_deliverable,
+            default_surface=notebook.default_surface,
         ),
         encoding="utf-8",
     )
@@ -111,7 +144,9 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
             "runtime": "marimo",
             "title": notebook.title,
             "default_deliverable": notebook.default_deliverable,
-            "missing_default_plots": missing_plot_ids,
+            "default_surface": notebook.default_surface,
+            "ordered_plot_ids": plot_ids,
+            "missing_ordered_plots": missing_plot_ids,
         },
         outputs=[
             ArtifactOutput(path="notebook.py", media_type="text/x-python"),
@@ -121,7 +156,8 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
             "plots": len(plot_ids),
             "deliverables": len(catalog_payload.get("deliverables", [])),
             "runs": len(catalog_payload.get("runs", [])),
-            "geometries": len(controls_payload.geometry_switchboard.geometries),
+            "geometries": len(controls_payload.geometry_controls.geometries),
+            "default_deliverable_status": live_default_status.status,
         },
         warnings=warnings,
     )
@@ -138,8 +174,9 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
         metrics={
             "plots": len(plot_ids),
             "deliverables": len(catalog_payload.get("deliverables", [])),
-            "geometries": len(controls_payload.geometry_switchboard.geometries),
-            "missing_default_plots": missing_plot_ids,
+            "geometries": len(controls_payload.geometry_controls.geometries),
+            "default_deliverable_status": live_default_status.status,
+            "missing_ordered_plots": missing_plot_ids,
         },
     )
     record_audit(
@@ -181,33 +218,26 @@ def smoke_workspace_notebook(workspace: str | Path) -> dict[str, object]:
     if controls_path.is_file():
         try:
             controls = WorkspaceNotebookControls.model_validate(read_json(controls_path))
-            checks["control_plane_loads"] = bool(controls.geometry_switchboard.geometries)
+            checks["control_plane_loads"] = bool(controls.geometry_controls.geometries)
         except Exception as exc:  # pragma: no cover - surfaced in health payload
             warnings.append(f"control_plane_loads failed: {exc}")
 
     deliverables = catalog.get("deliverables", [])
     plots = catalog.get("plots", [])
     checks["plot_catalog_loads"] = isinstance(deliverables, list) and isinstance(plots, list)
-
-    default_deliverable_plots = [
-        row
-        for row in plots
-        if isinstance(row, dict) and row.get("deliverable_id") == notebook.default_deliverable and row.get("plot_id")
-    ]
-    checks["default_deliverable_ready"] = bool(default_deliverable_plots) and all(
-        artifact_exists(
-            context,
-            artifact_kind="plot",
-            artifact_id=str(row["plot_id"]),
-        )
-        for row in default_deliverable_plots
-    )
-    output_paths = [
-        context.output_root / str(path_text)
-        for row in default_deliverable_plots
-        if isinstance(row, dict)
-        for path_text in row.get("output_paths", [])
-    ]
+    live_default_status = _default_deliverable_status(context, notebook.default_deliverable)
+    _, _, missing_plot_ids = _notebook_plot_inputs(context, notebook)
+    checks["default_deliverable_ready"] = not missing_plot_ids and live_default_status.status == "ok"
+    if missing_plot_ids or live_default_status.status != "ok":
+        ready_reasons = []
+        if missing_plot_ids:
+            ready_reasons.append("missing ordered plots: " + ", ".join(missing_plot_ids))
+        if live_default_status.status != "ok":
+            ready_reasons.append(
+                "; ".join(str(message) for message in live_default_status.warnings or [live_default_status.status])
+            )
+        warnings.append("default_deliverable_ready failed: " + " | ".join(ready_reasons))
+    output_paths = _notebook_plot_output_paths(context, notebook)
     checks["static_links_resolve"] = bool(output_paths) and all(path.is_file() for path in output_paths)
 
     status = "ok" if all(checks.values()) else "error"

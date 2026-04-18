@@ -46,7 +46,7 @@ Keep four complementary artifacts for each real study:
 - `campaign.yaml`: workflow progress and registered procedure evidence
 - `datasets.yaml`: machine-readable registry of affiliated USR datasets and
   sync posture across local and remote locations
-- `status.md`: human-readable current datasets, current phase, current row
+- `status.md`: maintainer-facing current datasets, current phase, current row
   counts, downstream posture, and next actions
 - `ops.study.yaml`: OPS-facing study contract for lifecycle order, record
   sources, artifacts, execution surfaces, and explicit preflight scope/check
@@ -110,7 +110,7 @@ docs/studies/index.yaml
   location is a shared USR root or a workspace-local export root, how
   it should be onboarded, and how it syncs to remotes such as `cluster` or a
   study-specific workspace-export remote.
-- `status.md` is the human-readable note that records current datasets, current
+- `status.md` is the maintainer-facing note that records current datasets, current
   phase, current row counts, downstream posture, and concise next actions.
 - `ops.study.yaml` is the machine-readable OPS contract for lifecycle
   ordering, record sources, artifacts, execution surfaces, repo-scoped

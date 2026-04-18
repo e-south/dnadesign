@@ -1,19 +1,16 @@
 ![latentdna banner](docs/assets/latentdna-banner.svg)
 
-`latentdna` is the artifact-first downstream latent analysis surface for dnadesign. It reads vector-bearing sources, materializes reusable latent-analysis artifacts inside a workspace, and renders plots or exports from those artifacts without taking over infer, USR mutation, or OPAL training loops.
+`latentdna` is the comparison layer for `dnadesign`. It materializes study-neutral representation comparisons, persists artifact contracts, and exposes read-only QC surfaces. It does not own supervised benchmarking or final selection.
 
 ## Documentation
 
-- [latentdna docs](docs/README.md): workflow, reference, concepts, and package routing.
+- [LatentDNA docs](docs/README.md): workflow, reference, concepts, and package routing.
 - [Workspaces guide](workspaces/README.md): packaged templates and local workspace scaffolding.
 - [CLI contracts](docs/reference/cli-contracts.md): current command surface and machine output contracts.
 - [Workspace schema](docs/reference/workspace-schema.md): `latentdna.workspace.v1` core config shape.
-- [Source contract](docs/reference/source-contract.md): declared source kinds including `matrix_bundle`.
-- [View contract](docs/reference/view-contract.md): source-backed and derived view legality.
-- [Deliverable contract](docs/reference/deliverable-contract.md): readiness, outputs, and recipe coupling.
-- [Performance budgets](docs/reference/performance-budgets.md): fixture-scale benchmark harness and pressure-path notes.
-- [Promoter-study latent atlas workflow](docs/workflows/promoter-study-latent-atlas.md): first tracer-bullet path from USR-backed vectors to persisted plots.
-- [Context-shift workflow](docs/workflows/context-shift.md): aligned delta views and scalar QC.
-- [Cross-view agreement workflow](docs/workflows/cross-view-agreement.md): structural agreement without raw coordinate mixing.
-- [Export to OPAL workflow](docs/workflows/export-opal-x.md): deterministic `X` bundle handoff patterns.
+- [Workspace snapshot contract](docs/reference/workspace-snapshot-contract.md): study-facing status surface.
+- [Artifact naming grammar](docs/reference/artifact-naming.md): canonical representation, scope, and deliverable naming.
+- [Promoter-study representation comparison workflow](docs/workflows/promoter-study-representation-comparison.md): comparison path for the active promoter study.
+- [Context-geometry workflow](docs/workflows/context-shift.md): paired anchor-versus-full-context geometry metrics.
+- [Cross-view agreement workflow](docs/workflows/cross-view-agreement.md): structural agreement diagnostics outside the promoter-study path.
 - [Repository docs index](../../../docs/README.md): repo-wide upstream and downstream handoff index.

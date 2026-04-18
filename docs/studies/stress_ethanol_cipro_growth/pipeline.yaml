@@ -7,15 +7,9 @@ study_pipeline:
     workspace: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
     doc: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md
     notebook: densegen_run_overview
-    default_plot_ids:
-      - dataset_source_inventory
-      - dataset_metadata_heatmap
-      - stage_a_summary
-      - placement_map
-      - run_health
-      - tfbs_usage
-    optional_plot_ids:
-      - dense_array_video_showcase
+    analysis_surface:
+      source: workspace:study_stress_ethanol_cipro
+      contract_ref: densegen.analysis_surface.v1
   execution_surfaces:
     construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
     infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
@@ -30,9 +24,6 @@ study_pipeline:
     densegen_anchor_source: densegen/study_stress_ethanol_cipro
     merged_anchor_dataset: promoter/stress_ethanol_cipro_anchor_set
     construct_context_dataset: promoter/stress_ethanol_cipro_construct_contexts
-  construct:
-    workspace_projects:
-      - id: forward_anchor_window
   infer:
     preferred_model_family: evo2_20b
     supported_model_families:
@@ -46,34 +37,16 @@ study_pipeline:
       full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
       full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
   latentdna:
-    workspace: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
-    doc: src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md
-    notebook: browser
-    # The current study question is pooled 60 bp anchor versus pooled 1 kb
-    # context movement plus downstream prediction, not token-level mechanism.
-    expected_deliverables:
-      - atlas_2x2_intermediate_main
-      - geometry_switchboard_20b
-      - control_pca_explained_variance_curve
-      - context_shift_primary
-      - context_audit_primary_20b
-      - agreement_7b_vs_20b
-      - cluster_correspondence_primary
-    required_leiden_runs:
-      - leiden_z20_60
-      - leiden_z20_1k_anchor
-    # `x2_primary_20b` remains the open export gate, but the bundle is not yet
-    # materialized under the current saved outputs.
-    required_exports:
-      - x2_primary_20b
+    binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
+    doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
   cluster:
     doc: src/dnadesign/cluster/docs/workflows/exploratory-clustering.md
-    entry_artifact: promoter/stress_ethanol_cipro_feature_matrix
+    entry_artifact: representation_comparison
     workspace_example: src/dnadesign/cluster/workspaces/promoter_clusters_v1/config.yaml
     results_root: n/a
     state: planned
   opal:
     doc: src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md
-    entry_artifact: promoter/stress_ethanol_cipro_feature_matrix
+    entry_artifact: study-owned feature bundle chosen outside LatentDNA
     config: n/a
     state: not_configured

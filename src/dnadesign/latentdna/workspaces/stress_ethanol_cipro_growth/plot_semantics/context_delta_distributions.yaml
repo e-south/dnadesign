@@ -1,0 +1,10 @@
+plot_id: context_delta_distributions
+research_question: How large are context-induced geometry shifts within each candidate representation family?
+evidence_tier: primary
+encoding_summary: Distribution grid of context-shift metrics grouped by design family.
+sampling_scope: Aligned anchor/context pairs for the candidate panels shown.
+interpretation_guardrails:
+  - Distribution panels summarize subgroup spread rather than pairwise trajectories.
+  - Sampling and grouping should be checked before comparing absolute spread across panels.
+caption_md: Distribution view of context-shift metrics across the aligned paired population.
+alt_text: Four distribution panels showing context-shift metric values grouped by design family.

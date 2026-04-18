@@ -3,293 +3,158 @@
 dnadesign
 src/dnadesign/studies/families/promoter/latentdna_readiness.py
 
-Read-only latentdna readiness inspection for promoter-study status surfaces.
+Read-only LatentDNA readiness inspection for promoter-study status surfaces.
 
-Module Author(s): Eric J. South
+Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from pathlib import Path
 
-from dnadesign.ops.status.paths import resolve_repo_relative_path
-
+from .latentdna_contract import (
+    binding_decision_deliverables,
+    binding_default_model_family,
+    binding_model_families,
+    binding_required_wildtypes,
+    binding_source_datasets,
+    latentdna_binding_path,
+    latentdna_doc_path,
+    latentdna_workspace_ref,
+    load_latentdna_binding,
+    load_latentdna_snapshot,
+)
 from .record_normalizer import PromoterStudyResolvedContext
-
-_STATUS_KIND = "promoter-study-status"
-_DEFAULT_NOTEBOOK_ID = "browser"
-_DEFAULT_DOC_PATH = "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md"
 
 
 def inspect_promoter_latentdna_readiness(
     *,
     study_context: PromoterStudyResolvedContext,
 ) -> dict[str, object]:
-    latentdna_config = study_context.study_pipeline.get("latentdna")
-    if not isinstance(latentdna_config, Mapping):
-        return _build_empty_payload(doc_path=_DEFAULT_DOC_PATH)
-    workspace_raw = _string_or_none(latentdna_config.get("workspace"))
-    doc_path = _string_or_none(latentdna_config.get("doc")) or _DEFAULT_DOC_PATH
-
-    expected_deliverables = _string_list(latentdna_config.get("expected_deliverables"))
-    required_leiden_runs = _string_list(latentdna_config.get("required_leiden_runs"))
-    required_exports = _string_list(latentdna_config.get("required_exports"))
-    notebook_id = _string_or_none(latentdna_config.get("notebook")) or _DEFAULT_NOTEBOOK_ID
-    if workspace_raw is None or study_context.study_repo_root is None:
-        return _build_empty_payload(
-            doc_path=doc_path,
-            expected_deliverables=expected_deliverables,
-            required_leiden_runs=required_leiden_runs,
-            required_exports=required_exports,
-        )
-
-    workspace_path = resolve_repo_relative_path(
-        repo_root=study_context.study_repo_root,
-        raw_path=workspace_raw,
-        status_kind=_STATUS_KIND,
-    )
-    payload = _build_empty_payload(
-        doc_path=doc_path,
-        surface_ref=str(workspace_path),
-        configured=True,
-        state="missing",
-        workspace_id=workspace_path.name,
-        expected_deliverables=expected_deliverables,
-        required_leiden_runs=required_leiden_runs,
-        required_exports=required_exports,
-    )
-    if not workspace_path.exists():
-        return payload
-
-    from dnadesign.latentdna.src.io.json_io import read_json
-    from dnadesign.latentdna.src.services.deliverable_service import deliverable_status
-    from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
-
+    doc_path = latentdna_doc_path(study_context)
+    binding_path = latentdna_binding_path(study_context)
+    binding_error: str | None = None
     try:
-        context = load_workspace_config(workspace_path)
-    except Exception as exc:
-        payload["state"] = "error"
-        payload["error"] = str(exc)
-        return payload
+        binding_path, binding = load_latentdna_binding(study_context)
+    except ValueError as exc:
+        binding = None
+        binding_error = str(exc)
+    if binding_error is not None:
+        return {
+            "configured": binding_path is not None and binding_path.is_file(),
+            "state": "error",
+            "doc": doc_path,
+            "binding_ref": None if binding_path is None else str(binding_path),
+            "workspace_ref": None,
+            "snapshot_ref": None,
+            "workspace_id": None,
+            "source_datasets": {},
+            "decision_deliverables": [],
+            "ok_deliverables": [],
+            "pending_deliverables": [],
+            "export_ids": [],
+            "exports_ok": False,
+            "browser_default_geometry_ids": [],
+            "browser_preferred_hues": [],
+            "supported_model_families": [],
+            "default_model_family": None,
+            "required_wildtype_references": [],
+            "last_updated_at": None,
+            "error": binding_error,
+        }
+    if binding is None:
+        return {
+            "configured": False,
+            "state": "not_configured",
+            "doc": doc_path,
+            "binding_ref": None if binding_path is None else str(binding_path),
+            "workspace_ref": None,
+            "snapshot_ref": None,
+            "workspace_id": None,
+            "source_datasets": {},
+            "decision_deliverables": [],
+            "ok_deliverables": [],
+            "pending_deliverables": [],
+            "export_ids": [],
+            "exports_ok": True,
+            "browser_default_geometry_ids": [],
+            "browser_preferred_hues": [],
+            "supported_model_families": [],
+            "default_model_family": None,
+            "required_wildtype_references": [],
+            "last_updated_at": None,
+        }
 
-    payload["workspace_id"] = context.workspace_id
-    if not expected_deliverables:
-        expected_deliverables = sorted(context.config.deliverables)
-        payload["expected_deliverables"] = list(expected_deliverables)
-        payload["missing_deliverables"] = list(expected_deliverables)
+    workspace_ref = latentdna_workspace_ref(study_context, binding=binding)
+    snapshot_error: str | None = None
+    try:
+        snapshot_path, snapshot = load_latentdna_snapshot(study_context, binding=binding)
+    except ValueError as exc:
+        snapshot_path = None
+        snapshot = None
+        snapshot_error = str(exc)
+    decision_deliverables = binding_decision_deliverables(binding, snapshot=snapshot)
+    source_datasets = binding_source_datasets(binding)
+    deliverables_payload = snapshot.get("deliverables") if isinstance(snapshot, Mapping) else {}
+    exports_payload = snapshot.get("exports") if isinstance(snapshot, Mapping) else {}
+    browser_payload = snapshot.get("browser") if isinstance(snapshot, Mapping) else {}
 
-    ok_deliverables: list[str] = []
-    missing_deliverables: list[str] = []
-    deliverable_error = False
-    for deliverable_id in expected_deliverables:
-        if deliverable_id not in context.config.deliverables:
-            missing_deliverables.append(deliverable_id)
-            continue
-        try:
-            status = deliverable_status(context.workspace_dir, deliverable_id).status
-        except Exception:
-            deliverable_error = True
-            missing_deliverables.append(deliverable_id)
-            continue
-        if status == "ok":
-            ok_deliverables.append(deliverable_id)
-            continue
-        if status == "error":
-            deliverable_error = True
-        missing_deliverables.append(deliverable_id)
-    payload["ok_deliverables"] = ok_deliverables
-    payload["missing_deliverables"] = missing_deliverables
+    ok_deliverables = [
+        deliverable_id
+        for deliverable_id in decision_deliverables
+        if isinstance(deliverables_payload, Mapping)
+        and isinstance(deliverables_payload.get(deliverable_id), Mapping)
+        and str(deliverables_payload[deliverable_id].get("status") or "") == "ok"
+    ]
+    pending_deliverables = [
+        deliverable_id for deliverable_id in decision_deliverables if deliverable_id not in ok_deliverables
+    ]
+    export_ids = (
+        sorted(str(export_id) for export_id in exports_payload.keys()) if isinstance(exports_payload, Mapping) else []
+    )
+    export_statuses = [
+        str((exports_payload.get(export_id) or {}).get("status") or "")
+        for export_id in export_ids
+        if isinstance(exports_payload.get(export_id), Mapping)
+    ]
+    deliverable_statuses = [
+        str((deliverables_payload.get(deliverable_id) or {}).get("status") or "")
+        for deliverable_id in decision_deliverables
+        if isinstance(deliverables_payload.get(deliverable_id), Mapping)
+    ]
 
-    payload["rendered_plot_count"] = _rendered_plot_count(
-        plots_root=context.output_root / "plots",
-        read_json=read_json,
-    )
-    payload["notebook_generated"] = (context.output_root / "notebooks" / notebook_id / "notebook.py").is_file()
-    notebook_smoke_ok, notebook_error = _notebook_smoke_ok(
-        health_path=context.output_root / "notebooks" / "health.json",
-        read_json=read_json,
-    )
-    payload["notebook_smoke_ok"] = notebook_smoke_ok
-
-    leiden_runs_ok, any_leiden_artifacts, leiden_error = _required_artifacts_ok(
-        artifacts_root=context.output_root / "clusters",
-        artifact_ids=required_leiden_runs,
-        read_json=read_json,
-    )
-    payload["leiden_runs_ok"] = leiden_runs_ok
-
-    exports_ok, any_export_artifacts, export_error = _required_artifacts_ok(
-        artifacts_root=context.output_root / "exports",
-        artifact_ids=required_exports,
-        read_json=read_json,
-    )
-    payload["exports_ok"] = exports_ok
-
-    has_materialized_outputs = any(
-        (
-            bool(ok_deliverables),
-            bool(payload["rendered_plot_count"]),
-            bool(payload["notebook_generated"]),
-            any_leiden_artifacts,
-            any_export_artifacts,
-            _has_any_artifact_manifests(context.output_root),
-        )
-    )
-    all_main_ready = (
-        len(ok_deliverables) == len(expected_deliverables)
-        and payload["notebook_smoke_ok"] is True
-        and payload["leiden_runs_ok"] is True
-        and payload["exports_ok"] is True
-    )
-    if deliverable_error or notebook_error or leiden_error or export_error:
-        payload["state"] = "error"
-    elif all_main_ready:
-        payload["state"] = "ok"
-    elif has_materialized_outputs:
-        payload["state"] = "attention"
+    if snapshot_error is not None:
+        state = "error"
+    elif snapshot is None:
+        state = "missing"
+    elif any(status == "error" for status in [*deliverable_statuses, *export_statuses]):
+        state = "error"
+    elif pending_deliverables or any(status != "ok" for status in export_statuses):
+        state = "attention"
     else:
-        payload["state"] = "missing"
-    return payload
+        state = "ok"
 
-
-def _build_empty_payload(
-    *,
-    doc_path: str,
-    surface_ref: str | None = None,
-    configured: bool = False,
-    state: str = "not_configured",
-    workspace_id: str | None = None,
-    expected_deliverables: list[str] | None = None,
-    required_leiden_runs: list[str] | None = None,
-    required_exports: list[str] | None = None,
-) -> dict[str, object]:
-    expected = list(expected_deliverables or [])
-    leiden_runs = list(required_leiden_runs or [])
-    exports = list(required_exports or [])
     return {
-        "configured": configured,
+        "configured": True,
         "state": state,
         "doc": doc_path,
-        "surface_ref": surface_ref,
-        "workspace_id": workspace_id,
-        "expected_deliverables": expected,
-        "ok_deliverables": [],
-        "missing_deliverables": list(expected),
-        "rendered_plot_count": 0,
-        "notebook_generated": False,
-        "notebook_smoke_ok": False,
-        "leiden_runs_ok": False if leiden_runs else True,
-        "exports_ok": False if exports else True,
-        "required_leiden_runs": leiden_runs,
-        "required_exports": exports,
+        "binding_ref": None if binding_path is None else str(binding_path),
+        "workspace_ref": None if workspace_ref is None else str(workspace_ref),
+        "snapshot_ref": None if snapshot_path is None else str(snapshot_path),
+        "workspace_id": str(binding.get("workspace_id")),
+        "source_datasets": source_datasets,
+        "decision_deliverables": decision_deliverables,
+        "ok_deliverables": ok_deliverables,
+        "pending_deliverables": pending_deliverables,
+        "export_ids": export_ids,
+        "exports_ok": all(status == "ok" for status in export_statuses) if export_statuses else True,
+        "browser_default_geometry_ids": list((browser_payload or {}).get("default_geometry_ids") or []),
+        "browser_preferred_hues": list((browser_payload or {}).get("preferred_hues") or []),
+        "supported_model_families": binding_model_families(binding)
+        or (list(snapshot.get("model_families") or []) if isinstance(snapshot, Mapping) else []),
+        "default_model_family": binding_default_model_family(binding),
+        "required_wildtype_references": binding_required_wildtypes(binding),
+        "last_updated_at": None if snapshot is None else snapshot.get("last_updated_at"),
+        **({"error": snapshot_error} if snapshot_error is not None else {}),
     }
-
-
-def _has_any_artifact_manifests(output_root: Path) -> bool:
-    for manifest_path in output_root.rglob("manifest.json"):
-        if "logs" not in manifest_path.parts:
-            return True
-    return False
-
-
-def _rendered_plot_count(
-    *,
-    plots_root: Path,
-    read_json,
-) -> int:
-    index_path = plots_root / "index.json"
-    if index_path.is_file():
-        try:
-            payload = read_json(index_path)
-        except Exception:
-            return 0
-        rows = payload.get("plots")
-        if isinstance(rows, list):
-            return sum(
-                1
-                for row in rows
-                if isinstance(row, dict)
-                and str(row.get("status") or "").strip() == "ok"
-                and bool(row.get("output_paths"))
-            )
-
-    rendered = 0
-    if not plots_root.is_dir():
-        return rendered
-    for plot_dir in sorted(candidate for candidate in plots_root.iterdir() if candidate.is_dir()):
-        manifest_path = plot_dir / "manifest.json"
-        if not manifest_path.is_file():
-            continue
-        try:
-            manifest = read_json(manifest_path)
-        except Exception:
-            continue
-        outputs = manifest.get("outputs")
-        if str(manifest.get("status") or "").strip() == "ok" and isinstance(outputs, list) and outputs:
-            rendered += 1
-    return rendered
-
-
-def _notebook_smoke_ok(
-    *,
-    health_path: Path,
-    read_json,
-) -> tuple[bool, bool]:
-    if not health_path.is_file():
-        return False, False
-    try:
-        payload = read_json(health_path)
-    except Exception:
-        return False, True
-    checks = payload.get("checks")
-    if not isinstance(checks, dict):
-        return False, True
-    all_checks = all(bool(value) for value in checks.values())
-    status_text = str(payload.get("status") or "").strip()
-    return status_text == "ok" and all_checks, status_text == "error"
-
-
-def _required_artifacts_ok(
-    *,
-    artifacts_root: Path,
-    artifact_ids: list[str],
-    read_json,
-) -> tuple[bool, bool, bool]:
-    if not artifact_ids:
-        return True, False, False
-    any_present = False
-    saw_error = False
-    for artifact_id in artifact_ids:
-        manifest_path = artifacts_root / artifact_id / "manifest.json"
-        if not manifest_path.is_file():
-            return False, any_present, saw_error
-        any_present = True
-        try:
-            manifest = read_json(manifest_path)
-        except Exception:
-            return False, any_present, True
-        status_text = str(manifest.get("status") or "").strip()
-        if status_text == "error":
-            saw_error = True
-            return False, any_present, saw_error
-        if status_text != "ok":
-            return False, any_present, saw_error
-    return True, any_present, saw_error
-
-
-def _string_or_none(value: object) -> str | None:
-    text = str(value or "").strip()
-    return text or None
-
-
-def _string_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    result: list[str] = []
-    for item in value:
-        text = _string_or_none(item)
-        if text is not None:
-            result.append(text)
-    return result

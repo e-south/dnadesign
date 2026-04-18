@@ -10,13 +10,20 @@ import marimo as mo
 import numpy as np
 import pandas as pd
 
+from ..visual_style import (
+    PANEL_BACKGROUND_COLOR,
+    PUBLICATION_PALETTE,
+    SPINE_COLOR,
+    TEXT_COLOR,
+    wrap_plot_title,
+)
 from .browser_runtime_support import (
-    CONTROL_PLANE_PALETTE,
-    fig_to_image,
     load_table,
     load_view_matrix,
     load_view_rows,
+    render_matplotlib_figure,
     shared_join_key,
+    style_notebook_axes,
 )
 
 
@@ -127,7 +134,7 @@ def linear_cka(left_matrix: np.ndarray, right_matrix: np.ndarray) -> float | Non
     return numerator / (denom_left * denom_right)
 
 
-def mean_knn_overlap(left_matrix: np.ndarray, right_matrix: np.ndarray, *, k: int) -> float | None:
+def neighbor_set_jaccard(left_matrix: np.ndarray, right_matrix: np.ndarray, *, k: int) -> float | None:
     if left_matrix.shape[0] != right_matrix.shape[0] or left_matrix.shape[0] <= 2:
         return None
     max_k = min(int(k), left_matrix.shape[0] - 1)
@@ -222,6 +229,7 @@ def compare_pair_payload(
         "status": "ok",
         "basis": basis_label,
         "rows": int(left_sample.shape[0]),
+        "sample_strategy": "deterministic_even_stride",
         "left_dims": int(left_sample.shape[1]),
         "right_dims": int(right_sample.shape[1]),
         "distance_pairs": int(left_distance_values.size),
@@ -234,7 +242,7 @@ def compare_pair_payload(
         "metrics": {
             "distance_spearman": spearman_correlation(left_distance_values, right_distance_values),
             "linear_cka": linear_cka(left_sample, right_sample),
-            "mean_knn_overlap": mean_knn_overlap(
+            "neighbor_set_jaccard": neighbor_set_jaccard(
                 left_sample,
                 right_sample,
                 k=int(compare_metrics.get("knn_k", 10)),
@@ -255,20 +263,21 @@ def render_distance_correlation(payload: dict[str, object], *, title: str):
         return mo.callout("Not enough paired distances are available to render a correlation plot.", kind="warn")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(7.2, 5.2))
-    mesh = ax.hexbin(distance_x, distance_y, gridsize=40, cmap="viridis", mincnt=1)
+    fig, ax = plt.subplots(figsize=(5.05, 4.75))
+    ax.set_facecolor(PANEL_BACKGROUND_COLOR)
+    mesh = ax.hexbin(distance_x, distance_y, gridsize=40, cmap="cividis", mincnt=1)
     lower = float(min(distance_x.min(), distance_y.min()))
     upper = float(max(distance_x.max(), distance_y.max()))
-    ax.plot([lower, upper], [lower, upper], linestyle="--", linewidth=1.0, color="#5C6874", alpha=0.8)
-    fig.colorbar(mesh, ax=ax, shrink=0.84, label="Pair count")
-    ax.set_title(title, fontsize=11, fontweight="semibold")
+    ax.plot([lower, upper], [lower, upper], linestyle="--", linewidth=1.0, color=SPINE_COLOR, alpha=0.8)
+    colorbar = fig.colorbar(mesh, ax=ax, shrink=0.78, pad=0.025, label="Pair count")
+    colorbar.ax.tick_params(labelsize=10, colors=TEXT_COLOR)
+    colorbar.set_label("Pair count", fontsize=11, color=TEXT_COLOR)
+    ax.set_title(wrap_plot_title(title, width=28), fontweight="semibold", pad=8)
     ax.set_xlabel("Left-view cosine distance")
     ax.set_ylabel("Right-view cosine distance")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.grid(True, color="#D5DCE4", linewidth=0.7, alpha=0.55)
-    ax.set_axisbelow(True)
-    return fig_to_image(fig)
+    style_notebook_axes(ax, grid=True, square=True)
+    fig.tight_layout(pad=0.7)
+    return render_matplotlib_figure(fig, alt=title)
 
 
 def render_rowwise_distribution(payload: dict[str, object], *, value_key: str, title: str, xlabel: str):
@@ -286,13 +295,12 @@ def render_rowwise_distribution(payload: dict[str, object], *, value_key: str, t
         return mo.callout("No row-wise metric values are available for the selected pair.", kind="warn")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(7.2, 3.6))
-    ax.hist(values, bins=min(40, max(12, int(values.size / 3))), color=CONTROL_PLANE_PALETTE[0], alpha=0.8)
-    ax.set_title(title, fontsize=11, fontweight="semibold")
+    fig, ax = plt.subplots(figsize=(4.4, 3.7))
+    ax.set_facecolor(PANEL_BACKGROUND_COLOR)
+    ax.hist(values, bins=min(40, max(12, int(values.size / 3))), color=PUBLICATION_PALETTE[0], alpha=0.8)
+    ax.set_title(wrap_plot_title(title, width=26), fontweight="semibold", pad=8)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Count")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.grid(True, color="#D5DCE4", linewidth=0.7, alpha=0.55)
-    ax.set_axisbelow(True)
-    return fig_to_image(fig)
+    style_notebook_axes(ax, grid=True, square=False)
+    fig.tight_layout(pad=0.7)
+    return render_matplotlib_figure(fig, alt=title)

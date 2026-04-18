@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
   <title id="title">latentdna banner</title>
-  <desc id="desc">latentdna title banner with latent atlas grid and downstream artifact motifs.</desc>
+  <desc id="desc">latentdna title banner with latent geometry grid and downstream artifact motifs.</desc>
   <defs>
     <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />

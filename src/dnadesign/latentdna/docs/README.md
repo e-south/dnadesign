@@ -1,17 +1,20 @@
 # LatentDNA Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-04-17
+
+Reference docs for the `latentdna` comparison layer.
 
 ### Start here
 
-- [Promoter-study latent atlas workflow](workflows/promoter-study-latent-atlas.md)
-- [Context-shift workflow](workflows/context-shift.md)
+- [Promoter-study representation comparison workflow](workflows/promoter-study-representation-comparison.md)
+- [Context-geometry workflow](workflows/context-shift.md)
 - [Cross-view agreement workflow](workflows/cross-view-agreement.md)
-- [Export to OPAL X bundles](workflows/export-opal-x.md)
 - [CLI contracts](reference/cli-contracts.md)
 - [Workspace schema](reference/workspace-schema.md)
-- [Performance budgets](reference/performance-budgets.md)
+- [Workspace snapshot contract](reference/workspace-snapshot-contract.md)
+- [Artifact naming grammar](reference/artifact-naming.md)
+- [Operations guide](operations/README.md)
 - [Development notes](dev/README.md)
 
 ### Route map
@@ -28,4 +31,4 @@
 
 - Upstream source-of-truth datasets: [USR README](../../usr/README.md)
 - Upstream vector generation: [Infer docs](../../infer/docs/README.md)
-- Downstream supervised learning handoff: [OPAL README](../../opal/README.md)
+- Study-facing status surfaces: [workspace snapshot contract](reference/workspace-snapshot-contract.md)

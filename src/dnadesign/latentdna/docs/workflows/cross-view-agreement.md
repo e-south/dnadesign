@@ -1,13 +1,13 @@
 # Cross-View Agreement
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-04-17
 
 This workflow compares view structure without mixing incompatible raw coordinate spaces.
 
-Primary checked-in promoter-study deliverable:
+Primary checked-in promoter-study role:
 
-- `agreement_7b_vs_20b`
+- optional appendix or QC-only diagnostic outside the active reference-first decision ladder
 
 Core artifact path:
 
@@ -22,6 +22,7 @@ Key invariants:
 - Agreement operates over neighbors, clusters, and landmark neighborhoods, not raw cross-model subtraction.
 - Shared support must be explicit.
 - The resulting `agreement_set` is a persisted artifact, not notebook-only logic.
+- Agreement summaries are not primary representation-comparison evidence for the active promoter study.
 
 See also:
 

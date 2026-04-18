@@ -97,6 +97,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - `control-plane`
   - `data-plane`
   - `downstream-tool`
+- If extra route nuance is needed, use a separate field such as `Surface role`
+  or `Relationship`; do not invent replacement plane names such as
+  `producer-analysis`, `execution-surface`, or `downstream-analysis`.
 
 ## High-level data flows
 - Producer tools -> USR event stream (`.events.log`) -> observer tools and webhook sinks.

@@ -1,33 +1,17 @@
-# Export To OPAL X Bundles
+# External Export Note
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-04-17
 
-This workflow covers deterministic export bundles that hand off explicit `X` matrices to downstream supervised tools.
+External supervised benchmarking handoff is outside the current LatentDNA product posture.
 
-Primary checked-in promoter-study deliverables:
+LatentDNA stops at comparison and reporting:
 
-- `x0_primary_20b`
-- `x1_primary_20b`
-- `x2_primary_20b`
-- `x3_ablation_7b`
+- `dataset_overview`
+- `reference_margin_analysis`
+- `context_geometry_audit`
+- `representation_comparison`
+- `representation_health_diagnostic`
+- `appendix_umap_gallery`
 
-Core artifact path:
-
-1. Materialize the required source-backed or derived views.
-2. Fit reducers once and persist reduced views.
-3. Score any scalar or landmark-distance sidecar tables.
-4. Export a deterministic matrix or aligned table bundle with a feature ledger.
-
-Key invariants:
-
-- Export blocks are ordered explicitly.
-- Alignment-backed block projection must name the alignment and aggregation mode.
-- Metadata stays outside the numeric matrix.
-- Feature names are stable and ledger-backed.
-
-See also:
-
-- [promoter-study-latent-atlas.md](promoter-study-latent-atlas.md)
-- [export-contract.md](../reference/export-contract.md)
-- [performance-budgets.md](../reference/performance-budgets.md)
+If a future study needs a neutral export bundle, specify the consumer and contract first and reintroduce that surface under a separate scope.

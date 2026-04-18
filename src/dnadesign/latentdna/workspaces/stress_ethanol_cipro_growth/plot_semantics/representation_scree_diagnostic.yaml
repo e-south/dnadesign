@@ -1,0 +1,10 @@
+plot_id: representation_scree_diagnostic
+research_question: Is each candidate representation space healthy or pathologically low-rank after pooling?
+evidence_tier: secondary
+encoding_summary: Multi-panel scree diagnostic showing explained-variance and cumulative-variance curves for each candidate representation.
+sampling_scope: Candidate reducer summaries.
+interpretation_guardrails:
+  - Scree curves diagnose geometry health and do not by themselves determine biological usefulness.
+  - Comparisons should consider both cumulative variance and effective rank.
+caption_md: Representation-health scree diagnostics for the canonical candidate inventory.
+alt_text: Multiple scree panels showing explained-variance and cumulative-variance curves for each candidate representation.

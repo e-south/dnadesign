@@ -1,0 +1,10 @@
+plot_id: representation_tradeoff_scatter
+research_question: Which candidate representations look strongest on biology-aligned evidence versus context stability tradeoffs?
+evidence_tier: primary
+encoding_summary: Multi-panel candidate scatter comparing explicit biology or reference-neighbor metrics against context stability.
+sampling_scope: Candidate-level summaries derived from materialized comparison metrics.
+interpretation_guardrails:
+  - Each axis is an explicitly named aggregate metric with a published definition.
+  - The figure compares tradeoffs and does not declare a winner state.
+caption_md: Transparent candidate tradeoff scatter across biology evidence, neighborhood evidence, and context stability.
+alt_text: Four scatter panels, one point per candidate representation, comparing evidence metrics against context stability.

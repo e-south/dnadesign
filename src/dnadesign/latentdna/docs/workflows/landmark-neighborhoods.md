@@ -7,20 +7,20 @@ This workflow owns the landmark-neighborhood analysis lane, but the current
 checked-in promoter-study slice is a reduction QA surface rather than a true
 neighborhood enrichment artifact.
 
-Primary checked-in promoter-study deliverable:
+Current role in the promoter-study refactor:
 
-- `control_pca_explained_variance_curve`
+- internal reducer diagnostics only
 
-Core artifact path:
+Representative artifact path:
 
 1. Materialize the anchor-space view.
 2. Fit a reusable PCA reducer on that view.
-3. Render the resulting explained-variance scree as a `curve` plot.
+3. Record explained-variance metadata for maintainer-side diagnostics.
 
 Key invariants:
 
-- The checked-in deliverable name must match the reducer-backed scree implementation.
-- Plot rendering stays read-only and fails if reducer artifacts are missing.
+- Diagnostic reducer metadata stays internal and is not a named study deliverable.
+- Any optional scree rendering stays read-only and fails if reducer artifacts are missing.
 - Future neighborhood-enrichment work must add an explicit `enrichment_set`
   artifact instead of reusing the scree surface name.
 
