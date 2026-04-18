@@ -258,10 +258,14 @@ def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro
     assert "Route map: `routes.md`" in status
     assert "Study execution map: `pipeline.yaml`" in status
     assert "evidence.analysis_surfaces" in status
+    assert "usr.data-plane.promoter-study-status --json" in status
     assert "construct_workspace:" in pipeline
     assert "study_stress_ethanol_cipro_pdual10" in pipeline
     assert "densegen:" in pipeline
-    assert "default_plot_ids:" in pipeline
+    assert "analysis_surface:" in pipeline
+    assert "contract_ref: densegen.analysis_surface.v1" in pipeline
+    assert "source: workspace:study_stress_ethanol_cipro" in pipeline
+    assert "default_plot_ids:" not in pipeline
     assert "infer_batch_7b_with_notify:" in pipeline
     assert "anchor_only:" in pipeline
     assert "latentdna:" in pipeline
@@ -272,29 +276,28 @@ def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro
 
 def test_promoter_study_route_map_exposes_owner_surfaces() -> None:
     routes = _read("docs/studies/stress_ethanol_cipro_growth/routes.md")
-    latentdna_validate_command = (
-        "uv run latentdna validate workspace --workspace "
-        "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth "
-        "--deep"
-    )
+    latentdna_validate_command = "uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep"
 
     assert "### DenseGen EDA" in routes
-    assert "### Construct lineage" in routes
     assert "### Infer lanes" in routes
-    assert "### LatentDNA atlas" in routes
+    assert "### LatentDNA comparison surface" in routes
     assert "### Cluster exploration" in routes
     assert "### OPAL campaigns" in routes
-    assert "analysis_surfaces.{densegen,latentdna,cluster}" in routes
-    assert "Status JSON route: `evidence.analysis_surfaces.densegen`" in routes
-    assert "Status JSON route: `evidence.analysis_surfaces.latentdna`" in routes
-    assert "Status JSON route: `evidence.analysis_surfaces.cluster`" in routes
-    assert "plot_manifest.json" in routes
-    assert "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md" in routes
+    assert "### Terminology guardrails" in routes
+    assert "evidence.analysis_surfaces.{densegen,latentdna,cluster}" in routes
+    assert "- Type: `route`" in routes
+    assert "- Plane: `data-plane`" in routes
+    assert "- Surface role: `producer`" in routes
+    assert "- Owner-boundary: `densegen`" in routes
+    assert "DenseGen generation plans are biological generation conditions" in routes
+    assert "Study lifecycle phases are record-plane state labels" in routes
+    assert "Infer lanes are model-family and dataset-target configs" in routes
+    assert "outputs/plots/current_inventory.json" in routes
+    assert "src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md" in routes
     assert "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md" in routes
     assert latentdna_validate_command in routes
-    assert "Configured/planned/not configured: `configured`" in routes
-    assert "Configured/planned/not configured: `planned`" in routes
-    assert "Configured/planned/not configured: `not configured`" in routes
+    assert "Primary review path:" in routes
+    assert "appendix_umap_gallery" in routes
 
 
 def test_promoter_study_ops_contract_marks_default_notify_submit_path_as_required() -> None:
@@ -313,17 +316,18 @@ def test_promoter_study_ops_contract_marks_default_notify_submit_path_as_require
 def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
     journey = _read("src/dnadesign/usr/docs/operations/promoter-evo2-journey.md")
 
-    assert "ops catalog show usr.data-plane.promoter-feature-matrix" in journey
+    assert "ops progress show usr.data-plane.promoter-study-status --json" in journey
+    assert "ops catalog show latentdna.downstream.promoter-study-representation-comparison" in journey
     assert "multi-source-shared-dataset-assembly.md" in journey
     assert "construct-infer-shared-dataset-runbook.md" in journey
     assert "evo2-promoter-features.md" in journey
     assert "evo2-provider.md" in journey
     assert "promoter-study-status-contract.md" in journey
-    assert "promoter-study-latent-atlas.md" in journey
+    assert "promoter-study-representation-comparison.md" in journey
     assert "checked-in study `routes.md`" in journey
     assert "docs/notify/README.md" in journey
     assert "usr-infer-x-active-learning.md" in journey
-    assert "only after one explicit `infer__...` column is chosen as `X`" in journey
+    assert "only after a separate study-owned downstream decision names a concrete feature bundle" in journey
 
 
 def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() -> None:
@@ -392,6 +396,9 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "analysis_surfaces.densegen" in contract
     assert "analysis_surfaces.latentdna" in contract
     assert "analysis_surfaces.cluster" in contract
+    assert "outputs/plots/current_inventory.json" in contract
+    assert "outputs/plots/artifact_ledger.json" in contract
+    assert "record-plane summary, not a scheduler-health" in contract
     assert "gpu_t=RTXP6000" not in contract
     assert "stress_ethanol_cipro_growth" not in contract
     assert "### Choose the next surface" in preflight_contract
@@ -457,7 +464,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "Fail visibly when" in refresh_reference
     assert "Status:" in study_routes
     assert "Preflight:" in study_routes
-    assert "This page: downstream owner handoff" in study_routes
+    assert "This page keeps the downstream handoff map in one place." in study_routes
     assert "uv run usr --root <usr-root> info <dataset-id> --format json" in contract
     assert "--audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
     assert "ops progress show usr.data-plane.hpc-sync --sync-audit-json" in contract
@@ -535,11 +542,15 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "### Current phase" in status
     assert "### Current row counts" in status
     assert "### Current downstream posture" in status
-    assert "Canonical consolidated feature dataset:" in status
+    assert "Canonical benchmark export:" not in status
     assert "Declared phase: `infer_batch_preparation`" in status
-    assert "LatentDNA: `configured`;" in status
-    assert "Cluster: `planned`;" in status
-    assert "OPAL: `not configured`;" in status
+    assert "LatentDNA: `configured` for downstream comparison" in status
+    assert "Cluster: `planned`" in status
+    assert "OPAL: `not_configured`" in status
+    assert (
+        "sanctioned current-record surface is `uv run ops progress show usr.data-plane.promoter-study-status --json`"
+        in status
+    )
     assert re.search(r"`densegen/study_stress_ethanol_cipro`: `\d+`", status)
     assert re.search(r"`promoter/stress_ethanol_cipro_anchor_set`: `\d+`", status)
     assert re.search(r"`promoter/stress_ethanol_cipro_construct_contexts`: `\d+`", status)
@@ -560,7 +571,7 @@ def test_promoter_study_status_note_separates_row_target_from_live_handoff_count
 
     assert row_target == densegen_target == 100000
     assert "### Current row counts" in status
-    assert "Canonical consolidated feature dataset:" in status
+    assert "Canonical benchmark export:" not in status
     assert "DenseGen source row target:" in status
     assert "historical context rather than the main status" not in status
     assert re.search(r"`densegen/study_stress_ethanol_cipro`: `\d+`", status)

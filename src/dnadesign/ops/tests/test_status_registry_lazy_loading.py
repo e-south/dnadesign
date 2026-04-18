@@ -59,6 +59,11 @@ def test_status_registry_fragments_load_provider_owned_specs() -> None:
     )
     assert supported_specs["cluster-run-index"].owner_boundary == "cluster"
     assert supported_specs["cluster-run-index"].observes_plane == "data"
+    assert supported_specs["latentdna-workspace-snapshot"].provider_ref == (
+        "dnadesign.latentdna.ops.status_providers:provide_latentdna_workspace_snapshot_status"
+    )
+    assert supported_specs["latentdna-workspace-snapshot"].owner_boundary == "latentdna"
+    assert supported_specs["latentdna-workspace-snapshot"].observes_plane == "data"
     assert supported_specs["opal-campaign-state"].provider_ref == (
         "dnadesign.opal.ops.status_providers:provide_opal_campaign_state_status"
     )
@@ -79,6 +84,7 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status_providers',
         'dnadesign.usr.ops.status_providers',
+        'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
@@ -151,6 +157,7 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status_providers',
         'dnadesign.usr.ops.status_providers',
+        'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
@@ -178,6 +185,7 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status_providers',
         'dnadesign.usr.ops.status_providers',
+        'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',

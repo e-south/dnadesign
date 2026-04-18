@@ -3,15 +3,15 @@
 **Type:** contract
 **Plane:** data-plane
 **Owner-boundary:** usr
-**Entry artifact:** one checked-in promoter-study directory selected through docs/studies/index.yaml
-**Exit artifact:** one read-only summary of source growth, shared handoff readiness, semantic completeness of critical handoff metadata, planned outputs, and study-owned execution surfaces
+**Entry artifact:** one checked-in promoter-study directory chosen from docs/studies/index.yaml
+**Exit artifact:** a read-only snapshot of the current phase, dataset posture, and study-owned handoff surfaces
 **Registry-id:** usr.data-plane.promoter-study-status
-**Summary:** Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
+**Summary:** Read one checked-in promoter-study record and report the current phase, datasets, and handoff surfaces without reconstructing the workflow by hand.
 **Execution-kind:** iterative
 **Status-kind:** promoter-study-status
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-13
+**Last verified:** 2026-04-17
 
 Use this for the current state of the live DenseGen/manual/wildtype ->
 optional Construct -> Infer -> LatentDNA, Cluster, or OPAL study.
@@ -27,7 +27,7 @@ Use this page for the cheap snapshot.
 | Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of study phase, datasets, row counts, and downstream posture. |
 | What blocks execution on this host? | [Promoter Study Preflight](promoter-study-preflight.md) | Command-level readiness for the next actionable phase. |
 | Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
-| Which plots, notebooks, deliverables, or artifact roots are available? | `uv run ops progress show usr.data-plane.promoter-study-status --json` and read `evidence.analysis_surfaces` | One snapshot now exposes DenseGen live plot inventory, LatentDNA deliverable ids plus artifact roots, and Cluster artifact-layout templates without guessing. |
+| Which plots, notebooks, deliverables, or artifact roots are available? | `uv run ops progress show usr.data-plane.promoter-study-status --json` and read `evidence.analysis_surfaces` | One snapshot now exposes DenseGen contract-governed current inventory and freshness, LatentDNA deliverable ids plus artifact roots, and Cluster artifact-layout templates without guessing. |
 
 This page is a router, not the full workflow doc.
 
@@ -127,14 +127,20 @@ the snapshot lives under `src/dnadesign/studies/families/promoter/`.
 
 The snapshot keeps exploratory-analysis discovery in a separate
 `evidence.analysis_surfaces` section so record-plane status stays distinct from
-tool-local execution.
+tool-local execution. It is still a record-plane summary, not a scheduler-health
+surface and not a blanket feature-matrix completeness guarantee.
 
 - `analysis_surfaces.densegen` exposes the checked-in DenseGen workspace,
-  default plot ids, live rendered plot inventory from
-  `outputs/plots/plot_manifest.json`, and the generated notebook path when
-  present.
+  public analysis-surface contract reference, generated/operator-visible/
+  optional/hidden plot taxonomy, authoritative current inventory from
+  `outputs/plots/current_inventory.json`, optional historical ledger from
+  `outputs/plots/artifact_ledger.json`, freshness state, degraded-state
+  diagnostics, and the generated notebook path when present.
+- DenseGen may still keep `outputs/plots/plot_manifest.json` as a compatibility
+  ledger mirror, but it is not the authoritative current snapshot for operator
+  status.
 - `analysis_surfaces.latentdna` exposes the checked-in workspace, notebook id,
-  plot ids, deliverable ids, export ids, and the
+  plot ids, deliverable ids, any declared export ids, and the
   `outputs/<artifact-kind>/<artifact-id>/manifest.json` path
   contract plus `outputs/notebooks/<notebook-id>/notebook.py` for the generated
   workspace notebook.
@@ -294,7 +300,7 @@ source/handoff mode.
 | What blocks execution on this host? | `usr.data-plane.promoter-study-preflight --scope next --json` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `ops.study.yaml` or declared execution surfaces are missing |
 | Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | owner tool, entry artifact, primary doc or workspace, first command | the study spans owner surfaces but no route map is checked in |
 | Which dataset sync posture is current? | `datasets.yaml` plus `usr.data-plane.hpc-sync` | dataset id, remote profile, audit JSON path, explicit drift summary | sync-enabled dataset entries or audit evidence are missing |
-| Which exploratory-analysis artifacts exist or are declared? | `usr.data-plane.promoter-study-status --json` `analysis_surfaces` plus `docs/studies/<study-id>/routes.md` | DenseGen plot ids or rendered plot paths, LatentDNA deliverable/export ids plus artifact roots, Cluster results-layout template | the study record omits the owning workspace/doc path or the tool-local contract is missing |
+| Which exploratory-analysis artifacts exist or are declared? | `usr.data-plane.promoter-study-status --json` `analysis_surfaces` plus `docs/studies/<study-id>/routes.md` | DenseGen operator-visible/current inventory plus freshness and degradation state, LatentDNA deliverable/export ids plus artifact roots, Cluster results-layout template | the study record omits the owning workspace/doc path or the tool-local contract is missing |
 
 3. Validate the dataset and inspect lineage plus one explicit infer column:
 

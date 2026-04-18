@@ -548,7 +548,7 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
         "notify",
         "ops",
     ]
-    assert ("latentdna", "promoter-study-latent-atlas") in [
+    assert ("latentdna", "promoter-study-representation-comparison") in [
         (entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]
     ]
     assert ("handoff-to", "usr.data-plane.promoter-study-preflight") in [

@@ -59,3 +59,19 @@ def test_build_status_inputs_applies_declared_default_scope() -> None:
     resolved = build_status_inputs(spec=spec, raw_inputs={}, repo_root=Path("/tmp/repo"))
 
     assert resolved == {"scope": "next"}
+
+
+def test_build_status_inputs_coerces_latentdna_workspace_repo_path() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    spec = load_status_kind_spec("latentdna-workspace-snapshot")
+
+    resolved = build_status_inputs(
+        spec=spec,
+        raw_inputs={"workspace": "repo:src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth"},
+        repo_root=repo_root,
+    )
+
+    assert (
+        resolved["workspace"]
+        == (repo_root / "src" / "dnadesign" / "latentdna" / "workspaces" / "stress_ethanol_cipro_growth").resolve()
+    )

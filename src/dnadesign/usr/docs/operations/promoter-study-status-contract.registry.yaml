@@ -4,9 +4,9 @@ registry_id: usr.data-plane.promoter-study-status
 type: contract
 plane: data-plane
 owner_boundary: usr
-entry_artifact: one checked-in promoter-study directory selected through docs/studies/index.yaml
-exit_artifact: one read-only summary of source growth, shared handoff readiness, semantic completeness of critical handoff metadata, planned outputs, and study-owned execution surfaces
-summary: Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
+entry_artifact: one checked-in promoter-study directory chosen from docs/studies/index.yaml
+exit_artifact: a read-only snapshot of the current phase, dataset posture, and study-owned handoff surfaces
+summary: Read one checked-in promoter-study record and report the current phase, datasets, and handoff surfaces without reconstructing the workflow by hand.
 execution_kind: iterative
 status_kind: promoter-study-status
 keywords:
@@ -32,7 +32,7 @@ related_tool_routes:
   - tool: infer
     route: evo2-promoter-features
   - tool: latentdna
-    route: promoter-study-latent-atlas
+    route: promoter-study-representation-comparison
   - tool: cluster
     route: exploratory-clustering
   - tool: opal
