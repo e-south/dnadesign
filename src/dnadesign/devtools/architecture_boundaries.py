@@ -16,7 +16,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes", "studies"}
+_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes"}
 _SKIPPED_PATH_SEGMENTS = {
     "tests",
     "notebooks",
@@ -55,6 +55,10 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("ops", "notify"),
     ("ops", "usr"),
     ("permuter", "infer"),
+    ("studies", "infer"),
+    ("studies", "ops"),
+    ("studies", "densegen"),
+    ("studies", "usr"),
     ("usr", "ops"),
 }
 _FORBIDDEN_LEGACY_SURFACE_PATHS = (

@@ -16,9 +16,15 @@ import json
 import textwrap
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.core.record_values import (
+    normalize_used_tfbs_entries as normalize_used_tfbs_entries_impl,
+)
+from dnadesign.densegen.src.viz import dense_array_video_source as dense_array_video_source_module
 from dnadesign.densegen.src.viz import plotting as plotting_module
 from dnadesign.densegen.src.viz.plotting import run_plots_from_config
 
@@ -172,7 +178,7 @@ def test_dense_array_video_round_robin_single_output(monkeypatch, tmp_path: Path
     _patch_video_job_capture(monkeypatch, captured)
 
     loaded = load_config(cfg_path)
-    run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
     assert captured["kind"] == "sequence_rows_v3"
     assert captured["selection_ids"] == ["rec_a_1", "rec_b_1", "rec_a_2", "rec_b_2"]
@@ -182,7 +188,7 @@ def test_dense_array_video_round_robin_single_output(monkeypatch, tmp_path: Path
 
     manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
     payload = json.loads(manifest_path.read_text())
-    entries = [item for item in payload.get("plots", []) if item.get("name") == "dense_array_video_showcase"]
+    entries = [item for item in payload.get("plots", []) if item.get("name") == "dense_array_showcase_video"]
     assert len(entries) == 1
     assert entries[0]["path"] == "stage_b/all_plans/showcase.mp4"
 
@@ -191,7 +197,7 @@ def test_dense_array_video_runs_when_enabled_without_only(monkeypatch, tmp_path:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
-    _write_video_config(cfg_path, default_plots_yaml='["dense_array_video_showcase"]')
+    _write_video_config(cfg_path, default_plots_yaml='["dense_array_showcase_video"]')
     (run_root / "inputs.csv").write_text("tf,tfbs\n")
 
     records_path = run_root / "outputs" / "tables" / "records.parquet"
@@ -207,6 +213,74 @@ def test_dense_array_video_runs_when_enabled_without_only(monkeypatch, tmp_path:
 
     assert captured["selection_ids"] == ["rec_a_1", "rec_b_1", "rec_a_2", "rec_b_2"]
     assert (run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.mp4").exists()
+
+
+def test_dense_array_video_requires_explicit_selection_even_when_enabled(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(cfg_path, default_plots_yaml='["source_cohort_concentration"]')
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    dataset_df = _base_records_df().assign(source="demo", densegen__input_name="demo_input")
+    _patch_records_loader(monkeypatch, dataset_df, records_path)
+
+    def _fake_dataset_plot(_df: pd.DataFrame, out_path: Path, **_kwargs) -> list[Path]:
+        target = out_path.parent / "dataset" / "source_cohort_concentration.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("plot")
+        return [target]
+
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["source_cohort_concentration"], "fn", _fake_dataset_plot)
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path)
+
+    assert "kind" not in captured
+    assert (run_root / "outputs" / "plots" / "dataset" / "source_cohort_concentration.png").exists()
+    assert not (run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.mp4").exists()
+
+
+def test_dense_array_video_requires_enabled_true_when_selected(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(
+        cfg_path,
+        video_yaml="""
+enabled: false
+mode: all_plans_round_robin_single_video
+sampling:
+  stride: 1
+  max_source_rows: 100
+  max_snapshots: 20
+playback:
+  target_duration_sec: 5
+  fps: 8
+""",
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    _patch_records_loader(monkeypatch, _base_records_df(), records_path)
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    with pytest.raises(RuntimeError, match=r"plots\.video\.enabled: true"):
+        run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+
+    assert "kind" not in captured
+    assert not (run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.mp4").exists()
 
 
 def test_dense_array_video_single_plan_mode_filters_rows(monkeypatch, tmp_path: Path) -> None:
@@ -239,7 +313,7 @@ playback:
     _patch_video_job_capture(monkeypatch, captured)
 
     loaded = load_config(cfg_path)
-    run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
     assert captured["selection_ids"] == ["rec_b_1", "rec_b_2"]
     assert (run_root / "outputs" / "plots" / "stage_b" / "plan_b" / "showcase.mp4").exists()
@@ -286,9 +360,69 @@ playback:
     _patch_video_job_capture(monkeypatch, captured)
 
     loaded = load_config(cfg_path)
-    run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
     assert len(captured["selection_ids"]) <= 24
+
+
+def test_dense_array_video_normalizes_only_sampled_rows(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(
+        cfg_path,
+        video_yaml="""
+enabled: true
+mode: all_plans_round_robin_single_video
+sampling:
+  stride: 1
+  max_source_rows: 2
+  max_snapshots: 2
+playback:
+  target_duration_sec: 5
+  fps: 8
+""",
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    rows: list[dict[str, object]] = []
+    for idx in range(12):
+        plan = "plan_a" if idx % 2 == 0 else "plan_b"
+        rows.append(
+            {
+                "id": f"rec_{idx:03d}",
+                "sequence": "ACGTACGTAA",
+                "densegen__plan": plan,
+                "densegen__used_tfbs_detail": _annotations("tfX", "ACGT", 0),
+            }
+        )
+    records_df = pd.DataFrame(rows)
+    _patch_records_loader(monkeypatch, records_df, records_path)
+
+    normalize_call_count = 0
+
+    def _counting_normalize(items: list[dict]) -> list[dict]:
+        nonlocal normalize_call_count
+        normalize_call_count += 1
+        return normalize_used_tfbs_entries_impl(items)
+
+    monkeypatch.setattr(
+        dense_array_video_source_module,
+        "normalize_used_tfbs_entries",
+        _counting_normalize,
+    )
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+
+    assert len(captured["selection_ids"]) == 2
+    assert normalize_call_count == len(captured["selection_ids"])
 
 
 def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatch, tmp_path: Path) -> None:
@@ -331,15 +465,25 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
     _patch_video_job_capture(monkeypatch, captured)
 
     loaded = load_config(cfg_path)
-    run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
     assert "overlay_text" not in captured["adapter_columns"]
     assert captured["adapter_columns"]["video_subtitle"] == "densegen__video_subtitle"
     assert captured["adapter_columns"]["promoter_detail"] == "densegen__promoter_detail"
     assert captured["job_mapping"]["outputs"][0]["title_text"] == "Run"
+    assert captured["job_mapping"]["outputs"][0]["title_font_size"] == 24
     assert captured["job_mapping"]["render"]["style"]["overrides"]["palette"]["tf:lexA"] == "#5DADE2"
-    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_mode"] == "inline"
-    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_font_size"] == 14
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_mode"] == "bottom"
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_seq"] == 24
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_label"] == 24
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_height_px"] == 136.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_patch_w"] == 96.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_patch_h"] == 34.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_gap_patch_text"] == 22.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_gap_x"] == 60.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_font_size"] == 24
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_vertical_align"] == 1.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["uniform_display_font_size"] is True
     rendered_df = captured["records_df"]
     assert "densegen__promoter_detail" in rendered_df.columns
     legacy_row = rendered_df.loc[rendered_df["id"].astype(str) == "rec_b_1"].iloc[0]
@@ -352,6 +496,91 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
         "Sequence rec_a_2 | Plan plan a",
         "Sequence rec_b_2 | Plan plan b",
     ]
+
+
+def test_dense_array_video_accepts_ndarray_annotation_payloads(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(cfg_path)
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    records_df = _base_records_df().copy()
+    records_df.at[0, "densegen__used_tfbs_detail"] = np.array(
+        [{"regulator": "tfB", "sequence": "ACGT", "orientation": "fwd", "offset": 0}],
+        dtype=object,
+    )
+    _patch_records_loader(monkeypatch, records_df, records_path)
+
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+
+    rendered_df = captured["records_df"]
+    normalized_annotations = json.loads(
+        rendered_df.loc[rendered_df["id"].astype(str) == "rec_b_1", "densegen__used_tfbs_detail"].iloc[0]
+    )
+    assert len(normalized_annotations) == 1
+    assert normalized_annotations[0]["regulator"] == "tfB"
+    assert normalized_annotations[0]["sequence"] == "ACGT"
+    assert normalized_annotations[0]["orientation"] == "fwd"
+    assert normalized_annotations[0]["offset"] == 0
+    assert normalized_annotations[0]["part_index"] == 0
+
+
+def test_dense_array_video_rejects_invalid_unsampled_annotation_rows(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(
+        cfg_path,
+        video_yaml="""
+enabled: true
+mode: all_plans_round_robin_single_video
+sampling:
+  stride: 1
+  max_source_rows: 2
+  max_snapshots: 2
+playback:
+  target_duration_sec: 5
+  fps: 8
+""",
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    rows: list[dict[str, object]] = []
+    for idx in range(12):
+        plan = "plan_a" if idx % 2 == 0 else "plan_b"
+        rows.append(
+            {
+                "id": f"rec_{idx:03d}",
+                "sequence": "ACGTACGTAA",
+                "densegen__plan": plan,
+                "densegen__used_tfbs_detail": _annotations("tfX", "ACGT", 0),
+            }
+        )
+    rows[5]["densegen__used_tfbs_detail"] = 1
+    records_df = pd.DataFrame(rows)
+    _patch_records_loader(monkeypatch, records_df, records_path)
+    _patch_video_job_capture(monkeypatch, {})
+
+    loaded = load_config(cfg_path)
+    try:
+        run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+    except RuntimeError as exc:
+        assert "densegen__used_tfbs_detail" in str(exc)
+    else:
+        raise AssertionError("Expected invalid unsampled dense-array annotations to fail validation.")
 
 
 def test_dense_array_video_rejects_duplicate_ids(monkeypatch, tmp_path: Path) -> None:
@@ -372,11 +601,11 @@ def test_dense_array_video_rejects_duplicate_ids(monkeypatch, tmp_path: Path) ->
 
     loaded = load_config(cfg_path)
     try:
-        run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+        run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
     except RuntimeError as exc:
         assert "duplicate" in str(exc).lower()
     else:
-        raise AssertionError("Expected duplicate-id validation failure for dense_array_video_showcase.")
+        raise AssertionError("Expected duplicate-id validation failure for dense_array_showcase_video.")
 
 
 def test_dense_array_video_single_plan_mode_requires_rows(monkeypatch, tmp_path: Path) -> None:
@@ -409,11 +638,11 @@ playback:
 
     loaded = load_config(cfg_path)
     try:
-        run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+        run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
     except RuntimeError as exc:
         assert "selected no rows" in str(exc).lower()
     else:
-        raise AssertionError("Expected single-plan empty-selection failure for dense_array_video_showcase.")
+        raise AssertionError("Expected single-plan empty-selection failure for dense_array_showcase_video.")
 
 
 def test_dense_array_video_rejects_null_required_values(monkeypatch, tmp_path: Path) -> None:
@@ -434,11 +663,11 @@ def test_dense_array_video_rejects_null_required_values(monkeypatch, tmp_path: P
 
     loaded = load_config(cfg_path)
     try:
-        run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+        run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
     except RuntimeError as exc:
         assert "null" in str(exc).lower()
     else:
-        raise AssertionError("Expected null-value validation failure for dense_array_video_showcase.")
+        raise AssertionError("Expected null-value validation failure for dense_array_showcase_video.")
 
 
 def test_dense_array_video_rejects_invalid_annotation_string(monkeypatch, tmp_path: Path) -> None:
@@ -459,11 +688,11 @@ def test_dense_array_video_rejects_invalid_annotation_string(monkeypatch, tmp_pa
 
     loaded = load_config(cfg_path)
     try:
-        run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+        run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
     except RuntimeError as exc:
         assert "json" in str(exc).lower()
     else:
-        raise AssertionError("Expected annotation JSON validation failure for dense_array_video_showcase.")
+        raise AssertionError("Expected annotation JSON validation failure for dense_array_showcase_video.")
 
 
 def test_dense_array_video_single_plan_output_path_is_stage_b_scoped(monkeypatch, tmp_path: Path) -> None:
@@ -498,7 +727,7 @@ playback:
     _patch_video_job_capture(monkeypatch, captured)
 
     loaded = load_config(cfg_path)
-    run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
     out_path = Path(str(captured["job_mapping"]["outputs"][0]["path"]))
     expected_prefix = run_root / "outputs" / "plots" / "stage_b"

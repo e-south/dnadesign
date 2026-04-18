@@ -635,7 +635,7 @@ def _print_run_next_steps(*, cfg_path: Path, run_root: Path, context: CliContext
         run_root=run_root,
     )
     placement_cmd = context.workspace_command(
-        "dense plot --only placement_map",
+        "dense plot --only placement_occupancy_map",
         cfg_path=cfg_path,
         run_root=run_root,
     )

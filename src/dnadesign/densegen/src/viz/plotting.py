@@ -19,15 +19,12 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional
 
 import pandas as pd
-import pyarrow.parquet as pq
 from rich.console import Console
 from typing_extensions import Literal
 
 from ..adapters.outputs import load_records_from_config
-from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
-from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact, load_pool_artifact
-from ..core.pipeline.attempts import _load_attempts_snapshot
-from ..core.record_values import require_list_of_dicts as _require_list_of_dicts
+from ..config import RootConfig, resolve_run_root
+from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact
 from ..utils.rich_style import make_panel, make_table
 from .dense_array_video import plot_dense_array_video_showcase
 from .plot_common import (  # noqa: F401
@@ -38,27 +35,93 @@ from .plot_common import (  # noqa: F401
     _palette,
     plan_group_from_name,
 )
-from .plot_dataset import plot_dataset_metadata_heatmap, plot_dataset_source_inventory
-from .plot_inventory import manifest_path_fields
+from .plot_data_loading import (
+    _ensure_out_dir,
+    _is_missing_composition_artifact_error,
+    _load_attempts,
+    _load_composition,
+    _load_dense_arrays,
+    _load_effective_config,
+    _load_events,
+    _load_libraries,
+    _load_stage_a_pools,
+    _maybe_load_libraries,
+    _recover_composition_from_output_records,
+    _root_config_to_dict,
+)
+from .plot_dataset import plot_source_cohort_concentration, plot_source_plan_input_heatmap
+from .plot_inventory import (
+    ANALYSIS_SURFACE_CONTRACT_VERSION,
+    ARTIFACT_LEDGER_SCHEMA_VERSION,
+    CURRENT_INVENTORY_SCHEMA_VERSION,
+    LEGACY_PUBLIC_PLOT_IDS,
+    base_plot_id,
+    build_plot_text_contract,
+    manifest_path_fields,
+    resolve_plot_record,
+)
+from .plot_inventory import (
+    artifact_ledger_path as resolve_artifact_ledger_path,
+)
+from .plot_inventory import (
+    current_inventory_path as resolve_current_inventory_path,
+)
+from .plot_inventory import (
+    plot_manifest_path as resolve_plot_manifest_path,
+)
 from .plot_registry import PLOT_SPECS
-from .plot_run import plot_run_health, plot_tfbs_usage
-from .plot_stage_a import plot_stage_a_summary  # noqa: F401
+from .plot_run import (
+    plot_attempt_outcome_timeline,
+    plot_compression_ratio_by_plan,
+    plot_solve_pressure_and_progress,
+    plot_tfbs_concentration_profile,
+)
+from .plot_stage_a import (
+    plot_background_sequence_logo,
+    plot_stage_a_pool_diversity,
+    plot_stage_a_pool_score_strata,
+    plot_stage_a_sampling_yield,
+)  # noqa: F401
+from .plot_stage_a import plot_stage_a_summary as plot_stage_a_summary  # noqa: F401
 from .plot_stage_a_strata import _build_stage_a_strata_overview_figure  # noqa: F401
 from .plot_stage_a_yield import _build_stage_a_yield_bias_figure  # noqa: F401
-from .plot_stage_b_placement import plot_placement_map
+from .plot_stage_b_placement import plot_placement_occupancy_map
+from .plot_stage_b_summary import (
+    plot_plan_regulator_deployment_heatmap,
+    plot_retained_pool_coverage_by_regulator,
+    plot_retained_vs_deployed_length_mix_by_regulator,
+    plot_retained_vs_deployed_tier_mix_by_regulator,
+    plot_score_strata_and_deployed_length_bridge,
+    plot_upstream_motif_supply_and_pwm_strength,
+)
 
 _console = Console()
 
 
 def _plot_manifest_path(out_dir: Path) -> Path:
-    return out_dir / "plot_manifest.json"
+    return resolve_plot_manifest_path(out_dir)
 
 
-def _load_plot_manifest(out_dir: Path) -> dict:
-    path = _plot_manifest_path(out_dir)
+def _current_inventory_path(out_dir: Path) -> Path:
+    return resolve_current_inventory_path(out_dir)
+
+
+def _artifact_ledger_path(out_dir: Path) -> Path:
+    return resolve_artifact_ledger_path(out_dir)
+
+
+def _load_inventory_payload(path: Path) -> dict:
     if not path.exists():
         return {}
     return json.loads(path.read_text())
+
+
+def _load_plot_manifest(out_dir: Path) -> dict:
+    return _load_inventory_payload(_plot_manifest_path(out_dir))
+
+
+def _load_artifact_ledger(out_dir: Path) -> dict:
+    return _load_inventory_payload(_artifact_ledger_path(out_dir))
 
 
 def _is_supported_plot_path(rel_path: str) -> bool:
@@ -69,6 +132,8 @@ def _is_supported_plot_path(rel_path: str) -> bool:
         return len(parts) >= 2
     if parts[0] == "stage_b":
         return len(parts) >= 3
+    if parts[0] == "stage_b_summary":
+        return len(parts) >= 2
     if parts[0] == "run_health":
         return len(parts) >= 2
     if parts[0] == "dataset":
@@ -76,102 +141,11 @@ def _is_supported_plot_path(rel_path: str) -> bool:
     return False
 
 
-def _read_columns(columns: Iterable[str] | None) -> list[str] | None:
-    if columns is None:
-        return None
-    cleaned = sorted({str(col).strip() for col in columns if str(col).strip()})
-    return cleaned or None
-
-
-def _resolve_composition_projection_columns(
-    path: Path,
-    columns: list[str] | None,
-) -> tuple[list[str] | None, dict[str, str]]:
-    if columns is None:
-        return None, {}
-    try:
-        available = set(pq.read_schema(path).names)
-    except Exception:
-        return columns, {}
-    read_cols: list[str] = []
-    aliases: dict[str, str] = {}
-    missing: list[str] = []
-    for col in columns:
-        if col == "tf":
-            if "regulator" in available:
-                read_cols.append("regulator")
-                aliases["tf"] = "regulator"
-            elif "tf" in available:
-                read_cols.append("tf")
-            else:
-                missing.append("tf")
-            continue
-        if col == "tfbs":
-            if "sequence" in available:
-                read_cols.append("sequence")
-                aliases["tfbs"] = "sequence"
-            elif "tfbs" in available:
-                read_cols.append("tfbs")
-            else:
-                missing.append("tfbs")
-            continue
-        if col in available:
-            read_cols.append(col)
-            continue
-        missing.append(col)
-    if missing:
-        raise ValueError(
-            "composition.parquet missing required columns: "
-            f"{sorted(set(missing))}. Available columns: {sorted(available)}"
-        )
-    return sorted(set(read_cols)), aliases
-
-
-def _read_composition_parquet(path: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
-    requested = _read_columns(columns)
-    read_columns, aliases = _resolve_composition_projection_columns(path, requested)
-    frame = pd.read_parquet(path, columns=read_columns)
-    for dest, source in aliases.items():
-        if dest not in frame.columns and source in frame.columns:
-            frame[dest] = frame[source]
-    return frame
-
-
-def _resolve_analysis_table_paths(
-    tables_root: Path,
-    *,
-    final_name: str,
-    part_glob: str,
-) -> list[Path]:
-    final_path = tables_root / final_name
-    part_paths = sorted(tables_root.glob(part_glob))
-    paths: list[Path] = []
-    if final_path.exists():
-        paths.append(final_path)
-    paths.extend(part_paths)
-    if not paths:
-        raise ValueError(
-            f"{final_name} not found: {final_path}. Expected finalized table or pending `{part_glob}` files."
-        )
-    return paths
-
-
-def _load_attempts(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
-    tables_root = run_root / "outputs" / "tables"
-    projected_columns = _read_columns(columns)
-    return _load_attempts_snapshot(tables_root, columns=projected_columns)
-
-
-def _load_events(run_root: Path) -> pd.DataFrame:
-    events_path = run_root / "outputs" / "meta" / "events.jsonl"
-    if not events_path.exists():
-        raise ValueError(f"events.jsonl not found: {events_path}")
-    rows = []
-    for line in events_path.read_text().splitlines():
-        if not line.strip():
-            continue
-        rows.append(json.loads(line))
-    return pd.DataFrame(rows)
+def _is_legacy_public_plot_id(token: str) -> bool:
+    raw = str(token or "").strip()
+    if not raw:
+        return False
+    return raw in LEGACY_PUBLIC_PLOT_IDS or base_plot_id(raw) in LEGACY_PUBLIC_PLOT_IDS
 
 
 def _write_plot_manifest(
@@ -182,258 +156,101 @@ def _write_plot_manifest(
     cfg_path: Path,
     source: str,
 ) -> None:
-    existing = _load_plot_manifest(out_dir)
-    merged: dict[str, dict] = {}
-    for item in existing.get("plots", []):
-        rel_path = str(item.get("path") or "")
-        if not rel_path:
-            continue
-        if (out_dir / rel_path).exists() and _is_supported_plot_path(rel_path):
-            merged[rel_path] = item
+    def _supported_entries(payload: dict, *, expected_schema_version: str | None = None) -> dict[str, dict]:
+        if expected_schema_version is not None:
+            schema_version = str(payload.get("schema_version") or "").strip()
+            if schema_version != expected_schema_version:
+                return {}
+        supported: dict[str, dict] = {}
+        for item in payload.get("plots", []):
+            rel_path = str(item.get("path") or "")
+            if not rel_path:
+                continue
+            plot_id = str(item.get("plot_id") or item.get("name") or "").strip()
+            if _is_legacy_public_plot_id(plot_id):
+                continue
+            if (out_dir / rel_path).exists() and _is_supported_plot_path(rel_path):
+                supported[rel_path] = item
+        return supported
+
+    current_entries: dict[str, dict] = {}
     for item in entries:
         rel_path = str(item.get("path") or "")
         if not rel_path:
             continue
-        merged[rel_path] = item
-    payload = {
-        "schema_version": "2.0",
+        if (out_dir / rel_path).exists() and _is_supported_plot_path(rel_path):
+            current_entries[rel_path] = item
+
+    existing_current_entries = _supported_entries(
+        _load_inventory_payload(_current_inventory_path(out_dir)),
+        expected_schema_version=CURRENT_INVENTORY_SCHEMA_VERSION,
+    )
+    refreshed_plot_ids = {
+        str(item.get("plot_id") or item.get("name") or "").strip()
+        for item in current_entries.values()
+        if str(item.get("plot_id") or item.get("name") or "").strip()
+    }
+    merged_current_entries = {
+        rel_path: item
+        for rel_path, item in existing_current_entries.items()
+        if str(item.get("plot_id") or item.get("name") or "").strip() not in refreshed_plot_ids
+    }
+    merged_current_entries.update(current_entries)
+
+    current_payload = {
+        "schema_version": CURRENT_INVENTORY_SCHEMA_VERSION,
+        "contract_version": ANALYSIS_SURFACE_CONTRACT_VERSION,
         "run_root": str(run_root),
         "config_path": str(cfg_path),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "source": str(source),
-        "plots": sorted(merged.values(), key=lambda x: (x.get("name", ""), x.get("path", ""))),
+        "plots": sorted(merged_current_entries.values(), key=lambda x: (x.get("plot_id", ""), x.get("path", ""))),
     }
-    _plot_manifest_path(out_dir).write_text(json.dumps(payload, indent=2, sort_keys=True))
+    serialized_current_payload = json.dumps(current_payload, indent=2, sort_keys=True)
+    _current_inventory_path(out_dir).write_text(serialized_current_payload)
 
-
-def _ensure_out_dir(plots_cfg, cfg_path: Path, run_root: Path) -> Path:
-    out_dir = plots_cfg.out_dir if plots_cfg else "outputs/plots"
-    out = resolve_outputs_scoped_path(cfg_path, run_root, out_dir, label="plots.out_dir")
-    out.mkdir(parents=True, exist_ok=True)
-    return out
-
-
-def _read_projected_parquet(path: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
-    requested = _read_columns(columns)
-    if requested is None:
-        return pd.read_parquet(path)
-    import pyarrow.parquet as pq
-
-    schema_names = set(pq.ParquetFile(path).schema.names)
-    projected = [name for name in requested if name in schema_names]
-    if not projected:
-        raise ValueError(f"Parquet file is missing all projected columns: {path}")
-    return pd.read_parquet(path, columns=projected)
-
-
-def _resolve_pool_path(pools_dir: Path, rel_path: Path, *, input_name: str) -> Path:
-    candidate = pools_dir / rel_path
-    root = pools_dir.resolve()
-    resolved = candidate.resolve()
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise ValueError(f"Pool path for input '{input_name}' escapes outputs/pools: {rel_path}") from exc
-    return candidate
-
-
-def _load_stage_a_pools(
-    run_root: Path,
-    *,
-    columns: Iterable[str] | None = None,
-) -> tuple[TFBSPoolArtifact, dict[str, pd.DataFrame]]:
-    pools_dir = run_root / "outputs" / "pools"
-    artifact = load_pool_artifact(pools_dir)
-    pools: dict[str, pd.DataFrame] = {}
-    for entry in artifact.inputs.values():
-        if entry.pool_mode != POOL_MODE_TFBS:
-            continue
-        pool_path = _resolve_pool_path(pools_dir, entry.pool_path, input_name=entry.name)
-        if not pool_path.exists():
-            raise FileNotFoundError(f"Stage-A pool not found: {pool_path}")
-        pools[entry.name] = _read_projected_parquet(pool_path, columns=columns)
-    if not pools:
-        raise ValueError("No TFBS pools available for Stage-A plots.")
-    return artifact, pools
+    ledger_entries = _supported_entries(
+        _load_artifact_ledger(out_dir),
+        expected_schema_version=ARTIFACT_LEDGER_SCHEMA_VERSION,
+    )
+    for rel_path, item in current_entries.items():
+        ledger_entries[rel_path] = item
+    artifact_ledger_payload = {
+        "schema_version": ARTIFACT_LEDGER_SCHEMA_VERSION,
+        "contract_version": ANALYSIS_SURFACE_CONTRACT_VERSION,
+        "run_root": str(run_root),
+        "config_path": str(cfg_path),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "source": str(source),
+        "plots": sorted(ledger_entries.values(), key=lambda x: (x.get("name", ""), x.get("path", ""))),
+    }
+    serialized_ledger_payload = json.dumps(artifact_ledger_payload, indent=2, sort_keys=True)
+    _artifact_ledger_path(out_dir).write_text(serialized_ledger_payload)
+    _plot_manifest_path(out_dir).write_text(serialized_ledger_payload)
 
 
 # ---------------------- Plots ----------------------
 
 
-def _maybe_load_stage_a_pools(
-    run_root: Path,
-    *,
-    columns: Iterable[str] | None = None,
-) -> tuple[TFBSPoolArtifact | None, dict[str, pd.DataFrame] | None]:
-    pools_dir = run_root / "outputs" / "pools"
-    if not pools_dir.exists():
-        return None, None
-    return _load_stage_a_pools(run_root, columns=columns)
-
-
-def _load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
-    tables_root = run_root / "outputs" / "tables"
-    composition_paths = _resolve_analysis_table_paths(
-        tables_root,
-        final_name="composition.parquet",
-        part_glob="composition_part-*.parquet",
-    )
-    frames = [_read_composition_parquet(path, columns=columns) for path in composition_paths]
-    frame = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
-    if {"solution_id", "placement_index"}.issubset(set(frame.columns)):
-        frame = frame.drop_duplicates(subset=["solution_id", "placement_index"], keep="last", ignore_index=True)
-    return frame
-
-
-def _is_missing_composition_artifact_error(exc: Exception) -> bool:
-    message = str(exc).strip().lower()
-    return "composition.parquet not found:" in message
-
-
-def _recover_composition_from_output_records(
-    dense_arrays_df: pd.DataFrame,
-    *,
-    columns: Iterable[str] | None = None,
-) -> pd.DataFrame:
-    required = {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"}
-    missing = required - set(dense_arrays_df.columns)
-    if missing:
-        raise ValueError(
-            f"Output records are missing the columns required to recover composition data: {sorted(missing)}"
-        )
-    rows: list[dict[str, object]] = []
-    for _, row in dense_arrays_df.iterrows():
-        solution_id = str(row.get("id") or "").strip()
-        input_name = str(row.get("densegen__input_name") or "").strip()
-        plan_name = str(row.get("densegen__plan") or "").strip()
-        if not solution_id or not input_name or not plan_name:
-            raise ValueError(
-                "Output records are missing id/input_name/plan metadata required for composition recovery."
-            )
-        library_hash = str(row.get("densegen__sampling_library_hash") or "").strip() or None
-        library_index = row.get("densegen__sampling_library_index")
-        for item in _require_list_of_dicts(row.get("densegen__used_tfbs_detail")):
-            part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
-            if part_kind != "tfbs":
-                continue
-            tf = str(item.get("regulator") or "").strip()
-            tfbs = str(item.get("sequence") or "").strip()
-            if not tf or not tfbs:
-                continue
-            rows.append(
-                {
-                    "solution_id": solution_id,
-                    "input_name": input_name,
-                    "plan_name": plan_name,
-                    "library_hash": library_hash,
-                    "library_index": library_index,
-                    "part_kind": "tfbs",
-                    "tf": tf,
-                    "tfbs": tfbs,
-                    "regulator": tf,
-                    "sequence": tfbs,
-                    "offset": item.get("offset"),
-                    "offset_raw": item.get("offset_raw"),
-                    "length": item.get("length"),
-                    "end": item.get("end"),
-                    "orientation": item.get("orientation"),
-                    "source": item.get("source"),
-                    "motif_id": item.get("motif_id"),
-                    "tfbs_id": item.get("tfbs_id"),
-                    "site_id": item.get("site_id"),
-                }
-            )
-    if not rows:
-        raise ValueError("Output records include no TFBS placement annotations to recover composition data.")
-    recovered = pd.DataFrame(rows)
-    requested = _read_columns(columns)
-    if requested is None:
-        return recovered
-    missing_requested = sorted(set(requested) - set(recovered.columns))
-    if missing_requested:
-        raise ValueError(f"Recovered composition data is missing required columns: {missing_requested}")
-    return recovered[requested].copy()
-
-
-def _maybe_load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame | None:
-    tables_root = run_root / "outputs" / "tables"
-    final_path = tables_root / "composition.parquet"
-    part_paths = sorted(tables_root.glob("composition_part-*.parquet"))
-    if not final_path.exists() and not part_paths:
-        return None
-    return _load_composition(run_root, columns=columns)
-
-
-def _load_libraries(
-    run_root: Path,
-    *,
-    builds_columns: Iterable[str] | None = None,
-    members_columns: Iterable[str] | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    libs_dir = run_root / "outputs" / "libraries"
-    builds_path = libs_dir / "library_builds.parquet"
-    members_path = libs_dir / "library_members.parquet"
-    if not builds_path.exists():
-        raise ValueError(f"library_builds.parquet not found: {builds_path}")
-    if not members_path.exists():
-        raise ValueError(f"library_members.parquet not found: {members_path}")
-    return (
-        pd.read_parquet(builds_path, columns=_read_columns(builds_columns)),
-        pd.read_parquet(members_path, columns=_read_columns(members_columns)),
-    )
-
-
-def _maybe_load_libraries(
-    run_root: Path,
-    *,
-    builds_columns: Iterable[str] | None = None,
-    members_columns: Iterable[str] | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame] | None:
-    libs_dir = run_root / "outputs" / "libraries"
-    builds_path = libs_dir / "library_builds.parquet"
-    members_path = libs_dir / "library_members.parquet"
-    if not builds_path.exists() or not members_path.exists():
-        return None
-    return (
-        pd.read_parquet(builds_path, columns=_read_columns(builds_columns)),
-        pd.read_parquet(members_path, columns=_read_columns(members_columns)),
-    )
-
-
-def _load_effective_config(run_root: Path) -> dict:
-    path = run_root / "outputs" / "meta" / "effective_config.json"
-    if not path.exists():
-        raise ValueError(f"effective_config.json not found: {path}")
-    return json.loads(path.read_text())
-
-
-def _model_to_dict(model: object) -> dict:
-    if hasattr(model, "model_dump"):
-        return dict(model.model_dump(mode="python", exclude_none=True))
-    if hasattr(model, "dict"):
-        return dict(model.dict(exclude_none=True))
-    raise TypeError("DenseGen config model does not support dict export for plotting fallback.")
-
-
-def _root_config_to_dict(root_cfg: RootConfig) -> dict:
-    return {"config": _model_to_dict(root_cfg.densegen)}
-
-
-def _load_dense_arrays(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
-    path = run_root / "outputs" / "tables" / "records.parquet"
-    if path.exists():
-        return pd.read_parquet(path, columns=_read_columns(columns))
-    raise ValueError(f"records.parquet not found: {path}")
-
-
 _PLOT_FNS = {
-    "dataset_source_inventory": plot_dataset_source_inventory,
-    "dataset_metadata_heatmap": plot_dataset_metadata_heatmap,
-    "dense_array_video_showcase": plot_dense_array_video_showcase,
-    "placement_map": plot_placement_map,
-    "tfbs_usage": plot_tfbs_usage,
-    "run_health": plot_run_health,
-    "stage_a_summary": plot_stage_a_summary,
+    "attempt_outcome_timeline": plot_attempt_outcome_timeline,
+    "background_sequence_logo": plot_background_sequence_logo,
+    "compression_ratio_by_plan": plot_compression_ratio_by_plan,
+    "dense_array_showcase_video": plot_dense_array_video_showcase,
+    "plan_regulator_deployment_heatmap": plot_plan_regulator_deployment_heatmap,
+    "placement_occupancy_map": plot_placement_occupancy_map,
+    "retained_pool_coverage_by_regulator": plot_retained_pool_coverage_by_regulator,
+    "retained_vs_deployed_length_mix_by_regulator": plot_retained_vs_deployed_length_mix_by_regulator,
+    "retained_vs_deployed_tier_mix_by_regulator": plot_retained_vs_deployed_tier_mix_by_regulator,
+    "score_strata_and_deployed_length_bridge": plot_score_strata_and_deployed_length_bridge,
+    "solve_pressure_and_progress": plot_solve_pressure_and_progress,
+    "source_cohort_concentration": plot_source_cohort_concentration,
+    "source_plan_input_heatmap": plot_source_plan_input_heatmap,
+    "stage_a_pool_diversity": plot_stage_a_pool_diversity,
+    "stage_a_pool_score_strata": plot_stage_a_pool_score_strata,
+    "stage_a_sampling_yield": plot_stage_a_sampling_yield,
+    "tfbs_concentration_profile": plot_tfbs_concentration_profile,
+    "upstream_motif_supply_and_pwm_strength": plot_upstream_motif_supply_and_pwm_strength,
 }
 
 AVAILABLE_PLOTS: Dict[str, Dict[str, object]] = {}
@@ -452,13 +269,24 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
-    "dataset_source_inventory": {"max_sources"},
-    "dataset_metadata_heatmap": {"max_sources", "max_plans", "max_inputs"},
-    "dense_array_video_showcase": set(),
-    "placement_map": {"occupancy_alpha", "occupancy_max_categories", "scope", "max_plans", "drilldown_plans"},
-    "tfbs_usage": {"scope", "max_plans", "drilldown_plans"},
-    "run_health": set(),
-    "stage_a_summary": set(),
+    "attempt_outcome_timeline": set(),
+    "background_sequence_logo": set(),
+    "compression_ratio_by_plan": set(),
+    "dense_array_showcase_video": set(),
+    "plan_regulator_deployment_heatmap": set(),
+    "placement_occupancy_map": {"occupancy_alpha", "occupancy_max_categories", "scope", "max_plans", "drilldown_plans"},
+    "retained_pool_coverage_by_regulator": set(),
+    "retained_vs_deployed_length_mix_by_regulator": set(),
+    "retained_vs_deployed_tier_mix_by_regulator": set(),
+    "score_strata_and_deployed_length_bridge": set(),
+    "solve_pressure_and_progress": set(),
+    "source_cohort_concentration": {"max_sources"},
+    "source_plan_input_heatmap": {"max_sources", "max_plans", "max_inputs"},
+    "stage_a_pool_diversity": set(),
+    "stage_a_pool_score_strata": set(),
+    "stage_a_sampling_yield": set(),
+    "tfbs_concentration_profile": {"scope", "max_plans", "drilldown_plans"},
+    "upstream_motif_supply_and_pwm_strength": set(),
 }
 
 
@@ -529,6 +357,34 @@ def _clean_selected_plot_files(out_dir: Path, *, subdir: str, plot_ids: Iterable
         target.rmdir()
 
 
+def _clean_selected_stage_b_outputs(out_dir: Path, *, plot_ids: Iterable[str]) -> None:
+    target = out_dir / "stage_b"
+    if not target.exists():
+        return
+    selected = {str(plot_id).strip() for plot_id in plot_ids if str(plot_id).strip()}
+    if not selected:
+        return
+    for path in sorted(target.rglob("*"), reverse=True):
+        if not path.is_file():
+            continue
+        rel_path = str(path.relative_to(out_dir))
+        if not _is_supported_plot_path(rel_path):
+            continue
+        try:
+            record = resolve_plot_record(plot_root=out_dir, plot_path=path)
+        except Exception:
+            continue
+        plot_id = str(record.get("plot_id") or record.get("visual_plot_type") or "").strip()
+        if plot_id not in selected:
+            continue
+        path.unlink(missing_ok=True)
+    for directory in sorted(target.rglob("*"), reverse=True):
+        if directory.is_dir() and not any(directory.iterdir()):
+            directory.rmdir()
+    if target.exists() and not any(target.iterdir()):
+        target.rmdir()
+
+
 def _plot_required_sources(selected: Iterable[str]) -> set[str]:
     sources: set[str] = set()
     for name in selected:
@@ -542,35 +398,85 @@ def _plot_required_sources(selected: Iterable[str]) -> set[str]:
 
 
 _OUTPUT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "dataset_source_inventory": {"source", "densegen__plan", "densegen__input_name"},
-    "dataset_metadata_heatmap": {"source", "densegen__plan", "densegen__input_name"},
-    "dense_array_video_showcase": {"id", "sequence", "densegen__plan", "densegen__used_tfbs_detail"},
-    "placement_map": {"id", "sequence", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
-    "run_health": {"densegen__compression_ratio", "densegen__plan"},
+    "compression_ratio_by_plan": {"densegen__compression_ratio", "densegen__plan"},
+    "dense_array_showcase_video": {"id", "sequence", "densegen__plan", "densegen__used_tfbs_detail"},
+    "plan_regulator_deployment_heatmap": {"densegen__plan", "densegen__used_tfbs_detail"},
+    "placement_occupancy_map": {
+        "id",
+        "sequence",
+        "densegen__input_name",
+        "densegen__plan",
+        "densegen__used_tfbs_detail",
+    },
+    "retained_pool_coverage_by_regulator": {"densegen__plan", "densegen__used_tfbs_detail"},
+    "retained_vs_deployed_length_mix_by_regulator": {"densegen__plan", "densegen__used_tfbs_detail"},
+    "retained_vs_deployed_tier_mix_by_regulator": {"densegen__plan", "densegen__used_tfbs_detail"},
+    "score_strata_and_deployed_length_bridge": {"densegen__plan", "densegen__used_tfbs_detail"},
+    "source_cohort_concentration": {"source", "densegen__plan", "densegen__input_name"},
+    "source_plan_input_heatmap": {"source", "densegen__plan", "densegen__input_name"},
 }
 _COMPOSITION_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "placement_map": {"solution_id", "input_name", "plan_name", "tf", "tfbs", "offset", "length", "end"},
-    "tfbs_usage": {"input_name", "plan_name", "tf", "tfbs"},
-    "run_health": {"input_name", "plan_name", "tf", "tfbs", "length"},
+    "placement_occupancy_map": {"solution_id", "input_name", "plan_name", "tf", "tfbs", "offset", "length", "end"},
+    "tfbs_concentration_profile": {"input_name", "plan_name", "tf", "tfbs"},
 }
 _ATTEMPT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "run_health": {"status", "reason", "plan_name", "created_at", "detail_json"},
+    "attempt_outcome_timeline": {"status", "reason", "plan_name", "created_at", "detail_json"},
+    "solve_pressure_and_progress": {"status", "reason", "plan_name", "created_at", "detail_json"},
 }
 _LIBRARY_BUILDS_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "placement_map": {"library_index", "library_hash", "input_name", "plan_name"},
-    "tfbs_usage": {"library_index", "library_hash", "input_name", "plan_name"},
-    "run_health": {"library_index", "library_hash", "input_name", "plan_name"},
+    "placement_occupancy_map": {"library_index", "library_hash", "input_name", "plan_name"},
+    "tfbs_concentration_profile": {"library_index", "library_hash", "input_name", "plan_name"},
 }
 _LIBRARY_MEMBERS_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "placement_map": {"input_name", "plan_name", "tf", "tfbs"},
-    "tfbs_usage": {"input_name", "plan_name", "tf", "tfbs"},
-    "run_health": {"input_name", "plan_name", "tf", "tfbs"},
+    "placement_occupancy_map": {"input_name", "plan_name", "tf", "tfbs"},
+    "tfbs_concentration_profile": {"input_name", "plan_name", "tf", "tfbs"},
 }
 _DENSE_ARRAY_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "placement_map": {"id", "sequence", "densegen__input_name", "densegen__plan"},
+    "placement_occupancy_map": {"id", "sequence", "densegen__input_name", "densegen__plan"},
 }
 _POOL_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "stage_a_summary": {
+    "background_sequence_logo": {
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "sequence",
+    },
+    "retained_pool_coverage_by_regulator": {
+        "input_name",
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tier",
+    },
+    "retained_vs_deployed_length_mix_by_regulator": {
+        "input_name",
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tier",
+    },
+    "retained_vs_deployed_tier_mix_by_regulator": {
+        "input_name",
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tier",
+    },
+    "score_strata_and_deployed_length_bridge": {
+        "input_name",
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tfbs_core",
+        "best_hit_score",
+        "tier",
+    },
+    "stage_a_pool_diversity": {
         "tf",
         "regulator_id",
         "tfbs",
@@ -582,12 +488,45 @@ _POOL_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
         "selection_score_norm",
         "nearest_selected_distance_norm",
         "selection_rank",
-    }
+    },
+    "stage_a_pool_score_strata": {
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tfbs_core",
+        "sequence",
+        "best_hit_score",
+        "tier",
+        "selection_score_norm",
+        "nearest_selected_distance_norm",
+        "selection_rank",
+    },
+    "stage_a_sampling_yield": {
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tfbs_core",
+        "sequence",
+        "best_hit_score",
+        "tier",
+        "selection_score_norm",
+        "nearest_selected_distance_norm",
+        "selection_rank",
+    },
+    "upstream_motif_supply_and_pwm_strength": {
+        "input_name",
+        "tf",
+        "regulator_id",
+        "tfbs",
+        "tfbs_sequence",
+        "tier",
+    },
 }
 _COMPOSITION_RECOVERY_OUTPUT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
-    "placement_map": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
-    "tfbs_usage": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
-    "run_health": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
+    "placement_occupancy_map": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
+    "tfbs_concentration_profile": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
 }
 
 
@@ -634,13 +573,18 @@ def _cleanup_legacy_flat_outputs(out_dir: Path, selected: Iterable[str], plot_fo
             continue
         stem = path.stem
         remove = False
-        if "stage_a_summary" in selected_set and stem.startswith("stage_a_summary__"):
+        if {
+            "background_sequence_logo",
+            "stage_a_pool_diversity",
+            "stage_a_pool_score_strata",
+            "stage_a_sampling_yield",
+        } & selected_set and stem.startswith("stage_a_"):
             remove = True
-        elif "placement_map" in selected_set and stem.startswith("placement_map__"):
+        elif "placement_occupancy_map" in selected_set and stem.startswith("placement_"):
             remove = True
-        elif "tfbs_usage" in selected_set and stem.startswith("tfbs_usage__"):
+        elif "tfbs_concentration_profile" in selected_set and stem.startswith("tfbs_"):
             remove = True
-        elif "run_health" in selected_set and stem == "run_health":
+        elif {"attempt_outcome_timeline", "solve_pressure_and_progress", "compression_ratio_by_plan"} & selected_set:
             remove = True
         if remove:
             path.unlink(missing_ok=True)
@@ -768,21 +712,28 @@ def run_plots_from_config(
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
     plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "pdf"
-    default_list = plots_cfg.default if (plots_cfg and plots_cfg.default) else ["stage_a_summary", "placement_map"]
-    if (
-        only is None
-        and plots_cfg is not None
-        and bool(plots_cfg.video.enabled)
-        and "dense_array_video_showcase" not in set(default_list)
-    ):
-        default_list = [*list(default_list), "dense_array_video_showcase"]
+    default_list = (
+        plots_cfg.default
+        if (plots_cfg and plots_cfg.default)
+        else ["stage_a_sampling_yield", "placement_occupancy_map"]
+    )
     selected = _resolve_selected_plot_names(only=only, default_list=list(default_list))
     options = plots_cfg.options if plots_cfg else {}
     global_style = plots_cfg.style if plots_cfg else {}
     _cleanup_legacy_flat_outputs(out_dir, selected, plot_format)
-    if "placement_map" in selected or "tfbs_usage" in selected:
-        _clean_plot_subdir(out_dir, "stage_b")
-    dataset_plots = [name for name in selected if name in {"dataset_source_inventory", "dataset_metadata_heatmap"}]
+    stage_b_selected = [
+        name
+        for name in selected
+        if name
+        in {
+            "dense_array_showcase_video",
+            "placement_occupancy_map",
+            "tfbs_concentration_profile",
+        }
+    ]
+    if stage_b_selected:
+        _clean_selected_stage_b_outputs(out_dir, plot_ids=stage_b_selected)
+    dataset_plots = [name for name in selected if name in {"source_cohort_concentration", "source_plan_input_heatmap"}]
     if dataset_plots:
         _clean_selected_plot_files(out_dir, subdir="dataset", plot_ids=dataset_plots)
     required_sources = _plot_required_sources(selected)
@@ -821,6 +772,7 @@ def run_plots_from_config(
                 columns=cols,
                 max_rows=max_rows,
                 allow_truncated=allow_truncated_records,
+                normalize_used_tfbs_detail=False,
             )
             src_label = _format_source_label(src_label, run_root, absolute)
             row_count = len(df)
@@ -841,6 +793,7 @@ def run_plots_from_config(
                         columns=recovery_cols,
                         max_rows=max_rows,
                         allow_truncated=allow_truncated_records,
+                        normalize_used_tfbs_detail=False,
                     )
                     src_label = _format_source_label(src_label, run_root, absolute)
                     row_count = len(df)
@@ -912,7 +865,7 @@ def run_plots_from_config(
                 src_label = _format_source_label(f"pools:{run_root / 'outputs' / 'pools'}", run_root, absolute)
         except Exception as exc:
             source_errors["pools"] = exc
-    if "tfbs_usage" in selected and library_members_df is None:
+    if "tfbs_concentration_profile" in selected and library_members_df is None:
         libs = _maybe_load_libraries(
             run_root,
             builds_columns=library_build_cols,
@@ -964,7 +917,7 @@ def run_plots_from_config(
 
         # drop unknown/retired options (e.g., promoter_scan_revcomp)
         kwargs = _filter_kwargs(name, raw)
-        if name in {"placement_map", "tfbs_usage"}:
+        if name in {"placement_occupancy_map", "tfbs_concentration_profile"}:
             scope_options = _parse_stage_b_scope_options(kwargs)
             kwargs.pop("scope", None)
             kwargs.pop("max_plans", None)
@@ -976,9 +929,13 @@ def run_plots_from_config(
         try:
             if plot_source_error is not None:
                 raise plot_source_error
-            if name == "dense_array_video_showcase":
+            if name == "dense_array_showcase_video":
                 if plots_cfg is None:
-                    raise ValueError("dense_array_video_showcase requires plots.video configuration.")
+                    raise ValueError("dense_array_showcase_video requires plots.video configuration.")
+                if not bool(plots_cfg.video.enabled):
+                    raise ValueError(
+                        "dense_array_showcase_video requires plots.video.enabled: true when explicitly selected."
+                    )
                 result = fn(
                     df,
                     out_path,
@@ -986,7 +943,7 @@ def run_plots_from_config(
                     workspace_name=cfg_path.parent.name,
                     **kwargs,
                 )
-            elif name == "placement_map":
+            elif name == "placement_occupancy_map":
                 placement_dense_arrays_df = dense_arrays_df if dense_arrays_df is not None else df
                 plan_names = (
                     placement_dense_arrays_df["densegen__plan"].astype(str).dropna().unique().tolist()
@@ -1053,7 +1010,7 @@ def run_plots_from_config(
                         cfg=cfg_effective,
                         **kwargs,
                     )
-            elif name == "tfbs_usage":
+            elif name == "tfbs_concentration_profile":
                 plan_names = (
                     composition_df["plan_name"].astype(str).dropna().unique().tolist()
                     if composition_df is not None and "plan_name" in composition_df.columns
@@ -1113,20 +1070,52 @@ def run_plots_from_config(
                         library_members_df=library_members_df,
                         **kwargs,
                     )
-            elif name == "run_health":
+            elif name in {"attempt_outcome_timeline", "solve_pressure_and_progress"}:
                 result = fn(
                     df,
                     out_path,
                     style=style,
                     attempts_df=attempts_df,
-                    composition_df=composition_df,
-                    library_members_df=library_members_df,
                     events_df=events_df,
                     cfg=cfg_effective,
                     **kwargs,
                 )
-            elif name == "stage_a_summary":
-                result = fn(df, out_path, style=style, pools=pools, pool_manifest=pool_manifest, **kwargs)
+            elif name == "compression_ratio_by_plan":
+                result = fn(
+                    df,
+                    out_path,
+                    style=style,
+                    **kwargs,
+                )
+            elif name in {
+                "retained_pool_coverage_by_regulator",
+                "retained_vs_deployed_length_mix_by_regulator",
+                "retained_vs_deployed_tier_mix_by_regulator",
+                "score_strata_and_deployed_length_bridge",
+                "upstream_motif_supply_and_pwm_strength",
+            }:
+                result = fn(
+                    df,
+                    out_path,
+                    style=style,
+                    pools=pools,
+                    pool_manifest=pool_manifest,
+                    **kwargs,
+                )
+            elif name in {
+                "background_sequence_logo",
+                "stage_a_pool_diversity",
+                "stage_a_pool_score_strata",
+                "stage_a_sampling_yield",
+            }:
+                result = fn(
+                    df,
+                    out_path,
+                    style=style,
+                    pools=pools,
+                    pool_manifest=pool_manifest,
+                    **kwargs,
+                )
             else:
                 result = fn(df, out_path, style=style, **kwargs)
             if result is None:
@@ -1146,11 +1135,20 @@ def run_plots_from_config(
             for path in paths:
                 rel_path = path.relative_to(out_dir)
                 manifest_fields = manifest_path_fields(name, rel_path)
+                text_contract = build_plot_text_contract(
+                    name,
+                    variant=str(manifest_fields.get("variant") or ""),
+                    plan_name=str(manifest_fields.get("plan_name") or ""),
+                    input_name=str(manifest_fields.get("input_name") or ""),
+                )
                 manifest_entries.append(
                     {
                         "name": name,
                         "path": str(rel_path),
-                        "description": AVAILABLE_PLOTS[name]["description"],
+                        "title": text_contract["title"],
+                        "description": text_contract["description"] or AVAILABLE_PLOTS[name]["description"],
+                        "caption": text_contract["caption"],
+                        "alt_text": text_contract["alt_text"],
                         "figsize": list(style.get("figsize", [])) if style.get("figsize") else None,
                         "generated_at": created_at,
                         "source": str(source),

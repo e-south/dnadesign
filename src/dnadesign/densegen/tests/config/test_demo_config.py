@@ -20,6 +20,7 @@ import yaml
 from dnadesign.densegen.src.adapters.sources.base import resolve_path
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.config.base import LATEST_SCHEMA_VERSION
+from dnadesign.densegen.src.viz.plot_inventory import notebook_visible_plot_ids
 
 PACKAGED_WORKSPACE_IDS = (
     "demo_tfbs_baseline",
@@ -79,12 +80,12 @@ def test_demo_artifacts_present() -> None:
     assert not missing, f"Missing demo artifacts: {missing}"
 
 
-def test_demo_sampling_baseline_default_plots_cover_core_diagnostics() -> None:
+def test_demo_sampling_baseline_default_plots_cover_full_notebook_surface() -> None:
     cfg_path = _demo_config_path("demo_sampling_baseline")
     cfg = load_config(cfg_path)
     plots = cfg.root.plots
     assert plots is not None
-    assert list(plots.default or []) == ["stage_a_summary", "placement_map", "run_health", "tfbs_usage"]
+    assert list(plots.default or []) == notebook_visible_plot_ids()
 
 
 def test_demo_sampling_baseline_uses_background_and_plan_specific_sigma70_spacers() -> None:
@@ -511,19 +512,13 @@ def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None
     assert runtime.max_consecutive_no_progress_resamples >= 1
 
 
-def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() -> None:
+def test_packaged_workspace_plot_defaults_cover_full_notebook_surface() -> None:
+    expected_notebook_surface = set(notebook_visible_plot_ids())
     expected_defaults = {
-        "demo_tfbs_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "demo_sampling_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "study_constitutive_sigma_panel": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "study_stress_ethanol_cipro": {
-            "dataset_source_inventory",
-            "dataset_metadata_heatmap",
-            "stage_a_summary",
-            "placement_map",
-            "run_health",
-            "tfbs_usage",
-        },
+        "demo_tfbs_baseline": expected_notebook_surface,
+        "demo_sampling_baseline": expected_notebook_surface,
+        "study_constitutive_sigma_panel": expected_notebook_surface,
+        "study_stress_ethanol_cipro": expected_notebook_surface,
     }
     for workspace_id, expected in expected_defaults.items():
         cfg = load_config(_demo_config_path(workspace_id))
@@ -532,11 +527,11 @@ def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() ->
         assert set(plots.default) == expected
 
 
-def test_study_stress_ethanol_cipro_disables_default_video_for_read_only_analysis() -> None:
+def test_study_stress_ethanol_cipro_retains_opt_in_video_configuration() -> None:
     cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
     plots = cfg.root.plots
     assert plots is not None
-    assert plots.video.enabled is False
+    assert plots.video.enabled is True
 
 
 def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
@@ -544,12 +539,19 @@ def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
         cfg = load_config(_demo_config_path(workspace_id))
         plots = cfg.root.plots
         assert plots is not None
-        placement_opts = dict((plots.options or {}).get("placement_map") or {})
-        tfbs_opts = dict((plots.options or {}).get("tfbs_usage") or {})
+        placement_opts = dict((plots.options or {}).get("placement_occupancy_map") or {})
+        tfbs_opts = dict((plots.options or {}).get("tfbs_concentration_profile") or {})
         assert placement_opts.get("scope") == "auto"
         assert int(placement_opts.get("max_plans", 0)) == 12
         assert tfbs_opts.get("scope") == "auto"
         assert int(tfbs_opts.get("max_plans", 0)) == 12
+
+
+def test_stress_study_defaults_match_full_notebook_surface() -> None:
+    stress_cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
+    stress_plots = stress_cfg.root.plots
+    assert stress_plots is not None
+    assert stress_plots.default == notebook_visible_plot_ids()
 
 
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:

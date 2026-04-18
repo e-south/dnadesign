@@ -17,18 +17,29 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import colors as mcolors
 from matplotlib import ticker as mticker
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
-from .plot_common import _apply_style, _palette, _save_figure, _stage_b_plan_output_dir, _style, plan_group_from_name
+from .plot_common import (
+    _apply_style,
+    _palette,
+    _save_figure,
+    _stage_b_plan_output_dir,
+    _style,
+    plan_group_from_name,
+)
 from .plot_run_helpers import (
-    _bin_attempts,
     _ellipsize,
     _first_existing_column,
     _humanize_scope_label,
     _normalize_plan_name,
     _usage_available_unique,
     _usage_category_label,
+    compact_plan_label,
+    compact_regulator_label,
+    order_regulators_for_display,
 )
 
 
@@ -40,6 +51,119 @@ def _capitalize_first(text: str) -> str:
     return token
 
 
+def _stable_seed(token: str) -> int:
+    return sum((idx + 1) * ord(char) for idx, char in enumerate(str(token))) % (2**32)
+
+
+def _stable_subsample(values: np.ndarray, *, token: str, max_points: int | None) -> np.ndarray:
+    if max_points is None or int(max_points) <= 0 or values.size <= int(max_points):
+        return values
+    rng = np.random.default_rng(_stable_seed(token))
+    indices = np.sort(rng.choice(values.size, size=int(max_points), replace=False))
+    return values[indices]
+
+
+def _mix_with_white(color: object, *, fraction: float) -> tuple[float, float, float]:
+    rgb = np.asarray(mcolors.to_rgb(color), dtype=float)
+    weight = min(1.0, max(0.0, float(fraction)))
+    mixed = rgb + (1.0 - rgb) * weight
+    return tuple(float(value) for value in mixed)
+
+
+def _progressive_regulator_shades(base_color: object, n_values: int) -> list[tuple[float, float, float]]:
+    if int(n_values) <= 1:
+        return [_mix_with_white(base_color, fraction=0.34)]
+    fractions = np.linspace(0.62, 0.18, int(n_values))
+    return [_mix_with_white(base_color, fraction=float(value)) for value in fractions.tolist()]
+
+
+def _style_deemphasized_boxplot(boxplot: dict[str, list], *, colors: list[object]) -> None:
+    for box, color in zip(boxplot.get("boxes", []), colors, strict=False):
+        box.set(
+            facecolor=_mix_with_white(color, fraction=0.68),
+            edgecolor="#8d98a5",
+            linewidth=0.95,
+            alpha=0.64,
+            zorder=1.0,
+        )
+    for median in boxplot.get("medians", []):
+        median.set(color="#4a5564", linewidth=1.25, zorder=1.4)
+    for whisker, color in zip(boxplot.get("whiskers", []), np.repeat(colors, 2), strict=False):
+        whisker.set(color=_mix_with_white(color, fraction=0.5), linewidth=0.95, alpha=0.76, zorder=1.2)
+    for cap, color in zip(boxplot.get("caps", []), np.repeat(colors, 2), strict=False):
+        cap.set(color=_mix_with_white(color, fraction=0.5), linewidth=0.95, alpha=0.76, zorder=1.2)
+    for flier in boxplot.get("fliers", []):
+        flier.set(alpha=0.0, markersize=0.0)
+
+
+def _draw_category_box_and_jitter(
+    ax: plt.Axes,
+    *,
+    categories: list[str],
+    values_by_category: dict[str, np.ndarray],
+    colors_by_category: dict[str, object],
+    positions: np.ndarray,
+    orientation: str,
+    jitter_width: float,
+    max_points_per_category: int | None = None,
+    rasterized: bool = False,
+) -> None:
+    non_empty_categories = [category for category in categories if values_by_category[category].size > 0]
+    if not non_empty_categories:
+        raise ValueError("box-and-jitter plot requires at least one non-empty category.")
+    boxplot = ax.boxplot(
+        [values_by_category[category].tolist() for category in non_empty_categories],
+        positions=[float(positions[categories.index(category)]) for category in non_empty_categories],
+        widths=0.54,
+        patch_artist=True,
+        showfliers=False,
+        manage_ticks=False,
+        orientation=orientation,
+    )
+    _style_deemphasized_boxplot(
+        boxplot,
+        colors=[colors_by_category[category] for category in non_empty_categories],
+    )
+    for category, position in zip(categories, positions.tolist(), strict=False):
+        values = _stable_subsample(
+            values_by_category[category],
+            token=category,
+            max_points=max_points_per_category,
+        )
+        if values.size == 0:
+            continue
+        jitter = np.random.default_rng(_stable_seed(category)).uniform(
+            -float(jitter_width),
+            float(jitter_width),
+            size=int(values.size),
+        )
+        color = _mix_with_white(colors_by_category[category], fraction=0.35)
+        if orientation == "vertical":
+            ax.scatter(
+                np.full(values.size, float(position)) + jitter,
+                values,
+                s=22.0,
+                color=color,
+                alpha=0.58,
+                edgecolors="white",
+                linewidths=0.28,
+                zorder=3.0,
+                rasterized=rasterized,
+            )
+        else:
+            ax.scatter(
+                values,
+                np.full(values.size, float(position)) + jitter,
+                s=22.0,
+                color=color,
+                alpha=0.58,
+                edgecolors="white",
+                linewidths=0.28,
+                zorder=3.0,
+                rasterized=rasterized,
+            )
+
+
 def _build_tfbs_usage_breakdown_figure(
     composition_df: pd.DataFrame,
     *,
@@ -48,6 +172,7 @@ def _build_tfbs_usage_breakdown_figure(
     style: Optional[dict] = None,
     pools: dict[str, pd.DataFrame] | None = None,
     library_members_df: pd.DataFrame | None = None,
+    plot_label: str = "tfbs_concentration_profile",
 ) -> tuple[plt.Figure, dict[str, plt.Axes]]:
     style = _style(style)
     sub = composition_df[
@@ -55,11 +180,11 @@ def _build_tfbs_usage_breakdown_figure(
         & (composition_df["plan_name"].astype(str) == str(plan_name))
     ].copy()
     if sub.empty:
-        raise ValueError(f"tfbs_usage found no placements for {input_name}/{plan_name}.")
+        raise ValueError(f"{plot_label} found no placements for {input_name}/{plan_name}.")
     sub["category_label"] = sub["tf"].map(_usage_category_label)
     sub = sub[sub["category_label"].astype(str).str.strip() != ""].copy()
     if sub.empty:
-        raise ValueError(f"tfbs_usage found no regulator TFBS counts for {input_name}/{plan_name}.")
+        raise ValueError(f"{plot_label} found no regulator TFBS counts for {input_name}/{plan_name}.")
     sub["tfbs"] = sub["tfbs"].astype(str)
     counts = (
         sub.groupby(["category_label", "tfbs"])
@@ -69,7 +194,7 @@ def _build_tfbs_usage_breakdown_figure(
         .reset_index(drop=True)
     )
     if counts.empty:
-        raise ValueError(f"tfbs_usage found no TFBS counts for {input_name}/{plan_name}.")
+        raise ValueError(f"{plot_label} found no TFBS counts for {input_name}/{plan_name}.")
 
     total = float(counts["count"].sum())
     counts = counts.copy()
@@ -277,9 +402,10 @@ def plot_tfbs_usage(
     style: Optional[dict] = None,
     plan_col: str = "plan_name",
     input_col: str = "input_name",
+    plot_label: str = "tfbs_concentration_profile",
 ) -> list[Path]:
     if composition_df is None or composition_df.empty:
-        raise ValueError("tfbs_usage requires composition.parquet with placements.")
+        raise ValueError(f"{plot_label} requires composition.parquet with placements.")
     plan_col = str(plan_col or "").strip() or "plan_name"
     input_col = str(input_col or "").strip() or "input_name"
     required = {input_col, plan_col, "tf", "tfbs"}
@@ -301,6 +427,7 @@ def plot_tfbs_usage(
             style=style,
             pools=pools,
             library_members_df=library_members_df,
+            plot_label=plot_label,
         )
         target_dir = _stage_b_plan_output_dir(out_path, input_name=str(input_name), plan_name=str(plan_name))
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -331,7 +458,13 @@ def _build_run_health_compression_ratio_figure(
     )
     frame = dense_arrays_df[[ratio_col, plan_col]].copy()
     frame[ratio_col] = pd.to_numeric(frame[ratio_col], errors="coerce")
-    frame[plan_col] = frame[plan_col].map(_normalize_plan_name).fillna("all plans")
+    plan_values = frame[plan_col].astype("object")
+    normalized_plan_lookup = {
+        raw_value: normalized_value
+        for raw_value in pd.unique(plan_values)
+        if (normalized_value := _normalize_plan_name(raw_value)) is not None
+    }
+    frame[plan_col] = plan_values.map(normalized_plan_lookup).fillna("all plans")
     frame = frame.dropna(subset=[ratio_col]).reset_index(drop=True)
     if frame.empty:
         raise ValueError("run_health compression_ratio_distribution found no numeric compression_ratio values.")
@@ -342,65 +475,66 @@ def _build_run_health_compression_ratio_figure(
         legend_max = 14
     by_plan_group = False
     if int(frame[plan_col].nunique(dropna=True)) > int(legend_max):
-        grouped = frame[plan_col].astype(str).map(plan_group_from_name)
+        grouped_lookup = {
+            str(plan_name): plan_group_from_name(plan_name) for plan_name in pd.unique(frame[plan_col].astype(str))
+        }
+        grouped = frame[plan_col].astype(str).map(grouped_lookup)
         if int(grouped.nunique(dropna=True)) < int(frame[plan_col].nunique(dropna=True)):
             frame = frame.assign(__plan_group=grouped)
             plan_col = "__plan_group"
             by_plan_group = True
     plan_counts = frame.groupby(plan_col)[ratio_col].size().sort_values(ascending=False)
     plan_names = [str(name) for name in plan_counts.index.tolist()]
-    labeled_plans = set(plan_names[:legend_max])
     fig_size = style.get("run_health_compression_figsize")
     if fig_size is None:
-        fig_size = (7.2, 4.0)
+        side = max(6.2, min(9.8, 4.8 + 0.24 * float(len(plan_names))))
+        fig_size = (side, side)
     fig, ax = plt.subplots(
         figsize=(float(fig_size[0]), float(fig_size[1])),
         constrained_layout=False,
     )
-    values = frame[ratio_col].to_numpy(dtype=float)
-    bins = max(8, min(42, int(np.ceil(np.sqrt(values.size) * 2.0))))
-    edges, _centers = _bin_attempts(values, bins=bins)
     palette = _palette(style, max(1, len(plan_names)))
-    for idx, plan in enumerate(plan_names):
-        plan_values = frame.loc[frame[plan_col].astype(str) == plan, ratio_col].to_numpy(dtype=float)
-        if plan_values.size == 0:
-            continue
-        ax.hist(
-            plan_values,
-            bins=edges,
-            alpha=0.45,
-            color=palette[idx],
-            edgecolor="white",
-            linewidth=0.55,
-            label=(f"{_ellipsize(plan, max_len=24)} (n={plan_values.size})" if plan in labeled_plans else None),
-        )
-    ax.set_xlabel("Compression ratio")
-    ax.set_ylabel("Count")
-    if by_plan_group:
-        ax.set_title("Compression ratio distribution by plan group")
-    else:
-        ax.set_title("Compression ratio distribution by plan")
-    legend_ncol = 1
-    ax.legend(
-        loc="center left",
-        bbox_to_anchor=(1.02, 0.5),
-        frameon=False,
-        ncol=legend_ncol,
-        fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.88)),
+    colors_by_plan = {plan: palette[idx] for idx, plan in enumerate(plan_names)}
+    values_by_plan = {
+        plan: frame.loc[frame[plan_col].astype(str) == plan, ratio_col].to_numpy(dtype=float) for plan in plan_names
+    }
+    max_points_raw = style.get("run_health_compression_max_points_per_plan", 900)
+    try:
+        max_points_per_plan = None if max_points_raw is None else max(1, int(max_points_raw))
+    except Exception:
+        max_points_per_plan = 900
+    positions = np.arange(len(plan_names), dtype=float)
+    _draw_category_box_and_jitter(
+        ax,
+        categories=plan_names,
+        values_by_category=values_by_plan,
+        colors_by_category=colors_by_plan,
+        positions=positions,
+        orientation="vertical",
+        jitter_width=0.16,
+        max_points_per_category=max_points_per_plan,
+        rasterized=True,
     )
-    hidden_plans = max(0, len(plan_names) - len(labeled_plans))
-    if hidden_plans > 0:
-        ax.text(
-            0.995,
-            0.01,
-            f"Legend shows top {len(labeled_plans)} of {len(plan_names)} plans",
-            transform=ax.transAxes,
-            ha="right",
-            va="bottom",
-            fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.82)),
-            alpha=0.86,
-        )
-    fig.subplots_adjust(right=0.74)
+    label_rotation = 45
+    ax.set_xticks(positions)
+    ax.set_xticklabels(
+        [_ellipsize(compact_plan_label(plan), max_len=28) for plan in plan_names],
+        rotation=label_rotation,
+        ha="right",
+    )
+    ax.set_xlabel("Plan")
+    ax.set_ylabel("Compression ratio")
+    if by_plan_group:
+        ax.set_title("Compression ratio by plan group")
+    else:
+        ax.set_title("Compression ratio by plan")
+    ax.set_box_aspect(1.0)
+    ax.set_xlim(-0.6, float(len(plan_names) - 1) + 0.6)
+    ax.grid(axis="y", linestyle="--", linewidth=0.55, alpha=0.28)
+    ax.tick_params(axis="x", labelsize=float(style.get("label_size", style.get("font_size", 12.5))))
+    ax.tick_params(axis="y", labelsize=float(style.get("label_size", style.get("font_size", 12.5))))
+    bottom = 0.34
+    fig.subplots_adjust(left=0.14, right=0.96, bottom=bottom, top=0.9)
     _apply_style(ax, style)
     return fig, {"compression": ax}
 
@@ -436,32 +570,21 @@ def _build_run_health_tfbs_length_by_regulator_figure(
         raise ValueError("run_health tfbs_length_by_regulator found no TFBS length values.")
     frame["tfbs_length"] = frame["tfbs_length"].astype(int)
 
-    counts = (
-        frame.groupby(["regulator", "tfbs_length"])
-        .size()
-        .reset_index(name="count")
-        .sort_values(by=["regulator", "tfbs_length"], ascending=[True, True])
+    counts = frame.groupby("regulator")["tfbs_length"].size().sort_values(ascending=False)
+    regulators = order_regulators_for_display(
+        counts.index.astype(str).tolist(),
+        counts_by_regulator=counts.astype(int).to_dict(),
     )
-    if counts.empty:
-        raise ValueError("run_health tfbs_length_by_regulator produced no regulator/length counts.")
-    pivot = counts.pivot(index="regulator", columns="tfbs_length", values="count").fillna(0).astype(int)
-    pivot["__total"] = pivot.sum(axis=1)
-    pivot = pivot.sort_values("__total", ascending=False).drop(columns=["__total"])
-    regulators = pivot.index.astype(str).tolist()
-    lengths = [int(v) for v in pivot.columns.tolist()]
     fig_size = style.get("run_health_tfbs_length_figsize")
     if fig_size is None:
-        if len(regulators) == 1:
-            fig_size = (4.6, 4.6)
-        else:
-            fig_size = (7.2, 3.5)
+        side = max(5.6, min(9.4, 4.8 + 0.28 * float(len(regulators))))
+        fig_size = (side, side)
     fig, ax = plt.subplots(
         figsize=(float(fig_size[0]), float(fig_size[1])),
         constrained_layout=False,
     )
-    x = np.arange(len(regulators), dtype=float)
-    width = 0.82 / max(1, len(lengths))
-    palette = _palette(style, max(1, len(lengths)))
+    palette = _palette(style, max(1, len(regulators)))
+    colors_by_regulator = {regulator: palette[idx] for idx, regulator in enumerate(regulators)}
     candidate_pool_sizes: dict[str, int] = {}
     if library_members_df is not None and not library_members_df.empty:
         lib = library_members_df.copy()
@@ -484,75 +607,62 @@ def _build_run_health_tfbs_length_by_regulator_figure(
         candidate_pool_sizes = (
             frame[["regulator", "tfbs"]].drop_duplicates().groupby("regulator")["tfbs"].nunique().astype(int).to_dict()
         )
-    if len(regulators) == 1:
-        regulator = regulators[0]
-        regulator_counts = (
-            counts[counts["regulator"] == regulator]
-            .sort_values(by=["tfbs_length"], ascending=[True])
-            .reset_index(drop=True)
-        )
-        lengths_single = regulator_counts["tfbs_length"].astype(int).to_numpy()
-        values_single = regulator_counts["count"].astype(float).to_numpy()
-        single_color = "#7a7a7a"
-        ax.bar(
-            lengths_single.astype(float),
-            values_single,
-            width=0.8,
-            color=single_color,
-            edgecolor="white",
-            linewidth=0.6,
-        )
-        ax.set_xticks(lengths_single.astype(float))
-        ax.set_xticklabels([str(item) for item in lengths_single.tolist()])
-        ax.set_xlabel("TFBS length (bp)")
-        ax.set_ylabel("Count in accepted outputs")
-        ax.set_title("TFBS length distribution across accepted outputs")
-        ax.text(
-            0.99,
-            0.96,
-            f"Regulator: {_ellipsize(regulator, max_len=24)}\n"
-            f"unique available: {int(candidate_pool_sizes.get(regulator, 0))}",
-            transform=ax.transAxes,
-            ha="right",
-            va="top",
-            fontsize=max(8.0, float(style.get("tick_size", style.get("font_size", 13.0) * 0.62))),
-            color="#333333",
-        )
-    else:
-        for idx, length in enumerate(lengths):
-            offset = (float(idx) - (float(len(lengths) - 1) / 2.0)) * width
-            y = pivot[length].to_numpy(dtype=float)
-            ax.bar(
-                x + offset,
-                y,
-                width=width * 0.92,
-                color=palette[idx],
-                edgecolor="white",
-                linewidth=0.5,
-                label=f"{length} bp",
+    unique_lengths = sorted(frame["tfbs_length"].astype(int).unique().tolist())
+    y_centers = np.arange(len(regulators), dtype=float)
+    total_group_height = 0.82
+    bar_height = total_group_height / float(max(1, len(unique_lengths)))
+    max_count = 0
+    for regulator_idx, regulator in enumerate(regulators):
+        center = float(y_centers[regulator_idx])
+        base_color = colors_by_regulator[regulator]
+        shades = _progressive_regulator_shades(base_color, len(unique_lengths))
+        regulator_mask = frame["regulator"].astype(str) == regulator
+        for length_idx, length_value in enumerate(unique_lengths):
+            position = center - (total_group_height / 2.0) + (bar_height * length_idx) + (bar_height / 2.0)
+            count = int((regulator_mask & (frame["tfbs_length"].astype(int) == int(length_value))).sum())
+            max_count = max(max_count, count)
+            ax.barh(
+                position,
+                count,
+                height=bar_height * 0.9,
+                color=shades[length_idx],
+                edgecolor=base_color,
+                linewidth=0.95,
+                alpha=0.94,
+                zorder=2.0,
             )
-        x_labels = [
-            f"{_ellipsize(label, max_len=20)}\n(n={int(candidate_pool_sizes.get(label, 0))})" for label in regulators
-        ]
-        rotate = 20 if len(regulators) > 4 else 0
-        ax.set_xticks(x)
-        ax.set_xticklabels(
-            x_labels,
-            rotation=rotate,
-            ha="right" if rotate else "center",
-        )
-        ax.set_xlabel("Regulator")
-        ax.set_ylabel("Count in accepted outputs")
-        ax.set_title("TFBS length counts by regulator across accepted outputs")
-        ax.legend(
-            loc="center left",
-            bbox_to_anchor=(1.02, 0.5),
-            title="TFBS length",
-            frameon=False,
-            fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.86)),
-            title_fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.9)),
-        )
-        fig.subplots_adjust(right=0.78)
+    ax.set_yticks(y_centers)
+    ax.set_yticklabels([compact_regulator_label(regulator) for regulator in regulators])
+    ax.invert_yaxis()
+    ax.set_xlabel("Count")
+    ax.set_ylabel("Regulator")
+    ax.set_title("TFBS lengths by regulator across accepted outputs")
+    ax.set_xlim(0.0, max(1.0, float(max_count) * 1.14))
+    ax.set_box_aspect(1.0)
+    ax.grid(axis="x", linestyle="--", linewidth=0.55, alpha=0.28)
+    ax.tick_params(axis="x", labelsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.9)))
+    ax.tick_params(axis="y", labelsize=float(style.get("label_size", style.get("font_size", 13.0))), pad=6.0)
     ax.margins(y=0.08)
+    grayscale_shades = np.linspace(0.82, 0.38, len(unique_lengths))
+    legend_handles = [
+        Patch(
+            facecolor=str(gray_value),
+            edgecolor="#8f949b",
+            linewidth=0.9,
+            label=f"{int(length_value)} bp",
+        )
+        for gray_value, length_value in zip(grayscale_shades.tolist(), unique_lengths, strict=False)
+    ]
+    ax.legend(
+        handles=legend_handles,
+        loc="upper right",
+        frameon=False,
+        title="Length",
+        fontsize=float(style.get("label_size", style.get("font_size", 13.0)) * 0.92),
+        title_fontsize=float(style.get("label_size", style.get("font_size", 13.0))),
+    )
+    longest_regulator_label = max((len(compact_regulator_label(reg)) for reg in regulators), default=8)
+    left_margin = max(0.22, min(0.32, 0.16 + 0.008 * longest_regulator_label))
+    fig.subplots_adjust(left=left_margin, right=0.97, bottom=0.14, top=0.9)
     _apply_style(ax, style)
     return fig, {"length": ax}

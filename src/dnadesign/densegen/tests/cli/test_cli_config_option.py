@@ -131,7 +131,7 @@ def test_ls_plots_accepts_config_after_command(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["ls-plots", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
-    assert "placement_map" in result.output
+    assert "placement_occupancy_map" in result.output
 
 
 def test_validate_reports_invalid_config(tmp_path: Path) -> None:

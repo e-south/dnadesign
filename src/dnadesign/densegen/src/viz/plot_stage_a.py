@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..config.plots import StageASummaryPlotOptions
 from ..core.artifacts.pool import TFBSPoolArtifact
 from .plot_common import _apply_style, _safe_filename, _save_figure, _style
 from .plot_stage_a_diversity import _build_stage_a_diversity_figure
@@ -129,9 +130,11 @@ def plot_stage_a_summary(
     pools: dict[str, pd.DataFrame] | None = None,
     pool_manifest: TFBSPoolArtifact | None = None,
     style: Optional[dict] = None,
+    stage_a_options: StageASummaryPlotOptions | None = None,
 ) -> list[Path]:
     if pools is None or pool_manifest is None:
         raise ValueError("Stage-A summary requires pool manifests; run stage-a build-pool first.")
+    del stage_a_options
     raw_style = style or {}
     style = _style(raw_style)
     style["seaborn_style"] = False
@@ -308,4 +311,237 @@ def plot_stage_a_summary(
         _save_figure(fig, fallback_path, style=style)
         plt.close(fig)
         paths.append(fallback_path)
+    return paths
+
+
+def _prepare_stage_a_inputs(
+    *,
+    pools: dict[str, pd.DataFrame] | None,
+    pool_manifest: TFBSPoolArtifact | None,
+) -> tuple[list[tuple[str, pd.DataFrame, dict]], list[tuple[str, pd.DataFrame]]]:
+    if pools is None or pool_manifest is None:
+        raise ValueError("Stage-A plots require pool manifests; run stage-a build-pool first.")
+
+    pwm_inputs: list[tuple[str, pd.DataFrame, dict]] = []
+    background_inputs: list[tuple[str, pd.DataFrame]] = []
+    for input_name, pool_df in pools.items():
+        entry = pool_manifest.entry_for(input_name)
+        if entry.input_type == "background_pool":
+            background_inputs.append((input_name, pool_df))
+            continue
+        sampling = entry.stage_a_sampling
+        if sampling is None:
+            if entry.input_type == "pwm_artifact":
+                raise ValueError(f"Stage-A sampling metadata missing for input '{input_name}'.")
+            continue
+        eligible_hist = sampling.get("eligible_score_hist") or []
+        if not eligible_hist:
+            raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+        for row in eligible_hist:
+            if row.get("diversity") is None:
+                raise ValueError(
+                    f"Stage-A diversity metrics missing for input '{input_name}' ({row.get('regulator')}). "
+                    "Rebuild Stage-A pools."
+                )
+        pwm_inputs.append((input_name, pool_df, sampling))
+    return pwm_inputs, background_inputs
+
+
+def _stage_a_regulator_count(input_name: str, sampling: dict) -> int:
+    eligible_hist = sampling.get("eligible_score_hist") or []
+    if not eligible_hist:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+    regulators: list[str] = []
+    for row in eligible_hist:
+        if "regulator" not in row:
+            raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
+        regulators.append(str(row["regulator"]))
+    if not regulators:
+        raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
+    return len(regulators)
+
+
+def _stage_a_style(style: Optional[dict]) -> dict:
+    raw_style = style or {}
+    style_cfg = _style(raw_style)
+    style_cfg["seaborn_style"] = False
+    if "figsize" not in raw_style:
+        style_cfg["figsize"] = (15.8, 2.6)
+    return style_cfg
+
+
+def _stage_a_output_dir(out_path: Path) -> Path:
+    base_dir = out_path.parent / "stage_a"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    return base_dir
+
+
+def plot_stage_a_pool_score_strata(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    pools: dict[str, pd.DataFrame] | None = None,
+    pool_manifest: TFBSPoolArtifact | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    del df
+    pwm_inputs, _background_inputs = _prepare_stage_a_inputs(pools=pools, pool_manifest=pool_manifest)
+    if not pwm_inputs:
+        raise ValueError("Stage A pool score strata requires non-background Stage-A PWM pools.")
+    style_cfg = _stage_a_style(style)
+    base_dir = _stage_a_output_dir(out_path)
+    fig_width = float(style_cfg.get("figsize", (11, 4))[0])
+    strata_heights = [
+        max(2.45, 0.9 * _stage_a_regulator_count(input_name, sampling) + 0.6)
+        for input_name, _pool_df, sampling in pwm_inputs
+    ]
+    fig = plt.figure(figsize=(fig_width, float(sum(strata_heights))), constrained_layout=False)
+    outer = fig.add_gridspec(
+        nrows=len(pwm_inputs),
+        ncols=1,
+        height_ratios=strata_heights,
+        hspace=0.34,
+    )
+    for idx, (input_name, pool_df, sampling) in enumerate(pwm_inputs):
+        _build_stage_a_strata_overview_figure(
+            input_name=input_name,
+            pool_df=pool_df,
+            sampling=sampling,
+            style=style_cfg,
+            fig=fig,
+            slot=outer[idx, 0],
+            show_column_titles=(idx == 0),
+        )
+    path = base_dir / f"stage_a_pool_score_strata{out_path.suffix}"
+    _save_figure(fig, path, style=style_cfg)
+    plt.close(fig)
+    return [path]
+
+
+def plot_stage_a_sampling_yield(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    pools: dict[str, pd.DataFrame] | None = None,
+    pool_manifest: TFBSPoolArtifact | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    del df
+    pwm_inputs, _background_inputs = _prepare_stage_a_inputs(pools=pools, pool_manifest=pool_manifest)
+    if not pwm_inputs:
+        raise ValueError("Stage A sampling yield requires non-background Stage-A PWM pools.")
+    style_cfg = _stage_a_style(style)
+    base_dir = _stage_a_output_dir(out_path)
+    fig_width = float(style_cfg.get("figsize", (11, 4))[0])
+    base_height = float(style_cfg.get("figsize", (11, 4.2))[1])
+    yield_heights = [
+        max(2.9, base_height, 0.95 * _stage_a_regulator_count(input_name, sampling) + 0.5)
+        for input_name, _pool_df, sampling in pwm_inputs
+    ]
+    fig = plt.figure(figsize=(fig_width, float(sum(yield_heights))), constrained_layout=False)
+    outer = fig.add_gridspec(
+        nrows=len(pwm_inputs),
+        ncols=1,
+        height_ratios=yield_heights,
+        hspace=0.36,
+    )
+    for idx, (input_name, pool_df, sampling) in enumerate(pwm_inputs):
+        _build_stage_a_yield_bias_figure(
+            input_name=input_name,
+            pool_df=pool_df,
+            sampling=sampling,
+            style=style_cfg,
+            fig=fig,
+            slot=outer[idx, 0],
+            show_column_titles=(idx == 0),
+        )
+    path = base_dir / f"stage_a_sampling_yield{out_path.suffix}"
+    _save_figure(fig, path, style=style_cfg)
+    plt.close(fig)
+    return [path]
+
+
+def plot_stage_a_pool_diversity(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    pools: dict[str, pd.DataFrame] | None = None,
+    pool_manifest: TFBSPoolArtifact | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    del df
+    pwm_inputs, _background_inputs = _prepare_stage_a_inputs(pools=pools, pool_manifest=pool_manifest)
+    if not pwm_inputs:
+        raise ValueError("Stage A pool diversity requires non-background Stage-A PWM pools.")
+    style_cfg = _stage_a_style(style)
+    base_dir = _stage_a_output_dir(out_path)
+    fig_width = float(style_cfg.get("figsize", (11, 4))[0])
+    diversity_heights = [
+        max(2.65, 0.9 * _stage_a_regulator_count(input_name, sampling) + 0.65)
+        for input_name, _pool_df, sampling in pwm_inputs
+    ]
+    fig = plt.figure(figsize=(fig_width, float(sum(diversity_heights))), constrained_layout=False)
+    outer = fig.add_gridspec(
+        nrows=len(pwm_inputs),
+        ncols=1,
+        height_ratios=diversity_heights,
+        hspace=0.34,
+    )
+    for idx, (input_name, pool_df, sampling) in enumerate(pwm_inputs):
+        _build_stage_a_diversity_figure(
+            input_name=input_name,
+            pool_df=pool_df,
+            sampling=sampling,
+            style=style_cfg,
+            fig=fig,
+            slot=outer[idx, 0],
+            show_column_titles=(idx == 0),
+        )
+    path = base_dir / f"stage_a_pool_diversity{out_path.suffix}"
+    _save_figure(fig, path, style=style_cfg)
+    plt.close(fig)
+    return [path]
+
+
+def plot_background_sequence_logo(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    pools: dict[str, pd.DataFrame] | None = None,
+    pool_manifest: TFBSPoolArtifact | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    del df
+    _pwm_inputs, background_inputs = _prepare_stage_a_inputs(pools=pools, pool_manifest=pool_manifest)
+    if not background_inputs:
+        raise ValueError("Background sequence logo requires at least one Stage-A background pool.")
+    style_cfg = _stage_a_style(style)
+    base_dir = _stage_a_output_dir(out_path)
+    paths: list[Path] = []
+    for input_name, pool_df in background_inputs:
+        if "tfbs" in pool_df.columns:
+            sequences = pool_df["tfbs"].astype(str).tolist()
+        elif "sequence" in pool_df.columns:
+            sequences = pool_df["sequence"].astype(str).tolist()
+        else:
+            raise ValueError(f"Background pool '{input_name}' is missing tfbs/sequence columns.")
+        fig, _axes = _build_background_logo_figure(
+            input_name=input_name,
+            sequences=sequences,
+            style=style_cfg,
+        )
+        input_segment = _safe_filename(input_name)
+        if input_segment.lower() == "background":
+            fname = f"background_sequence_logo{out_path.suffix}"
+        else:
+            fname = f"{input_segment}__background_sequence_logo{out_path.suffix}"
+        path = base_dir / fname
+        logo_save_style = dict(style_cfg)
+        try:
+            logo_save_style["save_dpi"] = min(float(logo_save_style.get("save_dpi", 300.0)), 220.0)
+        except Exception:
+            logo_save_style["save_dpi"] = 220.0
+        _save_figure(fig, path, style=logo_save_style)
+        plt.close(fig)
+        paths.append(path)
     return paths

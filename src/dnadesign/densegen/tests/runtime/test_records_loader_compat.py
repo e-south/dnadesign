@@ -185,3 +185,61 @@ def test_load_records_from_config_accepts_legacy_used_tfbs_detail_schema(tmp_pat
     assert detail[0]["core_sequence"] == "ACGT"
     assert detail[0]["rank_among_selected"] == 3
     assert detail[0]["part_index"] == 0
+
+
+def test_load_records_from_config_recovers_missing_plan_and_input_from_source(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_minimal_config(cfg_path)
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    schema = _build_schema("densegen", pa)
+    rows = [
+        {
+            "id": "row1",
+            "sequence": "ACGTACGTAA",
+            "bio_type": "dna",
+            "alphabet": "dna_4",
+            "source": "plan_pool__ethanol_ciprofloxacin__sig35_f",
+            "densegen__schema_version": "2.9",
+            "densegen__created_at": "2026-04-13T00:00:00Z",
+            "densegen__run_id": "demo",
+            "densegen__length": 10,
+            "densegen__plan": None,
+            "densegen__input_name": None,
+            "densegen__used_tfbs_detail": None,
+            "densegen__used_tf_counts": [],
+            "densegen__library_unique_tf_count": 0,
+            "densegen__library_unique_tfbs_count": 0,
+            "densegen__covers_all_tfs_in_solution": True,
+            "densegen__required_regulators": [],
+            "densegen__min_count_by_regulator": [],
+            "densegen__compression_ratio": None,
+            "densegen__sampling_library_hash": None,
+            "densegen__sampling_library_index": None,
+            "densegen__pad_used": False,
+            "densegen__pad_bases": 0,
+            "densegen__pad_end": None,
+            "densegen__pad_literal": None,
+            "densegen__sequence_validation": {"validation_passed": True, "violations": []},
+            "densegen__gc_total": 0.5,
+            "densegen__gc_core": 0.5,
+        }
+    ]
+    pq.write_table(pa.Table.from_pylist(rows, schema=schema), records_path)
+
+    loaded = load_config(cfg_path)
+    records_df, source_label = load_records_from_config(
+        loaded.root,
+        cfg_path,
+        columns=["id", "densegen__plan", "densegen__input_name"],
+    )
+
+    assert source_label == f"parquet:{records_path.resolve()}"
+    assert "source" not in records_df.columns
+    assert records_df.loc[0, "densegen__plan"] == "ethanol_ciprofloxacin__sig35=f"
+    assert records_df.loc[0, "densegen__input_name"] == "plan_pool__ethanol_ciprofloxacin__sig35_f"
+    assert bool(records_df.loc[0, "densegen__metadata_inferred_from_source"]) is True

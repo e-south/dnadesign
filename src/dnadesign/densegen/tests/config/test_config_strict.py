@@ -997,6 +997,96 @@ def test_plots_source_must_be_target(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_plot_scope_options_accept_concrete_plot_ids(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {
+            "placement_occupancy_map": {"scope": "auto", "max_plans": 12},
+            "tfbs_concentration_profile": {"scope": "per_group", "max_plans": 8, "drilldown_plans": 2},
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    placement_opts = dict((loaded.root.plots.options or {}).get("placement_occupancy_map") or {})
+    tfbs_opts = dict((loaded.root.plots.options or {}).get("tfbs_concentration_profile") or {})
+    assert placement_opts["scope"] == "auto"
+    assert int(placement_opts["max_plans"]) == 12
+    assert tfbs_opts["scope"] == "per_group"
+    assert int(tfbs_opts["max_plans"]) == 8
+    assert int(tfbs_opts["drilldown_plans"]) == 2
+
+
+def test_legacy_stage_a_summary_plot_option_is_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {"stage_a_summary": {"include_sampling_length_companion": True}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="stage_a_summary"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize(
+    "legacy_plot_id",
+    [
+        "stage_a_summary",
+        "placement_map",
+        "tfbs_usage",
+        "run_health",
+        "dataset_source_inventory",
+        "run_health/outcomes_over_time",
+    ],
+)
+def test_legacy_plot_ids_are_rejected_in_plots_default(tmp_path: Path, legacy_plot_id: str) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "default": [legacy_plot_id],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="no longer supported"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize(
+    "legacy_option_key",
+    [
+        "stage_a_summary",
+        "run_health",
+        "placement_map",
+        "tfbs_usage",
+    ],
+)
+def test_legacy_plot_option_blocks_are_rejected(tmp_path: Path, legacy_option_key: str) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {legacy_option_key: {}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="no longer supported"):
+        load_config(cfg_path)
+
+
+def test_unknown_plot_option_blocks_are_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {"stage_a_sampling_yield": {"scope": "auto"}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="supported plot option blocks"):
+        load_config(cfg_path)
+
+
 def test_output_outside_run_root_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     run_dir = tmp_path / "run"

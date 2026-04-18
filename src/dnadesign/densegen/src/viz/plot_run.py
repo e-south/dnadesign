@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -22,7 +23,7 @@ from matplotlib import ticker as mticker
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.lines import Line2D
 
-from .plot_common import _apply_style, _palette, _save_figure, _style, plan_group_from_name
+from .plot_common import _apply_style, _palette, _rename_artifact_path, _save_figure, _style, plan_group_from_name
 from .plot_run_health_utils import (
     aggregate_reason_pareto as _aggregate_reason_pareto,
 )
@@ -42,6 +43,8 @@ from .plot_run_helpers import (
     _ellipsize,
     _normalize_plan_name,
     _reason_family_label,
+    compact_failure_reason_label,
+    compact_plan_label,
 )
 from .plot_run_helpers import (
     _usage_category_label as _usage_category_label_helper,
@@ -74,6 +77,14 @@ _usage_category_label = _usage_category_label_helper
 _PLAN_MARKER_CYCLE = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h")
 
 
+def _rename_output_paths(paths: list[Path], *, stem: str) -> list[Path]:
+    renamed: list[Path] = []
+    for path in paths:
+        target = path.with_name(f"{stem}{path.suffix}")
+        renamed.append(_rename_artifact_path(path, target))
+    return renamed
+
+
 def _capitalize_first(text: str) -> str:
     token = str(text)
     for idx, ch in enumerate(token):
@@ -84,6 +95,38 @@ def _capitalize_first(text: str) -> str:
 
 def _plan_markers(plan_names: list[str]) -> dict[str, str]:
     return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
+
+
+def _place_figure_legend_below_xlabel(
+    fig: plt.Figure,
+    *,
+    ax_xlabel: plt.Axes,
+    legend,
+    gap: float = 0.012,
+    min_bottom: float = 0.01,
+    max_bottom: float = 0.55,
+) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    xlabel_bbox = (
+        ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    )
+    target_top = float(xlabel_bbox.y0) - float(gap)
+    legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    if legend_bbox.y0 < float(min_bottom):
+        needed = float(min_bottom) - float(legend_bbox.y0)
+        new_bottom = min(float(max_bottom), float(fig.subplotpars.bottom) + needed + 0.005)
+        fig.subplots_adjust(bottom=new_bottom)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        xlabel_bbox = (
+            ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        target_top = float(xlabel_bbox.y0) - float(gap)
+        legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
 
 
 def _outcomes_attempts_per_row_for_workload(max_plan_attempts: int) -> int:
@@ -106,9 +149,10 @@ def _prepare_run_health_inputs(
     *,
     plan_quotas: dict[str, int] | None = None,
     style: Optional[dict] = None,
+    plot_label: str = "solve_pressure_and_progress",
 ) -> tuple[dict, pd.DataFrame, list[str], dict[str, int], ProgressAxis, pd.Series, str, float]:
     if attempts_df is None or attempts_df.empty:
-        raise ValueError("run_health requires attempts.parquet.")
+        raise ValueError(f"{plot_label} requires attempts.parquet.")
     required = {"status", "reason", "plan_name"}
     missing = required - set(attempts_df.columns)
     if missing:
@@ -166,7 +210,7 @@ def _prepare_run_health_inputs(
     missing_quota = [plan for plan in plan_names if int(quota_map.get(plan, 0)) <= 0]
     if missing_quota:
         raise ValueError(
-            "run_health requires generation.plan quotas for all plans in attempts. "
+            f"{plot_label} requires generation.plan quotas for all plans in attempts. "
             f"Missing or invalid quota for: {', '.join(sorted(missing_quota))}"
         )
     return style, attempts_df, plan_names, quota_map, progress, solver_x, solver_x_label, legend_size
@@ -176,9 +220,10 @@ def _prepare_run_health_outcomes_inputs(
     attempts_df: pd.DataFrame,
     *,
     style: Optional[dict] = None,
+    plot_label: str = "attempt_outcome_timeline",
 ) -> tuple[dict, pd.DataFrame, list[str], float]:
     if attempts_df is None or attempts_df.empty:
-        raise ValueError("run_health requires attempts.parquet.")
+        raise ValueError(f"{plot_label} requires attempts.parquet.")
     required = {"status", "plan_name"}
     missing = required - set(attempts_df.columns)
     if missing:
@@ -225,12 +270,14 @@ def _build_run_health_outcomes_figure(
     events_df: pd.DataFrame | None = None,
     plan_quotas: dict[str, int] | None = None,
     style: Optional[dict] = None,
+    plot_label: str = "run_health",
 ) -> tuple[plt.Figure, dict[str, plt.Axes]]:
     del events_df
     del plan_quotas
-    _style_cfg, attempts_df, plan_names, legend_size = _prepare_run_health_outcomes_inputs(
+    _style_cfg, attempts_df, plan_names, _legend_size = _prepare_run_health_outcomes_inputs(
         attempts_df,
         style=style,
+        plot_label=plot_label,
     )
     plan_counts = attempts_df["plan_name"].astype(str).value_counts()
     max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
@@ -259,7 +306,8 @@ def _build_run_health_outcomes_figure(
         constrained_layout=False,
     )
     axes = [axis for axis in axes_grid[0]]
-    fig.subplots_adjust(left=0.09, right=0.88, bottom=0.12, top=0.84, wspace=0.06)
+    fig_height = float(fig.get_size_inches()[1])
+    fig.subplots_adjust(left=0.16, right=0.985, bottom=0.2, top=0.86, wspace=0.06)
 
     plot_df = attempts_df.copy()
     plot_df["_plan_attempt_rank"] = plot_df.groupby("plan_name", sort=False).cumcount().astype(int) + 1
@@ -292,6 +340,14 @@ def _build_run_health_outcomes_figure(
             max_yticks = max(2, int(_style_cfg.get("run_health_outcomes_max_yticks", 12)))
         except Exception as exc:
             raise ValueError("run_health_outcomes_max_yticks must be an integer >= 2") from exc
+        precomputed_tick_size = float(
+            _style_cfg.get(
+                "run_health_outcomes_tick_label_size",
+                max(13.0, float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13))) * 1.02),
+            )
+        )
+        max_visible_ticks = max(3, int((fig_height * 72.0) / max(18.0, precomputed_tick_size * 2.6)))
+        max_yticks = min(max_yticks, max_visible_ticks)
         step_rows = max(1, int(np.ceil(float(max_rows) / float(max_yticks))))
         tick_rows = list(range(1, max_rows + 1, step_rows))
         if max_rows not in tick_rows:
@@ -303,9 +359,16 @@ def _build_run_health_outcomes_figure(
         y_tick_positions = []
         tick_labels = []
 
-    y_label = "Per-plan attempt index"
-    if max_rows > 1:
-        y_label = f"{y_label}\n({attempts_per_row:,} attempts per row)"
+    label_size = float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13)))
+    uniform_font_size = max(28.0, label_size * 1.85)
+    panel_title_size = uniform_font_size
+    tick_label_size = uniform_font_size
+    axis_label_size = uniform_font_size
+    legend_font_size = uniform_font_size
+    local_style = dict(_style_cfg)
+    local_style["tick_size"] = uniform_font_size
+    local_style["label_size"] = uniform_font_size
+    local_style["title_size"] = uniform_font_size
     try:
         x_pad = max(0.0, float(_style_cfg.get("run_health_outcomes_panel_xpad", 0.7)))
         y_pad = max(0.0, float(_style_cfg.get("run_health_outcomes_panel_ypad", 0.6)))
@@ -359,27 +422,28 @@ def _build_run_health_outcomes_figure(
         ax.set_ylim(float(max_rows) + y_pad, -y_pad)
         ax.set_xticks([])
         ax.tick_params(axis="x", bottom=False, labelbottom=False)
-        ax.set_title(_capitalize_first(_ellipsize(plan_name, max_len=22)), pad=12.0)
-        _apply_style(ax, _style_cfg)
+        ax.set_title(
+            textwrap.fill(compact_plan_label(plan_name), width=18, break_on_hyphens=False),
+            pad=8.0,
+            fontsize=panel_title_size,
+        )
+        _apply_style(ax, local_style)
         ax.grid(False)
-        if "top" in ax.spines:
-            ax.spines["top"].set_visible(False)
-        if "right" in ax.spines:
-            ax.spines["right"].set_visible(False)
-        if "left" in ax.spines:
-            ax.spines["left"].set_visible(False)
-        if "bottom" in ax.spines:
-            ax.spines["bottom"].set_visible(True)
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+            spine.set_color("#d1d5db")
+            spine.set_linewidth(0.9)
         if axis_idx == 0:
             ax.set_yticks(y_tick_positions)
             ax.set_yticklabels(tick_labels)
-            ax.set_ylabel(y_label)
+            ax.tick_params(axis="y", labelsize=tick_label_size)
         else:
             ax.tick_params(axis="y", left=False, labelleft=False)
 
-    title_size = float(_style_cfg.get("title_size", _style_cfg.get("font_size", 13) * 1.1))
+    title_size = uniform_font_size
     text_color = str(_style_cfg.get("text_color", "#111111"))
-    fig.suptitle("Attempt outcomes by plan", y=0.96, fontsize=title_size, color=text_color)
+    fig.suptitle("Attempt outcomes by plan", y=0.94, fontsize=title_size, color=text_color)
+    fig.supylabel("Attempt index", x=0.018, fontsize=axis_label_size, color=text_color)
 
     legend_handles = [
         Line2D(
@@ -390,7 +454,7 @@ def _build_run_health_outcomes_figure(
             markerfacecolor="#d9d9d9",
             markeredgecolor="none",
             markeredgewidth=0.0,
-            markersize=6.0,
+            markersize=8.0,
             label="Accepted",
         ),
         Line2D(
@@ -401,7 +465,7 @@ def _build_run_health_outcomes_figure(
             markerfacecolor=rejected_color,
             markeredgecolor="none",
             markeredgewidth=0.0,
-            markersize=6.0,
+            markersize=8.0,
             label="Rejected",
         ),
         Line2D(
@@ -413,18 +477,17 @@ def _build_run_health_outcomes_figure(
             markeredgecolor="#ffffff",
             markeredgewidth=0.65,
             color=failed_color,
-            markersize=7.5,
+            markersize=9.0,
             label="Failed",
         ),
     ]
-    label_size = float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13)))
     legend = fig.legend(
         handles=legend_handles,
-        loc="center left",
-        bbox_to_anchor=(0.905, 0.5),
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.05),
         frameon=False,
-        fontsize=label_size,
-        ncol=1,
+        fontsize=legend_font_size,
+        ncol=3,
         borderaxespad=0.0,
     )
     for text in legend.get_texts():
@@ -438,18 +501,20 @@ def _build_run_health_detail_figure(
     events_df: pd.DataFrame | None = None,
     plan_quotas: dict[str, int] | None = None,
     style: Optional[dict] = None,
+    plot_label: str = "run_health",
 ) -> tuple[plt.Figure, dict[str, plt.Axes]]:
     _style_cfg, attempts_df, plan_names, quota_map, progress, _solver_x, _solver_x_label, legend_size = (
         _prepare_run_health_inputs(
             attempts_df,
             plan_quotas=plan_quotas,
             style=style,
+            plot_label=plot_label,
         )
     )
     fig_size = _style_cfg.get("run_health_detail_figsize")
     if fig_size is None:
-        fig_height = max(5.2, min(10.5, 0.18 * float(len(plan_names)) + 4.6))
-        fig_size = (11.2, fig_height)
+        fig_height = max(7.8, min(14.2, 0.28 * float(len(plan_names)) + 6.8))
+        fig_size = (12.4, fig_height)
     fig, (ax_fail, ax_plan) = plt.subplots(
         1,
         2,
@@ -460,8 +525,11 @@ def _build_run_health_detail_figure(
     plan_palette = _palette(_style_cfg, max(3, len(plan_names)))
     plan_colors = {plan: plan_palette[idx] for idx, plan in enumerate(plan_names)}
     plan_markers = _plan_markers(plan_names)
+    base_font_size = float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13)))
+    uniform_font_size = max(20.0, base_font_size * 1.28)
     problem = attempts_df[attempts_df["status"].astype(str).isin(["rejected", "failed"])].copy()
     reason_label_size: float | None = None
+    reason_labels: list[str] = []
     if problem.empty:
         ax_fail.text(
             0.5,
@@ -490,6 +558,8 @@ def _build_run_health_detail_figure(
         )
         reason_counts["total"] = reason_counts.sum(axis=1)
         reason_counts = reason_counts.sort_values("total", ascending=False)
+        fig_w, fig_h = fig.get_size_inches()
+        fig.set_size_inches(fig_w, max(fig_h, 6.2 + 0.42 * float(len(reason_counts))))
         positions = np.arange(len(reason_counts), dtype=float)
         totals_reason = reason_counts["total"].to_numpy(dtype=float)
         counts_reason = totals_reason
@@ -511,12 +581,12 @@ def _build_run_health_detail_figure(
             zorder=3,
         )
         ax_fail.set_yticks(positions)
-        reason_labels = [_capitalize_first(str(item)) for item in reason_counts.index.tolist()]
+        reason_labels = [compact_failure_reason_label(item) for item in reason_counts.index.tolist()]
         ax_fail.set_yticklabels(reason_labels)
         try:
             reason_label_size_raw = _style_cfg.get("run_health_reason_label_size")
             if reason_label_size_raw is None:
-                reason_label_size = max(7.0, 11.0 - 0.20 * max(0, len(reason_labels) - 8))
+                reason_label_size = uniform_font_size
             else:
                 reason_label_size = float(reason_label_size_raw)
             if reason_label_size <= 0:
@@ -530,12 +600,12 @@ def _build_run_health_detail_figure(
         ax_fail.set_xlim(0.0, max_count + x_pad)
         ax_fail.set_ylim(float(len(reason_counts)) - 0.5 + y_pad, -0.5 - y_pad)
         ax_fail.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=7))
-        ax_fail.set_xlabel("Failed solve count")
-        ax_fail.set_title("Reason for failed solve")
+        ax_fail.set_xlabel("Failed solve count", fontsize=uniform_font_size, labelpad=10.0)
+        ax_fail.set_title("Failure pressure by reason", pad=10.0, fontsize=uniform_font_size)
+        ax_fail.tick_params(axis="y", pad=8.0)
 
     max_progress = 0.0
     for idx, plan in enumerate(plan_names):
-        quota = int(quota_map[plan])
         plan_mask = attempts_df["plan_name"].astype(str) == plan
         accepted_mask = (plan_mask & (attempts_df["status"] == "ok")).astype(int).to_numpy(dtype=int)
         if progress.mode == "discrete":
@@ -551,18 +621,18 @@ def _build_run_health_detail_figure(
                 .to_numpy(dtype=float)
             )
         cumulative = np.cumsum(accepted_counts)
-        ratio = cumulative / float(max(1, quota))
+        accepted_final = int(cumulative[-1]) if cumulative.size > 0 else 0
+        ratio = cumulative / float(max(1, accepted_final))
         max_progress = max(max_progress, float(np.nanmax(ratio)) if ratio.size else 0.0)
         color = plan_colors[plan]
         marker = plan_markers[plan]
         plan_mask_values = plan_mask.to_numpy(dtype=bool)
-        accepted_final = int(cumulative[-1]) if cumulative.size > 0 else 0
         ax_plan.plot(
             progress.x,
             ratio,
             linewidth=1.6,
             color=color,
-            label=f"{_ellipsize(plan, 20)} ({accepted_final}/{quota})",
+            label=compact_plan_label(plan),
         )
         if progress.mode == "discrete":
             final_indices = np.where(plan_mask_values)[0]
@@ -589,35 +659,20 @@ def _build_run_health_detail_figure(
                 linewidths=0.5,
                 zorder=4,
             )
-    ax_plan.axhline(1.0, color="#999999", linewidth=1.0, linestyle="--")
-    unique_quotas = sorted({int(value) for value in quota_map.values()})
-    if len(unique_quotas) == 1:
-        quota_text = f"Quota ({unique_quotas[0]})"
-    else:
-        quota_text = f"Quota ({unique_quotas[0]}-{unique_quotas[-1]})"
-    ax_plan.text(
-        0.01,
-        1.0,
-        quota_text,
-        transform=ax_plan.get_yaxis_transform(),
-        ha="left",
-        va="bottom",
-        fontsize=max(10.0, legend_size * 1.2),
-        color="#555555",
-    )
-    ax_plan.set_xlabel("Attempt index")
-    ax_plan.set_ylabel("Accepted / quota")
-    ax_plan.set_ylim(0.0, max(1.05, max_progress + 0.05))
-    ax_plan.set_title("Quota progress")
+    ax_plan.axhline(1.0, color="#999999", linewidth=1.0, linestyle="--", alpha=0.7)
+    ax_plan.set_xlabel("Attempt index", fontsize=uniform_font_size, labelpad=10.0)
+    ax_plan.set_ylabel("Cumulative accepted / final accepted", fontsize=uniform_font_size, labelpad=12.0)
+    ax_plan.set_ylim(0.0, max(1.02, max_progress + 0.02))
+    ax_plan.set_title("Accepted progress by plan", pad=10.0, fontsize=uniform_font_size)
     ax_plan.grid(axis="x", linestyle="--", linewidth=0.55, alpha=0.35)
-    ax_fail.set_box_aspect(1.0)
-    ax_plan.set_box_aspect(1.0)
 
     _apply_style(ax_fail, _style_cfg)
     if reason_label_size is not None:
         for tick in ax_fail.get_yticklabels():
             tick.set_fontsize(float(reason_label_size))
     _apply_style(ax_plan, _style_cfg)
+    ax_fail.tick_params(axis="both", labelsize=uniform_font_size)
+    ax_plan.tick_params(axis="both", labelsize=uniform_font_size)
     handles = []
     for plan in plan_names:
         marker = plan_markers[plan]
@@ -633,22 +688,30 @@ def _build_run_health_detail_figure(
                 markerfacecolor=color,
                 markeredgecolor="white",
                 markeredgewidth=0.6,
-                label=_ellipsize(plan, max_len=20),
+                label=compact_plan_label(plan),
             )
         )
-    fig.legend(
+    legend_obj = fig.legend(
         handles=handles,
         labels=[handle.get_label() for handle in handles],
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.0),
-        ncol=max(1, min(3, len(plan_names))),
+        bbox_to_anchor=(0.5, 0.035),
+        ncol=max(1, min(6, len(plan_names))),
         frameon=False,
-        fontsize=float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13))),
+        fontsize=uniform_font_size,
     )
-    legend_cols = max(1, min(3, len(plan_names)))
-    legend_rows = max(1, int(np.ceil(float(len(plan_names)) / float(legend_cols))))
-    bottom_pad = min(0.34, 0.08 + 0.045 * legend_rows)
-    fig.tight_layout(rect=(0.0, bottom_pad, 1.0, 0.97))
+    fig.suptitle(
+        "Failed-solve pressure and accepted progress diverge across DenseGen plans",
+        y=0.965,
+        fontsize=uniform_font_size,
+        color=str(_style_cfg.get("text_color", "#111111")),
+    )
+    max_reason_chars = max((len(label) for label in reason_labels), default=12)
+    left_margin = max(0.28, min(0.44, 0.18 + 0.0042 * float(max_reason_chars)))
+    legend_rows = int(np.ceil(float(len(handles)) / float(max(1, min(6, len(plan_names))))))
+    bottom_margin = max(0.22, 0.16 + 0.06 * float(legend_rows))
+    fig.subplots_adjust(left=left_margin, right=0.985, bottom=bottom_margin, top=0.93, wspace=0.3)
+    _place_figure_legend_below_xlabel(fig, ax_xlabel=ax_plan, legend=legend_obj, gap=0.03, min_bottom=0.024)
     return fig, {"fail": ax_fail, "plan": ax_plan}
 
 
@@ -678,32 +741,123 @@ def plot_run_health(
         style=style,
     )
     fig_compression, _axes_compression = _build_run_health_compression_ratio_figure(df, style=style)
-    fig_tfbs_length, _axes_tfbs_length = _build_run_health_tfbs_length_by_regulator_figure(
-        composition_df if composition_df is not None else pd.DataFrame(),
-        library_members_df=library_members_df,
-        style=style,
-    )
     target_dir = out_path.parent / "run_health"
     target_dir.mkdir(parents=True, exist_ok=True)
     outcomes_path = target_dir / f"outcomes_over_time{out_path.suffix}"
     run_health_path = target_dir / f"run_health{out_path.suffix}"
     compression_path = target_dir / f"compression_ratio_distribution{out_path.suffix}"
-    tfbs_length_path = target_dir / f"tfbs_length_by_regulator{out_path.suffix}"
     legacy_detail_path = target_dir / f"run_health_detail{out_path.suffix}"
+    legacy_tfbs_length_path = target_dir / f"tfbs_length_by_regulator{out_path.suffix}"
+    legacy_summary_table_path = target_dir / f"summary_table{out_path.suffix}"
     legacy_detail_path.unlink(missing_ok=True)
+    legacy_tfbs_length_path.unlink(missing_ok=True)
+    legacy_summary_table_path.unlink(missing_ok=True)
     _save_figure(fig_outcome, outcomes_path, style=style)
     _save_figure(fig_detail, run_health_path, style=style)
     _save_figure(fig_compression, compression_path, style=style)
-    _save_figure(fig_tfbs_length, tfbs_length_path, style=style)
     plt.close(fig_outcome)
     plt.close(fig_detail)
     plt.close(fig_compression)
-    plt.close(fig_tfbs_length)
     summary_df = _run_health_summary_frame(_normalize_and_order_attempts(attempts_df), plan_quotas=plan_quotas)
     summary_df.to_csv(target_dir / "summary.csv", index=False)
-    summary_table_path = target_dir / f"summary_table{out_path.suffix}"
-    _render_run_health_summary_table_figure(summary_df, summary_table_path, style=style)
-    return [outcomes_path, run_health_path, compression_path, tfbs_length_path, summary_table_path]
+    return [outcomes_path, run_health_path, compression_path]
+
+
+def plot_tfbs_concentration_profile(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    composition_df: pd.DataFrame,
+    pools: dict[str, pd.DataFrame] | None = None,
+    library_members_df: pd.DataFrame | None = None,
+    style: Optional[dict] = None,
+    plan_col: str = "plan_name",
+    input_col: str = "input_name",
+) -> list[Path]:
+    return _rename_output_paths(
+        plot_tfbs_usage_panel(
+            df,
+            out_path,
+            composition_df=composition_df,
+            pools=pools,
+            library_members_df=library_members_df,
+            style=style,
+            plan_col=plan_col,
+            input_col=input_col,
+            plot_label="tfbs_concentration_profile",
+        ),
+        stem="tfbs_concentration_profile",
+    )
+
+
+def plot_attempt_outcome_timeline(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    attempts_df: pd.DataFrame,
+    events_df: pd.DataFrame | None = None,
+    cfg: dict | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    del df
+    style = _style(style)
+    plan_quotas = _extract_plan_quotas(cfg)
+    fig_outcome, _axes_outcome = _build_run_health_outcomes_figure(
+        attempts_df,
+        events_df=events_df,
+        plan_quotas=plan_quotas,
+        style=style,
+        plot_label="attempt_outcome_timeline",
+    )
+    target_dir = out_path.parent / "run_health"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    outcomes_path = target_dir / f"attempt_outcome_timeline{out_path.suffix}"
+    _save_figure(fig_outcome, outcomes_path, style=style)
+    plt.close(fig_outcome)
+    return [outcomes_path]
+
+
+def plot_solve_pressure_and_progress(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    attempts_df: pd.DataFrame,
+    events_df: pd.DataFrame | None = None,
+    cfg: dict | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    del df
+    style = _style(style)
+    plan_quotas = _extract_plan_quotas(cfg)
+    fig_detail, _axes_detail = _build_run_health_detail_figure(
+        attempts_df,
+        events_df=events_df,
+        plan_quotas=plan_quotas,
+        style=style,
+        plot_label="solve_pressure_and_progress",
+    )
+    target_dir = out_path.parent / "run_health"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    detail_path = target_dir / f"solve_pressure_and_progress{out_path.suffix}"
+    _save_figure(fig_detail, detail_path, style=style)
+    plt.close(fig_detail)
+    return [detail_path]
+
+
+def plot_compression_ratio_by_plan(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    style = _style(style)
+    fig_compression, _axes_compression = _build_run_health_compression_ratio_figure(df, style=style)
+    target_dir = out_path.parent / "run_health"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    compression_path = target_dir / f"compression_ratio_by_plan{out_path.suffix}"
+    _save_figure(fig_compression, compression_path, style=style)
+    plt.close(fig_compression)
+    return [compression_path]
 
 
 def _run_health_summary_frame(attempts_df: pd.DataFrame, *, plan_quotas: dict[str, int]) -> pd.DataFrame:
@@ -868,9 +1022,10 @@ def _build_run_health_figure(
     events_df: pd.DataFrame | None = None,
     plan_quotas: dict[str, int] | None = None,
     style: Optional[dict] = None,
+    plot_label: str = "run_health",
 ) -> tuple[plt.Figure, dict[str, plt.Axes | None]]:
     if attempts_df is None or attempts_df.empty:
-        raise ValueError("run_health requires attempts.parquet.")
+        raise ValueError(f"{plot_label} requires attempts.parquet.")
     required = {"status", "reason", "plan_name"}
     missing = required - set(attempts_df.columns)
     if missing:
@@ -919,7 +1074,7 @@ def _build_run_health_figure(
     missing_quota = [plan for plan in plan_names if int(quota_map.get(plan, 0)) <= 0]
     if missing_quota:
         raise ValueError(
-            "run_health requires generation.plan quotas for all plans in attempts. "
+            f"{plot_label} requires generation.plan quotas for all plans in attempts. "
             f"Missing or invalid quota for: {', '.join(sorted(missing_quota))}"
         )
 
@@ -1065,25 +1220,23 @@ def _build_run_health_figure(
     max_progress = 0.0
     palette = _palette(style, max(3, len(plan_names)))
     for idx, plan in enumerate(plan_names):
-        quota = int(quota_map[plan])
         plan_mask = attempts_df["plan_name"].astype(str) == plan
         accepted_mask = (plan_mask & (attempts_df["status"] == "ok")).astype(int).to_numpy(dtype=int)
         accepted_counts = accepted_mask.astype(float)
         cumulative = np.cumsum(accepted_counts)
-        ratio = cumulative / float(max(1, quota))
+        accepted_final = int(cumulative[-1]) if cumulative.size > 0 else 0
+        ratio = cumulative / float(max(1, accepted_final))
         max_progress = max(max_progress, float(np.nanmax(ratio)) if ratio.size else 0.0)
         color = palette[idx]
-        accepted_final = int(cumulative[-1]) if cumulative.size > 0 else 0
         ax_plan.plot(
             progress.x,
             ratio,
             linewidth=1.6,
             color=color,
-            label=f"{_ellipsize(plan, 20)} {accepted_final}/{quota}",
+            label=f"{_ellipsize(plan, 20)} ({accepted_final} accepted)",
         )
-        hit = np.where(ratio >= 1.0)[0]
-        if hit.size > 0:
-            h = int(hit[0])
+        if ratio.size > 0:
+            h = int(len(ratio) - 1)
             ax_plan.scatter(
                 float(progress.x[h]),
                 float(ratio[h]),
@@ -1094,24 +1247,14 @@ def _build_run_health_figure(
                 linewidths=0.5,
                 zorder=4,
             )
-    ax_plan.axhline(1.0, color="#999999", linewidth=1.0, linestyle="--")
-    ax_plan.text(
-        0.01,
-        1.0,
-        "quota",
-        transform=ax_plan.get_yaxis_transform(),
-        ha="left",
-        va="bottom",
-        fontsize=max(8.0, legend_size * 0.88),
-        color="#666666",
-    )
+    ax_plan.axhline(1.0, color="#999999", linewidth=1.0, linestyle="--", alpha=0.7)
     ax_plan.set_xlabel("Attempt index")
-    ax_plan.set_ylabel("Accepted / quota")
-    ax_plan.set_ylim(0.0, max(1.05, max_progress + 0.05))
-    ax_plan.set_title("Quota attainment by plan")
+    ax_plan.set_ylabel("Cumulative accepted / final accepted")
+    ax_plan.set_ylim(0.0, max(1.02, max_progress + 0.02))
+    ax_plan.set_title("Accepted progress by plan")
     _subtitle(
         ax_plan,
-        "Cumulative accepted libraries relative to each plan quota.",
+        "Each plan trace is normalized to its own final accepted count.",
         fontsize=max(8.0, legend_size * 0.9),
     )
     ax_plan.legend(

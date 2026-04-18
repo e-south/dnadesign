@@ -16,6 +16,38 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Literal
 
+from ..viz.plot_registry import PLOT_SPECS
+
+CURRENT_PUBLIC_PLOT_IDS = frozenset(PLOT_SPECS.keys())
+LEGACY_PUBLIC_PLOT_IDS = frozenset(
+    {
+        "accepted_arrays_by_plan",
+        "dataset_metadata_heatmap",
+        "dataset_source_inventory",
+        "dense_array_video_showcase",
+        "plan_by_regulator_heatmap",
+        "placement_map",
+        "retained_vs_deployed_length_shift",
+        "retained_vs_deployed_tier_mix",
+        "run_health",
+        "run_health/compression_ratio_distribution",
+        "run_health/outcomes_over_time",
+        "run_health/run_health",
+        "run_health/summary_table.pdf",
+        "run_health/tfbs_length_by_regulator",
+        "stage_a_summary",
+        "stage_a_summary/background_logo",
+        "stage_a_summary/diversity",
+        "stage_a_summary/pool_tiers",
+        "stage_a_summary/sampling_vs_length_ridgeline",
+        "stage_a_summary/yield_bias",
+        "tfbs_usage",
+        "upstream_evidence_quality_summary",
+        "used_unique_vs_retained",
+    }
+)
+SUPPORTED_PLOT_OPTION_BLOCKS = frozenset({"placement_occupancy_map", "tfbs_concentration_profile"})
+
 
 class PlotVideoSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -136,6 +168,31 @@ class PlotVideoConfig(BaseModel):
         return self
 
 
+class StageASummaryPlotOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class StageBScopePlotOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: Literal["auto", "per_plan", "per_group"] = "auto"
+    max_plans: int = 12
+    drilldown_plans: int = 0
+
+    @field_validator("max_plans")
+    @classmethod
+    def _max_plans_ok(cls, value: int) -> int:
+        if not isinstance(value, int) or int(value) <= 0:
+            raise ValueError("plots.options.<plot>.max_plans must be > 0")
+        return int(value)
+
+    @field_validator("drilldown_plans")
+    @classmethod
+    def _drilldown_plans_ok(cls, value: int) -> int:
+        if not isinstance(value, int) or int(value) < 0:
+            raise ValueError("plots.options.<plot>.drilldown_plans must be >= 0")
+        return int(value)
+
+
 class PlotConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     out_dir: str = "outputs/plots"
@@ -156,3 +213,42 @@ class PlotConfig(BaseModel):
         if int(v) <= 0:
             raise ValueError("plots.sample_rows must be > 0")
         return int(v)
+
+    @field_validator("default")
+    @classmethod
+    def _validate_default_plot_ids(cls, value: List[str]) -> List[str]:
+        normalized: list[str] = []
+        for raw_name in list(value or []):
+            name = str(raw_name).strip()
+            if not name:
+                raise ValueError("plots.default must not contain empty plot ids")
+            if name in LEGACY_PUBLIC_PLOT_IDS:
+                raise ValueError(f"plots.default.{name} is no longer supported; use concrete plot ids instead")
+            if name not in CURRENT_PUBLIC_PLOT_IDS:
+                raise ValueError(f"plots.default.{name} is not a supported DenseGen plot id")
+            normalized.append(name)
+        return normalized
+
+    @field_validator("options")
+    @classmethod
+    def _validate_known_plot_options(cls, value: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        options = {str(name): dict(payload or {}) for name, payload in dict(value or {}).items()}
+        for name in list(options):
+            if name in LEGACY_PUBLIC_PLOT_IDS:
+                raise ValueError(f"plots.options.{name} is no longer supported; use concrete plot ids instead")
+            if name not in SUPPORTED_PLOT_OPTION_BLOCKS:
+                raise ValueError(
+                    "plots.options."
+                    + name
+                    + " is not supported; supported plot option blocks: "
+                    + ", ".join(sorted(SUPPORTED_PLOT_OPTION_BLOCKS))
+                )
+        if "placement_occupancy_map" in options:
+            options["placement_occupancy_map"] = StageBScopePlotOptions.model_validate(
+                options["placement_occupancy_map"]
+            ).model_dump(exclude_none=False)
+        if "tfbs_concentration_profile" in options:
+            options["tfbs_concentration_profile"] = StageBScopePlotOptions.model_validate(
+                options["tfbs_concentration_profile"]
+            ).model_dump(exclude_none=False)
+        return options

@@ -42,25 +42,31 @@ from dnadesign.densegen.src.viz.plot_run import (
     _rate_series_from_counts,
     _render_run_health_summary_table_figure,
     _usage_category_label,
+    plot_attempt_outcome_timeline,
     plot_run_health,
+    plot_solve_pressure_and_progress,
+    plot_tfbs_concentration_profile,
     plot_tfbs_usage,
 )
 from dnadesign.densegen.src.viz.plot_stage_a_diversity import _build_stage_a_diversity_figure
 from dnadesign.densegen.src.viz.plot_stage_a_strata import _build_stage_a_strata_overview_figure
 from dnadesign.densegen.src.viz.plot_stage_a_yield import _build_stage_a_yield_bias_figure
-from dnadesign.densegen.src.viz.plot_stage_b_placement import (
+from dnadesign.densegen.src.viz.plot_stage_b_allocation import (
     _allocation_summary_lines,
-    _build_occupancy,
     _build_tfbs_count_records,
+    _render_tfbs_allocation,
+)
+from dnadesign.densegen.src.viz.plot_stage_b_placement import (
+    _build_occupancy,
     _category_display_label,
     _normalize_tf_label,
     _placement_bounds,
     _promoter_constraints,
     _render_occupancy,
-    _render_tfbs_allocation,
     _sanitize_fixed_label,
     _sanitize_tf_label,
     plot_placement_map,
+    plot_placement_occupancy_map,
 )
 from dnadesign.densegen.src.viz.plotting import _load_dense_arrays, _plot_required_columns, plot_stage_a_summary
 
@@ -566,7 +572,16 @@ def _background_pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
 
 
 def test_plot_required_columns_for_new_plots() -> None:
-    cols = _plot_required_columns(["placement_map", "tfbs_usage", "run_health"], {})
+    cols = _plot_required_columns(
+        [
+            "placement_occupancy_map",
+            "tfbs_concentration_profile",
+            "attempt_outcome_timeline",
+            "solve_pressure_and_progress",
+            "compression_ratio_by_plan",
+        ],
+        {},
+    )
     assert set(cols) == {
         "densegen__compression_ratio",
         "densegen__input_name",
@@ -575,7 +590,7 @@ def test_plot_required_columns_for_new_plots() -> None:
         "id",
         "sequence",
     }
-    dataset_cols = _plot_required_columns(["dataset_source_inventory", "dataset_metadata_heatmap"], {})
+    dataset_cols = _plot_required_columns(["source_cohort_concentration", "source_plan_input_heatmap"], {})
     assert set(dataset_cols) == {"source", "densegen__plan", "densegen__input_name"}
 
 
@@ -615,20 +630,43 @@ def test_plot_run_health(tmp_path: Path) -> None:
         cfg={"config": {"generation": {"plan": [{"name": "demo_plan", "quota": 12}]}}},
         style={},
     )
-    assert len(paths) == 5
+    assert len(paths) == 3
     rel_paths = {str(Path(path).relative_to(tmp_path)) for path in paths}
     assert "run_health/outcomes_over_time.png" in rel_paths
     assert "run_health/run_health.png" in rel_paths
     assert "run_health/compression_ratio_distribution.png" in rel_paths
-    assert "run_health/tfbs_length_by_regulator.png" in rel_paths
-    assert "run_health/summary_table.png" in rel_paths
     assert (tmp_path / "run_health" / "outcomes_over_time.png").exists()
     assert (tmp_path / "run_health" / "run_health.png").exists()
     assert (tmp_path / "run_health" / "compression_ratio_distribution.png").exists()
-    assert (tmp_path / "run_health" / "tfbs_length_by_regulator.png").exists()
-    assert (tmp_path / "run_health" / "summary_table.png").exists()
+    assert not (tmp_path / "run_health" / "tfbs_length_by_regulator.png").exists()
+    assert not (tmp_path / "run_health" / "summary_table.png").exists()
     assert not (tmp_path / "run_health" / "run_health_detail.png").exists()
     assert (tmp_path / "run_health" / "summary.csv").exists()
+
+
+def test_attempt_outcome_timeline_errors_use_concrete_plot_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=r"attempt_outcome_timeline requires attempts\.parquet\."):
+        plot_attempt_outcome_timeline(
+            pd.DataFrame(),
+            tmp_path / "attempt_outcome_timeline.png",
+            attempts_df=pd.DataFrame(),
+            cfg=_cfg(),
+            style={},
+        )
+
+
+def test_solve_pressure_and_progress_errors_use_concrete_plot_id(tmp_path: Path) -> None:
+    with pytest.raises(
+        ValueError,
+        match=r"solve_pressure_and_progress requires generation\.plan quotas for all plans in attempts\.",
+    ):
+        plot_solve_pressure_and_progress(
+            pd.DataFrame(),
+            tmp_path / "solve_pressure_and_progress.png",
+            attempts_df=_attempts_df(),
+            cfg={},
+            style={},
+        )
 
 
 def test_plot_run_health_supports_effective_config_sequences(tmp_path: Path) -> None:
@@ -664,7 +702,7 @@ def test_plot_run_health_supports_effective_config_sequences(tmp_path: Path) -> 
         },
         style={},
     )
-    assert len(paths) == 5
+    assert len(paths) == 3
     assert (tmp_path / "run_health" / "run_health.png").exists()
 
 
@@ -681,20 +719,17 @@ def test_run_health_compression_ratio_distribution_uses_plan_hue() -> None:
     try:
         ax = axes["compression"]
         fig_w, fig_h = fig.get_size_inches()
-        assert fig_w == pytest.approx(7.2)
-        assert fig_h == pytest.approx(4.0)
-        assert ax.get_xlabel() == "Compression ratio"
-        assert ax.get_ylabel() == "Count"
-        assert ax.get_title() == "Compression ratio distribution by plan"
-        legend = ax.get_legend()
-        assert legend is not None
-        assert getattr(legend, "_loc", None) == 6
-        legend_bbox = legend.get_bbox_to_anchor()._bbox
-        assert legend_bbox.x0 >= 1.0
-        assert legend_bbox.y0 == pytest.approx(0.5)
-        labels = [text.get_text() for text in legend.get_texts()]
-        assert any("plan_a" in label for label in labels)
-        assert any("plan_b" in label for label in labels)
+        assert fig_w == pytest.approx(fig_h, rel=0.01)
+        assert ax.get_box_aspect() == pytest.approx(1.0)
+        assert ax.get_xlabel() == "Plan"
+        assert ax.get_ylabel() == "Compression ratio"
+        assert ax.get_title() == "Compression ratio by plan"
+        labels = [text.get_text() for text in ax.get_xticklabels()]
+        assert any("Plan A" == label for label in labels)
+        assert any("Plan B" == label for label in labels)
+        assert len(ax.collections) == 2
+        assert ax.patches
+        assert ax.get_legend() is None
         assert not ax.spines["top"].get_visible()
         assert not ax.spines["right"].get_visible()
     finally:
@@ -735,12 +770,10 @@ def test_run_health_compression_ratio_distribution_groups_expanded_plan_names() 
     )
     try:
         ax = axes["compression"]
-        assert ax.get_title() == "Compression ratio distribution by plan group"
-        legend = ax.get_legend()
-        assert legend is not None
-        labels = [text.get_text() for text in legend.get_texts()]
-        assert any("ethanol" in label for label in labels)
-        assert any("ciprofloxacin" in label for label in labels)
+        assert ax.get_title() == "Compression ratio by plan group"
+        labels = [text.get_text() for text in ax.get_xticklabels()]
+        assert any(label.startswith("EtOH") for label in labels)
+        assert any(label.startswith("Cipro") for label in labels)
     finally:
         fig.clf()
 
@@ -771,23 +804,16 @@ def test_run_health_tfbs_length_by_regulator_groups_lengths() -> None:
     )
     try:
         ax = axes["length"]
-        assert ax.get_xlabel() == "Regulator"
-        assert ax.get_ylabel() == "Count in accepted outputs"
-        assert ax.get_title() == "TFBS length counts by regulator across accepted outputs"
-        labels = [tick.get_text() for tick in ax.get_xticklabels()]
-        assert any("TF_A" in label for label in labels)
-        assert any("TF_B" in label for label in labels)
-        assert any("\n(n=" in label for label in labels)
+        assert ax.get_xlabel() == "Count"
+        assert ax.get_ylabel() == "Regulator"
+        assert ax.get_title() == "TFBS lengths by regulator across accepted outputs"
+        labels = [tick.get_text() for tick in ax.get_yticklabels()]
+        assert labels[:2] == ["TF A", "TF B"]
         assert not any("fixed:" in label for label in labels)
-        legend = ax.get_legend()
-        assert legend is not None
-        assert getattr(legend, "_loc", None) == 6
-        legend_bbox = legend.get_bbox_to_anchor()._bbox
-        assert legend_bbox.x0 >= 1.0
-        assert legend_bbox.y0 == pytest.approx(0.5)
-        legend_labels = [text.get_text() for text in legend.get_texts()]
-        assert "4 bp" in legend_labels
-        assert "5 bp" in legend_labels
+        assert ax.get_box_aspect() == pytest.approx(1.0)
+        assert ax.get_legend() is not None
+        assert ax.patches
+        assert not ax.collections
         assert not ax.spines["top"].get_visible()
         assert not ax.spines["right"].get_visible()
     finally:
@@ -805,10 +831,10 @@ def test_run_health_tfbs_length_by_regulator_drops_nan_regulator_labels() -> Non
     )
     fig, axes = _build_run_health_tfbs_length_by_regulator_figure(composition, style={})
     try:
-        labels = [tick.get_text().lower() for tick in axes["length"].get_xticklabels()]
-        assert any("tf_a" in label for label in labels)
-        assert any("tf_b" in label for label in labels)
-        assert not any("nan" in label for label in labels)
+        group_labels = [text.get_text().lower() for text in axes["length"].get_yticklabels()]
+        assert any("tf a" in label for label in group_labels)
+        assert any("tf b" in label for label in group_labels)
+        assert not any("nan" in label for label in group_labels)
     finally:
         fig.clf()
 
@@ -835,18 +861,16 @@ def test_run_health_tfbs_length_single_regulator_uses_length_axis() -> None:
     )
     try:
         ax = axes["length"]
-        assert ax.get_xlabel() == "TFBS length (bp)"
-        assert ax.get_ylabel() == "Count in accepted outputs"
-        assert ax.get_title() == "TFBS length distribution across accepted outputs"
+        assert ax.get_xlabel() == "Count"
+        assert ax.get_ylabel() == "Regulator"
+        assert ax.get_title() == "TFBS lengths by regulator across accepted outputs"
         size = fig.get_size_inches()
         assert size[0] == pytest.approx(size[1], rel=0.01)
-        assert float(size[0]) <= 4.8
-        labels = [tick.get_text() for tick in ax.get_xticklabels()]
-        assert any(label == "4" for label in labels)
-        assert any(label == "5" for label in labels)
-        assert ax.get_legend() is None
+        assert [tick.get_text() for tick in ax.get_yticklabels()] == ["TF A"]
+        assert ax.get_legend() is not None
         patches = ax.patches
         assert patches
+        assert not ax.collections
         face_color = patches[0].get_facecolor()
         assert float(face_color[0]) > 0.3
         assert float(face_color[1]) > 0.3
@@ -915,7 +939,9 @@ def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
         assert fig._suptitle is not None
         assert fig._suptitle.get_text() == "Attempt outcomes by plan"
         assert not ax.get_xlabel()
-        assert ax.get_ylabel() == "Per-plan attempt index"
+        assert ax.get_ylabel() == ""
+        assert fig._supylabel is not None
+        assert fig._supylabel.get_text() == "Attempt index"
         assert ax._left_title.get_text() == ""
         assert fig.legends
         legend = fig.legends[0]
@@ -925,14 +951,39 @@ def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
         assert "Rejected" in legend_labels
         assert "Failed" in legend_labels
         assert "duplicate" not in legend_labels
-        label_size = ax.yaxis.label.get_size()
-        assert all(text.get_size() == pytest.approx(label_size) for text in legend.get_texts())
-        assert legend.get_bbox_to_anchor()._bbox.x0 >= 0.9
+        assert legend._ncols == 3
+        assert legend.get_bbox_to_anchor()._bbox.y0 <= 0.05
         failed_handle = legend.legend_handles[legend_labels.index("Failed")]
         assert isinstance(failed_handle, Line2D)
         assert failed_handle.get_marker() == "X"
         assert to_rgba(failed_handle.get_markerfacecolor()) == pytest.approx(to_rgba("#C62828"))
         assert len(ax.get_lines()) == 0
+    finally:
+        fig.clf()
+
+
+def test_run_health_outcomes_pins_one_font_size_across_titles_labels_and_legend() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = _attempts_df().copy()
+    attempts.loc[:, "sampling_library_index"] = [1, 2, 3]
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 12},
+    )
+    try:
+        ax = axes["outcome"]
+        assert fig._suptitle is not None
+        assert fig._supylabel is not None
+        assert fig.legends
+        ytick_labels = [tick for tick in ax.get_yticklabels() if tick.get_text()]
+        assert ytick_labels
+        pinned_font_size = ytick_labels[0].get_fontsize()
+        assert ax.title.get_fontsize() == pytest.approx(pinned_font_size)
+        assert fig._suptitle.get_fontsize() == pytest.approx(pinned_font_size)
+        assert fig._supylabel.get_fontsize() == pytest.approx(pinned_font_size)
+        assert fig.legends[0].get_texts()[0].get_fontsize() == pytest.approx(pinned_font_size)
     finally:
         fig.clf()
 
@@ -955,10 +1006,12 @@ def test_run_health_outcomes_single_plan_panel_keeps_event_map() -> None:
         assert set(axes.keys()) == {"outcome"}
         assert len(fig.axes) == 1
         ax = axes["outcome"]
-        assert ax.get_title() == "Demo_plan"
+        assert ax.get_title() == "Demo Plan"
         assert ax._left_title.get_text() == ""
         assert not ax.get_xlabel()
-        assert ax.get_ylabel() == "Per-plan attempt index"
+        assert ax.get_ylabel() == ""
+        assert fig._supylabel is not None
+        assert fig._supylabel.get_text() == "Attempt index"
         assert all("Rejected/failed reason composition" not in t.get_text() for t in ax.texts)
         assert all("Quota attainment by plan" not in t.get_text() for t in ax.texts)
         assert fig.legends
@@ -1125,7 +1178,7 @@ def test_run_health_outcomes_tiles_attempts_by_plan_row() -> None:
         tick_labels = [tick.get_text().strip() for tick in axes["outcome"].get_yticklabels() if tick.get_text().strip()]
         assert "1" in tick_labels
         assert "11" in tick_labels
-        assert axes["outcome"].get_ylabel() == "Per-plan attempt index\n(10 attempts per row)"
+        assert axes["outcome"].get_ylabel() == ""
     finally:
         fig.clf()
 
@@ -1154,7 +1207,7 @@ def test_run_health_outcomes_titles_identify_plan_pillars() -> None:
     try:
         ticks = axes["outcome"].get_xticks()
         assert len(ticks) == 0
-        assert axes["outcome"].get_title() == "Plan_a"
+        assert axes["outcome"].get_title() == "Plan A"
     finally:
         fig.clf()
 
@@ -1218,8 +1271,8 @@ def test_run_health_outcomes_auto_groups_expanded_plans() -> None:
     try:
         titles = [ax.get_title() for ax in fig.axes]
         assert len(titles) == 2
-        assert any("Sigma70_panel" in title for title in titles)
-        assert any("Sigma70_topup" in title for title in titles)
+        assert any("Sigma70 Panel" in title for title in titles)
+        assert any("Sigma70 Topup" in title for title in titles)
     finally:
         fig.clf()
 
@@ -1254,8 +1307,8 @@ def test_run_health_outcomes_defaults_to_parent_plan_ticks() -> None:
     try:
         titles = [ax.get_title() for ax in fig.axes]
         assert len(titles) == 2
-        assert any("Sigma70_panel" in title for title in titles)
-        assert any("Sigma70_topup" in title for title in titles)
+        assert any("Sigma70 Panel" in title for title in titles)
+        assert any("Sigma70 Topup" in title for title in titles)
     finally:
         fig.clf()
 
@@ -1294,7 +1347,7 @@ def test_run_health_outcomes_per_plan_scope_keeps_expanded_plan_ticks() -> None:
     try:
         titles = [ax.get_title() for ax in fig.axes]
         assert len(titles) == 2
-        assert all("Sigma70_panel" in title for title in titles)
+        assert all("Sigma70 Panel" in title for title in titles)
     finally:
         fig.clf()
 
@@ -1345,10 +1398,8 @@ def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
         assert not axes["fail"].texts
         assert fig.legends
         assert fig.legends[0]._ncols == 2
-        assert axes["plan"].get_title() == "Quota progress"
-        quota_text = next(text for text in axes["plan"].texts if "Quota (" in text.get_text())
-        assert quota_text.get_ha() == "left"
-        assert quota_text.get_position()[0] <= 0.1
+        assert axes["plan"].get_title() == "Accepted progress by plan"
+        assert not axes["plan"].texts
         assert not axes["fail"].patches
         assert axes["fail"].collections
         fig.canvas.draw()
@@ -1359,8 +1410,8 @@ def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
         plan_title_bbox = (
             axes["plan"].title.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
         )
-        assert (1.0 - fail_title_bbox.y1) >= 0.05
-        assert (1.0 - plan_title_bbox.y1) >= 0.05
+        assert (1.0 - fail_title_bbox.y1) >= 0.02
+        assert (1.0 - plan_title_bbox.y1) >= 0.02
     finally:
         fig.clf()
 
@@ -1412,7 +1463,7 @@ def test_run_health_detail_reason_labels_keep_full_text_without_truncation() -> 
         assert any("Custom reason label with many words 00 segment" == label for label in labels)
         font_sizes = [float(tick.get_fontsize()) for tick in axes["fail"].get_yticklabels() if tick.get_text()]
         assert font_sizes
-        assert max(font_sizes) <= 10.0
+        assert max(font_sizes) <= 15.0
     finally:
         fig.clf()
 
@@ -1477,7 +1528,7 @@ def test_run_health_detail_legend_wraps_for_many_plans() -> None:
     )
     try:
         assert fig.legends
-        assert fig.legends[0]._ncols <= 4
+        assert fig.legends[0]._ncols == 12
     finally:
         fig.clf()
 
@@ -2040,6 +2091,19 @@ def test_plot_placement_map(tmp_path: Path) -> None:
         assert path.stat().st_size > 0
 
 
+def test_plot_placement_occupancy_map_errors_use_concrete_plot_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=r"placement_occupancy_map requires composition\.parquet with placements\."):
+        plot_placement_occupancy_map(
+            _dense_arrays_df(),
+            tmp_path / "placement_occupancy_map.png",
+            composition_df=pd.DataFrame(),
+            dense_arrays_df=_dense_arrays_df(),
+            library_members_df=_library_members_df(),
+            cfg=_cfg(),
+            style={},
+        )
+
+
 def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     out_path = tmp_path / "placement_map_effective.png"
@@ -2133,7 +2197,18 @@ def test_plot_tfbs_usage(tmp_path: Path) -> None:
     assert str(path.relative_to(tmp_path)) == "stage_b/demo_plan/tfbs_usage.png"
 
 
-def test_tfbs_usage_title_is_human_readable_and_legend_has_no_frame() -> None:
+def test_plot_tfbs_concentration_profile_errors_use_concrete_plot_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=r"tfbs_concentration_profile requires composition\.parquet with placements\."):
+        plot_tfbs_concentration_profile(
+            _dense_arrays_df(),
+            tmp_path / "tfbs_concentration_profile.png",
+            composition_df=pd.DataFrame(),
+            library_members_df=_library_members_df(),
+            style={},
+        )
+
+
+def test_tfbs_usage_title_is_readable_and_legend_has_no_frame() -> None:
     matplotlib.use("Agg", force=True)
     fig, axes = _build_tfbs_usage_breakdown_figure(
         _composition_df(),
@@ -2272,7 +2347,6 @@ def test_plot_run_health_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> N
     fake_outcomes = _FakeFigure()
     fake_detail = _FakeFigure()
     fake_compression = _FakeFigure()
-    fake_tfbs = _FakeFigure()
     monkeypatch.setattr(
         plot_run_module,
         "_build_run_health_outcomes_figure",
@@ -2288,11 +2362,6 @@ def test_plot_run_health_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> N
         "_build_run_health_compression_ratio_figure",
         lambda *_args, **_kwargs: (fake_compression, {}),
     )
-    monkeypatch.setattr(
-        plot_run_module,
-        "_build_run_health_tfbs_length_by_regulator_figure",
-        lambda *_args, **_kwargs: (fake_tfbs, {}),
-    )
     monkeypatch.setattr(plot_run_module.plt, "close", lambda *_args, **_kwargs: None)
 
     paths = plot_run_module.plot_run_health(
@@ -2304,8 +2373,8 @@ def test_plot_run_health_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> N
         cfg={"config": {"generation": {"plan": [{"name": "demo_plan", "quota": 12}]}}},
         style={},
     )
-    assert len(paths) == 5
-    for fake_figure in (fake_outcomes, fake_detail, fake_compression, fake_tfbs):
+    assert len(paths) == 3
+    for fake_figure in (fake_outcomes, fake_detail, fake_compression):
         assert len(fake_figure.calls) == 1
         _path, kwargs = fake_figure.calls[0]
         assert kwargs.get("bbox_inches") == "tight"
@@ -3346,8 +3415,8 @@ def test_run_health_dashboard_titles_and_layout() -> None:
         assert axes["dup"].get_title() == "Waste prevalence over solver sequence"
         assert axes["fail"].get_title() == "Rejected/failed reason composition"
         assert axes["plan"] is not None
-        assert axes["plan"].get_title() == "Quota attainment by plan"
-        assert axes["plan"].get_ylabel() == "Accepted / quota"
+        assert axes["plan"].get_title() == "Accepted progress by plan"
+        assert axes["plan"].get_ylabel() == "Cumulative accepted / final accepted"
         assert axes["outcome"].figure.get_constrained_layout()
         assert axes["fail"].get_box_aspect() == pytest.approx(1.0)
         assert axes["plan"].get_box_aspect() == pytest.approx(1.0)
@@ -3356,7 +3425,7 @@ def test_run_health_dashboard_titles_and_layout() -> None:
         )
         assert any("Failure reasons" in text.get_text() for text in axes["fail"].texts)
         assert any(
-            "Cumulative accepted libraries relative to each plan quota." in text.get_text()
+            "Each plan trace is normalized to its own final accepted count." in text.get_text()
             for text in axes["plan"].texts
         )
 

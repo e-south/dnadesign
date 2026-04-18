@@ -19,7 +19,12 @@ from matplotlib.gridspec import SubplotSpec
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
 from .plot_common import _apply_style, _style
-from .plot_stage_a_common import _stage_a_regulator_colors, _stage_a_text_sizes
+from .plot_stage_a_common import (
+    _stage_a_pool_regulator_column,
+    _stage_a_regulator_colors,
+    _stage_a_regulator_order,
+    _stage_a_text_sizes,
+)
 
 
 def _build_stage_a_diversity_figure(
@@ -42,21 +47,10 @@ def _build_stage_a_diversity_figure(
     eligible_hist = sampling["eligible_score_hist"]
     if not isinstance(eligible_hist, list) or not eligible_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-    regulators: list[str] = []
-    for row in eligible_hist:
-        if not isinstance(row, dict):
-            raise ValueError(f"Stage-A sampling has invalid eligible score entry for input '{input_name}'.")
-        if "regulator" not in row:
-            raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
-        regulators.append(str(row["regulator"]))
+    regulators = _stage_a_regulator_order(input_name, sampling)
     if not regulators:
         raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
-    if "regulator_id" in pool_df.columns:
-        tf_col = "regulator_id"
-    elif "tf" in pool_df.columns:
-        tf_col = "tf"
-    else:
-        raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
+    tf_col = _stage_a_pool_regulator_column(pool_df, input_name=input_name)
     if "best_hit_score" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
     reg_colors = _stage_a_regulator_colors(regulators, style)
@@ -91,6 +85,8 @@ def _build_stage_a_diversity_figure(
         row_by_reg: dict[str, dict] = {}
         for row in eligible_hist:
             reg = str(row["regulator"])
+            if reg not in regulators:
+                continue
             if "diversity" not in row:
                 raise ValueError(f"Stage-A diversity missing for input '{input_name}' ({reg}).")
             diversity = row["diversity"]

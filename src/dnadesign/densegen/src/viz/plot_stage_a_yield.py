@@ -19,7 +19,12 @@ from matplotlib.gridspec import SubplotSpec
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
 from .plot_common import _apply_style, _format_percent, _shared_x_cleanup, _style
-from .plot_stage_a_common import _stage_a_regulator_colors, _stage_a_text_sizes
+from .plot_stage_a_common import (
+    _stage_a_pool_regulator_column,
+    _stage_a_regulator_colors,
+    _stage_a_regulator_order,
+    _stage_a_text_sizes,
+)
 
 
 def _build_stage_a_yield_bias_figure(
@@ -42,23 +47,16 @@ def _build_stage_a_yield_bias_figure(
     eligible_hist = sampling["eligible_score_hist"]
     if not isinstance(eligible_hist, list) or not eligible_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-    if "regulator_id" in pool_df.columns:
-        tf_col = "regulator_id"
-    elif "tf" in pool_df.columns:
-        tf_col = "tf"
-    else:
-        raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
-    regs: list[str] = []
-    for row in eligible_hist:
-        if "regulator" not in row:
-            raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
-        regs.append(str(row["regulator"]))
+    tf_col = _stage_a_pool_regulator_column(pool_df, input_name=input_name)
+    regs = _stage_a_regulator_order(input_name, sampling)
     stage_counts = []
     diversity_by_reg: dict[str, dict] = {}
     consensus_by_reg: dict[str, str] = {}
     core_lengths: dict[str, int] = {}
     for row in eligible_hist:
         reg = str(row["regulator"])
+        if reg not in regs:
+            continue
         consensus = row.get("pwm_consensus_iupac")
         if not consensus:
             raise ValueError(f"Stage-A sampling missing pwm_consensus_iupac for '{input_name}' ({reg}).")
@@ -104,7 +102,7 @@ def _build_stage_a_yield_bias_figure(
     fig_height = max(2.9, base_height, 0.95 * n_regs + 0.5)
     reg_colors = _stage_a_regulator_colors(reg_order, style)
     stage_labels = ["Generated", "Eligible", "Unique core", "Selection pool", "Retained"]
-    counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
+    counts_by_reg = {reg: counts for reg, counts in zip(reg_order, stage_counts)}
     max_count = max((max(counts) for counts in stage_counts), default=0)
     subtitle_size = text_sizes["panel_title"] * 0.88
     font_size = float(style.get("font_size", 12.0))

@@ -16,6 +16,8 @@ from typing import Any
 
 import pandas as pd
 
+from ..core.record_metadata_recovery import recover_densegen_metadata_from_source
+
 _CURATED_RECORD_COLUMNS = [
     "id",
     "sequence",
@@ -83,7 +85,7 @@ def build_records_preview_table(records_df: pd.DataFrame) -> pd.DataFrame:
     if records_df.empty:
         return pd.DataFrame(columns=_CURATED_RECORD_COLUMNS)
 
-    df = records_df.copy()
+    df = recover_densegen_metadata_from_source(records_df)
     if "densegen__parts_detail" not in df.columns:
         df["densegen__parts_detail"] = [
             _build_parts_detail(row.get("densegen__used_tfbs_detail")) for _, row in df.iterrows()

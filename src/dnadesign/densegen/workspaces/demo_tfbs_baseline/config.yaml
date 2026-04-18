@@ -88,8 +88,28 @@ plots:
   source: parquet
   out_dir: outputs/plots
   format: pdf
-  default: [stage_a_summary, placement_map, run_health, tfbs_usage]
-  # Stage-B showcase video (single all-plan MP4 by default).
+  default:
+    [
+      source_cohort_concentration,
+      stage_a_sampling_yield,
+      stage_a_pool_diversity,
+      plan_regulator_deployment_heatmap,
+      placement_occupancy_map,
+      retained_pool_coverage_by_regulator,
+      attempt_outcome_timeline,
+      solve_pressure_and_progress,
+      background_sequence_logo,
+      compression_ratio_by_plan,
+      dense_array_showcase_video,
+      retained_vs_deployed_length_mix_by_regulator,
+      retained_vs_deployed_tier_mix_by_regulator,
+      score_strata_and_deployed_length_bridge,
+      source_plan_input_heatmap,
+      stage_a_pool_score_strata,
+      tfbs_concentration_profile,
+      upstream_motif_supply_and_pwm_strength,
+    ]
+  # Optional Stage-B showcase video configuration (single all-plan MP4 when selected).
   video:
     enabled: true
     mode: all_plans_round_robin_single_video

@@ -20,16 +20,14 @@ from matplotlib.patches import Patch
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
 from .plot_common import _apply_style, _draw_tier_markers, _style
-from .plot_stage_a_common import _pastelize_color, _stage_a_regulator_colors, _stage_a_text_sizes
-
-
-def _is_background_regulator(label: str) -> bool:
-    norm = str(label).strip().lower().replace("-", "_")
-    if not norm:
-        return False
-    if norm in {"background", "background_pool", "neutral_bg"}:
-        return True
-    return norm.startswith("background_")
+from .plot_stage_a_common import (
+    _pastelize_color,
+    _stage_a_non_background_sampling_rows,
+    _stage_a_pool_regulator_column,
+    _stage_a_pool_tfbs_column,
+    _stage_a_regulator_colors,
+    _stage_a_text_sizes,
+)
 
 
 def _percentile_from_hist(score: float, *, edges: list[float], counts: list[int]) -> float:
@@ -108,36 +106,13 @@ def _build_stage_a_strata_overview_figure(
         raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
     if "eligible_score_hist" not in sampling:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-    eligible_score_hist = sampling["eligible_score_hist"]
-    if not isinstance(eligible_score_hist, list) or not eligible_score_hist:
-        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-    if "regulator_id" in pool_df.columns:
-        tf_col = "regulator_id"
-    elif "tf" in pool_df.columns:
-        tf_col = "tf"
-    else:
-        raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
-    if "tfbs_sequence" in pool_df.columns:
-        tfbs_col = "tfbs_sequence"
-    elif "tfbs" in pool_df.columns:
-        tfbs_col = "tfbs"
-    else:
-        raise ValueError(f"Stage-A pool missing tfbs_sequence or tfbs column for input '{input_name}'.")
+    tf_col = _stage_a_pool_regulator_column(pool_df, input_name=input_name)
+    tfbs_col = _stage_a_pool_tfbs_column(pool_df, input_name=input_name)
     if "best_hit_score" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
-    eligible_rows: list[dict] = []
-    regulators: list[str] = []
-    for row in eligible_score_hist:
-        if "regulator" not in row:
-            raise ValueError(f"Stage-A eligible score histogram missing regulator for input '{input_name}'.")
-        reg = str(row["regulator"])
-        if _is_background_regulator(reg):
-            continue
-        eligible_rows.append(row)
-        regulators.append(reg)
-    if not regulators:
-        raise ValueError(f"Stage-A sampling missing non-background regulator labels for input '{input_name}'.")
+    eligible_rows = _stage_a_non_background_sampling_rows(input_name, sampling)
+    regulators = [str(row["regulator"]) for row in eligible_rows]
     hist_by_reg: dict[str, tuple[list[float], list[int], float | None, float | None, float | None]] = {}
     tier_labels_by_reg: dict[str, list[str]] = {}
     global_scores: list[float] = []

@@ -38,6 +38,14 @@ _KNOWN_ACRONYMS = {
     "tfbs": "TFBS",
     "usr": "USR",
 }
+_DENSEGEN_BASERENDER_FONT_SIZE = 24
+_DENSEGEN_BASERENDER_LEGEND_HEIGHT_PX = 136.0
+_DENSEGEN_BASERENDER_LEGEND_PAD_PX = 36.0
+_DENSEGEN_BASERENDER_LEGEND_PATCH_W = 96.0
+_DENSEGEN_BASERENDER_LEGEND_PATCH_H = 34.0
+_DENSEGEN_BASERENDER_LEGEND_GAP_X = 60.0
+_DENSEGEN_BASERENDER_LEGEND_GAP_PATCH_TEXT = 22.0
+_DENSEGEN_BASERENDER_LEGEND_VERTICAL_ALIGN = 1.0
 
 
 @dataclass(frozen=True)
@@ -84,6 +92,10 @@ def format_densegen_plan_label(plan_name: str) -> str:
     return plan_label or "unscoped"
 
 
+def densegen_baserender_title_text(*, workspace_name: str) -> str:
+    return format_densegen_workspace_heading(workspace_name)
+
+
 def densegen_video_subtitle_text(*, record_id: str, plan_name: str) -> str:
     return f"Sequence {format_densegen_record_display_id(record_id)} | Plan {format_densegen_plan_label(plan_name)}"
 
@@ -122,13 +134,21 @@ def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
     }
     style_overrides.update(
         {
-            "legend_mode": "inline",
-            "legend_pad_px": 24.0,
-            "legend_patch_w": 28.0,
-            "legend_patch_h": 13.0,
-            "legend_font_size": 14,
-            "legend_gap_patch_text": 11.0,
-            "legend_gap_x": 44.0,
+            "font_size_seq": _DENSEGEN_BASERENDER_FONT_SIZE,
+            "font_size_label": _DENSEGEN_BASERENDER_FONT_SIZE,
+            "legend": True,
+            "legend_mode": "bottom",
+            "legend_height_px": _DENSEGEN_BASERENDER_LEGEND_HEIGHT_PX,
+            "legend_pad_px": _DENSEGEN_BASERENDER_LEGEND_PAD_PX,
+            "legend_patch_w": _DENSEGEN_BASERENDER_LEGEND_PATCH_W,
+            "legend_patch_h": _DENSEGEN_BASERENDER_LEGEND_PATCH_H,
+            "legend_font_size": _DENSEGEN_BASERENDER_FONT_SIZE,
+            "legend_gap_patch_text": _DENSEGEN_BASERENDER_LEGEND_GAP_PATCH_TEXT,
+            "legend_gap_x": _DENSEGEN_BASERENDER_LEGEND_GAP_X,
+            "legend_vertical_align": _DENSEGEN_BASERENDER_LEGEND_VERTICAL_ALIGN,
+            "span_link_line_width": 3.2,
+            "span_link_tick_line_width": 2.8,
+            "uniform_display_font_size": True,
         }
     )
     contract = DenseGenNotebookRenderContract(

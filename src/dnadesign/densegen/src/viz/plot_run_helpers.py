@@ -17,6 +17,17 @@ import re
 import numpy as np
 import pandas as pd
 
+_PLAN_BASE_LABELS = {
+    "background_only": "Background",
+    "ciprofloxacin": "Cipro",
+    "ethanol": "EtOH",
+    "ethanol_ciprofloxacin": "EtOH + Cipro",
+}
+_PLAN_VARIANT_LABELS = {
+    "sig35": "σ70",
+    "sigma70": "σ70",
+}
+
 
 def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
     if values.size == 0:
@@ -123,6 +134,124 @@ def _normalize_plan_name(value: object) -> str | None:
     if label.lower() in {"nan", "none"}:
         return None
     return label
+
+
+def _title_case_words(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    words = [word for word in text.replace("-", " ").replace("_", " ").split() if word]
+    if not words:
+        return ""
+    return " ".join(word[:1].upper() + word[1:] for word in words)
+
+
+def compact_regulator_label(value: object) -> str:
+    token = _usage_category_label(value) or str(value or "").strip()
+    if not token:
+        return ""
+    if token.lower() == "background":
+        return "Background"
+    parts = [part for part in token.replace("-", "_").split("_") if part]
+    labels: list[str] = []
+    for part in parts:
+        if part.isupper():
+            labels.append(part)
+            continue
+        labels.append(part[:1].upper() + part[1:])
+    return " ".join(labels).strip()
+
+
+_KNOWN_REGULATOR_DISPLAY_ORDER = {
+    "lexa": 0,
+    "cpxr": 1,
+    "baer": 2,
+    "background": 99,
+}
+
+
+def order_regulators_for_display(
+    regulators: list[str] | tuple[str, ...],
+    *,
+    counts_by_regulator: dict[str, int] | None = None,
+) -> list[str]:
+    ordered_unique = list(dict.fromkeys(str(regulator) for regulator in regulators if str(regulator).strip()))
+    if not ordered_unique:
+        return []
+    counts = {str(key): int(value) for key, value in (counts_by_regulator or {}).items()}
+
+    def _sort_key(regulator: str) -> tuple[int, int, str]:
+        label = compact_regulator_label(regulator)
+        token = label.lower().replace(" ", "")
+        primary = _KNOWN_REGULATOR_DISPLAY_ORDER.get(token, 40)
+        secondary = -int(counts.get(regulator, 0))
+        return primary, secondary, label.lower()
+
+    return sorted(ordered_unique, key=_sort_key)
+
+
+def compact_plan_label(plan_name: object) -> str:
+    plan_text = _normalize_plan_name(plan_name) or ""
+    if not plan_text:
+        return "Run-level"
+    if plan_text == "unscoped":
+        return "Run-level"
+    if plan_text == "stage_a":
+        return "Stage A"
+    parts = [part for part in plan_text.split("__") if str(part).strip()]
+    base_token = str(parts[0] if parts else plan_text).strip()
+    base_label = _PLAN_BASE_LABELS.get(base_token.lower(), _title_case_words(base_token) or base_token)
+    variant_tokens: list[str] = []
+    for token in parts[1:]:
+        token_text = str(token).strip()
+        if not token_text:
+            continue
+        if "=" in token_text:
+            key, value = token_text.split("=", 1)
+        elif "_" in token_text:
+            key, value = token_text.split("_", 1)
+        else:
+            key, value = token_text, ""
+        key = str(key).strip()
+        value = str(value).strip()
+        if key and value:
+            key_label = _PLAN_VARIANT_LABELS.get(key.lower(), _title_case_words(key) or key)
+            variant_tokens.append(f"{key_label} {value}")
+    if not variant_tokens:
+        return base_label
+    return f"{base_label} [{' | '.join(variant_tokens)}]"
+
+
+def compact_failure_reason_label(reason_label: object) -> str:
+    text = str(reason_label or "").strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    compact_map = {
+        "duplicate output": "Duplicate output",
+        "unknown": "Unknown",
+        "sequence validation": "Sequence validation",
+        "no solution": "No solution",
+        "required regulators": "Required TF set",
+        "min by regulator": "Per-regulator minimum",
+        "min per tf": "Per-TF minimum",
+        "min regulator groups": "Regulator-group minimum",
+        "solver failure": "Solver failure",
+    }
+    if lowered in compact_map:
+        return compact_map[lowered]
+    if lowered.startswith("forbidden kmer:"):
+        token = text.split(":", 1)[1].strip()
+        return f"Forbidden k-mer {token}".strip()
+    if lowered.startswith("forbidden kmers:"):
+        tokens = [item.strip() for item in text.split(":", 1)[1].split(",") if item.strip()]
+        if len(tokens) <= 2:
+            return f"Forbidden k-mers {', '.join(tokens)}".strip()
+        return f"Forbidden k-mers {', '.join(tokens[:2])} ({len(tokens) - 2} more)"
+    normalized = text.replace("_", " ").strip()
+    if not normalized:
+        return ""
+    return normalized[:1].upper() + normalized[1:]
 
 
 def _humanize_scope_label(value: object) -> str:

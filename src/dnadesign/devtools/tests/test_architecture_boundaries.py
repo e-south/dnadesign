@@ -108,6 +108,21 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_studies_to_densegen_public_edge(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "families" / "demo" / "surface.py",
+        "from dnadesign.densegen import inspect_analysis_surface\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "densegen" / "__init__.py",
+        "def inspect_analysis_surface(_path):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
 @pytest.mark.parametrize(
     ("owner_tool", "imported_tool"),
     (
@@ -242,6 +257,25 @@ def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_
     )
 
     assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_scans_study_family_modules(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "def run():\n    return 1\n")
+    _write(tmp_path / "src" / "dnadesign" / "bar" / "src" / "runtime.py", "def run():\n    return 1\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "families" / "demo" / "status.py",
+        "from dnadesign.bar.src.runtime import run\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(
+        repo_root=tmp_path,
+        allowed_edges=set(),
+    )
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "studies"
+    assert violations[0].imported_tool == "bar"
+    assert violations[0].import_target == "dnadesign.bar.src.runtime"
 
 
 def test_find_legacy_surface_violations_flags_removed_repo_root_contract_paths(tmp_path: Path) -> None:

@@ -68,6 +68,22 @@ def _save_figure(fig: plt.Figure, path: Path, *, style: Optional[dict] = None) -
     except Exception:
         save_dpi = 300.0
     fig.savefig(path, bbox_inches="tight", pad_inches=pad_inches, facecolor="white", dpi=save_dpi)
+    if path.suffix.lower() != ".svg":
+        svg_path = path.with_suffix(".svg")
+        fig.savefig(svg_path, bbox_inches="tight", pad_inches=pad_inches, facecolor="white")
+
+
+def _rename_artifact_path(path: Path, target: Path) -> Path:
+    if path == target:
+        return target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    path.replace(target)
+    source_svg = path.with_suffix(".svg")
+    target_svg = target.with_suffix(".svg")
+    if source_svg.exists():
+        target_svg.parent.mkdir(parents=True, exist_ok=True)
+        source_svg.replace(target_svg)
+    return target
 
 
 def _format_plot_path(path: Path, run_root: Path, absolute: bool) -> str:
