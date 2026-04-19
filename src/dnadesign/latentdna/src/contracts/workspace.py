@@ -287,6 +287,7 @@ class PromoterMetadataCohortConfig(StrictWorkspaceModel):
         "design_family",
         "design_regulator_composition",
         "sig35_variant",
+        "spacer_length",
         "campaign_prior",
         "is_control",
         "source_class",

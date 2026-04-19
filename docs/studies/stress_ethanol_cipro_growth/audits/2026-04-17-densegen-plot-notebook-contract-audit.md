@@ -46,7 +46,7 @@ The dashed line is the minimum score among the MMR-retained set, not a simple â€
 The scaffold generates `outputs/notebooks/records_with_overlays.parquet` and `.baserender_preview_cache/`, but the workspace runbook and tutorial mostly describe the visible notebook and plots. DenseGen tests verify template wiring and small synthetic fixtures, not an end-to-end USR-backed notebook generation path against the shared analysis flow.
 
 8. Medium: study-level downstream attention surfaces are overstated.
-The promoter-study `status.md` and `routes.md` present `appendix_umap_gallery` as part of the current attention surface, but the LatentDNA notebook only exposes that preset when all eight canonical views are materialized, and its actual notebook default is `reference_margin_analysis`.
+The promoter-study `status.md` and `routes.md` present `appendix_umap_gallery` as part of the current attention surface, but the LatentDNA notebook only exposes that preset when all eight canonical views are materialized, and its actual notebook surface is `latent_geometry_browser`.
 
 ### Deep Introspection
 

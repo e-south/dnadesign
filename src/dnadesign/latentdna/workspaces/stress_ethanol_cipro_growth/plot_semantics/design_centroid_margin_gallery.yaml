@@ -1,0 +1,15 @@
+plot_id: design_centroid_margin_gallery
+question: How do promoters shift relative to ethanol, ciprofloxacin, and background centroids in each candidate space?
+decision_role: appendix
+encoding: Multi-panel scatter gallery of background-relative ethanol and ciprofloxacin centroid margins across the candidate inventory.
+scope: Stratified candidate samples from the shared promoter population, including study controls and leakage-safe cohort margins.
+guardrails:
+  - Use this gallery for study-internal orientation across the sampled cohorts.
+  - Judge candidate ranking from the design-structure and Sigma-35 summaries first.
+caption: Internal design-centroid margin gallery across the candidate inventory.
+alt_text: Scatter-panel gallery showing background-relative ethanol and ciprofloxacin centroid margins for sampled promoters in each candidate representation.
+preprocessing_md: Margins are computed after view-level standardization and row L2 normalization, using leave-one-out centroids for rows that belong to the target or control cohorts.
+math_md: The axes report m_eth(x) = cos(z_x, c_eth) - cos(z_x, c_bg) and m_cipro(x) = cos(z_x, c_cipro) - cos(z_x, c_bg), where cohort centroids come from the sampled study-internal design families and leave-one-out centroids are used for rows that belong to the target or control cohort.
+rationale_md: Gives an intuitive, length-matched orientation surface without letting reference promoters or neighborhood heuristics drive candidate selection.
+limitations_md: Two-dimensional margins are still a projection of higher-dimensional geometry and cannot substitute for the summary metrics.
+failure_modes_md: Sampling imbalance or centroid leakage can make the scatter appear cleaner than the underlying full-space geometry.

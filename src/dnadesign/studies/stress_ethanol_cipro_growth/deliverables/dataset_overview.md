@@ -1,21 +1,23 @@
-# Dataset inventory by cohort dimension
+# Dataset Overview
 
-LatentDNA is a downstream comparison surface over the current `infer_batch_preparation` record. DenseGen remains the upstream source of cohort semantics. This deliverable fixes the denominator before any geometry or reference-margin plot is interpreted.
+The comparison set has `157,164` promoters: `157,160` DenseGen synthetic promoters and `4` carried controls. The figure defines the shared denominator and the annotation axes used in the later geometry summaries.
 
-The current population is one shared promoter set: `157,160` DenseGen rows plus `4` manual or wildtype controls, for `N = 157,164`. The 60 bp anchor handoff and the 1 kb construct-context handoff contain the same promoters.
+The current shared population is `N = 157,164`: `157,160` DenseGen synthetic promoters plus `4` carried controls. The view name `anchor_60bp` covers the dominant synthetic cohort. The carried controls are 35 bp, 165 bp, 200 bp, and 220 bp anchors.
 
 ### dataset_overview | Dataset inventory by cohort dimension
 
 #### Plot details
 
-**Data.** This is one promoter population viewed through several cohort partitions. The denominator for each partition is \(N = 157{,}164\): \(157{,}160\) DenseGen designs plus \(4\) manual or wildtype controls. The 60 bp anchor handoff and the 1 kb construct-context handoff contain the same promoter population, so this plot does not facet by anchor versus context.
+**Data.** The anchor and 1 kb construct-context datasets contain the same promoter population. The inventory is therefore reported once across provenance, design family, regulator composition, Sigma-35 variant, and realized spacer length.
 
-**Definition.** Each subpanel is a separate partition of the same \(N\) records. Within a subpanel, category fractions are computed as
+**Preprocessing.** None beyond the persisted cohort inventory table.
+
+**Definition.** Each subpanel reports
 
 $$
 \mathrm{fraction}(c) = \frac{n_c}{157{,}164}.
 $$
 
-The categories in each subpanel should sum to one, up to rounding.
+**Decision use.** The inventory defines the denominator and the annotation axes carried into the later summaries: design family, regulator composition, Sigma-35 variant, and spacer length.
 
-**Interpretation.** Read each subpanel independently. The plot answers whether the study population is balanced enough for downstream comparisons across provenance, generation plan, and Sigma-35 variant. It is not a stacked list of unrelated scalar counts.
+**Limits.** Inventory balance is descriptive only. It does not measure representation quality or downstream usefulness.

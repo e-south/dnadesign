@@ -1,4 +1,4 @@
-"""Contracts for the checked-in promoter-study workspace surface."""
+"""Contracts for the checked-in promoter-study pre-assay workspace surface."""
 
 from __future__ import annotations
 
@@ -6,8 +6,10 @@ import json
 from pathlib import Path
 
 from dnadesign.latentdna.src.notebooks.browser_runtime import _parse_deliverable_markdown
+from dnadesign.latentdna.src.services.catalog_service import workspace_catalog_from_context
 from dnadesign.latentdna.src.services.notebook_controls_service import build_workspace_notebook_controls_payload
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
+from dnadesign.latentdna.src.workspaces.plot_semantics import resolve_plot_semantics
 
 
 def _repo_root() -> Path:
@@ -39,14 +41,13 @@ def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() 
     assert controls.plot_controls.default_surface == "plots"
     assert controls.plot_controls.ordered_plot_ids == [
         "dataset_overview",
-        "reference_margin_gallery_wildtype",
-        "reference_neighbor_evidence",
-        "context_shift_reference_plane",
-        "context_delta_distributions",
-        "context_geometry_summary",
-        "representation_tradeoff_scatter",
+        "representation_health_summary",
+        "design_structure_summary",
+        "sigma35_ordinal_audit",
+        "context_robustness_summary",
+        "design_centroid_margin_gallery",
+        "reference_alignment_summary",
         "representation_scree_diagnostic",
-        "reference_margin_gallery_synthetic_centroids",
         "appendix_umap_gallery",
     ]
     assert geometry_ids == [
@@ -63,22 +64,19 @@ def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() 
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_20b_full_context_1kb"
     assert "design_family" in controls.geometry_controls.preferred_hues
     assert "sig35_variant" in controls.geometry_controls.preferred_hues
+    assert "spacer_length" in controls.geometry_controls.preferred_hues
+    assert "wildtype_margin_ethanol_vs_control" not in controls.geometry_controls.preferred_hues
+    assert "wildtype_margin_cipro_vs_control" not in controls.geometry_controls.preferred_hues
     assert "sigma70_variant" not in controls.geometry_controls.preferred_hues
     assert "sigma70_strength_class" not in controls.geometry_controls.preferred_hues
-    assert "context_shift_l2" in controls.geometry_controls.preferred_hues
-    assert "log_likelihood_per_token_20b_anchor_60bp" not in controls.geometry_controls.preferred_hues
-    assert "log_likelihood_per_token_20b_full_context_1kb" not in controls.geometry_controls.preferred_hues
-    assert "log_likelihood_per_token_7b_anchor_60bp" not in controls.geometry_controls.preferred_hues
-    assert "log_likelihood_per_token_7b_full_context_1kb" not in controls.geometry_controls.preferred_hues
     assert "construct__context_id" not in controls.geometry_controls.preferred_hues
-    assert controls.geometry_controls.preferred_hues == list(controls.geometry_controls.hue_kinds)
     assert controls.geometry_controls.hue_kinds["design_family"] == "categorical"
     assert controls.geometry_controls.hue_kinds["is_control"] == "binary"
-    assert controls.geometry_controls.hue_kinds["context_shift_l2"] == "continuous"
+    assert controls.geometry_controls.hue_kinds["spacer_length"] == "continuous"
     assert controls.geometry_controls.reference_labels == ["spyp", "sulap", "j23105"]
 
 
-def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() -> None:
+def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> None:
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
     snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
@@ -87,10 +85,9 @@ def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() 
     assert snapshot["workspace_id"] == "stress_ethanol_cipro_growth"
     assert snapshot["decision_ladder"] == [
         "dataset_overview",
-        "reference_margin_analysis",
-        "context_geometry_audit",
-        "representation_comparison",
-        "representation_health_diagnostic",
+        "design_structure_summary",
+        "sigma35_ordinal_audit",
+        "context_robustness_summary",
     ]
     assert snapshot["browser"]["default_geometry_ids"] == [
         "intermediate_embedding_7b_anchor_60bp",
@@ -102,58 +99,40 @@ def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() 
         "intermediate_embedding_20b_full_context_1kb",
         "pooled_logits_20b_full_context_1kb",
     ]
-    assert snapshot["browser"]["preferred_hues"] == [
+    assert "spacer_length" in snapshot["browser"]["preferred_hues"]
+    assert "wildtype_margin_ethanol_vs_control" not in snapshot["browser"]["preferred_hues"]
+    assert "wildtype_margin_cipro_vs_control" not in snapshot["browser"]["preferred_hues"]
+
+    assert context.config.plots["representation_health_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["design_structure_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["sigma35_ordinal_audit"].kind == "metric_panel_grid"
+    assert context.config.plots["context_robustness_summary"].kind == "metric_panel_grid"
+    assert resolve_plot_semantics(context, plot_id="representation_health_summary").decision_role == "gate"
+    dataset_semantics = resolve_plot_semantics(context, plot_id="dataset_overview")
+    assert "35 bp" in dataset_semantics.scope
+    assert "anchor_60bp" in " ".join(dataset_semantics.guardrails)
+    context_semantics = resolve_plot_semantics(context, plot_id="context_robustness_summary")
+    assert "4,096-row design-family-stratified sample" in context_semantics.scope
+    umap_semantics = resolve_plot_semantics(context, plot_id="appendix_umap_gallery")
+    assert "stored view matrices" in umap_semantics.preprocessing_md
+    assert context.config.plots["design_centroid_margin_gallery"].kind == "xy_scatter_grid"
+    assert context.config.plots["design_centroid_margin_gallery"].visibility_tier == "appendix"
+    assert [option.column for option in context.config.plots["design_centroid_margin_gallery"].hue_options] == [
         "design_family",
         "design_regulator_composition",
         "sig35_variant",
-        "source_class",
-        "is_control",
-        "wildtype_margin_ethanol_vs_control",
-        "wildtype_margin_cipro_vs_control",
-        "synthetic_margin_ethanol_vs_background",
-        "synthetic_margin_cipro_vs_background",
-        "context_self_cosine",
-        "context_shift_l2",
+        "spacer_length",
     ]
-
-    reference_plot = context.config.plots["reference_margin_gallery_wildtype"]
-    assert reference_plot.kind == "xy_scatter_grid"
-    assert list(reference_plot.scalars) == [
-        "wildtype_reference_margins_intermediate_embedding_7b_anchor_60bp",
-        "wildtype_reference_margins_pooled_logits_7b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_7b_full_context_1kb",
-        "wildtype_reference_margins_pooled_logits_7b_full_context_1kb",
-        "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
-        "wildtype_reference_margins_pooled_logits_20b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
-        "wildtype_reference_margins_pooled_logits_20b_full_context_1kb",
-    ]
-    assert reference_plot.default_hue == "design_family"
-    assert [option.column for option in reference_plot.hue_options] == ["design_family", "sig35_variant"]
-
-    context_plane = context.config.plots["context_shift_reference_plane"]
-    assert context_plane.kind == "paired_xy_scatter_grid"
-    assert context_plane.default_hue == "design_family"
-    assert [option.column for option in context_plane.hue_options] == [
-        "design_family",
-        "sig35_variant",
-        "context_self_cosine",
-        "context_shift_l2",
-    ]
-
-    geometry_summary = context.config.plots["context_geometry_summary"]
-    assert geometry_summary.kind == "metric_panel_grid"
-    assert context.config.plots["reference_neighbor_evidence"].kind == "metric_panel_grid"
-    assert "dual_margin_plane" not in context.config.plots
+    assert context.config.plots["reference_alignment_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["reference_alignment_summary"].visibility_tier == "appendix"
+    assert context.config.plots["representation_scree_diagnostic"].kind == "curve_grid"
+    assert context.config.plots["representation_scree_diagnostic"].visibility_tier == "appendix"
     assert context.config.plots["context_delta_distributions"].kind == "distribution_grid"
+    assert context.config.plots["context_delta_distributions"].visibility_tier == "debug"
     assert list(context.config.plots["context_delta_distributions"].metric_columns or []) == [
         "context_self_cosine",
         "context_shift_l2",
-        "context_margin_delta_ethanol",
-        "context_margin_delta_cipro",
     ]
-    assert context.config.plots["representation_tradeoff_scatter"].kind == "xy_scatter_grid"
-    assert context.config.plots["representation_scree_diagnostic"].kind == "curve_grid"
     appendix_gallery = context.config.plots["appendix_umap_gallery"]
     assert appendix_gallery.kind == "projection_grid"
     assert appendix_gallery.visibility_tier == "appendix"
@@ -161,101 +140,107 @@ def test_live_study_snapshot_and_deliverables_follow_reference_first_contract() 
     assert appendix_gallery.default_hue == "design_family"
     assert [option.column for option in appendix_gallery.hue_options] == [
         "design_family",
+        "design_regulator_composition",
         "sig35_variant",
-        "context_self_cosine",
-        "context_shift_l2",
+        "spacer_length",
     ]
+    assert "reference_margin_gallery_wildtype" not in context.config.plots
+    assert "reference_neighbor_evidence" not in context.config.plots
+    assert "context_shift_reference_plane" not in context.config.plots
+    assert "context_geometry_summary" not in context.config.plots
+    assert "representation_tradeoff_scatter" not in context.config.plots
     assert all(getattr(plot, "semantics_ref", None) for plot in context.config.plots.values())
 
-    reference_requirements = context.config.deliverables["reference_margin_analysis"].requires
-    assert list(reference_requirements["views"]) == [
-        "intermediate_embedding_20b_anchor_60bp",
-        "intermediate_embedding_20b_full_context_1kb",
-        "intermediate_embedding_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_20b_anchor_60bp",
-        "pooled_logits_20b_full_context_1kb",
-        "pooled_logits_7b_anchor_60bp",
-        "pooled_logits_7b_full_context_1kb",
+    assert context.config.deliverables["representation_health_summary"].docs_refs == [
+        "study:stress_ethanol_cipro_growth/deliverables/representation_health_summary"
     ]
-
-    geometry_requirements = context.config.deliverables["context_geometry_audit"].requires
-    assert list(geometry_requirements["alignments"]) == [
-        "intermediate_embedding_20b_anchor_to_full_context",
-        "intermediate_embedding_7b_anchor_to_full_context",
-        "pooled_logits_20b_anchor_to_full_context",
-        "pooled_logits_7b_anchor_to_full_context",
+    assert context.config.deliverables["design_structure_summary"].docs_refs == [
+        "study:stress_ethanol_cipro_growth/deliverables/design_structure_summary"
     ]
-
-    assert context.config.deliverables["reference_margin_analysis"].outputs["plots"] == [
-        "reference_margin_gallery_wildtype",
-        "reference_neighbor_evidence",
+    assert context.config.deliverables["sigma35_ordinal_audit"].docs_refs == [
+        "study:stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit"
     ]
-    assert context.config.deliverables["reference_margin_analysis"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/reference_margin_analysis"
+    assert context.config.deliverables["context_robustness_summary"].docs_refs == [
+        "study:stress_ethanol_cipro_growth/deliverables/context_robustness_summary"
     ]
-    assert context.config.deliverables["context_geometry_audit"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/context_geometry_audit"
+    assert context.config.deliverables["appendix_geometry_audit"].outputs["plots"] == [
+        "design_centroid_margin_gallery",
+        "reference_alignment_summary",
+        "representation_scree_diagnostic",
     ]
-    assert context.config.deliverables["representation_comparison"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/representation_comparison"
-    ]
-    assert context.config.deliverables["representation_health_diagnostic"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/representation_health_diagnostic"
-    ]
+    assert context.config.deliverables["appendix_umap_gallery"].outputs["plots"] == ["appendix_umap_gallery"]
+    assert context.config.deliverables["appendix_umap_gallery"].outputs["notebooks"] == ["latent_geometry_browser"]
     assert context.config.exports == {}
-    assert "benchmark_feature_matrix" not in context.config.deliverables
-    assert "benchmark_results_summary" not in context.config.deliverables
-
-    comparison_step = next(
-        step
-        for step in _recipe_steps(context, "representation_comparison_recipe")
-        if step.id == "build_candidate_metrics_long"
-    )
-    assert comparison_step.params["ethanol_values"] == ["ethanol", "ethanol_ciprofloxacin"]
-    assert comparison_step.params["cipro_values"] == ["ciprofloxacin", "ethanol_ciprofloxacin"]
-    assert comparison_step.params["dual_values"] == ["ethanol_ciprofloxacin"]
 
 
 def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
-    reference_steps = {step.id: step for step in _recipe_steps(context, "reference_margin_analysis_recipe")}
-    health_step_ids = [step.id for step in _recipe_steps(context, "representation_health_diagnostic_recipe")]
+    pre_assay_steps = {step.id: step for step in _recipe_steps(context, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
 
-    assert "materialize_intermediate_embedding_20b_anchor_60bp" in reference_steps
-    assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" in reference_steps
-    assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" in reference_steps
-    assert "reduce_pca_intermediate_embedding_20b_anchor_60bp" in reference_steps
-    assert "fit_scorecard_knn_intermediate_embedding_20b_anchor_60bp" in reference_steps
-    assert "build_context_geometry_metrics_intermediate_embedding_20b" in reference_steps
-    assert "compare_context_geometry_agreement_intermediate_embedding_20b" in reference_steps
+    assert "materialize_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
+    assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
+    assert "reduce_pca_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
+    assert "build_design_centroid_margins_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
     assert (
-        reference_steps["build_wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb"].params[
-            "alignment_id"
-        ]
-        == "intermediate_embedding_20b_anchor_to_full_context"
+        pre_assay_steps["build_design_centroid_margins_intermediate_embedding_20b_anchor_60bp"].params["sample_id"]
+        == "scorecard_sample_intermediate_embedding_20b_anchor_60bp"
     )
-    assert "reduce_pca_intermediate_embedding_20b_anchor_60bp" in health_step_ids
-    assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" in health_step_ids
+    assert "build_representation_health_summary_metrics" in pre_assay_steps
+    assert "build_design_structure_summary_metrics" in pre_assay_steps
+    assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
+    assert "build_context_robustness_summary_metrics" in pre_assay_steps
+    assert "build_reference_alignment_summary_metrics" in pre_assay_steps
+    assert all(
+        step.params.get("kind")
+        not in {
+            "similarity_margin",
+            "candidate_metrics_long",
+            "representation_scorecard",
+            "candidate_metric_pairs",
+            "candidate_metric_bars",
+        }
+        for step in pre_assay_steps.values()
+        if getattr(step, "op", None) == "scalar.build"
+    )
+    assert (
+        pre_assay_steps["build_sigma35_ordinal_audit_metrics"].params["sig35_order_path"]
+        == "study_inputs/sig35_order.yaml"
+    )
+    assert "render_design_centroid_margin_gallery" in pre_assay_steps
+    assert "render_reference_alignment_summary" in pre_assay_steps
+    assert "render_representation_scree_diagnostic" in pre_assay_steps
+    assert "render_context_delta_distributions" in pre_assay_steps
+
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" in appendix_steps
     assert appendix_steps["build_umap_sample_intermediate_embedding_20b_anchor_60bp"].params["strategy"] == "all"
     assert set(appendix_steps["generate_latent_geometry_browser"].depends_on) >= {
-        "render_reference_margin_gallery_wildtype",
-        "render_reference_neighbor_evidence",
-        "render_context_shift_reference_plane",
-        "render_context_delta_distributions",
-        "render_context_geometry_summary",
-        "render_representation_tradeoff_scatter",
+        "render_dataset_overview",
+        "render_representation_health_summary",
+        "render_design_structure_summary",
+        "render_sigma35_ordinal_audit",
+        "render_context_robustness_summary",
+        "render_design_centroid_margin_gallery",
+        "render_reference_alignment_summary",
         "render_representation_scree_diagnostic",
         "render_appendix_umap_gallery",
     }
 
 
-def test_live_study_appendix_deliverable_docs_cover_both_appendix_plots() -> None:
-    appendix_doc = (
+def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() -> None:
+    appendix_geometry_doc = (
+        _repo_root()
+        / "src"
+        / "dnadesign"
+        / "studies"
+        / "stress_ethanol_cipro_growth"
+        / "deliverables"
+        / "appendix_geometry_audit.md"
+    ).read_text(encoding="utf-8")
+    appendix_umap_doc = (
         _repo_root()
         / "src"
         / "dnadesign"
@@ -265,7 +250,53 @@ def test_live_study_appendix_deliverable_docs_cover_both_appendix_plots() -> Non
         / "appendix_umap_gallery.md"
     ).read_text(encoding="utf-8")
 
-    parsed = _parse_deliverable_markdown(appendix_doc)
+    parsed_geometry = _parse_deliverable_markdown(appendix_geometry_doc)
+    parsed_umap = _parse_deliverable_markdown(appendix_umap_doc)
 
-    assert "reference_margin_gallery_synthetic_centroids" in parsed["plot_sections"]
-    assert "appendix_umap_gallery" in parsed["plot_sections"]
+    assert "design_centroid_margin_gallery" in parsed_geometry["plot_sections"]
+    assert "reference_alignment_summary" in parsed_geometry["plot_sections"]
+    assert "representation_scree_diagnostic" in parsed_geometry["plot_sections"]
+    assert "appendix_umap_gallery" in parsed_umap["plot_sections"]
+
+
+def test_live_generated_catalog_and_controls_do_not_publish_retired_plot_surfaces() -> None:
+    workspace = _live_workspace()
+    workspace_catalog_from_context(load_workspace_config(workspace))
+    catalog = json.loads((workspace / "outputs" / "catalog.json").read_text(encoding="utf-8"))
+    controls = json.loads(
+        (workspace / "outputs" / "notebooks" / "latent_geometry_browser" / "controls.json").read_text(encoding="utf-8")
+    )
+
+    retired_plot_ids = {
+        "context_geometry_summary",
+        "context_shift_reference_plane",
+        "dual_margin_plane",
+        "reference_margin_gallery_synthetic_centroids",
+        "reference_margin_gallery_wildtype",
+        "reference_neighbor_evidence",
+        "representation_tradeoff_scatter",
+    }
+    catalog_plot_ids = {str(row["plot_id"]) for row in catalog.get("plots", []) if isinstance(row, dict)}
+    assert retired_plot_ids.isdisjoint(catalog_plot_ids)
+    plot_dirs = {path.name for path in (workspace / "outputs" / "plots").iterdir() if path.is_dir()}
+    assert retired_plot_ids.isdisjoint(plot_dirs)
+
+    joinable_tables = controls.get("geometry_controls", {}).get("joinable_tables", [])
+    joinable_artifact_ids = {str(row.get("artifact_id")) for row in joinable_tables if isinstance(row, dict)}
+    assert "context_geometry_summary_metrics" not in joinable_artifact_ids
+    assert "reference_neighbor_evidence_metrics" not in joinable_artifact_ids
+    scalar_dirs = {path.name for path in (workspace / "outputs" / "scalars").iterdir() if path.is_dir()}
+    retired_scalar_ids = {
+        "context_geometry_summary_metrics",
+        "reference_neighbor_evidence_metrics",
+        "tradeoff_cipro_context",
+        "tradeoff_dual_context",
+        "tradeoff_ethanol_context",
+        "tradeoff_reference_neighbor_context",
+    }
+    assert retired_scalar_ids.isdisjoint(scalar_dirs)
+    for row in joinable_tables:
+        if not isinstance(row, dict):
+            continue
+        assert "wildtype_margin_ethanol_vs_control" not in row.get("columns", [])
+        assert "wildtype_margin_cipro_vs_control" not in row.get("columns", [])

@@ -16,11 +16,11 @@ def render_scope_note_cell() -> str:
 
             plot_scope_note = _support.mo.md(
                 (
-                    "This notebook is a downstream LatentDNA comparison surface over the current "
-                    "`infer_batch_preparation` study snapshot. DenseGen remains the upstream source of cohort "
-                    "semantics and provenance; use these plots to review available Evo 2 embedding geometry, "
-                    "reference-margin behavior, and context stability rather than to answer current study-status "
-                    "questions."
+                    "This notebook is the LatentDNA pre-assay review surface for the current "
+                    "`infer_batch_preparation` study snapshot. DenseGen remains the source of cohort semantics "
+                    "and provenance. Use these plots to review representation health, design structure, "
+                    "Sigma-35 organization, and context robustness. Do not use this notebook as the "
+                    "study-status record."
                 )
             )
             geometry_scope_note = _support.mo.md(
@@ -197,6 +197,14 @@ def render_plot_review_cell() -> str:
                     _section_blocks.insert(
                         1,
                         _support.mo.hstack(_selectors, justify="start", align="end", wrap=True, gap=0.28),
+                    )
+                if str(_active_card.get("status") or "missing") != "ok":
+                    _section_blocks.append(
+                        _support.mo.callout(
+                            "This plot artifact is not current. Rebuild it or inspect the deliverable status "
+                            "before using it.",
+                            kind="warn",
+                        )
                     )
                 if _active_card.get("study_doc_warning"):
                     _section_blocks.append(_support.mo.callout(str(_active_card["study_doc_warning"]), kind="warn"))
@@ -440,7 +448,7 @@ def render_compare_panel_cell() -> str:
             )
             distance_correlation_plot = _renderers.render_distance_correlation(
                 compare_payload,
-                title="Pairwise distance correlation",
+                title="Pairwise distance Spearman",
             )
             rowwise_cosine_plot = _renderers.render_rowwise_distribution(
                 compare_payload,

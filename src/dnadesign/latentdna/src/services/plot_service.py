@@ -47,7 +47,7 @@ def write_plot_index(
             if not manifest_path.is_file():
                 continue
             manifest = context.read_manifest(manifest_path)
-            plot_id = str(manifest["artifact_id"])
+            plot_id = str(manifest.get("artifact_id") or plot_dir.name)
             freshness = evaluate_artifact_freshness(context, artifact_kind="plot", artifact_id=plot_id, cache=cache)
             rendered_formats = [
                 Path(str(output.get("path") or "")).suffix.lstrip(".")
@@ -63,7 +63,8 @@ def write_plot_index(
                 {
                     "plot_id": plot_id,
                     "deliverable_id": _plot_deliverable_id(context, plot_id=plot_id),
-                    "status": manifest.get("status", freshness["status"]),
+                    "status": freshness["status"],
+                    "manifest_status": manifest.get("status"),
                     "rendered_formats": rendered_formats,
                     "output_paths": output_paths,
                     "input_artifact_ids": [
@@ -71,16 +72,12 @@ def write_plot_index(
                         for entry in manifest.get("inputs", [])
                         if isinstance(entry, dict)
                     ],
-                    "research_question": (
-                        manifest.get("semantics", {}).get("research_question")
-                        if isinstance(manifest.get("semantics"), dict)
-                        else None
-                    ),
-                    "evidence_tier": (
-                        manifest.get("semantics", {}).get("evidence_tier")
-                        if isinstance(manifest.get("semantics"), dict)
-                        else None
-                    ),
+                    "question": manifest.get("semantics", {}).get("question")
+                    if isinstance(manifest.get("semantics"), dict)
+                    else None,
+                    "decision_role": manifest.get("semantics", {}).get("decision_role")
+                    if isinstance(manifest.get("semantics"), dict)
+                    else None,
                     "created_at": manifest.get("created_at"),
                     "stale": freshness["status"] != "ok",
                 }

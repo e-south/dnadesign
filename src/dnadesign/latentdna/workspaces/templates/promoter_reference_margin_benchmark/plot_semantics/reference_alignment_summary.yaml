@@ -1,0 +1,15 @@
+plot_id: reference_alignment_summary
+question: How strongly do the full-context candidate spaces align to the ethanol and ciprofloxacin reference promoters?
+decision_role: appendix
+encoding: Candidate-by-metric bar panels for background-relative alignment to the ethanol and ciprofloxacin reference centroids.
+scope: Full-context candidate samples that include the carried reference promoters alongside the synthetic cohort.
+guardrails:
+  - Use this panel as a weak external landmark check.
+  - Keep candidate selection on the primary ladder even when the reference margins look intuitive.
+caption: Weak external reference-alignment summary for the full-context candidate subset.
+alt_text: Bar-panel summary showing background-relative alignment to the ethanol and ciprofloxacin reference promoters for full-context candidates.
+preprocessing_md: Reference alignments use the same view-level standardization and row L2 normalization contract as the other cosine-based plots.
+math_md: The plot reports a_eth = cos(c_eth, r_spyP) - cos(c_bg, r_spyP) and a_cipro = cos(c_cipro, r_sulAp) - cos(c_bg, r_sulAp).
+rationale_md: Retains the external landmarks as appendix-only evidence while shrinking the claim to a background-relative cohort comparison.
+limitations_md: Anchor-only controls are length-mismatched, and even full-context reference alignment remains much weaker than assay-era phenotype evidence.
+failure_modes_md: Sparse reference rows or strong context dilution can make alignment metrics noisy or misleadingly flat.

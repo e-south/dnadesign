@@ -69,23 +69,22 @@ def _write_workspace_config(workspace_dir: Path) -> None:
                     }
                 },
                 "plots": {
-                    "reference_margin_gallery_wildtype": {
+                    "design_centroid_margin_gallery": {
                         "kind": "xy_scatter_grid",
                         "scalars": ["margin_a", "margin_b"],
                         "panel_titles": ["panel a", "panel b"],
-                        "x_column": "wildtype_margin_ethanol_vs_control",
-                        "y_column": "wildtype_margin_cipro_vs_control",
+                        "x_column": "synthetic_margin_ethanol_vs_background",
+                        "y_column": "synthetic_margin_cipro_vs_background",
                         "default_hue": "design_family",
                         "hue_options": [
                             {"column": "design_family", "label": "Design family", "type": "categorical"},
                             {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
                         ],
-                        "annotation": {"reference_set": "promoter_wildtype_primary"},
-                        "semantics_ref": "plot_semantics/reference_margin_gallery_wildtype.yaml",
+                        "semantics_ref": "plot_semantics/design_centroid_margin_gallery.yaml",
                     },
-                    "context_geometry_summary": {
+                    "representation_health_summary": {
                         "kind": "metric_panel_grid",
-                        "scalar": "context_geometry_summary_metrics",
+                        "scalar": "representation_health_summary_metrics",
                         "facet_column": "category",
                         "panel_title_column": "display_name",
                         "category_column": "label",
@@ -98,7 +97,7 @@ def _write_workspace_config(workspace_dir: Path) -> None:
                         "measure_kind": "metric",
                         "value_kind": "score",
                         "value_label": "Metric value",
-                        "semantics_ref": "plot_semantics/context_geometry_summary.yaml",
+                        "semantics_ref": "plot_semantics/representation_health_summary.yaml",
                     },
                 },
             },
@@ -108,33 +107,45 @@ def _write_workspace_config(workspace_dir: Path) -> None:
     )
     semantics_dir = workspace_dir / "plot_semantics"
     semantics_dir.mkdir(exist_ok=True)
-    (semantics_dir / "reference_margin_gallery_wildtype.yaml").write_text(
+    (semantics_dir / "design_centroid_margin_gallery.yaml").write_text(
         yaml.safe_dump(
             {
-                "plot_id": "reference_margin_gallery_wildtype",
-                "research_question": "Do promoters move toward the correct wildtype references relative to J23105?",
-                "evidence_tier": "primary",
-                "encoding_summary": "Two-panel scatter plot of reference-relative margins.",
-                "sampling_scope": "Full population.",
-                "interpretation_guardrails": ["Two-dimensional separation is descriptive only."],
-                "caption_md": "Wildtype reference-relative margin plane.",
-                "alt_text": "Two-panel scatter plot of ethanol-reference versus cipro-reference margins.",
+                "plot_id": "design_centroid_margin_gallery",
+                "question": "Do internal design centroids orient the candidate space away from the background cohort?",
+                "decision_role": "primary",
+                "encoding": "Two-panel scatter plot of study-internal design-centroid margins.",
+                "scope": "Full population.",
+                "guardrails": ["Two-dimensional separation is descriptive only."],
+                "caption": "Study-internal design-centroid margin plane.",
+                "alt_text": (
+                    "Two-panel scatter plot of ethanol-versus-background and ciprofloxacin-versus-background margins."
+                ),
+                "preprocessing_md": "Fixture semantics do not declare additional preprocessing.",
+                "math_md": "Fixture semantics do not declare a mathematical definition.",
+                "rationale_md": "Fixture semantics exist only to validate plot-gallery rendering.",
+                "limitations_md": "Fixture semantics are not a study-facing scientific contract.",
+                "failure_modes_md": "Replace fixture semantics before using the plot outside tests.",
             },
             sort_keys=False,
         ),
         encoding="utf-8",
     )
-    (semantics_dir / "context_geometry_summary.yaml").write_text(
+    (semantics_dir / "representation_health_summary.yaml").write_text(
         yaml.safe_dump(
             {
-                "plot_id": "context_geometry_summary",
-                "research_question": "How stable is context geometry across candidate spaces?",
-                "evidence_tier": "primary",
-                "encoding_summary": "Two-panel agreement summary chart.",
-                "sampling_scope": "Aligned paired population.",
-                "interpretation_guardrails": ["Agreement metrics summarize paired geometry only."],
-                "caption_md": "Context geometry summary.",
-                "alt_text": "Two-panel agreement summary chart for context geometry.",
+                "plot_id": "representation_health_summary",
+                "question": "Which candidate spaces pass the representation-health gate?",
+                "decision_role": "primary",
+                "encoding": "Two-panel candidate metric summary chart.",
+                "scope": "Candidate-level health metrics.",
+                "guardrails": ["Health metrics are a gate, not a biological performance claim."],
+                "caption": "Representation-health summary.",
+                "alt_text": "Two-panel candidate metric chart for effective rank and pairwise distance spread.",
+                "preprocessing_md": "Fixture semantics do not declare additional preprocessing.",
+                "math_md": "Fixture semantics do not declare a mathematical definition.",
+                "rationale_md": "Fixture semantics exist only to validate plot-gallery rendering.",
+                "limitations_md": "Fixture semantics are not a study-facing scientific contract.",
+                "failure_modes_md": "Replace fixture semantics before using the plot outside tests.",
             },
             sort_keys=False,
         ),
@@ -198,44 +209,44 @@ def _write_metric_panel_scalar(output_root: Path, scalar_id: str) -> None:
         scalar_id,
         [
             {
-                "category": "context_self_cosine_median",
+                "category": "effective_rank",
                 "label": "candidate_a",
-                "display_name": "Context self cosine",
+                "display_name": "Effective rank",
                 "candidate_label": "candidate a",
                 "candidate_family": "intermediate_embedding",
                 "direction": "higher_is_better",
-                "unit": "cosine",
-                "metric_value": 0.98,
+                "unit": "rank",
+                "metric_value": 8.4,
             },
             {
-                "category": "context_self_cosine_median",
+                "category": "effective_rank",
                 "label": "candidate_b",
-                "display_name": "Context self cosine",
+                "display_name": "Effective rank",
                 "candidate_label": "candidate b",
                 "candidate_family": "pooled_logits",
                 "direction": "higher_is_better",
-                "unit": "cosine",
-                "metric_value": 0.74,
+                "unit": "rank",
+                "metric_value": 1.2,
             },
             {
-                "category": "context_shift_l2_median",
+                "category": "pairwise_cosine_distance_iqr",
                 "label": "candidate_a",
-                "display_name": "Context shift L2",
+                "display_name": "Pairwise cosine distance IQR",
                 "candidate_label": "candidate a",
                 "candidate_family": "intermediate_embedding",
-                "direction": "lower_is_better",
-                "unit": "l2",
-                "metric_value": 0.11,
+                "direction": "higher_is_better",
+                "unit": "distance",
+                "metric_value": 0.18,
             },
             {
-                "category": "context_shift_l2_median",
+                "category": "pairwise_cosine_distance_iqr",
                 "label": "candidate_b",
-                "display_name": "Context shift L2",
+                "display_name": "Pairwise cosine distance IQR",
                 "candidate_label": "candidate b",
                 "candidate_family": "pooled_logits",
-                "direction": "lower_is_better",
-                "unit": "l2",
-                "metric_value": 0.38,
+                "direction": "higher_is_better",
+                "unit": "distance",
+                "metric_value": 0.01,
             },
         ],
     )
@@ -276,14 +287,14 @@ def test_plot_gallery_rendering_records_plural_scalar_and_agreement_inputs(tmp_p
         "margin_a",
         [
             {
-                "wildtype_margin_ethanol_vs_control": 0.25,
-                "wildtype_margin_cipro_vs_control": -0.10,
+                "synthetic_margin_ethanol_vs_background": 0.25,
+                "synthetic_margin_cipro_vs_background": -0.10,
                 "design_family": "ethanol",
                 "sig35_variant": "b",
             },
             {
-                "wildtype_margin_ethanol_vs_control": -0.05,
-                "wildtype_margin_cipro_vs_control": 0.20,
+                "synthetic_margin_ethanol_vs_background": -0.05,
+                "synthetic_margin_cipro_vs_background": 0.20,
                 "design_family": "cipro",
                 "sig35_variant": "c",
             },
@@ -294,26 +305,26 @@ def test_plot_gallery_rendering_records_plural_scalar_and_agreement_inputs(tmp_p
         "margin_b",
         [
             {
-                "wildtype_margin_ethanol_vs_control": 0.35,
-                "wildtype_margin_cipro_vs_control": -0.15,
+                "synthetic_margin_ethanol_vs_background": 0.35,
+                "synthetic_margin_cipro_vs_background": -0.15,
                 "design_family": "ethanol",
                 "sig35_variant": "b",
             },
             {
-                "wildtype_margin_ethanol_vs_control": -0.15,
-                "wildtype_margin_cipro_vs_control": 0.30,
+                "synthetic_margin_ethanol_vs_background": -0.15,
+                "synthetic_margin_cipro_vs_background": 0.30,
                 "design_family": "cipro",
                 "sig35_variant": "c",
             },
         ],
     )
-    _write_metric_panel_scalar(output_root, "context_geometry_summary_metrics")
+    _write_metric_panel_scalar(output_root, "representation_health_summary_metrics")
 
-    _render_named_plot(workspace_dir, "reference_margin_gallery_wildtype")
-    _render_named_plot(workspace_dir, "context_geometry_summary")
+    _render_named_plot(workspace_dir, "design_centroid_margin_gallery")
+    _render_named_plot(workspace_dir, "representation_health_summary")
 
     reference_manifest = json.loads(
-        (output_root / "plots" / "reference_margin_gallery_wildtype" / "manifest.json").read_text(encoding="utf-8")
+        (output_root / "plots" / "design_centroid_margin_gallery" / "manifest.json").read_text(encoding="utf-8")
     )
     assert reference_manifest["params"]["plot_kind"] == "xy_scatter_grid"
     assert reference_manifest["params"]["scalar_ids"] == ["margin_a", "margin_b"]
@@ -324,68 +335,64 @@ def test_plot_gallery_rendering_records_plural_scalar_and_agreement_inputs(tmp_p
     ]
     assert "shape_column" not in reference_manifest["params"]
     assert [entry["id"] for entry in reference_manifest["inputs"]] == ["margin_a", "margin_b"]
-    assert reference_manifest["semantics"]["evidence_tier"] == "primary"
-    assert reference_manifest["semantics"]["research_question"].startswith("Do promoters move")
-    assert reference_manifest["stats"]["reference_set_complete"] is False
-    assert reference_manifest["stats"]["reference_panels"]["margin_a"]["error"] == "missing_reference_columns"
-    reference_svg = output_root / "plots" / "reference_margin_gallery_wildtype" / "plot.svg"
+    assert reference_manifest["semantics"]["decision_role"] == "primary"
+    assert reference_manifest["semantics"]["question"].startswith("Do internal design centroids orient")
+    reference_svg = output_root / "plots" / "design_centroid_margin_gallery" / "plot.svg"
     assert reference_svg.is_file()
     reference_svg_text = reference_svg.read_text(encoding="utf-8")
     assert (
-        "<title>Do promoters move toward the correct wildtype references relative to J23105?</title>"
+        "<title>Do internal design centroids orient the candidate space away from the background cohort?</title>"
         in reference_svg_text
     )
     assert (
-        "<desc>Two-panel scatter plot of ethanol-reference versus cipro-reference margins.</desc>" in reference_svg_text
+        "<desc>Two-panel scatter plot of ethanol-versus-background and ciprofloxacin-versus-background margins.</desc>"
+        in reference_svg_text
     )
 
     agreement_manifest = json.loads(
-        (output_root / "plots" / "context_geometry_summary" / "manifest.json").read_text(encoding="utf-8")
+        (output_root / "plots" / "representation_health_summary" / "manifest.json").read_text(encoding="utf-8")
     )
     assert agreement_manifest["params"]["plot_kind"] == "metric_panel_grid"
     assert agreement_manifest["params"]["measure_kind"] == "metric"
     assert agreement_manifest["params"]["value_column"] == "metric_value"
     assert agreement_manifest["params"]["row_column"] == "category"
     assert agreement_manifest["params"]["panel_column"] == "display_name"
-    assert [entry["id"] for entry in agreement_manifest["inputs"]] == ["context_geometry_summary_metrics"]
-    assert (output_root / "plots" / "context_geometry_summary" / "plot.png").is_file()
+    assert [entry["id"] for entry in agreement_manifest["inputs"]] == ["representation_health_summary_metrics"]
+    assert (output_root / "plots" / "representation_health_summary" / "plot.png").is_file()
 
 
-def test_reference_margin_annotations_do_not_expand_canvas_excessively(tmp_path: Path) -> None:
+def test_design_centroid_margin_gallery_keeps_reasonable_canvas(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     _write_workspace_config(workspace_dir)
 
     output_root = workspace_dir / "outputs"
-    annotated_rows = [
+    design_rows = [
         {
-            "wildtype_margin_ethanol_vs_control": 0.25,
-            "wildtype_margin_cipro_vs_control": -0.10,
+            "synthetic_margin_ethanol_vs_background": 0.25,
+            "synthetic_margin_cipro_vs_background": -0.10,
             "design_family": "ethanol",
             "sig35_variant": "b",
-            "usr_label__primary": "spyp",
         },
         {
-            "wildtype_margin_ethanol_vs_control": -0.05,
-            "wildtype_margin_cipro_vs_control": 0.20,
+            "synthetic_margin_ethanol_vs_background": -0.05,
+            "synthetic_margin_cipro_vs_background": 0.20,
             "design_family": "cipro",
             "sig35_variant": "c",
-            "usr_label__primary": "sulap",
         },
         {
-            "wildtype_margin_ethanol_vs_control": 0.02,
-            "wildtype_margin_cipro_vs_control": 0.01,
-            "design_family": "control",
-            "sig35_variant": "control",
-            "usr_label__primary": "j23105",
+            "synthetic_margin_ethanol_vs_background": 0.02,
+            "synthetic_margin_cipro_vs_background": 0.01,
+            "design_family": "background_only",
+            "sig35_variant": "f",
         },
     ]
-    _write_scalar(output_root, "margin_a", annotated_rows)
-    _write_scalar(output_root, "margin_b", annotated_rows)
+    _write_scalar(output_root, "margin_a", design_rows)
+    _write_scalar(output_root, "margin_b", design_rows)
 
-    _render_named_plot(workspace_dir, "reference_margin_gallery_wildtype")
+    _render_named_plot(workspace_dir, "design_centroid_margin_gallery")
 
-    reference_svg = output_root / "plots" / "reference_margin_gallery_wildtype" / "plot.svg"
+    reference_svg = output_root / "plots" / "design_centroid_margin_gallery" / "plot.svg"
     root = ET.fromstring(reference_svg.read_text(encoding="utf-8"))
     width = float(root.attrib["width"].removesuffix("pt"))
     height = float(root.attrib["height"].removesuffix("pt"))

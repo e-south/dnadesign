@@ -657,10 +657,11 @@ def test_load_workspace_config_accepts_promoter_reference_margin_benchmark_templ
 
     assert context.workspace_id == "promoter_reference_margin_workspace"
     assert "dataset_overview" in context.config.deliverables
-    assert "reference_margin_analysis" in context.config.deliverables
-    assert "context_geometry_audit" in context.config.deliverables
-    assert "representation_comparison" in context.config.deliverables
-    assert "representation_health_diagnostic" in context.config.deliverables
+    assert "representation_health_summary" in context.config.deliverables
+    assert "design_structure_summary" in context.config.deliverables
+    assert "sigma35_ordinal_audit" in context.config.deliverables
+    assert "context_robustness_summary" in context.config.deliverables
+    assert "appendix_geometry_audit" in context.config.deliverables
     assert "appendix_umap_gallery" in context.config.deliverables
 
 
@@ -671,14 +672,19 @@ def test_load_workspace_config_accepts_notebook_declarations(tmp_path) -> None:
     (workspace_dir / "plot_semantics" / "appendix_umap_gallery.yaml").write_text(
         """
 plot_id: appendix_umap_gallery
-research_question: What appendix projection is available for the demo notebook?
-evidence_tier: appendix
-encoding_summary: Demo projection scatter plot for notebook wiring validation.
-sampling_scope: Full population.
-interpretation_guardrails:
+question: What appendix projection is available for the demo notebook?
+decision_role: appendix
+encoding: Demo projection scatter plot for notebook wiring validation.
+scope: Full population.
+guardrails:
   - This fixture only validates workspace loading.
-caption_md: Demo appendix plot semantics fixture.
+caption: Demo appendix plot semantics fixture.
 alt_text: Demo appendix plot semantics fixture.
+preprocessing_md: Fixture semantics do not declare additional preprocessing.
+math_md: Fixture semantics do not declare a mathematical definition.
+rationale_md: Fixture semantics exist only to validate workspace loading.
+limitations_md: Fixture semantics are not a study-facing scientific contract.
+failure_modes_md: Replace fixture semantics before using the plot outside tests.
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -879,14 +885,19 @@ def test_load_workspace_config_accepts_plot_registry(tmp_path) -> None:
     (workspace_dir / "plot_semantics" / "atlas_scatter.yaml").write_text(
         """
 plot_id: atlas_scatter
-research_question: Does the demo plot registry preserve scatter settings?
-evidence_tier: qc
-encoding_summary: Demo scatter plot used for plot-registry validation.
-sampling_scope: Full population.
-interpretation_guardrails:
+question: Does the demo plot registry preserve scatter settings?
+decision_role: debug
+encoding: Demo scatter plot used for plot-registry validation.
+scope: Full population.
+guardrails:
   - Fixture semantics for config validation only.
-caption_md: Demo plot registry semantics.
+caption: Demo plot registry semantics.
 alt_text: Demo plot registry semantics.
+preprocessing_md: Fixture semantics do not declare additional preprocessing.
+math_md: Fixture semantics do not declare a mathematical definition.
+rationale_md: Fixture semantics exist only to validate plot-registry loading.
+limitations_md: Fixture semantics are not a study-facing scientific contract.
+failure_modes_md: Replace fixture semantics before using the plot outside tests.
         """.strip()
         + "\n",
         encoding="utf-8",

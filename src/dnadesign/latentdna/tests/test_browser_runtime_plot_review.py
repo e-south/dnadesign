@@ -14,35 +14,35 @@ def test_render_plot_review_surface_supports_semantic_xy_columns(monkeypatch, tm
     frames = [
         pd.DataFrame(
             {
-                "wildtype_margin_ethanol_vs_control": [0.4, -0.2],
-                "wildtype_margin_cipro_vs_control": [0.25, -0.1],
+                "synthetic_margin_ethanol_vs_background": [0.4, -0.2],
+                "synthetic_margin_cipro_vs_background": [0.25, -0.1],
                 "design_family": ["ethanol", "background_only"],
-                "usr_label__primary": ["spyp", "background_only"],
+                "sig35_variant": ["b", "f"],
             }
         )
     ]
 
     rendered = render_plot_review_surface(
         {
-            "plot_id": "reference_margin_gallery_wildtype",
+            "plot_id": "design_centroid_margin_gallery",
             "kind": "xy_scatter_grid",
-            "x_column": "wildtype_margin_ethanol_vs_control",
-            "y_column": "wildtype_margin_cipro_vs_control",
-            "panel_titles": ["Wildtype reference-margin gallery"],
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
+            "panel_titles": ["Design-centroid margin gallery"],
             "hue_options": [
                 {"column": "design_family", "label": "Design family", "type": "categorical"},
             ],
         },
         frames=frames,
         hue_column="design_family",
-        reference_labels=["spyp"],
+        reference_labels=[],
         joinable_tables=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
     )
 
     assert isinstance(rendered, mo.Html)
-    assert "reference_margin_gallery_wildtype" in rendered.text
+    assert "design_centroid_margin_gallery" in rendered.text
 
 
 def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scalar_rows(
@@ -52,13 +52,13 @@ def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scal
     frames = [
         pd.DataFrame(
             {
-                "category": ["reference_in_knn_rate", "reference_in_knn_rate"],
+                "category": ["effective_rank", "effective_rank"],
                 "label": ["candidate_a", "candidate_b"],
-                "panel_id": ["Reference in-kNN rate", "Reference in-kNN rate"],
-                "row_count": [0.4, 0.7],
-                "display_name": ["Reference in-kNN rate", "Reference in-kNN rate"],
+                "panel_id": ["Effective rank", "Effective rank"],
+                "metric_value": [6.4, 2.1],
+                "display_name": ["Effective rank", "Effective rank"],
                 "direction": ["higher_is_better", "higher_is_better"],
-                "unit": ["fraction", "fraction"],
+                "unit": ["dims", "dims"],
                 "candidate_family": ["intermediate_embedding", "pooled_logits"],
                 "candidate_model": ["20b", "20b"],
                 "candidate_scope": ["anchor_60bp", "full_context_1kb"],
@@ -69,9 +69,9 @@ def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scal
 
     rendered = render_plot_review_surface(
         {
-            "plot_id": "reference_neighbor_evidence",
+            "plot_id": "representation_health_summary",
             "kind": "metric_panel_grid",
-            "scalar_id": "reference_neighbor_evidence_metrics",
+            "scalar_id": "representation_health_summary_metrics",
             "row_column": "category",
             "panel_column": "display_name",
             "column_column": "label",
@@ -91,7 +91,7 @@ def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scal
     )
 
     assert isinstance(rendered, mo.Html)
-    assert "reference_neighbor_evidence" in rendered.text
+    assert "representation_health_summary" in rendered.text
 
 
 def test_render_plot_review_surface_supports_categorical_count_grid(monkeypatch, tmp_path: Path) -> None:

@@ -111,7 +111,7 @@ def render_selector_cells() -> tuple[str, ...]:
                 _family_options = {
                     {
                         "intermediate_embedding": "Intermediate block mean",
-                        "pooled_logits": "Output-layer mean",
+                        "pooled_logits": "Pooled logits",
                     }.get(value, value.replace("_", " ")): value
                     for value in family_values
                 }

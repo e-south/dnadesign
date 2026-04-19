@@ -16,9 +16,9 @@ def test_xy_scatter_plot_config_accepts_default_hue_and_hue_options() -> None:
     config = _PLOT_CONFIG_ADAPTER.validate_python(
         {
             "kind": "xy_scatter",
-            "scalar": "wildtype_reference_margins",
-            "x_column": "wildtype_margin_ethanol_vs_control",
-            "y_column": "wildtype_margin_cipro_vs_control",
+            "scalar": "design_centroid_margins",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
             "default_hue": "design_family",
             "hue_options": [
                 {"column": "design_family", "label": "Design family", "type": "categorical"},
@@ -36,9 +36,9 @@ def test_plot_config_rejects_default_hue_not_declared_in_hue_options() -> None:
         _PLOT_CONFIG_ADAPTER.validate_python(
             {
                 "kind": "xy_scatter",
-                "scalar": "wildtype_reference_margins",
-                "x_column": "wildtype_margin_ethanol_vs_control",
-                "y_column": "wildtype_margin_cipro_vs_control",
+                "scalar": "design_centroid_margins",
+                "x_column": "synthetic_margin_ethanol_vs_background",
+                "y_column": "synthetic_margin_cipro_vs_background",
                 "default_hue": "design_family",
                 "hue_options": [
                     {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
@@ -51,9 +51,9 @@ def test_resolve_plot_spec_preserves_hue_configuration() -> None:
     config = _PLOT_CONFIG_ADAPTER.validate_python(
         {
             "kind": "xy_scatter",
-            "scalar": "wildtype_reference_margins",
-            "x_column": "wildtype_margin_ethanol_vs_control",
-            "y_column": "wildtype_margin_cipro_vs_control",
+            "scalar": "design_centroid_margins",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
             "default_hue": "design_family",
             "hue_options": [
                 {"column": "design_family", "label": "Design family", "type": "categorical"},
@@ -63,8 +63,8 @@ def test_resolve_plot_spec_preserves_hue_configuration() -> None:
     )
 
     spec = resolve_plot_spec(
-        plots={"reference_margin_gallery_wildtype": config},
-        plot_id="reference_margin_gallery_wildtype",
+        plots={"design_centroid_margin_gallery": config},
+        plot_id="design_centroid_margin_gallery",
         kind=None,
         projection_ids=[],
         panel_titles=[],
@@ -95,9 +95,9 @@ def test_hue_switchable_scatter_surfaces_ignore_shape_channel_at_render_time() -
     config = _PLOT_CONFIG_ADAPTER.validate_python(
         {
             "kind": "xy_scatter",
-            "scalar": "wildtype_reference_margins",
-            "x_column": "wildtype_margin_ethanol_vs_control",
-            "y_column": "wildtype_margin_cipro_vs_control",
+            "scalar": "design_centroid_margins",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
             "shape_column": "sig35_variant",
             "default_hue": "design_family",
             "hue_options": [
@@ -107,8 +107,8 @@ def test_hue_switchable_scatter_surfaces_ignore_shape_channel_at_render_time() -
         }
     )
     spec = resolve_plot_spec(
-        plots={"reference_margin_gallery_wildtype": config},
-        plot_id="reference_margin_gallery_wildtype",
+        plots={"design_centroid_margin_gallery": config},
+        plot_id="design_centroid_margin_gallery",
         kind=None,
         projection_ids=[],
         panel_titles=[],

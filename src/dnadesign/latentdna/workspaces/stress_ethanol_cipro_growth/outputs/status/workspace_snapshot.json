@@ -296,84 +296,99 @@
       ],
       "warnings": []
     },
-    "reference_margin_analysis": {
-      "title": "Reference margin analysis",
-      "status": "attention",
-      "freshness": "attention",
-      "acceptance_checks": [],
-      "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_margin_gallery_wildtype",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_neighbor_evidence"
-      ],
-      "docs_refs": [
-        {
-          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/reference_margin_analysis",
-          "relative_ref": "deliverables/reference_margin_analysis",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/reference_margin_analysis.md"
-        }
-      ],
-      "warnings": []
-    },
-    "context_geometry_audit": {
-      "title": "Context geometry audit",
+    "representation_health_summary": {
+      "title": "Representation health summary",
       "status": "ok",
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_shift_reference_plane",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_delta_distributions",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_geometry_summary"
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_health_summary"
       ],
       "docs_refs": [
         {
-          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/context_geometry_audit",
-          "relative_ref": "deliverables/context_geometry_audit",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/context_geometry_audit.md"
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/representation_health_summary",
+          "relative_ref": "deliverables/representation_health_summary",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/representation_health_summary.md"
         }
       ],
       "warnings": []
     },
-    "representation_comparison": {
-      "title": "Representation comparison",
+    "design_structure_summary": {
+      "title": "Design-structure summary",
       "status": "ok",
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_tradeoff_scatter"
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/design_structure_summary"
       ],
       "docs_refs": [
         {
-          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/representation_comparison",
-          "relative_ref": "deliverables/representation_comparison",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/representation_comparison.md"
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/design_structure_summary",
+          "relative_ref": "deliverables/design_structure_summary",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/design_structure_summary.md"
         }
       ],
       "warnings": []
     },
-    "representation_health_diagnostic": {
-      "title": "Representation health diagnostic",
+    "sigma35_ordinal_audit": {
+      "title": "Sigma-35 ordinal audit",
       "status": "ok",
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_ordinal_audit"
+      ],
+      "docs_refs": [
+        {
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit",
+          "relative_ref": "deliverables/sigma35_ordinal_audit",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit.md"
+        }
+      ],
+      "warnings": []
+    },
+    "context_robustness_summary": {
+      "title": "Context robustness summary",
+      "status": "ok",
+      "freshness": "ok",
+      "acceptance_checks": [],
+      "artifact_paths": [
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_robustness_summary"
+      ],
+      "docs_refs": [
+        {
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/context_robustness_summary",
+          "relative_ref": "deliverables/context_robustness_summary",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/context_robustness_summary.md"
+        }
+      ],
+      "warnings": []
+    },
+    "appendix_geometry_audit": {
+      "title": "Appendix geometry audit",
+      "status": "ok",
+      "freshness": "ok",
+      "acceptance_checks": [],
+      "artifact_paths": [
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/design_centroid_margin_gallery",
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_alignment_summary",
         "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_scree_diagnostic"
       ],
       "docs_refs": [
         {
-          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/representation_health_diagnostic",
-          "relative_ref": "deliverables/representation_health_diagnostic",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/representation_health_diagnostic.md"
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit",
+          "relative_ref": "deliverables/appendix_geometry_audit",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit.md"
         }
       ],
       "warnings": []
     },
     "appendix_umap_gallery": {
       "title": "UMAP gallery",
-      "status": "attention",
-      "freshness": "attention",
+      "status": "ok",
+      "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_margin_gallery_synthetic_centroids",
         "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/appendix_umap_gallery",
         "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/notebooks/latent_geometry_browser"
       ],
@@ -403,10 +418,9 @@
       "design_family",
       "design_regulator_composition",
       "sig35_variant",
+      "spacer_length",
       "source_class",
       "is_control",
-      "wildtype_margin_ethanol_vs_control",
-      "wildtype_margin_cipro_vs_control",
       "synthetic_margin_ethanol_vs_background",
       "synthetic_margin_cipro_vs_background",
       "context_self_cosine",
@@ -415,10 +429,9 @@
   },
   "decision_ladder": [
     "dataset_overview",
-    "reference_margin_analysis",
-    "context_geometry_audit",
-    "representation_comparison",
-    "representation_health_diagnostic"
+    "design_structure_summary",
+    "sigma35_ordinal_audit",
+    "context_robustness_summary"
   ],
-  "last_updated_at": "2026-04-19T00:51:56.756534+00:00"
+  "last_updated_at": "2026-04-19T18:32:19.608150+00:00"
 }

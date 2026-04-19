@@ -20,10 +20,10 @@
 - Declared phase: `infer_batch_preparation`
 - Preferred infer family: `evo2_20b`
 - Supported infer families: `evo2_20b`, `evo2_7b`
-- The study is still in infer preparation; LatentDNA is a downstream comparison surface, not the record-plane authority for current study status
-- The sanctioned current-record surface is `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Current attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`
-- Context and health diagnostics remain in the record, and appendix surfaces remain secondary audit material
+- The study phase is `infer_batch_preparation`
+- Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
+- Current attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Appendix and debug surfaces remain secondary audit material
 
 ### Current row counts
 
@@ -37,11 +37,12 @@
 ### Current downstream posture
 
 - LatentDNA: `configured` for downstream comparison; the study-status authority remains the checked-in record plus `usr.data-plane.promoter-study-status`
-- LatentDNA primary attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`
-- LatentDNA notebook role: plot-first review surface with `Geometry audit` and `Comparison audit` as secondary tabs
+- LatentDNA gate: `representation_health_summary`
+- LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- LatentDNA notebook role: plot-first review surface for the five-step pre-assay ladder, with appendix and debug material kept secondary
 - Cluster: `planned`
 - OPAL: `not_configured`
-- Appendix surfaces remain secondary: `reference_margin_gallery_synthetic_centroids`, `appendix_umap_gallery`
+- Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
 - The active comparison is `anchor_60bp` versus `full_context_1kb`
 
 ### Next actions
@@ -52,4 +53,4 @@
   `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - If you need blockers or next-run readiness, switch to `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
 - Treat `intermediate_embedding_*` and `pooled_logits_*` as candidate `X` blocks; use `log_likelihood_per_token_*` only as scalar side channels
-- Do not use UMAP aesthetics, cluster correspondence, or model-agreement surfaces as the primary comparison rule
+- Do not use UMAP aesthetics, reference-neighbor artifacts, or geodesic pilots as the primary comparison rule

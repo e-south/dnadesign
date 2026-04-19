@@ -1,10 +1,15 @@
 plot_id: dataset_overview
-research_question: What is in the dataset?
-evidence_tier: primary
-encoding_summary: Cohort inventory chart split into provenance, generation plan, and Sigma-35 variant partitions.
-sampling_scope: Full 157,164-promoter population shared by the anchor and construct-context handoff datasets.
-interpretation_guardrails:
-  - Each panel uses the same denominator and should be read independently.
-  - This figure inventories cohort balance; it does not compare two different promoter populations.
-caption_md: Proportional cohort inventory across provenance, generation plan, and Sigma-35 variant for the shared 157,164-promoter study population.
-alt_text: Three-panel proportional cohort inventory showing provenance, generation plan, and Sigma-35 variant counts for the shared study population.
+question: What promoter population and annotation inventory does LatentDNA compare downstream?
+decision_role: primary
+encoding: Multi-panel cohort inventory chart over provenance, design family, regulator composition, Sigma-35 variant, and spacer length.
+scope: Full promoter population shared by the paired anchor and construct-context datasets. The dominant synthetic cohort is 60 bp, and the carried controls are 35 bp, 165 bp, 200 bp, and 220 bp.
+guardrails:
+  - Inventory counts set the denominator only; they do not rank candidate representations.
+  - Treat `anchor_60bp` as the view name for the dominant synthetic cohort rather than a literal row-length guarantee.
+caption: Shared promoter inventory across provenance and trusted design annotations.
+alt_text: Multi-panel chart showing cohort fractions for the shared promoter population across provenance and promoter-design annotations.
+preprocessing_md: Uses the persisted dataset-overview scalar table without vector normalization or neighborhood construction.
+math_md: Each panel reports cohort fractions as n_c divided by the shared population size N.
+rationale_md: Establishes the exact population and trusted annotation axes before any representation-health or geometry claim is interpreted.
+limitations_md: Descriptive inventory only; balanced counts do not imply informative latent geometry.
+failure_modes_md: Stale study overlays or metadata derivation drift can misstate the denominator or annotation counts.

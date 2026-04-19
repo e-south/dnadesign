@@ -34,10 +34,9 @@ _PREFERRED_HUES = [
     "design_family",
     "design_regulator_composition",
     "sig35_variant",
+    "spacer_length",
     "source_class",
     "is_control",
-    "wildtype_margin_ethanol_vs_control",
-    "wildtype_margin_cipro_vs_control",
     "synthetic_margin_ethanol_vs_background",
     "synthetic_margin_cipro_vs_background",
     "log_likelihood_per_token_20b_anchor_60bp",
@@ -52,10 +51,9 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "design_family": "categorical",
     "design_regulator_composition": "categorical",
     "sig35_variant": "categorical",
+    "spacer_length": "continuous",
     "source_class": "categorical",
     "is_control": "binary",
-    "wildtype_margin_ethanol_vs_control": "continuous",
-    "wildtype_margin_cipro_vs_control": "continuous",
     "synthetic_margin_ethanol_vs_background": "continuous",
     "synthetic_margin_cipro_vs_background": "continuous",
     "context_self_cosine": "continuous",
@@ -64,7 +62,7 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
 
 _FAMILY_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
-    "pooled_logits": "Output-layer mean",
+    "pooled_logits": "Pooled logits",
 }
 
 _SCOPE_LABELS = {
@@ -177,15 +175,17 @@ def _table_inventory(context) -> tuple[list[WorkspaceNotebookTableRef], dict[str
     inventory: list[WorkspaceNotebookTableRef] = []
     schemas: dict[str, object] = {}
     table_roots = [
-        ("scalar", "scalars", "table.parquet"),
-        ("distance", "distances", "table.parquet"),
-        ("cluster", "clusters", "assignments.parquet"),
+        ("scalar", "scalars", "table.parquet", set(getattr(context.config, "scalars", {}))),
+        ("distance", "distances", "table.parquet", set(getattr(context.config, "distances", {}))),
+        ("cluster", "clusters", "assignments.parquet", set(getattr(context.config, "clusters", {}))),
     ]
-    for kind, root_name, filename in table_roots:
+    for kind, root_name, filename, configured_ids in table_roots:
         root = context.output_root / root_name
         if not root.is_dir():
             continue
         for artifact_dir in sorted(path for path in root.iterdir() if path.is_dir()):
+            if artifact_dir.name not in configured_ids:
+                continue
             table_path = artifact_dir / filename
             manifest_path = artifact_dir / "manifest.json"
             if not table_path.is_file():
@@ -269,13 +269,13 @@ def _layout_presets(geometry_rows: list[WorkspaceNotebookGeometry]) -> list[Work
                 view_ids=_CANONICAL_GEOMETRY_ORDER,
                 panel_titles=[
                     "Evo 2 7B · 60 bp anchor · Intermediate block mean",
-                    "Evo 2 7B · 60 bp anchor · Output-layer mean",
+                    "Evo 2 7B · 60 bp anchor · Pooled logits",
                     "Evo 2 7B · 1 kb construct context · Intermediate block mean",
-                    "Evo 2 7B · 1 kb construct context · Output-layer mean",
+                    "Evo 2 7B · 1 kb construct context · Pooled logits",
                     "Evo 2 20B · 60 bp anchor · Intermediate block mean",
-                    "Evo 2 20B · 60 bp anchor · Output-layer mean",
+                    "Evo 2 20B · 60 bp anchor · Pooled logits",
                     "Evo 2 20B · 1 kb construct context · Intermediate block mean",
-                    "Evo 2 20B · 1 kb construct context · Output-layer mean",
+                    "Evo 2 20B · 1 kb construct context · Pooled logits",
                 ],
             )
         )

@@ -31,6 +31,20 @@ SUPPORTED_PLOT_KINDS: frozenset[str] = frozenset(
     }
 )
 
+SQUARE_METRIC_PANEL_PLOT_IDS: frozenset[str] = frozenset(
+    {
+        "representation_health_summary",
+        "design_structure_summary",
+        "sigma35_ordinal_audit",
+        "context_robustness_summary",
+        "reference_alignment_summary",
+    }
+)
+
+
+def metric_panel_uses_square_axes(plot_id: str | None) -> bool:
+    return plot_id in SQUARE_METRIC_PANEL_PLOT_IDS
+
 
 class StrictPlotModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -205,6 +219,8 @@ class MetricPanelGridPlotConfig(PlotBaseConfig):
     category_column: str
     label_column: str
     value_column: str
+    ci_lower_column: str | None = None
+    ci_upper_column: str | None = None
     color_column: str | None = None
     direction_column: str | None = None
     unit_column: str | None = None
@@ -368,6 +384,8 @@ class ResolvedPlotSpec(StrictPlotModel):
     left_cluster_id: Identifier | None = None
     right_cluster_id: Identifier | None = None
     value_column: str | None = None
+    ci_lower_column: str | None = None
+    ci_upper_column: str | None = None
     value_columns: list[str] = Field(default_factory=list)
     metric_columns: list[str] = Field(default_factory=list)
     row_column: str | None = None

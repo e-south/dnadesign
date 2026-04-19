@@ -22,13 +22,18 @@ def _generated_fallback(plot_id: str) -> PlotSemantics:
     pretty = plot_id.replace("_", " ")
     return PlotSemantics(
         plot_id=plot_id,
-        research_question=f"QC view for {pretty}.",
-        evidence_tier="qc",
-        encoding_summary=f"Mechanically generated QC semantics for {pretty}.",
-        sampling_scope="Scope not declared.",
-        interpretation_guardrails=["Fallback semantics are descriptive only."],
-        caption_md=f"QC-only plot for {pretty}.",
+        question=f"QC view for {pretty}.",
+        decision_role="debug",
+        encoding=f"Mechanically generated QC semantics for {pretty}.",
+        scope="Scope not declared.",
+        guardrails=["Fallback semantics are descriptive only."],
+        caption=f"QC-only plot for {pretty}.",
         alt_text=f"QC-only plot for {pretty}.",
+        preprocessing_md="Fallback semantics do not declare preprocessing.",
+        math_md="Fallback semantics do not declare a mathematical definition.",
+        rationale_md="Fallback semantics exist only to keep QC rendering explicit.",
+        limitations_md="Fallback semantics are not a study-facing scientific contract.",
+        failure_modes_md="Replace generated fallback semantics before using the plot in a study surface.",
     )
 
 

@@ -20,7 +20,8 @@ from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.result import CommandResult
 from dnadesign.latentdna.src.services import progress_service, recipe_service
 from dnadesign.latentdna.src.services.catalog_service import workspace_catalog, workspace_catalog_from_context
-from dnadesign.latentdna.src.services.plot_service import render_plot
+from dnadesign.latentdna.src.services.plot_service import render_plot, write_plot_index
+from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 _RUNNER = CliRunner()
 
@@ -32,15 +33,20 @@ def _write_workspace_config(workspace_dir: Path) -> None:
         yaml.safe_dump(
             {
                 "plot_id": "atlas",
-                "research_question": "Do both projection panels retain the required reference set?",
-                "evidence_tier": "qc",
-                "encoding_summary": "Two-panel projection grid colored by family.",
-                "sampling_scope": "Full population.",
-                "interpretation_guardrails": [
+                "question": "Do both projection panels retain the required reference set?",
+                "decision_role": "debug",
+                "encoding": "Two-panel projection grid colored by family.",
+                "scope": "Full population.",
+                "guardrails": [
                     "Projection geometry is descriptive only.",
                 ],
-                "caption_md": "Reference-set completeness check for projection-grid rendering.",
+                "caption": "Reference-set completeness check for projection-grid rendering.",
                 "alt_text": "Two-panel projection grid used to validate reference-set completeness rules.",
+                "preprocessing_md": "Fixture semantics do not declare additional preprocessing.",
+                "math_md": "Fixture semantics do not declare a mathematical definition.",
+                "rationale_md": "Fixture semantics exist only to validate runtime progress reporting.",
+                "limitations_md": "Fixture semantics are not a study-facing scientific contract.",
+                "failure_modes_md": "Replace fixture semantics before using the plot outside tests.",
             },
             sort_keys=False,
         ),
@@ -471,3 +477,142 @@ def test_workspace_catalog_from_context_avoids_workspace_reload(
     assert payload["workspace_id"] == "catalog_demo"
     stored = json.loads((outputs_dir / "catalog.json").read_text(encoding="utf-8"))
     assert stored["workspace_id"] == "catalog_demo"
+
+
+def test_workspace_catalog_prunes_retired_managed_artifacts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    outputs_dir = workspace_dir / "outputs"
+    outputs_dir.mkdir(parents=True)
+    for artifact_dir in (
+        outputs_dir / "views" / "current_view",
+        outputs_dir / "views" / "retired_view",
+        outputs_dir / "scalars" / "current_scalar",
+        outputs_dir / "scalars" / "retired_scalar",
+    ):
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        (artifact_dir / "manifest.json").write_text("{}", encoding="utf-8")
+
+    fake_context = SimpleNamespace(
+        workspace_id="catalog_demo",
+        workspace_dir=workspace_dir,
+        output_root=outputs_dir,
+        config=SimpleNamespace(
+            workspace=SimpleNamespace(title="Catalog demo"),
+            deliverables={"dataset_overview": object()},
+            notebooks={},
+            exports={},
+            views={"current_view": object()},
+            scalars={"current_scalar": object()},
+            alignments={},
+            plots={},
+        ),
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.deliverable_status_from_context",
+        lambda context, deliverable_id, **kwargs: SimpleNamespace(
+            model_dump=lambda mode="json": {"deliverable_id": deliverable_id, "status": "ok"},
+            docs_refs=[],
+            status="ok",
+        ),
+    )
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.catalog_service.write_plot_index",
+        lambda context, **kwargs: {"plots": []},
+    )
+
+    payload = workspace_catalog_from_context(fake_context)
+
+    assert payload["pruned_artifacts"] == sorted(
+        [
+            (outputs_dir / "views" / "retired_view").as_posix(),
+        ]
+    )
+    assert not (outputs_dir / "views" / "retired_view").exists()
+    assert (outputs_dir / "scalars" / "retired_scalar").is_dir()
+    assert (outputs_dir / "views" / "current_view").is_dir()
+    assert (outputs_dir / "scalars" / "current_scalar").is_dir()
+
+
+def test_write_plot_index_uses_freshness_status_for_catalog_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    semantics_dir = workspace_dir / "plot_semantics"
+    semantics_dir.mkdir()
+    (semantics_dir / "atlas.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "plot_id": "atlas",
+                "question": "Does the plot stay current?",
+                "decision_role": "debug",
+                "encoding": "Fixture plot.",
+                "scope": "Fixture scope.",
+                "guardrails": ["Fixture guardrail."],
+                "caption": "Fixture caption.",
+                "alt_text": "Fixture alt text.",
+                "preprocessing_md": "Fixture preprocessing.",
+                "math_md": "Fixture math.",
+                "rationale_md": "Fixture rationale.",
+                "limitations_md": "Fixture limitations.",
+                "failure_modes_md": "Fixture failure modes.",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "plot_index_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {},
+                "metadata": {"include": []},
+                "plots": {
+                    "atlas": {
+                        "kind": "projection_grid",
+                        "semantics_ref": "./plot_semantics/atlas.yaml",
+                        "projections": ["p1"],
+                        "color_column": "family",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    plot_dir = workspace_dir / "outputs" / "plots" / "atlas"
+    plot_dir.mkdir(parents=True)
+    (plot_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "plot",
+                "artifact_id": "atlas",
+                "status": "ok",
+                "outputs": [{"path": "plot.svg"}],
+                "inputs": [],
+                "semantics": {"question": "Fixture question.", "decision_role": "debug"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (plot_dir / "plot.svg").write_text("<svg />", encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.plot_service.evaluate_artifact_freshness",
+        lambda *args, **kwargs: {"status": "attention", "reason": "stale plot", "known": True},
+    )
+
+    payload = write_plot_index(context)
+
+    assert payload["plots"][0]["status"] == "attention"
+    assert payload["plots"][0]["stale"] is True

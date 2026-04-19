@@ -15,10 +15,12 @@ Canonical examples:
 - `intermediate_embedding_20b_anchor_60bp`
 - `intermediate_embedding_20b_full_context_1kb`
 - `pooled_logits_7b_anchor_60bp`
-- `wildtype_reference_margins`
-- `context_geometry_metrics`
-- `representation_comparison`
-- `representation_health_diagnostic`
+- `design_centroid_margins`
+- `context_delta_distribution_intermediate_embedding_7b`
+- `representation_health_summary`
+- `design_structure_summary`
+- `sigma35_ordinal_audit`
+- `context_robustness_summary`
 - `appendix_umap_gallery`
 
 Forbidden naming patterns in study-facing surfaces:

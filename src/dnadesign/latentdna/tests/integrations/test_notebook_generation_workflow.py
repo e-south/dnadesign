@@ -167,13 +167,18 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "plot_id": "atlas_demo_plot",
-                "research_question": "Can the atlas review notebook render the persisted projection plot?",
-                "evidence_tier": "qc",
-                "encoding_summary": "Single persisted projection scatter for the atlas review fixture.",
-                "sampling_scope": "All rows in the fixture atlas sample.",
-                "interpretation_guardrails": ["Fixture-only QC plot for notebook workflow coverage."],
-                "caption_md": "QC projection used to validate notebook generation and smoke behavior.",
+                "question": "Can the atlas review notebook render the persisted projection plot?",
+                "decision_role": "debug",
+                "encoding": "Single persisted projection scatter for the atlas review fixture.",
+                "scope": "All rows in the fixture atlas sample.",
+                "guardrails": ["Fixture-only QC plot for notebook workflow coverage."],
+                "caption": "QC projection used to validate notebook generation and smoke behavior.",
                 "alt_text": "Projection scatter for the notebook workflow fixture.",
+                "preprocessing_md": "Fixture semantics do not declare additional preprocessing.",
+                "math_md": "Fixture semantics do not declare a mathematical definition.",
+                "rationale_md": "Fixture semantics exist only to validate notebook generation and smoke behavior.",
+                "limitations_md": "Fixture semantics are not a study-facing scientific contract.",
+                "failure_modes_md": "Replace fixture semantics before using the plot outside tests.",
             },
             sort_keys=False,
         ),
@@ -347,7 +352,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "value=active_top_tab" in notebook_text
     assert "on_change=set_active_top_tab" in notebook_text
     assert "lazy=True" in notebook_text
-    assert "This notebook is a downstream LatentDNA comparison surface over the current " in notebook_text
+    assert "This notebook is the LatentDNA pre-assay review surface for the current " in notebook_text
     assert "`infer_batch_preparation` study snapshot." in notebook_text
     assert "Point positions are fixed by the saved coordinates" in notebook_text
     assert "Jump list:" not in notebook_text

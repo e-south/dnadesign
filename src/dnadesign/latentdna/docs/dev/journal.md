@@ -5,7 +5,7 @@
 
 ## Active refactor
 
-LatentDNA now treats the promoter-study workspace as a reference-first comparison surface rather than a downstream benchmark-handoff surface.
+LatentDNA now treats the promoter-study workspace as a pre-assay representation-triage surface rather than a reference-first benchmark proxy.
 
 Current checked-in direction:
 
@@ -19,10 +19,10 @@ Current checked-in direction:
 
 - Pressure-path evidence should be recorded against the current decision ladder:
   1. `dataset_overview`
-  2. `reference_margin_analysis`
-  3. `context_geometry_audit`
-  4. `representation_comparison`
-  5. `representation_health_diagnostic`
+  2. `representation_health_summary`
+  3. `design_structure_summary`
+  4. `sigma35_ordinal_audit`
+  5. `context_robustness_summary`
   6. `appendix_umap_gallery`
 - When updating workspace artifacts, regenerate from the checked-in workspace config rather than editing outputs by hand.
 - Study-family tools must consume the study binding plus workspace snapshot only; they must not import `dnadesign.latentdna.src.*`.
@@ -31,7 +31,7 @@ Current checked-in direction:
 
 - Status/control-plane paths now load workspace config without eagerly validating every plot-semantics sidecar; explicit workspace validation still owns that fail-fast contract.
 - `WorkspaceContext` now resolves and stores the canonical `output_root` once instead of re-normalizing it on each access.
-- On the April 17, 2026 live `stress_ethanol_cipro_growth` workspace, warmed `workspace_snapshot()` measured 0.18s mean across three runs and warmed `deliverable_status(reference_margin_analysis)` measured 0.13s mean across three runs after the loader/control-plane split.
+- On the April 17, 2026 live `stress_ethanol_cipro_growth` workspace, warmed `workspace_snapshot()` measured 0.18s mean across three runs and warmed `deliverable_status(representation_health_summary)` measured 0.13s mean across three runs after the loader/control-plane split.
 - Independent fresh-process `workspace_snapshot()` launches measured 1.75s on the first cold launch and about 1.00s on subsequent launches, so cold-cache variance remains material.
 
 ## Next checks

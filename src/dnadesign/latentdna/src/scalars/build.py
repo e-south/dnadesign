@@ -5,7 +5,6 @@ Semantic scalar-table builders for artifact-first latentdna workflows.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +12,7 @@ import numpy as np
 import pyarrow as pa
 
 from ..contracts.errors import ContractViolationError, MissingArtifactError
+from ..geometry.preprocessing import try_l2_normalize_vector
 from ..io.json_io import read_json, write_json
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_table, write_table
@@ -22,33 +22,18 @@ from ..sources.resolver import read_records_table, resolve_source
 from ..views.materialize import _promoter_metadata_value
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
-
-
-@dataclass(frozen=True, slots=True)
-class ScalarInputRef:
-    kind: str
-    artifact_id: str
-    path: Path
-
-
-@dataclass(frozen=True, slots=True)
-class BuiltScalarArtifact:
-    artifact_dir: Path
-    rows: int
-    columns: list[str]
-    inputs: list[ScalarInputRef]
-    outputs: list[tuple[str, str]]
-    stats: dict[str, object]
-
-
-def _require_param(params: dict[str, Any], key: str) -> Any:
-    if key not in params:
-        raise ContractViolationError(f"scalar.build requires param {key!r}")
-    return params[key]
-
-
-def _optional_param(params: dict[str, Any], key: str, *, default: Any = None) -> Any:
-    return params.get(key, default)
+from .common import (
+    BuiltScalarArtifact,
+    ScalarInputRef,
+    _effective_rank,
+    _load_view_scope_table,
+    _normalized_geometry_rows,
+    _optional_param,
+    _reducer_summary_path,
+    _require_param,
+    _spearman_correlation,
+)
+from .preassay import build_preassay_scalar_artifact
 
 
 def _view_paths(context: WorkspaceContext, view_id: str) -> tuple[Path, Path]:
@@ -88,24 +73,10 @@ def _neighbor_paths(context: WorkspaceContext, neighbor_id: str) -> tuple[Path, 
     return rows_path, indices_path, manifest_path
 
 
-def _reducer_summary_path(context: WorkspaceContext, reducer_id: str) -> Path:
-    path = context.output_root / "reducers" / reducer_id / "summary.json"
-    if not path.is_file():
-        raise MissingArtifactError(f"reducer artifact is missing for scalar.build: {reducer_id}")
-    return path
-
-
 def _agreement_summary_path(context: WorkspaceContext, agreement_id: str) -> Path:
     path = context.output_root / "agreements" / agreement_id / "summary.json"
     if not path.is_file():
         raise MissingArtifactError(f"agreement artifact is missing for scalar.build: {agreement_id}")
-    return path
-
-
-def _workspace_input_path(context: WorkspaceContext, relative_path: str) -> Path:
-    path = (context.workspace_dir / relative_path).resolve()
-    if not path.is_file():
-        raise MissingArtifactError(f"workspace input is missing for scalar.build: {relative_path}")
     return path
 
 
@@ -355,26 +326,6 @@ def _same_source_landmark_indices(
     return [index for index, key in enumerate(row_keys) if key in matched_keys]
 
 
-def _stable_zscore(matrix: np.ndarray) -> np.ndarray:
-    centered = np.asarray(matrix, dtype=np.float32) - np.asarray(matrix.mean(axis=0), dtype=np.float32)
-    scale = np.asarray(matrix.std(axis=0), dtype=np.float32)
-    scale = np.where(scale < 1e-12, 1.0, scale)
-    return np.ascontiguousarray(centered / scale)
-
-
-def _normalize_rows(matrix: np.ndarray) -> np.ndarray:
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    norms = np.where(norms < 1e-12, 1.0, norms)
-    return np.ascontiguousarray(matrix / norms)
-
-
-def _normalize_vector(vector: np.ndarray) -> np.ndarray:
-    norm = float(np.linalg.norm(vector))
-    if norm < 1e-12:
-        raise ContractViolationError("reference vector norm is zero after standardization")
-    return np.asarray(vector / norm, dtype=np.float32)
-
-
 def _replace_or_append_column(table: pa.Table, name: str, values: np.ndarray | list[float]) -> pa.Table:
     array = pa.array(values)
     if name in table.column_names:
@@ -393,8 +344,7 @@ def _similarity_margin_table(
     matrix_path, rows_path = _view_paths(context, view_id)
     matrix = np.asarray(read_matrix(matrix_path), dtype=np.float32)
     rows_table = read_table(rows_path)
-    standardized = _stable_zscore(matrix)
-    normalized_rows = _normalize_rows(standardized)
+    normalized_rows = _normalized_geometry_rows(matrix)
     inputs = [
         ScalarInputRef(kind="view_matrix", artifact_id=view_id, path=matrix_path),
         ScalarInputRef(kind="view_rows", artifact_id=view_id, path=rows_path),
@@ -459,11 +409,19 @@ def _similarity_margin_table(
             raise ContractViolationError(f"landmark {target_landmark} matched no rows for similarity margin")
         if not control_indices:
             raise ContractViolationError(f"landmark {control_landmark} matched no rows for similarity margin")
-        target_reference = _normalize_vector(np.asarray(standardized[target_indices].mean(axis=0), dtype=np.float32))
-        control_reference = _normalize_vector(np.asarray(standardized[control_indices].mean(axis=0), dtype=np.float32))
-        target_similarity = np.asarray(normalized_rows @ target_reference, dtype=np.float32)
-        control_similarity = np.asarray(normalized_rows @ control_reference, dtype=np.float32)
-        margin = np.asarray(target_similarity - control_similarity, dtype=np.float32)
+        target_reference = try_l2_normalize_vector(
+            np.asarray(normalized_rows[target_indices].mean(axis=0), dtype=np.float32)
+        )
+        control_reference = try_l2_normalize_vector(
+            np.asarray(normalized_rows[control_indices].mean(axis=0), dtype=np.float32)
+        )
+        if target_reference is None or control_reference is None:
+            margin = np.full(len(rows_table), np.nan, dtype=np.float32)
+            margin_stats[f"{output_column}_degenerate_reference"] = True
+        else:
+            target_similarity = np.asarray(normalized_rows @ target_reference, dtype=np.float32)
+            control_similarity = np.asarray(normalized_rows @ control_reference, dtype=np.float32)
+            margin = np.asarray(target_similarity - control_similarity, dtype=np.float32)
         table = _replace_or_append_column(table, output_column, margin)
         margin_stats[f"{output_column}_target_members"] = len(target_indices)
         margin_stats[f"{output_column}_control_members"] = len(control_indices)
@@ -527,23 +485,30 @@ def _cohort_similarity_margin_table(
     context: WorkspaceContext,
     *,
     view_id: str,
+    sample_id: str | None = None,
     cohort_column: str,
     margin_pairs: list[dict[str, Any]],
+    leave_one_out: bool = False,
 ) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object]]:
-    matrix_path, rows_path = _view_paths(context, view_id)
-    matrix = np.asarray(read_matrix(matrix_path), dtype=np.float32)
-    rows_table = read_table(rows_path)
+    if sample_id is None:
+        matrix_path, rows_path = _view_paths(context, view_id)
+        matrix = np.asarray(read_matrix(matrix_path), dtype=np.float32)
+        rows_table = read_table(rows_path)
+        inputs = [
+            ScalarInputRef(kind="view_matrix", artifact_id=view_id, path=matrix_path),
+            ScalarInputRef(kind="view_rows", artifact_id=view_id, path=rows_path),
+        ]
+    else:
+        matrix, rows, inputs = _load_view_scope_table(context, view_id=view_id, sample_id=sample_id)
+        rows_table = pa.Table.from_pylist(rows)
     if cohort_column not in rows_table.column_names:
         raise ContractViolationError(f"cohort column {cohort_column!r} is missing from {view_id!r}")
     rows = rows_table.to_pylist()
-    standardized = _stable_zscore(matrix)
-    normalized_rows = _normalize_rows(standardized)
-    inputs = [
-        ScalarInputRef(kind="view_matrix", artifact_id=view_id, path=matrix_path),
-        ScalarInputRef(kind="view_rows", artifact_id=view_id, path=rows_path),
-    ]
+    normalized_rows = _normalized_geometry_rows(matrix)
     table = rows_table
     stats: dict[str, object] = {"view_id": view_id, "margin_count": len(margin_pairs)}
+    if sample_id is not None:
+        stats["sample_id"] = sample_id
     for pair in margin_pairs:
         target_values = {str(value) for value in _require_param(pair, "target_values")}
         control_values = {str(value) for value in _require_param(pair, "control_values")}
@@ -558,16 +523,40 @@ def _cohort_similarity_margin_table(
         # features. Build their directions from already normalized row vectors so
         # cohorts near the global standardized mean do not collapse to an invalid
         # zero-norm cosine reference.
-        target_reference = _normalize_vector(np.asarray(normalized_rows[target_indices].mean(axis=0), dtype=np.float32))
-        control_reference = _normalize_vector(
-            np.asarray(normalized_rows[control_indices].mean(axis=0), dtype=np.float32)
-        )
-        margin = np.asarray(
-            (normalized_rows @ target_reference) - (normalized_rows @ control_reference), dtype=np.float32
-        )
+        target_sum = np.asarray(normalized_rows[target_indices].sum(axis=0), dtype=np.float32)
+        control_sum = np.asarray(normalized_rows[control_indices].sum(axis=0), dtype=np.float32)
+        target_reference = try_l2_normalize_vector(np.asarray(target_sum / len(target_indices), dtype=np.float32))
+        control_reference = try_l2_normalize_vector(np.asarray(control_sum / len(control_indices), dtype=np.float32))
+        if target_reference is None or control_reference is None:
+            margin = np.full(len(rows), np.nan, dtype=np.float32)
+            stats[f"{output_column}_degenerate_reference"] = True
+            table = _replace_or_append_column(table, output_column, margin)
+            stats[f"{output_column}_target_members"] = len(target_indices)
+            stats[f"{output_column}_control_members"] = len(control_indices)
+            stats[f"{output_column}_leave_one_out"] = bool(leave_one_out)
+            continue
+        target_similarity = np.asarray(normalized_rows @ target_reference, dtype=np.float32)
+        control_similarity = np.asarray(normalized_rows @ control_reference, dtype=np.float32)
+        if leave_one_out:
+            if len(target_indices) <= 1 or len(control_indices) <= 1:
+                raise ContractViolationError(
+                    f"leave_one_out cohort margins require at least two rows in each cohort for {output_column!r}"
+                )
+            for index in target_indices:
+                adjusted = try_l2_normalize_vector(
+                    np.asarray((target_sum - normalized_rows[index]) / (len(target_indices) - 1), dtype=np.float32)
+                )
+                target_similarity[index] = float(normalized_rows[index] @ adjusted) if adjusted is not None else np.nan
+            for index in control_indices:
+                adjusted = try_l2_normalize_vector(
+                    np.asarray((control_sum - normalized_rows[index]) / (len(control_indices) - 1), dtype=np.float32)
+                )
+                control_similarity[index] = float(normalized_rows[index] @ adjusted) if adjusted is not None else np.nan
+        margin = np.asarray(target_similarity - control_similarity, dtype=np.float32)
         table = _replace_or_append_column(table, output_column, margin)
         stats[f"{output_column}_target_members"] = len(target_indices)
         stats[f"{output_column}_control_members"] = len(control_indices)
+        stats[f"{output_column}_leave_one_out"] = bool(leave_one_out)
     return table, inputs, stats
 
 
@@ -684,18 +673,16 @@ def _sample_alignment_indices(
 
 
 def _cosine_distance_correlation(left_matrix: np.ndarray, right_matrix: np.ndarray) -> float:
-    left = _normalize_rows(np.asarray(left_matrix, dtype=np.float32))
-    right = _normalize_rows(np.asarray(right_matrix, dtype=np.float32))
+    left = _normalized_geometry_rows(left_matrix)
+    right = _normalized_geometry_rows(right_matrix)
     left_distance = 1.0 - np.asarray(left @ left.T, dtype=np.float32)
     right_distance = 1.0 - np.asarray(right @ right.T, dtype=np.float32)
     upper = np.triu_indices(left_distance.shape[0], k=1)
     left_values = np.asarray(left_distance[upper], dtype=np.float64)
     right_values = np.asarray(right_distance[upper], dtype=np.float64)
     if left_values.size == 0:
-        return 1.0
-    if np.std(left_values) < 1e-12 or np.std(right_values) < 1e-12:
-        return 1.0
-    return float(np.corrcoef(left_values, right_values)[0, 1])
+        return float("nan")
+    return _spearman_correlation(left_values, right_values)
 
 
 def _alignment_metrics_table(
@@ -725,10 +712,10 @@ def _alignment_metrics_table(
     )
     if metadata_table.num_rows != left_matrix.shape[0]:
         raise ContractViolationError("alignment metadata rows are not aligned to the aligned matrix row count")
-    left_norm = _normalize_rows(np.asarray(left_matrix, dtype=np.float32))
-    right_norm = _normalize_rows(np.asarray(right_matrix, dtype=np.float32))
+    left_norm = _normalized_geometry_rows(left_matrix)
+    right_norm = _normalized_geometry_rows(right_matrix)
     self_cosine = np.asarray(np.sum(left_norm * right_norm, axis=1), dtype=np.float32)
-    shift_l2 = np.asarray(np.linalg.norm(left_matrix - right_matrix, axis=1), dtype=np.float32)
+    shift_l2 = np.asarray(np.linalg.norm(left_norm - right_norm, axis=1), dtype=np.float32)
     table = metadata_table
     table = _replace_or_append_column(table, "context_self_cosine", self_cosine)
     table = _replace_or_append_column(table, "context_shift_l2", shift_l2)
@@ -958,15 +945,6 @@ def _neighbor_label_enrichment(rows_table: pa.Table, indices: np.ndarray, *, lab
     return float(np.mean(np.asarray(enrichments, dtype=np.float64)))
 
 
-def _effective_rank(ratios: list[float]) -> float:
-    array = np.asarray([float(value) for value in ratios if float(value) > 0.0], dtype=np.float64)
-    if array.size == 0:
-        return 0.0
-    probabilities = array / np.sum(array, dtype=np.float64)
-    entropy = -np.sum(probabilities * np.log(probabilities), dtype=np.float64)
-    return float(np.exp(entropy))
-
-
 def _candidate_descriptor(candidate_id: str) -> dict[str, object]:
     family = "unknown"
     if "intermediate_embedding" in candidate_id:
@@ -999,7 +977,7 @@ def _task_reference_neighbor_metrics(
     label_column: str,
     positive_values: set[str],
     reference_labels: set[str],
-) -> tuple[float, float] | None:
+) -> tuple[list[float], list[float]] | None:
     normalized_reference_labels = {label.lower() for label in reference_labels}
     row_labels = [str(row.get("usr_label__primary") or "").strip().lower() for row in rows]
     label_values = [str(row.get(label_column) or "") for row in rows]
@@ -1009,15 +987,15 @@ def _task_reference_neighbor_metrics(
     positive_indices = [index for index, value in enumerate(label_values) if value in positive_values]
     if not reference_indices or not positive_indices:
         return None
-    rates: list[float] = []
+    hit_values: list[float] = []
     ranks: list[float] = []
     neighbor_count = int(indices.shape[1]) if indices.ndim == 2 else 0
     for row_index in positive_indices:
         neighbor_indices = [int(value) for value in indices[row_index].tolist()]
         hits = [rank + 1 for rank, neighbor_index in enumerate(neighbor_indices) if neighbor_index in reference_indices]
-        rates.append(1.0 if hits else 0.0)
+        hit_values.append(1.0 if hits else 0.0)
         ranks.append(float(hits[0] if hits else neighbor_count + 1))
-    return float(np.mean(np.asarray(rates, dtype=np.float64))), float(np.median(np.asarray(ranks, dtype=np.float64)))
+    return hit_values, ranks
 
 
 def _reference_neighbor_metrics(
@@ -1045,9 +1023,11 @@ def _reference_neighbor_metrics(
     )
     summaries = [summary for summary in [ethanol_summary, cipro_summary] if summary is not None]
     if summaries:
-        metrics["reference_in_knn_rate"] = float(np.mean([summary[0] for summary in summaries], dtype=np.float64))
-        metrics["reference_neighbor_rank_median"] = float(
-            np.mean([summary[1] for summary in summaries], dtype=np.float64)
+        hit_values = [value for summary in summaries for value in summary[0]]
+        rank_values = [value for summary in summaries for value in summary[1]]
+        metrics["reference_in_knn_rate"] = float(np.mean(np.asarray(hit_values, dtype=np.float64)))
+        metrics["reference_neighbor_topk_censored_rank_median"] = float(
+            np.median(np.asarray(rank_values, dtype=np.float64))
         )
     return metrics
 
@@ -1414,6 +1394,15 @@ def build_scalar_artifact(
     extra_outputs: list[tuple[str, str]] = []
     stats: dict[str, object]
 
+    preassay_artifact = build_preassay_scalar_artifact(
+        context,
+        scalar_id=scalar_id,
+        builder_kind=builder_kind,
+        params=params,
+    )
+    if preassay_artifact is not None:
+        return preassay_artifact
+
     if builder_kind == "dataset_overview":
         source_ids = [
             str(value) for value in _optional_param(params, "source_ids", default=list(context.config.sources))
@@ -1561,8 +1550,10 @@ def build_scalar_artifact(
         table, inputs, stats = _cohort_similarity_margin_table(
             context,
             view_id=str(_require_param(params, "view_id")),
+            sample_id=_optional_param(params, "sample_id", default=None),
             cohort_column=str(_require_param(params, "cohort_column")),
             margin_pairs=[dict(value) for value in _require_param(params, "margin_pairs")],
+            leave_one_out=bool(_optional_param(params, "leave_one_out", default=False)),
         )
         write_table(table, artifact_dir / "table.parquet")
         return BuiltScalarArtifact(

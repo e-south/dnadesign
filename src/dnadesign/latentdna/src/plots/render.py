@@ -14,7 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import ContractViolationError, MissingArtifactError
-from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec
+from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..contracts.plot_semantics import PlotSemantics
 from ..labels import humanize_candidate
 from ..visual_style import (
@@ -955,8 +955,10 @@ def _render_metric_panel(
         bar_colors = [color_map[str(row[spec.color_column])] for row in ordered_rows]
     else:
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
+    ci_enabled = spec.ci_lower_column is not None and spec.ci_upper_column is not None and ordered_rows
 
     bar_value_pairs: list[tuple[Any, float]] = []
+    errorbar_specs: list[tuple[float, float, float, float]] = []
     if grouped_family_bars:
         family_order = ordered_categories([str(row["candidate_family"]) for row in ordered_rows])
         group_keys = list(
@@ -997,16 +999,31 @@ def _render_metric_panel(
                     continue
                 family_positions.append(float(group_position + offset))
                 family_values.append(float(row[spec.value_column]))
-            family_bars = ax.bar(
-                family_positions,
-                family_values,
-                width=bar_width * 0.9,
-                color=color_map[family],
-                edgecolor="white",
-                linewidth=0.6,
-                alpha=0.92,
-            )
+                family_bars = ax.bar(
+                    family_positions,
+                    family_values,
+                    width=bar_width * 0.9,
+                    color=color_map[family],
+                    edgecolor="white",
+                    linewidth=0.6,
+                    alpha=0.92,
+                )
             bar_value_pairs.extend(zip(family_bars, family_values, strict=True))
+            if ci_enabled:
+                family_ci_rows = [family_rows[key] for key in group_keys if key in family_rows]
+                for bar, row in zip(family_bars, family_ci_rows, strict=False):
+                    lower = row.get(spec.ci_lower_column)
+                    upper = row.get(spec.ci_upper_column)
+                    if lower is None or upper is None:
+                        continue
+                    errorbar_specs.append(
+                        (
+                            float(bar.get_x() + (bar.get_width() / 2.0)),
+                            float(row[spec.value_column]),
+                            float(lower),
+                            float(upper),
+                        )
+                    )
         ax.set_xticks(group_positions, group_labels)
     else:
         positions = np.arange(len(ordered_rows), dtype=float)
@@ -1019,12 +1036,41 @@ def _render_metric_panel(
             alpha=0.92,
         )
         bar_value_pairs.extend(zip(bars, values, strict=True))
+        if ci_enabled:
+            for position, row in zip(positions, ordered_rows, strict=True):
+                lower = row.get(spec.ci_lower_column)
+                upper = row.get(spec.ci_upper_column)
+                if lower is None or upper is None:
+                    continue
+                errorbar_specs.append(
+                    (
+                        float(position),
+                        float(row[spec.value_column]),
+                        float(lower),
+                        float(upper),
+                    )
+                )
         ax.set_xticks(positions, labels)
     ax.tick_params(axis="x", pad=6)
     if spec.reference_line is not None:
         ax.axhline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
     if values.size and float(values.min()) < 0.0 < float(values.max()):
         ax.axhline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+    if errorbar_specs:
+        xs = np.asarray([item[0] for item in errorbar_specs], dtype=np.float64)
+        ys = np.asarray([item[1] for item in errorbar_specs], dtype=np.float64)
+        lowers = np.asarray([max(item[1] - item[2], 0.0) for item in errorbar_specs], dtype=np.float64)
+        uppers = np.asarray([max(item[3] - item[1], 0.0) for item in errorbar_specs], dtype=np.float64)
+        ax.errorbar(
+            xs,
+            ys,
+            yerr=np.vstack([lowers, uppers]),
+            fmt="none",
+            ecolor=SPINE_COLOR,
+            elinewidth=0.9,
+            capsize=2.0,
+            alpha=0.85,
+        )
     ax.set_xlabel("")
     ax.set_ylabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=20))
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
@@ -1089,7 +1135,7 @@ def _inject_svg_accessibility(output_path: Path, *, semantics: PlotSemantics) ->
     tree = ET.parse(output_path)
     root = tree.getroot()
     title = ET.Element("title")
-    title.text = semantics.research_question
+    title.text = semantics.question
     desc = ET.Element("desc")
     desc.text = semantics.alt_text
     root.insert(0, desc)
@@ -1477,7 +1523,7 @@ def render_plot_artifact(
         resolved_spec = spec.model_copy(update={"value_column": resolved_value_column})
         panel_values = list(dict.fromkeys(str(row[spec.row_column]) for row in rows))
         rows_count, columns = _panel_grid_dimensions(len(panel_values))
-        square_metric_panels = spec.plot_id == "context_geometry_summary"
+        square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
         fig, axes = plt.subplots(
             rows_count,
             columns,

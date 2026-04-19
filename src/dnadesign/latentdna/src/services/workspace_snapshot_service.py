@@ -98,6 +98,9 @@ def _deliverable_snapshots(context) -> dict[str, WorkspaceSnapshotDeliverable]:
 def _decision_ladder(context) -> list[str]:
     ladder: list[str] = []
     for deliverable_id, deliverable in context.config.deliverables.items():
+        section = str(getattr(deliverable, "section", "") or "").strip().lower()
+        if section == "gate":
+            continue
         plot_ids = [str(plot_id) for plot_id in deliverable.outputs.get("plots", [])]
         if plot_ids:
             visibility_tiers = {

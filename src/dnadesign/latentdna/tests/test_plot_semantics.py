@@ -16,13 +16,20 @@ def test_plot_semantics_loads_sidecar_and_returns_required_fields(tmp_path: Path
         yaml.safe_dump(
             {
                 "plot_id": "dataset_overview",
-                "research_question": "What is in the dataset?",
-                "evidence_tier": "primary",
-                "encoding_summary": "Multi-panel bar chart of dataset counts.",
-                "sampling_scope": "Full population.",
-                "interpretation_guardrails": ["Counts are descriptive, not a model-quality signal."],
-                "caption_md": "Dataset composition across scopes and biological axes.",
+                "question": "What is in the dataset?",
+                "decision_role": "primary",
+                "encoding": "Multi-panel bar chart of dataset counts.",
+                "scope": "Full population.",
+                "guardrails": ["Counts are descriptive, not a model-quality signal."],
+                "caption": "Dataset composition across scopes and biological axes.",
                 "alt_text": "Multi-panel bar chart summarizing dataset counts.",
+                "preprocessing_md": (
+                    "Counts use the persisted cohort-inventory table without additional vector preprocessing."
+                ),
+                "math_md": "Bar heights equal observed row counts or proportions for each cohort partition.",
+                "rationale_md": "This plot sets the shared denominator before comparing candidate representations.",
+                "limitations_md": "Inventory counts are descriptive and do not measure representation quality.",
+                "failure_modes_md": "Small metadata drift or stale cohort labels can misstate the study denominator.",
             },
             sort_keys=False,
         ),
@@ -63,7 +70,7 @@ def test_plot_semantics_loads_sidecar_and_returns_required_fields(tmp_path: Path
     semantics = resolve_plot_semantics(context, plot_id="dataset_overview")
 
     assert semantics.plot_id == "dataset_overview"
-    assert semantics.evidence_tier == "primary"
-    assert semantics.sampling_scope == "Full population."
-    assert semantics.caption_md == "Dataset composition across scopes and biological axes."
+    assert semantics.decision_role == "primary"
+    assert semantics.scope == "Full population."
+    assert semantics.caption == "Dataset composition across scopes and biological axes."
     assert semantics.alt_text == "Multi-panel bar chart summarizing dataset counts."

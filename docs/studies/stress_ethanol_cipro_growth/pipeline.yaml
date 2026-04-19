@@ -41,7 +41,7 @@ study_pipeline:
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
   cluster:
     doc: src/dnadesign/cluster/docs/workflows/exploratory-clustering.md
-    entry_artifact: representation_comparison
+    entry_artifact: context_robustness_summary
     workspace_example: src/dnadesign/cluster/workspaces/promoter_clusters_v1/config.yaml
     results_root: n/a
     state: planned

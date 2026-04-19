@@ -1,0 +1,15 @@
+plot_id: representation_health_summary
+question: Which candidate mean-pooled Evo2 spaces are healthy enough to survive pre-assay triage?
+decision_role: gate
+encoding: Candidate-by-metric bar panels for effective rank, PC1 variance fraction, median pairwise cosine distance, and pairwise cosine-distance spread, with bar color showing pass/warn/fail gate status.
+scope: Candidate reducer summaries and sampled candidate rows used for representation-health diagnostics.
+guardrails:
+  - Higher effective rank means variance is spread across more directions.
+  - Candidate choice still depends on design structure and context robustness.
+caption: Representation-health gate across the canonical candidate inventory.
+alt_text: Bar-panel summary comparing effective rank, PC1 variance fraction, and cosine-distance spread for each candidate representation.
+preprocessing_md: Pairwise cosine metrics use view-level standardization followed by row L2 normalization; PCA-derived metrics use the persisted reducer summaries for the sampled candidate tables.
+math_md: Effective rank is exp(-sum p_i log p_i) with p_i = lambda_i / sum_j lambda_j; PC1 variance fraction is lambda_1 / sum_j lambda_j; cosine-distance spread is summarized by the pairwise median and interquartile range after the shared standardize-then-normalize contract.
+rationale_md: Filters out collapsed or near-degenerate spaces before the study compares design structure or ordered Sigma-35 signal.
+limitations_md: Reducer summaries are sample-based and low-dimensional, so this is a health diagnostic rather than the full original spectrum.
+failure_modes_md: A space can pass health checks while still encoding nuisance structure such as spacer length or context dilution.

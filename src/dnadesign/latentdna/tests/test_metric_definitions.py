@@ -24,7 +24,11 @@ def test_metric_registry_uses_comparison_metadata_and_drops_selection_state() ->
     assert reference_rate.direction == "higher_is_better"
     assert reference_rate.unit == "fraction"
 
-    reference_rank = resolve_metric_definition("reference_neighbor_rank_median")
+    reference_rank = resolve_metric_definition("reference_neighbor_topk_censored_rank_median")
     assert reference_rank.metric_family == "reference_neighborhood"
     assert reference_rank.direction == "lower_is_better"
     assert reference_rank.unit == "rank"
+
+    distance_spearman = resolve_metric_definition("geometry_distance_correlation")
+    assert distance_spearman.display_name == "Pairwise distance Spearman"
+    assert "Spearman correlation" in distance_spearman.mathematical_definition

@@ -1,10 +1,15 @@
 plot_id: representation_scree_diagnostic
-research_question: Is each candidate representation space healthy or pathologically low-rank after pooling?
-evidence_tier: secondary
-encoding_summary: Multi-panel scree diagnostic showing explained-variance and cumulative-variance curves for each candidate representation.
-sampling_scope: Candidate reducer summaries.
-interpretation_guardrails:
-  - Scree curves diagnose geometry health and do not by themselves determine biological usefulness.
-  - Comparisons should consider both cumulative variance and effective rank.
-caption_md: Representation-health scree diagnostics for the canonical candidate inventory.
-alt_text: Multiple scree panels showing explained-variance and cumulative-variance curves for each candidate representation.
+question: How concentrated is the retained variance spectrum for each candidate representation after sampled reduction?
+decision_role: appendix
+encoding: Multi-panel explained-variance and cumulative-variance scree curves for the candidate reducer summaries.
+scope: Sample-based PCA reducer summaries for the canonical candidate inventory.
+guardrails:
+  - Use this as a diagnostic companion to the health summary.
+  - Visual variance decay does not say which directions matter for later modeling.
+caption: PCA scree diagnostic for the canonical candidate inventory.
+alt_text: Multi-panel scree curves showing explained and cumulative retained variance for each candidate representation.
+preprocessing_md: Uses the persisted sampled PCA reducer summaries for each candidate representation.
+math_md: Each panel shows retained variance ratios and their cumulative sum over the stored principal components.
+rationale_md: Provides a transparent appendix diagnostic behind the condensed representation-health gate.
+limitations_md: Reducer summaries are sample-based and low-dimensional, so they do not expose the full original spectrum.
+failure_modes_md: Visually smooth decay can hide collapse when variance is dominated by one nuisance direction.

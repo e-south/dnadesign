@@ -8,10 +8,11 @@ External supervised benchmarking handoff is outside the current LatentDNA produc
 LatentDNA stops at comparison and reporting:
 
 - `dataset_overview`
-- `reference_margin_analysis`
-- `context_geometry_audit`
-- `representation_comparison`
-- `representation_health_diagnostic`
+- `representation_health_summary`
+- `design_structure_summary`
+- `sigma35_ordinal_audit`
+- `context_robustness_summary`
+- `appendix_geometry_audit`
 - `appendix_umap_gallery`
 
 If a future study needs a neutral export bundle, specify the consumer and contract first and reintroduce that surface under a separate scope.

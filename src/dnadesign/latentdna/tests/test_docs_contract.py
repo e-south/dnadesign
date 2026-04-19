@@ -57,9 +57,14 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert (
         "**Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables" in workflow
     )
-    assert "reference_margin_analysis" in workflow
-    assert "representation_comparison" in workflow
+    assert "representation_health_summary" in workflow
+    assert "design_structure_summary" in workflow
+    assert "sigma35_ordinal_audit" in workflow
+    assert "context_robustness_summary" in workflow
     assert "appendix_umap_gallery" in workflow
+    assert "### Gate" in workflow
+    assert "pre-assay representation triage" in workflow
+    assert "Leave geodesic pilots in study notes" in workflow
     assert "workspace snapshot" in workflow
 
     assert "`latentdna workspace snapshot`" in cli_contracts
@@ -68,7 +73,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Nested output roots are rejected." in cli_contracts
 
     assert "<workspace>/outputs" in workspace_schema
-    assert "promoter-study reference-margin template" in workspace_schema
+    assert "promoter-study pre-assay template" in workspace_schema
 
     assert "Workspace snapshot contract" in reference_index
     assert "Artifact naming grammar" in reference_index
@@ -76,15 +81,17 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
 
     assert "latentdna_binding.yaml" in workspace_readme
     assert "workspace_snapshot.json" in workspace_readme
-    assert "UMAP role: appendix context only" in workspace_readme
+    assert "UMAP role: appendix orientation only" in workspace_readme
 
+    assert "Gate:" in study_routes
+    assert "representation_health_summary" in study_routes
     assert "Primary review path:" in study_routes
-    assert "representation_health_diagnostic" in study_routes
+    assert "sigma35_ordinal_audit" in study_routes
     assert "appendix_umap_gallery" in study_routes
-    assert (
-        "Snapshot attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`"
-        in study_routes
-    )
+    assert "Snapshot attention surfaces:" in study_routes
+    assert "dataset_overview" in study_routes
+    assert "design_structure_summary" in study_routes
+    assert "context_robustness_summary" in study_routes
     assert "Plane: `data-plane`" in study_routes
     assert "Plane: `control-plane`" in study_routes
     assert "Surface role: `producer`" in study_routes
@@ -96,12 +103,12 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Plane: `downstream-analysis`" not in study_routes
     assert "Plane: `downstream-tool`" not in study_routes
 
-    assert "LatentDNA is a downstream comparison surface" in study_status
-    assert (
-        "Current attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`"
-        in study_status
-    )
-    assert "Appendix surfaces remain secondary" in study_status
+    assert "The study phase is `infer_batch_preparation`" in study_status
+    assert "Current attention surfaces:" in study_status
+    assert "representation_health_summary" in study_status
+    assert "LatentDNA gate:" in study_status
+    assert "LatentDNA primary review path:" in study_status
+    assert "Appendix deliverables remain secondary" in study_status
 
 
 def test_latentdna_docs_remove_legacy_promoter_surface_names() -> None:

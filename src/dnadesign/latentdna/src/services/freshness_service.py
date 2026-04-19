@@ -7,7 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..contracts.errors import ContractViolationError
 from ..sources.provenance import OVERLAY_INVENTORY_DIGEST_MODE, source_provenance_digest
+from ..sources.resolver import inspect_source_schema, resolve_source
+from ..views.row_contracts import source_backed_view_row_contract
 from ..workspaces.loader import WorkspaceContext
 from ._artifact_inputs import artifact_kind_for_input_dependency
 from ._artifacts import artifact_exists, artifact_manifest_path
@@ -41,6 +44,54 @@ def _resolve_overlay_inventory_digest(path: Path, *, cache: FreshnessCache) -> s
     digest = source_provenance_digest({"path": key, "digest_mode": OVERLAY_INVENTORY_DIGEST_MODE})
     cache.overlay_inventory_digests[key] = digest
     return digest
+
+
+def _view_config_freshness_reasons(
+    context: WorkspaceContext,
+    *,
+    artifact_id: str,
+    manifest: dict[str, object],
+) -> tuple[list[str], bool]:
+    if not all(hasattr(context, attribute) for attribute in ("require_source_view", "require_source", "config")):
+        return [], True
+    try:
+        view = context.require_source_view(artifact_id)
+        source = context.require_source(view.source)
+        resolved = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
+        row_contract = source_backed_view_row_contract(
+            context,
+            source_id=view.source,
+            source=source,
+            available_columns=inspect_source_schema(resolved)["columns"],
+        )
+    except ContractViolationError as exc:
+        return [f"stale view config for view:{artifact_id}: {exc}"], True
+    except Exception as exc:
+        return [f"freshness unknown: could not resolve view config for view:{artifact_id}: {exc}"], False
+
+    params = manifest.get("params")
+    if not isinstance(params, dict):
+        return [f"freshness unknown: view manifest lacks params for view:{artifact_id}"], False
+
+    reasons: list[str] = []
+    expected_pairs = {
+        "coordinate_space_id": view.coordinate_space_id,
+        "record_key": source.record_key,
+        "subject_key": source.subject_key,
+        "context_key": source.context_key,
+        "source": view.source,
+        "role": view.role,
+    }
+    for key, expected in expected_pairs.items():
+        if params.get(key) != expected:
+            reasons.append(f"stale view config for view:{artifact_id}: {key}")
+
+    expected_row_columns = row_contract.materialized_row_columns
+    recorded_row_columns = [str(value) for value in params.get("row_columns", []) if value is not None]
+    missing_row_columns = [column for column in expected_row_columns if column not in recorded_row_columns]
+    if missing_row_columns:
+        reasons.append(f"stale view config for view:{artifact_id}: missing row columns {missing_row_columns}")
+    return reasons, True
 
 
 def evaluate_artifact_freshness(
@@ -184,6 +235,19 @@ def evaluate_manifest_freshness(
 
     if reasons:
         return {"status": "attention", "reason": reasons[0], "known": known, "reasons": reasons}
+    if artifact_kind == "view":
+        view_reasons, view_known = _view_config_freshness_reasons(
+            context,
+            artifact_id=artifact_id,
+            manifest=manifest,
+        )
+        if view_reasons:
+            return {
+                "status": "attention",
+                "reason": view_reasons[0],
+                "known": view_known,
+                "reasons": view_reasons,
+            }
     if not checked_any:
         return {
             "status": "attention",

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..contracts.plot import ResolvedPlotSpec
+from ..contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..plots.render import (
     _category_color_map as static_category_color_map,
 )
@@ -374,7 +374,7 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
 
     panel_values = list(dict.fromkeys(frame[spec.row_column].astype(str).tolist())) if spec.row_column else ["panel"]
     rows_count, columns = static_panel_grid_dimensions(len(panel_values))
-    square_metric_panels = spec.plot_id == "context_geometry_summary"
+    square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
     fig, axes = plt.subplots(
         rows_count,
         columns,

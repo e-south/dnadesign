@@ -14,7 +14,9 @@ from types import ModuleType
 import marimo as mo
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
 
+from ..contracts.plot_semantics import PlotSemantics
 from ..labels import humanize_plot_title
 from ..plots.recipes import resolve_plot_spec
 from ..studies.docs_refs import read_docs_ref
@@ -158,6 +160,25 @@ class WorkspaceBrowserRuntime:
 
 def _humanize_plot_id(plot_id: str) -> str:
     return humanize_plot_title(plot_id)
+
+
+def _resolved_plot_semantics_payload(
+    context,
+    *,
+    plot_id: str,
+    manifest: dict[str, object],
+) -> dict[str, object]:
+    raw_semantics = manifest.get("semantics")
+    if isinstance(raw_semantics, dict):
+        try:
+            semantics = PlotSemantics.model_validate(raw_semantics)
+        except ValidationError:
+            semantics = resolve_plot_semantics(context, plot_id=plot_id)
+        else:
+            if semantics.plot_id != plot_id:
+                semantics = resolve_plot_semantics(context, plot_id=plot_id)
+        return semantics.model_dump(mode="json")
+    return resolve_plot_semantics(context, plot_id=plot_id).model_dump(mode="json")
 
 
 def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
@@ -314,11 +335,7 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
         )
         plot_dir = output_root / "plots" / plot_id
         manifest = load_json(plot_dir / "manifest.json")
-        semantics = (
-            manifest.get("semantics", {})
-            if isinstance(manifest.get("semantics"), dict)
-            else resolve_plot_semantics(context, plot_id=plot_id, allow_generated_fallback=True).model_dump(mode="json")
-        )
+        semantics = _resolved_plot_semantics_payload(context, plot_id=plot_id, manifest=manifest)
         output_paths = [
             plot_dir / str(output.get("path"))
             for output in manifest.get("outputs", [])
@@ -353,10 +370,12 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
                 "title": str(doc_block.get("title") or _humanize_plot_id(plot_id)),
                 "visibility_tier": visibility_tier,
                 "render_path": render_path,
-                "caption_md": str(semantics.get("caption_md") or "").strip(),
+                "caption_md": str(semantics.get("caption") or "").strip(),
                 "study_doc_md": str(doc_block.get("markdown") or "").strip(),
                 "plot_details_md": str(doc_block.get("plot_details_md") or "").strip(),
                 "study_doc_warning": doc_block.get("warning"),
+                "status": str(entry.get("status") or "missing"),
+                "stale": bool(entry.get("stale")),
                 "live_render": live_render,
                 "plot_spec": resolved_spec.model_dump(mode="json"),
             }

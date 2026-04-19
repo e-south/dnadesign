@@ -52,30 +52,31 @@ This page keeps the downstream handoff map in one place.
 - Owner-boundary: `latentdna`
 - Current state: snapshot posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract
 - Entry artifact: `promoter/stress_ethanol_cipro_anchor_set` and `promoter/stress_ethanol_cipro_construct_contexts`
-- Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the plot-review notebook
+- Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
 - Workspace: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md`
 - First command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - Snapshot artifact: the path declared by `latentdna_binding.yaml`
 - Follow-up validation: `uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep`
+- Gate:
+  1. `representation_health_summary`
 - Primary review path:
   1. `dataset_overview`
-  2. `reference_margin_analysis`
-  3. `context_geometry_audit`
-  4. `representation_comparison`
-  5. `representation_health_diagnostic`
-- Appendix surfaces:
-  - `reference_margin_gallery_synthetic_centroids`
+  2. `design_structure_summary`
+  3. `sigma35_ordinal_audit`
+  4. `context_robustness_summary`
+- Appendix deliverables:
+  - `appendix_geometry_audit`
   - `appendix_umap_gallery`
-- Snapshot attention surfaces: `dataset_overview`, `reference_margin_analysis`, `representation_comparison`
-- Notebook role: plot-first review surface; `Geometry audit` and `Comparison audit` are secondary audit tabs
+- Snapshot attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
 - Browser default geometries: the eight canonical anchor/full-context spaces across `intermediate_embedding` and `pooled_logits` for `evo2_7b` and `evo2_20b`
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors
   - do not treat the notebook browser as the authoritative study-status surface
-- Route note: this is the downstream representation-comparison route, not the sanctioned record-plane answer to “where is the study now?”
+- Route note: use this route for downstream comparison outputs after checking the study record.
 
 ### Cluster exploration
 
@@ -84,7 +85,7 @@ This page keeps the downstream handoff map in one place.
 - Surface role: `downstream-analysis`
 - Owner-boundary: `cluster`
 - Current state: `planned`
-- Entry artifact: `representation_comparison`
+- Entry artifact: `context_robustness_summary`
 - Exit artifact: study-owned cluster workspace or results root once this route is configured
 - Primary doc/workspace: `src/dnadesign/cluster/docs/workflows/exploratory-clustering.md`
 - First command: `uv run ops catalog show cluster.downstream.exploratory-clustering`

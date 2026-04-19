@@ -36,10 +36,10 @@ def _write_latentdna_binding_fixture(tmp_path: Path) -> Path:
                 "required_wildtype_references": ["spyp", "sulap", "j23105"],
                 "decision_deliverables": [
                     "dataset_overview",
-                    "reference_margin_analysis",
-                    "context_geometry_audit",
-                    "representation_comparison",
-                    "representation_health_diagnostic",
+                    "representation_health_summary",
+                    "design_structure_summary",
+                    "sigma35_ordinal_audit",
+                    "context_robustness_summary",
                 ],
             },
             sort_keys=False,
@@ -107,17 +107,17 @@ def _write_latentdna_snapshot_fixture(tmp_path: Path) -> Path:
                         "docs_refs": [],
                         "warnings": [],
                     },
-                    "reference_margin_analysis": {
-                        "title": "Reference margin analysis",
+                    "representation_health_summary": {
+                        "title": "Representation health summary",
                         "status": "ok",
                         "freshness": "ok",
                         "acceptance_checks": [],
-                        "artifact_paths": ["plots/reference_margin_gallery_wildtype"],
+                        "artifact_paths": ["plots/representation_health_summary"],
                         "docs_refs": [],
                         "warnings": [],
                     },
-                    "context_geometry_audit": {
-                        "title": "Context geometry audit",
+                    "design_structure_summary": {
+                        "title": "Design-structure summary",
                         "status": "attention",
                         "freshness": "attention",
                         "acceptance_checks": [],
@@ -125,8 +125,8 @@ def _write_latentdna_snapshot_fixture(tmp_path: Path) -> Path:
                         "docs_refs": [],
                         "warnings": ["pending refreshed artifact run"],
                     },
-                    "representation_comparison": {
-                        "title": "Representation comparison",
+                    "sigma35_ordinal_audit": {
+                        "title": "Sigma-35 ordinal audit",
                         "status": "missing",
                         "freshness": "missing",
                         "acceptance_checks": [],
@@ -134,8 +134,8 @@ def _write_latentdna_snapshot_fixture(tmp_path: Path) -> Path:
                         "docs_refs": [],
                         "warnings": [],
                     },
-                    "representation_health_diagnostic": {
-                        "title": "Representation health diagnostic",
+                    "context_robustness_summary": {
+                        "title": "Context robustness summary",
                         "status": "missing",
                         "freshness": "missing",
                         "acceptance_checks": [],
@@ -176,10 +176,10 @@ def _write_latentdna_snapshot_fixture(tmp_path: Path) -> Path:
                 },
                 "decision_ladder": [
                     "dataset_overview",
-                    "reference_margin_analysis",
-                    "context_geometry_audit",
-                    "representation_comparison",
-                    "representation_health_diagnostic",
+                    "representation_health_summary",
+                    "design_structure_summary",
+                    "sigma35_ordinal_audit",
+                    "context_robustness_summary",
                 ],
                 "last_updated_at": "2026-04-15T12:00:00+00:00",
             },
@@ -219,9 +219,9 @@ def test_inspect_promoter_latentdna_readiness_uses_binding_and_snapshot_contract
     }
     assert readiness["ok_deliverables"] == [
         "dataset_overview",
-        "reference_margin_analysis",
+        "representation_health_summary",
     ]
-    assert "representation_comparison" in readiness["pending_deliverables"]
+    assert "design_structure_summary" in readiness["pending_deliverables"]
     assert readiness["exports_ok"] is True
     assert readiness["browser_default_geometry_ids"] == [
         "intermediate_embedding_20b_anchor_60bp",

@@ -31,7 +31,7 @@ Interpretation:
 - live study workspaces that rely on large USR directory overlays should opt into `digest_ledger.json` source provenance before regeneration when snapshot freshness latency becomes dominant
 - the April 17, 2026 live `stress_ethanol_cipro_growth` snapshot pressure run measured warmed `workspace_snapshot()` at 1.12s mean across three runs after shared overlay-inventory freshness caching, down from 2.36s cumulative on the profiled pre-pass hot path
 - the same study now measures warmed `workspace_snapshot()` at 0.22s mean across three runs after decoupling browser geometry assembly from full notebook context-audit work, with a fresh-process single run at 1.05s
-- after splitting plot-semantics sidecar validation out of generic workspace loading and caching the canonical `output_root` on `WorkspaceContext`, the same study now measures warmed `workspace_snapshot()` at 0.18s mean across three runs and warmed `deliverable_status(reference_margin_analysis)` at 0.13s mean across three runs
+- after splitting plot-semantics sidecar validation out of generic workspace loading and caching the canonical `output_root` on `WorkspaceContext`, the same study now measures warmed `workspace_snapshot()` at 0.18s mean across three runs and warmed `deliverable_status(representation_health_summary)` at 0.13s mean across three runs
 - fresh-process `workspace_snapshot()` launches after that loader/control-plane split measured 1.75s on the first cold launch and about 1.00s on subsequent independent launches
 - the profiled status path is now dominated by workspace-config YAML parsing plus deliverable freshness recursion rather than plot-semantics sidecar validation
 - real-study pressure evidence should continue to be recorded in the development journal

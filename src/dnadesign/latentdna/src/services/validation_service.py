@@ -12,6 +12,7 @@ from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConf
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..sources.resolver import inspect_source_schema, resolve_source
+from ..views.row_contracts import source_backed_view_row_contract
 from ..workspaces.loader import load_workspace_config
 from ..workspaces.paths import resolve_repo_path
 from ..workspaces.plot_semantics import validate_plot_semantics_sidecars
@@ -24,6 +25,7 @@ _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
         "usr_label__primary",
     },
     "sig35_variant": {"densegen__plan", "usr_label__primary"},
+    "spacer_length": {"densegen__used_tfbs_detail", "usr_label__primary"},
     "campaign_prior": {"densegen__plan", "usr_label__primary"},
     "is_control": {"densegen__plan", "usr_label__primary"},
     "source_class": {"densegen__plan", "usr_label__primary"},
@@ -127,40 +129,18 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             matrix_path = view_dir / "matrix.npy"
             if rows_path.is_file() and matrix_path.is_file():
                 materialized_columns = {field.name for field in read_schema(rows_path)}
-                promoter_cohort_ids = {
-                    cohort_id
-                    for cohort_id, cohort in context.config.cohorts.items()
-                    if isinstance(cohort, PromoterMetadataCohortConfig) and cohort.source == view.source
-                }
-                requested_metadata_columns = {
-                    source.record_key,
-                    source.subject_key,
-                    *(context.config.metadata.include or []),
-                    *(source.metadata_include or []),
-                    *(context.config.metadata.derivations or {}).keys(),
-                    *promoter_cohort_ids,
-                }
-                required_materialized_columns = set(requested_metadata_columns)
-                if "construct_template_id" in requested_metadata_columns and {
-                    "template_id",
-                    "construct__template_id",
-                }.intersection(columns):
-                    required_materialized_columns.add("construct_template_id")
-                if source.context_key is not None:
-                    required_materialized_columns.add(source.context_key)
-                missing_materialized_columns = sorted(
-                    column
-                    for column in required_materialized_columns
-                    if (
-                        column not in materialized_columns
-                        and (
-                            column in columns
-                            or column == "construct_template_id"
-                            or column in (context.config.metadata.derivations or {})
-                            or column in (source.metadata_include or [])
-                            or column in context.config.cohorts
-                        )
+                try:
+                    row_contract = source_backed_view_row_contract(
+                        context,
+                        source_id=view.source,
+                        source=source,
+                        available_columns=columns,
                     )
+                except Exception as exc:
+                    raise WorkspaceValidationError(f"view {view_id} row-column contract is invalid: {exc}") from exc
+                required_materialized_columns = set(row_contract.materialized_row_columns)
+                missing_materialized_columns = sorted(
+                    column for column in required_materialized_columns if column not in materialized_columns
                 )
                 if missing_materialized_columns:
                     raise WorkspaceValidationError(

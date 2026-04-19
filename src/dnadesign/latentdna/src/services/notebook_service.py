@@ -76,9 +76,6 @@ def _default_deliverable_status(context, default_deliverable: str):
 
 
 def _load_catalog_payload(context) -> dict[str, object]:
-    catalog_path = context.output_root / "catalog.json"
-    if catalog_path.is_file():
-        return read_json(catalog_path)
     from .catalog_service import workspace_catalog_from_context
 
     return workspace_catalog_from_context(context)

@@ -63,10 +63,10 @@ Current runtime limits:
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
 - `notebook generate` currently emits one workspace notebook surface per declared `notebooks.<id>`, with `notebooks.<id>.default_deliverable` selecting the initial catalog focus while all plot, run, and manifest browsing stays read-only.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
-- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study reference-margin template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
+- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
 - `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
 - `validate workspace --deep` currently performs schema-only pressure checks against declared sources, views, cohorts, landmarks, and the bound study directory without loading embedding payloads.
 - Deliverable loading now rejects declared outputs that the linked recipe does not actually produce, including config-backed outputs such as `views`, `scalars`, `reducers`, `reduced_views`, and `exports`.
 - Deliverables must now declare explicit semantic fields in config. The runtime no longer hydrates missing `title`, `summary`, `question`, or `section` from legacy `description` and `kind` fields.
 - Deliverable status and run inventory now use recorded input and source digests where available, including export and alignment manifests with explicit path-backed provenance.
-- Fixture-scale contract coverage now lives under the checked-in contract and CLI tests for the promoter reference-margin template; these are smoke checks, not a replacement for live promoter-study pressure runs.
+- Fixture-scale contract coverage now lives under the checked-in contract and CLI tests for the promoter-study pre-assay template; these are smoke checks, not a replacement for live promoter-study pressure runs.

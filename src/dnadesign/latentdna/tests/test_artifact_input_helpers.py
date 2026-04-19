@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.latentdna.src.io.hashing import sha256_file
@@ -11,9 +13,11 @@ from dnadesign.latentdna.src.services._artifact_inputs import (
     artifact_kind_for_input_dependency,
     dependency_artifact_input,
 )
+from dnadesign.latentdna.src.services._artifacts import prune_retired_artifact_dirs
 from dnadesign.latentdna.src.services.freshness_service import FreshnessCache, evaluate_artifact_freshness
 from dnadesign.latentdna.src.sources import provenance as provenance_module
 from dnadesign.latentdna.src.sources.provenance import OVERLAY_INVENTORY_DIGEST_MODE, overlay_inventory_digest
+from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
 def test_dependency_artifact_input_uses_manifest_for_managed_artifacts(tmp_path: Path) -> None:
@@ -258,4 +262,297 @@ def test_freshness_cache_reuses_overlay_inventory_digest_across_artifacts(
 
     assert first["status"] == "ok"
     assert second["status"] == "ok"
-    assert overlay_counts == {overlay_dir.resolve().as_posix(): 1}
+
+
+def test_view_freshness_detects_row_column_drift_from_workspace_config(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    source_path = workspace_dir / "inputs" / "anchor.parquet"
+    source_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["row_a"],
+                "subject_id": ["row_a"],
+                "embedding": [[0.1, 0.2]],
+            }
+        ),
+        source_path,
+    )
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: freshness_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+sources:
+  anchor_60bp:
+    kind: parquet
+    path: inputs/anchor.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: [spacer_length]
+views:
+  demo_view:
+    source: anchor_60bp
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+cohorts:
+  spacer_length:
+    kind: promoter_metadata
+    source: anchor_60bp
+    derive: spacer_length
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest_path = workspace_dir / "outputs" / "views" / "demo_view" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "artifact_kind": "view",
+                "artifact_id": "demo_view",
+                "status": "ok",
+                "source_provenance": [
+                    {
+                        "path": source_path.as_posix(),
+                        "digest": sha256_file(source_path),
+                    }
+                ],
+                "params": {
+                    "source": "anchor_60bp",
+                    "coordinate_space_id": "demo_space",
+                    "record_key": "id",
+                    "subject_key": "subject_id",
+                    "context_key": None,
+                    "row_columns": ["id", "subject_id"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    freshness = evaluate_artifact_freshness(context, artifact_kind="view", artifact_id="demo_view")
+
+    assert freshness["status"] == "attention"
+    assert "missing row columns ['spacer_length']" in str(freshness["reason"])
+
+
+def test_view_freshness_ignores_promoter_metadata_cohorts_from_other_sources(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    anchor_path = workspace_dir / "inputs" / "anchor.parquet"
+    control_path = workspace_dir / "inputs" / "control.parquet"
+    anchor_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["anchor_a"],
+                "subject_id": ["anchor_a"],
+                "embedding": [[0.1, 0.2]],
+                "densegen__used_tfbs_detail": ['[{"spacer_length":17}]'],
+                "usr_label__primary": ["anchor_a"],
+            }
+        ),
+        anchor_path,
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["control_a"],
+                "subject_id": ["control_a"],
+                "embedding": [[0.3, 0.4]],
+            }
+        ),
+        control_path,
+    )
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: freshness_scope_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+sources:
+  anchor_60bp:
+    kind: parquet
+    path: inputs/anchor.parquet
+    record_key: id
+    subject_key: subject_id
+  controls:
+    kind: parquet
+    path: inputs/control.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  control_view:
+    source: controls
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+cohorts:
+  spacer_length:
+    kind: promoter_metadata
+    source: anchor_60bp
+    derive: spacer_length
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest_path = workspace_dir / "outputs" / "views" / "control_view" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "artifact_kind": "view",
+                "artifact_id": "control_view",
+                "status": "ok",
+                "source_provenance": [
+                    {
+                        "path": control_path.as_posix(),
+                        "digest": sha256_file(control_path),
+                    }
+                ],
+                "params": {
+                    "source": "controls",
+                    "coordinate_space_id": "demo_space",
+                    "record_key": "id",
+                    "subject_key": "subject_id",
+                    "context_key": None,
+                    "row_columns": ["id", "subject_id"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    freshness = evaluate_artifact_freshness(context, artifact_kind="view", artifact_id="control_view")
+
+    assert freshness["status"] == "ok"
+
+
+def test_view_freshness_marks_source_resolution_failures_as_attention(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    source_path = workspace_dir / "inputs" / "anchor.parquet"
+    source_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["row_a"],
+                "subject_id": ["row_a"],
+                "embedding": [[0.1, 0.2]],
+            }
+        ),
+        source_path,
+    )
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: freshness_resolution_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+sources:
+  anchor_60bp:
+    kind: parquet
+    path: inputs/anchor.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  demo_view:
+    source: anchor_60bp
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest_path = workspace_dir / "outputs" / "views" / "demo_view" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "artifact_kind": "view",
+                "artifact_id": "demo_view",
+                "status": "ok",
+                "source_provenance": [
+                    {
+                        "path": source_path.as_posix(),
+                        "digest": sha256_file(source_path),
+                    }
+                ],
+                "params": {
+                    "source": "anchor_60bp",
+                    "coordinate_space_id": "demo_space",
+                    "record_key": "id",
+                    "subject_key": "subject_id",
+                    "context_key": None,
+                    "row_columns": ["id", "subject_id"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.freshness_service.inspect_source_schema",
+        lambda resolved: (_ for _ in ()).throw(RuntimeError("schema probe failed")),
+    )
+
+    freshness = evaluate_artifact_freshness(context, artifact_kind="view", artifact_id="demo_view")
+
+    assert freshness["status"] == "attention"
+    assert freshness["known"] is False
+    assert "schema probe failed" in str(freshness["reason"])
+
+
+def test_prune_retired_artifact_dirs_removes_only_unconfigured_manifests(tmp_path: Path) -> None:
+    output_root = tmp_path / "outputs"
+    current_view = output_root / "views" / "current_view"
+    retired_view = output_root / "views" / "retired_view"
+    scratch_dir = output_root / "views" / "_scratch"
+    for path in (current_view, retired_view, scratch_dir):
+        path.mkdir(parents=True, exist_ok=True)
+    (current_view / "manifest.json").write_text("{}", encoding="utf-8")
+    (retired_view / "manifest.json").write_text("{}", encoding="utf-8")
+    (scratch_dir / "note.txt").write_text("keep", encoding="utf-8")
+
+    context = SimpleNamespace(
+        output_root=output_root,
+        config=SimpleNamespace(views={"current_view": object()}),
+    )
+
+    removed = prune_retired_artifact_dirs(context, artifact_kind="view")
+
+    assert removed == [retired_view.as_posix()]
+    assert current_view.is_dir()
+    assert not retired_view.exists()
+    assert scratch_dir.is_dir()

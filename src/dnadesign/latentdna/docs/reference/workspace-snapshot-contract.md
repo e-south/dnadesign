@@ -19,6 +19,10 @@ Required top-level fields:
 - `decision_ladder`
 - `last_updated_at`
 
+`decision_ladder` publishes the primary decision surfaces only. Gate
+deliverables still appear under `deliverables`, but they are not listed as
+decision steps.
+
 Promoter-study tooling is allowed to know only:
 
 - the study-owned binding file

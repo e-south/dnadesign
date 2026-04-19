@@ -8,20 +8,22 @@ from collections.abc import Mapping
 _DIRECT_LABELS = {
     "appendix_umap_gallery": "UMAP gallery",
     "dataset_overview": "Dataset inventory by cohort dimension",
-    "reference_margin_gallery_wildtype": "Wildtype reference-margin gallery",
-    "reference_neighbor_evidence": "Reference-neighborhood evidence",
-    "context_shift_reference_plane": "Context-shift margin plane",
+    "representation_health_summary": "Representation health summary",
+    "design_structure_summary": "Design-structure summary",
+    "sigma35_ordinal_audit": "Sigma-35 ordinal audit",
+    "context_robustness_summary": "Context robustness summary",
+    "design_centroid_margin_gallery": "Design-centroid margin gallery",
+    "reference_alignment_summary": "Reference alignment summary",
     "context_delta_distributions": "Context-shift distributions",
-    "context_geometry_summary": "Context stability summary",
-    "representation_tradeoff_scatter": "Candidate evidence vs context stability",
     "representation_scree_diagnostic": "PCA variance-decay diagnostic",
-    "reference_margin_gallery_synthetic_centroids": "Synthetic proxy margin gallery",
     "intermediate_embedding": "Intermediate block mean",
-    "pooled_logits": "Output-layer mean",
+    "pooled_logits": "Pooled logits",
     "anchor_60bp": "60 bp anchor",
     "full_context_1kb": "1 kb construct context",
+    "anchor_vs_context": "Anchor vs 1 kb context",
     "sig35_variant": "Sigma-35 variant",
     "sigma35_variant": "Sigma-35 variant",
+    "spacer_length": "Spacer length",
     "design_family": "Design family",
     "style": "Design family",
     "background_only": "Background only",
@@ -29,7 +31,6 @@ _DIRECT_LABELS = {
     "cipro": "Ciprofloxacin",
     "ciprofloxacin": "Ciprofloxacin",
     "ethanol_ciprofloxacin": "Ethanol + ciprofloxacin",
-    "ethanol_plus_cipro": "Ethanol + ciprofloxacin",
     "control": "Control",
     "densegen": "DenseGen",
     "manual_or_wildtype": "Manual/wildtype control",
@@ -45,15 +46,29 @@ _DIRECT_LABELS = {
     "context_shift_l2": "Context-shift L2 distance",
     "context_self_cosine_median": "Median context self-cosine",
     "reference_in_knn_rate": "Reference in-kNN rate",
-    "reference_neighbor_rank_median": "Median reference-neighbor rank",
-    "wildtype_margin_ethanol_auprc": "Wildtype ethanol-margin AUPRC",
-    "wildtype_margin_cipro_auprc": "Wildtype ciprofloxacin-margin AUPRC",
-    "wildtype_margin_dual_joint_auprc": "Joint wildtype-margin AUPRC",
+    "reference_neighbor_topk_censored_rank_median": "Median reference-neighbor top-k-censored rank",
     "effective_rank": "Effective rank",
-    "wildtype_margin_ethanol_vs_control": "Ethanol reference margin",
-    "wildtype_margin_cipro_vs_control": "Ciprofloxacin reference margin",
-    "synthetic_margin_ethanol_vs_background": "Synthetic ethanol margin",
-    "synthetic_margin_cipro_vs_background": "Synthetic ciprofloxacin margin",
+    "pc1_variance_fraction": "PC1 variance fraction",
+    "pairwise_cosine_distance_median": "Median pairwise cosine distance",
+    "pairwise_cosine_distance_iqr": "Pairwise cosine distance IQR",
+    "design_family_separation_ratio": "Design-family separation ratio",
+    "design_family_balanced_separation_ratio": "Balanced design-family separation ratio",
+    "design_regulator_composition_separation_ratio": "Regulator-composition separation ratio",
+    "sig35_variant_separation_ratio": "Sigma-35 separation ratio",
+    "spacer_length_separation_ratio": "Spacer-length separation ratio",
+    "sig35_ordinal_spearman": "Sigma-35 ordinal Spearman",
+    "sig35_ordinal_kendall": "Sigma-35 ordinal Kendall",
+    "sig35_balanced_ordinal_spearman": "Balanced Sigma-35 ordinal Spearman",
+    "sig35_within_family_mean_spearman": "Within-family Sigma-35 Spearman",
+    "sig35_label_permutation_pvalue": "Sigma-35 permutation p-value",
+    "design_family_retention_correlation": "Design-family retention",
+    "design_regulator_composition_retention_correlation": "Regulator-composition retention",
+    "sig35_variant_retention_correlation": "Sigma-35 retention",
+    "reference_alignment_ethanol_background_relative": "Ethanol reference alignment",
+    "reference_alignment_cipro_background_relative": "Ciprofloxacin reference alignment",
+    "synthetic_margin_ethanol_vs_background": "Design-centroid ethanol margin",
+    "synthetic_margin_cipro_vs_background": "Design-centroid ciprofloxacin margin",
+    "synthetic_margin_dual_vs_background": "Design-centroid dual margin",
     "context_margin_delta_ethanol": "Δ ethanol margin",
     "context_margin_delta_cipro": "Δ ciprofloxacin margin",
     "generation_plan": "Generation plan",
@@ -64,8 +79,8 @@ _DIRECT_LABELS = {
     "variant e": "Variant e",
     "variant f": "Variant f",
     "neighbor_overlap_fraction": "Neighbor-overlap fraction",
-    "geometry_distance_correlation": "Geometry-distance correlation",
-    "pairwise distance spearman": "Geometry-distance correlation",
+    "geometry_distance_correlation": "Pairwise distance Spearman",
+    "pairwise distance spearman": "Geometry-distance Spearman",
     "x_metric_value": "Evidence metric value",
     "y_metric_value": "Median context self-cosine",
     "candidate_family": "Representation family",
@@ -149,7 +164,7 @@ def humanize_label(value: object) -> str:
 
     normalized = text.replace("_", " ")
     normalized = re.sub(r"\bintermediate embedding\b", "Intermediate block mean", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"\bpooled logits\b", "Output-layer mean", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bpooled logits\b", "Pooled logits", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\banchor 60 ?bp\b", "60 bp anchor", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\bfull context 1 ?kb\b",
@@ -191,7 +206,7 @@ def humanize_candidate(candidate_key: str | Mapping[str, str]) -> str:
         return direct
     normalized = text.replace("_", " ")
     normalized = re.sub(r"\bintermediate embedding\b", "Intermediate block mean", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"\bpooled logits\b", "Output-layer mean", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bpooled logits\b", "Pooled logits", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\banchor 60 ?bp\b", "60 bp anchor", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\bfull context 1 ?kb\b",

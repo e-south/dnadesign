@@ -10,7 +10,7 @@ from ..contracts.errors import MissingArtifactError
 from ..io.json_io import read_json, write_json
 from ..studies.docs_refs import read_docs_ref
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
-from ._artifacts import artifact_dir, artifact_exists
+from ._artifacts import artifact_dir, artifact_exists, prune_retired_managed_artifacts
 from .deliverable_service import deliverable_status_from_context
 from .freshness_service import FreshnessCache
 from .plot_service import write_plot_index
@@ -27,6 +27,10 @@ def _workspace_state(states: list[str]) -> str:
 
 
 def workspace_catalog_from_context(context: WorkspaceContext) -> dict[str, object]:
+    pruned_artifacts = prune_retired_managed_artifacts(
+        context,
+        artifact_kinds=("alignment_set", "export_bundle", "notebook", "view"),
+    )
     deliverable_rows = []
     docs_refs: list[dict[str, str]] = []
     freshness_cache = FreshnessCache()
@@ -81,6 +85,7 @@ def workspace_catalog_from_context(context: WorkspaceContext) -> dict[str, objec
         "exports": exports,
         "runs": runs,
         "docs_refs": docs_refs,
+        "pruned_artifacts": pruned_artifacts,
     }
     write_json(context.output_root / "catalog.json", payload)
     return payload
@@ -107,15 +112,17 @@ def explain_plot(workspace: str | Path, plot_id: str) -> dict[str, object]:
     context = load_workspace_config(workspace)
     if not artifact_exists(context, artifact_kind="plot", artifact_id=plot_id):
         raise MissingArtifactError(f"plot artifact not found: {plot_id}")
-    plot = context.require_plot(plot_id)
     manifest_path = artifact_dir(context, artifact_kind="plot", artifact_id=plot_id) / "manifest.json"
+    plot = context.config.plots.get(plot_id)
+    manifest = context.read_manifest(manifest_path)
+    params = manifest.get("params") if isinstance(manifest.get("params"), dict) else {}
     return {
         "workspace_id": context.workspace_id,
         "plot_id": plot_id,
-        "kind": plot.kind,
-        "config": plot.model_dump(mode="json"),
+        "kind": plot.kind if plot is not None else params.get("kind"),
+        "config": plot.model_dump(mode="json") if plot is not None else None,
         "path": artifact_dir(context, artifact_kind="plot", artifact_id=plot_id).as_posix(),
-        "manifest": context.read_manifest(manifest_path),
+        "manifest": manifest,
     }
 
 

@@ -218,16 +218,24 @@ def test_usr_top_readme_is_lightweight_router() -> None:
 
 
 def test_usr_agent_and_sync_docs_prefer_explicit_remotes_config() -> None:
+    root_agents = _read("AGENTS.md")
     usr_agents = _read("src/dnadesign/usr/AGENTS.md")
     sync_setup = _read("src/dnadesign/usr/docs/operations/sync-setup.md")
-    sync_skill = _read("src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md")
+    sync_skill = _read(".agents/skills/bu-scc-usr-sync/SKILL.md")
 
+    assert ".agents/skills/bu-scc-usr-sync/SKILL.md" in root_agents
+    assert ".agents/skills/bu-scc-usr-sync/SKILL.md" in usr_agents
+    assert "src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md" not in usr_agents
     assert "--remotes-config <remotes.yaml>" in usr_agents
     assert "USR_REMOTES_PATH" in usr_agents
     assert "fallback" in usr_agents
     assert "--remotes-config" in sync_setup
     assert "USR_REMOTES_PATH" in sync_setup
     assert "Prefer `uv run usr --remotes-config <remotes.yaml> ...`" in sync_skill
+    assert "uv run usr remotes doctor --remote <name>" in sync_skill
+    assert "uv run usr remotes warm-auth --remote <name>" in sync_skill
+    assert "docs/bu-scc/README.md" in sync_skill
+    assert not (_repo_root() / "src" / "dnadesign" / "usr" / "skills" / "bu-scc-usr-sync" / "SKILL.md").exists()
 
 
 def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
@@ -503,6 +511,29 @@ def test_repo_local_promoter_skill_audit_passes() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_repo_local_bu_scc_usr_sync_skill_audit_is_documented_and_present() -> None:
+    dev_docs = _read("docs/dev/README.md")
+    skill_root = _repo_root() / ".agents" / "skills" / "bu-scc-usr-sync"
+
+    assert ".agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh" in dev_docs
+    assert (skill_root / "SKILL.md").exists()
+    assert (skill_root / "references" / "sync-loop.md").exists()
+    assert (skill_root / "references" / "external-sources.md").exists()
+    assert (skill_root / "scripts" / "audit-bu-scc-usr-sync-skill.sh").exists()
+
+
+def test_repo_local_bu_scc_usr_sync_skill_audit_passes() -> None:
+    skill_root = _repo_root() / ".agents" / "skills" / "bu-scc-usr-sync"
+    result = subprocess.run(
+        [shutil.which("bash") or "bash", str(skill_root / "scripts" / "audit-bu-scc-usr-sync-skill.sh")],
+        cwd=_repo_root(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
 
@@ -547,10 +578,8 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "LatentDNA: `configured` for downstream comparison" in status
     assert "Cluster: `planned`" in status
     assert "OPAL: `not_configured`" in status
-    assert (
-        "sanctioned current-record surface is `uv run ops progress show usr.data-plane.promoter-study-status --json`"
-        in status
-    )
+    assert "uv run ops progress show usr.data-plane.promoter-study-status --json" in status
+    assert "checked-in study record" in status
     assert re.search(r"`densegen/study_stress_ethanol_cipro`: `\d+`", status)
     assert re.search(r"`promoter/stress_ethanol_cipro_anchor_set`: `\d+`", status)
     assert re.search(r"`promoter/stress_ethanol_cipro_construct_contexts`: `\d+`", status)

@@ -16,22 +16,22 @@ def test_xy_scatter_grid_accepts_scalar_panels() -> None:
         {
             "kind": "xy_scatter_grid",
             "scalars": [
-                "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
-                "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
+                "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+                "design_centroid_margins_intermediate_embedding_20b_full_context_1kb",
             ],
             "panel_titles": [
                 "intermediate_embedding 20b anchor_60bp",
                 "intermediate_embedding 20b full_context_1kb",
             ],
-            "x_column": "wildtype_margin_ethanol_vs_control",
-            "y_column": "wildtype_margin_cipro_vs_control",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
             "color_column": "design_family",
         }
     )
 
     spec = resolve_plot_spec(
-        plots={"reference_margin_gallery_wildtype": config},
-        plot_id="reference_margin_gallery_wildtype",
+        plots={"design_centroid_margin_gallery": config},
+        plot_id="design_centroid_margin_gallery",
         kind=None,
         projection_ids=[],
         panel_titles=[],
@@ -55,8 +55,8 @@ def test_xy_scatter_grid_accepts_scalar_panels() -> None:
 
     assert spec.kind == "xy_scatter_grid"
     assert spec.scalar_ids == [
-        "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
-        "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
+        "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+        "design_centroid_margins_intermediate_embedding_20b_full_context_1kb",
     ]
     assert spec.panel_titles == [
         "intermediate_embedding 20b anchor_60bp",
@@ -70,12 +70,12 @@ def test_xy_scatter_grid_rejects_misaligned_panel_titles() -> None:
             {
                 "kind": "xy_scatter_grid",
                 "scalars": [
-                    "wildtype_reference_margins_intermediate_embedding_20b_anchor_60bp",
-                    "wildtype_reference_margins_intermediate_embedding_20b_full_context_1kb",
+                    "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+                    "design_centroid_margins_intermediate_embedding_20b_full_context_1kb",
                 ],
                 "panel_titles": ["only one title"],
-                "x_column": "wildtype_margin_ethanol_vs_control",
-                "y_column": "wildtype_margin_cipro_vs_control",
+                "x_column": "synthetic_margin_ethanol_vs_background",
+                "y_column": "synthetic_margin_cipro_vs_background",
             }
         )
 
@@ -96,8 +96,8 @@ def test_agreement_summary_grid_preserves_panel_inventory() -> None:
     )
 
     spec = resolve_plot_spec(
-        plots={"context_geometry_summary": config},
-        plot_id="context_geometry_summary",
+        plots={"agreement_demo": config},
+        plot_id="agreement_demo",
         kind=None,
         projection_ids=[],
         panel_titles=[],
@@ -174,7 +174,7 @@ def test_metric_panel_grid_accepts_candidate_metric_summary_plots() -> None:
     config = _PLOT_CONFIG_ADAPTER.validate_python(
         {
             "kind": "metric_panel_grid",
-            "scalar": "reference_neighbor_evidence_metrics",
+            "scalar": "representation_health_summary_metrics",
             "facet_column": "category",
             "panel_title_column": "display_name",
             "category_column": "label",
@@ -191,8 +191,8 @@ def test_metric_panel_grid_accepts_candidate_metric_summary_plots() -> None:
     )
 
     spec = resolve_plot_spec(
-        plots={"reference_neighbor_evidence": config},
-        plot_id="reference_neighbor_evidence",
+        plots={"representation_health_summary": config},
+        plot_id="representation_health_summary",
         kind=None,
         projection_ids=[],
         panel_titles=[],
@@ -215,7 +215,7 @@ def test_metric_panel_grid_accepts_candidate_metric_summary_plots() -> None:
     )
 
     assert spec.kind == "metric_panel_grid"
-    assert spec.scalar_id == "reference_neighbor_evidence_metrics"
+    assert spec.scalar_id == "representation_health_summary_metrics"
     assert spec.row_column == "category"
     assert spec.panel_column == "display_name"
     assert spec.column_column == "label"

@@ -103,7 +103,13 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
     register_test_namespace(
         usr_root,
         namespace="densegen",
-        columns_spec="densegen__plan:string,densegen__required_regulators:string",
+        columns_spec=",".join(
+            [
+                "densegen__plan:string",
+                "densegen__required_regulators:string",
+                "densegen__used_tfbs_detail:string",
+            ]
+        ),
     )
     register_test_namespace(
         usr_root,
@@ -167,6 +173,11 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                 "id": anchor_ids,
                 "densegen__plan": ["ethanol__sigma70_b", "ciprofloxacin__sigma70_c", "background_only__sigma70_d"],
                 "densegen__required_regulators": ["cpxR", "lexA", "background"],
+                "densegen__used_tfbs_detail": [
+                    '[{"part_kind":"fixed_element","spacer_length":17}]',
+                    '[{"part_kind":"fixed_element","spacer_length":16}]',
+                    '[{"part_kind":"fixed_element","spacer_length":18}]',
+                ],
             }
         ),
         key="id",
@@ -225,6 +236,27 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                 ),
             }
         ),
+        key="id",
+    )
+    context_dataset.write_overlay_part(
+        "densegen",
+        pa.table(
+            {
+                "id": context_ids,
+                "densegen__plan": ["ethanol__sigma70_b", "ciprofloxacin__sigma70_c", "background_only__sigma70_d"],
+                "densegen__required_regulators": ["cpxR", "lexA", "background"],
+                "densegen__used_tfbs_detail": [
+                    '[{"part_kind":"fixed_element","spacer_length":17}]',
+                    '[{"part_kind":"fixed_element","spacer_length":16}]',
+                    '[{"part_kind":"fixed_element","spacer_length":18}]',
+                ],
+            }
+        ),
+        key="id",
+    )
+    context_dataset.write_overlay_part(
+        "usr_label",
+        pa.table({"id": context_ids, "usr_label__primary": ["spyP", "sulAp", "J23105"]}),
         key="id",
     )
     context_dataset.write_overlay_part(
