@@ -13,9 +13,13 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from .plot_common import _rename_artifact_path
 
 _PLAN_BASE_LABELS = {
     "background_only": "Background",
@@ -157,6 +161,46 @@ def capitalize_first(value: object) -> str:
 
 def plan_markers(plan_names: list[str]) -> dict[str, str]:
     return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
+
+
+def rename_output_paths(paths: list[Path], *, stem: str) -> list[Path]:
+    renamed: list[Path] = []
+    for path in paths:
+        target = path.with_name(f"{stem}{path.suffix}")
+        renamed.append(_rename_artifact_path(path, target))
+    return renamed
+
+
+def place_figure_legend_below_xlabel(
+    fig: plt.Figure,
+    *,
+    ax_xlabel: plt.Axes,
+    legend,
+    gap: float = 0.012,
+    min_bottom: float = 0.01,
+    max_bottom: float = 0.55,
+) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    xlabel_bbox = (
+        ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    )
+    target_top = float(xlabel_bbox.y0) - float(gap)
+    legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    if legend_bbox.y0 < float(min_bottom):
+        needed = float(min_bottom) - float(legend_bbox.y0)
+        new_bottom = min(float(max_bottom), float(fig.subplotpars.bottom) + needed + 0.005)
+        fig.subplots_adjust(bottom=new_bottom)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        xlabel_bbox = (
+            ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        target_top = float(xlabel_bbox.y0) - float(gap)
+        legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
 
 
 def compact_regulator_label(value: object) -> str:

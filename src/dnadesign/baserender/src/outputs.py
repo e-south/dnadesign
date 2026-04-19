@@ -637,9 +637,14 @@ def write_video(
         "center" if renderer_name == "sequence_rows" else ("bottom" if has_header_block else "center")
     )
     frame_w, frame_h = _target_frame_size(natural_w=natural_w, natural_h=natural_h, output=output)
+    can_expand_frame_height = output.height_px is None and output.aspect_ratio is None
     if has_header_block:
         min_header_frame_height = _even_ceil(int(round(float(style.dpi) * 1.2)))
         frame_h = max(int(frame_h), int(min_header_frame_height))
+        if can_expand_frame_height and renderer_name == "sequence_rows":
+            reserve_scale = 0.82 if has_title and dynamic_subtitle_enabled else 0.56
+            header_reserve_px = _even_ceil(int(round(float(style.dpi) * float(reserve_scale))))
+            frame_h = max(int(frame_h), int(natural_h) + int(header_reserve_px))
     rendered_content_scale = 0.96 if renderer_name == "sequence_rows" else 1.0
     rendered_content_top_norm = _rendered_content_top_norm_for_video_frame(
         frame_shapes=frame_shapes,
@@ -652,7 +657,6 @@ def write_video(
         vertical_align=frame_vertical_align,
         rendered_content_scale=rendered_content_scale,
     )
-    can_expand_frame_height = output.height_px is None and output.aspect_ratio is None
     if (
         can_expand_frame_height
         and has_title
@@ -872,7 +876,7 @@ def write_video(
         if content_top_norm is None:
             return
         top_margin = 0.016
-        content_gap = 0.012
+        content_gap = 0.018
         line_gap = 0.006
         if bool(style.uniform_display_font_size):
             min_title_font = float(title_size)

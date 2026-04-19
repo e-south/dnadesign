@@ -23,7 +23,7 @@ from matplotlib import ticker as mticker
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.lines import Line2D
 
-from .plot_common import _apply_style, _palette, _rename_artifact_path, _save_figure, _style, plan_group_from_name
+from .plot_common import _apply_style, _palette, _save_figure, _style, plan_group_from_name
 from .plot_run_health_utils import (
     aggregate_reason_pareto as _aggregate_reason_pareto,
 )
@@ -53,7 +53,13 @@ from .plot_run_helpers import (
     capitalize_first as _capitalize_first,
 )
 from .plot_run_helpers import (
+    place_figure_legend_below_xlabel as _place_figure_legend_below_xlabel,
+)
+from .plot_run_helpers import (
     plan_markers as _plan_markers,
+)
+from .plot_run_helpers import (
+    rename_output_paths as _rename_output_paths,
 )
 from .plot_run_inputs import (
     load_plan_quotas_from_effective_config as _extract_plan_quotas,
@@ -81,47 +87,20 @@ plot_tfbs_usage = plot_tfbs_usage_panel
 _build_run_health_compression_ratio_figure = _build_run_health_compression_ratio_figure_panel
 _build_run_health_tfbs_length_by_regulator_figure = _build_run_health_tfbs_length_by_regulator_figure_panel
 _usage_category_label = _usage_category_label_helper
-_render_run_health_summary_table_figure = _render_run_health_summary_table_figure_impl
 
 
-def _rename_output_paths(paths: list[Path], *, stem: str) -> list[Path]:
-    renamed: list[Path] = []
-    for path in paths:
-        target = path.with_name(f"{stem}{path.suffix}")
-        renamed.append(_rename_artifact_path(path, target))
-    return renamed
-
-
-def _place_figure_legend_below_xlabel(
-    fig: plt.Figure,
+def _render_run_health_summary_table_figure(
+    summary_df: pd.DataFrame,
+    out_path: Path,
     *,
-    ax_xlabel: plt.Axes,
-    legend,
-    gap: float = 0.012,
-    min_bottom: float = 0.01,
-    max_bottom: float = 0.55,
+    style: Optional[dict] = None,
 ) -> None:
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    xlabel_bbox = (
-        ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    _render_run_health_summary_table_figure_impl(
+        summary_df,
+        out_path,
+        style=style,
+        save_figure=_save_figure,
     )
-    target_top = float(xlabel_bbox.y0) - float(gap)
-    legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
-    if legend_bbox.y0 < float(min_bottom):
-        needed = float(min_bottom) - float(legend_bbox.y0)
-        new_bottom = min(float(max_bottom), float(fig.subplotpars.bottom) + needed + 0.005)
-        fig.subplots_adjust(bottom=new_bottom)
-        fig.canvas.draw()
-        renderer = fig.canvas.get_renderer()
-        xlabel_bbox = (
-            ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
-        )
-        target_top = float(xlabel_bbox.y0) - float(gap)
-        legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
 
 
 def _outcomes_attempts_per_row_for_workload(max_plan_attempts: int) -> int:

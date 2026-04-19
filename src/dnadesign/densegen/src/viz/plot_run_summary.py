@@ -12,7 +12,7 @@ Module Author(s): Codex
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,6 +67,7 @@ def render_run_health_summary_table_figure(
     out_path: Path,
     *,
     style: Optional[dict] = None,
+    save_figure: Callable | None = None,
 ) -> None:
     style_cfg = _style(style)
     display = summary_df.copy()
@@ -90,7 +91,8 @@ def render_run_health_summary_table_figure(
     table.scale(1.03, 1.28)
     save_style = dict(style_cfg)
     save_style["save_pad_inches"] = min(float(save_style.get("save_pad_inches", 0.08)), 0.02)
-    _save_figure(fig, out_path, style=save_style)
+    save = _save_figure if save_figure is None else save_figure
+    save(fig, out_path, style=save_style)
     plt.close(fig)
 
 
