@@ -48,6 +48,20 @@ _PREFERRED_HUES = [
     "context_shift_l2",
 ]
 
+_PREFERRED_HUE_KIND_DEFAULTS = {
+    "design_family": "categorical",
+    "design_regulator_composition": "categorical",
+    "sig35_variant": "categorical",
+    "source_class": "categorical",
+    "is_control": "binary",
+    "wildtype_margin_ethanol_vs_control": "continuous",
+    "wildtype_margin_cipro_vs_control": "continuous",
+    "synthetic_margin_ethanol_vs_background": "continuous",
+    "synthetic_margin_cipro_vs_background": "continuous",
+    "context_self_cosine": "continuous",
+    "context_shift_l2": "continuous",
+}
+
 _FAMILY_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
     "pooled_logits": "Output-layer mean",
@@ -223,6 +237,8 @@ def _preferred_hue_kinds(
             kind = _infer_hue_kind_from_type(field.type)
             if kind is not None:
                 kinds[field.name] = kind
+    for column, kind in _PREFERRED_HUE_KIND_DEFAULTS.items():
+        kinds.setdefault(column, kind)
     return {column: kinds[column] for column in _PREFERRED_HUES if column in kinds}
 
 

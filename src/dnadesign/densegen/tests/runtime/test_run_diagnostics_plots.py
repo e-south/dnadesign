@@ -2327,7 +2327,7 @@ def test_plot_tfbs_usage_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> N
         style={},
     )
     assert len(paths) == 1
-    assert len(fake_fig.calls) == 1
+    assert len(fake_fig.calls) == 2
     _path, kwargs = fake_fig.calls[0]
     assert kwargs.get("bbox_inches") == "tight"
     assert float(kwargs.get("pad_inches", 0.0)) > 0.0
@@ -2375,7 +2375,7 @@ def test_plot_run_health_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> N
     )
     assert len(paths) == 3
     for fake_figure in (fake_outcomes, fake_detail, fake_compression):
-        assert len(fake_figure.calls) == 1
+        assert len(fake_figure.calls) == 2
         _path, kwargs = fake_figure.calls[0]
         assert kwargs.get("bbox_inches") == "tight"
         assert float(kwargs.get("pad_inches", 0.0)) > 0.0

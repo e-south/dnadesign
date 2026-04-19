@@ -49,6 +49,12 @@ from .plot_run_helpers import (
 from .plot_run_helpers import (
     _usage_category_label as _usage_category_label_helper,
 )
+from .plot_run_helpers import (
+    capitalize_first as _capitalize_first,
+)
+from .plot_run_helpers import (
+    plan_markers as _plan_markers,
+)
 from .plot_run_inputs import (
     load_plan_quotas_from_effective_config as _extract_plan_quotas,
 )
@@ -67,14 +73,15 @@ from .plot_run_panels import (
 from .plot_run_panels import (
     plot_tfbs_usage as plot_tfbs_usage_panel,
 )
+from .plot_run_summary import build_run_health_summary_frame as _run_health_summary_frame
+from .plot_run_summary import render_run_health_summary_table_figure as _render_run_health_summary_table_figure_impl
 
 _build_tfbs_usage_breakdown_figure = _build_tfbs_usage_breakdown_figure_panel
 plot_tfbs_usage = plot_tfbs_usage_panel
 _build_run_health_compression_ratio_figure = _build_run_health_compression_ratio_figure_panel
 _build_run_health_tfbs_length_by_regulator_figure = _build_run_health_tfbs_length_by_regulator_figure_panel
 _usage_category_label = _usage_category_label_helper
-
-_PLAN_MARKER_CYCLE = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h")
+_render_run_health_summary_table_figure = _render_run_health_summary_table_figure_impl
 
 
 def _rename_output_paths(paths: list[Path], *, stem: str) -> list[Path]:
@@ -83,18 +90,6 @@ def _rename_output_paths(paths: list[Path], *, stem: str) -> list[Path]:
         target = path.with_name(f"{stem}{path.suffix}")
         renamed.append(_rename_artifact_path(path, target))
     return renamed
-
-
-def _capitalize_first(text: str) -> str:
-    token = str(text)
-    for idx, ch in enumerate(token):
-        if ch.isalpha():
-            return token[:idx] + ch.upper() + token[idx + 1 :]
-    return token
-
-
-def _plan_markers(plan_names: list[str]) -> dict[str, str]:
-    return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
 
 
 def _place_figure_legend_below_xlabel(
@@ -526,7 +521,7 @@ def _build_run_health_detail_figure(
     plan_colors = {plan: plan_palette[idx] for idx, plan in enumerate(plan_names)}
     plan_markers = _plan_markers(plan_names)
     base_font_size = float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13)))
-    uniform_font_size = max(20.0, base_font_size * 1.28)
+    uniform_font_size = min(15.0, max(14.0, base_font_size * 1.1))
     problem = attempts_df[attempts_df["status"].astype(str).isin(["rejected", "failed"])].copy()
     reason_label_size: float | None = None
     reason_labels: list[str] = []
@@ -601,7 +596,7 @@ def _build_run_health_detail_figure(
         ax_fail.set_ylim(float(len(reason_counts)) - 0.5 + y_pad, -0.5 - y_pad)
         ax_fail.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=7))
         ax_fail.set_xlabel("Failed solve count", fontsize=uniform_font_size, labelpad=10.0)
-        ax_fail.set_title("Failure pressure by reason", pad=10.0, fontsize=uniform_font_size)
+        ax_fail.set_title("Reason for failed solve", pad=10.0, fontsize=uniform_font_size)
         ax_fail.tick_params(axis="y", pad=8.0)
 
     max_progress = 0.0
@@ -665,6 +660,8 @@ def _build_run_health_detail_figure(
     ax_plan.set_ylim(0.0, max(1.02, max_progress + 0.02))
     ax_plan.set_title("Accepted progress by plan", pad=10.0, fontsize=uniform_font_size)
     ax_plan.grid(axis="x", linestyle="--", linewidth=0.55, alpha=0.35)
+    ax_fail.set_box_aspect(1.0)
+    ax_plan.set_box_aspect(1.0)
 
     _apply_style(ax_fail, _style_cfg)
     if reason_label_size is not None:
@@ -696,19 +693,13 @@ def _build_run_health_detail_figure(
         labels=[handle.get_label() for handle in handles],
         loc="lower center",
         bbox_to_anchor=(0.5, 0.035),
-        ncol=max(1, min(6, len(plan_names))),
+        ncol=max(1, len(plan_names)),
         frameon=False,
         fontsize=uniform_font_size,
     )
-    fig.suptitle(
-        "Failed-solve pressure and accepted progress diverge across DenseGen plans",
-        y=0.965,
-        fontsize=uniform_font_size,
-        color=str(_style_cfg.get("text_color", "#111111")),
-    )
     max_reason_chars = max((len(label) for label in reason_labels), default=12)
     left_margin = max(0.28, min(0.44, 0.18 + 0.0042 * float(max_reason_chars)))
-    legend_rows = int(np.ceil(float(len(handles)) / float(max(1, min(6, len(plan_names))))))
+    legend_rows = int(np.ceil(float(len(handles)) / float(max(1, len(plan_names)))))
     bottom_margin = max(0.22, 0.16 + 0.06 * float(legend_rows))
     fig.subplots_adjust(left=left_margin, right=0.985, bottom=bottom_margin, top=0.93, wspace=0.3)
     _place_figure_legend_below_xlabel(fig, ax_xlabel=ax_plan, legend=legend_obj, gap=0.03, min_bottom=0.024)
@@ -858,79 +849,6 @@ def plot_compression_ratio_by_plan(
     _save_figure(fig_compression, compression_path, style=style)
     plt.close(fig_compression)
     return [compression_path]
-
-
-def _run_health_summary_frame(attempts_df: pd.DataFrame, *, plan_quotas: dict[str, int]) -> pd.DataFrame:
-    n_attempts = int(len(attempts_df))
-    n_ok = int((attempts_df["status"] == "ok").sum())
-    n_rej = int((attempts_df["status"] == "rejected").sum())
-    n_dup = int((attempts_df["status"] == "duplicate").sum())
-    n_fail = int((attempts_df["status"] == "failed").sum())
-    waste_rate = (n_rej + n_dup + n_fail) / float(max(1, n_attempts))
-    rows: list[dict[str, object]] = [
-        {"scope": "run", "name": "attempts", "value": n_attempts, "unit": "count"},
-        {"scope": "run", "name": "ok", "value": n_ok, "unit": "count"},
-        {"scope": "run", "name": "rejected", "value": n_rej, "unit": "count"},
-        {"scope": "run", "name": "duplicate", "value": n_dup, "unit": "count"},
-        {"scope": "run", "name": "failed", "value": n_fail, "unit": "count"},
-        {"scope": "run", "name": "waste_rate", "value": waste_rate, "unit": "fraction"},
-    ]
-    by_plan = (
-        attempts_df.groupby("plan_name")
-        .agg(
-            attempts=("status", "size"),
-            ok=("status", lambda s: int((s == "ok").sum())),
-            rejected=("status", lambda s: int((s == "rejected").sum())),
-            duplicate=("status", lambda s: int((s == "duplicate").sum())),
-            failed=("status", lambda s: int((s == "failed").sum())),
-        )
-        .reset_index()
-    )
-    for row in by_plan.to_dict(orient="records"):
-        plan = str(row["plan_name"])
-        quota = int(plan_quotas.get(plan, 0))
-        ok_count = int(row["ok"])
-        rows.append(
-            {
-                "scope": "plan",
-                "name": f"{plan}:accepted_over_quota",
-                "value": (ok_count / float(quota)) if quota > 0 else np.nan,
-                "unit": "fraction",
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def _render_run_health_summary_table_figure(
-    summary_df: pd.DataFrame,
-    out_path: Path,
-    *,
-    style: Optional[dict] = None,
-) -> None:
-    _style_cfg = _style(style)
-    display = summary_df.copy()
-    if "value" in display.columns:
-        display["value"] = display["value"].map(
-            lambda value: f"{float(value):.6g}" if isinstance(value, (float, np.floating)) else str(value)
-        )
-    fig_width = min(22.0, max(10.0, 2.2 * len(display.columns) + 1.7))
-    fig_height = min(22.0, max(3.0, 0.52 * max(1, len(display)) + 1.2))
-    fig, ax = plt.subplots(figsize=(float(fig_width), float(fig_height)), constrained_layout=False)
-    ax.axis("off")
-    table = ax.table(
-        cellText=display.values.tolist(),
-        colLabels=[str(col) for col in display.columns],
-        cellLoc="left",
-        loc="center",
-    )
-    table.auto_set_font_size(False)
-    table_font = max(11.0, float(_style_cfg.get("tick_size", _style_cfg.get("font_size", 13.0) * 0.78)))
-    table.set_fontsize(table_font)
-    table.scale(1.03, 1.28)
-    save_style = dict(_style_cfg)
-    save_style["save_pad_inches"] = min(float(save_style.get("save_pad_inches", 0.08)), 0.02)
-    _save_figure(fig, out_path, style=save_style)
-    plt.close(fig)
 
 
 @dataclass(frozen=True)

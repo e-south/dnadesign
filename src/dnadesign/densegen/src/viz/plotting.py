@@ -46,6 +46,7 @@ from .plot_data_loading import (
     _load_libraries,
     _load_stage_a_pools,
     _maybe_load_libraries,
+    _read_composition_parquet,
     _recover_composition_from_output_records,
     _root_config_to_dict,
 )
@@ -96,6 +97,7 @@ from .plot_stage_b_summary import (
 )
 
 _console = Console()
+_read_composition_parquet = _read_composition_parquet
 
 
 def _plot_manifest_path(out_dir: Path) -> Path:

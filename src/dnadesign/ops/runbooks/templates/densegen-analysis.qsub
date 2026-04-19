@@ -9,7 +9,7 @@
 set -euo pipefail
 
 DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
-DENSEGEN_ANALYSIS_PLOTS="${DENSEGEN_ANALYSIS_PLOTS:-stage_a_summary,placement_map,run_health,tfbs_usage}"
+DENSEGEN_ANALYSIS_PLOTS="${DENSEGEN_ANALYSIS_PLOTS:-source_cohort_concentration,stage_a_sampling_yield,stage_a_pool_diversity,plan_regulator_deployment_heatmap,placement_occupancy_map,retained_pool_coverage_by_regulator,attempt_outcome_timeline,solve_pressure_and_progress}"
 
 if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
   echo "Missing DenseGen config: $DENSEGEN_CONFIG" >&2
@@ -19,8 +19,8 @@ if [[ -z "${DENSEGEN_ANALYSIS_PLOTS//[[:space:]]/}" ]]; then
   echo "DENSEGEN_ANALYSIS_PLOTS must be a non-empty comma-separated list." >&2
   exit 2
 fi
-if [[ "$DENSEGEN_ANALYSIS_PLOTS" == *"dense_array_video_showcase"* ]] && ! command -v ffmpeg >/dev/null 2>&1; then
-  echo "dense_array_video_showcase requires ffmpeg executable in PATH." >&2
+if [[ "$DENSEGEN_ANALYSIS_PLOTS" == *"dense_array_showcase_video"* ]] && ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "dense_array_showcase_video requires ffmpeg executable in PATH." >&2
   exit 2
 fi
 
@@ -31,23 +31,31 @@ TABLES_DIR="$RUN_ROOT/outputs/tables"
 ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"
 COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"
 RECORDS_PARQUET="$TABLES_DIR/records.parquet"
+POOLS_MANIFEST="$RUN_ROOT/outputs/pools/pool_manifest.json"
 
 needs_attempts_artifact=0
 needs_composition_artifact=0
 needs_records_artifact=0
+needs_pool_artifact=0
 IFS=',' read -r -a DENSEGEN_ANALYSIS_PLOT_ARRAY <<< "$DENSEGEN_ANALYSIS_PLOTS"
 for raw_plot in "${DENSEGEN_ANALYSIS_PLOT_ARRAY[@]}"; do
   plot="${raw_plot//[[:space:]]/}"
   case "$plot" in
-    run_health)
+    attempt_outcome_timeline|solve_pressure_and_progress)
       needs_attempts_artifact=1
-      needs_composition_artifact=1
       ;;
-    tfbs_usage)
+    placement_occupancy_map|tfbs_concentration_profile)
       needs_composition_artifact=1
+      needs_records_artifact=1
       ;;
-    placement_map)
-      needs_composition_artifact=1
+    source_cohort_concentration|source_plan_input_heatmap|plan_regulator_deployment_heatmap|compression_ratio_by_plan|dense_array_showcase_video)
+      needs_records_artifact=1
+      ;;
+    stage_a_sampling_yield|stage_a_pool_diversity|background_sequence_logo|stage_a_pool_score_strata)
+      needs_pool_artifact=1
+      ;;
+    retained_pool_coverage_by_regulator|retained_vs_deployed_tier_mix_by_regulator|retained_vs_deployed_length_mix_by_regulator|upstream_motif_supply_and_pwm_strength)
+      needs_pool_artifact=1
       needs_records_artifact=1
       ;;
   esac
@@ -87,6 +95,12 @@ if [[ "$needs_records_artifact" -eq 1 ]]; then
     echo "Missing records.parquet and records__part-*.parquet under: $TABLES_DIR" >&2
     exit 2
   fi
+fi
+
+if [[ "$needs_pool_artifact" -eq 1 ]] && [[ ! -f "$POOLS_MANIFEST" ]]; then
+  echo "Selected DenseGen analysis plots require pool artifacts." >&2
+  echo "Missing pool_manifest.json under: $RUN_ROOT/outputs/pools" >&2
+  exit 2
 fi
 
 uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"

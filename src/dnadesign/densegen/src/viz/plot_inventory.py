@@ -427,8 +427,8 @@ def _plot_supporting_caption_base(plot_id: str) -> str:
             "the right panel shows accepted progress by plan"
         ),
         "source_cohort_concentration": (
-            "Break DenseGen arrays down by source-derived part composition so "
-            "the dominant composition cohorts are visible"
+            "Show how final DenseGen records concentrate across source cohorts "
+            "by breaking arrays down through source-derived part composition"
         ),
         "source_plan_input_heatmap": (
             "The left heatmap counts final DenseGen records by source cohort and "

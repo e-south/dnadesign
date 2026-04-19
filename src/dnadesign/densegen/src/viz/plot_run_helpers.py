@@ -27,6 +27,7 @@ _PLAN_VARIANT_LABELS = {
     "sig35": "σ70",
     "sigma70": "σ70",
 }
+_PLAN_MARKER_CYCLE = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h")
 
 
 def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
@@ -144,6 +145,18 @@ def _title_case_words(value: object) -> str:
     if not words:
         return ""
     return " ".join(word[:1].upper() + word[1:] for word in words)
+
+
+def capitalize_first(value: object) -> str:
+    token = str(value)
+    for idx, char in enumerate(token):
+        if char.isalpha():
+            return token[:idx] + char.upper() + token[idx + 1 :]
+    return token
+
+
+def plan_markers(plan_names: list[str]) -> dict[str, str]:
+    return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
 
 
 def compact_regulator_label(value: object) -> str:
