@@ -7,7 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
-from dnadesign.usr.src.overlays import overlay_parts
+from dnadesign.usr.overlays import overlay_parts
 
 from ..io.hashing import sha256_path, sha256_payload
 

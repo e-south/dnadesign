@@ -74,3 +74,13 @@ def test_non_cli_modules_do_not_depend_on_cli_runtime() -> None:
                 offenders.append(f"{path.relative_to(_repo_root())}: {imported}")
 
     assert offenders == []
+
+
+def test_latentdna_runtime_does_not_import_usr_src_internals() -> None:
+    offenders: list[str] = []
+    for path in _python_files(_latentdna_src()):
+        for imported in _resolve_imports(path):
+            if imported.startswith("dnadesign.usr.src"):
+                offenders.append(f"{path.relative_to(_repo_root())}: {imported}")
+
+    assert offenders == []

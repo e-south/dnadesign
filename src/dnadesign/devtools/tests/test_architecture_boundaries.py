@@ -75,6 +75,17 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_p
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_rejects_ops_to_studies_edge(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "ops" / "gates.py", "from dnadesign.studies import StudyOpsContract\n")
+    _write(tmp_path / "src" / "dnadesign" / "studies" / "__init__.py", "class StudyOpsContract:\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "ops"
+    assert violations[0].imported_tool == "studies"
+
+
 def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "from dnadesign.usr import Dataset\n")
     _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")

@@ -14,10 +14,9 @@ from __future__ import annotations
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from dnadesign.ops.status.path_ref import resolve_path_ref
-from dnadesign.studies.core.models import StudyOpsContract
-from dnadesign.studies.core.preflight_plan import compile_study_preflight_execution_plan
 
 from .check_protocols import CommandCheckTarget, RunbookPlanCheckTarget, SchedulerQueueCheckTarget
 from .checks import (
@@ -34,6 +33,28 @@ from .support import execute_runbook_plan as default_execute_runbook_plan
 _ENVIRONMENT_MATCH_MODES = frozenset({"all", "any"})
 
 
+class _PreflightContractLike(Protocol):
+    check_specs: Mapping[str, Sequence[Mapping[str, object]]]
+
+
+class _StudyOpsContractLike(Protocol):
+    preflight: _PreflightContractLike
+    artifacts: Mapping[str, Mapping[str, object]]
+    execution_surfaces: Mapping[str, Mapping[str, object]]
+
+
+@dataclass(frozen=True)
+class _CompiledContractCheck:
+    check_id: str
+    kind: str
+    check_group: str
+    phase_id: str
+    phase: str
+    summary: str
+    required: bool
+    payload: dict[str, object]
+
+
 @dataclass(frozen=True)
 class ContractPreflightCheckDependencies:
     run_preflight_command: Callable[..., CommandExecution]
@@ -47,7 +68,7 @@ def build_contract_preflight_checks(
     *,
     repo_root: Path,
     study_root: Path,
-    contract: StudyOpsContract,
+    contract: _StudyOpsContractLike,
     dataset_index: Mapping[str, Mapping[str, object]],
     execution_surface_index: Mapping[str, Path],
     enabled_groups: Collection[str],
@@ -59,12 +80,12 @@ def build_contract_preflight_checks(
     checks: list[PreflightCheck] = []
     gpu_inventory_cache = dict(gpu_inventory or {}) or None
 
-    compiled_plan = compile_study_preflight_execution_plan(
-        contract=contract.preflight,
+    compiled_checks = _compile_contract_preflight_checks(
+        check_specs=contract.preflight.check_specs,
         enabled_groups=tuple(enabled_group_set),
     )
     execute_runbook_plan = dependencies.execute_runbook_plan or default_execute_runbook_plan
-    for compiled in compiled_plan.checks:
+    for compiled in compiled_checks:
         kind = compiled.kind
         check_group = compiled.check_group
         phase_id = compiled.phase_id
@@ -271,7 +292,7 @@ def build_contract_preflight_checks(
 
 def contract_environment_flag_state(
     *,
-    contract: StudyOpsContract,
+    contract: _StudyOpsContractLike,
     environ: Mapping[str, object | None],
     check_group: str | None = None,
 ) -> dict[str, bool]:
@@ -434,7 +455,7 @@ def _build_path_exists_check(
     summary: str,
     required: bool,
     artifact_id: str,
-    contract: StudyOpsContract,
+    contract: _StudyOpsContractLike,
     repo_root: Path,
     study_root: Path,
     dataset_index: Mapping[str, Mapping[str, object]],
@@ -476,7 +497,7 @@ def _build_dataset_snapshot_check(
     required: bool,
     artifact_id: str,
     target_rows: int,
-    contract: StudyOpsContract,
+    contract: _StudyOpsContractLike,
     repo_root: Path,
     study_root: Path,
     dataset_index: Mapping[str, Mapping[str, object]],
@@ -527,7 +548,7 @@ def _build_dataset_snapshot_check(
 def _resolve_artifact_state(
     *,
     artifact_id: str,
-    contract: StudyOpsContract,
+    contract: _StudyOpsContractLike,
     repo_root: Path,
     study_root: Path,
     dataset_index: Mapping[str, Mapping[str, object]],
@@ -608,6 +629,39 @@ def _phase_label(*, spec: Mapping[str, object], check_group: str, kind: str) -> 
     if check_group.startswith("notify"):
         return "notify"
     return check_group or kind
+
+
+def _compile_contract_preflight_checks(
+    *,
+    check_specs: Mapping[str, Sequence[Mapping[str, object]]],
+    enabled_groups: Sequence[str],
+) -> tuple[_CompiledContractCheck, ...]:
+    enabled_group_set = {str(group).strip() for group in enabled_groups if str(group).strip()}
+    compiled_checks: list[_CompiledContractCheck] = []
+    for declared_phase_id, specs in check_specs.items():
+        for raw_spec in specs:
+            spec = dict(raw_spec)
+            check_group = str(spec.get("check_group") or "").strip()
+            if not check_group or check_group not in enabled_group_set:
+                continue
+            kind = str(spec.get("kind") or "").strip()
+            compiled_checks.append(
+                _CompiledContractCheck(
+                    check_id=str(spec.get("check_id") or "").strip(),
+                    kind=kind,
+                    check_group=check_group,
+                    phase_id=str(spec.get("phase_id") or declared_phase_id).strip() or declared_phase_id,
+                    phase=_phase_label(spec=spec, check_group=check_group, kind=kind),
+                    summary=str(spec.get("summary") or "").strip(),
+                    required=bool(spec.get("required", True)),
+                    payload={
+                        key: value
+                        for key, value in spec.items()
+                        if key not in {"check_id", "kind", "check_group", "phase_id", "phase", "summary", "required"}
+                    },
+                )
+            )
+    return tuple(compiled_checks)
 
 
 __all__ = [

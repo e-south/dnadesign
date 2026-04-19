@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pyarrow as pa
 
-from dnadesign.usr.src.dataset import Dataset
-from dnadesign.usr.src.overlay_digest_ledger import overlay_digest_ledger_path
+from dnadesign.usr.dataset import Dataset
+from dnadesign.usr.overlay_digest_ledger import overlay_digest_ledger_path
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 
