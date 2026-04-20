@@ -1,10 +1,10 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
+**Last verified:** 2026-04-19
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-19
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
@@ -31,6 +31,7 @@ Cruncher is organized as peer workflow families, not one monolithic run shape:
 
 - **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
+- **Snapback workspaces** use `snapback init-workspace|validate|design|solve|show` and publish snapback-specific reports, candidate tables, a three-state QA triptych, and optional BaseRender job files.
 - **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
 
 These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
@@ -69,6 +70,20 @@ The YIU workflow is a peer lane, not a cassette submode:
 5. **yiu show** -> inspect the bundle contract, provenance, selected junction window, PWM state, and available renders for one YIU bundle
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette-specific render contracts, or any legacy state graph.
+
+#### Snapback lifecycle
+
+The snapback workflow is a peer lane, not a cassette or YIU submode:
+
+1. optional **snapback init-workspace** -> scaffold a runbook-only snapback workspace with one explicit v2 example and one solve example
+2. author `<workspace>/configs/snapback/<name>.snapback.yaml` or `<workspace>/configs/snapback/<name>.snapback.solve.yaml`
+3. author or select a local nickase catalog or use a preset-only resolved catalog
+4. **snapback validate** -> strict schema + invariant check plus deterministic explicit report
+5. **snapback design** -> materialize one explicit candidate bundle with reports, provenance snapshots, candidate table, and QA views
+6. **snapback solve** -> bounded search, deterministic hit ranking, selected-hit materialization, and solve-level reports
+7. **snapback show** -> inspect explicit or solve bundle metadata, artifacts, and drift checks without guessing
+
+This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.
 
 ---
 
@@ -158,6 +173,14 @@ Core contract:
 - panel render/load/save helpers live in `yiu/render_panels.py`
 - no dependency on legacy `sample` or cassette-specific planner contracts
 
+#### `snapback/` (single-nick foldback domain)
+- snapback v2 spec schema for explicit and solve contracts
+- canonical top-strand nick-relative geometry and bounded search
+- protected-region, homology, and extra-nick invariant enforcement
+- typed producer-owned QA view models live in `snapback/view_models.py`
+- local view-contract assembly and validation live in `snapback/view_contracts.py`
+- no dependency on legacy `sample`, cassette render contracts, or YIU payload semantics
+
 #### `viz/` (plotting)
 - matplotlib/logomaker setup
 - PWM logo rendering + visualization helpers
@@ -220,6 +243,15 @@ For cassette runs, Cruncher now publishes shared, file-based visual contracts ra
 * sibling `baserender_jobs/*.job.yaml` files that reference those contracts by path
 
 Cassette runs do not call baserender directly; they publish the contracts and jobs for downstream consumers and fail fast on schema violations before write-out.
+
+For snapback runs, Cruncher publishes both producer-owned QA views and shared evidence-map contracts:
+
+* `views/pre_nick_duplex.v1.json`, `views/post_nick_exposed.v1.json`, `views/post_nick_foldback.v1.json`
+* `views/pre_nick_duplex.snapback_visual.v1.json`, `views/post_nick_exposed.snapback_visual.v1.json`, `views/post_nick_foldback.snapback_visual.v1.json`
+* `views/views_manifest.v1.json`
+* sibling `baserender_jobs/*.job.yaml` files that reference the evidence-map contracts by path
+
+These views are a topology and coordinate QA surface, not a biophysical rendering claim. The producer-owned JSON captures snapback-specific semantics such as released-prefix, retained-stem, cap, foldback-revcomp, and junction boundaries; the shared `snapback_visual_v1` contracts carry the nucleotide-resolution publication surface for downstream BaseRender rendering.
 
 The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
@@ -378,6 +410,37 @@ YIU runs are intentionally isolated from both `sample` and `cassette` runs:
 - they do not write `meta/run_manifest.json`
 - they do not append to workspace `run_index.json`
 - they do not reuse cassette-specific `views/*.v1.json` render contracts
+
+---
+
+#### Snapback artifacts
+
+A typical **snapback explicit** run directory contains:
+
+- `meta/snapback_manifest.json`, `meta/snapback_status.json` - explicit-run metadata + status
+- `provenance/spec_used.yaml`, `provenance/nickase_catalog.yaml` - frozen input snapshots
+- `analysis/reports/report.json`, `analysis/reports/report.md` - deterministic explicit report
+- `export/table__candidates.csv` - candidate table with one row for the explicit candidate when satisfied
+- `views/pre_nick_duplex.v1.json`, `views/post_nick_exposed.v1.json`, `views/post_nick_foldback.v1.json` - producer-owned QA views
+- `views/*.snapback_visual.v1.json` - shared snapback visual contracts for the QA triptych
+- `views/views_manifest.v1.json` - grouped view inventory plus recommended render jobs
+- `baserender_jobs/*.job.yaml` - optional downstream render jobs for the three QA states
+- `renders/*.png` - optional rendered QA triptych after downstream BaseRender execution
+
+A typical **snapback solve** run directory contains:
+
+- `solve_report.json`, `solve_report.md` - solve-level report outputs
+- `table__hits.csv` - ranked admissible hit table
+- `solve_manifest.json`, `solve_status.json` - solve metadata + status
+- `specs/input_solve_spec.yaml`, `specs/resolved_catalog.yaml` - frozen solve inputs
+- `hits/<rank>__<design_id>/...` - materialized explicit hit bundles under the explicit snapback artifact contract
+
+Snapback runs are intentionally isolated from `sample`, `cassette`, and `yiu` runs:
+
+- they do not write `meta/run_manifest.json`
+- they do not append to workspace `run_index.json`
+- they do not emit shared baserender jobs at this stage
+- they do not reuse cassette or YIU view contracts
 
 ---
 
