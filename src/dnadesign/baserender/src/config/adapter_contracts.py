@@ -18,6 +18,7 @@ from typing import Any, Callable
 
 from dnadesign.contracts.visual import (
     SequenceEvidenceMapV1,
+    SnapbackVisualV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
     YiuPayloadVisualV1,
@@ -123,6 +124,12 @@ def _build_sequence_evidence_map(cfg: Any, alphabet: str) -> Any:
     from ..adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
 
     return SequenceEvidenceMapV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_snapback_visual(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.snapback_visual_v1 import SnapbackVisualV1Adapter
+
+    return SnapbackVisualV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
 def _build_duplex_sequence(cfg: Any, alphabet: str) -> Any:
@@ -278,6 +285,19 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         supported_alphabets=("DNA", "IUPAC_DNA"),
         factory=_build_sequence_evidence_map,
         docs_slug="sequence-evidence-map-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "snapback_visual_v1": AdapterDescriptor(
+        kind="snapback_visual_v1",
+        owner_tool="snapback",
+        contract_kind="snapback_visual_v1",
+        schema_model=SnapbackVisualV1,
+        supported_renderers=("snapback_map",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_snapback_visual,
+        docs_slug="snapback-visual-v1",
         allowed_config_columns=(),
         required_config_columns=(),
         required_source_columns=(),

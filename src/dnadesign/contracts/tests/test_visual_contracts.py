@@ -18,6 +18,7 @@ from dnadesign.contracts.visual import (
     HairpinTopologyViewV1,
     LinearDuplexViewV1,
     SequenceEvidenceMapV1,
+    SnapbackVisualV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
     YiuTopologyCartoonV1,
@@ -563,3 +564,62 @@ def test_sequence_evidence_map_contract_rejects_pairing_length_overflow(
 
     with pytest.raises(ValueError, match=message):
         SequenceEvidenceMapV1.model_validate(payload)
+
+
+def test_snapback_visual_contract_validates_foldback_payload() -> None:
+    payload = {
+        "contract_kind": "snapback_visual_v1",
+        "state_id": "demo.post_nick_foldback",
+        "state_kind": "post_nick_foldback",
+        "alphabet": "dna",
+        "title": "Foldback",
+        "primary_sequence": "TCAGCAGTCTTGACT",
+        "complement_sequence": "AGTCGTCAGAACTGA",
+        "primary_row_label": "Primary",
+        "complement_row_label": "Partner",
+        "ligation_junction_boundary": 5,
+        "protected_region_span": {"start": 5, "end": 8},
+        "released_prefix_span": {"start": 0, "end": 5},
+        "retained_stem_span": {"start": 5, "end": 9},
+        "cap_span": {"start": 9, "end": 11},
+        "foldback_revcomp_span": {"start": 11, "end": 15},
+        "pairings": [
+            {"left_index": 5, "right_index": 14},
+            {"left_index": 6, "right_index": 13},
+        ],
+        "primary_mismatch_positions": [],
+        "complement_mismatch_positions": [],
+        "meta": {"source": "test"},
+    }
+
+    contract = SnapbackVisualV1.model_validate(payload)
+
+    assert contract.contract_kind == "snapback_visual_v1"
+    assert contract.state_kind == "post_nick_foldback"
+    assert contract.pairings[0].left_index == 5
+
+
+def test_snapback_visual_contract_rejects_pairings_outside_foldback_spans() -> None:
+    payload = {
+        "contract_kind": "snapback_visual_v1",
+        "state_id": "demo.post_nick_foldback",
+        "state_kind": "post_nick_foldback",
+        "alphabet": "dna",
+        "primary_sequence": "TCAGCAGTCTTGACT",
+        "complement_sequence": "AGTCGTCAGAACTGA",
+        "primary_row_label": "Primary",
+        "complement_row_label": "Partner",
+        "ligation_junction_boundary": 5,
+        "released_prefix_span": {"start": 0, "end": 5},
+        "retained_stem_span": {"start": 5, "end": 9},
+        "cap_span": {"start": 9, "end": 11},
+        "foldback_revcomp_span": {"start": 11, "end": 15},
+        "pairings": [
+            {"left_index": 4, "right_index": 14},
+        ],
+        "primary_mismatch_positions": [],
+        "complement_mismatch_positions": [],
+    }
+
+    with pytest.raises(ValueError, match="pairings left_index must remain inside retained_stem_span"):
+        SnapbackVisualV1.model_validate(payload)

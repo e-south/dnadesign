@@ -1296,7 +1296,12 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
     segment_labels = record.meta.get("segment_labels") if isinstance(record.meta, Mapping) else None
     if not isinstance(segment_labels, Sequence) or isinstance(segment_labels, (str, bytes)):
         return
-    y = layout.y_forward + layout.sequence_extent_up + max(5.0, style.font_size_label * 0.4)
+    font_size = style.display_font_size() if bool(style.uniform_display_font_size) else max(9, style.font_size_label)
+    line_height = max(10.0, (float(font_size) / 72.0) * float(style.dpi))
+    horizontal_gap = max(6.0, layout.cw * 0.25)
+    top_tiers: list[list[tuple[float, float]]] = []
+    bottom_tiers: list[list[tuple[float, float]]] = []
+    placements: list[tuple[str, str, float, int]] = []
     for raw in segment_labels:
         if not isinstance(raw, Mapping):
             continue
@@ -1310,16 +1315,41 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
             continue
         if end <= start:
             continue
+        row_id = str(raw.get("row_id", "primary")).strip().lower() or "primary"
+        if row_id not in {"primary", "complement"}:
+            row_id = "primary"
         x = layout.x_left + ((start + end) / 2.0) * layout.cw
+        text_width = _text_px_width(text, style.font_label, int(round(font_size)), style.dpi)
+        x0 = x - text_width / 2.0
+        x1 = x + text_width / 2.0
+        tiers = bottom_tiers if row_id == "complement" else top_tiers
+        tier_index = len(tiers)
+        for candidate_index, occupied in enumerate(tiers):
+            if all((x1 + horizontal_gap) <= left or (x0 - horizontal_gap) >= right for left, right in occupied):
+                tier_index = candidate_index
+                occupied.append((x0, x1))
+                break
+        else:
+            tiers.append([(x0, x1)])
+        placements.append((row_id, text, x, tier_index))
+
+    top_base_y = layout.y_forward + layout.sequence_extent_up + max(18.0, style.font_size_label * 1.4)
+    bottom_base_y = layout.y_reverse - layout.sequence_extent_down - max(16.0, style.font_size_label * 1.2)
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
+    for row_id, text, x, tier_index in placements:
+        if row_id == "complement" and show_two:
+            y = bottom_base_y - tier_index * line_height * 1.05
+            va = "top"
+        else:
+            y = top_base_y + tier_index * line_height * 1.05
+            va = "bottom"
         ax.text(
             x,
             y,
             text,
             ha="center",
-            va="bottom",
-            fontsize=(
-                style.display_font_size() if bool(style.uniform_display_font_size) else max(10, style.font_size_label)
-            ),
+            va=va,
+            fontsize=font_size,
             family=style.font_label,
             color="#111827",
             zorder=4.3,
