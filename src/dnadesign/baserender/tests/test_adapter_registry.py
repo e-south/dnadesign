@@ -604,21 +604,28 @@ def test_snapback_visual_adapter_embeds_contract_for_snapback_renderer() -> None
             "state_kind": "post_nick_foldback",
             "alphabet": "dna",
             "title": "Foldback",
-            "primary_sequence": "TCAGCAGTCTTGACT",
-            "complement_sequence": "AGTCGTCAGAACTGA",
+            "primary_sequence": "TCAGCAGTCTTGACTA",
+            "complement_sequence": "AGTCGTCAGAACTGAT",
             "primary_row_label": "Foldback",
             "complement_row_label": "Partner",
             "ligation_junction_boundary": 5,
             "released_prefix_span": {"start": 0, "end": 5},
             "retained_stem_span": {"start": 5, "end": 9},
-            "cap_span": {"start": 9, "end": 11},
-            "foldback_revcomp_span": {"start": 11, "end": 15},
+            "cap_span": {"start": 9, "end": 12},
+            "foldback_revcomp_span": {"start": 12, "end": 16},
+            "loop_geometry": {
+                "kind": "hairpin_corner_triloop_v1",
+                "source_cap_span": {"start": 9, "end": 11},
+                "cap_extension_span": {"start": 11, "end": 12},
+                "display_primary_span": {"start": 5, "end": 9},
+                "display_complement_span": {"start": 12, "end": 16},
+            },
             "pairings": [
-                {"left_index": 5, "right_index": 14},
-                {"left_index": 6, "right_index": 13},
+                {"left_index": 5, "right_index": 15},
+                {"left_index": 6, "right_index": 14},
             ],
             "primary_mismatch_positions": [6],
-            "complement_mismatch_positions": [13],
+            "complement_mismatch_positions": [14],
             "meta": {"source_view_kind": "snapback_post_nick_foldback_v1"},
         },
         row_index=0,
@@ -629,9 +636,10 @@ def test_snapback_visual_adapter_embeds_contract_for_snapback_renderer() -> None
     assert record.features == ()
     assert record.meta["contract"]["state_kind"] == "post_nick_foldback"
     assert record.meta["contract"]["pairings"] == [
-        {"left_index": 5, "right_index": 14},
-        {"left_index": 6, "right_index": 13},
+        {"left_index": 5, "right_index": 15},
+        {"left_index": 6, "right_index": 14},
     ]
+    assert record.meta["contract"]["loop_geometry"]["kind"] == "hairpin_corner_triloop_v1"
 
 
 def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:

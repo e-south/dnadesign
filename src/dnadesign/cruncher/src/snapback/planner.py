@@ -14,9 +14,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.cruncher.nickases.models import NickaseCatalog, reverse_complement
+from dnadesign.cruncher.nickases.models import NickaseCatalog
 from dnadesign.cruncher.nickases.scanning import EvaluatedMatch, enumerate_site_instances
+from dnadesign.cruncher.snapback.artifacts import display_workspace_relative
 from dnadesign.cruncher.snapback.models import (
+    EFFECTIVE_CAP_LOOP_NT,
     CoordinateSpan,
     PairContract,
     SingleNickSnapbackSpec,
@@ -30,6 +32,13 @@ from dnadesign.cruncher.snapback.models import (
     gc_fraction,
     max_homopolymer_run,
 )
+
+_COMPLEMENT_BASE = {
+    "A": "T",
+    "C": "G",
+    "G": "C",
+    "T": "A",
+}
 
 
 def _issue(code: str, message: str, **details: object) -> SnapbackIssue:
@@ -104,9 +113,10 @@ def _select_intended_match(
 def _pairing_summary(*, retained_homology_sequence: str, foldback_arm: str) -> tuple[list[int], int, int, list[bool]]:
     mismatch_positions: list[int] = []
     matched_mask: list[bool] = []
-    for index, retained_base in enumerate(retained_homology_sequence):
-        arm_base = foldback_arm[len(foldback_arm) - 1 - index]
-        matched = reverse_complement(arm_base) == retained_base
+    for index, (retained_base, arm_base) in enumerate(
+        zip(retained_homology_sequence, reversed(foldback_arm), strict=True)
+    ):
+        matched = _COMPLEMENT_BASE[arm_base] == retained_base
         matched_mask.append(matched)
         if not matched:
             mismatch_positions.append(index)
@@ -173,17 +183,18 @@ def evaluate_snapback_candidate(
     gc_bounds,
     max_homopolymer_run_allowed: int | None,
     intended_match: EvaluatedMatch,
+    site_mutation_count: int,
     all_matches: list[EvaluatedMatch],
     forbid_additional_target_strand_nicks: bool,
     forbid_any_additional_nicks: bool,
 ) -> tuple[SnapbackCandidateDesign | None, list[SnapbackIssue]]:
     issues: list[SnapbackIssue] = []
     nick_boundary = intended_match.nick.boundary
-    if retained_homology_window.start < nick_boundary:
+    if retained_homology_window.start != nick_boundary:
         issues.append(
             _issue(
-                "RETAINED_HOMOLOGY_BEFORE_NICK",
-                "retained_homology_window.start must be >= the resolved nick boundary.",
+                "RETAINED_HOMOLOGY_MUST_START_AT_NICK",
+                "retained_homology_window.start must equal the resolved nick boundary.",
                 retained_homology_start=retained_homology_window.start,
                 nick_boundary=nick_boundary,
             )
@@ -191,7 +202,10 @@ def evaluate_snapback_candidate(
         return None, issues
 
     retained_homology_sequence = input_sequence[retained_homology_window.start : retained_homology_window.end]
-    released_prefix_sequence = input_sequence[nick_boundary : retained_homology_window.start]
+    released_prefix_sequence = ""
+    source_cap_window = CoordinateSpan(start=retained_homology_window.end, end=len(input_sequence))
+    source_cap_sequence = input_sequence[source_cap_window.start : source_cap_window.end]
+    effective_cap_sequence = f"{source_cap_sequence}{cap_sequence}"
     added_sequence = f"{cap_sequence}{foldback_arm}"
     added_nt = len(added_sequence)
     if added_nt > max_added_nt:
@@ -255,6 +269,17 @@ def evaluate_snapback_candidate(
                 max_uninterrupted_duplex_bp=max_uninterrupted_duplex_bp,
             )
         )
+    if len(effective_cap_sequence) != EFFECTIVE_CAP_LOOP_NT:
+        issues.append(
+            _issue(
+                "EFFECTIVE_CAP_NT_OUT_OF_RANGE",
+                "The effective snapback cap loop must be exactly 3 nt.",
+                observed_cap_nt=len(effective_cap_sequence),
+                required_cap_nt=EFFECTIVE_CAP_LOOP_NT,
+                source_cap_nt=len(source_cap_sequence),
+                cap_extension_nt=len(cap_sequence),
+            )
+        )
     gc_added = gc_fraction(added_sequence)
     gc_distance = gc_distance_for_range(added_sequence, gc_bounds)
     if gc_bounds is not None and not gc_bounds.min <= gc_added <= gc_bounds.max:
@@ -306,6 +331,7 @@ def evaluate_snapback_candidate(
     post_nick_sequence = build_post_nick_sequence(
         released_prefix_sequence=released_prefix_sequence,
         retained_homology_sequence=retained_homology_sequence,
+        source_cap_sequence=source_cap_sequence,
         cap_sequence=cap_sequence,
         foldback_arm=foldback_arm,
     )
@@ -314,9 +340,17 @@ def evaluate_snapback_candidate(
         start=post_nick_released_prefix_span.end,
         end=post_nick_released_prefix_span.end + len(retained_homology_sequence),
     )
+    post_nick_source_cap_span = CoordinateSpan(
+        start=post_nick_retained_homology_span.end,
+        end=post_nick_retained_homology_span.end + len(source_cap_sequence),
+    )
+    post_nick_cap_extension_span = CoordinateSpan(
+        start=post_nick_source_cap_span.end,
+        end=post_nick_source_cap_span.end + len(cap_sequence),
+    )
     post_nick_cap_span = CoordinateSpan(
         start=post_nick_retained_homology_span.end,
-        end=post_nick_retained_homology_span.end + len(cap_sequence),
+        end=post_nick_cap_extension_span.end,
     )
     post_nick_foldback_arm_span = CoordinateSpan(
         start=post_nick_cap_span.end,
@@ -334,19 +368,24 @@ def evaluate_snapback_candidate(
             protected_region=protected_region,
             pre_nick_duplex_window=pre_nick_duplex_window,
             retained_homology_window=retained_homology_window,
+            source_cap_window=source_cap_window,
             cap_span=cap_span,
             foldback_arm_span=foldback_arm_span,
             retained_homology_sequence=retained_homology_sequence,
             released_prefix_sequence=released_prefix_sequence,
+            source_cap_sequence=source_cap_sequence,
+            effective_cap_sequence=effective_cap_sequence,
             cap_sequence=cap_sequence,
             foldback_arm=foldback_arm,
             intended_site=intended_match.site,
             intended_nick=intended_match.nick,
             nick_boundary=nick_boundary,
             nick_boundary_from_left=nick_boundary,
-            released_prefix_nt=len(released_prefix_sequence),
-            retained_start_from_nick=retained_homology_window.start - nick_boundary,
-            cap_nt=len(cap_sequence),
+            site_mutation_count=site_mutation_count,
+            released_prefix_nt=0,
+            retained_start_from_nick=0,
+            cap_nt=len(effective_cap_sequence),
+            cap_extension_nt=len(cap_sequence),
             paired_bp=len(foldback_arm),
             mismatch_count=mismatch_count,
             mismatch_positions=mismatch_positions,
@@ -362,6 +401,8 @@ def evaluate_snapback_candidate(
             post_nick_sequence=post_nick_sequence,
             post_nick_released_prefix_span=post_nick_released_prefix_span,
             post_nick_retained_homology_span=post_nick_retained_homology_span,
+            post_nick_source_cap_span=post_nick_source_cap_span,
+            post_nick_cap_extension_span=post_nick_cap_extension_span,
             post_nick_cap_span=post_nick_cap_span,
             post_nick_foldback_arm_span=post_nick_foldback_arm_span,
             pair_map=pair_map,
@@ -375,17 +416,41 @@ def _markdown_report(report: SnapbackEvaluationReport) -> str:
         f"# Snapback Report: {report.spec_name}",
         "",
         f"- status: {report.status}",
-        f"- spec_path: {report.spec_path}",
-        f"- catalog_source: {report.catalog_source}",
+        f"- spec_path: {display_workspace_relative(report.spec_path, workspace_root=report.workspace_root)}",
+        f"- catalog_source: {display_workspace_relative(report.catalog_source, workspace_root=report.workspace_root)}",
         f"- coordinate_semantics: {report.metadata.coordinate_semantics}",
         f"- boundary_semantics: {report.metadata.boundary_semantics}",
         f"- input_length_nt: {report.metadata.input_length_nt}",
         f"- added_nt: {report.metadata.added_nt}",
     ]
+    for preset_id in report.metadata.catalog_presets:
+        lines.append(f"- catalog_preset: {preset_id}")
     if report.run_dir:
-        lines.append(f"- run_dir: {report.run_dir}")
+        lines.append(f"- run_dir: {display_workspace_relative(report.run_dir, workspace_root=report.workspace_root)}")
     for code, warning in zip(report.metadata.warning_codes, report.metadata.warnings, strict=False):
         lines.append(f"- warning[{code}]: {warning}")
+    if report.metadata.catalog_variants:
+        catalog_entry = report.metadata.catalog_variants[0]
+        lines.extend(
+            [
+                "",
+                "## Nickase",
+                f"- variant_id: {catalog_entry.variant_id}",
+                f"- nicked_strand: {catalog_entry.nicked_strand}",
+                f"- active_cut_offset: {catalog_entry.active_cut_offset}",
+                (
+                    "- outside_site: "
+                    f"{catalog_entry.selection.outside_site if catalog_entry.selection is not None else 'unknown'}"
+                ),
+                (
+                    "- snapback_tier: "
+                    f"{catalog_entry.selection.snapback_tier if catalog_entry.selection is not None else '-'}"
+                ),
+                f"- vendor: {catalog_entry.vendor or catalog_entry.source or '-'}",
+            ]
+        )
+        if catalog_entry.selection is not None and catalog_entry.selection.warning_codes:
+            lines.append(f"- warnings: {', '.join(catalog_entry.selection.warning_codes)}")
     if report.candidate is not None:
         candidate = report.candidate
         lines.extend(
@@ -395,9 +460,11 @@ def _markdown_report(report: SnapbackEvaluationReport) -> str:
                 f"- designed_sequence: `{candidate.designed_sequence}`",
                 f"- intended_nick: {candidate.intended_nick.variant_id}@{candidate.nick_boundary}",
                 f"- nick_boundary_from_left: {candidate.nick_boundary_from_left}",
+                f"- site_mutation_count: {candidate.site_mutation_count}",
                 f"- released_prefix_nt: {candidate.released_prefix_nt}",
                 f"- retained_start_from_nick: {candidate.retained_start_from_nick}",
                 f"- cap_nt: {candidate.cap_nt}",
+                f"- cap_extension_nt: {candidate.cap_extension_nt}",
                 f"- paired_bp: {candidate.paired_bp}",
                 f"- mismatch_count: {candidate.mismatch_count}",
                 f"- terminal_ligatable_duplex_bp: {candidate.terminal_ligatable_duplex_bp}",
@@ -433,6 +500,7 @@ def build_invalid_catalog_report(
             added_nt=spec.added_nt,
             designed_length_nt=len(spec.designed_sequence),
             catalog_source=catalog_source,
+            catalog_presets=spec.design.nickase.catalog.resolved_preset_ids(),
             catalog_variants=[],
         ),
         issues=[_issue(code, message, **(details or {}))],
@@ -486,6 +554,7 @@ def build_snapback_report(
             gc_bounds=spec.design.sequence_quality.gc_fraction,
             max_homopolymer_run_allowed=spec.design.sequence_quality.max_homopolymer_run,
             intended_match=intended_match,
+            site_mutation_count=0,
             all_matches=matches,
             forbid_additional_target_strand_nicks=spec.design.constraints.forbid_additional_target_strand_nicks,
             forbid_any_additional_nicks=spec.design.constraints.forbid_any_additional_nicks,
@@ -503,6 +572,7 @@ def build_snapback_report(
             added_nt=spec.added_nt,
             designed_length_nt=len(designed_sequence),
             catalog_source=catalog_source,
+            catalog_presets=spec.design.nickase.catalog.resolved_preset_ids(),
             catalog_variants=[build_catalog_info(entry)],
         ),
         issues=issues,

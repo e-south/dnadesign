@@ -17,9 +17,8 @@ from dnadesign.cruncher.nickases.models import (
     NickaseCatalogEntry,
     NickEvent,
     RecognitionSiteInstance,
-    motif_matches,
-    reverse_complement_iupac,
 )
+from dnadesign.cruncher.nickases.scan_plan import build_entry_scan_plans, window_matches_plan
 
 
 @dataclass(frozen=True)
@@ -90,8 +89,77 @@ def _raw_nick_geometry(
 
 
 def display_motif_for_orientation(entry: NickaseCatalogEntry, *, orientation: str) -> str:
-    motif = entry.motif_top_5to3
-    return motif if orientation == "forward" else reverse_complement_iupac(motif)
+    for plan in build_entry_scan_plans(entry):
+        if plan.orientation == orientation:
+            return plan.motif_text
+    raise ValueError(f"Unsupported orientation {orientation!r} for nickase {entry.id}.")
+
+
+def suffix_sensitive_scan_start(entry: NickaseCatalogEntry, *, prefix_length: int) -> int:
+    plans = build_entry_scan_plans(entry)
+    if not plans:
+        return max(0, prefix_length)
+    return max(0, prefix_length - plans[0].motif_len + 1)
+
+
+def enumerate_boundary_placements(
+    entry: NickaseCatalogEntry,
+    *,
+    boundary: int,
+    required_strand: str | None = None,
+) -> list[tuple[str, int]]:
+    placements: list[tuple[str, int]] = []
+    for plan in build_entry_scan_plans(entry):
+        strand, boundary_offset = _raw_nick_geometry(
+            entry=entry,
+            start=0,
+            orientation=plan.orientation,
+            motif_len=plan.motif_len,
+        )
+        if required_strand is not None and strand != required_strand:
+            continue
+        placements.append((plan.orientation, boundary - boundary_offset))
+    return placements
+
+
+def build_evaluated_match(
+    *,
+    entry: NickaseCatalogEntry,
+    start: int,
+    orientation: str,
+    coordinate_offset: int,
+    matched_span_sequence: str,
+) -> EvaluatedMatch:
+    motif_len = entry.motif_len or len(entry.motif_top_5to3)
+    strand, boundary_context = _raw_nick_geometry(
+        entry=entry,
+        start=start,
+        orientation=orientation,
+        motif_len=motif_len,
+    )
+    return EvaluatedMatch(
+        variant=entry,
+        site=RecognitionSiteInstance(
+            variant_id=entry.id,
+            specificity_id=entry.specificity_id,
+            start=start,
+            end=start + motif_len,
+            orientation=orientation,
+            matched_span_sequence=matched_span_sequence,
+            local_start=start - coordinate_offset,
+            local_end=start + motif_len - coordinate_offset,
+        ),
+        nick=NickEvent(
+            variant_id=entry.id,
+            specificity_id=entry.specificity_id,
+            strand=strand,
+            boundary=boundary_context - coordinate_offset,
+            boundary_context=boundary_context,
+            source_site_start=start,
+            source_site_end=start + motif_len,
+            source_site_orientation=orientation,
+        ),
+    )
 
 
 def enumerate_site_instances(
@@ -100,50 +168,49 @@ def enumerate_site_instances(
     coordinate_offset: int,
     entry: NickaseCatalogEntry,
 ) -> list[EvaluatedMatch]:
-    motif = entry.motif_top_5to3
-    motif_rc = reverse_complement_iupac(motif)
-    motif_len = entry.motif_len or len(motif)
+    return enumerate_site_instances_starting_at_or_after(
+        sequence,
+        coordinate_offset=coordinate_offset,
+        entry=entry,
+        start_min=0,
+    )
+
+
+def enumerate_site_instances_starting_at_or_after(
+    sequence: str,
+    *,
+    coordinate_offset: int,
+    entry: NickaseCatalogEntry,
+    start_min: int,
+) -> list[EvaluatedMatch]:
+    plans = build_entry_scan_plans(entry)
+    if not plans:
+        return []
+    motif_len = plans[0].motif_len
     matches: list[EvaluatedMatch] = []
-    for start in range(0, len(sequence) - motif_len + 1):
+    window_limit = len(sequence) - motif_len
+    if window_limit < 0:
+        return matches
+    for start in range(max(0, start_min), window_limit + 1):
         window = sequence[start : start + motif_len]
-        orientations: list[str] = []
-        if motif_matches(window, motif):
-            orientations.append("forward")
-        if motif_matches(window, motif_rc) and motif_rc != motif:
-            orientations.append("reverse")
-        for orientation in orientations:
-            strand, boundary_context = _raw_nick_geometry(
+        for plan in plans:
+            if not window_matches_plan(sequence, start=start, plan=plan):
+                continue
+            _strand, boundary_context = _raw_nick_geometry(
                 entry=entry,
                 start=start,
-                orientation=orientation,
-                motif_len=motif_len,
+                orientation=plan.orientation,
+                motif_len=plan.motif_len,
             )
             if boundary_context < 0 or boundary_context > len(sequence):
                 continue
-            site = RecognitionSiteInstance(
-                variant_id=entry.id,
-                specificity_id=entry.specificity_id,
-                start=start,
-                end=start + motif_len,
-                orientation=orientation,
-                matched_span_sequence=window,
-                local_start=start - coordinate_offset,
-                local_end=start + motif_len - coordinate_offset,
-            )
             matches.append(
-                EvaluatedMatch(
-                    variant=entry,
-                    site=site,
-                    nick=NickEvent(
-                        variant_id=entry.id,
-                        specificity_id=entry.specificity_id,
-                        strand=strand,
-                        boundary=boundary_context - coordinate_offset,
-                        boundary_context=boundary_context,
-                        source_site_start=start,
-                        source_site_end=start + motif_len,
-                        source_site_orientation=orientation,
-                    ),
+                build_evaluated_match(
+                    entry=entry,
+                    start=start,
+                    orientation=plan.orientation,
+                    coordinate_offset=coordinate_offset,
+                    matched_span_sequence=window,
                 )
             )
     return matches

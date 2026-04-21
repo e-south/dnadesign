@@ -1,0 +1,70 @@
+catalog_version: 1
+preset_id: thermo_nicking_v1
+preset_ids:
+  - thermo_nicking_v1
+generated_from: Thermo Fisher primary nicking enzyme product pages and manual
+generated_on: 2026-04-21
+normalization_policy: raw_cut_notation_is_authoritative
+
+variants:
+  - id: Nb.Mva1269I
+    specificity_id: Mva1269I
+    motif_top_5to3: GAATGC
+    raw_cut_notation: GAATGC(none/-1)
+    vendor: Thermo Fisher Scientific
+    vendor_catalog_number: ER2051
+    origin_class: naturally_occurring
+    source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
+    operational:
+      incubation_temp_c: 37
+      buffer_family: O
+      heat_inactivation: "Yes"
+    notes:
+      - Current Thermo product page shows the bottom-strand nick geometry and marks the enzyme as non-Type IIS.
+
+  - id: Nb.Bpu10I
+    specificity_id: Bpu10I
+    motif_top_5to3: CCTNAGC
+    raw_cut_notation: CCTNAGC(none/-2)
+    vendor: Thermo Fisher Scientific
+    vendor_catalog_number: ER1681
+    origin_class: naturally_occurring
+    source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+        - DNA_BINDING_BAND_SHIFT_RISK
+    operational:
+      incubation_temp_c: 37
+      buffer_family: R
+      heat_inactivation: "Yes"
+    notes:
+      - Thermo warns that the enzyme can remain associated with cleaved DNA and shift gel bands unless SDS or heat treatment is used.
+
+  - id: Nt.Bpu10I
+    specificity_id: Bpu10I
+    motif_top_5to3: CCTNAGC
+    raw_cut_notation: CCTNAGC(2/none)
+    vendor: Thermo Fisher Scientific
+    vendor_catalog_number: ER2011
+    origin_class: engineered
+    source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier3
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+        - NONSPECIFIC_NICKING_ASSAY_SIGNAL
+    operational:
+      incubation_temp_c: 37
+      buffer_family: R
+      heat_inactivation: 65 C for 20 min
+    notes:
+      - Thermo manual reports no detectable double-strand cleavage in the QC assay.
+      - Thermo manual also reports 2.4% conversion in a nonspecific nicking assay on pUC19 lacking the recognition site.

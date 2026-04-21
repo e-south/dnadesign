@@ -24,6 +24,7 @@ from dnadesign.contracts.visual import SnapbackVisualV1
 from ..config import Style
 from ..core import Record, RenderingError
 from .palette import Palette
+from .snapback_foldback import render_foldback_corner_triloop
 
 _TITLE_COLOR = "#475569"
 _TEXT_COLOR = "#334155"
@@ -35,12 +36,26 @@ _BOUNDARY_COLOR = "#0F172A"
 _RELEASED_COLOR = "#64748B"
 _STEM_COLOR = "#DC2626"
 _CAP_COLOR = "#DB2777"
+_SOURCE_CAP_COLOR = "#BE185D"
+_CAP_EXTENSION_COLOR = "#EC4899"
 _FOLDBACK_COLOR = "#7C3AED"
 _WINDOW_COLOR = "#94A3B8"
 _SITE_COLOR = "#D97706"
 _PROTECTED_COLOR = "#2563EB"
 _ANCHORED_COLOR = "#059669"
 _EXPOSED_COLOR = "#D97706"
+_FOLDBACK_RENDER_COLORS = {
+    "boundary": _BOUNDARY_COLOR,
+    "cap_extension": _CAP_EXTENSION_COLOR,
+    "loop_backbone": "#CBD5E1",
+    "mismatch": _MISMATCH_COLOR,
+    "pair": _PAIR_COLOR,
+    "protected": _PROTECTED_COLOR,
+    "source_cap": _SOURCE_CAP_COLOR,
+    "terminal": "#475569",
+    "text": _TEXT_COLOR,
+    "title": _TITLE_COLOR,
+}
 
 
 @dataclass(frozen=True)
@@ -372,10 +387,17 @@ class SnapbackMapRenderer:
         record = record.validate()
         contract = _contract_from_record(record)
 
+        if contract.state_kind == "post_nick_foldback" and contract.loop_geometry is not None:
+            return render_foldback_corner_triloop(contract, style, colors=_FOLDBACK_RENDER_COLORS)
+
         primary_y = 1.45
         complement_y = 0.45
-        top_rails = _assign_tiers(_structural_rails(contract))
-        bottom_rails = _assign_tiers(_context_rails(contract))
+        if contract.state_kind == "post_nick_exposed":
+            top_rails = _assign_tiers(_context_rails(contract))
+            bottom_rails = _assign_tiers(_structural_rails(contract))
+        else:
+            top_rails = _assign_tiers(_structural_rails(contract))
+            bottom_rails = _assign_tiers(_context_rails(contract))
         top_step = 0.34
         bottom_step = 0.30
         top_base = primary_y + 0.55
@@ -434,27 +456,52 @@ class SnapbackMapRenderer:
             font_size=max(22.0, float(style.font_size_seq) * 1.55),
         )
 
+        boundary_y0 = (
+            complement_y - 0.18 if contract.state_kind in {"pre_nick_duplex", "post_nick_exposed"} else primary_y - 0.18
+        )
+        boundary_y1 = primary_y + 0.18
         nick_label_y = primary_y + 0.28
-        jct_label_y = primary_y + 0.30
-        if contract.nick_boundary is not None:
+        if contract.nick_boundary is not None and contract.nick_boundary == contract.ligation_junction_boundary:
             _draw_boundary(
                 ax,
                 x=contract.nick_boundary,
-                y0=primary_y - 0.18,
-                y1=primary_y + 0.18,
-                label="Nick",
+                y0=boundary_y0,
+                y1=boundary_y1,
+                label="Nick / origin",
                 dashed=False,
                 label_y=nick_label_y,
             )
-        _draw_boundary(
-            ax,
-            x=contract.ligation_junction_boundary,
-            y0=primary_y - 0.18,
-            y1=primary_y + 0.18,
-            label="Jct",
-            dashed=True,
-            label_y=jct_label_y,
-        )
+        else:
+            if contract.nick_boundary is not None:
+                _draw_boundary(
+                    ax,
+                    x=contract.nick_boundary,
+                    y0=boundary_y0,
+                    y1=boundary_y1,
+                    label="Nick",
+                    dashed=False,
+                    label_y=nick_label_y,
+                )
+            if contract.state_kind == "post_nick_foldback":
+                _draw_boundary(
+                    ax,
+                    x=contract.ligation_junction_boundary,
+                    y0=primary_y - 0.18,
+                    y1=primary_y + 0.18,
+                    label="Origin",
+                    dashed=True,
+                    label_y=primary_y + 0.30,
+                )
+            else:
+                _draw_boundary(
+                    ax,
+                    x=contract.ligation_junction_boundary,
+                    y0=boundary_y0,
+                    y1=boundary_y1,
+                    label="Origin",
+                    dashed=True,
+                    label_y=primary_y + 0.30,
+                )
 
         for rail, tier in top_rails:
             rail_y = top_base + tier * top_step

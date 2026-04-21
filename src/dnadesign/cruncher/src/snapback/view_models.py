@@ -45,7 +45,8 @@ class SnapbackExposedTopology(StrictSnapbackModel):
     released_top_span: CoordinateSpan
     released_prefix_span: CoordinateSpan
     retained_homology_span: CoordinateSpan
-    released_suffix_span: CoordinateSpan | None = None
+    source_cap_span: CoordinateSpan
+    cap_extension_span: CoordinateSpan
     cap_span: CoordinateSpan
     foldback_arm_span: CoordinateSpan
 
@@ -57,15 +58,16 @@ class SnapbackExposedTopology(StrictSnapbackModel):
             raise ValueError("released_prefix_span must start at released_top_span.start.")
         if self.released_prefix_span.end > self.retained_homology_span.start:
             raise ValueError("released_prefix_span must end at or before retained_homology_span.start.")
-        if self.released_suffix_span is not None:
-            if self.retained_homology_span.end > self.released_suffix_span.start:
-                raise ValueError("retained_homology_span must end at or before released_suffix_span.start.")
-            if self.released_suffix_span.end > self.cap_span.start:
-                raise ValueError("released_suffix_span must end at or before cap_span.start.")
-        elif self.retained_homology_span.end > self.cap_span.start:
+        if self.retained_homology_span.end != self.source_cap_span.start:
+            raise ValueError("retained_homology_span must end at source_cap_span.start.")
+        if self.source_cap_span.end != self.cap_extension_span.start:
+            raise ValueError("source_cap_span must end at cap_extension_span.start.")
+        if self.cap_extension_span.end != self.foldback_arm_span.start:
+            raise ValueError("cap_extension_span must end at foldback_arm_span.start.")
+        if self.cap_span.start != self.source_cap_span.start or self.cap_span.end != self.cap_extension_span.end:
+            raise ValueError("cap_span must cover source_cap_span + cap_extension_span.")
+        if self.retained_homology_span.end > self.cap_span.start:
             raise ValueError("retained_homology_span must end at or before cap_span.start.")
-        if self.cap_span.end > self.foldback_arm_span.start:
-            raise ValueError("cap_span must end at or before foldback_arm_span.start.")
         if self.released_top_span.end != self.foldback_arm_span.end:
             raise ValueError("released_top_span must end at foldback_arm_span.end.")
         return self
@@ -74,6 +76,8 @@ class SnapbackExposedTopology(StrictSnapbackModel):
 class SnapbackFoldbackTopology(StrictSnapbackModel):
     released_prefix_span: CoordinateSpan
     retained_homology_span: CoordinateSpan
+    source_cap_span: CoordinateSpan
+    cap_extension_span: CoordinateSpan
     cap_span: CoordinateSpan
     foldback_arm_span: CoordinateSpan
     protected_overlap_span: CoordinateSpan | None = None
@@ -82,10 +86,14 @@ class SnapbackFoldbackTopology(StrictSnapbackModel):
     def _validate_order(self) -> "SnapbackFoldbackTopology":
         if self.released_prefix_span.end > self.retained_homology_span.start:
             raise ValueError("released_prefix_span must end at or before retained_homology_span.start.")
-        if self.retained_homology_span.end > self.cap_span.start:
-            raise ValueError("retained_homology_span must end at or before cap_span.start.")
-        if self.cap_span.end > self.foldback_arm_span.start:
-            raise ValueError("cap_span must end at or before foldback_arm_span.start.")
+        if self.retained_homology_span.end != self.source_cap_span.start:
+            raise ValueError("retained_homology_span must end at source_cap_span.start.")
+        if self.source_cap_span.end != self.cap_extension_span.start:
+            raise ValueError("source_cap_span must end at cap_extension_span.start.")
+        if self.cap_extension_span.end != self.foldback_arm_span.start:
+            raise ValueError("cap_extension_span must end at foldback_arm_span.start.")
+        if self.cap_span.start != self.source_cap_span.start or self.cap_span.end != self.cap_extension_span.end:
+            raise ValueError("cap_span must cover source_cap_span + cap_extension_span.")
         if self.protected_overlap_span is not None:
             if self.protected_overlap_span.start < self.retained_homology_span.start:
                 raise ValueError("protected_overlap_span must stay inside retained_homology_span.")
@@ -110,6 +118,8 @@ class SnapbackPreNickDuplexViewV1(StrictSnapbackModel):
     protected_region: CoordinateSpan
     pre_nick_duplex_window: CoordinateSpan
     retained_homology_window: CoordinateSpan
+    source_cap_window: CoordinateSpan
+    effective_cap_window: CoordinateSpan
     cap_span: CoordinateSpan
     foldback_arm_span: CoordinateSpan
     intended_site: RecognitionSiteInstance
@@ -131,14 +141,22 @@ class SnapbackPreNickDuplexViewV1(StrictSnapbackModel):
             raise ValueError("nick_boundary must stay inside input_span.")
         if self.ligation_junction_boundary > self.input_span.end:
             raise ValueError("ligation_junction_boundary must stay inside input_span.")
+        if self.ligation_junction_boundary != self.nick_boundary:
+            raise ValueError("ligation_junction_boundary must equal nick_boundary in pre-nick duplex view.")
         for label, span in (
             ("protected_region", self.protected_region),
             ("pre_nick_duplex_window", self.pre_nick_duplex_window),
             ("retained_homology_window", self.retained_homology_window),
+            ("source_cap_window", self.source_cap_window),
+            ("effective_cap_window", self.effective_cap_window),
             ("cap_span", self.cap_span),
             ("foldback_arm_span", self.foldback_arm_span),
         ):
             _validate_span_within(span, limit=sequence_length, label=label)
+        if self.effective_cap_window.start != self.source_cap_window.start:
+            raise ValueError("effective_cap_window.start must equal source_cap_window.start.")
+        if self.effective_cap_window.end != self.cap_span.end:
+            raise ValueError("effective_cap_window.end must equal cap_span.end.")
         return self
 
 
@@ -170,6 +188,8 @@ class SnapbackPostNickExposedViewV1(StrictSnapbackModel):
             raise ValueError("nick_boundary must stay inside sequence_span.")
         if self.ligation_junction_boundary > self.sequence_span.end:
             raise ValueError("ligation_junction_boundary must stay inside sequence_span.")
+        if self.ligation_junction_boundary != self.nick_boundary:
+            raise ValueError("ligation_junction_boundary must equal nick_boundary in post-nick exposed view.")
         if self.topology.anchored_top_span.end != self.nick_boundary:
             raise ValueError("anchored_top_span.end must equal nick_boundary.")
         if self.topology.retained_homology_span.start != self.ligation_junction_boundary:
@@ -179,16 +199,12 @@ class SnapbackPostNickExposedViewV1(StrictSnapbackModel):
             ("released_top_span", self.topology.released_top_span),
             ("released_prefix_span", self.topology.released_prefix_span),
             ("retained_homology_span", self.topology.retained_homology_span),
+            ("source_cap_span", self.topology.source_cap_span),
+            ("cap_extension_span", self.topology.cap_extension_span),
             ("cap_span", self.topology.cap_span),
             ("foldback_arm_span", self.topology.foldback_arm_span),
         ):
             _validate_span_within(span, limit=sequence_length, label=f"topology.{label}")
-        if self.topology.released_suffix_span is not None:
-            _validate_span_within(
-                self.topology.released_suffix_span,
-                limit=sequence_length,
-                label="topology.released_suffix_span",
-            )
         return self
 
 
@@ -218,6 +234,8 @@ class SnapbackPostNickFoldbackViewV1(StrictSnapbackModel):
         for label, span in (
             ("topology.released_prefix_span", self.topology.released_prefix_span),
             ("topology.retained_homology_span", self.topology.retained_homology_span),
+            ("topology.source_cap_span", self.topology.source_cap_span),
+            ("topology.cap_extension_span", self.topology.cap_extension_span),
             ("topology.cap_span", self.topology.cap_span),
             ("topology.foldback_arm_span", self.topology.foldback_arm_span),
         ):

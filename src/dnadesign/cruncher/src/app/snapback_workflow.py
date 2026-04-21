@@ -11,9 +11,14 @@ Module Author(s): Codex
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
+from dnadesign.cruncher.app.snapback_publish import (
+    build_publication_bundle,
+    write_publication_bundle,
+)
 from dnadesign.cruncher.nickases.catalog import dump_nickase_catalog_yaml, load_merged_nickase_catalog
 from dnadesign.cruncher.nickases.errors import NickaseCatalogError
 from dnadesign.cruncher.snapback.artifacts import (
@@ -28,19 +33,23 @@ from dnadesign.cruncher.snapback.artifacts import (
     load_solve_manifest,
     load_solve_status,
     load_status,
-    post_nick_exposed_job_path,
+    materialized_hits_dir,
     post_nick_exposed_view_path,
     post_nick_exposed_visual_contract_path,
-    post_nick_foldback_job_path,
     post_nick_foldback_view_path,
     post_nick_foldback_visual_contract_path,
-    pre_nick_duplex_job_path,
     pre_nick_duplex_view_path,
     pre_nick_duplex_visual_contract_path,
     renders_dir,
     report_json_path,
     report_md_path,
+    snapback_manifest_path,
+    snapback_status_path,
+    snapback_triptych_job_path,
+    snapback_triptych_render_path,
+    snapback_triptych_visual_contracts_path,
     snapshot_explicit_inputs,
+    solve_frontier_table_path,
     solve_hits_table_path,
     solve_input_spec_path,
     solve_manifest_path,
@@ -50,12 +59,10 @@ from dnadesign.cruncher.snapback.artifacts import (
     solve_status_path,
     spec_snapshot_path,
     views_manifest_path,
-    write_baserender_job,
     write_candidate_table,
     write_manifest,
     write_report,
     write_status,
-    write_view_bundle,
 )
 from dnadesign.cruncher.snapback.load import load_snapback_spec
 from dnadesign.cruncher.snapback.planner import (
@@ -63,22 +70,11 @@ from dnadesign.cruncher.snapback.planner import (
     build_snapback_report,
     render_markdown_report,
 )
-from dnadesign.cruncher.snapback.view_contracts import (
-    build_post_nick_exposed_snapback_visual,
-    build_post_nick_exposed_view,
-    build_post_nick_foldback_snapback_visual,
-    build_post_nick_foldback_view,
-    build_pre_nick_duplex_view,
-    build_pre_nick_snapback_visual,
-    build_single_view_job,
-    build_views_manifest,
-)
 
 
-def _catalog_source_label(*, preset: str | None, resolved_paths: list[Path]) -> str:
+def _catalog_source_label(*, preset_ids: list[str], resolved_paths: list[Path]) -> str:
     labels: list[str] = []
-    if preset is not None:
-        labels.append(f"preset:{preset}")
+    labels.extend(f"preset:{preset_id}" for preset_id in preset_ids)
     labels.extend(str(path) for path in resolved_paths)
     return ", ".join(labels) if labels else "resolved_catalog"
 
@@ -86,6 +82,7 @@ def _catalog_source_label(*, preset: str | None, resolved_paths: list[Path]) -> 
 def _resolve_catalog(spec, *, workspace_root: Path):
     catalog, resolved_paths = load_merged_nickase_catalog(
         preset_id=spec.design.nickase.catalog.preset,
+        additional_preset_ids=spec.design.nickase.catalog.additional_presets,
         additional_paths=spec.design.nickase.catalog.additional_paths,
         workspace_root=workspace_root,
     )
@@ -93,21 +90,94 @@ def _resolve_catalog(spec, *, workspace_root: Path):
         catalog,
         resolved_paths,
         _catalog_source_label(
-            preset=spec.design.nickase.catalog.preset,
+            preset_ids=spec.design.nickase.catalog.resolved_preset_ids(),
             resolved_paths=resolved_paths,
         ),
     )
 
 
-def _view_title(*, spec_name: str, solution_id: str, state_label: str) -> str:
-    _ = (spec_name, solution_id)
-    return state_label
+def _existing_triptych_render(run_dir: Path) -> Path | None:
+    for fmt in ("png", "svg", "pdf"):
+        candidate = snapback_triptych_render_path(run_dir, fmt=fmt)
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _validate_explicit_publication_alignment(run_dir: Path, *, candidate: dict[str, object]) -> None:
+    manifest_payload = json.loads(views_manifest_path(run_dir).read_text(encoding="utf-8"))
+    solution_id = manifest_payload.get("solution_id")
+    if not isinstance(solution_id, str) or not solution_id:
+        raise ValueError("Snapback views manifest solution_id drift detected.")
+
+    expected_state_ids = [
+        f"{solution_id}.pre_nick_duplex",
+        f"{solution_id}.post_nick_exposed",
+        f"{solution_id}.post_nick_foldback",
+    ]
+    pre_visual = json.loads(pre_nick_duplex_visual_contract_path(run_dir).read_text(encoding="utf-8"))
+    exposed_visual = json.loads(post_nick_exposed_visual_contract_path(run_dir).read_text(encoding="utf-8"))
+    foldback_visual = json.loads(post_nick_foldback_visual_contract_path(run_dir).read_text(encoding="utf-8"))
+    for expected_state_id, visual_payload in zip(
+        expected_state_ids,
+        [pre_visual, exposed_visual, foldback_visual],
+        strict=True,
+    ):
+        if visual_payload.get("state_id") != expected_state_id:
+            raise ValueError(f"Snapback visual state_id drift detected for {expected_state_id}.")
+
+    designed_sequence = candidate.get("designed_sequence")
+    post_nick_sequence = candidate.get("post_nick_sequence")
+    if pre_visual.get("primary_sequence") != designed_sequence:
+        raise ValueError("Snapback pre-nick visual primary_sequence drift detected.")
+    if exposed_visual.get("primary_sequence") != designed_sequence:
+        raise ValueError("Snapback exposed visual primary_sequence drift detected.")
+    if foldback_visual.get("primary_sequence") != post_nick_sequence:
+        raise ValueError("Snapback foldback visual primary_sequence drift detected.")
+    if foldback_visual.get("meta", {}).get("cap_extension_nt") != candidate.get("cap_extension_nt"):
+        raise ValueError("Snapback foldback visual cap_extension_nt drift detected.")
+    if foldback_visual.get("meta", {}).get("terminal_ligatable_duplex_bp") != candidate.get(
+        "terminal_ligatable_duplex_bp"
+    ):
+        raise ValueError("Snapback foldback visual terminal_ligatable_duplex_bp drift detected.")
+
+    triptych_lines = [
+        json.loads(line)
+        for line in snapback_triptych_visual_contracts_path(run_dir).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    if len(triptych_lines) != 3:
+        raise ValueError("Snapback triptych visual contract count drift detected.")
+    if [payload.get("state_id") for payload in triptych_lines] != expected_state_ids:
+        raise ValueError("Snapback triptych visual state ordering drift detected.")
+
+
+def _validate_materialized_hit_alignment(*, hit: dict[str, object], hit_run_dir: Path) -> None:
+    report_payload = json.loads(report_json_path(hit_run_dir).read_text(encoding="utf-8"))
+    candidate = report_payload.get("candidate")
+    if not isinstance(candidate, dict):
+        raise ValueError(f"Materialized snapback hit bundle missing candidate payload: {hit_run_dir}")
+    intended_nick = candidate.get("intended_nick")
+    if not isinstance(intended_nick, dict):
+        raise ValueError(f"Materialized snapback hit bundle missing intended_nick payload: {hit_run_dir}")
+    if intended_nick.get("variant_id") != hit.get("variant_id"):
+        raise ValueError(f"Materialized snapback hit variant drift detected: {hit_run_dir}")
+    for candidate_key, hit_key in (
+        ("cap_sequence", "cap_sequence"),
+        ("foldback_arm", "foldback_arm"),
+        ("nick_boundary", "nick_boundary"),
+        ("paired_bp", "paired_bp"),
+        ("cap_extension_nt", "cap_extension_nt"),
+        ("site_mutation_count", "site_mutation_count"),
+    ):
+        if candidate.get(candidate_key) != hit.get(hit_key):
+            raise ValueError(f"Materialized snapback hit {candidate_key} drift detected: {hit_run_dir}")
 
 
 def validate_snapback_spec(path: str | Path):
     spec, spec_path, workspace_root = load_snapback_spec(path)
     catalog_source = _catalog_source_label(
-        preset=spec.design.nickase.catalog.preset,
+        preset_ids=spec.design.nickase.catalog.resolved_preset_ids(),
         resolved_paths=spec.design.nickase.catalog.additional_paths,
     )
     try:
@@ -150,101 +220,25 @@ def run_snapback_design(path: str | Path, *, force_overwrite: bool = False):
         if not force_overwrite:
             raise ValueError(f"Snapback run directory already exists: {run_dir}. Use --force-overwrite to replace it.")
         shutil.rmtree(run_dir)
-    ensure_run_dirs(run_dir)
+    ensure_run_dirs(
+        run_dir,
+        include_visual_contracts=spec.output.emit_visual_contracts,
+        include_baserender_jobs=spec.output.emit_baserender_jobs,
+    )
     snapshot_explicit_inputs(run_dir, spec_path=spec_path, catalog_yaml=catalog_yaml)
     report = report.model_copy(update={"run_dir": str(run_dir.resolve())})
     write_report(run_dir, report, markdown=render_markdown_report(report))
     write_candidate_table(run_dir, report)
     if spec.output.emit_visual_contracts and report.candidate is not None:
-        pre_nick_duplex = build_pre_nick_duplex_view(
-            report=report,
-            solution_id=snapback_design_id,
-            title=_view_title(
-                spec_name=report.spec_name,
-                solution_id=snapback_design_id,
-                state_label="pre-nick duplex",
-            ),
-        )
-        post_nick_exposed = build_post_nick_exposed_view(
-            report=report,
-            solution_id=snapback_design_id,
-            title=_view_title(
-                spec_name=report.spec_name,
-                solution_id=snapback_design_id,
-                state_label="post-nick exposed",
-            ),
-        )
-        post_nick_foldback = build_post_nick_foldback_view(
-            report=report,
-            solution_id=snapback_design_id,
-            title=_view_title(
-                spec_name=report.spec_name,
-                solution_id=snapback_design_id,
-                state_label="post-nick foldback",
-            ),
-        )
-        pre_nick_duplex_visual_contract = build_pre_nick_snapback_visual(
-            report=report,
-            solution_id=snapback_design_id,
-            title=_view_title(
-                spec_name=report.spec_name,
-                solution_id=snapback_design_id,
-                state_label="pre-nick duplex",
-            ),
-        )
-        post_nick_exposed_visual_contract = build_post_nick_exposed_snapback_visual(
-            report=report,
-            solution_id=snapback_design_id,
-            title=_view_title(
-                spec_name=report.spec_name,
-                solution_id=snapback_design_id,
-                state_label="post-nick exposed",
-            ),
-        )
-        post_nick_foldback_visual_contract = build_post_nick_foldback_snapback_visual(
-            report=report,
-            solution_id=snapback_design_id,
-            title=_view_title(
-                spec_name=report.spec_name,
-                solution_id=snapback_design_id,
-                state_label="post-nick foldback",
-            ),
-        )
-        write_view_bundle(
+        write_publication_bundle(
             run_dir,
-            pre_nick_duplex=pre_nick_duplex,
-            post_nick_exposed=post_nick_exposed,
-            post_nick_foldback=post_nick_foldback,
-            pre_nick_duplex_visual_contract=pre_nick_duplex_visual_contract,
-            post_nick_exposed_visual_contract=post_nick_exposed_visual_contract,
-            post_nick_foldback_visual_contract=post_nick_foldback_visual_contract,
-            manifest=build_views_manifest(
+            bundle=build_publication_bundle(
+                report=report,
                 solution_id=snapback_design_id,
                 include_jobs=spec.output.emit_baserender_jobs,
+                render_format=spec.output.render_format,
             ),
         )
-        if spec.output.emit_baserender_jobs:
-            write_baserender_job(
-                pre_nick_duplex_job_path(run_dir),
-                build_single_view_job(
-                    input_filename=pre_nick_duplex_visual_contract_path(run_dir).name,
-                    output_filename="pre_nick_duplex.png",
-                ),
-            )
-            write_baserender_job(
-                post_nick_exposed_job_path(run_dir),
-                build_single_view_job(
-                    input_filename=post_nick_exposed_visual_contract_path(run_dir).name,
-                    output_filename="post_nick_exposed.png",
-                ),
-            )
-            write_baserender_job(
-                post_nick_foldback_job_path(run_dir),
-                build_single_view_job(
-                    input_filename=post_nick_foldback_visual_contract_path(run_dir).name,
-                    output_filename="post_nick_foldback.png",
-                ),
-            )
     manifest = build_manifest(
         run_dir=run_dir,
         workspace_root=workspace_root,
@@ -300,22 +294,28 @@ def _explicit_show_payload(run_dir: Path) -> dict[str, object]:
         "pre_nick_duplex_visual_contract",
         "post_nick_exposed_visual_contract",
         "post_nick_foldback_visual_contract",
-        "pre_nick_duplex_job",
-        "post_nick_exposed_job",
-        "post_nick_foldback_job",
+        "snapback_triptych_visual_contracts",
+        "snapback_triptych_job",
     ):
         if key in declared_artifacts:
             candidate = run_dir / declared_artifacts[key]
             if not candidate.exists():
                 raise FileNotFoundError(f"Declared snapback visual artifact missing: {candidate}")
+    report_payload = json.loads(report_json_path(run_dir).read_text(encoding="utf-8"))
+    if views_manifest_path(run_dir).exists():
+        candidate = report_payload.get("candidate")
+        if not isinstance(candidate, dict):
+            raise ValueError("Snapback visual artifacts require a satisfied candidate payload.")
+        _validate_explicit_publication_alignment(run_dir, candidate=candidate)
+    triptych_render = _existing_triptych_render(run_dir)
     return {
         "kind": "explicit",
         "run_dir": str(run_dir),
         "spec_name": manifest.get("spec_name"),
         "status": status.get("status"),
         "status_message": status.get("status_message"),
-        "manifest_path": str((run_dir / "meta" / "snapback_manifest.json").resolve()),
-        "status_path": str((run_dir / "meta" / "snapback_status.json").resolve()),
+        "manifest_path": str(snapback_manifest_path(run_dir).resolve()),
+        "status_path": str(snapback_status_path(run_dir).resolve()),
         "report_json": str(report_json_path(run_dir).resolve()),
         "report_md": str(report_md_path(run_dir).resolve()),
         "spec_snapshot": str(spec_snapshot_path(run_dir).resolve()),
@@ -338,6 +338,11 @@ def _explicit_show_payload(run_dir: Path) -> dict[str, object]:
             if post_nick_foldback_visual_contract_path(run_dir).exists()
             else None
         ),
+        "snapback_triptych_visual_contracts": (
+            str(snapback_triptych_visual_contracts_path(run_dir).resolve())
+            if snapback_triptych_visual_contracts_path(run_dir).exists()
+            else None
+        ),
         "pre_nick_duplex_view": (
             str(pre_nick_duplex_view_path(run_dir).resolve()) if pre_nick_duplex_view_path(run_dir).exists() else None
         ),
@@ -351,38 +356,51 @@ def _explicit_show_payload(run_dir: Path) -> dict[str, object]:
             if post_nick_foldback_view_path(run_dir).exists()
             else None
         ),
-        "pre_nick_duplex_job": (
-            str(pre_nick_duplex_job_path(run_dir).resolve()) if pre_nick_duplex_job_path(run_dir).exists() else None
-        ),
-        "post_nick_exposed_job": (
-            str(post_nick_exposed_job_path(run_dir).resolve()) if post_nick_exposed_job_path(run_dir).exists() else None
-        ),
-        "post_nick_foldback_job": (
-            str(post_nick_foldback_job_path(run_dir).resolve())
-            if post_nick_foldback_job_path(run_dir).exists()
-            else None
+        "snapback_triptych_job": (
+            str(snapback_triptych_job_path(run_dir).resolve()) if snapback_triptych_job_path(run_dir).exists() else None
         ),
         "baserender_jobs_dir": (
             str(baserender_jobs_dir(run_dir).resolve()) if baserender_jobs_dir(run_dir).exists() else None
         ),
-        "renders_dir": str(renders_dir(run_dir).resolve()),
-        "pre_nick_duplex_render": (
-            str((renders_dir(run_dir) / "pre_nick_duplex.png").resolve())
-            if (renders_dir(run_dir) / "pre_nick_duplex.png").exists()
-            else None
-        ),
-        "post_nick_exposed_render": (
-            str((renders_dir(run_dir) / "post_nick_exposed.png").resolve())
-            if (renders_dir(run_dir) / "post_nick_exposed.png").exists()
-            else None
-        ),
-        "post_nick_foldback_render": (
-            str((renders_dir(run_dir) / "post_nick_foldback.png").resolve())
-            if (renders_dir(run_dir) / "post_nick_foldback.png").exists()
-            else None
-        ),
+        "plots_dir": str(renders_dir(run_dir).resolve()) if renders_dir(run_dir).exists() else None,
+        "snapback_triptych_render": str(triptych_render.resolve()) if triptych_render is not None else None,
         "artifacts": manifest.get("artifacts", []),
     }
+
+
+def _validate_materialized_hit_bundles(run_dir: Path) -> None:
+    report_payload = json.loads(solve_report_json_path(run_dir).read_text(encoding="utf-8"))
+    metadata = report_payload.get("metadata", {})
+    hits = report_payload.get("hits", [])
+    workspace_root = Path(report_payload["workspace_root"]).resolve()
+    expected_hit_count = metadata.get("materialized_hit_count")
+    if not isinstance(expected_hit_count, int):
+        raise ValueError("Snapback solve materialized_hit_count drift detected.")
+    materialized_hits = [hit for hit in hits if hit.get("materialized_run_dir") is not None]
+    if len(materialized_hits) != expected_hit_count:
+        raise ValueError("Snapback solve materialized_hit_count drift detected.")
+    observed_ranks = {hit.get("rank") for hit in materialized_hits}
+    if observed_ranks != set(range(1, expected_hit_count + 1)):
+        raise ValueError("Snapback solve materialized hit rank coverage drift detected.")
+    seen_materialized_dirs: set[str] = set()
+    for hit in materialized_hits:
+        rank = hit.get("rank")
+        materialized_run_dir = hit["materialized_run_dir"]
+        if materialized_run_dir in seen_materialized_dirs:
+            raise ValueError("Duplicate materialized snapback hit bundle path detected.")
+        seen_materialized_dirs.add(materialized_run_dir)
+        expected_name = f"hit_{int(rank):02d}"
+        if Path(materialized_run_dir).name != expected_name:
+            raise ValueError("Snapback solve materialized hit path/rank drift detected.")
+        hit_run_dir = (workspace_root / materialized_run_dir).resolve()
+        try:
+            hit_run_dir.relative_to(workspace_root)
+        except ValueError as exc:
+            raise ValueError(f"Materialized snapback hit bundle escaped workspace_root: {hit_run_dir}") from exc
+        if not hit_run_dir.exists():
+            raise FileNotFoundError(f"Materialized snapback hit bundle missing: {hit_run_dir}")
+        _explicit_show_payload(hit_run_dir)
+        _validate_materialized_hit_alignment(hit=hit, hit_run_dir=hit_run_dir)
 
 
 def _solve_show_payload(run_dir: Path) -> dict[str, object]:
@@ -393,11 +411,11 @@ def _solve_show_payload(run_dir: Path) -> dict[str, object]:
         raise ValueError("Snapback solve manifest kind drift detected.")
     if manifest.get("workflow") != "snapback_solve":
         raise ValueError("Snapback solve manifest workflow drift detected.")
-    if manifest.get("contract") != "single_nick_snapback_solve_v2":
+    if manifest.get("contract") != "single_nick_snapback_solve_v3":
         raise ValueError("Unsupported snapback solve contract version.")
     if status.get("workflow") != "snapback_solve":
         raise ValueError("Snapback solve status workflow drift detected.")
-    if status.get("contract") != "single_nick_snapback_solve_v2":
+    if status.get("contract") != "single_nick_snapback_solve_v3":
         raise ValueError("Unsupported snapback solve status contract version.")
     if manifest.get("stage") != "snapback" or status.get("stage") != "snapback":
         raise ValueError("Snapback solve stage drift detected.")
@@ -417,10 +435,13 @@ def _solve_show_payload(run_dir: Path) -> dict[str, object]:
         solve_input_spec_path(run_dir),
         solve_resolved_catalog_path(run_dir),
         solve_hits_table_path(run_dir),
+        solve_frontier_table_path(run_dir),
+        materialized_hits_dir(run_dir),
     ]
     for path in required_paths:
         if not path.exists():
             raise FileNotFoundError(f"Required snapback solve artifact missing: {path}")
+    _validate_materialized_hit_bundles(run_dir)
     return {
         "kind": "solve",
         "run_dir": str(run_dir),
@@ -434,14 +455,15 @@ def _solve_show_payload(run_dir: Path) -> dict[str, object]:
         "input_solve_spec": str(solve_input_spec_path(run_dir).resolve()),
         "resolved_catalog": str(solve_resolved_catalog_path(run_dir).resolve()),
         "table__hits": str(solve_hits_table_path(run_dir).resolve()),
-        "hits_root": str((run_dir / "hits").resolve()),
+        "table__frontier": str(solve_frontier_table_path(run_dir).resolve()),
+        "materialized_hits_dir": str(materialized_hits_dir(run_dir).resolve()),
     }
 
 
 def snapback_show_payload(run_dir: str | Path) -> dict[str, object]:
     resolved = Path(run_dir).expanduser().resolve()
-    explicit_manifest_exists = (resolved / "meta" / "snapback_manifest.json").exists()
-    solve_manifest_exists = (resolved / "solve_manifest.json").exists()
+    explicit_manifest_exists = snapback_manifest_path(resolved).exists()
+    solve_manifest_exists = solve_manifest_path(resolved).exists()
     if explicit_manifest_exists and solve_manifest_exists:
         raise ValueError(f"Ambiguous snapback run directory contains explicit and solve manifests: {resolved}")
     if explicit_manifest_exists:

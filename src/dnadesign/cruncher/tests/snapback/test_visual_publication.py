@@ -13,18 +13,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
+from pydantic import ValidationError
 
 from dnadesign.contracts.visual import SnapbackVisualV1
+from dnadesign.cruncher.app.snapback_publish import build_publication_bundle, write_publication_bundle
 from dnadesign.cruncher.app.snapback_workflow import validate_snapback_spec
-from dnadesign.cruncher.snapback.view_contracts import (
+from dnadesign.cruncher.nickases.models import reverse_complement
+from dnadesign.cruncher.snapback.artifacts import snapback_triptych_visual_contracts_path, views_manifest_path
+from dnadesign.cruncher.snapback.public_visuals import (
     build_post_nick_exposed_snapback_visual,
-    build_post_nick_exposed_view,
     build_post_nick_foldback_snapback_visual,
-    build_post_nick_foldback_view,
-    build_pre_nick_duplex_view,
     build_pre_nick_snapback_visual,
 )
+from dnadesign.cruncher.snapback.view_contracts import (
+    build_post_nick_exposed_view,
+    build_post_nick_foldback_view,
+    build_pre_nick_duplex_view,
+)
+from dnadesign.cruncher.snapback.view_models import SnapbackPostNickExposedViewV1, SnapbackPostNickFoldbackViewV1
 
 
 def _write_workspace(
@@ -67,9 +75,9 @@ def _base_payload() -> dict[str, object]:
         },
         "input": {
             "canonical_top_strand": {
-                "sequence": "CCTCAGCAGTC",
-                "protected_region": {"start": 0, "end": 11},
-                "pre_nick_duplex_window": {"start": 0, "end": 11},
+                "sequence": "CCTCAGCA",
+                "protected_region": {"start": 0, "end": 8},
+                "pre_nick_duplex_window": {"start": 0, "end": 8},
             }
         },
         "design": {
@@ -83,15 +91,15 @@ def _base_payload() -> dict[str, object]:
             },
             "single_nick_goal": {"nick_boundary_window": {"min": 2, "max": 2}},
             "topology": {
-                "retained_homology_window": {"start": 7, "end": 11},
-                "cap_sequence": "TT",
-                "foldback_arm": "GACT",
+                "retained_homology_window": {"start": 2, "end": 6},
+                "cap_sequence": "T",
+                "foldback_arm": "CTGA",
                 "homology_policy": {"max_mismatches": 0, "min_paired_bp": 4, "max_paired_bp": 4},
             },
             "constraints": {
                 "terminal_ligatable_duplex_bp": {"min": 4, "max": 4},
                 "max_uninterrupted_duplex_bp": 4,
-                "max_added_nt": 6,
+                "max_added_nt": 5,
                 "forbid_additional_target_strand_nicks": False,
                 "forbid_any_additional_nicks": False,
             },
@@ -101,7 +109,7 @@ def _base_payload() -> dict[str, object]:
             },
         },
         "output": {
-            "run_dir": "outputs/snapback",
+            "run_dir": "outputs/design",
             "emit_visual_contracts": True,
             "emit_baserender_jobs": True,
         },
@@ -117,11 +125,13 @@ def test_snapback_visual_builders_publish_three_consistent_states(tmp_path: Path
     foldback = build_post_nick_foldback_view(report=report, solution_id="demo", title="Foldback")
 
     assert pre["nick_boundary"] == 2
-    assert pre["ligation_junction_boundary"] == 7
+    assert pre["ligation_junction_boundary"] == 2
+    assert pre["source_cap_window"] == {"start": 6, "end": 8}
+    assert pre["effective_cap_window"] == {"start": 6, "end": 9}
     assert exposed["nick_boundary"] == 2
-    assert exposed["ligation_junction_boundary"] == 7
+    assert exposed["ligation_junction_boundary"] == 2
     assert foldback["source_nick_boundary"] == 2
-    assert foldback["ligation_junction_boundary"] == 5
+    assert foldback["ligation_junction_boundary"] == 0
 
     pre_public = SnapbackVisualV1.model_validate(
         build_pre_nick_snapback_visual(report=report, solution_id="demo", title="Pre")
@@ -132,6 +142,7 @@ def test_snapback_visual_builders_publish_three_consistent_states(tmp_path: Path
     foldback_public = SnapbackVisualV1.model_validate(
         build_post_nick_foldback_snapback_visual(report=report, solution_id="demo", title="Foldback")
     )
+    assert report.candidate is not None
 
     assert pre_public.state_kind == "pre_nick_duplex"
     assert exposed_public.state_kind == "post_nick_exposed"
@@ -139,19 +150,28 @@ def test_snapback_visual_builders_publish_three_consistent_states(tmp_path: Path
     assert pre_public.pairings == []
     assert exposed_public.pairings == []
     assert pre_public.nick_boundary == 2
+    assert pre_public.ligation_junction_boundary == 2
     assert exposed_public.exposed_complement_span is not None
     assert foldback_public.nick_boundary is None
-    assert foldback_public.ligation_junction_boundary == 5
-    assert any(pair.left_index == 5 for pair in foldback_public.pairings)
+    assert foldback_public.ligation_junction_boundary == 0
+    assert foldback_public.loop_geometry is not None
+    assert foldback_public.loop_geometry.kind == "hairpin_corner_triloop_v1"
+    assert foldback_public.loop_geometry.source_cap_span.model_dump(mode="json") == {"start": 4, "end": 6}
+    assert foldback_public.loop_geometry.cap_extension_span.model_dump(mode="json") == {"start": 6, "end": 7}
+    assert foldback_public.primary_sequence == report.candidate.post_nick_sequence
+    assert foldback_public.complement_sequence == reverse_complement(report.candidate.post_nick_sequence)[::-1]
+    assert foldback_public.complement_sequence != foldback_public.primary_sequence
+    assert any(pair.left_index == 0 for pair in foldback_public.pairings)
 
 
 def test_snapback_foldback_visuals_publish_absolute_mismatch_positions(tmp_path: Path) -> None:
     payload = _base_payload()
-    payload["input"]["canonical_top_strand"]["protected_region"] = {"start": 0, "end": 8}
-    payload["design"]["topology"]["foldback_arm"] = "GAGT"
+    payload["input"]["canonical_top_strand"]["protected_region"] = {"start": 0, "end": 2}
+    payload["design"]["topology"]["foldback_arm"] = "CTAA"
     payload["design"]["topology"]["homology_policy"]["max_mismatches"] = 1
     payload["design"]["constraints"]["terminal_ligatable_duplex_bp"] = {"min": 1, "max": 4}
     payload["design"]["constraints"]["max_uninterrupted_duplex_bp"] = 2
+    payload["design"]["sequence_quality"]["gc_fraction"] = {"min": 0.0, "max": 0.75}
     spec_path = _write_workspace(tmp_path, spec_payload=payload, catalog_entries=_catalog_entries())
     report = validate_snapback_spec(spec_path)
     assert report.candidate is not None
@@ -169,3 +189,44 @@ def test_snapback_foldback_visuals_publish_absolute_mismatch_positions(tmp_path:
     assert foldback["foldback_partner_mismatch_positions"] == expected_foldback
     assert public.primary_mismatch_positions == expected_primary
     assert public.complement_mismatch_positions == expected_foldback
+
+
+def test_snapback_publication_bundle_manifest_matches_emitted_files(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path, spec_payload=_base_payload(), catalog_entries=_catalog_entries())
+    report = validate_snapback_spec(spec_path)
+    run_dir = tmp_path / "outputs" / "design"
+
+    bundle = build_publication_bundle(report=report, solution_id="demo", include_jobs=True)
+    write_publication_bundle(run_dir, bundle=bundle)
+
+    manifest_path = views_manifest_path(run_dir)
+    manifest_dir = manifest_path.parent
+    for entry in bundle.manifest["views"]:
+        assert (run_dir / entry["path"]).exists()
+    triptych_jsonl = snapback_triptych_visual_contracts_path(run_dir)
+    assert triptych_jsonl.exists()
+    assert len(triptych_jsonl.read_text(encoding="utf-8").strip().splitlines()) == 3
+    assert len(bundle.manifest["recommended_jobs"]) == 1
+    assert bundle.manifest["recommended_jobs"][0]["name"] == "snapback_triptych"
+    for job in bundle.manifest["recommended_jobs"]:
+        assert (manifest_dir / job["path"]).resolve().exists()
+
+
+def test_snapback_exposed_view_rejects_non_adjacent_cap_partition(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path, spec_payload=_base_payload(), catalog_entries=_catalog_entries())
+    report = validate_snapback_spec(spec_path)
+    payload = build_post_nick_exposed_view(report=report, solution_id="demo", title="Exposed")
+    payload["topology"]["cap_extension_span"]["start"] += 1
+
+    with pytest.raises(ValidationError, match="source_cap_span must end at cap_extension_span.start."):
+        SnapbackPostNickExposedViewV1.model_validate(payload)
+
+
+def test_snapback_foldback_view_rejects_non_adjacent_cap_partition(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path, spec_payload=_base_payload(), catalog_entries=_catalog_entries())
+    report = validate_snapback_spec(spec_path)
+    payload = build_post_nick_foldback_view(report=report, solution_id="demo", title="Foldback")
+    payload["topology"]["cap_extension_span"]["start"] += 1
+
+    with pytest.raises(ValidationError, match="source_cap_span must end at cap_extension_span.start."):
+        SnapbackPostNickFoldbackViewV1.model_validate(payload)

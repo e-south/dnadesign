@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/snapback/load.py
 
-Load v2 explicit and solve snapback specs.
+Load v2 explicit and v3 co-design solve snapback specs.
 
 Module Author(s): Codex
 --------------------------------------------------------------------------------

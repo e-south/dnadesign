@@ -38,6 +38,23 @@ _ENTRY_METADATA_EXCLUDE = {
     "recognition_sequence",
     "nicked_site_strand",
     "cut_offset",
+    "vendor",
+    "vendor_catalog_number",
+    "origin_class",
+    "source_family",
+    "notes",
+    "selection",
+    "operational",
+    "outside_site",
+    "snapback_tier",
+    "commercial_confidence",
+    "warning_codes",
+    "incubation_temp_c",
+    "buffer_family",
+    "heat_inactivation",
+    "methylation_sensitivity",
+    "star_activity_warning",
+    "double_strand_cleavage_warning",
 }
 
 
@@ -71,6 +88,80 @@ def _normalize_metadata(entry: dict[str, Any]) -> dict[str, Any]:
         if key not in _ENTRY_METADATA_EXCLUDE and value is not None:
             metadata[key] = value
     return metadata
+
+
+def _normalize_string_list(value: Any, *, label: str) -> list[str]:
+    items = value or []
+    if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+        raise NickaseCatalogError(f"{label} must be a list of strings.")
+    normalized = [str(item).strip() for item in items]
+    if any(not item for item in normalized):
+        raise NickaseCatalogError(f"{label} must not contain blank values.")
+    return normalized
+
+
+def _normalize_selection(entry: dict[str, Any]) -> dict[str, Any] | None:
+    raw_selection = entry.get("selection")
+    if raw_selection is None:
+        selection: dict[str, Any] = {}
+    elif isinstance(raw_selection, dict):
+        selection = dict(raw_selection)
+    else:
+        raise NickaseCatalogError("entry.selection must be a mapping when present.")
+
+    for key in ("outside_site", "snapback_tier", "commercial_confidence", "warning_codes"):
+        if key in entry:
+            if key in selection and selection[key] != entry[key]:
+                raise NickaseCatalogError(f"entry.selection.{key} must not conflict with top-level {key}.")
+            selection[key] = entry[key]
+    if not selection:
+        return None
+    if "warning_codes" in selection:
+        selection["warning_codes"] = _normalize_string_list(
+            selection["warning_codes"], label="entry.selection.warning_codes"
+        )
+    return selection
+
+
+def _normalize_operational(entry: dict[str, Any]) -> dict[str, Any] | None:
+    raw_operational = entry.get("operational")
+    if raw_operational is None:
+        operational: dict[str, Any] = {}
+    elif isinstance(raw_operational, dict):
+        operational = dict(raw_operational)
+    else:
+        raise NickaseCatalogError("entry.operational must be a mapping when present.")
+
+    for key in (
+        "incubation_temp_c",
+        "buffer_family",
+        "heat_inactivation",
+        "methylation_sensitivity",
+        "star_activity_warning",
+        "double_strand_cleavage_warning",
+    ):
+        if key in entry:
+            if key in operational and operational[key] != entry[key]:
+                raise NickaseCatalogError(f"entry.operational.{key} must not conflict with top-level {key}.")
+            operational[key] = entry[key]
+    if not operational:
+        return None
+    methylation = operational.get("methylation_sensitivity")
+    if methylation is not None and not isinstance(methylation, dict):
+        raise NickaseCatalogError("entry.operational.methylation_sensitivity must be a mapping when present.")
+    return operational
+
+
+def _normalize_preset_ids(value: Any, *, label: str) -> list[str]:
+    raw_ids = value or []
+    if not isinstance(raw_ids, list):
+        raise NickaseCatalogError(f"{label} must be a list when present.")
+    preset_ids = [str(item or "").strip() for item in raw_ids]
+    if any(not item for item in preset_ids):
+        raise NickaseCatalogError(f"{label} must not contain blank values.")
+    if len(set(preset_ids)) != len(preset_ids):
+        raise NickaseCatalogError(f"{label} must not repeat preset ids.")
+    return preset_ids
 
 
 def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -156,9 +247,13 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
             )
 
     source = normalized.get("source")
+    notes = _normalize_string_list(normalized.get("notes"), label="entry.notes")
+    selection = _normalize_selection(normalized)
+    operational = _normalize_operational(normalized)
     metadata = _normalize_metadata(normalized)
-    if source is None and metadata.get("vendor"):
-        source = str(metadata["vendor"])
+    vendor = normalized.get("vendor")
+    if source is None and vendor is not None:
+        source = str(vendor)
 
     return {
         "id": normalized["id"],
@@ -168,6 +263,13 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "top_cut_offset": top_cut_offset,
         "bottom_cut_offset": bottom_cut_offset,
         "source": source,
+        "vendor": vendor,
+        "vendor_catalog_number": normalized.get("vendor_catalog_number"),
+        "origin_class": normalized.get("origin_class"),
+        "source_family": normalized.get("source_family"),
+        "notes": notes,
+        "selection": selection,
+        "operational": operational,
         "raw_cut_notation": raw_cut_notation,
         "metadata": metadata,
     }
@@ -217,6 +319,7 @@ def _normalize_local_catalog_document(payload: dict[str, Any]) -> dict[str, Any]
             "schema_version": nickases.get("schema_version", 1),
             "entries": normalized_entries,
             "preset_id": str(nickases["preset_id"]) if nickases.get("preset_id") is not None else None,
+            "preset_ids": _normalize_preset_ids(nickases.get("preset_ids"), label="nickases.preset_ids"),
             "catalog_version": nickases.get("catalog_version"),
             "generated_from": str(nickases["generated_from"]) if nickases.get("generated_from") is not None else None,
             "generated_on": str(nickases["generated_on"]) if nickases.get("generated_on") is not None else None,
@@ -250,6 +353,7 @@ def _normalize_preset_catalog_document(payload: dict[str, Any]) -> dict[str, Any
             "schema_version": 1,
             "entries": normalized_entries,
             "preset_id": str(payload["preset_id"]) if payload.get("preset_id") is not None else None,
+            "preset_ids": _normalize_preset_ids(payload.get("preset_ids"), label="preset.preset_ids"),
             "catalog_version": payload.get("catalog_version"),
             "generated_from": str(payload["generated_from"]) if payload.get("generated_from") is not None else None,
             "generated_on": str(payload["generated_on"]) if payload.get("generated_on") is not None else None,
@@ -322,6 +426,7 @@ def merge_nickase_catalogs(*catalogs: NickaseCatalog) -> NickaseCatalog:
     seen_entry_ids: set[str] = set()
     seen_alias_ids: set[str] = set()
     preset_id: str | None = None
+    preset_ids: list[str] = []
     catalog_version: int | None = None
     generated_from: str | None = None
     generated_on: str | None = None
@@ -330,6 +435,9 @@ def merge_nickase_catalogs(*catalogs: NickaseCatalog) -> NickaseCatalog:
     for catalog in catalogs:
         if catalog.preset_id is not None and preset_id is None:
             preset_id = catalog.preset_id
+        for catalog_preset_id in catalog.preset_ids:
+            if catalog_preset_id not in preset_ids:
+                preset_ids.append(catalog_preset_id)
         if catalog.catalog_version is not None and catalog_version is None:
             catalog_version = catalog.catalog_version
         if catalog.generated_from is not None and generated_from is None:
@@ -353,6 +461,7 @@ def merge_nickase_catalogs(*catalogs: NickaseCatalog) -> NickaseCatalog:
         schema_version=1,
         entries=entries,
         preset_id=preset_id,
+        preset_ids=preset_ids,
         catalog_version=catalog_version,
         generated_from=generated_from,
         generated_on=generated_on,
@@ -364,13 +473,15 @@ def merge_nickase_catalogs(*catalogs: NickaseCatalog) -> NickaseCatalog:
 def load_merged_nickase_catalog(
     *,
     preset_id: str | None,
+    additional_preset_ids: list[str] | None = None,
     additional_paths: list[Path],
     workspace_root: Path,
 ) -> tuple[NickaseCatalog, list[Path]]:
     catalogs: list[NickaseCatalog] = []
     resolved_paths: list[Path] = []
-    if preset_id:
-        catalogs.append(load_builtin_nickase_catalog_preset(preset_id))
+    for builtin_preset_id in [preset_id, *(additional_preset_ids or [])]:
+        if builtin_preset_id:
+            catalogs.append(load_builtin_nickase_catalog_preset(builtin_preset_id))
     for raw_path in additional_paths:
         resolved = resolve_workspace_relative_path(
             raw_path,
@@ -389,6 +500,7 @@ def dump_nickase_catalog_payload(catalog: NickaseCatalog) -> dict[str, Any]:
         "nickases": {
             "schema_version": catalog.schema_version,
             "preset_id": catalog.preset_id,
+            "preset_ids": list(catalog.preset_ids),
             "catalog_version": catalog.catalog_version,
             "generated_from": catalog.generated_from,
             "generated_on": catalog.generated_on,

@@ -17,9 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
-
-from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text, atomic_write_yaml
 from dnadesign.cruncher.snapback.models import SnapbackEvaluationReport
 from dnadesign.cruncher.snapback.solve_models import SnapbackSolveReport
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
@@ -28,12 +26,11 @@ RUN_META_DIR = "meta"
 RUN_PROVENANCE_DIR = "provenance"
 RUN_ANALYSIS_DIR = "analysis"
 RUN_ANALYSIS_REPORTS_DIR = "reports"
+RUN_ANALYSIS_VIEWS_DIR = "views"
 RUN_EXPORT_DIR = "export"
-RUN_VIEWS_DIR = "views"
+RUN_PLOTS_DIR = "plots"
 RUN_BASERENDER_JOBS_DIR = "baserender_jobs"
-RUN_RENDERS_DIR = "renders"
-SOLVE_HITS_DIR = "hits"
-SOLVE_SPECS_DIR = "specs"
+SOLVE_HITS_DIR = "materialized_hits"
 
 
 def design_id(*, spec_bytes: bytes, catalog_bytes: bytes) -> str:
@@ -56,34 +53,55 @@ def _scoped_run_dir(workspace_root: Path, *parts: Path | str) -> Path:
     return candidate
 
 
+def display_workspace_relative(value: str | Path, *, workspace_root: str | Path) -> str:
+    root = Path(workspace_root).expanduser().resolve()
+    rendered: list[str] = []
+    for part in str(value).split(", "):
+        candidate = Path(part).expanduser()
+        if not candidate.is_absolute():
+            rendered.append(part)
+            continue
+        try:
+            rendered.append(str(candidate.resolve().relative_to(root)))
+        except ValueError:
+            rendered.append(part)
+    return ", ".join(rendered)
+
+
 def build_run_dir(*, workspace_root: Path, run_root: Path, spec_name: str, snapback_design_id: str) -> Path:
-    return _scoped_run_dir(workspace_root, run_root, spec_name, snapback_design_id)
+    del spec_name, snapback_design_id
+    return _scoped_run_dir(workspace_root, run_root)
 
 
 def build_solve_run_dir(*, workspace_root: Path, run_root: Path, snapback_solve_id: str) -> Path:
-    return _scoped_run_dir(workspace_root, run_root, snapback_solve_id)
+    del snapback_solve_id
+    return _scoped_run_dir(workspace_root, run_root)
 
 
-def solve_hit_run_dir(run_dir: Path, *, rank: int, explicit_design_id: str) -> Path:
-    return run_dir / SOLVE_HITS_DIR / f"{rank:02d}__{explicit_design_id}"
+def solve_hit_run_dir(run_dir: Path, *, rank: int) -> Path:
+    return materialized_hits_dir(run_dir) / f"hit_{rank:02d}"
 
 
-def ensure_run_dirs(run_dir: Path) -> None:
+def ensure_run_dirs(
+    run_dir: Path,
+    *,
+    include_visual_contracts: bool = False,
+    include_baserender_jobs: bool = False,
+) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_META_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_EXPORT_DIR).mkdir(parents=True, exist_ok=True)
-    (run_dir / RUN_VIEWS_DIR).mkdir(parents=True, exist_ok=True)
-    (run_dir / RUN_BASERENDER_JOBS_DIR).mkdir(parents=True, exist_ok=True)
-    (run_dir / RUN_RENDERS_DIR).mkdir(parents=True, exist_ok=True)
+    if include_visual_contracts:
+        views_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    if include_baserender_jobs:
+        baserender_jobs_dir(run_dir).mkdir(parents=True, exist_ok=True)
 
 
 def ensure_solve_run_dirs(run_dir: Path) -> None:
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / SOLVE_HITS_DIR).mkdir(parents=True, exist_ok=True)
-    (run_dir / SOLVE_SPECS_DIR).mkdir(parents=True, exist_ok=True)
-    (run_dir / RUN_BASERENDER_JOBS_DIR).mkdir(parents=True, exist_ok=True)
-    (run_dir / RUN_RENDERS_DIR).mkdir(parents=True, exist_ok=True)
+    ensure_run_dirs(run_dir)
+    materialized_hits_dir(run_dir).mkdir(parents=True, exist_ok=True)
 
 
 def snapback_manifest_path(run_dir: Path) -> Path:
@@ -110,8 +128,16 @@ def report_md_path(run_dir: Path) -> Path:
     return run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR / "report.md"
 
 
+def analysis_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_ANALYSIS_DIR
+
+
 def views_dir(run_dir: Path) -> Path:
-    return run_dir / RUN_VIEWS_DIR
+    return analysis_dir(run_dir) / RUN_ANALYSIS_VIEWS_DIR
+
+
+def materialized_hits_dir(run_dir: Path) -> Path:
+    return analysis_dir(run_dir) / SOLVE_HITS_DIR
 
 
 def baserender_jobs_dir(run_dir: Path) -> Path:
@@ -119,7 +145,7 @@ def baserender_jobs_dir(run_dir: Path) -> Path:
 
 
 def renders_dir(run_dir: Path) -> Path:
-    return run_dir / RUN_RENDERS_DIR
+    return run_dir / RUN_PLOTS_DIR
 
 
 def pre_nick_duplex_view_path(run_dir: Path) -> Path:
@@ -150,16 +176,16 @@ def views_manifest_path(run_dir: Path) -> Path:
     return views_dir(run_dir) / "views_manifest.v1.json"
 
 
-def pre_nick_duplex_job_path(run_dir: Path) -> Path:
-    return baserender_jobs_dir(run_dir) / "pre_nick_duplex.job.yaml"
+def snapback_triptych_visual_contracts_path(run_dir: Path) -> Path:
+    return views_dir(run_dir) / "snapback_triptych.snapback_visual.v1.jsonl"
 
 
-def post_nick_exposed_job_path(run_dir: Path) -> Path:
-    return baserender_jobs_dir(run_dir) / "post_nick_exposed.job.yaml"
+def snapback_triptych_job_path(run_dir: Path) -> Path:
+    return baserender_jobs_dir(run_dir) / "snapback_triptych.job.yaml"
 
 
-def post_nick_foldback_job_path(run_dir: Path) -> Path:
-    return baserender_jobs_dir(run_dir) / "post_nick_foldback.job.yaml"
+def snapback_triptych_render_path(run_dir: Path, *, fmt: str) -> Path:
+    return renders_dir(run_dir) / f"snapback_triptych.{fmt}"
 
 
 def candidate_table_path(run_dir: Path) -> Path:
@@ -167,31 +193,35 @@ def candidate_table_path(run_dir: Path) -> Path:
 
 
 def solve_report_json_path(run_dir: Path) -> Path:
-    return run_dir / "solve_report.json"
+    return run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR / "solve_report.json"
 
 
 def solve_report_md_path(run_dir: Path) -> Path:
-    return run_dir / "solve_report.md"
+    return run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR / "solve_report.md"
 
 
 def solve_manifest_path(run_dir: Path) -> Path:
-    return run_dir / "solve_manifest.json"
+    return run_dir / RUN_META_DIR / "solve_manifest.json"
 
 
 def solve_status_path(run_dir: Path) -> Path:
-    return run_dir / "solve_status.json"
+    return run_dir / RUN_META_DIR / "solve_status.json"
 
 
 def solve_hits_table_path(run_dir: Path) -> Path:
-    return run_dir / "table__hits.csv"
+    return run_dir / RUN_EXPORT_DIR / "table__hits.csv"
+
+
+def solve_frontier_table_path(run_dir: Path) -> Path:
+    return run_dir / RUN_EXPORT_DIR / "table__frontier.csv"
 
 
 def solve_input_spec_path(run_dir: Path) -> Path:
-    return run_dir / SOLVE_SPECS_DIR / "input_solve_spec.yaml"
+    return run_dir / RUN_PROVENANCE_DIR / "input_solve_spec.yaml"
 
 
 def solve_resolved_catalog_path(run_dir: Path) -> Path:
-    return run_dir / SOLVE_SPECS_DIR / "resolved_catalog.yaml"
+    return run_dir / RUN_PROVENANCE_DIR / "resolved_catalog.yaml"
 
 
 def build_manifest(
@@ -244,13 +274,20 @@ def build_manifest(
                 "path": str(post_nick_foldback_visual_contract_path(run_dir).relative_to(run_dir)),
             }
         )
-    for name, path in (
-        ("pre_nick_duplex_job", pre_nick_duplex_job_path(run_dir)),
-        ("post_nick_exposed_job", post_nick_exposed_job_path(run_dir)),
-        ("post_nick_foldback_job", post_nick_foldback_job_path(run_dir)),
-    ):
-        if path.exists():
-            artifacts.append({"name": name, "path": str(path.relative_to(run_dir))})
+    if snapback_triptych_visual_contracts_path(run_dir).exists():
+        artifacts.append(
+            {
+                "name": "snapback_triptych_visual_contracts",
+                "path": str(snapback_triptych_visual_contracts_path(run_dir).relative_to(run_dir)),
+            }
+        )
+    if snapback_triptych_job_path(run_dir).exists():
+        artifacts.append(
+            {
+                "name": "snapback_triptych_job",
+                "path": str(snapback_triptych_job_path(run_dir).relative_to(run_dir)),
+            }
+        )
     return {
         "kind": "explicit",
         "stage": "snapback",
@@ -288,13 +325,14 @@ def build_solve_manifest(
         "spec_path": str(spec_path.resolve()),
         "spec_sha256": sha256_path(spec_path),
         "artifacts": [
-            {"name": "solve_report_json", "path": "solve_report.json"},
-            {"name": "solve_report_md", "path": "solve_report.md"},
-            {"name": "solve_hits_table", "path": "table__hits.csv"},
-            {"name": "solve_status", "path": "solve_status.json"},
-            {"name": "input_solve_spec", "path": "specs/input_solve_spec.yaml"},
-            {"name": "resolved_catalog", "path": "specs/resolved_catalog.yaml"},
-            {"name": "hits", "path": "hits"},
+            {"name": "solve_report_json", "path": str(solve_report_json_path(run_dir).relative_to(run_dir))},
+            {"name": "solve_report_md", "path": str(solve_report_md_path(run_dir).relative_to(run_dir))},
+            {"name": "solve_hits_table", "path": str(solve_hits_table_path(run_dir).relative_to(run_dir))},
+            {"name": "solve_frontier_table", "path": str(solve_frontier_table_path(run_dir).relative_to(run_dir))},
+            {"name": "solve_status", "path": str(solve_status_path(run_dir).relative_to(run_dir))},
+            {"name": "input_solve_spec", "path": str(solve_input_spec_path(run_dir).relative_to(run_dir))},
+            {"name": "resolved_catalog", "path": str(solve_resolved_catalog_path(run_dir).relative_to(run_dir))},
+            {"name": "materialized_hits", "path": str(materialized_hits_dir(run_dir).relative_to(run_dir))},
         ],
     }
 
@@ -346,13 +384,23 @@ def write_solve_status(run_dir: Path, *, report: SnapbackSolveReport, status_mes
 
 
 def snapshot_explicit_inputs(run_dir: Path, *, spec_path: Path, catalog_yaml: str) -> None:
-    spec_snapshot_path(run_dir).write_text(spec_path.read_text(encoding="utf-8"), encoding="utf-8")
-    catalog_snapshot_path(run_dir).write_text(catalog_yaml, encoding="utf-8")
+    atomic_write_text(spec_snapshot_path(run_dir), spec_path.read_text(encoding="utf-8"))
+    atomic_write_text(catalog_snapshot_path(run_dir), catalog_yaml)
+
+
+def write_materialized_explicit_inputs(
+    run_dir: Path,
+    *,
+    spec_payload: dict[str, object],
+    catalog_yaml: str,
+) -> None:
+    atomic_write_yaml(spec_snapshot_path(run_dir), spec_payload, sort_keys=False)
+    atomic_write_text(catalog_snapshot_path(run_dir), catalog_yaml)
 
 
 def write_solve_inputs(run_dir: Path, *, spec_path: Path, catalog_yaml: str) -> None:
-    solve_input_spec_path(run_dir).write_text(spec_path.read_text(encoding="utf-8"), encoding="utf-8")
-    solve_resolved_catalog_path(run_dir).write_text(catalog_yaml, encoding="utf-8")
+    atomic_write_text(solve_input_spec_path(run_dir), spec_path.read_text(encoding="utf-8"))
+    atomic_write_text(solve_resolved_catalog_path(run_dir), catalog_yaml)
 
 
 def write_report(run_dir: Path, report: SnapbackEvaluationReport, *, markdown: str) -> None:
@@ -366,15 +414,24 @@ def write_solve_report(run_dir: Path, report: SnapbackSolveReport, *, markdown: 
 
 
 def write_candidate_table(run_dir: Path, report: SnapbackEvaluationReport) -> None:
+    catalog_entry = report.metadata.catalog_variants[0] if report.metadata.catalog_variants else None
     fieldnames = [
         "status",
         "spec_name",
         "variant_id",
+        "nicked_strand",
+        "active_cut_offset",
+        "outside_site",
+        "snapback_tier",
+        "vendor",
+        "intended_site_sequence",
         "nick_boundary",
         "nick_boundary_from_left",
+        "site_mutation_count",
         "released_prefix_nt",
         "retained_start_from_nick",
         "cap_nt",
+        "cap_extension_nt",
         "paired_bp",
         "mismatch_count",
         "terminal_ligatable_duplex_bp",
@@ -395,11 +452,27 @@ def write_candidate_table(run_dir: Path, report: SnapbackEvaluationReport) -> No
                 "status": report.status,
                 "spec_name": report.spec_name,
                 "variant_id": candidate.intended_nick.variant_id,
+                "nicked_strand": catalog_entry.nicked_strand if catalog_entry is not None else None,
+                "active_cut_offset": catalog_entry.active_cut_offset if catalog_entry is not None else None,
+                "outside_site": (
+                    catalog_entry.selection.outside_site
+                    if catalog_entry is not None and catalog_entry.selection is not None
+                    else None
+                ),
+                "snapback_tier": (
+                    catalog_entry.selection.snapback_tier
+                    if catalog_entry is not None and catalog_entry.selection is not None
+                    else None
+                ),
+                "vendor": (catalog_entry.vendor or catalog_entry.source if catalog_entry is not None else None),
+                "intended_site_sequence": candidate.intended_site.matched_span_sequence,
                 "nick_boundary": candidate.nick_boundary,
                 "nick_boundary_from_left": candidate.nick_boundary_from_left,
+                "site_mutation_count": candidate.site_mutation_count,
                 "released_prefix_nt": candidate.released_prefix_nt,
                 "retained_start_from_nick": candidate.retained_start_from_nick,
                 "cap_nt": candidate.cap_nt,
+                "cap_extension_nt": candidate.cap_extension_nt,
                 "paired_bp": candidate.paired_bp,
                 "mismatch_count": candidate.mismatch_count,
                 "terminal_ligatable_duplex_bp": candidate.terminal_ligatable_duplex_bp,
@@ -417,9 +490,21 @@ def write_solve_hits_table(run_dir: Path, report: SnapbackSolveReport) -> None:
         "rank",
         "hit_id",
         "variant_id",
+        "nicked_strand",
+        "active_cut_offset",
+        "outside_site",
+        "snapback_tier",
+        "commercial_confidence",
+        "vendor",
+        "warning_codes",
+        "intended_site_orientation",
+        "intended_site_sequence",
         "nick_boundary",
         "nick_boundary_from_left",
+        "site_mutation_count",
         "retained_start_from_nick",
+        "cap_nt",
+        "cap_extension_nt",
         "cap_sequence",
         "foldback_arm",
         "added_nt",
@@ -440,9 +525,25 @@ def write_solve_hits_table(run_dir: Path, report: SnapbackSolveReport) -> None:
                     "rank": hit.rank,
                     "hit_id": hit.hit_id,
                     "variant_id": hit.variant_id,
+                    "nicked_strand": hit.nickase.nicked_strand,
+                    "active_cut_offset": hit.nickase.active_cut_offset,
+                    "outside_site": hit.nickase.selection.outside_site if hit.nickase.selection is not None else None,
+                    "snapback_tier": hit.nickase.selection.snapback_tier if hit.nickase.selection is not None else None,
+                    "commercial_confidence": (
+                        hit.nickase.selection.commercial_confidence if hit.nickase.selection is not None else None
+                    ),
+                    "vendor": hit.nickase.vendor or hit.nickase.source,
+                    "warning_codes": (
+                        ",".join(hit.nickase.selection.warning_codes) if hit.nickase.selection is not None else ""
+                    ),
+                    "intended_site_orientation": hit.intended_site_orientation,
+                    "intended_site_sequence": hit.intended_site_sequence,
                     "nick_boundary": hit.nick_boundary,
                     "nick_boundary_from_left": hit.nick_boundary_from_left,
+                    "site_mutation_count": hit.site_mutation_count,
                     "retained_start_from_nick": hit.retained_start_from_nick,
+                    "cap_nt": hit.cap_nt,
+                    "cap_extension_nt": hit.cap_extension_nt,
                     "cap_sequence": hit.cap_sequence,
                     "foldback_arm": hit.foldback_arm,
                     "added_nt": hit.added_nt,
@@ -457,6 +558,30 @@ def write_solve_hits_table(run_dir: Path, report: SnapbackSolveReport) -> None:
             )
 
 
+def write_solve_frontier_table(run_dir: Path, report: SnapbackSolveReport) -> None:
+    fieldnames = [
+        "nick_boundary_from_left",
+        "paired_bp",
+        "cap_extension_nt",
+        "codesigned_input_count",
+        "enumerated_candidate_count",
+        "accepted_candidate_count",
+    ]
+    with solve_frontier_table_path(run_dir).open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in report.frontier:
+            writer.writerow(row.model_dump(mode="json"))
+
+
+def write_jsonl_records(path: Path, records: list[dict[str, Any]]) -> Path:
+    payload = "\n".join(json.dumps(record) for record in records)
+    if payload:
+        payload += "\n"
+    atomic_write_text(path, payload)
+    return path
+
+
 def write_view_bundle(
     run_dir: Path,
     *,
@@ -466,6 +591,7 @@ def write_view_bundle(
     pre_nick_duplex_visual_contract: dict[str, Any],
     post_nick_exposed_visual_contract: dict[str, Any],
     post_nick_foldback_visual_contract: dict[str, Any],
+    triptych_visual_contracts: list[dict[str, Any]],
     manifest: dict[str, Any],
 ) -> None:
     atomic_write_json(pre_nick_duplex_view_path(run_dir), pre_nick_duplex)
@@ -474,12 +600,12 @@ def write_view_bundle(
     atomic_write_json(pre_nick_duplex_visual_contract_path(run_dir), pre_nick_duplex_visual_contract)
     atomic_write_json(post_nick_exposed_visual_contract_path(run_dir), post_nick_exposed_visual_contract)
     atomic_write_json(post_nick_foldback_visual_contract_path(run_dir), post_nick_foldback_visual_contract)
+    write_jsonl_records(snapback_triptych_visual_contracts_path(run_dir), triptych_visual_contracts)
     atomic_write_json(views_manifest_path(run_dir), manifest)
 
 
 def write_baserender_job(path: Path, payload: dict[str, Any]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    atomic_write_yaml(path, payload, sort_keys=False)
     return path
 
 

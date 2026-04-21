@@ -25,7 +25,9 @@ from dnadesign.cruncher.nickases.models import (
     NickaseCatalog,
     NickaseCatalogDocument,
     NickaseCatalogEntry,
+    NickaseOperationalProfile,
     NickaseProductAlias,
+    NickaseSelectionProfile,
     NickEvent,
     RecognitionSiteInstance,
     iupac_bases_for_symbol,
@@ -41,6 +43,7 @@ from dnadesign.cruncher.nickases.scanning import (
     display_motif_for_orientation,
     enumerate_site_instances,
 )
+from dnadesign.cruncher.nickases.selection import snapback_entry_priority_key
 
 __all__ = [
     "EvaluatedMatch",
@@ -49,7 +52,9 @@ __all__ = [
     "NickaseCatalogDocument",
     "NickaseCatalogEntry",
     "NickaseCatalogError",
+    "NickaseOperationalProfile",
     "NickaseProductAlias",
+    "NickaseSelectionProfile",
     "RecognitionSiteInstance",
     "derive_nick_event",
     "display_motif_for_orientation",
@@ -69,4 +74,5 @@ __all__ = [
     "resolve_workspace_relative_path",
     "reverse_complement",
     "reverse_complement_iupac",
+    "snapback_entry_priority_key",
 ]

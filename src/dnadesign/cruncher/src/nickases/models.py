@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -61,6 +61,16 @@ class StrictNickaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+CommercialConfidence = Literal[
+    "primary_vendor_current",
+    "secondary_vendor_current",
+    "produced_on_demand",
+    "literature_only",
+]
+SnapbackTier = Literal["tier1", "tier2", "tier3"]
+YesNoUnknown = Literal["yes", "no", "unknown"]
+
+
 def normalize_dna(value: str, *, allow_empty: bool = False) -> str:
     text = str(value or "").strip().upper()
     if not text:
@@ -104,6 +114,49 @@ def motif_matches(sequence: str, motif: str) -> bool:
     return all(base in _IUPAC_MAP[symbol] for base, symbol in zip(sequence_text, motif_text, strict=True))
 
 
+class NickaseSelectionProfile(StrictNickaseModel):
+    outside_site: bool | None = None
+    snapback_tier: SnapbackTier | None = None
+    commercial_confidence: CommercialConfidence | None = None
+    warning_codes: list[str] = Field(default_factory=list)
+
+    @field_validator("warning_codes")
+    @classmethod
+    def _validate_warning_codes(cls, value: list[str]) -> list[str]:
+        normalized = [str(item or "").strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("warning_codes must not contain blank values.")
+        return normalized
+
+
+class NickaseOperationalProfile(StrictNickaseModel):
+    incubation_temp_c: int | None = Field(default=None, ge=0)
+    buffer_family: str | None = None
+    heat_inactivation: str | None = None
+    methylation_sensitivity: dict[str, YesNoUnknown] = Field(default_factory=dict)
+    star_activity_warning: bool | None = None
+    double_strand_cleavage_warning: bool | None = None
+
+    @field_validator("buffer_family", "heat_inactivation")
+    @classmethod
+    def _validate_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("methylation_sensitivity")
+    @classmethod
+    def _validate_methylation_sensitivity(cls, value: dict[str, YesNoUnknown]) -> dict[str, YesNoUnknown]:
+        normalized: dict[str, YesNoUnknown] = {}
+        for key, item in value.items():
+            key_text = str(key or "").strip()
+            if not key_text:
+                raise ValueError("methylation_sensitivity keys must be non-empty.")
+            normalized[key_text] = item
+        return normalized
+
+
 class NickaseCatalogEntry(StrictNickaseModel):
     id: str
     specificity_id: str
@@ -112,6 +165,13 @@ class NickaseCatalogEntry(StrictNickaseModel):
     top_cut_offset: int | None = None
     bottom_cut_offset: int | None = None
     source: str | None = None
+    vendor: str | None = None
+    vendor_catalog_number: str | None = None
+    origin_class: str | None = None
+    source_family: str | None = None
+    notes: list[str] = Field(default_factory=list)
+    selection: NickaseSelectionProfile | None = None
+    operational: NickaseOperationalProfile | None = None
     raw_cut_notation: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -122,6 +182,22 @@ class NickaseCatalogEntry(StrictNickaseModel):
         if not text:
             raise ValueError("nickase id and specificity_id must be non-empty.")
         return text
+
+    @field_validator("source", "vendor", "vendor_catalog_number", "origin_class", "source_family")
+    @classmethod
+    def _validate_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("notes")
+    @classmethod
+    def _validate_notes(cls, value: list[str]) -> list[str]:
+        normalized = [str(item or "").strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("nickase notes must not contain blank values.")
+        return normalized
 
     @field_validator("motif_top_5to3")
     @classmethod
@@ -138,6 +214,20 @@ class NickaseCatalogEntry(StrictNickaseModel):
         elif self.motif_len != expected_len:
             raise ValueError("motif_len must equal len(motif_top_5to3).")
         return self
+
+    @property
+    def nicked_strand(self) -> Literal["top", "bottom"]:
+        return "top" if self.top_cut_offset is not None else "bottom"
+
+    @property
+    def active_cut_offset(self) -> int:
+        return int(self.top_cut_offset if self.top_cut_offset is not None else self.bottom_cut_offset)
+
+    @property
+    def outside_site(self) -> bool | None:
+        if self.selection is None:
+            return None
+        return self.selection.outside_site
 
 
 class NickaseProductAlias(StrictNickaseModel):
@@ -161,6 +251,7 @@ class NickaseCatalog(StrictNickaseModel):
     schema_version: int = 1
     entries: list[NickaseCatalogEntry]
     preset_id: str | None = None
+    preset_ids: list[str] = Field(default_factory=list)
     catalog_version: int | None = None
     generated_from: str | None = None
     generated_on: str | None = None
@@ -173,6 +264,24 @@ class NickaseCatalog(StrictNickaseModel):
         if int(value) != 1:
             raise ValueError("nickases.schema_version must be 1.")
         return int(value)
+
+    @field_validator("preset_id", "generated_from", "generated_on", "normalization_policy")
+    @classmethod
+    def _validate_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("preset_ids")
+    @classmethod
+    def _validate_preset_ids(cls, value: list[str]) -> list[str]:
+        normalized = [str(item or "").strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("nickase catalog preset_ids must not contain blank values.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("nickase catalog preset_ids must be unique.")
+        return normalized
 
     @field_validator("entries")
     @classmethod
@@ -195,6 +304,12 @@ class NickaseCatalog(StrictNickaseModel):
 
     @model_validator(mode="after")
     def _validate_product_aliases(self) -> "NickaseCatalog":
+        if self.preset_id is not None and not self.preset_ids:
+            self.preset_ids = [self.preset_id]
+        elif self.preset_id is None and self.preset_ids:
+            self.preset_id = self.preset_ids[0]
+        elif self.preset_id is not None and self.preset_ids and self.preset_ids[0] != self.preset_id:
+            raise ValueError("nickase catalog preset_id must match preset_ids[0] when both are provided.")
         entry_ids = {entry.id for entry in self.entries}
         alias_ids = [alias.alias_id for alias in self.product_aliases]
         if len(set(alias_ids)) != len(alias_ids):

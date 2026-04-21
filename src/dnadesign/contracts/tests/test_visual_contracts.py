@@ -573,19 +573,25 @@ def test_snapback_visual_contract_validates_foldback_payload() -> None:
         "state_kind": "post_nick_foldback",
         "alphabet": "dna",
         "title": "Foldback",
-        "primary_sequence": "TCAGCAGTCTTGACT",
-        "complement_sequence": "AGTCGTCAGAACTGA",
+        "primary_sequence": "TCAGCATCTGA",
+        "complement_sequence": "GACTTGCAACT",
         "primary_row_label": "Primary",
         "complement_row_label": "Partner",
-        "ligation_junction_boundary": 5,
-        "protected_region_span": {"start": 5, "end": 8},
-        "released_prefix_span": {"start": 0, "end": 5},
-        "retained_stem_span": {"start": 5, "end": 9},
-        "cap_span": {"start": 9, "end": 11},
-        "foldback_revcomp_span": {"start": 11, "end": 15},
+        "ligation_junction_boundary": 0,
+        "protected_region_span": {"start": 0, "end": 4},
+        "retained_stem_span": {"start": 0, "end": 4},
+        "cap_span": {"start": 4, "end": 7},
+        "foldback_revcomp_span": {"start": 7, "end": 11},
+        "loop_geometry": {
+            "kind": "hairpin_corner_triloop_v1",
+            "source_cap_span": {"start": 4, "end": 6},
+            "cap_extension_span": {"start": 6, "end": 7},
+            "display_primary_span": {"start": 0, "end": 4},
+            "display_complement_span": {"start": 7, "end": 11},
+        },
         "pairings": [
-            {"left_index": 5, "right_index": 14},
-            {"left_index": 6, "right_index": 13},
+            {"left_index": 0, "right_index": 10},
+            {"left_index": 1, "right_index": 9},
         ],
         "primary_mismatch_positions": [],
         "complement_mismatch_positions": [],
@@ -596,7 +602,8 @@ def test_snapback_visual_contract_validates_foldback_payload() -> None:
 
     assert contract.contract_kind == "snapback_visual_v1"
     assert contract.state_kind == "post_nick_foldback"
-    assert contract.pairings[0].left_index == 5
+    assert contract.loop_geometry is not None
+    assert contract.pairings[0].left_index == 0
 
 
 def test_snapback_visual_contract_rejects_pairings_outside_foldback_spans() -> None:
@@ -622,4 +629,88 @@ def test_snapback_visual_contract_rejects_pairings_outside_foldback_spans() -> N
     }
 
     with pytest.raises(ValueError, match="pairings left_index must remain inside retained_stem_span"):
+        SnapbackVisualV1.model_validate(payload)
+
+
+def test_snapback_visual_contract_rejects_pre_nick_origin_not_at_nick() -> None:
+    payload = {
+        "contract_kind": "snapback_visual_v1",
+        "state_id": "demo.pre_nick_duplex",
+        "state_kind": "pre_nick_duplex",
+        "alphabet": "dna",
+        "primary_sequence": "ACGTACGTAA",
+        "complement_sequence": "TGCATGCATT",
+        "primary_row_label": "Top",
+        "complement_row_label": "Partner",
+        "nick_boundary": 2,
+        "ligation_junction_boundary": 3,
+        "retained_stem_span": {"start": 3, "end": 6},
+        "cap_span": {"start": 6, "end": 8},
+        "foldback_revcomp_span": {"start": 8, "end": 10},
+        "pairings": [],
+    }
+
+    with pytest.raises(ValueError, match="pre/exposed states must use the nick boundary as the snapback origin"):
+        SnapbackVisualV1.model_validate(payload)
+
+
+def test_snapback_visual_contract_rejects_foldback_loop_geometry_with_noncontiguous_segments() -> None:
+    payload = {
+        "contract_kind": "snapback_visual_v1",
+        "state_id": "demo.post_nick_foldback",
+        "state_kind": "post_nick_foldback",
+        "alphabet": "dna",
+        "primary_sequence": "TCAGACATCTGA",
+        "complement_sequence": "GACTTGCAACTA",
+        "primary_row_label": "Primary",
+        "complement_row_label": "Partner",
+        "ligation_junction_boundary": 0,
+        "retained_stem_span": {"start": 0, "end": 4},
+        "cap_span": {"start": 5, "end": 8},
+        "foldback_revcomp_span": {"start": 8, "end": 12},
+        "loop_geometry": {
+            "kind": "hairpin_corner_triloop_v1",
+            "source_cap_span": {"start": 5, "end": 7},
+            "cap_extension_span": {"start": 7, "end": 8},
+            "display_primary_span": {"start": 0, "end": 4},
+            "display_complement_span": {"start": 8, "end": 12},
+        },
+        "pairings": [
+            {"left_index": 0, "right_index": 11},
+            {"left_index": 1, "right_index": 10},
+        ],
+    }
+
+    with pytest.raises(ValueError, match="loop_geometry requires retained_stem_span.end == cap_span.start"):
+        SnapbackVisualV1.model_validate(payload)
+
+
+def test_snapback_visual_contract_rejects_foldback_loop_geometry_with_unequal_display_spans() -> None:
+    payload = {
+        "contract_kind": "snapback_visual_v1",
+        "state_id": "demo.post_nick_foldback",
+        "state_kind": "post_nick_foldback",
+        "alphabet": "dna",
+        "primary_sequence": "TCAGCATCTG",
+        "complement_sequence": "GACTTGCAAC",
+        "primary_row_label": "Primary",
+        "complement_row_label": "Partner",
+        "ligation_junction_boundary": 0,
+        "retained_stem_span": {"start": 0, "end": 4},
+        "cap_span": {"start": 4, "end": 7},
+        "foldback_revcomp_span": {"start": 7, "end": 10},
+        "loop_geometry": {
+            "kind": "hairpin_corner_triloop_v1",
+            "source_cap_span": {"start": 4, "end": 6},
+            "cap_extension_span": {"start": 6, "end": 7},
+            "display_primary_span": {"start": 0, "end": 4},
+            "display_complement_span": {"start": 7, "end": 10},
+        },
+        "pairings": [
+            {"left_index": 0, "right_index": 9},
+            {"left_index": 1, "right_index": 8},
+        ],
+    }
+
+    with pytest.raises(ValueError, match="loop_geometry display spans must have equal length"):
         SnapbackVisualV1.model_validate(payload)

@@ -47,9 +47,9 @@ def _explicit_payload() -> dict[str, object]:
         },
         "input": {
             "canonical_top_strand": {
-                "sequence": "CCTCAGCAGTC",
-                "protected_region": {"start": 0, "end": 11},
-                "pre_nick_duplex_window": {"start": 0, "end": 11},
+                "sequence": "CCTCAGCA",
+                "protected_region": {"start": 0, "end": 8},
+                "pre_nick_duplex_window": {"start": 0, "end": 8},
             }
         },
         "design": {
@@ -63,15 +63,15 @@ def _explicit_payload() -> dict[str, object]:
             },
             "single_nick_goal": {"nick_boundary_window": {"min": 2, "max": 2}},
             "topology": {
-                "retained_homology_window": {"start": 7, "end": 11},
-                "cap_sequence": "TT",
-                "foldback_arm": "GACT",
+                "retained_homology_window": {"start": 2, "end": 6},
+                "cap_sequence": "T",
+                "foldback_arm": "CTGA",
                 "homology_policy": {"max_mismatches": 0, "min_paired_bp": 4, "max_paired_bp": 4},
             },
             "constraints": {
                 "terminal_ligatable_duplex_bp": {"min": 4, "max": 4},
                 "max_uninterrupted_duplex_bp": 4,
-                "max_added_nt": 6,
+                "max_added_nt": 5,
                 "forbid_additional_target_strand_nicks": False,
                 "forbid_any_additional_nicks": False,
             },
@@ -80,36 +80,29 @@ def _explicit_payload() -> dict[str, object]:
                 "max_homopolymer_run": 2,
             },
         },
-        "output": {"run_dir": "outputs/snapback", "emit_visual_contracts": True, "emit_baserender_jobs": True},
+        "output": {"run_dir": "outputs/design", "emit_visual_contracts": True, "emit_baserender_jobs": True},
     }
 
 
 def _solve_payload() -> dict[str, object]:
     return {
         "snapback_solve": {
-            "schema_version": 2,
-            "contract": "single_nick_snapback_solve_v2",
+            "schema_version": 3,
+            "contract": "single_nick_snapback_solve_v3",
             "name": "demo_snapback_solve",
         },
         "input": {
             "canonical_top_strand": {
-                "sequence": "CCTCAGCAGTC",
-                "protected_region": {"start": 0, "end": 11},
-                "pre_nick_duplex_window": {"start": 0, "end": 11},
+                "sequence": "CCTCAGCA",
+                "protected_region": {"start": 0, "end": 8},
+                "pre_nick_duplex_window": {"start": 0, "end": 8},
             }
         },
         "catalog": {"additional_paths": ["inputs/nickases/local.nickases.yaml"]},
-        "nickase_policy": {
-            "allowed_variant_ids": ["Nt.Bpu10I"],
-            "normalize_to_top_strand_nick": True,
-        },
-        "goal": {
-            "nick_boundary_window": {"min": 2, "max": 2},
-            "retained_start_from_nick": {"min": 5, "max": 5},
-        },
+        "orientation_policy": {"normalize_to_top_strand_nick": True},
+        "goal": {"nick_boundary_window": {"min": 2, "max": 2}},
         "search": {
             "retained_homology_length": {"min": 4, "max": 4},
-            "cap_nt": {"min": 1, "max": 1},
             "max_added_nt": 5,
             "max_mismatches": 0,
             "max_enumerated_candidates": 64,
@@ -128,7 +121,7 @@ def _solve_payload() -> dict[str, object]:
             "max_homopolymer_run": 3,
         },
         "output": {
-            "run_dir": "outputs/snapback_solves",
+            "run_dir": "outputs/solve",
             "emit_visual_contracts": True,
             "emit_baserender_jobs": True,
         },
@@ -144,8 +137,8 @@ def test_load_snapback_spec_accepts_valid_v2_explicit_contract(tmp_path: Path) -
     assert workspace_root == _workspace_root(tmp_path).resolve()
     assert spec.snapback.contract == "single_nick_snapback_v2"
     assert spec.name == "demo_snapback"
-    assert spec.designed_sequence == "CCTCAGCAGTCTTGACT"
-    assert spec.added_nt == 6
+    assert spec.designed_sequence == "CCTCAGCATCTGA"
+    assert spec.added_nt == 5
 
 
 def test_load_snapback_spec_defaults_homology_floor_to_three_when_omitted(tmp_path: Path) -> None:
@@ -203,18 +196,53 @@ def test_load_snapback_spec_accepts_preset_only_catalog_sources(tmp_path: Path) 
     spec, _resolved, _workspace_root = load_snapback_spec(spec_path)
 
     assert spec.design.nickase.catalog.preset == "neb_nicking_v1"
+    assert spec.design.nickase.catalog.additional_presets == []
     assert spec.design.nickase.catalog.additional_paths == []
 
 
-def test_load_snapback_solve_spec_accepts_valid_v2_solve_contract(tmp_path: Path) -> None:
+def test_load_snapback_solve_spec_accepts_additional_presets(tmp_path: Path) -> None:
+    payload = _solve_payload()
+    payload["catalog"] = {
+        "preset": "neb_nicking_v1",
+        "additional_presets": ["thermo_nicking_v1"],
+    }
+    spec_path = _write_yaml(_solve_path(tmp_path), payload)
+
+    spec, _resolved, _workspace_root = load_snapback_solve_spec(spec_path)
+
+    assert spec.catalog.resolved_preset_ids() == ["neb_nicking_v1", "thermo_nicking_v1"]
+
+
+def test_load_snapback_solve_spec_accepts_valid_v3_solve_contract(tmp_path: Path) -> None:
     spec_path = _write_yaml(_solve_path(tmp_path), _solve_payload())
 
     spec, resolved, workspace_root = load_snapback_solve_spec(spec_path)
 
     assert resolved == spec_path.resolve()
     assert workspace_root == _workspace_root(tmp_path).resolve()
-    assert spec.snapback_solve.contract == "single_nick_snapback_solve_v2"
+    assert spec.snapback_solve.contract == "single_nick_snapback_solve_v3"
     assert spec.search.materialize_top_k == 2
+
+
+def test_load_snapback_solve_spec_defaults_compact_ranges_when_omitted(tmp_path: Path) -> None:
+    payload = _solve_payload()
+    payload.pop("goal")
+    payload["search"].pop("retained_homology_length")
+    payload["search"]["min_paired_bp"] = 3
+    payload["constraints"].pop("terminal_ligatable_duplex_bp")
+    payload["constraints"].pop("max_uninterrupted_duplex_bp")
+    spec_path = _write_yaml(_solve_path(tmp_path), payload)
+
+    spec, _resolved, _workspace_root = load_snapback_solve_spec(spec_path)
+    resolved = spec.resolved_search_space()
+
+    assert resolved.nick_boundary_window.min == 0
+    assert resolved.nick_boundary_window.max == 8
+    assert resolved.retained_homology_length.min == 3
+    assert resolved.retained_homology_length.max == 8
+    assert resolved.terminal_ligatable_duplex_bp.min == 3
+    assert resolved.terminal_ligatable_duplex_bp.max == 8
+    assert resolved.max_uninterrupted_duplex_bp == 8
 
 
 def test_load_snapback_solve_spec_rejects_materialize_top_k_above_max_hits(tmp_path: Path) -> None:

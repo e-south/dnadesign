@@ -18,10 +18,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from dnadesign.cruncher.nickases.models import (
     NickaseCatalogEntry,
+    NickaseOperationalProfile,
+    NickaseSelectionProfile,
     NickEvent,
     RecognitionSiteInstance,
     normalize_dna,
 )
+
+EFFECTIVE_CAP_LOOP_NT = 3
 
 
 class StrictSnapbackModel(BaseModel):
@@ -45,10 +49,6 @@ class CoordinateSpan(StrictSnapbackModel):
     @property
     def length(self) -> int:
         return self.end - self.start
-
-
-class BoundaryPosition(StrictSnapbackModel):
-    value: int = Field(ge=0)
 
 
 class BoundaryRange(StrictSnapbackModel):
@@ -146,7 +146,28 @@ class SnapbackInputSpec(StrictSnapbackModel):
 
 class CatalogSources(StrictSnapbackModel):
     preset: str | None = None
+    additional_presets: list[str] = Field(default_factory=list)
     additional_paths: list[Path] = Field(default_factory=list)
+
+    @field_validator("preset")
+    @classmethod
+    def _validate_preset(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            raise ValueError("catalog.preset must be non-empty when provided.")
+        return text
+
+    @field_validator("additional_presets")
+    @classmethod
+    def _validate_additional_presets(cls, value: list[str]) -> list[str]:
+        normalized = [str(item or "").strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("catalog.additional_presets must not contain blank values.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("catalog.additional_presets must not repeat values.")
+        return normalized
 
     @field_validator("additional_paths")
     @classmethod
@@ -158,9 +179,19 @@ class CatalogSources(StrictSnapbackModel):
 
     @model_validator(mode="after")
     def _validate_sources(self) -> "CatalogSources":
-        if self.preset is None and not self.additional_paths:
-            raise ValueError("nickase catalog must define a preset or at least one additional path.")
+        if self.preset is None and not self.additional_presets and not self.additional_paths:
+            raise ValueError("nickase catalog must define a preset, an additional preset, or an additional path.")
+        preset_ids = self.resolved_preset_ids()
+        if len(set(preset_ids)) != len(preset_ids):
+            raise ValueError("catalog presets must not repeat values across preset and additional_presets.")
         return self
+
+    def resolved_preset_ids(self) -> list[str]:
+        preset_ids: list[str] = []
+        if self.preset is not None:
+            preset_ids.append(self.preset)
+        preset_ids.extend(self.additional_presets)
+        return preset_ids
 
 
 class SnapbackNickaseSpec(StrictSnapbackModel):
@@ -206,7 +237,13 @@ class SnapbackTopologySpec(StrictSnapbackModel):
     @field_validator("cap_sequence")
     @classmethod
     def _validate_cap_sequence(cls, value: str) -> str:
-        return _normalize_dna(value, allow_empty=True)
+        normalized = _normalize_dna(value, allow_empty=True)
+        if len(normalized) > EFFECTIVE_CAP_LOOP_NT:
+            raise ValueError(
+                f"design.topology.cap_sequence must be <= {EFFECTIVE_CAP_LOOP_NT} nt because the snapback "
+                "effective cap loop is fixed to 3 nt."
+            )
+        return normalized
 
     @field_validator("foldback_arm")
     @classmethod
@@ -243,9 +280,10 @@ class SnapbackDesignSpec(StrictSnapbackModel):
 
 
 class SnapbackOutputConfig(StrictSnapbackModel):
-    run_dir: Path = Path("outputs/snapback")
+    run_dir: Path = Path("outputs/design")
     emit_visual_contracts: bool = True
     emit_baserender_jobs: bool = True
+    render_format: Literal["png", "svg", "pdf"] = "png"
 
     @field_validator("run_dir", mode="before")
     @classmethod
@@ -316,9 +354,18 @@ class CatalogNormalizationInfo(StrictSnapbackModel):
     specificity_id: str
     motif_top_5to3: str
     motif_len: int = Field(ge=1)
+    nicked_strand: Literal["top", "bottom"]
+    active_cut_offset: int
     top_cut_offset: int | None = None
     bottom_cut_offset: int | None = None
     source: str | None = None
+    vendor: str | None = None
+    vendor_catalog_number: str | None = None
+    origin_class: str | None = None
+    source_family: str | None = None
+    notes: list[str] = Field(default_factory=list)
+    selection: NickaseSelectionProfile | None = None
+    operational: NickaseOperationalProfile | None = None
     raw_cut_notation: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -338,6 +385,7 @@ class SnapbackReportMetadata(StrictSnapbackModel):
     added_nt: int = Field(ge=0)
     designed_length_nt: int = Field(ge=0)
     catalog_source: str
+    catalog_presets: list[str] = Field(default_factory=list)
     catalog_variants: list[CatalogNormalizationInfo] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     warning_codes: list[str] = Field(default_factory=list)
@@ -349,19 +397,24 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
     protected_region: CoordinateSpan
     pre_nick_duplex_window: CoordinateSpan
     retained_homology_window: CoordinateSpan
+    source_cap_window: CoordinateSpan
     cap_span: CoordinateSpan
     foldback_arm_span: CoordinateSpan
     retained_homology_sequence: str
     released_prefix_sequence: str
+    source_cap_sequence: str
+    effective_cap_sequence: str
     cap_sequence: str
     foldback_arm: str
     intended_site: RecognitionSiteInstance
     intended_nick: NickEvent
     nick_boundary: int = Field(ge=0)
     nick_boundary_from_left: int = Field(ge=0)
+    site_mutation_count: int = Field(ge=0)
     released_prefix_nt: int = Field(ge=0)
     retained_start_from_nick: int = Field(ge=0)
     cap_nt: int = Field(ge=0)
+    cap_extension_nt: int = Field(ge=0)
     paired_bp: int = Field(ge=0)
     mismatch_count: int = Field(ge=0)
     mismatch_positions: list[int] = Field(default_factory=list)
@@ -377,6 +430,8 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
     post_nick_sequence: str
     post_nick_released_prefix_span: CoordinateSpan
     post_nick_retained_homology_span: CoordinateSpan
+    post_nick_source_cap_span: CoordinateSpan
+    post_nick_cap_extension_span: CoordinateSpan
     post_nick_cap_span: CoordinateSpan
     post_nick_foldback_arm_span: CoordinateSpan
     pair_map: list[PairContract] = Field(default_factory=list)
@@ -386,6 +441,8 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
         "input_sequence",
         "retained_homology_sequence",
         "released_prefix_sequence",
+        "source_cap_sequence",
+        "effective_cap_sequence",
         "cap_sequence",
         "foldback_arm",
         "post_nick_sequence",
@@ -404,10 +461,18 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
             raise ValueError("pre_nick_duplex_window must stay inside input_sequence.")
         if self.retained_homology_window.end > input_length:
             raise ValueError("retained_homology_window must stay inside input_sequence.")
+        if self.intended_site.start < 0 or self.intended_site.end > input_length:
+            raise ValueError("intended_site must stay inside input_sequence.")
+        if self.source_cap_window.start != self.retained_homology_window.end:
+            raise ValueError("source_cap_window must start at retained_homology_window.end.")
+        if self.source_cap_window.end != input_length:
+            raise ValueError("source_cap_window must end at input_sequence length.")
         if self.nick_boundary > input_length:
             raise ValueError("nick_boundary must stay inside input_sequence.")
-        if self.retained_homology_window.start < self.nick_boundary:
-            raise ValueError("retained_homology_window must start at or after nick_boundary.")
+        if self.site_mutation_count > len(self.intended_site.matched_span_sequence):
+            raise ValueError("site_mutation_count must not exceed intended_site length.")
+        if self.retained_homology_window.start != self.nick_boundary:
+            raise ValueError("retained_homology_window must start exactly at nick_boundary.")
         if self.cap_span.start != input_length:
             raise ValueError("cap_span must start at the end of input_sequence.")
         if self.cap_span.end != self.cap_span.start + len(self.cap_sequence):
@@ -424,12 +489,21 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
         expected_prefix = self.input_sequence[self.nick_boundary : self.retained_homology_window.start]
         if self.released_prefix_sequence != expected_prefix:
             raise ValueError("released_prefix_sequence must match nick-relative input prefix.")
+        expected_source_cap = self.input_sequence[self.retained_homology_window.end : self.source_cap_window.end]
+        if self.source_cap_sequence != expected_source_cap:
+            raise ValueError("source_cap_sequence must match retained_homology_window.end:input_sequence.end.")
         if self.released_prefix_nt != len(self.released_prefix_sequence):
             raise ValueError("released_prefix_nt must match released_prefix_sequence length.")
-        if self.retained_start_from_nick != self.retained_homology_window.start - self.nick_boundary:
-            raise ValueError("retained_start_from_nick must match retained_homology_window.start - nick_boundary.")
-        if self.cap_nt != len(self.cap_sequence):
-            raise ValueError("cap_nt must match cap_sequence length.")
+        if self.retained_start_from_nick != 0:
+            raise ValueError("retained_start_from_nick must be 0 because retained_homology starts at nick_boundary.")
+        if self.effective_cap_sequence != f"{self.source_cap_sequence}{self.cap_sequence}":
+            raise ValueError("effective_cap_sequence must match source_cap_sequence + cap_sequence.")
+        if self.cap_nt != len(self.effective_cap_sequence):
+            raise ValueError("cap_nt must match effective_cap_sequence length.")
+        if self.cap_extension_nt != len(self.cap_sequence):
+            raise ValueError("cap_extension_nt must match cap_sequence length.")
+        if self.cap_nt != EFFECTIVE_CAP_LOOP_NT:
+            raise ValueError(f"cap_nt must equal the fixed effective cap loop size of {EFFECTIVE_CAP_LOOP_NT}.")
         if self.paired_bp != len(self.foldback_arm):
             raise ValueError("paired_bp must match foldback_arm length.")
         if self.added_nt != len(self.cap_sequence) + len(self.foldback_arm):
@@ -437,6 +511,7 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
         expected_post_nick = build_post_nick_sequence(
             released_prefix_sequence=self.released_prefix_sequence,
             retained_homology_sequence=self.retained_homology_sequence,
+            source_cap_sequence=self.source_cap_sequence,
             cap_sequence=self.cap_sequence,
             foldback_arm=self.foldback_arm,
         )
@@ -447,9 +522,17 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
             start=expected_released_span.end,
             end=expected_released_span.end + len(self.retained_homology_sequence),
         )
+        expected_source_cap_span = CoordinateSpan(
+            start=expected_retained_span.end,
+            end=expected_retained_span.end + len(self.source_cap_sequence),
+        )
+        expected_cap_extension_span = CoordinateSpan(
+            start=expected_source_cap_span.end,
+            end=expected_source_cap_span.end + len(self.cap_sequence),
+        )
         expected_cap_span = CoordinateSpan(
             start=expected_retained_span.end,
-            end=expected_retained_span.end + len(self.cap_sequence),
+            end=expected_cap_extension_span.end,
         )
         expected_foldback_span = CoordinateSpan(
             start=expected_cap_span.end,
@@ -459,8 +542,12 @@ class SnapbackCandidateDesign(StrictSnapbackModel):
             raise ValueError("post_nick_released_prefix_span must match released_prefix_sequence length.")
         if self.post_nick_retained_homology_span != expected_retained_span:
             raise ValueError("post_nick_retained_homology_span must match retained_homology_sequence length.")
+        if self.post_nick_source_cap_span != expected_source_cap_span:
+            raise ValueError("post_nick_source_cap_span must match source_cap_sequence length.")
+        if self.post_nick_cap_extension_span != expected_cap_extension_span:
+            raise ValueError("post_nick_cap_extension_span must match cap_sequence length.")
         if self.post_nick_cap_span != expected_cap_span:
-            raise ValueError("post_nick_cap_span must match cap_sequence length.")
+            raise ValueError("post_nick_cap_span must match effective_cap_sequence length.")
         if self.post_nick_foldback_arm_span != expected_foldback_span:
             raise ValueError("post_nick_foldback_arm_span must match foldback_arm length.")
         if expected_foldback_span.end != len(self.post_nick_sequence):
@@ -501,9 +588,18 @@ def build_catalog_info(entry: NickaseCatalogEntry) -> CatalogNormalizationInfo:
         specificity_id=entry.specificity_id,
         motif_top_5to3=entry.motif_top_5to3,
         motif_len=entry.motif_len or len(entry.motif_top_5to3),
+        nicked_strand=entry.nicked_strand,
+        active_cut_offset=entry.active_cut_offset,
         top_cut_offset=entry.top_cut_offset,
         bottom_cut_offset=entry.bottom_cut_offset,
         source=entry.source,
+        vendor=entry.vendor,
+        vendor_catalog_number=entry.vendor_catalog_number,
+        origin_class=entry.origin_class,
+        source_family=entry.source_family,
+        notes=list(entry.notes),
+        selection=entry.selection,
+        operational=entry.operational,
         raw_cut_notation=entry.raw_cut_notation,
         metadata=entry.metadata,
     )
@@ -524,7 +620,7 @@ def gc_distance_for_range(sequence: str, bounds: FractionRange | None) -> float:
         return bounds.min - observed
     if observed > bounds.max:
         return observed - bounds.max
-    return observed - bounds.min
+    return 0.0
 
 
 def max_homopolymer_run(sequence: str) -> int:
@@ -545,7 +641,8 @@ def build_post_nick_sequence(
     *,
     released_prefix_sequence: str,
     retained_homology_sequence: str,
+    source_cap_sequence: str,
     cap_sequence: str,
     foldback_arm: str,
 ) -> str:
-    return f"{released_prefix_sequence}{retained_homology_sequence}{cap_sequence}{foldback_arm}"
+    return f"{released_prefix_sequence}{retained_homology_sequence}{source_cap_sequence}{cap_sequence}{foldback_arm}"

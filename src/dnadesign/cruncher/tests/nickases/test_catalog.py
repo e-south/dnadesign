@@ -65,8 +65,13 @@ def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() 
     entries = catalog.by_id()
 
     assert catalog.preset_id == "neb_nicking_v1"
+    assert catalog.preset_ids == ["neb_nicking_v1"]
     assert "Nt.BbvCI" in entries
-    assert entries["Nt.BstNBI"].metadata["vendor_catalog_number"] == "R0607"
+    assert entries["Nt.BstNBI"].vendor_catalog_number == "R0607"
+    assert entries["Nt.BstNBI"].selection is not None
+    assert entries["Nt.BstNBI"].selection.outside_site is True
+    assert entries["Nb.BsmI"].selection is not None
+    assert entries["Nb.BsmI"].selection.warning_codes == ["STAR_ACTIVITY_RISK", "DOUBLE_STRAND_CLEAVAGE_RISK"]
     assert any(alias.alias_id == "WarmStart Nt.BstNBI" for alias in catalog.product_aliases)
 
 
@@ -98,3 +103,26 @@ def test_shared_preset_overlay_merge_rejects_duplicate_variant_ids(tmp_path: Pat
             additional_paths=[Path("inputs/nickases/overlay.yaml")],
             workspace_root=workspace,
         )
+
+
+def test_shared_multiple_builtin_presets_merge_and_preserve_typed_selection_metadata(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspaces" / "demo_snapback"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    catalog, resolved_paths = load_merged_nickase_catalog(
+        preset_id="neb_nicking_v1",
+        additional_preset_ids=["thermo_nicking_v1"],
+        additional_paths=[],
+        workspace_root=workspace,
+    )
+
+    entries = catalog.by_id()
+
+    assert resolved_paths == []
+    assert catalog.preset_ids == ["neb_nicking_v1", "thermo_nicking_v1"]
+    assert entries["Nt.Bpu10I"].top_cut_offset == 2
+    assert entries["Nb.Bpu10I"].bottom_cut_offset == -2
+    assert entries["Nb.Mva1269I"].operational is not None
+    assert entries["Nb.Mva1269I"].operational.buffer_family == "O"
+    assert entries["Nt.Bpu10I"].selection is not None
+    assert entries["Nt.Bpu10I"].selection.warning_codes == ["NONSPECIFIC_NICKING_ASSAY_SIGNAL"]

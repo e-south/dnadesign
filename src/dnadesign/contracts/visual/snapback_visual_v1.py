@@ -29,6 +29,20 @@ class SnapbackPairingV1(VisualContractModel):
         return self
 
 
+class SnapbackLoopGeometryV1(VisualContractModel):
+    kind: Literal["hairpin_corner_triloop_v1"] = "hairpin_corner_triloop_v1"
+    source_cap_span: CoordinateSpan
+    cap_extension_span: CoordinateSpan
+    display_primary_span: PositiveLengthSpan
+    display_complement_span: PositiveLengthSpan
+
+    @model_validator(mode="after")
+    def _validate_cap_partition(self) -> "SnapbackLoopGeometryV1":
+        if self.source_cap_span.end != self.cap_extension_span.start:
+            raise ValueError("source_cap_span must end at cap_extension_span.start")
+        return self
+
+
 class SnapbackVisualV1(VisualContractModel):
     contract_kind: Literal["snapback_visual_v1"] = "snapback_visual_v1"
     state_id: str
@@ -51,6 +65,7 @@ class SnapbackVisualV1(VisualContractModel):
     cap_span: CoordinateSpan | None = None
     foldback_revcomp_span: PositiveLengthSpan
     exposed_complement_span: CoordinateSpan | None = None
+    loop_geometry: SnapbackLoopGeometryV1 | None = None
     pairings: list[SnapbackPairingV1] = Field(default_factory=list)
     primary_mismatch_positions: list[int] = Field(default_factory=list)
     complement_mismatch_positions: list[int] = Field(default_factory=list)
@@ -93,6 +108,8 @@ class SnapbackVisualV1(VisualContractModel):
         if self.state_kind in {"pre_nick_duplex", "post_nick_exposed"}:
             if self.nick_boundary is None:
                 raise ValueError("nick_boundary is required for pre/exposed states")
+            if self.ligation_junction_boundary != self.nick_boundary:
+                raise ValueError("pre/exposed states must use the nick boundary as the snapback origin")
             if self.released_prefix_span is not None and self.released_prefix_span.start != self.nick_boundary:
                 raise ValueError("released_prefix_span.start must equal nick_boundary")
             if self.anchored_duplex_span is not None:
@@ -110,6 +127,37 @@ class SnapbackVisualV1(VisualContractModel):
                 raise ValueError("post_nick_foldback must not publish exposed_complement_span")
             if self.released_suffix_span is not None:
                 raise ValueError("post_nick_foldback must not publish released_suffix_span")
+            if self.loop_geometry is not None:
+                if self.cap_span is None:
+                    raise ValueError("post_nick_foldback loop_geometry requires cap_span")
+                for name, span in (
+                    ("loop_geometry.source_cap_span", self.loop_geometry.source_cap_span),
+                    ("loop_geometry.cap_extension_span", self.loop_geometry.cap_extension_span),
+                    ("loop_geometry.display_primary_span", self.loop_geometry.display_primary_span),
+                    ("loop_geometry.display_complement_span", self.loop_geometry.display_complement_span),
+                ):
+                    if span.end > limit:
+                        raise ValueError(f"{name} must lie within primary_sequence bounds")
+                if len(range(self.cap_span.start, self.cap_span.end)) != 3:
+                    raise ValueError("post_nick_foldback loop_geometry requires cap_span length == 3")
+                if self.loop_geometry.display_primary_span != self.retained_stem_span:
+                    raise ValueError("loop_geometry.display_primary_span must equal retained_stem_span")
+                if self.loop_geometry.display_complement_span != self.foldback_revcomp_span:
+                    raise ValueError("loop_geometry.display_complement_span must equal foldback_revcomp_span")
+                if len(range(self.retained_stem_span.start, self.retained_stem_span.end)) != len(
+                    range(self.foldback_revcomp_span.start, self.foldback_revcomp_span.end)
+                ):
+                    raise ValueError("loop_geometry display spans must have equal length")
+                if self.loop_geometry.source_cap_span.start != self.cap_span.start:
+                    raise ValueError("loop_geometry.source_cap_span.start must equal cap_span.start")
+                if self.loop_geometry.cap_extension_span.end != self.cap_span.end:
+                    raise ValueError("loop_geometry.cap_extension_span.end must equal cap_span.end")
+                if self.retained_stem_span.end != self.cap_span.start:
+                    raise ValueError("loop_geometry requires retained_stem_span.end == cap_span.start")
+                if self.cap_span.end != self.foldback_revcomp_span.start:
+                    raise ValueError("loop_geometry requires cap_span.end == foldback_revcomp_span.start")
+        elif self.loop_geometry is not None:
+            raise ValueError("loop_geometry is only supported for post_nick_foldback")
 
         if self.released_prefix_span is not None and self.released_prefix_span.end > self.retained_stem_span.start:
             raise ValueError("released_prefix_span must end at or before retained_stem_span.start")

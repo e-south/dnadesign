@@ -77,10 +77,17 @@ def merge_nickase_catalogs(*catalogs):
     return _translate_catalog_error(_merge_nickase_catalogs, *catalogs)
 
 
-def load_merged_nickase_catalog(*, preset_id: str | None, additional_paths: list[Path], workspace_root: Path):
+def load_merged_nickase_catalog(
+    *,
+    preset_id: str | None,
+    additional_preset_ids: list[str] | None = None,
+    additional_paths: list[Path],
+    workspace_root: Path,
+):
     return _translate_catalog_error(
         _load_merged_nickase_catalog,
         preset_id=preset_id,
+        additional_preset_ids=additional_preset_ids,
         additional_paths=additional_paths,
         workspace_root=workspace_root,
     )
