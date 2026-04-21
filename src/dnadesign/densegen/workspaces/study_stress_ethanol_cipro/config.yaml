@@ -8,10 +8,10 @@ densegen:
   motif_sets:
     sigma70_upstream_35:
       f: TTGACA
-      b: CTGACA
       e: TAGACA
       d: TTTACA
       c: TTGTGA
+      b: CTGACA
     sigma70_downstream_10:
       consensus: TATAAT
 
@@ -168,7 +168,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -187,7 +187,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -211,7 +211,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -234,7 +234,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:

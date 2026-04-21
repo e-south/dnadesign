@@ -18,6 +18,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.ticker import MaxNLocator
 
 from .plot_common import _apply_style, _save_figure, _style
 
@@ -43,6 +44,27 @@ _SOURCE_PLAN_COLORS = {
 }
 _SOURCE_VARIANT_RE = re.compile(r"^([A-Za-z]+[0-9]*)_(.+)$")
 _SOURCE_VARIANT_PREFIXES = ("sig", "variant", "rep", "batch")
+
+
+def _compact_source_variant_label(*, variant_key: str, variant_value: str, raw_key: str) -> str:
+    compact_value = str(variant_value).strip()
+    if not compact_value:
+        return ""
+    if variant_key in {"sig35", "sigma70"}:
+        return f"σ70-35({compact_value})"
+    return f"{raw_key}{compact_value}"
+
+
+def _compact_count_label(value: float) -> str:
+    numeric_value = float(value)
+    magnitude = abs(numeric_value)
+    if magnitude >= 1_000_000:
+        millions = numeric_value / 1_000_000.0
+        return f"{millions:.1f}M".replace(".0M", "M")
+    if magnitude >= 1_000:
+        thousands = numeric_value / 1_000.0
+        return f"{thousands:.1f}k".replace(".0k", "k")
+    return f"{int(round(numeric_value)):,}"
 
 
 def _normalize_metadata_value(value: object) -> str:
@@ -143,7 +165,7 @@ def _compact_source_axis_label(value: object) -> str:
         scoped_parts = scoped_parts[1:]
     descriptor_key = _source_descriptor_key(token)
     descriptor_label = {
-        "background_only": "Bg",
+        "background_only": "Background",
         "ethanol": "EtOH",
         "ciprofloxacin": "Cipro",
         "ethanol_ciprofloxacin": "EtOH+Cipro",
@@ -159,10 +181,13 @@ def _compact_source_axis_label(value: object) -> str:
         ):
             variant_key = str(variant_match.group(1)).strip().lower()
             variant_value = str(variant_match.group(2)).strip()
-            if variant_key in {"sig35", "sigma70"}:
-                variant_tokens.append(f"σ70{variant_value}")
-            else:
-                variant_tokens.append(f"{variant_match.group(1)}{variant_value}")
+            compact_variant = _compact_source_variant_label(
+                variant_key=variant_key,
+                variant_value=variant_value,
+                raw_key=str(variant_match.group(1)).strip(),
+            )
+            if compact_variant:
+                variant_tokens.append(compact_variant)
     if not variant_tokens:
         return descriptor_label
     return f"{descriptor_label} {', '.join(variant_tokens)}"
@@ -217,16 +242,22 @@ def plot_dataset_source_inventory(
     style_cfg = _style(style)
     source_series = _prepare_metadata_series(df, "source")
     display_sources, source_order = _top_categories(source_series, limit=max_sources)
-    source_counts = display_sources.value_counts().reindex(source_order, fill_value=0).sort_values(ascending=True)
+    source_counts = (
+        display_sources.value_counts()
+        .reindex(source_order, fill_value=0)
+        .sort_values(
+            ascending=False,
+            kind="stable",
+        )
+    )
     source_labels = [_compact_source_axis_label(label) for label in source_counts.index.tolist()]
     max_label_chars = max((len(label) for label in source_labels), default=12)
-    fig_side = max(8.6, min(13.4, 6.4 + 0.5 * float(len(source_labels))))
-    fig_height = fig_side * 1.25
-    fig_width = max(7.1, (fig_side + max(1.6, min(4.2, 0.06 * float(max_label_chars)))) * 0.75)
-    label_font_size = max(21.0, min(27.0, 27.0 - 0.18 * max(0, len(source_labels) - 5)))
-    annotation_font_size = label_font_size
-    title_font_size = annotation_font_size
-    axis_font_size = annotation_font_size
+    fig_width = max(7.9, min(11.8, 6.0 + 0.17 * float(len(source_labels)) + 0.035 * float(max_label_chars)))
+    fig_height = max(2.35, min(3.3, 2.2 + 0.016 * float(max_label_chars)))
+    label_font_size = max(13.0, min(18.0, 17.2 - 0.11 * max(0, len(source_labels) - 6)))
+    axis_font_size = max(12.0, label_font_size - 0.3)
+    annotation_font_size = max(9.8, axis_font_size - 2.0)
+    title_font_size = axis_font_size + 1.2
     style_cfg.setdefault("tick_size", label_font_size)
     style_cfg.setdefault("label_size", axis_font_size)
     style_cfg.setdefault("title_size", title_font_size)
@@ -237,8 +268,9 @@ def plot_dataset_source_inventory(
         constrained_layout=False,
     )
 
-    y_positions = np.arange(len(source_labels), dtype=float)
-    x_values = source_counts.values.astype(float)
+    x_step = 0.82
+    x_positions = np.arange(len(source_labels), dtype=float) * x_step
+    y_values = source_counts.values.astype(float)
     bar_colors = [
         _SOURCE_PLAN_COLORS.get(_source_descriptor_key(raw_label), _SOURCE_PLAN_COLORS["background_only"])[0]
         for raw_label in source_counts.index.tolist()
@@ -247,48 +279,49 @@ def plot_dataset_source_inventory(
         _SOURCE_PLAN_COLORS.get(_source_descriptor_key(raw_label), _SOURCE_PLAN_COLORS["background_only"])[1]
         for raw_label in source_counts.index.tolist()
     ]
-    ax_counts.barh(
-        y_positions,
-        x_values,
+    ax_counts.bar(
+        x_positions,
+        y_values,
         color=bar_colors,
         edgecolor=edge_colors,
         linewidth=0.8,
         alpha=0.96,
-        height=0.68,
+        width=0.46,
         zorder=2.0,
     )
-    ax_counts.set_yticks(y_positions)
-    ax_counts.set_yticklabels(source_labels)
+    ax_counts.set_xticks(x_positions)
+    ax_counts.set_xticklabels(source_labels, rotation=45, ha="right")
     _apply_style(ax_counts, style_cfg)
     ax_counts.set_title(
         "Dense arrays broken down by part-type composition",
         fontsize=title_font_size,
         pad=12.0,
     )
-    ax_counts.set_xlabel("Dense array counts", fontsize=axis_font_size, labelpad=8.0)
-    ax_counts.set_box_aspect(1.4)
-    ax_counts.tick_params(axis="y", labelsize=label_font_size, pad=12.0)
-    ax_counts.tick_params(axis="x", labelsize=axis_font_size, pad=6.0)
-    for tick, raw_label in zip(ax_counts.get_yticklabels(), source_counts.index.tolist(), strict=True):
-        tick.set_color(
-            _SOURCE_PLAN_COLORS.get(_source_descriptor_key(raw_label), _SOURCE_PLAN_COLORS["background_only"])[1]
-        )
-    annotation_dx = max(2.5, float(np.max(x_values) * 0.022)) if x_values.size else 2.5
+    ax_counts.set_ylabel("Counts", fontsize=axis_font_size, labelpad=8.0)
+    ax_counts.tick_params(axis="x", labelsize=label_font_size, pad=8.0)
+    ax_counts.tick_params(axis="y", labelsize=axis_font_size, pad=6.0)
+    ax_counts.yaxis.set_major_locator(MaxNLocator(nbins=8, integer=True, min_n_ticks=6))
+    for tick in ax_counts.get_xticklabels():
+        tick.set_color("#111111")
+    if x_positions.size:
+        edge_padding = 0.36
+        ax_counts.set_xlim(float(x_positions[0]) - edge_padding, float(x_positions[-1]) + edge_padding)
+    annotation_dy = max(2.5, float(np.max(y_values) * 0.022)) if y_values.size else 2.5
     for idx, value in enumerate(source_counts.values.tolist()):
         ax_counts.text(
-            float(value) + annotation_dx,
-            y_positions[idx],
-            f"{int(value):,}",
-            va="center",
-            ha="left",
+            x_positions[idx],
+            float(value) + annotation_dy,
+            _compact_count_label(float(value)),
+            va="bottom",
+            ha="center",
             fontsize=annotation_font_size,
             color="#5d6670",
         )
-    ax_counts.grid(axis="x", linestyle="--", linewidth=0.55, alpha=0.22)
+    ax_counts.set_ylim(0.0, max(1.0, float(np.max(y_values) + annotation_dy * 3.0)) if y_values.size else 1.0)
+    ax_counts.grid(axis="y", linestyle="--", linewidth=0.55, alpha=0.22)
 
-    left_margin = max(0.24, min(0.38, 0.14 + 0.0092 * float(max_label_chars)))
-    fig.subplots_adjust(left=left_margin, right=0.98, bottom=0.12, top=0.92)
-
+    bottom_margin = max(0.25, min(0.44, 0.15 + 0.0088 * float(max_label_chars)))
+    fig.subplots_adjust(left=0.08, right=0.985, bottom=bottom_margin, top=0.86)
     out = out_path.parent / "dataset" / out_path.name
     out.parent.mkdir(parents=True, exist_ok=True)
     _save_figure(fig, out, style=style_cfg)

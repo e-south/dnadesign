@@ -12,12 +12,14 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 import typer
 
+from ..adapters.sources.pwm_artifact import load_artifact
 from ..config import (
     load_config,
     resolve_outputs_scoped_path,
@@ -34,6 +36,7 @@ from ..core.reporting import collect_report_data
 from ..core.run_manifest import load_run_manifest
 from ..core.run_paths import run_manifest_path, run_state_path
 from ..core.run_state import load_run_state
+from ..viz.motif_logo import render_pwm_logo
 from .context import CliContext
 from .render import stage_a_plan_table
 from .sampling import stage_a_plan_rows
@@ -200,6 +203,120 @@ def _print_inputs_summary(
         cfg_path=loaded.path,
     )
     context.console.print(f"Tip: run `{rebuild_cmd}` to rebuild pools.")
+
+
+def _is_relative_to(path: Path, base: Path) -> bool:
+    try:
+        path.resolve().relative_to(base.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _resolve_motif_logo_out_dir(
+    loaded,
+    *,
+    out_dir: Path | None,
+) -> Path:
+    run_root = resolve_run_root(loaded.path, loaded.root.densegen.run.root)
+    inputs_root = run_root / "inputs"
+    outputs_root = run_root / "outputs"
+    if out_dir is None:
+        return resolve_outputs_scoped_path(
+            loaded.path,
+            run_root,
+            "outputs/plots/motif_logos",
+            label="motif logo output directory",
+        )
+    resolved = resolve_relative_path(loaded.path, out_dir)
+    if _is_relative_to(resolved, inputs_root):
+        raise ValueError(f"motif logo output directory must not be under inputs/ ({inputs_root}).")
+    if _is_relative_to(resolved, run_root) and not _is_relative_to(resolved, outputs_root):
+        raise ValueError(
+            f"motif logo output directory must stay within outputs/ when writing into the workspace ({outputs_root})."
+        )
+    return resolved
+
+
+def _pwm_artifact_inputs(loaded, *, selected_inputs: list[str] | None = None):
+    candidates = [inp for inp in loaded.root.densegen.inputs if str(inp.type) == "pwm_artifact"]
+    if not candidates:
+        raise ValueError("Config contains no pwm_artifact inputs.")
+    if not selected_inputs:
+        return candidates
+    by_name = {str(inp.name): inp for inp in candidates}
+    missing = [name for name in selected_inputs if name not in by_name]
+    if missing:
+        available = ", ".join(sorted(by_name))
+        raise ValueError("Unknown pwm_artifact input(s): " + ", ".join(sorted(missing)) + f". Available: {available}")
+    return [by_name[name] for name in selected_inputs]
+
+
+def _prepare_logo_targets(
+    loaded,
+    *,
+    out_dir: Path,
+    selected_inputs: list[str] | None = None,
+    overwrite: bool,
+) -> list[tuple[object, Path, Path]]:
+    targets: list[tuple[object, Path, Path]] = []
+    for inp in _pwm_artifact_inputs(loaded, selected_inputs=selected_inputs):
+        artifact_path = resolve_relative_path(loaded.path, getattr(inp, "path"))
+        out_path = out_dir / f"{artifact_path.stem}_logo.png"
+        svg_path = out_path.with_suffix(".svg")
+        if not overwrite:
+            clashes = [path for path in (out_path, svg_path) if path.exists()]
+            if clashes:
+                preview = ", ".join(str(path) for path in clashes)
+                raise ValueError(f"Refusing to overwrite existing logo outputs: {preview}")
+        targets.append((inp, artifact_path, out_path))
+    return targets
+
+
+def _render_motif_logo_targets(
+    loaded,
+    *,
+    out_dir: Path,
+    selected_inputs: list[str] | None = None,
+    overwrite: bool,
+) -> list[dict[str, str]]:
+    targets = _prepare_logo_targets(
+        loaded,
+        out_dir=out_dir,
+        selected_inputs=selected_inputs,
+        overwrite=overwrite,
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, str]] = []
+    for inp, artifact_path, out_path in targets:
+        if overwrite:
+            for existing in (out_path, out_path.with_suffix(".svg")):
+                if existing.exists():
+                    existing.unlink()
+        raw_payload = json.loads(artifact_path.read_text())
+        motif = load_artifact(artifact_path)
+        tf_name = str(raw_payload.get("tf_name") or inp.name).strip() or str(inp.name)
+        source = str(raw_payload.get("source") or "unknown").strip() or "unknown"
+        producer = str(raw_payload.get("producer") or "unknown").strip() or "unknown"
+        title = f"{tf_name} - {motif.motif_id}"
+        subtitle = f"input={inp.name}; source={source}; producer={producer}"
+        png_path, svg_path = render_pwm_logo(
+            motif,
+            out_path,
+            title=title,
+            subtitle=subtitle,
+            mode="information",
+        )
+        rows.append(
+            {
+                "input": str(inp.name),
+                "motif_id": str(motif.motif_id),
+                "artifact": str(artifact_path),
+                "png": str(png_path),
+                "svg": str(svg_path),
+            }
+        )
+    return rows
 
 
 def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) -> None:
@@ -766,6 +883,49 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             show_motif_ids=show_motif_ids,
             context=context,
         )
+
+    @inspect_app.command("motif-logos", help="Render logos from the exact pwm_artifact JSONs bound in the config.")
+    def inspect_motif_logos(
+        ctx: typer.Context,
+        input_name: list[str] = typer.Option([], "--input", help="pwm_artifact input name to render (repeatable)."),
+        out_dir: Optional[Path] = typer.Option(
+            None,
+            "--out-dir",
+            help="Output directory. Defaults to outputs/plots/motif_logos under the workspace.",
+        ),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing logo files."),
+        absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
+        config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
+    ):
+        cfg_path, is_default = context.resolve_config_path(ctx, config)
+        loaded = context.load_config_or_exit(
+            cfg_path,
+            missing_message=context.default_config_missing_message if is_default else None,
+        )
+        run_root = context.run_root_for(loaded)
+        try:
+            resolved_out_dir = _resolve_motif_logo_out_dir(loaded, out_dir=out_dir)
+            rows = _render_motif_logo_targets(
+                loaded,
+                out_dir=resolved_out_dir,
+                selected_inputs=list(input_name) or None,
+                overwrite=overwrite,
+            )
+        except Exception as exc:
+            context.console.print(f"[bold red]Failed to render motif logos:[/] {exc}")
+            raise typer.Exit(code=1)
+
+        table = context.make_table("input", "motif_id", "artifact", "png", "svg")
+        for row in rows:
+            table.add_row(
+                row["input"],
+                row["motif_id"],
+                context.display_path(Path(row["artifact"]), run_root, absolute=absolute),
+                context.display_path(Path(row["png"]), run_root, absolute=absolute),
+                context.display_path(Path(row["svg"]), run_root, absolute=absolute),
+            )
+        context.console.print("[bold]Rendered motif logos[/]")
+        context.console.print(table)
 
 
 def _count_files(path: Path, pattern: str = "*") -> int:

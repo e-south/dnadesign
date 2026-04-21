@@ -16,6 +16,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
+from matplotlib.ticker import MaxNLocator
 
 from dnadesign.densegen.src.viz import plot_dataset as plot_dataset_module
 
@@ -26,7 +27,13 @@ def _close_figures_after_test() -> None:
     plt.close("all")
 
 
-def test_dataset_source_inventory_uses_taller_axis_and_compact_source_labels(
+def test_compact_count_label_shortens_large_values() -> None:
+    assert plot_dataset_module._compact_count_label(7110) == "7.1k"
+    assert plot_dataset_module._compact_count_label(12000) == "12k"
+    assert plot_dataset_module._compact_count_label(999) == "999"
+
+
+def test_dataset_source_inventory_uses_wide_vertical_layout_and_compact_source_labels(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captured: dict[str, object] = {}
@@ -58,20 +65,28 @@ def test_dataset_source_inventory_uses_taller_axis_and_compact_source_labels(
     assert outputs == [tmp_path / "dataset" / "dataset_source_inventory.png"]
     fig = captured["fig"]
     ax = fig.axes[0]
-    labels = [tick.get_text() for tick in ax.get_yticklabels()]
-    label_colors = [tick.get_color() for tick in ax.get_yticklabels()]
+    labels = [tick.get_text() for tick in ax.get_xticklabels()]
+    label_colors = [tick.get_color() for tick in ax.get_xticklabels()]
     bar_colors = {tuple(round(channel, 3) for channel in patch.get_facecolor()) for patch in ax.patches}
-    assert ax.get_box_aspect() == pytest.approx(1.4)
+    bar_heights = [patch.get_height() for patch in ax.patches]
+    fig_width, fig_height = fig.get_size_inches()
+    assert fig_width > fig_height * 1.5
+    assert fig_height < 5.0
     assert len(ax.collections) == 0
     assert len(ax.patches) == 4
     assert len(bar_colors) == 4
-    assert "Bg σ70f" in labels
-    assert "EtOH σ70f" in labels
-    assert "Cipro σ70d" in labels
-    assert "EtOH+Cipro σ70e" in labels
-    assert len(set(label_colors)) == 4
+    assert bar_heights == sorted(bar_heights, reverse=True)
+    assert labels[0] == "Background σ70-35(f)"
+    assert "Background σ70-35(f)" in labels
+    assert "EtOH σ70-35(f)" in labels
+    assert "Cipro σ70-35(d)" in labels
+    assert "EtOH+Cipro σ70-35(e)" in labels
+    assert {tick.get_rotation() for tick in ax.get_xticklabels()} == {45.0}
+    assert set(label_colors) == {"#111111"}
     assert ax.get_title() == "Dense arrays broken down by part-type composition"
-    assert ax.get_xlabel() == "Dense array counts"
+    assert ax.get_xlabel() == ""
+    assert ax.get_ylabel() == "Counts"
+    assert isinstance(ax.yaxis.get_major_locator(), MaxNLocator)
 
 
 def test_dataset_metadata_heatmap_reports_source_recovery_footnote(
