@@ -1,0 +1,50 @@
+version: 1
+study_id: snapback_shortening_effort
+
+intent:
+  primary_goal: Preserve one tracked shortening effort that keeps released-product Snapback as the execution lane and keeps YIU in the boundary-only role.
+  primary_lane: released-product snapback
+  non_goals:
+    - Do not treat YIU as a topology-aware bulge or scaffold designer.
+    - Do not fold retron processivity heuristics directly into the Cruncher search contracts.
+    - Do not collapse preserved-site Snapback and released-product Snapback into one flagged lane.
+  context_refs:
+    - repo:src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md
+    - repo:src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md
+    - repo:src/dnadesign/cruncher/docs/guides/yiu_workflow.md
+  decision_refs:
+    - repo:src/dnadesign/cruncher/workspaces/demo_snapback/runbook.md
+    - repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/runbook.md
+
+command_groups:
+  - id: snapback_released_probe
+    purpose: Confirm the released-product target-search lane and local overlays still resolve cleanly.
+    workspace_ref: repo:src/dnadesign/cruncher/workspaces/demo_snapback
+    validation_role: read_only_probe
+    commands:
+      - uv run cruncher snapback released-target-search --workspace-root . --nick-additional-path inputs/nickases/local.nickases.yaml --release-additional-path inputs/release_enzymes/local.release.yaml --nick-boundary 0 --paired-bp 3 --cap-nt 3 --json
+  - id: snapback_released_bundle_run
+    purpose: Materialize the explicit released-product bundle after the read-only probe is clean.
+    workspace_ref: repo:src/dnadesign/cruncher/workspaces/demo_snapback
+    mutates_outputs: true
+    commands:
+      - uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml --force-overwrite
+      - uv run cruncher snapback released-show --run outputs/released_design --json
+  - id: yiu_boundary_check
+    purpose: Keep the direct TetR/TetO YIU path available as a contrast check on boundary language.
+    workspace_ref: repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr
+    commands:
+      - uv run cruncher yiu validate --spec configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+      - uv run cruncher yiu render --spec configs/yiu/tetr_teto2_wt_direct.yiu.yaml --force-overwrite --emit-renders
+      - uv run cruncher yiu show --bundle outputs/plots/yiu__tetr_teto2_wt_direct
+
+native_agent_bootstrap:
+  open_first:
+    - manifest:status.md
+    - manifest:routes.md
+    - manifest:pipeline.yaml
+  must_preserve:
+    - released-product Snapback is the active shortening architecture
+    - YIU remains mismatch-centric and contrast-only for this effort
+    - retron notes are framing context rather than hidden scoring rules
+    - preserved-site Snapback and released-product Snapback remain separate contracts

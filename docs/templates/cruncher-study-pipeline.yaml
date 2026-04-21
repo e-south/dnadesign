@@ -1,0 +1,28 @@
+version: 1
+study_id: <study-id>
+
+intent:
+  primary_goal: <what the study is trying to settle>
+  primary_lane: <lane name>
+  non_goals:
+    - <non-goal>
+  context_refs:
+    - <repo-path>
+  decision_refs:
+    - <repo-path>
+
+command_groups:
+  - id: <group-id>
+    purpose: <what this command group proves>
+    workspace_ref: <repo-path-to-workspace>
+    validation_role: <read_only_probe | contrast_check | n/a>
+    commands:
+      - <command>
+
+native_agent_bootstrap:
+  open_first:
+    - manifest:status.md
+    - manifest:routes.md
+    - manifest:pipeline.yaml
+  must_preserve:
+    - <hard boundary>
