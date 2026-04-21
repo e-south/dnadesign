@@ -5,8 +5,10 @@ Scaffolded by `cruncher snapback init-workspace`.
 Included files:
 - `configs/runbook.yaml`
 - `configs/snapback/demo_teto_bpu10i_cap.snapback.yaml`
+- `configs/snapback/demo_released_origin_033.released.snapback.yaml`
 - `configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml`
 - `inputs/nickases/local.nickases.yaml`
+- `inputs/release_enzymes/local.release.yaml`
 - `runbook.md`
 
 Canonical single-command refresh:
@@ -15,14 +17,17 @@ Canonical single-command refresh:
 Suggested next steps:
 1. `uv run cruncher snapback validate --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml`
 2. `uv run cruncher snapback design --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml`
-3. `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml`
+3. `uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml`
+4. `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml`
 
 Canonical refresh:
 1. `uv run cruncher snapback design --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml --force-overwrite`
-2. `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml --force-overwrite`
+2. `uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml --force-overwrite`
+3. `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml --force-overwrite`
 
 Workspace-scoped output roots:
 - explicit design bundle under `outputs/design/`
+- released-product design bundle under `outputs/released_design/`
 - solve summary bundle under `outputs/solve/`
 - materialized top hits under `outputs/solve/analysis/materialized_hits/hit_<rank>/`
 
@@ -30,6 +35,7 @@ Snapback invariants in this scaffold:
 - solve uses co-design by default across the resolved nickase catalog
 - the solve scaffold resolves built-in `neb_nicking_v1` plus `thermo_nicking_v1`
 - the local `Nt.Bpu10I` overlay remains the explicit design example only
+- the local `Nx.Exact7` plus `Re.Exact` overlays exist only to demonstrate the released-product lane
 - omitted solve boundary and retained-length windows resolve to compact-first defaults
 - retained homology starts exactly at the resolved nick boundary
 - the effective cap loop is fixed at 3 nt

@@ -64,7 +64,11 @@ _WORKFLOW_FAMILIES: tuple[WorkflowFamilyDescriptor, ...] = (
         display_name="single-nick snapback workflow",
         workspace_kind="runbook_family",
         runbook_command_roots=("snapback",),
-        spec_globs=("configs/snapback/*.snapback.yaml", "configs/snapback/*.snapback.solve.yaml"),
+        spec_globs=(
+            "configs/snapback/*.snapback.yaml",
+            "configs/snapback/*.snapback.solve.yaml",
+            "configs/snapback/*.released.snapback.yaml",
+        ),
         default_output_root="outputs",
         docs_section_id="snapback",
     ),

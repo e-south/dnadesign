@@ -76,16 +76,18 @@ This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette-
 The snapback workflow is a peer lane, not a cassette or YIU submode:
 
 1. optional **snapback init-workspace** -> scaffold a runbook-only snapback workspace with one explicit v2 example and one solve example
-2. author `<workspace>/configs/snapback/<name>.snapback.yaml` or `<workspace>/configs/snapback/<name>.snapback.solve.yaml`
-3. author or select a local nickase catalog or use a preset-only resolved catalog
+2. author `<workspace>/configs/snapback/<name>.snapback.yaml`, `<workspace>/configs/snapback/<name>.snapback.solve.yaml`, or `<workspace>/configs/snapback/<name>.released.snapback.yaml`
+3. author or select local nickase and release-enzyme catalogs or use preset-only resolved catalogs
 4. **snapback validate** -> strict schema + invariant check plus deterministic explicit report
-5. **snapback design** -> materialize one explicit candidate bundle with reports, provenance snapshots, candidate table, and QA views
-6. **snapback solve** -> bounded search, deterministic hit ranking, selected-hit materialization, and solve-level reports
-7. **snapback show** -> inspect explicit or solve bundle metadata, artifacts, and drift checks without guessing
+5. **snapback design** -> materialize one preserved-site explicit candidate bundle with reports, provenance snapshots, candidate table, and QA views
+6. **snapback released-design** -> project a two-stage precursor into a retained post-release product and materialize one released-product bundle
+7. **snapback solve** -> bounded preserved-site search, deterministic hit ranking, selected-hit materialization, and solve-level reports
+8. **snapback released-target-search** -> target-first paired nickase plus release-enzyme search in retained-product space
+9. **snapback show** / **snapback released-show** -> inspect the appropriate bundle type and fail fast on drift without guessing
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.
 
-For operator-facing usage, start with [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md). For the file-by-file output contract, use [`snapback_artifacts.md`](snapback_artifacts.md).
+For operator-facing usage, start with [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md) and [`../guides/snapback_released_workflow.md`](../guides/snapback_released_workflow.md). For the file-by-file output contracts, use [`snapback_artifacts.md`](snapback_artifacts.md) and [`released_snapback_artifacts.md`](released_snapback_artifacts.md).
 
 ---
 

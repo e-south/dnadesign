@@ -45,14 +45,6 @@ def _issue(code: str, message: str, **details: object) -> SnapbackIssue:
     return SnapbackIssue(code=code, message=message, details=details)
 
 
-def _catalog_source_label(*, preset: str | None, resolved_paths: list[Path]) -> str:
-    labels: list[str] = []
-    if preset is not None:
-        labels.append(f"preset:{preset}")
-    labels.extend(str(path) for path in resolved_paths)
-    return ", ".join(labels) if labels else "resolved_catalog"
-
-
 def _site_inside_duplex_window(match: EvaluatedMatch, duplex_window: CoordinateSpan) -> bool:
     return duplex_window.start <= match.site.start and match.site.end <= duplex_window.end
 

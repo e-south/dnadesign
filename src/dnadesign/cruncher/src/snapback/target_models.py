@@ -36,6 +36,8 @@ class SnapbackTargetGeometry(StrictSnapbackModel):
             raise ValueError(
                 f"target.cap_nt must equal the fixed snapback effective cap loop size of {EFFECTIVE_CAP_LOOP_NT}."
             )
+        if self.require_site_sequence_preserved is not True:
+            raise ValueError("target.require_site_sequence_preserved is reserved in v1 and must remain true.")
         return self
 
 

@@ -54,7 +54,11 @@ def test_workflow_family_descriptor_registers_snapback_as_runbook_family() -> No
     assert descriptor.id == "snapback"
     assert descriptor.workspace_kind == "runbook_family"
     assert descriptor.runbook_command_roots == ("snapback",)
-    assert descriptor.spec_globs == ("configs/snapback/*.snapback.yaml", "configs/snapback/*.snapback.solve.yaml")
+    assert descriptor.spec_globs == (
+        "configs/snapback/*.snapback.yaml",
+        "configs/snapback/*.snapback.solve.yaml",
+        "configs/snapback/*.released.snapback.yaml",
+    )
     assert descriptor.default_output_root == "outputs"
 
 

@@ -31,6 +31,7 @@ from dnadesign.cruncher.nickases.scanning import (
     suffix_sensitive_scan_start,
 )
 from dnadesign.cruncher.nickases.selection import snapback_entry_priority_key
+from dnadesign.cruncher.snapback.catalog_sources import catalog_source_label
 from dnadesign.cruncher.snapback.models import CoordinateSpan, build_catalog_info
 from dnadesign.cruncher.snapback.planner import evaluate_snapback_candidate
 from dnadesign.cruncher.snapback.target_models import (
@@ -40,13 +41,6 @@ from dnadesign.cruncher.snapback.target_models import (
     SnapbackTargetSearchMetadata,
     SnapbackTargetSearchReport,
 )
-
-
-def _catalog_source_label(*, preset_ids: list[str], additional_paths: list[Path]) -> str:
-    labels: list[str] = []
-    labels.extend(f"preset:{preset_id}" for preset_id in preset_ids)
-    labels.extend(str(path) for path in additional_paths)
-    return ", ".join(labels) if labels else "resolved_catalog"
 
 
 @lru_cache(maxsize=None)
@@ -448,9 +442,9 @@ def search_snapback_target_hits(
             catalog_preset=catalog_preset,
             catalog_presets=catalog_presets,
             catalog_additional_paths=[str(path) for path in catalog_additional_paths],
-            catalog_source=_catalog_source_label(
+            catalog_source=catalog_source_label(
                 preset_ids=catalog_presets,
-                additional_paths=catalog_additional_paths,
+                resolved_paths=catalog_additional_paths,
             ),
             target=target,
             evaluated_orientation_count=len(feasibility),

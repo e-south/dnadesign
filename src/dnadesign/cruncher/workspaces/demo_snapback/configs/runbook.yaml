@@ -24,6 +24,39 @@ runbook:
     - show
     - --run
     - outputs/design
+  - id: snapback_released_design
+    description: Materialize the checked-in released-product precursor demo bundle.
+    run:
+    - snapback
+    - released-design
+    - --spec
+    - configs/snapback/demo_released_origin_033.released.snapback.yaml
+    - --force-overwrite
+  - id: snapback_released_show
+    description: Inspect the released-product bundle and projection integrity checks.
+    run:
+    - snapback
+    - released-show
+    - --run
+    - outputs/released_design
+  - id: snapback_released_target_search
+    description: Search paired nickase plus release-enzyme placements against the checked-in demo overlays.
+    run:
+    - snapback
+    - released-target-search
+    - --workspace-root
+    - .
+    - --nick-additional-path
+    - inputs/nickases/local.nickases.yaml
+    - --release-additional-path
+    - inputs/release_enzymes/local.release.yaml
+    - --nick-boundary
+    - '0'
+    - --paired-bp
+    - '3'
+    - --cap-nt
+    - '3'
+    - --json
   - id: snapback_solve
     description: Run the broader catalog-scan solve demo.
     run:

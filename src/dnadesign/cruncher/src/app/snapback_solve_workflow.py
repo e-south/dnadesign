@@ -43,17 +43,11 @@ from dnadesign.cruncher.snapback.artifacts import (
     write_solve_status,
     write_status,
 )
+from dnadesign.cruncher.snapback.catalog_sources import catalog_source_label
 from dnadesign.cruncher.snapback.load import load_snapback_solve_spec
 from dnadesign.cruncher.snapback.models import SnapbackEvaluationReport, SnapbackReportMetadata
 from dnadesign.cruncher.snapback.planner import render_markdown_report
 from dnadesign.cruncher.snapback.solver import render_solve_markdown_report, solve_snapback_search
-
-
-def _catalog_source_label(*, preset_ids: list[str], resolved_paths: list[Path]) -> str:
-    labels: list[str] = []
-    labels.extend(f"preset:{preset_id}" for preset_id in preset_ids)
-    labels.extend(str(path) for path in resolved_paths)
-    return ", ".join(labels) if labels else "resolved_catalog"
 
 
 def _resolve_catalog(spec, *, workspace_root: Path):
@@ -66,7 +60,7 @@ def _resolve_catalog(spec, *, workspace_root: Path):
     return (
         catalog,
         resolved_paths,
-        _catalog_source_label(preset_ids=spec.catalog.resolved_preset_ids(), resolved_paths=resolved_paths),
+        catalog_source_label(preset_ids=spec.catalog.resolved_preset_ids(), resolved_paths=resolved_paths),
     )
 
 

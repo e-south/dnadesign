@@ -25,7 +25,7 @@ This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage a
 >
 > - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
-> - `snapback init-workspace|validate|design|solve|show` cover single-nick foldback workspaces. This lane uses explicit geometry contracts, bounded deterministic search, and a strict QA triptych publication surface.
+> - `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|show|released-show` cover single-nick foldback workspaces. This lane uses explicit geometry contracts, bounded deterministic search, a strict QA triptych publication surface for preserved-site explicit bundles, and a separate released-product precursor contract.
 > - `yiu init-workspace|validate|render|show` cover payload-centric YIU workflows. This lane uses the strict `split_yiu_payload_rendering_v4` contract, deterministic exhaustive optimization over a 4 nt junction, three published payload views, and one bundle-local `visual_inventory.json`.
 >
 > Choose the command family by the workspace contract you need. `cassette`, `snapback`, and `yiu` do not fall back to `sample`, and `sample` runs do not reuse their artifacts.
@@ -58,7 +58,7 @@ cruncher study list
 * **Optimize fixed-length sequences** → `sample`
 * **Analyze optimization runs** → `analyze`, `notebook`
 * **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
-* **Validate and search single-nick foldbacks** → `snapback init-workspace|validate|design|solve|show`
+* **Validate and search single-nick foldbacks** → `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|show|released-show`
 * **Render split YIU payloads** → `yiu init-workspace|validate|render|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
@@ -529,16 +529,18 @@ Notes:
 
 #### Snapback workflows
 
-The snapback workflow is separate from `sample`, `cassette`, and `yiu`. It expects one explicit spec at
-`<workspace>/configs/snapback/<name>.snapback.yaml` or one solve spec at
-`<workspace>/configs/snapback/<name>.snapback.solve.yaml`, plus a local or preset-backed nickase catalog.
+The snapback workflow is separate from `sample`, `cassette`, and `yiu`. It expects one explicit preserved-site spec at
+`<workspace>/configs/snapback/<name>.snapback.yaml`, one solve spec at
+`<workspace>/configs/snapback/<name>.snapback.solve.yaml`, or one released-product explicit spec at
+`<workspace>/configs/snapback/<name>.released.snapback.yaml`, plus local or preset-backed nickase catalogs and, for the released-product lane, release-enzyme catalogs.
 
 Current scope:
 
 * deterministic validation of one authored single-nick foldback design
 * bounded co-design search over nick boundary, retained homology length, cap extension, motif-compatible site edits, and foldback-arm choices
 * target-first catalog search for shortest preserved-site hits at an exact requested geometry
-* stable explicit and solve bundles under `outputs/design/` and `outputs/solve/`
+* target-first paired nickase plus release-enzyme search in retained-product space
+* stable explicit, solve, and released-product bundles under `outputs/design/`, `outputs/solve/`, and `outputs/released_design/`
 * strict QA-triptych publication plus fail-fast `show` integrity checks
 
 Current non-scope:
@@ -550,7 +552,10 @@ Current non-scope:
 Deep contracts live in:
 
 * [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md)
+* [`../guides/snapback_released_workflow.md`](../guides/snapback_released_workflow.md)
 * [`snapback_artifacts.md`](snapback_artifacts.md)
+* [`released_snapback_artifacts.md`](released_snapback_artifacts.md)
+* [`release_enzyme_catalogs.md`](release_enzyme_catalogs.md)
 * [`architecture.md`](architecture.md)
 * [`../../workspaces/demo_snapback/README.md`](../../workspaces/demo_snapback/README.md)
 * [`../../workspaces/demo_snapback/runbook.md`](../../workspaces/demo_snapback/runbook.md)
@@ -665,6 +670,64 @@ Notes:
 * the effective cap loop is still fixed at `3 nt`
 * recognition sites are preserved exactly in this mode; the search does not mutate the RE site
 * when no catalog source is provided, the command defaults to `neb_nicking_v1` plus `thermo_nicking_v1`
+
+#### `cruncher snapback released-design`
+
+Validate one explicit two-stage precursor spec and write the released-product bundle.
+
+Examples:
+
+* `uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml`
+* `uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/released_design/`
+* writes `meta/released_snapback_manifest.json` and `meta/released_snapback_status.json`
+* writes `analysis/report.json`, `analysis/released_product_projection.json`, `analysis/pre_nick_site.json`, and `analysis/release_site.json`
+* writes `export/released_design_summary.csv`
+
+Notes:
+
+* this lane evaluates final geometry on the retained post-release product, not the full precursor
+* only `nick_then_release` and `retained_side=upstream` are supported in v1
+* the release site and nickase site may be lost post-release when the explicit spec allows that loss
+
+#### `cruncher snapback released-target-search`
+
+Search paired nickase plus release-enzyme combinations for an exact retained-product geometry without assuming an authored precursor.
+
+Examples:
+
+* `uv run cruncher snapback released-target-search --json`
+* `uv run cruncher snapback released-target-search --nick-boundary 0 --paired-bp 3 --cap-nt 3`
+* `uv run cruncher snapback released-target-search --release-preset type_iis_release_v1 --json`
+
+Outputs:
+
+* prints one typed report to stdout
+* reports exact hits and near hits separately
+* includes blocker counts plus pre-truncation and post-truncation hit counts
+
+Notes:
+
+* this mode is target-first and separate from preserved-site `target-search`
+* final geometry is evaluated in retained-product space after the projected release event
+* when no sources are provided, the command defaults to `neb_nicking_v1` plus `thermo_nicking_v1` for nickases and `type_iis_release_v1` for release enzymes
+
+#### `cruncher snapback released-show`
+
+Read one released-product bundle and print a path-oriented summary with drift checks.
+
+Examples:
+
+* `uv run cruncher snapback released-show --run outputs/released_design`
+* `uv run cruncher snapback released-show --run outputs/released_design --json`
+
+Notes:
+
+* `released-show` accepts released-product bundle roots only
+* the command fails fast on manifest/status drift and projection/report inconsistency
 
 #### `cruncher snapback show`
 

@@ -19,3 +19,10 @@ nickases:
       buffer_family: R
     notes:
     - "Thermo manual raw geometry: CC\u2193TNAGC."
+  - id: Nx.Exact7
+    specificity_id: Nx.Exact7
+    motif_top_5to3: AACGTTG
+    top_cut_offset: 0
+    source: local_demo
+    notes:
+    - Synthetic demo nickase used by the released-product workspace example.

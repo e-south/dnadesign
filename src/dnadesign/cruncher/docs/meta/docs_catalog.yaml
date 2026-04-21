@@ -145,6 +145,22 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-03-25"
       next: [reference/cassette_solve_spec.md, reference/cassette_artifacts.md]
+    - id: guide_snapback
+      path: guides/snapback_workflow.md
+      title: Snapback Workflow
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [guides/snapback_released_workflow.md, reference/snapback_artifacts.md]
+    - id: guide_snapback_released
+      path: guides/snapback_released_workflow.md
+      title: Released-product Snapback Workflow
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [reference/released_snapback_artifacts.md, reference/release_enzyme_catalogs.md]
     - id: guide_yiu
       path: guides/yiu_workflow.md
       title: YIU Workflow
@@ -217,6 +233,30 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-03-25"
       next: [guides/cassette_solve_workflow.md, reference/cli.md]
+    - id: ref_snapback_artifacts
+      path: reference/snapback_artifacts.md
+      title: Snapback Artifacts
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [guides/snapback_workflow.md, reference/released_snapback_artifacts.md]
+    - id: ref_released_snapback_artifacts
+      path: reference/released_snapback_artifacts.md
+      title: Released-product Snapback Artifacts
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [guides/snapback_released_workflow.md, reference/release_enzyme_catalogs.md]
+    - id: ref_release_enzyme_catalogs
+      path: reference/release_enzyme_catalogs.md
+      title: Release-enzyme Catalogs
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [guides/snapback_released_workflow.md, reference/released_snapback_artifacts.md]
     - id: ref_yiu_spec
       path: reference/yiu_spec.md
       title: YIU Spec Reference
@@ -265,6 +305,22 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-02-23"
       next: [demos/demo_pairwise.md, guides/portfolio_aggregation.md]
+    - id: demo_snapback_readme
+      path: ../workspaces/demo_snapback/README.md
+      title: demo_snapback README
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [guides/snapback_workflow.md, guides/snapback_released_workflow.md]
+    - id: demo_snapback_runbook
+      path: ../workspaces/demo_snapback/runbook.md
+      title: demo_snapback runbook
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-21"
+      next: [reference/runbook_steps.md, guides/snapback_released_workflow.md]
     - id: internals_spec
       path: internals/spec.md
       title: Cruncher Internals Spec

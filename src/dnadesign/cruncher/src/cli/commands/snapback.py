@@ -50,10 +50,40 @@ def run_snapback_target_search(*args, **kwargs):
     return _run_snapback_target_search(*args, **kwargs)
 
 
+def validate_released_snapback_spec(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_released_workflow import (
+        validate_released_snapback_spec as _validate_released_snapback_spec,
+    )
+
+    return _validate_released_snapback_spec(*args, **kwargs)
+
+
+def run_released_snapback_design(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_released_workflow import (
+        run_released_snapback_design as _run_released_snapback_design,
+    )
+
+    return _run_released_snapback_design(*args, **kwargs)
+
+
+def run_released_snapback_target_search(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_released_target_search_workflow import (
+        run_released_snapback_target_search as _run_released_snapback_target_search,
+    )
+
+    return _run_released_snapback_target_search(*args, **kwargs)
+
+
 def snapback_show_payload(*args, **kwargs):
     from dnadesign.cruncher.app.snapback_workflow import snapback_show_payload as _snapback_show_payload
 
     return _snapback_show_payload(*args, **kwargs)
+
+
+def released_show_payload(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_released_show import released_show_payload as _released_show_payload
+
+    return _released_show_payload(*args, **kwargs)
 
 
 def init_snapback_workspace(*args, **kwargs):
@@ -193,6 +223,82 @@ def _print_target_search_report(report) -> None:
                 "earliest_boundary="
                 f"{row.earliest_feasible_boundary if row.earliest_feasible_boundary is not None else '-'} "
                 f"blockers={blockers}"
+            )
+
+
+def _print_released_report(report) -> None:
+    console.print(f"Released-product snapback spec -> {report.spec_name}")
+    console.print(f"Status -> {report.status}")
+    console.print(f"Nick catalog -> {report.metadata.nick_catalog_source}")
+    console.print(f"Release catalog -> {report.metadata.release_catalog_source}")
+    if report.candidate is not None and report.projection is not None:
+        console.print(
+            "Retained product -> "
+            f"input_nt={report.candidate.input_length_nt} "
+            f"retained_nt={report.candidate.retained_product_length_nt} "
+            f"nick={report.candidate.nick_boundary_from_left} "
+            f"paired_bp={report.candidate.paired_bp} cap_nt={report.candidate.cap_nt}"
+        )
+        console.print(
+            "Release cuts -> "
+            f"top={report.projection.release_top_cut_precursor} "
+            f"bottom={report.projection.release_bottom_cut_precursor}"
+        )
+        console.print(
+            "Site survival -> "
+            f"nickase={report.projection.nickase_site_survives_post_release} "
+            f"release={report.projection.release_site_survives_post_release}"
+        )
+    if report.issues:
+        console.print("Issues:")
+        for issue in report.issues:
+            console.print(f"  - {issue.code}: {issue.message}")
+
+
+def _print_released_target_search_report(report) -> None:
+    console.print("Released-product snapback target search")
+    console.print(f"Status -> {report.status}")
+    console.print(
+        "Target -> "
+        f"boundary={report.metadata.target.nick_boundary_from_left}, "
+        f"paired_bp={report.metadata.target.paired_bp}, "
+        f"cap_nt={report.metadata.target.cap_nt}"
+    )
+    console.print(f"Nick catalog -> {report.metadata.nick_catalog_source}")
+    console.print(f"Release catalog -> {report.metadata.release_catalog_source}")
+    console.print(f"Pairs evaluated -> {report.metadata.evaluated_pair_count}")
+    console.print(
+        "Hits -> "
+        f"exact={report.metadata.post_truncation_exact_hit_count}/"
+        f"{report.metadata.pre_truncation_exact_hit_count}, "
+        f"near={report.metadata.post_truncation_near_hit_count}/"
+        f"{report.metadata.pre_truncation_near_hit_count}"
+    )
+    if report.metadata.blocker_counts:
+        console.print("Blockers:")
+        for code, count in sorted(report.metadata.blocker_counts.items()):
+            console.print(f"  - {code}: {count}")
+    if report.exact_hits:
+        console.print("Exact hits:")
+        for hit in report.exact_hits:
+            console.print(
+                "  - "
+                f"rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
+                f"boundary={hit.nick_boundary_from_left} "
+                f"retained_input_nt={hit.retained_input_length_nt} "
+                f"precursor_nt={hit.precursor_length_nt} "
+                f"tail_nt={hit.sacrificial_downstream_tail_nt}"
+            )
+    if report.near_hits:
+        console.print("Near hits:")
+        for hit in report.near_hits:
+            console.print(
+                "  - "
+                f"rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
+                f"boundary={hit.nick_boundary_from_left} "
+                f"retained_input_nt={hit.retained_input_length_nt} "
+                f"precursor_nt={hit.precursor_length_nt} "
+                f"tail_nt={hit.sacrificial_downstream_tail_nt}"
             )
 
 
@@ -414,6 +520,176 @@ def target_search_cmd(
         _print_target_search_report(report)
     if report.status == "no_hits":
         raise typer.Exit(code=1)
+
+
+@app.command(
+    "released-design",
+    help="Materialize one explicit released-product snapback bundle from a two-stage precursor spec.",
+)
+def released_design_cmd(
+    spec: Path = typer.Option(
+        ...,
+        "--spec",
+        help="Path to <workspace>/configs/snapback/<name>.released.snapback.yaml.",
+    ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace the existing released-product workspace output root.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Print the released-product report as JSON."),
+) -> None:
+    try:
+        validation_report = validate_released_snapback_spec(spec)
+        if validation_report.status == "invalid_catalog":
+            if json_output:
+                typer.echo(validation_report.model_dump_json(indent=2))
+            else:
+                _print_released_report(validation_report)
+            raise typer.Exit(code=1)
+        run_dir, report = run_released_snapback_design(spec, force_overwrite=force_overwrite)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        console.print(f"Released-product outputs -> {run_dir}")
+        _print_released_report(report)
+    if report.status != "satisfied":
+        raise typer.Exit(code=1)
+
+
+@app.command(
+    "released-target-search",
+    help=(
+        "Search paired nickase plus release-enzyme combinations for retained post-release snapback targets. "
+        "This lane evaluates the final geometry in retained-product space."
+    ),
+)
+def released_target_search_cmd(
+    nick_preset: str | None = typer.Option(
+        None,
+        "--nick-preset",
+        help="Primary builtin nickase preset. Defaults to neb_nicking_v1 when no nick sources are provided.",
+    ),
+    nick_additional_preset: list[str] = typer.Option(
+        [],
+        "--nick-additional-preset",
+        help="Additional builtin nickase preset ids (repeatable).",
+    ),
+    nick_additional_path: list[Path] = typer.Option(
+        [],
+        "--nick-additional-path",
+        help="Additional workspace-relative nickase catalog overlays (repeatable).",
+    ),
+    release_preset: str | None = typer.Option(
+        None,
+        "--release-preset",
+        help=(
+            "Primary builtin release-enzyme preset. Defaults to type_iis_release_v1 when no release source is provided."
+        ),
+    ),
+    release_additional_preset: list[str] = typer.Option(
+        [],
+        "--release-additional-preset",
+        help="Additional builtin release-enzyme preset ids (repeatable).",
+    ),
+    release_additional_path: list[Path] = typer.Option(
+        [],
+        "--release-additional-path",
+        help="Additional workspace-relative release-enzyme catalog overlays (repeatable).",
+    ),
+    workspace_root: Path = typer.Option(
+        Path("."),
+        "--workspace-root",
+        help="Workspace root for resolving additional catalog paths.",
+    ),
+    nick_boundary: int = typer.Option(0, "--nick-boundary", help="Requested nick_boundary_from_left."),
+    paired_bp: int = typer.Option(3, "--paired-bp", help="Requested retained homology length."),
+    cap_nt: int = typer.Option(3, "--cap-nt", help="Requested effective cap nt. Must equal 3."),
+    max_results: int = typer.Option(8, "--max-results", help="Maximum exact or near hits to return."),
+    near_boundary_search_limit: int = typer.Option(
+        8,
+        "--near-boundary-search-limit",
+        help="How many later boundaries to probe per paired placement when the exact target is unavailable.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Print the released target-search report as JSON."),
+) -> None:
+    try:
+        from dnadesign.cruncher.snapback.models import CatalogSources
+        from dnadesign.cruncher.snapback.released_models import (
+            ReleaseCatalogSources,
+            ReleasedFinalTargetGeometry,
+            ReleasedTargetSearchConfig,
+            SingleNickReleasedTargetSearchRequest,
+        )
+
+        resolved_workspace_root = workspace_root.expanduser().resolve()
+        if nick_preset is None and not nick_additional_preset and not nick_additional_path:
+            nick_preset = "neb_nicking_v1"
+            nick_additional_preset = ["thermo_nicking_v1"]
+        if release_preset is None and not release_additional_preset and not release_additional_path:
+            release_preset = "type_iis_release_v1"
+        request = SingleNickReleasedTargetSearchRequest(
+            target=ReleasedFinalTargetGeometry(
+                nick_boundary_from_left=nick_boundary,
+                paired_bp=paired_bp,
+                cap_nt=cap_nt,
+            ),
+            nick_sources=CatalogSources(
+                preset=nick_preset,
+                additional_presets=nick_additional_preset,
+                additional_paths=nick_additional_path,
+            ),
+            release_sources=ReleaseCatalogSources(
+                preset=release_preset,
+                additional_presets=release_additional_preset,
+                additional_paths=release_additional_path,
+            ),
+            search=ReleasedTargetSearchConfig(
+                max_results=max_results,
+                near_boundary_search_limit=near_boundary_search_limit,
+            ),
+        )
+        report = run_released_snapback_target_search(
+            request=request,
+            workspace_root=resolved_workspace_root,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        _print_released_target_search_report(report)
+    if report.status == "no_hits":
+        raise typer.Exit(code=1)
+
+
+@app.command(
+    "released-show",
+    help="Read a released-product snapback bundle and print a path-oriented summary with drift checks.",
+)
+def released_show_cmd(
+    run: Path = typer.Option(..., "--run", help="Path to a released-product snapback output root."),
+    json_output: bool = typer.Option(False, "--json", help="Print the released show payload as JSON."),
+) -> None:
+    try:
+        payload = released_show_payload(run)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    console.print(f"Released-product bundle -> {payload['spec_name']}")
+    console.print(f"Kind -> {payload['kind']}")
+    console.print(f"Status -> {payload['status']}")
+    console.print(f"Manifest -> {payload['manifest_path']}")
+    console.print(f"Status file -> {payload['status_path']}")
+    console.print(f"Report JSON -> {payload['report_json']}")
+    console.print(f"Projection JSON -> {payload['projection_json']}")
 
 
 @app.command("show", help="Read a snapback design or solve workspace output root and print a path-oriented summary.")

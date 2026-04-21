@@ -34,6 +34,7 @@ Use `snapback` when you need:
 - bounded search over nick boundary, retained homology length, cap extension, motif-compatible site edits, and foldback-arm choices
 - target-first catalog search for an exact preserved-site geometry with the shortest feasible canonical top strand
 - explicit reports, stable tables, and a three-state QA triptych for the accepted design or top-ranked hits
+- released-product evaluation of a retained post-release object without forcing the nickase site itself into the final 6 nt budget
 
 ### Current workflow scope
 
@@ -43,6 +44,9 @@ Current scope:
 - `snapback design` writes one explicit bundle under a stable workspace output root
 - `snapback solve` runs bounded co-design search under `single_nick_snapback_solve_v3`
 - `snapback target-search` asks the catalog whether an exact preserved-site geometry exists and reports the nearest later-boundary fallbacks
+- `snapback released-design` validates one explicit two-stage precursor under `single_nick_released_snapback_v1`
+- `snapback released-target-search` searches paired nickase plus release-enzyme combinations in retained-product space
+- `snapback released-show` inspects released-product bundles and fails fast on projection and manifest drift
 - `snapback show` inspects explicit or solve bundles and fails fast on manifest, visual, or materialized-hit drift
 
 Current non-scope:
@@ -54,6 +58,8 @@ Current non-scope:
 - no multi-nick or excision workflow
 
 The lane is geometry-first. It answers whether a design satisfies the declared single-nick foldback contract and how accepted candidates rank under the current deterministic policy.
+
+For the two-stage precursor sibling lane, use [`snapback_released_workflow.md`](snapback_released_workflow.md).
 
 ### Core terms
 
@@ -182,6 +188,15 @@ cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.
 # Ask the catalog for an exact origin-junction hit with stem 3 and cap 3.
 cruncher snapback target-search --json
 
+# Materialize the checked-in released-product demo bundle.
+cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml --force-overwrite
+
+# Search the released-product lane in retained-product space.
+cruncher snapback released-target-search --workspace-root . --release-additional-path inputs/release_enzymes/local.release.yaml --json
+
+# Inspect the released-product bundle and drift checks.
+cruncher snapback released-show --run outputs/released_design
+
 # Inspect the solve bundle and materialized explicit hit bundles.
 cruncher snapback show --run outputs/solve
 ```
@@ -194,6 +209,7 @@ Notes:
 - `target-search` does not write a bundle; it prints a typed exact-hit / near-hit report to stdout.
 - the checked-in demo keeps `Nt.Bpu10I` as the explicit authored example, but the solve demo searches the broader NEB + Thermo preset catalog
 - `show` reads snapback-specific bundles only and refuses drift instead of guessing.
+- the released-product lane is a sibling contract surface and does not overload preserved-site `target-search` or `solve`
 
 ### Target-first catalog search
 

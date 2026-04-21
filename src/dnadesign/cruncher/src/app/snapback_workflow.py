@@ -64,19 +64,13 @@ from dnadesign.cruncher.snapback.artifacts import (
     write_report,
     write_status,
 )
+from dnadesign.cruncher.snapback.catalog_sources import catalog_source_label
 from dnadesign.cruncher.snapback.load import load_snapback_spec
 from dnadesign.cruncher.snapback.planner import (
     build_invalid_catalog_report,
     build_snapback_report,
     render_markdown_report,
 )
-
-
-def _catalog_source_label(*, preset_ids: list[str], resolved_paths: list[Path]) -> str:
-    labels: list[str] = []
-    labels.extend(f"preset:{preset_id}" for preset_id in preset_ids)
-    labels.extend(str(path) for path in resolved_paths)
-    return ", ".join(labels) if labels else "resolved_catalog"
 
 
 def _resolve_catalog(spec, *, workspace_root: Path):
@@ -89,7 +83,7 @@ def _resolve_catalog(spec, *, workspace_root: Path):
     return (
         catalog,
         resolved_paths,
-        _catalog_source_label(
+        catalog_source_label(
             preset_ids=spec.design.nickase.catalog.resolved_preset_ids(),
             resolved_paths=resolved_paths,
         ),
@@ -176,7 +170,7 @@ def _validate_materialized_hit_alignment(*, hit: dict[str, object], hit_run_dir:
 
 def validate_snapback_spec(path: str | Path):
     spec, spec_path, workspace_root = load_snapback_spec(path)
-    catalog_source = _catalog_source_label(
+    catalog_source = catalog_source_label(
         preset_ids=spec.design.nickase.catalog.resolved_preset_ids(),
         resolved_paths=spec.design.nickase.catalog.additional_paths,
     )
