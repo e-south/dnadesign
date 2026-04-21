@@ -11,6 +11,18 @@ runbooks or generated outputs.
 They are the record plane: `ops progress` reads them as observation surfaces,
 while `ops runbook` stays in the control plane for planning and execution.
 
+Family note:
+
+- `promoter` studies use `usr.data-plane.promoter-study-status` and
+  `usr.data-plane.promoter-study-preflight`.
+- `cruncher` studies use `cruncher.data-plane.cruncher-study-status` and
+  `cruncher.data-plane.cruncher-study-preflight`.
+- If the active checked-in study belongs to another family, pin the desired
+  study with `--study-dir docs/studies/<study-id>`.
+- The worked examples below remain promoter-oriented; Cruncher studies lean
+  harder on `routes.md` and `pipeline.yaml` because command grouping and native-agent
+  bootstrap are part of the family contract.
+
 ### Quick route
 
 Use these surfaces in order:

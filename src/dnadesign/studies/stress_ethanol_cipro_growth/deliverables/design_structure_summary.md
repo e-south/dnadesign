@@ -8,7 +8,7 @@ The summary measures how clearly each candidate space preserves design family, r
 
 **Data.** Each candidate is evaluated on a stratified sample over the shared promoter population with trusted metadata axes: `design_family`, `design_regulator_composition`, `sig35_variant`, and `spacer_length`.
 
-**Preprocessing.** All cosine geometry uses view-level standardization followed by row L2 normalization.
+**Preprocessing.** All cosine geometry uses view-level standardization followed by row L2 normalization. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0`.
 
 **Definition.** For each annotation axis \(A\), the cohort centroid is
 

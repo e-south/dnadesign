@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -184,3 +186,55 @@ def test_notify_maintainer_docs_use_deps_package_paths_not_removed_monolith() ->
     assert "src/dnadesign/notify/cli/bindings/deps/" in architecture
     assert "src/dnadesign/notify/cli/bindings/deps.py" not in docs_readme
     assert "src/dnadesign/notify/cli/bindings/deps.py" not in architecture
+
+
+def test_notify_agents_route_operator_workflow_to_repo_skill_and_docs() -> None:
+    root_agents = _read(_repo_root() / "AGENTS.md")
+    notify_agents = _read(_repo_root() / "src" / "dnadesign" / "notify" / "AGENTS.md")
+    skill = _read(_repo_root() / ".agents" / "skills" / "notify-ops" / "SKILL.md")
+    workflow_router = _read(_repo_root() / ".agents" / "skills" / "notify-ops" / "references" / "workflow-router.md")
+
+    assert ".agents/skills/notify-ops/SKILL.md" in root_agents
+    assert ".agents/skills/notify-ops/SKILL.md" in notify_agents
+    assert "docs/notify/README.md" in notify_agents
+    assert "docs/notify/usr-events.md" in notify_agents
+    assert "src/dnadesign/notify/docs/reference/command-contracts.md" in notify_agents
+    assert "Default low-friction flow" not in notify_agents
+    assert "notify setup slack" not in notify_agents
+    assert "notify usr-events watch --tool <tool> --workspace <workspace-name> --follow" not in notify_agents
+    assert "--secret-source auto" not in notify_agents
+    assert "docs/notify/README.md" in skill
+    assert "docs/notify/usr-events.md" in skill
+    assert "src/dnadesign/notify/docs/reference/command-contracts.md" in skill
+    assert "docs/bu-scc/batch-notify.md" in skill
+    assert ".events.log" in skill
+    assert "outputs/meta/events.jsonl" in skill
+    assert "--secret-source file --secret-ref file://" in skill
+    assert "one watcher per live Infer lane config" in skill
+    assert "one watcher per destination" in skill
+    assert "docs/notify/README.md" in workflow_router
+    assert "docs/notify/usr-events.md#setup-flow" in workflow_router
+    assert ".agents/skills/sge-hpc-ops/SKILL.md" in workflow_router
+
+
+def test_repo_local_notify_skill_audit_is_documented_and_present() -> None:
+    dev_docs = _read(_repo_root() / "docs" / "dev" / "README.md")
+    skill_root = _repo_root() / ".agents" / "skills" / "notify-ops"
+
+    assert ".agents/skills/notify-ops/scripts/audit-notify-ops-skill.sh" in dev_docs
+    assert (skill_root / "SKILL.md").exists()
+    assert (skill_root / "references" / "workflow-router.md").exists()
+    assert (skill_root / "references" / "external-sources.md").exists()
+    assert (skill_root / "scripts" / "audit-notify-ops-skill.sh").exists()
+
+
+def test_repo_local_notify_skill_audit_passes() -> None:
+    skill_root = _repo_root() / ".agents" / "skills" / "notify-ops"
+    result = subprocess.run(
+        [shutil.which("bash") or "bash", str(skill_root / "scripts" / "audit-notify-ops-skill.sh")],
+        cwd=_repo_root(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

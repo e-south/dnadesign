@@ -8,7 +8,7 @@ The summary measures whether the 1 kb construct context preserves or dilutes the
 
 **Data.** The comparison uses a 4,096-row design-family-stratified sample of aligned anchor and construct-context rows, with one context per promoter anchor, grouped into the canonical representation families.
 
-**Preprocessing.** Anchor and context vectors are standardized within view and row-normalized before any cosine or centroid-distance metric is computed on the persisted sample.
+**Preprocessing.** Anchor and context vectors are standardized within view and row-normalized before any cosine or centroid-distance metric is computed on the persisted sample. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0`.
 
 **Definition.** The row-level stability statistic is
 

@@ -5,3 +5,7 @@ studies:
     family: promoter
     title: Stress / ethanol / ciprofloxacin growth study
     record_root: docs/studies/stress_ethanol_cipro_growth
+  - study_id: snapback_shortening_effort
+    family: cruncher
+    title: Snapback shortening effort
+    record_root: docs/studies/snapback_shortening_effort

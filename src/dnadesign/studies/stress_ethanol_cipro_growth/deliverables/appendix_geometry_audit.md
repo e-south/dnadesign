@@ -6,7 +6,7 @@ These appendix surfaces provide orientation and diagnostics. Candidate ranking s
 
 #### Plot details
 
-**Data.** Each point is one sampled promoter row in a candidate representation
+**Data.** Each point is one promoter row in a candidate representation
 space. The gallery uses study-internal design cohorts rather than external
 reference promoters.
 

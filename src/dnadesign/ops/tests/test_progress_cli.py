@@ -2988,6 +2988,28 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
             ),
         },
     ]
+    assert kinds["cruncher-study-preflight"]["observes_plane"] == "execution_readiness"
+    assert kinds["cruncher-study-preflight"]["surface_type"] == "study_preflight"
+    assert kinds["cruncher-study-preflight"]["cost_class"] == "deep"
+    assert kinds["cruncher-study-preflight"]["summary_scope"] == "host"
+    assert kinds["cruncher-study-preflight"]["provider_id"] == "study.cruncher"
+    assert kinds["cruncher-study-preflight"]["optional_inputs"] == [
+        {
+            "cli_flag": "--study-dir",
+            "summary": (
+                "Checked-in cruncher-study directory containing campaign.yaml, "
+                "datasets.yaml, status.md, ops.study.yaml, routes.md, and pipeline.yaml."
+            ),
+        },
+        {
+            "cli_flag": "--scope",
+            "summary": (
+                "Preflight scope for cruncher-study-preflight surfaces: "
+                "`full` runs the whole suite; `next` focuses the current actionable "
+                "phase."
+            ),
+        },
+    ]
     assert kinds["ops-audit-json"]["notes"] == [
         "Smallest positive control-plane demo: run "
         "`uv run ops runbook execute ... --no-submit "
@@ -3036,6 +3058,25 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_preflight_
     assert "--study-dir" in result.output
     assert "--scope" in result.output
     assert "Preflight scope for promoter-study-preflight" in result.output
+
+
+def test_cli_progress_show_help_includes_registry_specific_inputs_for_cruncher_preflight_surface() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "show",
+            "cruncher.data-plane.cruncher-study-preflight",
+            "--help",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "--study-dir" in result.output
+    assert "--scope" in result.output
+    assert "Preflight scope for cruncher-study-preflight" in result.output
 
 
 def test_cli_progress_explain_includes_related_scaffold_when_route_has_neighbors() -> None:

@@ -1,6 +1,6 @@
 # Representation Health Summary
 
-Candidate spaces are screened for collapse with effective rank, PC1 variance fraction, and cosine-distance spread. Bar color marks the gate status: `pass`, `warn`, or `fail`.
+Candidate spaces are screened for collapse with effective rank, PC1 variance fraction, and cosine-distance spread. Read the bars directly by metric magnitude rather than a pass/fail hue.
 
 ### representation_health_summary | Representation health summary
 
@@ -8,7 +8,7 @@ Candidate spaces are screened for collapse with effective rank, PC1 variance fra
 
 **Data.** Each candidate summary combines a stratified candidate sample with the persisted PCA reducer summary for that same sampled view.
 
-**Preprocessing.** Pairwise cosine metrics use view-level standardization followed by row L2 normalization. PCA-derived metrics come from the stored reducer summaries on the sampled rows.
+**Preprocessing.** Pairwise cosine metrics use view-level standardization followed by row L2 normalization. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0` so degenerate spaces stay finite and are exposed by the health gate. PCA-derived metrics come from the stored reducer summaries on the sampled rows.
 
 **Definition.** The primary rank-health statistic is
 

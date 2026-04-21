@@ -15,6 +15,7 @@ Do not use this package when:
 
 Current families:
 - `promoter`: promoter-study snapshot and preflight adapters
+- `cruncher`: command-centric Cruncher study snapshot and preflight adapters
 
 See also:
 - [Ops README](../ops/README.md)

@@ -35,13 +35,18 @@ Use this index to find maintainer workflows, checks, and planning records.
 `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
 6. Run the repo-local skill audits when changing `.agents/skills/`:
 `bash .agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh`
+`bash .agents/skills/notify-ops/scripts/audit-notify-ops-skill.sh`
+`bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh`
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
-7. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
+7. Run the subtree routing contract checks when changing critical `AGENTS.md` surfaces or repo-local workflow skills:
+`uv run pytest -q src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+`uv run pytest -q src/dnadesign/usr/tests/test_usr_docs_contract.py`
+8. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
 `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py`
-8. Run the native gate stderr regression when changing `dnadesign.ops.orchestrator.gates` or any audit-fidelity path that executes those commands:
+9. Run the native gate stderr regression when changing `dnadesign.ops.orchestrator.gates` or any audit-fidelity path that executes those commands:
 `uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr`
 `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k captures_gate_stderr_for_nonzero_native_gate_command`
-9. Run focused OPS contract suites when changing state aggregation, preflight, or active-job identity:
+10. Run focused OPS contract suites when changing state aggregation, preflight, or active-job identity:
 `uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py`
 `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"`
 

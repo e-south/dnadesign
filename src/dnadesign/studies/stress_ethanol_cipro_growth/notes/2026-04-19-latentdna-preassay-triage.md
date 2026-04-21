@@ -16,24 +16,27 @@ Keep here:
 The checked-in study record still places the live study in
 `infer_batch_preparation`.
 
-The defensible pre-assay question is:
+The pre-assay question is:
 
 > Which mean-pooled Evo2 representation, X, is healthy, preserves trusted
 > synthetic-design structure, and remains stable enough under construct context
 > to be worth carrying into later supervised modeling?
 
-That is narrower than promoter-function discovery. The current study does not
-support claims that Evo2 geometry already recovers promoter fitness, promoter
-strength, or token-level mechanism.
+This is narrower than promoter-function discovery. The current study does not
+support claims about promoter fitness, promoter strength, or token-level
+mechanism.
 
 ## Current View Inventory
 
-The canonical LatentDNA inventory is eight `seq_mean` views:
+The study-facing notebook now surfaces a seven-view 7B inventory:
 
-- `intermediate_embedding_7b_anchor_60bp` and `pooled_logits_7b_anchor_60bp`
-- `intermediate_embedding_7b_full_context_1kb` and `pooled_logits_7b_full_context_1kb`
-- `intermediate_embedding_20b_anchor_60bp` and `pooled_logits_20b_anchor_60bp`
-- `intermediate_embedding_20b_full_context_1kb` and `pooled_logits_20b_full_context_1kb`
+- `intermediate_embedding_7b_anchor_60bp`
+- `pooled_logits_7b_anchor_60bp`
+- `intermediate_embedding_7b_full_context_1kb`
+- `pooled_logits_7b_full_context_1kb`
+- `intermediate_embedding_7b_full_context_anchor_mean`
+- `intermediate_embedding_7b_anchor_plus_full_context_concat`
+- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
 
 Important scope notes:
 
@@ -42,8 +45,11 @@ Important scope notes:
   logits.
 - `anchor_60bp` is a study label, not a literal invariant for every row. The
   carried controls are 35 bp, 165 bp, 200 bp, and 220 bp.
-- Infer also persists full-context `anchor_mean` vectors, but those are not yet
-  surfaced as canonical LatentDNA geometry views in this study.
+- The primary comparison story is still the 7B intermediate family; the 7B
+  pooled-logit views stay surfaced as appendix-grade notebook candidates and as
+  a log-likelihood hue source for EDA.
+- 20B views remain hidden from the notebook and do not participate in the
+  current deliverable ladder.
 
 ## Shared Geometry Contract
 
@@ -65,6 +71,11 @@ then computed on \(z_i\), not on the raw stored vectors.
 
 The study compares standardized and row-normalized geometry inside each view,
 not raw Evo2 outputs.
+
+Study builders use the collapse-tolerant normalization path. Zero-variance
+columns are set to `0.0` after scaling, and zero-norm rows remain `0.0`. This
+keeps degenerate spaces finite so they show up in the health gate instead of
+failing later cosine calculations.
 
 ## What The Current Views Can Test
 
@@ -108,9 +119,8 @@ $$
 W_A = \mathrm{mean}_g \ \mathrm{mean}_{i \in g}\left(1 - \cos(z_i, c_g)\right).
 $$
 
-This is the simplest useful pre-assay question: does the space preserve trusted
-study annotations such as design family, regulator composition, Sigma-35
-variant, and spacer length?
+This asks whether the space preserves trusted study annotations such as design
+family, regulator composition, Sigma-35 variant, and spacer length.
 
 ### 3. Sigma-35 ordered-axis structure
 
@@ -130,8 +140,8 @@ The audit reports Spearman and Kendall statistics, a balanced Sigma-35
 Spearman, a within-family mean Spearman, and a shuffled-label permutation
 p-value.
 
-This is the strongest current interpretability lane, but it is still an ordered
-design-axis audit, not mechanistic interpretability.
+This is the main interpretability signal in the study. It remains
+an ordered design-axis audit, not mechanistic interpretability.
 
 ### 4. Context robustness
 
@@ -156,7 +166,7 @@ visible in the anchor view.
 
 ### 5. Appendix-only reference alignment
 
-If reference promoters stay in view at all, the honest surface is the
+If reference promoters stay in the study, use the appendix-only
 background-relative full-context comparison
 
 $$
@@ -173,7 +183,7 @@ a_{\mathrm{cipro}} =
 \cos(c_{\mathrm{bg}}, r_{\mathrm{SulA}}).
 $$
 
-That is weaker than the internal design-structure evidence and should stay
+This is weaker than the internal design-structure evidence and stays
 appendix-only.
 
 ## What The Current Views Cannot Test
@@ -182,7 +192,7 @@ The current canonical views do not support:
 
 - assay-era phenotype claims
 - token-level mechanistic interpretation
-- strong manifold-biology language
+- promoter-function manifold claims
 - a primary geodesic story
 
 Without assay-derived phenotype distances, geodesics are mostly a graph choice
@@ -190,7 +200,7 @@ layered on top of already weak neighborhood evidence.
 
 ## Goodfire And EVOLVEpro Notes
 
-The connection to Goodfire is real but narrow.
+The Goodfire comparison is limited.
 
 - Goodfire SAE-style work is token-level internal-feature analysis. That does
   not port directly because this study persists mean-pooled vectors, not
@@ -201,19 +211,18 @@ The connection to Goodfire is real but narrow.
 - Goodfire's newer EVEE direction is a warning, not a shortcut: mean pooling
   can blur positional structure.
 
-The connection to EVOLVEpro is also narrow.
+The EVOLVEpro comparison is also limited.
 
 - EVOLVEpro supports using frozen model features as `X` for a later supervised
   model.
 - It does not justify treating model-native geometry as the task-native
   phenotype landscape before assay labels exist.
 
-So the present study should be described as feature-space triage, not as a
-promoter-fitness manifold.
+The present study is feature-space triage, not a promoter-fitness manifold.
 
 ## Current Read
 
-The strongest current evidence is internal:
+Current internal evidence:
 
 - representation health
 - design-family structure
@@ -221,17 +230,17 @@ The strongest current evidence is internal:
 - Sigma-35 structure
 - context robustness
 
-The weakest current evidence is external:
+Current weak evidence:
 
 - reference-neighbor artifacts
 - J23105-relative margin framing
 - any kNN-heavy story with little dynamic range
 
-That is why the live study contract now prefers centroid, separation, and
-retention surfaces over neighborhood-heavy or reference-heavy narratives.
+The live study contract therefore uses centroid, separation, and retention
+surfaces instead of neighborhood-heavy or reference-heavy narratives.
 
-The current shortlist still appears to be the two 7B intermediate spaces, but
-that should be read as a pre-assay shortlist, not as a winner declaration.
+The current shortlist is still the two 7B intermediate spaces. This is a
+pre-assay shortlist, not a final choice.
 
 ## Candidate-X Heuristic
 
@@ -245,7 +254,7 @@ So the current study contract is simple:
 
 - health is a gate
 - design structure is primary evidence
-- Sigma-35 is the strongest ordered annotation axis
+- Sigma-35 is the main ordered annotation axis
 - context robustness tests whether useful geometry survives full-context
   pooling
 

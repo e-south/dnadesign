@@ -23,6 +23,7 @@
 - The study phase is `infer_batch_preparation`
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
 - Current attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
 - Appendix and debug surfaces remain secondary audit material
 
 ### Current row counts

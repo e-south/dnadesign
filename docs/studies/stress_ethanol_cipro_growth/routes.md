@@ -70,6 +70,7 @@ This page keeps the downstream handoff map in one place.
   - `appendix_geometry_audit`
   - `appendix_umap_gallery`
 - Snapshot attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
 - Browser default geometries: the eight canonical anchor/full-context spaces across `intermediate_embedding` and `pooled_logits` for `evo2_7b` and `evo2_20b`
 - Interpretation guardrails:

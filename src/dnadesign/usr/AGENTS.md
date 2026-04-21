@@ -18,7 +18,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Remote sync config: prefer `uv run usr --remotes-config <remotes.yaml> ...`; `USR_REMOTES_PATH` is the fallback for shell-scoped sessions
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync.md`
-- Repo-local BU SCC sync skill: `src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md`
+- Repo-local BU SCC sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
 - Checked-in study records: `docs/studies/README.md`
 - Active study registry: `docs/studies/index.yaml`

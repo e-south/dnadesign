@@ -8,7 +8,7 @@ The audit measures whether each candidate space preserves the declared order acr
 
 **Data.** Each candidate is evaluated on a stratified sample over the synthetic promoter population using the workspace Sigma-35 order mapping.
 
-**Preprocessing.** All centroid distances use view-level standardization followed by row L2 normalization.
+**Preprocessing.** All centroid distances use view-level standardization followed by row L2 normalization. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0`.
 
 **Definition.** For the declared Sigma-35 order, the audit compares expected
 rank gaps

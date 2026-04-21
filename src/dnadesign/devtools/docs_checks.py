@@ -261,6 +261,16 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/cruncher/docs/operations/cruncher-study-status.md": {
+        "type": "contract",
+        "plane": "data-plane",
+        "owner_boundary": "cruncher",
+    },
+    "src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md": {
+        "type": "contract",
+        "plane": "data-plane",
+        "owner_boundary": "cruncher",
+    },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
         "plane": "downstream-tool",
