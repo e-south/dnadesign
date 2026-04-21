@@ -23,90 +23,112 @@ from ..views.reduce import fit_pca_reducer_artifacts
 from ..views.stats import compute_view_stats
 from ..workspaces.loader import load_workspace_config
 from ._artifact_inputs import artifact_input_from_manifest, dependency_artifact_input
-from .memory_service import apply_memory_preflight, evaluate_reduce_preflight
+from .memory_service import apply_memory_preflight, evaluate_materialize_preflight, evaluate_reduce_preflight
+from .operation_lock_service import acquire_workspace_operation_lock
 
 
-def materialize_view(workspace: str | Path, view_id: str, *, force: bool = False) -> CommandResult:
+def materialize_view(
+    workspace: str | Path,
+    view_id: str,
+    *,
+    allow_memory_overage: bool = False,
+    force: bool = False,
+) -> CommandResult:
     context = load_workspace_config(workspace)
-    view_dir = context.output_root / "views" / view_id
-    if view_dir.exists() and not force:
-        raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
-    staging_dir = stage_artifact_dir(context.output_root / "views", view_id)
+    with acquire_workspace_operation_lock(
+        context.output_root,
+        operation="view_materialize",
+        owner_id=view_id,
+    ):
+        view_dir = context.output_root / "views" / view_id
+        if view_dir.exists() and not force:
+            raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
+        preflight = evaluate_materialize_preflight(context, view_id=view_id)
+        status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
+        staging_dir = stage_artifact_dir(context.output_root / "views", view_id)
 
-    try:
-        artifact_dir, rows, dims, record_key, row_columns = materialize_view_artifact(
-            context,
-            view_id=view_id,
-            artifact_dir=staging_dir,
+        try:
+            artifact_dir, rows, dims, record_key, row_columns, provenance_row_columns = materialize_view_artifact(
+                context,
+                view_id=view_id,
+                artifact_dir=staging_dir,
+            )
+            assert artifact_dir == staging_dir
+        except Exception:
+            import shutil
+
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
+        view = context.require_source_view(view_id)
+        source = context.require_source(view.source)
+        resolved_source = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
+        input_columns = (
+            provenance_row_columns
+            if view.vector.kind == "bundle_matrix"
+            else [*provenance_row_columns, view.vector.name]
         )
-        assert artifact_dir == staging_dir
-    except Exception:
-        import shutil
+        source_input_digest, source_provenance, input_digests = source_digest(resolved_source, columns=input_columns)
+        source_input = ArtifactInput(
+            kind="source",
+            id=view.source,
+            digest=source_input_digest,
+        )
 
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise
-    view = context.require_source_view(view_id)
-    source = context.require_source(view.source)
-    resolved_source = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
-    input_columns = row_columns if view.vector.kind == "bundle_matrix" else [*row_columns, view.vector.name]
-    source_input_digest, source_provenance, input_digests = source_digest(resolved_source, columns=input_columns)
-    source_input = ArtifactInput(
-        kind="source",
-        id=view.source,
-        digest=source_input_digest,
-    )
-
-    manifest = ArtifactManifest(
-        artifact_kind="view",
-        artifact_id=view_id,
-        workspace_id=context.workspace_id,
-        created_at=datetime.now(UTC).isoformat(),
-        tool_version=__version__,
-        command="view materialize",
-        inputs=[source_input],
-        input_digests=input_digests,
-        freshness_basis={"kind": "source_provenance", "known": True},
-        source_provenance=source_provenance,
-        params={
-            "analysis_dtype": context.analysis_dtype,
-            "coordinate_space_id": view.coordinate_space_id,
-            "record_key": record_key,
-            "subject_key": source.subject_key,
-            "context_key": source.context_key,
-            "row_columns": row_columns,
-            "vector_kind": view.vector.kind,
-            "vector_column": getattr(view.vector, "name", None),
-            "source": view.source,
-            "role": view.role,
-            "tags": view.tags,
-        },
-        outputs=[
-            ArtifactOutput(path="matrix.npy", media_type="application/x-npy"),
-            ArtifactOutput(path="rows.parquet", media_type="application/x-parquet"),
-        ],
-        stats={"rows": rows, "dims": dims},
-    )
-    write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
-    commit_staged_artifact_dirs([(staging_dir, view_dir)], force=force)
-    result = CommandResult(
-        command="view materialize",
-        workspace_id=context.workspace_id,
-        status="ok",
-        artifact_kind="view",
-        artifact_id=view_id,
-        outputs=[view_dir.as_posix()],
-        inputs={"view": view_id, "source": view.source},
-        input_digests=input_digests,
-        metrics={"rows": rows, "dims": dims},
-        freshness_known=True,
-    )
-    record_audit(
-        context.output_root / "logs" / "audit",
-        payload=result.model_dump(mode="json"),
-        command="view_materialize",
-        artifact_id=view_id,
-    )
-    return result
+        manifest = ArtifactManifest(
+            artifact_kind="view",
+            artifact_id=view_id,
+            workspace_id=context.workspace_id,
+            created_at=datetime.now(UTC).isoformat(),
+            tool_version=__version__,
+            command="view materialize",
+            status=status,
+            inputs=[source_input],
+            input_digests=input_digests,
+            freshness_basis={"kind": "source_provenance", "known": True},
+            source_provenance=source_provenance,
+            params={
+                "analysis_dtype": context.analysis_dtype,
+                "coordinate_space_id": view.coordinate_space_id,
+                "record_key": record_key,
+                "subject_key": source.subject_key,
+                "context_key": source.context_key,
+                "row_columns": row_columns,
+                "vector_kind": view.vector.kind,
+                "vector_column": getattr(view.vector, "name", None),
+                "source": view.source,
+                "role": view.role,
+                "tags": view.tags,
+                "memory_preflight": preflight.as_payload(),
+            },
+            outputs=[
+                ArtifactOutput(path="matrix.npy", media_type="application/x-npy"),
+                ArtifactOutput(path="rows.parquet", media_type="application/x-parquet"),
+            ],
+            stats={"rows": rows, "dims": dims},
+            warnings=warnings,
+        )
+        write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
+        commit_staged_artifact_dirs([(staging_dir, view_dir)], force=force)
+        result = CommandResult(
+            command="view materialize",
+            workspace_id=context.workspace_id,
+            status=status,
+            artifact_kind="view",
+            artifact_id=view_id,
+            outputs=[view_dir.as_posix()],
+            inputs={"view": view_id, "source": view.source},
+            input_digests=input_digests,
+            warnings=warnings,
+            metrics={"rows": rows, "dims": dims, "memory_preflight": preflight.as_payload()},
+            freshness_known=True,
+        )
+        record_audit(
+            context.output_root / "logs" / "audit",
+            payload=result.model_dump(mode="json"),
+            command="view_materialize",
+            artifact_id=view_id,
+        )
+        return result
 
 
 def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> CommandResult:

@@ -14,9 +14,7 @@ from types import ModuleType
 import marimo as mo
 import numpy as np
 import pandas as pd
-from pydantic import ValidationError
 
-from ..contracts.plot_semantics import PlotSemantics
 from ..labels import humanize_plot_title
 from ..plots.recipes import resolve_plot_spec
 from ..studies.docs_refs import read_docs_ref
@@ -37,12 +35,14 @@ from .browser_runtime_support import (
     geometry_map,
     include_hue_column,
     key_value_table,
+    labeled_options,
     load_json,
     load_table,
     load_workspace_notebook_controls,
     notebook_theme,
     option_key_for_value,
     read_text,
+    render_math_markdown,
     render_plot_asset,
     select_plot_render_path,
     style_notebook_axes,
@@ -53,7 +53,16 @@ from .browser_runtime_support import (
 __all__ = ["build_workspace_browser_runtime", "load_workspace_notebook_controls", "resolve_plot_doc_block"]
 
 
-_ALLOWED_RUNTIME_HUE_KINDS = {"categorical", "binary", "continuous"}
+_ALLOWED_RUNTIME_HUE_KINDS = {"categorical", "binary", "continuous", "ordinal"}
+_PLOT_REVIEW_LIVE_RENDER_KINDS = {
+    "projection_grid",
+    "xy_scatter_grid",
+    "paired_xy_scatter_grid",
+    "categorical_count",
+    "metric_panel_grid",
+    "distribution_grid",
+    "curve_grid",
+}
 
 
 @dataclass(frozen=True)
@@ -123,6 +132,7 @@ class BrowserSupport:
     display_hue_label: Callable[[str], str]
     json: ModuleType
     key_value_table: Callable[..., object]
+    labeled_options: Callable[..., dict[str, object]]
     load_json: Callable[[Path], dict[str, object]]
     load_table: Callable[[Path], pd.DataFrame]
     mo: ModuleType
@@ -130,6 +140,7 @@ class BrowserSupport:
     option_key_for_value: Callable[[dict[str, object], object], str | None]
     pd: ModuleType
     read_text: Callable[[str | None], str | None]
+    render_math_markdown: Callable[[str], object]
     select_plot_render_path: Callable[[list[Path]], Path | None]
     style_notebook_axes: Callable[..., None]
     table_from_records: Callable[..., object]
@@ -168,17 +179,59 @@ def _resolved_plot_semantics_payload(
     plot_id: str,
     manifest: dict[str, object],
 ) -> dict[str, object]:
-    raw_semantics = manifest.get("semantics")
-    if isinstance(raw_semantics, dict):
-        try:
-            semantics = PlotSemantics.model_validate(raw_semantics)
-        except ValidationError:
-            semantics = resolve_plot_semantics(context, plot_id=plot_id)
-        else:
-            if semantics.plot_id != plot_id:
-                semantics = resolve_plot_semantics(context, plot_id=plot_id)
-        return semantics.model_dump(mode="json")
+    del manifest
     return resolve_plot_semantics(context, plot_id=plot_id).model_dump(mode="json")
+
+
+def _runtime_hue_columns(
+    *,
+    joinable_tables: list[dict[str, object]],
+    preferred_hues: list[str],
+    configured_hue_kinds: dict[str, object],
+    joinable_artifact_suffixes: set[str],
+) -> tuple[list[str], dict[str, str]]:
+    actual_columns = unique_in_order(
+        str(column)
+        for row in joinable_tables
+        for column in row.get("columns", [])
+        if isinstance(column, str) and include_hue_column(str(column), joinable_artifact_suffixes)
+    )
+    ordered_candidates = unique_in_order(
+        [
+            *[column for column in preferred_hues if column in actual_columns],
+            *[column for column in actual_columns if column in configured_hue_kinds],
+        ]
+    )
+    hue_kinds = resolve_runtime_hue_kinds(ordered_candidates, configured_hue_kinds)
+    return [column for column in ordered_candidates if column in hue_kinds], hue_kinds
+
+
+def _live_plot_status_rows(catalog_plots: list[dict[str, object]] | None) -> dict[str, dict[str, object]]:
+    return {
+        str(row.get("plot_id")): row for row in (catalog_plots or []) if isinstance(row, dict) and row.get("plot_id")
+    }
+
+
+def _projection_grid_render_mode(
+    *,
+    output_root: Path,
+    plot_spec: dict[str, object],
+) -> tuple[bool, str | None]:
+    del output_root, plot_spec
+    return True, None
+
+
+def _resolve_plot_review_render_mode(
+    *,
+    output_root: Path,
+    plot_spec: dict[str, object],
+) -> tuple[bool, str | None]:
+    kind = str(plot_spec.get("kind") or "")
+    if kind not in _PLOT_REVIEW_LIVE_RENDER_KINDS:
+        return False, None
+    if kind == "projection_grid":
+        return _projection_grid_render_mode(output_root=output_root, plot_spec=plot_spec)
+    return True, None
 
 
 def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
@@ -218,7 +271,7 @@ def _extract_plot_details(markdown: str) -> str:
     lines = markdown.splitlines()
     heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
     if not heading_indices:
-        return markdown.strip()
+        return ""
 
     heading_indices.append(len(lines))
     for start, end in zip(heading_indices, heading_indices[1:], strict=False):
@@ -227,6 +280,27 @@ def _extract_plot_details(markdown: str) -> str:
             continue
         return "\n".join(lines[start + 1 : end]).strip()
     return ""
+
+
+def _strip_plot_details(markdown: str) -> str:
+    lines = markdown.splitlines()
+    heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
+    if not heading_indices:
+        return markdown.strip()
+
+    heading_indices.append(len(lines))
+    kept_blocks: list[str] = []
+    cursor = 0
+    for start, end in zip(heading_indices[:-1], heading_indices[1:], strict=False):
+        if cursor < start:
+            kept_blocks.append("\n".join(lines[cursor:start]).strip())
+        title = lines[start][5:].strip()
+        if title.casefold() != "plot details":
+            kept_blocks.append("\n".join(lines[start:end]).strip())
+        cursor = end
+    if cursor < len(lines):
+        kept_blocks.append("\n".join(lines[cursor:]).strip())
+    return "\n\n".join(block for block in kept_blocks if block).strip()
 
 
 def resolve_plot_doc_block(
@@ -242,17 +316,18 @@ def resolve_plot_doc_block(
     plot_entry = plot_sections.get(plot_id) if isinstance(plot_sections, dict) else None
     if isinstance(plot_entry, dict):
         markdown = str(plot_entry.get("markdown") or "").strip()
+        plot_details_md = _extract_plot_details(markdown)
         return {
             "title": str(plot_entry.get("title") or _humanize_plot_id(plot_id)),
-            "markdown": markdown,
-            "plot_details_md": _extract_plot_details(markdown),
+            "markdown": _strip_plot_details(markdown),
+            "plot_details_md": plot_details_md,
             "warning": None,
         }
     fallback_markdown = summary_markdown or deliverable_summary.strip()
     return {
         "title": _humanize_plot_id(plot_id),
         "markdown": fallback_markdown,
-        "plot_details_md": _extract_plot_details(fallback_markdown),
+        "plot_details_md": "",
         "warning": f"Missing plot-specific study-doc subsection for `{plot_id}`.",
     }
 
@@ -295,7 +370,13 @@ def _resolve_review_plot_spec(context, *, plot_id: str):
     )
 
 
-def _plot_review_sections(context, *, output_root: Path, controls: dict[str, object]) -> BrowserPlotReview:
+def _plot_review_sections(
+    context,
+    *,
+    output_root: Path,
+    controls: dict[str, object],
+    catalog_plots: list[dict[str, object]] | None = None,
+) -> BrowserPlotReview:
     plot_controls = controls.get("plot_controls", {})
     ordered_plot_ids = [str(item) for item in plot_controls.get("ordered_plot_ids", []) if isinstance(item, str)]
     default_surface = str(plot_controls.get("default_surface") or "plots")
@@ -307,12 +388,14 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
         for item in plot_controls.get("plots", [])
         if isinstance(item, dict) and item.get("plot_id")
     }
+    live_plot_rows = _live_plot_status_rows(catalog_plots)
     docs_cache: dict[str, dict[str, object]] = {}
     sections: list[dict[str, object]] = []
     current_section: dict[str, object] | None = None
 
     for plot_id in ordered_plot_ids:
         entry = plot_entries.get(plot_id, {})
+        live_entry = live_plot_rows.get(plot_id, {})
         deliverable_id = str(entry.get("deliverable_id") or "")
         deliverable = context.config.deliverables.get(deliverable_id) if deliverable_id else None
         deliverable_title = str(entry.get("deliverable_title") or "") or (
@@ -334,7 +417,12 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
             parsed_markdown=docs_cache.get(deliverable_id),
         )
         plot_dir = output_root / "plots" / plot_id
-        manifest = load_json(plot_dir / "manifest.json")
+        manifest_warning: str | None = None
+        try:
+            manifest = load_json(plot_dir / "manifest.json")
+        except Exception as exc:
+            manifest = {"status": "error", "stale": False}
+            manifest_warning = f"Plot manifest could not be read for `{plot_id}`: {exc}"
         semantics = _resolved_plot_semantics_payload(context, plot_id=plot_id, manifest=manifest)
         output_paths = [
             plot_dir / str(output.get("path"))
@@ -346,15 +434,11 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
             entry.get("visibility_tier") or getattr(context.require_plot(plot_id), "visibility_tier", "primary")
         )
         resolved_spec = _resolve_review_plot_spec(context, plot_id=plot_id)
-        live_render = resolved_spec.kind in {
-            "projection_grid",
-            "xy_scatter_grid",
-            "paired_xy_scatter_grid",
-            "categorical_count",
-            "metric_panel_grid",
-            "distribution_grid",
-            "curve_grid",
-        }
+        plot_spec_payload = resolved_spec.model_dump(mode="json")
+        live_render, render_mode_note = _resolve_plot_review_render_mode(
+            output_root=output_root,
+            plot_spec=plot_spec_payload,
+        )
 
         if current_section is None or str(current_section.get("deliverable_id")) != deliverable_id:
             current_section = {
@@ -367,17 +451,37 @@ def _plot_review_sections(context, *, output_root: Path, controls: dict[str, obj
         current_section["cards"].append(
             {
                 "plot_id": plot_id,
+                "deliverable_id": deliverable_id,
                 "title": str(doc_block.get("title") or _humanize_plot_id(plot_id)),
                 "visibility_tier": visibility_tier,
                 "render_path": render_path,
+                "question": str(semantics.get("question") or "").strip(),
+                "decision_role": str(semantics.get("decision_role") or "").strip(),
+                "encoding": str(semantics.get("encoding") or "").strip(),
+                "scope": str(semantics.get("scope") or "").strip(),
+                "guardrails": [str(item).strip() for item in semantics.get("guardrails", []) if str(item).strip()],
                 "caption_md": str(semantics.get("caption") or "").strip(),
+                "alt_text": str(semantics.get("alt_text") or doc_block.get("title") or plot_id).strip(),
                 "study_doc_md": str(doc_block.get("markdown") or "").strip(),
                 "plot_details_md": str(doc_block.get("plot_details_md") or "").strip(),
+                "preprocessing_md": str(semantics.get("preprocessing_md") or "").strip(),
+                "math_md": str(semantics.get("math_md") or "").strip(),
+                "rationale_md": str(semantics.get("rationale_md") or "").strip(),
+                "limitations_md": str(semantics.get("limitations_md") or "").strip(),
+                "failure_modes_md": str(semantics.get("failure_modes_md") or "").strip(),
                 "study_doc_warning": doc_block.get("warning"),
-                "status": str(entry.get("status") or "missing"),
-                "stale": bool(entry.get("stale")),
+                "artifact_warning": manifest_warning,
+                "status": str(live_entry.get("status") or entry.get("status") or manifest.get("status") or "missing"),
+                "stale": bool(
+                    live_entry.get("stale")
+                    if live_entry.get("stale") is not None
+                    else entry.get("stale")
+                    if entry.get("stale") is not None
+                    else manifest.get("stale")
+                ),
                 "live_render": live_render,
-                "plot_spec": resolved_spec.model_dump(mode="json"),
+                "render_mode_note": render_mode_note,
+                "plot_spec": plot_spec_payload,
             }
         )
 
@@ -479,17 +583,12 @@ def build_workspace_browser_runtime(
     preferred_hues = [str(item) for item in geometry_control.get("preferred_hues", []) if isinstance(item, str)]
     configured_hue_kinds = geometry_control.get("hue_kinds", {})
     reference_labels = [str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)]
-    global_hue_columns = unique_in_order(
-        [
-            str(column)
-            for item in joinable_tables
-            for column in item.get("columns", [])
-            if isinstance(column, str)
-            and str(column) in preferred_hues
-            and include_hue_column(str(column), joinable_artifact_suffixes)
-        ]
+    global_hue_columns, hue_kinds = _runtime_hue_columns(
+        joinable_tables=joinable_tables,
+        preferred_hues=preferred_hues,
+        configured_hue_kinds=configured_hue_kinds,
+        joinable_artifact_suffixes=joinable_artifact_suffixes,
     )
-    hue_kinds = resolve_runtime_hue_kinds(global_hue_columns, configured_hue_kinds)
     model_values = unique_in_order(row.get("model") for row in geometry_rows) or ["20b"]
     model_default = (
         str(geometry_control.get("default_model"))
@@ -525,7 +624,12 @@ def build_workspace_browser_runtime(
         workspace_dir=workspace_dir,
     )
     compare_pair_payload_for_output = partial(compare_pair_payload, output_root=output_root)
-    plot_review = _plot_review_sections(context, output_root=output_root, controls=controls)
+    plot_review = _plot_review_sections(
+        context,
+        output_root=output_root,
+        controls=controls,
+        catalog_plots=plots,
+    )
 
     return WorkspaceBrowserRuntime(
         identity=BrowserIdentity(
@@ -587,8 +691,10 @@ def build_workspace_browser_runtime(
             mo=mo,
             notebook_theme=notebook_theme,
             option_key_for_value=option_key_for_value,
+            labeled_options=labeled_options,
             pd=pd,
             read_text=read_text,
+            render_math_markdown=render_math_markdown,
             select_plot_render_path=select_plot_render_path,
             style_notebook_axes=style_notebook_axes,
             table_from_records=table_from_records,

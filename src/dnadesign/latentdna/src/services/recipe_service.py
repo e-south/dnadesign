@@ -64,8 +64,12 @@ def _materialize_view_step(
     force: bool,
     allow_memory_overage: bool,
 ) -> CommandResult:
-    del allow_memory_overage
-    return materialize_view(workspace, str(_require_param(params, "view_id", "view")), force=force)
+    return materialize_view(
+        workspace,
+        str(_require_param(params, "view_id", "view")),
+        allow_memory_overage=allow_memory_overage,
+        force=force,
+    )
 
 
 def _derive_view_step(

@@ -298,7 +298,7 @@ _METRICS = [
     ),
     _metric(
         "geometry_distance_correlation",
-        "Pairwise distance Spearman",
+        "Pairwise distance Spearman correlation",
         "Spearman correlation between pairwise cosine distances in anchor and context spaces.",
         metric_family="context_stability",
         evidence_tier="secondary",

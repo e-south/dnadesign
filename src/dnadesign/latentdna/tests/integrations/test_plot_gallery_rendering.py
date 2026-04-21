@@ -337,6 +337,15 @@ def test_plot_gallery_rendering_records_plural_scalar_and_agreement_inputs(tmp_p
     assert [entry["id"] for entry in reference_manifest["inputs"]] == ["margin_a", "margin_b"]
     assert reference_manifest["semantics"]["decision_role"] == "primary"
     assert reference_manifest["semantics"]["question"].startswith("Do internal design centroids orient")
+    assert any(
+        entry["role"] == "workspace_config" and entry["path"].endswith("/config.yaml")
+        for entry in reference_manifest["source_provenance"]
+    )
+    assert any(
+        entry["role"] == "plot_semantics"
+        and entry["path"].endswith("/plot_semantics/design_centroid_margin_gallery.yaml")
+        for entry in reference_manifest["source_provenance"]
+    )
     reference_svg = output_root / "plots" / "design_centroid_margin_gallery" / "plot.svg"
     assert reference_svg.is_file()
     reference_svg_text = reference_svg.read_text(encoding="utf-8")
@@ -409,6 +418,7 @@ def test_figure_legends_are_reserved_below_the_axes() -> None:
     bottom_margin = _add_figure_legends(
         fig,
         plt,
+        plot_id=None,
         color_categories=["background_only", "ethanol", "ciprofloxacin"],
         color_map={
             "background_only": "#56B4E9",

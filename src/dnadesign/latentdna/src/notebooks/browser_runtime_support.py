@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import base64
 import json
+import re
+from functools import lru_cache
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Iterable
@@ -16,9 +18,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..labels import humanize_column_name
 from ..visual_style import (
+    ANNOTATION_LABEL_BOX_ALPHA,
     DEFAULT_NOTEBOOK_FIG_DPI,
     GRID_COLOR,
     NOTEBOOK_FONT_STACK,
@@ -31,6 +35,7 @@ from ..visual_style import (
     SPINE_COLOR,
     TEXT_COLOR,
     categorical_color_map,
+    display_category_text,
     humanize_display_text,
     ordered_categories,
 )
@@ -45,7 +50,23 @@ REFERENCE_DISPLAY = {
 PREFERRED_RASTER_PLOT_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 PREFERRED_PLOT_RENDER_SUFFIXES = (".svg", *PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf")
 MAX_INLINE_SVG_BYTES = 5_000_000
-NOTEBOOK_MEDIA_MAX_WIDTH_PX = 1080
+MAX_INLINE_NOTEBOOK_ASSET_BYTES = 600_000
+NOTEBOOK_MEDIA_MAX_WIDTH_PX = 1400
+_DISPLAY_MATH_RE = re.compile(r"\$\$(.*?)\$\$", flags=re.DOTALL)
+_PLOT_ASSET_WRAPPER_STYLE = (
+    "width: 100%; overflow-x: auto; padding: 0.2rem 0 0.35rem 0; "
+    "display: flex; align-items: flex-start; justify-content: center;"
+)
+_PLOT_ASSET_MEDIA_STYLE = (
+    f"display: block; width: auto; height: auto; max-width: 100%; flex: 0 1 auto; "
+    f"border-radius: 14px; background: {PANEL_BACKGROUND_COLOR};"
+)
+_MATH_BLOCK_STYLE = "padding: 0.1rem 0 0.25rem 0;"
+_MATH_IMAGE_STYLE = "display: block; max-width: 100%; height: auto;"
+_MATH_COMMAND_NORMALIZATIONS = (
+    (r"\\le\b", r"\\leq"),
+    (r"\\ge\b", r"\\geq"),
+)
 
 
 def load_json(path: Path) -> dict[str, object]:
@@ -73,6 +94,35 @@ def load_workspace_notebook_controls(control_path: Path) -> dict[str, object]:
     return WorkspaceNotebookControls.model_validate(load_json(control_path)).model_dump(mode="json")
 
 
+def _image_data_uri(image_bytes: bytes, *, suffix: str) -> str:
+    mime_type = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+    }.get(suffix.lower(), "application/octet-stream")
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def _inline_plot_image(image_bytes: bytes, *, suffix: str, alt: str) -> mo.Html:
+    return mo.Html(
+        (
+            '<div class="latentdna-plot-asset" role="img" aria-label="'
+            + escape(alt)
+            + '" style="'
+            + escape(_PLOT_ASSET_WRAPPER_STYLE)
+            + '"><img src="'
+            + _image_data_uri(image_bytes, suffix=suffix)
+            + '" alt="'
+            + escape(alt)
+            + '" style="'
+            + escape(_PLOT_ASSET_MEDIA_STYLE)
+            + '" /></div>'
+        )
+    )
+
+
 def fig_to_image(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent geometry plot"):
     buf = BytesIO()
     fig.patch.set_facecolor(PANEL_BACKGROUND_COLOR)
@@ -88,7 +138,7 @@ def fig_to_image(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent
     )
     image_bytes = buf.getvalue()
     plt.close(fig)
-    return mo.image(image_bytes, alt=alt, width=f"min(100%, {NOTEBOOK_MEDIA_MAX_WIDTH_PX}px)")
+    return _inline_plot_image(image_bytes, suffix=".png", alt=alt)
 
 
 def _svg_data_uri(svg_markup: str) -> str:
@@ -96,13 +146,14 @@ def _svg_data_uri(svg_markup: str) -> str:
     return f"data:image/svg+xml;base64,{encoded}"
 
 
-def fig_to_svg(fig, *, alt: str = "latent geometry plot"):
+def fig_to_svg(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent geometry plot"):
     buf = StringIO()
     fig.patch.set_facecolor(PANEL_BACKGROUND_COLOR)
     fig.patch.set_alpha(1.0)
     fig.savefig(
         buf,
         format="svg",
+        dpi=int(dpi),
         bbox_inches="tight",
         pad_inches=0.05,
         facecolor=fig.get_facecolor(),
@@ -114,10 +165,14 @@ def fig_to_svg(fig, *, alt: str = "latent geometry plot"):
         (
             '<div class="latentdna-plot-asset" role="img" aria-label="'
             + escape(alt)
+            + '" style="'
+            + escape(_PLOT_ASSET_WRAPPER_STYLE)
             + '"><img src="'
             + _svg_data_uri(svg_markup)
             + '" alt="'
             + escape(alt)
+            + '" style="'
+            + escape(_PLOT_ASSET_MEDIA_STYLE)
             + '" /></div>'
         )
     )
@@ -144,28 +199,6 @@ def notebook_theme():
     return mo.Html(
         f"""
         <style>
-          .latentdna-plot-asset {{
-            --latentdna-surface: {PANEL_BACKGROUND_COLOR};
-            --latentdna-media-max-width: {NOTEBOOK_MEDIA_MAX_WIDTH_PX}px;
-            width: 100%;
-            overflow-x: auto;
-            padding: 0.2rem 0;
-            display: flex;
-            justify-content: center;
-          }}
-
-          .latentdna-plot-asset img,
-          .latentdna-plot-asset canvas,
-          .latentdna-plot-asset svg {{
-            width: min(100%, var(--latentdna-media-max-width));
-            max-width: min(100%, var(--latentdna-media-max-width));
-            height: auto;
-            display: block;
-            margin-inline: auto;
-            border-radius: 14px;
-            background: var(--latentdna-surface);
-          }}
-
           .latentdna-badge {{
             display: inline-flex;
             align-items: center;
@@ -202,59 +235,167 @@ def select_plot_render_path(plot_files: Iterable[Path]) -> Path | None:
     return existing_paths[0] if existing_paths else None
 
 
+def _fallback_plot_render_path(path: Path) -> Path | None:
+    for suffix in (*PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf"):
+        candidate = path.with_suffix(suffix)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def resolve_plot_render_asset(path: Path) -> tuple[Path | None, str | None]:
     if not path.is_file():
         return None, f"Plot asset is missing: `{path.name}`."
+    asset_size = path.stat().st_size
+    if path.suffix.lower() == ".svg" and asset_size > MAX_INLINE_NOTEBOOK_ASSET_BYTES:
+        fallback_path = _fallback_plot_render_path(path)
+        if fallback_path is not None:
+            return (
+                fallback_path,
+                (
+                    f"Displaying `{fallback_path.name}` because `{path.name}` is large for inline notebook "
+                    f"rendering ({asset_size:,} bytes)."
+                ),
+            )
     if path.suffix.lower() != ".svg":
         return path, None
-    svg_size = path.stat().st_size
+    svg_size = asset_size
     if svg_size <= MAX_INLINE_SVG_BYTES:
         return path, None
-    raster_paths = []
-    for suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
-        candidate = path.with_suffix(suffix)
-        if candidate.is_file():
-            raster_paths.append(candidate)
-    if raster_paths:
-        raster_path = raster_paths[0]
+    fallback_path = _fallback_plot_render_path(path)
+    if fallback_path is not None:
         return (
-            raster_path,
+            fallback_path,
             (
-                f"Displaying `{raster_path.name}` because `{path.name}` exceeds the inline notebook "
+                f"Displaying `{fallback_path.name}` because `{path.name}` exceeds the inline notebook "
                 f"limit ({svg_size:,} bytes)."
             ),
         )
     return (
         None,
-        (f"`{path.name}` exceeds the inline notebook limit ({svg_size:,} bytes) and no raster fallback is available."),
+        (
+            f"`{path.name}` exceeds the inline notebook limit ({svg_size:,} bytes) "
+            "and no raster or PDF fallback is available."
+        ),
     )
 
 
-def render_plot_asset(path: Path, *, workspace_dir: Path):
+def render_plot_asset(path: Path, *, workspace_dir: Path, alt_text: str | None = None):
     render_path, notice = resolve_plot_render_asset(path)
     if render_path is None:
         return mo.md(notice or f"`{path.relative_to(workspace_dir).as_posix()}`")
+    alt = str(alt_text or render_path.name)
     suffix = render_path.suffix.lower()
     if suffix == ".svg":
         svg_html = render_path.read_text(encoding="utf-8")
         rendered = mo.Html(
             (
-                "<div class='latentdna-plot-asset'>"
-                f"<img src='{_svg_data_uri(svg_html)}' alt='{escape(render_path.name)}' />"
+                "<div class='latentdna-plot-asset' role='img' aria-label='"
+                + escape(alt)
+                + "' style='"
+                + escape(_PLOT_ASSET_WRAPPER_STYLE)
+                + "'>"
+                f"<img src='{_svg_data_uri(svg_html)}' alt='{escape(alt)}' style='{escape(_PLOT_ASSET_MEDIA_STYLE)}' />"
                 "</div>"
             )
         )
-    elif suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
-        rendered = mo.image(
-            render_path.read_bytes(),
-            alt=render_path.name,
-            width=f"min(100%, {NOTEBOOK_MEDIA_MAX_WIDTH_PX}px)",
+    elif suffix == ".pdf":
+        rendered = mo.pdf(
+            src=render_path,
+            width="100%",
+            height="78vh",
+            style={
+                "border-radius": "14px",
+                "background": PANEL_BACKGROUND_COLOR,
+            },
         )
+    elif suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
+        rendered = _inline_plot_image(render_path.read_bytes(), suffix=suffix, alt=alt)
     else:
         rendered = mo.md(f"`{render_path.relative_to(workspace_dir).as_posix()}`")
-    if notice is None:
-        return rendered
-    return mo.vstack([mo.md(notice), rendered])
+    return rendered
+
+
+@lru_cache(maxsize=256)
+def _render_math_svg_bytes(expression: str) -> bytes:
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.mathtext import math_to_image
+
+    normalized = " ".join(str(expression).split()).strip()
+    for pattern, replacement in _MATH_COMMAND_NORMALIZATIONS:
+        normalized = re.sub(pattern, replacement, normalized)
+    if not normalized:
+        return b""
+    buffer = BytesIO()
+    math_to_image(
+        f"${normalized}$",
+        buffer,
+        format="svg",
+        dpi=220,
+        prop=FontProperties(size=15.0, family=PLOT_FONT_FAMILY),
+        color="#E5EDF5",
+    )
+    return buffer.getvalue()
+
+
+def _clean_markdown_prose(text: str) -> str:
+    return text.replace(r"\(", "").replace(r"\)", "").strip()
+
+
+def _transparent_math_svg_markup(svg_markup: str) -> str:
+    return re.sub(
+        r'(<g id="patch_1">\s*<path\b[^>]*)(/>)',
+        r'\1 style="fill: none; stroke: none;"\2',
+        svg_markup,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+
+def render_math_markdown(text: str):
+    content = str(text or "").strip()
+    if not content:
+        return mo.md("")
+    parts: list[object] = []
+    cursor = 0
+    for match in _DISPLAY_MATH_RE.finditer(content):
+        prose = _clean_markdown_prose(content[cursor : match.start()])
+        if prose:
+            parts.append(mo.md(prose))
+        formula = match.group(1).strip()
+        try:
+            svg_bytes = _render_math_svg_bytes(formula)
+        except ValueError:
+            parts.append(
+                mo.callout(
+                    "Math rendering fell back to plain text for one formula because the syntax was not supported.",
+                    kind="warn",
+                )
+            )
+            parts.append(mo.md(f"`{formula}`"))
+            cursor = match.end()
+            continue
+        if svg_bytes:
+            svg_markup = _transparent_math_svg_markup(svg_bytes.decode("utf-8"))
+            parts.append(
+                mo.Html(
+                    (
+                        "<div class='latentdna-math-block' style='" + escape(_MATH_BLOCK_STYLE) + "'>"
+                        f"<img src='{_svg_data_uri(svg_markup)}' alt='Math expression' "
+                        f"style='{escape(_MATH_IMAGE_STYLE)}' />"
+                        "</div>"
+                    )
+                )
+            )
+        cursor = match.end()
+    trailing = _clean_markdown_prose(content[cursor:])
+    if trailing:
+        parts.append(mo.md(trailing))
+    if not parts:
+        return mo.md(_clean_markdown_prose(content))
+    if len(parts) == 1:
+        return parts[0]
+    return mo.vstack(parts, gap=0.25)
 
 
 def unique_in_order(values):
@@ -277,6 +418,32 @@ def option_key_for_value(options: dict[str, object], target_value: object) -> st
     return None
 
 
+def labeled_options(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
+    normalized: list[tuple[str, object]] = []
+    counts: dict[str, int] = {}
+    for label, value in pairs:
+        value_text = str(value).strip()
+        base_label = str(label).strip() or value_text
+        normalized.append((base_label, value))
+        counts[base_label] = counts.get(base_label, 0) + 1
+
+    options: dict[str, object] = {}
+    for base_label, value in normalized:
+        value_text = str(value).strip()
+        if not value_text:
+            continue
+        label = base_label if counts[base_label] == 1 else f"{base_label} [{value_text}]"
+        if label in options:
+            if str(options[label]).strip() == value_text:
+                continue
+            suffix = 2
+            while f"{label} #{suffix}" in options:
+                suffix += 1
+            label = f"{label} #{suffix}"
+        options[label] = value
+    return options
+
+
 def normalize_label(value) -> str:
     return str(value or "").strip().lower()
 
@@ -287,6 +454,12 @@ def display_reference_label(value) -> str:
 
 
 def display_hue_label(column: str) -> str:
+    if column == "design_regulator_composition":
+        return "Reg. comp."
+    if column == "log_likelihood_per_token_7b":
+        return "7B log likelihood / token"
+    if column == "log_likelihood_per_token_20b":
+        return "20B log likelihood / token"
     if column.startswith("log_likelihood_per_token_"):
         return humanize_display_text(column)
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
@@ -298,11 +471,54 @@ def display_hue_label(column: str) -> str:
     return humanize_column_name(column)
 
 
+def display_hue_value(column: str | None, value: object) -> str:
+    return display_category_text(value, column=column)
+
+
+def normalize_categorical_hue_value(column: str | None, value: object) -> str:
+    if pd.isna(value):
+        return "NA"
+    if str(column or "").strip() == "spacer_length":
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            numeric = None
+        if numeric is not None and np.isfinite(numeric):
+            return str(int(numeric)) if numeric.is_integer() else f"{numeric:g}"
+    if str(column or "").strip() == "design_regulator_composition":
+        normalized = display_hue_value(column, value)
+        return normalized or "NA"
+    text = str(value)
+    return text if text.strip() else "NA"
+
+
+def normalize_categorical_hue_series(column: str | None, values: pd.Series) -> pd.Series:
+    return values.map(lambda value: normalize_categorical_hue_value(column, value)).astype(str)
+
+
+def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str] | None:
+    candidate_pairs = [
+        ("construct__anchor_id", "construct__anchor_id"),
+        ("construct__anchor_id", "id"),
+        # Anchor-only projection rows should join context summary tables by anchor id.
+        ("id", "construct__anchor_id"),
+        ("id", "id"),
+        ("subject_id", "subject_id"),
+        ("context_id", "context_id"),
+    ]
+    for left_key, right_key in candidate_pairs:
+        if left_key in left.columns and right_key in right.columns:
+            return left_key, right_key
+    return None
+
+
 def shared_join_key(left: pd.DataFrame, right: pd.DataFrame) -> str | None:
-    preferred = ["construct__anchor_id", "id", "subject_id", "context_id"]
-    for column in preferred:
-        if column in left.columns and column in right.columns:
-            return column
+    resolved = resolve_join_keys(left, right)
+    if resolved is None:
+        return None
+    left_key, right_key = resolved
+    if left_key == right_key:
+        return left_key
     return None
 
 
@@ -346,7 +562,7 @@ def candidate_hue_columns(
 
 def normalize_hue_kind(value: object) -> str | None:
     text = str(value or "").strip().lower()
-    if text in {"categorical", "binary", "continuous"}:
+    if text in {"categorical", "binary", "continuous", "ordinal"}:
         return text
     return None
 
@@ -365,6 +581,9 @@ def available_hues_for_frames(
 ) -> list[str]:
     if not frames:
         return []
+    nonempty_frames = [frame for frame in frames if not frame.empty]
+    if not nonempty_frames:
+        return []
     available: list[str] = []
     for hue in preferred_hues:
         kind = normalize_hue_kind(hue_kinds.get(hue))
@@ -372,7 +591,7 @@ def available_hues_for_frames(
             continue
         continuous_values: list[pd.Series] = []
         supported = True
-        for frame in frames:
+        for frame in nonempty_frames:
             series = _finite_non_null_series(frame, hue)
             if series.empty:
                 supported = False
@@ -410,13 +629,46 @@ def classify_hue_series(series: pd.Series, *, configured_kind: object = None) ->
     return "categorical"
 
 
+def continuous_hue_render_params(column: str | None, values: pd.Series) -> dict[str, object]:
+    from matplotlib import colors as mcolors
+
+    numeric = pd.to_numeric(values, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if numeric.empty:
+        return {"cmap": "viridis", "norm": None, "vmin": None, "vmax": None}
+
+    column_name = str(column or "").strip()
+    if "margin" in column_name:
+        robust_limit = float(np.nanquantile(np.abs(numeric.to_numpy(dtype=float)), 0.99))
+        if not np.isfinite(robust_limit) or robust_limit <= 0.0:
+            robust_limit = float(np.nanmax(np.abs(numeric.to_numpy(dtype=float))))
+        robust_limit = max(robust_limit, 1e-6)
+        return {
+            "cmap": "coolwarm",
+            "norm": mcolors.TwoSlopeNorm(vmin=-robust_limit, vcenter=0.0, vmax=robust_limit),
+            "vmin": None,
+            "vmax": None,
+        }
+
+    lower = float(np.nanquantile(numeric.to_numpy(dtype=float), 0.01))
+    upper = float(np.nanquantile(numeric.to_numpy(dtype=float), 0.99))
+    if not np.isfinite(lower) or not np.isfinite(upper) or lower >= upper:
+        lower = float(numeric.min())
+        upper = float(numeric.max())
+    return {
+        "cmap": "viridis",
+        "norm": None,
+        "vmin": lower,
+        "vmax": upper,
+    }
+
+
 def scatter_style(row_count: int) -> tuple[float, float]:
     style = shared_scatter_style(row_count)
     return style.point_size, style.alpha
 
 
-def category_color_map(categories: list[str]) -> dict[str, str]:
-    return categorical_color_map(ordered_categories(categories))
+def category_color_map(categories: list[str], *, column: str | None = None) -> dict[str, str]:
+    return categorical_color_map(ordered_categories(categories, column=column), column=column)
 
 
 def table_from_records(
@@ -508,20 +760,10 @@ def draw_reference_labels(
     ].copy()
     if selected.empty:
         return
-    offsets = [
-        (10.0, 10.0),
-        (10.0, -18.0),
-        (-72.0, 10.0),
-        (-72.0, -18.0),
-        (18.0, 24.0),
-        (-80.0, 24.0),
-        (18.0, -32.0),
-        (-80.0, -32.0),
-        (38.0, 0.0),
-        (-92.0, 0.0),
-    ]
-    placed: list[tuple[float, float]] = []
+    placed_boxes: list[tuple[float, float, float, float]] = []
     axes_box = ax.get_window_extent()
+    display_x_mid = float((axes_box.x0 + axes_box.x1) / 2.0)
+    display_y_mid = float((axes_box.y0 + axes_box.y1) / 2.0)
     ax.scatter(
         selected[x_column].to_numpy(dtype=float),
         selected[y_column].to_numpy(dtype=float),
@@ -537,28 +779,35 @@ def draw_reference_labels(
         point_y = float(row[y_column])
         label = display_reference_label(row["usr_label__primary"])
         display_x, display_y = ax.transData.transform((point_x, point_y))
-        target_offset = offsets[0]
-        for offset_x, offset_y in offsets:
-            candidate_x = display_x + offset_x
-            candidate_y = display_y + offset_y
-            candidate_x = min(candidate_x, axes_box.x1 - right_padding_px)
-            candidate_x = max(candidate_x, axes_box.x0 + left_padding_px)
-            if all(
-                abs(candidate_x - placed_x) > 52.0 or abs(candidate_y - placed_y) > 22.0
-                for placed_x, placed_y in placed
-            ):
-                target_offset = (candidate_x - display_x, offset_y)
-                break
-        placed.append((display_x + target_offset[0], display_y + target_offset[1]))
+        placement = choose_annotation_placement(
+            display_x=display_x,
+            display_y=display_y,
+            label_text=label,
+            axes_box=axes_box,
+            placed_boxes=placed_boxes,
+            x_mid=display_x_mid,
+            y_mid=display_y_mid,
+            font_size=PLOT_TICK_FONT_SIZE,
+            left_padding_px=left_padding_px,
+            right_padding_px=right_padding_px,
+        )
+        placed_boxes.append(placement.box)
         annotation = ax.annotate(
             label,
             xy=(point_x, point_y),
-            xytext=target_offset,
-            textcoords="offset points",
+            xytext=(placement.offset_x, placement.offset_y),
+            textcoords="offset pixels",
             fontsize=PLOT_TICK_FONT_SIZE,
             fontweight="semibold",
+            ha=placement.ha,
+            va=placement.va,
             color=TEXT_COLOR,
-            bbox={"boxstyle": "round,pad=0.18", "fc": "white", "ec": "none", "alpha": 0.94},
+            bbox={
+                "boxstyle": "round,pad=0.18",
+                "fc": "white",
+                "ec": "none",
+                "alpha": ANNOTATION_LABEL_BOX_ALPHA,
+            },
             arrowprops={"arrowstyle": "-", "color": SPINE_COLOR, "linewidth": 0.9},
             zorder=6,
         )

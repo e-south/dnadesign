@@ -273,6 +273,9 @@
     "intermediate_embedding_20b_full_context_1kb",
     "intermediate_embedding_7b_anchor_60bp",
     "intermediate_embedding_7b_full_context_1kb",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_anchor_plus_full_context_concat",
+    "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     "pooled_logits_20b_anchor_60bp",
     "pooled_logits_20b_full_context_1kb",
     "pooled_logits_7b_anchor_60bp",
@@ -409,10 +412,9 @@
       "pooled_logits_7b_anchor_60bp",
       "intermediate_embedding_7b_full_context_1kb",
       "pooled_logits_7b_full_context_1kb",
-      "intermediate_embedding_20b_anchor_60bp",
-      "pooled_logits_20b_anchor_60bp",
-      "intermediate_embedding_20b_full_context_1kb",
-      "pooled_logits_20b_full_context_1kb"
+      "intermediate_embedding_7b_full_context_anchor_mean",
+      "intermediate_embedding_7b_anchor_plus_full_context_concat",
+      "intermediate_embedding_7b_anchor_plus_anchor_mean_concat"
     ],
     "preferred_hues": [
       "design_family",
@@ -423,6 +425,7 @@
       "is_control",
       "synthetic_margin_ethanol_vs_background",
       "synthetic_margin_cipro_vs_background",
+      "log_likelihood_per_token_7b",
       "context_self_cosine",
       "context_shift_l2"
     ]
@@ -433,5 +436,5 @@
     "sigma35_ordinal_audit",
     "context_robustness_summary"
   ],
-  "last_updated_at": "2026-04-19T18:32:19.608150+00:00"
+  "last_updated_at": "2026-04-21T18:23:30.611706+00:00"
 }

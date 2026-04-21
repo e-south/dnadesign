@@ -180,6 +180,8 @@ def test_metric_panel_grid_accepts_candidate_metric_summary_plots() -> None:
             "category_column": "label",
             "label_column": "candidate_label",
             "value_column": "metric_value",
+            "ci_lower_column": "ci_lower",
+            "ci_upper_column": "ci_upper",
             "color_column": "candidate_family",
             "direction_column": "direction",
             "unit_column": "unit",
@@ -221,6 +223,8 @@ def test_metric_panel_grid_accepts_candidate_metric_summary_plots() -> None:
     assert spec.column_column == "label"
     assert spec.label_column == "candidate_label"
     assert spec.value_column == "metric_value"
+    assert spec.ci_lower_column == "ci_lower"
+    assert spec.ci_upper_column == "ci_upper"
     assert spec.measure_kind == "metric"
     assert spec.value_kind == "score"
     assert spec.value_label == "Metric value"

@@ -65,6 +65,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "### Gate" in workflow
     assert "pre-assay representation triage" in workflow
     assert "Leave geodesic pilots in study notes" in workflow
+    assert 'zero_variance_policy="drop_or_zero"' in workflow
+    assert 'zero_row_policy="zero"' in workflow
     assert "workspace snapshot" in workflow
 
     assert "`latentdna workspace snapshot`" in cli_contracts

@@ -102,6 +102,178 @@ def _write_margin_workspace_config(workspace_dir: Path) -> None:
     )
 
 
+def _write_view_artifact(
+    workspace_dir: Path,
+    *,
+    view_id: str,
+    rows: list[dict[str, object]],
+    matrix: np.ndarray,
+    record_key: str,
+) -> None:
+    view_dir = workspace_dir / "outputs" / "views" / view_id
+    view_dir.mkdir(parents=True, exist_ok=True)
+    np.save(view_dir / "matrix.npy", np.asarray(matrix, dtype=np.float32))
+    pq.write_table(pa.Table.from_pylist(rows), view_dir / "rows.parquet")
+    (view_dir / "manifest.json").write_text(
+        json.dumps({"params": {"record_key": record_key}}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _write_alignment_artifact(
+    workspace_dir: Path,
+    *,
+    alignment_id: str,
+    left_view_id: str,
+    right_view_id: str,
+    left_rows: list[dict[str, object]],
+    right_rows: list[dict[str, object]],
+    key_column: str,
+) -> None:
+    alignment_dir = workspace_dir / "outputs" / "alignments" / alignment_id
+    alignment_dir.mkdir(parents=True, exist_ok=True)
+
+    right_index_by_key = {row[key_column]: index for index, row in enumerate(right_rows)}
+    ledger_rows: list[dict[str, object]] = []
+    mapping_rows: list[dict[str, object]] = []
+    for left_index, row in enumerate(left_rows):
+        key = row[key_column]
+        if key not in right_index_by_key:
+            continue
+        right_index = right_index_by_key[key]
+        ledger_row = {
+            key_column: key,
+            "left_count": 1,
+            "right_count": 1,
+        }
+        ledger_rows.append(ledger_row)
+        mapping_rows.append(
+            {
+                **ledger_row,
+                "left_indices": [left_index],
+                "right_indices": [right_index],
+            }
+        )
+
+    pq.write_table(pa.Table.from_pylist(ledger_rows), alignment_dir / "rows.parquet")
+    pq.write_table(pa.Table.from_pylist(mapping_rows), alignment_dir / "mapping.parquet")
+    (alignment_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "params": {
+                    "left": left_view_id,
+                    "right": right_view_id,
+                    "key_columns": [key_column],
+                    "right_key_columns": [key_column],
+                    "left_aggregation": "error",
+                    "right_aggregation": "error",
+                }
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_context_robustness_workspace(
+    workspace_dir: Path,
+    *,
+    anchor_rows: list[dict[str, object]],
+    context_rows: list[dict[str, object]],
+    anchor_matrix: np.ndarray,
+    context_matrix: np.ndarray,
+) -> None:
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "context_robustness_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor_source": {
+                        "kind": "parquet",
+                        "path": "inputs/anchor.parquet",
+                        "record_key": "anchor_id",
+                        "subject_key": "anchor_id",
+                    },
+                    "context_source": {
+                        "kind": "parquet",
+                        "path": "inputs/context.parquet",
+                        "record_key": "context_id",
+                        "subject_key": "anchor_id",
+                    },
+                },
+                "views": {
+                    "anchor_view": {
+                        "source": "anchor_source",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {
+                            "model": "7b",
+                            "family": "intermediate_embedding",
+                            "scope": "anchor_60bp",
+                        },
+                    },
+                    "context_view": {
+                        "source": "context_source",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {
+                            "model": "7b",
+                            "family": "intermediate_embedding",
+                            "scope": "full_context_1kb",
+                        },
+                    },
+                },
+                "alignments": {
+                    "anchor_ctx": {
+                        "left": "anchor_view",
+                        "right": "context_view",
+                        "left_on": ["anchor_id"],
+                        "right_on": ["anchor_id"],
+                        "left_aggregation": "error",
+                        "right_aggregation": "error",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", anchor_rows)
+    _write_source(workspace_dir / "inputs" / "context.parquet", context_rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="anchor_view",
+        rows=anchor_rows,
+        matrix=anchor_matrix,
+        record_key="anchor_id",
+    )
+    _write_view_artifact(
+        workspace_dir,
+        view_id="context_view",
+        rows=context_rows,
+        matrix=context_matrix,
+        record_key="context_id",
+    )
+    _write_alignment_artifact(
+        workspace_dir,
+        alignment_id="anchor_ctx",
+        left_view_id="anchor_view",
+        right_view_id="context_view",
+        left_rows=anchor_rows,
+        right_rows=context_rows,
+        key_column="anchor_id",
+    )
+
+
 def _base_rows() -> list[dict[str, object]]:
     return [
         {
@@ -173,6 +345,8 @@ def test_dataset_overview_builds_dimension_panels_with_shared_denominator(tmp_pa
     assert "anchor_60bp" not in dimensions
     assert "full_context_1kb" not in dimensions
     assert {row["dimension_label"] for row in table} == {"Provenance", "Generation plan", "Sigma-35 variant"}
+    sig35_rows = sorted((row for row in table if row["dimension"] == "sig35_variant"), key=lambda row: row["order"])
+    assert [row["category"] for row in sig35_rows] == ["f", "e", "d", "c", "b", "control"]
 
     for dimension in dimensions:
         dimension_rows = [row for row in table if row["dimension"] == dimension]
@@ -238,6 +412,268 @@ def test_dataset_overview_accepts_aligned_subject_populations_with_distinct_reco
 
     table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
     assert sum(int(row["count"]) for row in table if row["dimension"] == "provenance") == len(anchor_rows)
+
+
+def test_context_robustness_summary_projects_alignment_metadata_for_retention_metrics(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    anchor_rows = [
+        {
+            "anchor_id": "bg_1",
+            "subject_id": "bg_1",
+            "design_family": "background_only",
+            "design_regulator_composition": "background_only",
+            "sig35_variant": "f",
+            "embedding": [1.0, 0.15, 0.05],
+        },
+        {
+            "anchor_id": "eth_1",
+            "subject_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "embedding": [0.25, 1.05, 0.2],
+        },
+        {
+            "anchor_id": "cip_1",
+            "subject_id": "cip_1",
+            "design_family": "ciprofloxacin",
+            "design_regulator_composition": "lexA_only",
+            "sig35_variant": "b",
+            "embedding": [0.35, 0.45, 1.0],
+        },
+    ]
+    context_rows = [
+        {
+            "context_id": "ctx_bg_1",
+            "anchor_id": "bg_1",
+            "design_family": "background_only",
+            "design_regulator_composition": "background_only",
+            "sig35_variant": "f",
+            "embedding": [0.94, 0.2, 0.06],
+        },
+        {
+            "context_id": "ctx_eth_1",
+            "anchor_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "embedding": [0.3, 0.96, 0.18],
+        },
+        {
+            "context_id": "ctx_cip_1",
+            "anchor_id": "cip_1",
+            "design_family": "ciprofloxacin",
+            "design_regulator_composition": "lexA_only",
+            "sig35_variant": "b",
+            "embedding": [0.42, 0.5, 0.88],
+        },
+    ]
+    _write_context_robustness_workspace(
+        workspace_dir,
+        anchor_rows=anchor_rows,
+        context_rows=context_rows,
+        anchor_matrix=np.asarray([row["embedding"] for row in anchor_rows], dtype=np.float32),
+        context_matrix=np.asarray([row["embedding"] for row in context_rows], dtype=np.float32),
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="context_robustness_summary_metrics",
+        builder_kind="context_robustness_summary",
+        params={
+            "sample_size": 0,
+            "pairs": [
+                {
+                    "pair_id": "anchor_vs_context",
+                    "label": "7B intermediate: anchor vs 1 kb seq mean",
+                    "alignment_id": "anchor_ctx",
+                    "anchor_view_id": "anchor_view",
+                    "context_view_id": "context_view",
+                }
+            ],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    metric_values = {row["metric_id"]: float(row["metric_value"]) for row in table}
+
+    assert artifact.stats["pair_count"] == 1
+    assert any(input_ref.kind == "alignment_set" for input_ref in artifact.inputs)
+    assert {
+        "context_self_cosine_median",
+        "design_family_retention_correlation",
+        "design_regulator_composition_retention_correlation",
+        "sig35_variant_retention_correlation",
+    } == set(metric_values)
+    assert all(np.isfinite(value) for value in metric_values.values())
+
+
+def test_context_robustness_summary_skips_only_degenerate_axes(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    anchor_rows = [
+        {
+            "anchor_id": "bg_1",
+            "subject_id": "bg_1",
+            "design_family": "background_only",
+            "design_regulator_composition": "background_only",
+            "sig35_variant": "d",
+            "embedding": [1.0, 0.15, 0.05],
+        },
+        {
+            "anchor_id": "eth_1",
+            "subject_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "embedding": [0.25, 1.05, 0.2],
+        },
+        {
+            "anchor_id": "cip_1",
+            "subject_id": "cip_1",
+            "design_family": "ciprofloxacin",
+            "design_regulator_composition": "lexA_only",
+            "sig35_variant": "d",
+            "embedding": [0.35, 0.45, 1.0],
+        },
+    ]
+    context_rows = [
+        {
+            "context_id": "ctx_bg_1",
+            "anchor_id": "bg_1",
+            "design_family": "background_only",
+            "design_regulator_composition": "background_only",
+            "sig35_variant": "d",
+            "embedding": [0.94, 0.2, 0.06],
+        },
+        {
+            "context_id": "ctx_eth_1",
+            "anchor_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "embedding": [0.3, 0.96, 0.18],
+        },
+        {
+            "context_id": "ctx_cip_1",
+            "anchor_id": "cip_1",
+            "design_family": "ciprofloxacin",
+            "design_regulator_composition": "lexA_only",
+            "sig35_variant": "d",
+            "embedding": [0.42, 0.5, 0.88],
+        },
+    ]
+    _write_context_robustness_workspace(
+        workspace_dir,
+        anchor_rows=anchor_rows,
+        context_rows=context_rows,
+        anchor_matrix=np.asarray([row["embedding"] for row in anchor_rows], dtype=np.float32),
+        context_matrix=np.asarray([row["embedding"] for row in context_rows], dtype=np.float32),
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="context_robustness_summary_metrics",
+        builder_kind="context_robustness_summary",
+        params={
+            "sample_size": 0,
+            "pairs": [
+                {
+                    "pair_id": "anchor_vs_context",
+                    "alignment_id": "anchor_ctx",
+                    "anchor_view_id": "anchor_view",
+                    "context_view_id": "context_view",
+                }
+            ],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    metric_ids = {row["metric_id"] for row in table}
+
+    assert metric_ids == {
+        "context_self_cosine_median",
+        "design_family_retention_correlation",
+        "design_regulator_composition_retention_correlation",
+    }
+    assert artifact.stats["skipped_metric_ids"] == ["sig35_variant_retention_correlation"]
+
+
+def test_context_robustness_summary_skips_fully_degenerate_retention_axes(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    anchor_rows = [
+        {
+            "anchor_id": "eth_1",
+            "subject_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "embedding": [1.0, 0.0, 0.0],
+        },
+        {
+            "anchor_id": "ctrl_1",
+            "subject_id": "ctrl_1",
+            "design_family": "control",
+            "design_regulator_composition": "control",
+            "sig35_variant": "control",
+            "embedding": [0.0, 1.0, 0.0],
+        },
+    ]
+    context_rows = [
+        {
+            "context_id": "ctx_eth_1",
+            "anchor_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "embedding": [0.9, 0.1, 0.0],
+        },
+        {
+            "context_id": "ctx_ctrl_1",
+            "anchor_id": "ctrl_1",
+            "design_family": "control",
+            "design_regulator_composition": "control",
+            "sig35_variant": "control",
+            "embedding": [0.1, 0.9, 0.0],
+        },
+    ]
+    _write_context_robustness_workspace(
+        workspace_dir,
+        anchor_rows=anchor_rows,
+        context_rows=context_rows,
+        anchor_matrix=np.asarray([row["embedding"] for row in anchor_rows], dtype=np.float32),
+        context_matrix=np.asarray([row["embedding"] for row in context_rows], dtype=np.float32),
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="context_robustness_summary_metrics",
+        builder_kind="context_robustness_summary",
+        params={
+            "sample_size": 0,
+            "pairs": [
+                {
+                    "pair_id": "anchor_vs_context",
+                    "alignment_id": "anchor_ctx",
+                    "anchor_view_id": "anchor_view",
+                    "context_view_id": "context_view",
+                }
+            ],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    assert {row["metric_id"] for row in table} == {"context_self_cosine_median"}
+    assert artifact.stats["skipped_metric_ids"] == [
+        "design_family_retention_correlation",
+        "design_regulator_composition_retention_correlation",
+        "sig35_variant_retention_correlation",
+    ]
 
 
 def test_cohort_similarity_margin_returns_nan_for_degenerate_standardized_view(tmp_path: Path) -> None:

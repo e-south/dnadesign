@@ -432,6 +432,7 @@ def _context_robustness_summary_table(
     seed = int(_optional_param(params, "seed", default=context.config.defaults.random_seed))
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
+    skipped_metric_ids: list[str] = []
     axes = [
         ("design_family", "design_family_retention_correlation", {"control"}),
         ("design_regulator_composition", "design_regulator_composition_retention_correlation", {"control"}),
@@ -447,6 +448,7 @@ def _context_robustness_summary_table(
             view_id=left_view_id,
             candidate_id=pair_id,
             scope_override="anchor_vs_context",
+            label_override=_optional_param(pair, "label", default=None),
         )
         left_matrix, _, left_inputs = _load_view_scope_table(
             context,
@@ -491,9 +493,20 @@ def _context_robustness_summary_table(
                 column=column,
                 exclude_values=exclude_values,
             )
-            retention = float("nan") if anchor_vector.size == 0 else _pearson_correlation(anchor_vector, context_vector)
+            if anchor_vector.size == 0 or context_vector.size == 0:
+                skipped_metric_ids.append(metric_id)
+                continue
+            retention = _pearson_correlation(anchor_vector, context_vector)
             rows.append(_metric_row(descriptor=descriptor, metric_id=metric_id, metric_value=retention))
-    return pa.Table.from_pylist(rows), inputs, {"pair_count": len(pairs), "rows": len(rows)}
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {
+            "pair_count": len(pairs),
+            "rows": len(rows),
+            "skipped_metric_ids": skipped_metric_ids,
+        },
+    )
 
 
 def _reference_alignment_summary_table(

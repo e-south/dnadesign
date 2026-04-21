@@ -10,7 +10,7 @@
 **Entry artifact:** promoter/stress_ethanol_cipro_anchor_set and promoter/stress_ethanol_cipro_construct_contexts
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 
-The promoter study binds LatentDNA to two published datasets and eight canonical mean-pooled Evo2 views. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
+The promoter study binds LatentDNA to two published datasets and a 7B-first notebook candidate inventory. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
 
 ### Gate
 
@@ -50,6 +50,12 @@ $$
 Cosine, centroid, margin, and cosine-distance calculations operate on
 \(z_i\).
 
+Study builders use the collapse-tolerant normalization path from
+`standardize_and_l2_normalize(..., zero_variance_policy="drop_or_zero",
+zero_row_policy="zero")`. Zero-variance columns are set to `0.0` after
+scaling, and zero-norm rows remain zero vectors so degenerate spaces stay
+finite and surface in the health gate instead of failing later cosine plots.
+
 `appendix_umap_gallery` does not use this contract. Its persisted UMAP fits are
 built from the raw stored view matrices unless a projection manifest says
 otherwise.
@@ -65,16 +71,17 @@ Use the notes for:
 - external analogies such as Goodfire or EVOLVEpro comparisons
 - future assay-era extensions and open methodological questions
 
-### Canonical geometry inventory
+### Surfaced Notebook Inventory
 
-- `intermediate_embedding_20b_anchor_60bp`
-- `intermediate_embedding_20b_full_context_1kb`
 - `intermediate_embedding_7b_anchor_60bp`
-- `intermediate_embedding_7b_full_context_1kb`
-- `pooled_logits_20b_anchor_60bp`
-- `pooled_logits_20b_full_context_1kb`
 - `pooled_logits_7b_anchor_60bp`
+- `intermediate_embedding_7b_full_context_1kb`
 - `pooled_logits_7b_full_context_1kb`
+- `intermediate_embedding_7b_full_context_anchor_mean`
+- `intermediate_embedding_7b_anchor_plus_full_context_concat`
+- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
+
+20B views remain materializable in the workspace but are hidden from the study notebook and deliverable ladder.
 
 ### Operator path
 

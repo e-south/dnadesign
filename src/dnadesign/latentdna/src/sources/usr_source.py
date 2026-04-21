@@ -15,7 +15,7 @@ from dnadesign.usr.overlay_digest_ledger import (
 )
 from dnadesign.usr.overlays import overlay_parts
 
-from .provenance import OVERLAY_INVENTORY_DIGEST_MODE
+from .provenance import OVERLAY_INVENTORY_DIGEST_MODE, OVERLAY_LEDGER_PAYLOAD_DIGEST_MODE
 
 
 def records_path(root: str, dataset: str, *, workspace_dir: Path) -> Path:
@@ -83,6 +83,7 @@ def source_provenance(
                     "role": "overlay_ledger",
                     "namespace": namespace,
                     "columns": overlay_columns,
+                    "digest_mode": OVERLAY_LEDGER_PAYLOAD_DIGEST_MODE,
                 }
             )
             continue

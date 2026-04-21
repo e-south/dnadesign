@@ -16,11 +16,8 @@ def render_scope_note_cell() -> str:
 
             plot_scope_note = _support.mo.md(
                 (
-                    "This notebook is the LatentDNA pre-assay review surface for the current "
-                    "`infer_batch_preparation` study snapshot. DenseGen remains the source of cohort semantics "
-                    "and provenance. Use these plots to review representation health, design structure, "
-                    "Sigma-35 organization, and context robustness. Do not use this notebook as the "
-                    "study-status record."
+                    "Review the current artifact set for representation health, design structure, "
+                    "Sigma-35 organization, and context robustness."
                 )
             )
             geometry_scope_note = _support.mo.md(
@@ -45,26 +42,35 @@ def render_plot_review_cell() -> str:
         """\
         @app.cell
         def _(runtime):
+            _identity = runtime.identity
             _plot_review = runtime.plot_review
             _support = runtime.support
 
             plot_review_cards = []
             plot_selector = None
             if _plot_review.sections:
-                plot_options = {}
+                plot_option_pairs = []
                 for _plot_section in _plot_review.sections:
                     for _plot_card in _plot_section.get("cards", []):
                         _plot_label = str(_plot_card["title"])
-                        plot_options[_plot_label] = str(_plot_card["plot_id"])
+                        plot_option_pairs.append((_plot_label, str(_plot_card["plot_id"])))
                         plot_review_cards.append(dict(_plot_card))
+                plot_options = _support.labeled_options(plot_option_pairs)
 
                 default_plot_id = next(
                     (
-                        plot_id
-                        for plot_id in _plot_review.ordered_plot_ids
-                        if any(str(card["plot_id"]) == str(plot_id) for card in plot_review_cards)
+                        str(card["plot_id"])
+                        for card in plot_review_cards
+                        if str(card.get("deliverable_id") or "") == str(_identity.default_deliverable or "")
                     ),
-                    plot_review_cards[0]["plot_id"],
+                    next(
+                        (
+                            plot_id
+                            for plot_id in _plot_review.ordered_plot_ids
+                            if any(str(card["plot_id"]) == str(plot_id) for card in plot_review_cards)
+                        ),
+                        plot_review_cards[0]["plot_id"],
+                    ),
                 )
                 plot_selector = _support.mo.ui.dropdown(
                     options=plot_options,
@@ -73,6 +79,7 @@ def render_plot_review_cell() -> str:
                         or next(iter(plot_options))
                     ),
                     label="Plot",
+                    full_width=True,
                 )
             return (plot_review_cards, plot_selector)
 
@@ -171,8 +178,12 @@ def render_plot_review_cell() -> str:
                 if bool(_active_card.get("live_render")):
                     _requested_hue = str(plot_hue_selector.value) if plot_hue_selector is not None else ""
                     _effective_hue = _requested_hue if _requested_hue in available_plot_hues else None
+                    _plot_spec = {
+                        **dict(_active_card.get("plot_spec") or {}),
+                        "alt_text": str(_active_card.get("alt_text") or _active_card.get("title") or ""),
+                    }
                     _plot_surface = _renderers.render_plot_review_surface(
-                        dict(_active_card.get("plot_spec") or {}),
+                        _plot_spec,
                         frames=active_plot_frames,
                         hue_column=_effective_hue,
                         reference_labels=runtime.geometry.reference_labels,
@@ -180,7 +191,10 @@ def render_plot_review_cell() -> str:
                     )
                 else:
                     _plot_surface = (
-                        _renderers.render_plot_asset(_active_card["render_path"])
+                        _renderers.render_plot_asset(
+                            _active_card["render_path"],
+                            alt_text=str(_active_card.get("alt_text") or _active_card.get("title") or ""),
+                        )
                         if _active_card.get("render_path") is not None
                         else _support.mo.callout(
                             f"No persisted plot asset is available for `{_active_card['plot_id']}`.",
@@ -198,25 +212,75 @@ def render_plot_review_cell() -> str:
                         1,
                         _support.mo.hstack(_selectors, justify="start", align="end", wrap=True, gap=0.28),
                     )
-                if str(_active_card.get("status") or "missing") != "ok":
+                _status = str(_active_card.get("status") or "missing")
+                _stale = bool(_active_card.get("stale"))
+                if _status != "ok" or _stale:
+                    _status_message = (
+                        "This plot artifact is stale relative to the current workspace state."
+                        if _stale
+                        else f"This plot artifact status is `{_status}`."
+                    )
                     _section_blocks.append(
                         _support.mo.callout(
-                            "This plot artifact is not current. Rebuild it or inspect the deliverable status "
-                            "before using it.",
+                            _status_message + " Rebuild it or inspect the deliverable status before using it.",
                             kind="warn",
                         )
                     )
-                if _active_card.get("study_doc_warning"):
-                    _section_blocks.append(_support.mo.callout(str(_active_card["study_doc_warning"]), kind="warn"))
-                if str(_active_card.get("plot_details_md") or "").strip():
+                if _active_card.get("render_mode_note"):
                     _section_blocks.append(
-                        _support.mo.accordion(
-                            {"Plot details": _support.mo.md(str(_active_card["plot_details_md"]))}
+                        _support.mo.callout(
+                            str(_active_card["render_mode_note"]),
+                            kind="info",
                         )
                     )
+                if _active_card.get("artifact_warning"):
+                    _section_blocks.append(_support.mo.callout(str(_active_card["artifact_warning"]), kind="warn"))
+                if _active_card.get("study_doc_warning"):
+                    _section_blocks.append(_support.mo.callout(str(_active_card["study_doc_warning"]), kind="warn"))
+                _accordion_sections = {}
+                _at_a_glance_lines = []
+                if str(_active_card.get("question") or "").strip():
+                    _at_a_glance_lines.append(f"- **Question:** {str(_active_card['question'])}")
+                if str(_active_card.get("scope") or "").strip():
+                    _at_a_glance_lines.append(f"- **Scope:** {str(_active_card['scope'])}")
+                if str(_active_card.get("decision_role") or "").strip():
+                    _at_a_glance_lines.append(f"- **Role:** `{str(_active_card['decision_role'])}`")
+                if str(_active_card.get("encoding") or "").strip():
+                    _at_a_glance_lines.append(f"- **Encoding:** {str(_active_card['encoding'])}")
+                if _at_a_glance_lines:
+                    _accordion_sections["At a glance"] = _support.mo.md("\\n".join(_at_a_glance_lines))
+                if str(_active_card.get("study_doc_md") or "").strip():
+                    _accordion_sections["Study notes"] = _support.mo.md(str(_active_card["study_doc_md"]))
+                _guardrails = [
+                    str(item).strip()
+                    for item in (_active_card.get("guardrails") or [])
+                    if str(item).strip()
+                ]
+                if _guardrails:
+                    _accordion_sections["Guardrails"] = _support.mo.md(
+                        "\\n".join(f"- {item}" for item in _guardrails)
+                    )
+                for _section_title, _field_name in [
+                    ("Caption", "caption_md"),
+                    ("Preprocessing", "preprocessing_md"),
+                    ("Math", "math_md"),
+                    ("Why this helps choose X", "rationale_md"),
+                    ("Limits", "limitations_md"),
+                    ("Failure modes", "failure_modes_md"),
+                    ("Plot details", "plot_details_md"),
+                ]:
+                    if str(_active_card.get(_field_name) or "").strip():
+                        if _field_name == "math_md":
+                            _accordion_sections[_section_title] = _support.render_math_markdown(
+                                str(_active_card[_field_name])
+                            )
+                        else:
+                            _accordion_sections[_section_title] = _support.mo.md(str(_active_card[_field_name]))
                 _section_blocks.append(_plot_surface)
-                if str(_active_card.get("caption_md") or "").strip():
-                    _section_blocks.append(_support.mo.md(str(_active_card["caption_md"])))
+                if _accordion_sections:
+                    _section_blocks.append(
+                        _support.mo.accordion(_accordion_sections, lazy=True)
+                    )
 
                 plot_review_panel = _support.mo.vstack(_section_blocks, gap=0.4)
             return (plot_review_panel,)
@@ -317,33 +381,59 @@ def render_geometry_frames_cell() -> str:
 
             projection_frames = []
             for spec in panel_specs:
+                _view_id = str(spec.get("view_id") or "")
                 _projection_id = str(spec.get("projection_id") or "")
                 if not _projection_id:
                     projection_frames.append(_support.pd.DataFrame())
                     continue
                 frame = _support.load_table(_identity.output_root / "projections" / _projection_id / "coords.parquet")
                 if not frame.empty:
-                    frame = _renderers.enrich_projection_frame(frame, _geometry.joinable_tables)
+                    frame = _renderers.enrich_projection_frame(
+                        frame,
+                        _geometry.joinable_tables,
+                        view_id=_view_id or None,
+                        required_columns=_geometry.preferred_hues,
+                        strict_required_columns=False,
+                    )
                 projection_frames.append(frame)
             available_hues = _support.available_hues_for_frames(
                 projection_frames,
                 preferred_hues=_geometry.preferred_hues,
                 hue_kinds=_geometry.hue_kinds,
             )
+            return (available_hues, projection_frames)
+        """
+    )
+
+
+def render_geometry_hue_selector_cell() -> str:
+    return dedent(
+        """\
+        @app.cell
+        def _(available_hues, get_requested_hue, runtime, set_requested_hue):
+            _geometry = runtime.geometry
+            _support = runtime.support
+
+            active_hues = [column for column in _geometry.preferred_hues if column in available_hues]
             _hue_options = {
                 "(none)": "",
-                **{_support.display_hue_label(column): column for column in available_hues},
+                **{
+                    _support.display_hue_label(column): column
+                    for column in active_hues
+                },
             }
-            default_hue = _geometry.selected_hue_default if _geometry.selected_hue_default in available_hues else ""
+            _requested_hue = str(get_requested_hue() or "")
+            _selected_hue = _requested_hue if _requested_hue in active_hues else ""
             hue_selector = _support.mo.ui.dropdown(
                 options=_hue_options,
                 value=(
-                    _support.option_key_for_value(_hue_options, default_hue)
+                    _support.option_key_for_value(_hue_options, _selected_hue)
                     or next(iter(_hue_options))
                 ),
                 label="Hue",
+                on_change=set_requested_hue,
             )
-            return (available_hues, hue_selector, projection_frames)
+            return (hue_selector,)
         """
     )
 
@@ -368,17 +458,12 @@ def render_geometry_panel_cell() -> str:
             selected_layout,
         ):
             _geometry = runtime.geometry
+            _identity = runtime.identity
             _renderers = runtime.renderers
             _support = runtime.support
 
             requested_hue = str(hue_selector.value)
             effective_hue = requested_hue if requested_hue in available_hues else ""
-            hue_notice = None
-            if requested_hue and not effective_hue:
-                hue_notice = _support.mo.callout(
-                    "Hue reset because it is not available for the active layout.",
-                    kind="info",
-                )
             geometry_plot = _renderers.render_projection_grid(
                 panel_specs,
                 frames=projection_frames,
@@ -391,26 +476,66 @@ def render_geometry_panel_cell() -> str:
             if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
                 _control_widgets.append(geometry_selector)
             _control_widgets.append(hue_selector)
-            _layout_label = (
-                str(selected_layout.get("label"))
-                if selected_layout is not None
-                else "Single view"
-            )
-            _geometry_label = str(selected_geometry.get("label")) if selected_geometry is not None else ""
-            _selection_summary = (
-                f"Layout: **{_layout_label}**. "
-                f"Panels: **{len(panel_specs)}**. "
-                f"Hue: **{_support.display_hue_label(effective_hue) if effective_hue else 'None'}**."
-            )
-            if _geometry_label:
-                _selection_summary += f" Geometry: **{_geometry_label}**."
+            _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
+            _accordion_sections = {
+                "Selection": _support.mo.md(
+                    "\\n".join(
+                        [
+                            f"- **Layout:** {_layout_label}",
+                            f"- **Panels:** {len(panel_specs)}",
+                            f"- **Hue:** {_support.display_hue_label(effective_hue) if effective_hue else 'None'}",
+                            *(
+                                [f"- **Geometry:** {str(selected_geometry.get('label') or '')}"]
+                                if selected_geometry is not None
+                                else []
+                            ),
+                            *(
+                                [f"- **Rows:** {int(selected_geometry.get('rows')):,}"]
+                                if selected_geometry is not None and selected_geometry.get("rows") is not None
+                                else []
+                            ),
+                            *(
+                                [f"- **Dimensions:** {int(selected_geometry.get('dims')):,}"]
+                                if selected_geometry is not None and selected_geometry.get("dims") is not None
+                                else []
+                            ),
+                            *(
+                                [f"- **Role:** `{str(selected_geometry.get('role') or 'primary')}`"]
+                                if selected_geometry is not None and str(selected_geometry.get("role") or "").strip()
+                                else []
+                            ),
+                        ]
+                    )
+                )
+            }
+            _population_lines = []
+            for _panel_spec in panel_specs:
+                _projection_id = str(_panel_spec.get("projection_id") or "")
+                if not _projection_id:
+                    continue
+                _projection_manifest_path = _identity.output_root / "projections" / _projection_id / "manifest.json"
+                _projection_manifest = _support.load_json(_projection_manifest_path)
+                _manifest_stats = _projection_manifest.get("stats")
+                _stats = _manifest_stats if isinstance(_manifest_stats, dict) else {}
+                _projected_rows = _stats.get("projected_rows", _stats.get("rows"))
+                _population_rows = _stats.get("population_rows", _projected_rows)
+                _is_full_population = bool(_stats.get("is_full_population", _projected_rows == _population_rows))
+                if _projected_rows is None:
+                    continue
+                _population_note = (
+                    f"{int(_projected_rows):,} rows, full population"
+                    if _is_full_population
+                    else f"{int(_projected_rows):,} projected rows from {int(_population_rows):,}"
+                )
+                _population_lines.append(f"- **{str(_panel_spec.get('title') or _projection_id)}:** {_population_note}")
+            if _population_lines:
+                _accordion_sections["Projection population"] = _support.mo.md("\\n".join(_population_lines))
             geometry_panel = _support.mo.vstack(
                 [
                     geometry_scope_note,
                     _support.mo.hstack(_control_widgets, justify="start", align="end", wrap=True, gap=0.28),
-                    _support.mo.md(_selection_summary),
-                    *([hue_notice] if hue_notice is not None else []),
                     geometry_plot,
+                    _support.mo.accordion(_accordion_sections, lazy=True),
                 ],
                 gap=0.35,
             )
@@ -530,7 +655,14 @@ def render_compare_panel_cell() -> str:
                         align="start",
                         justify="center",
                     ),
-                    _support.key_value_table([(row["Metric"], row["Value"]) for row in metrics_rows]),
+                    _support.mo.accordion(
+                        {
+                            "Comparison metadata": _support.key_value_table(
+                                [(row["Metric"], row["Value"]) for row in metrics_rows]
+                            )
+                        },
+                        lazy=True,
+                    ),
                 ],
                 gap=0.35,
             )

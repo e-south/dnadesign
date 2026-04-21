@@ -69,7 +69,7 @@ class PlotBaseConfig(StrictPlotModel):
 class PlotHueOptionConfig(StrictPlotModel):
     column: Identifier
     label: str
-    type: Literal["categorical", "binary", "continuous"]
+    type: Literal["categorical", "binary", "continuous", "ordinal"]
 
 
 class PlotAnnotationConfig(StrictPlotModel):

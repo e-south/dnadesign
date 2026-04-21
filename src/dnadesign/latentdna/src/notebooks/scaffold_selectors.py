@@ -70,7 +70,7 @@ def render_selector_cells() -> tuple[str, ...]:
                 _geometry = runtime.geometry
                 _support = runtime.support
 
-                _model_options = {value.upper(): value for value in _geometry.model_values}
+                _model_options = _support.labeled_options((value.upper(), value) for value in _geometry.model_values)
                 model_selector = _support.mo.ui.dropdown(
                     options=_model_options,
                     value=(
@@ -108,13 +108,16 @@ def render_selector_cells() -> tuple[str, ...]:
                     if str(_geometry.geometry_control.get("default_family")) in family_values
                     else family_values[0]
                 )
-                _family_options = {
-                    {
-                        "intermediate_embedding": "Intermediate block mean",
-                        "pooled_logits": "Pooled logits",
-                    }.get(value, value.replace("_", " ")): value
+                _family_options = _support.labeled_options(
+                    (
+                        {
+                            "intermediate_embedding": "Intermediate block mean",
+                            "pooled_logits": "Pooled logits",
+                        }.get(value, value.replace("_", " ")),
+                        value,
+                    )
                     for value in family_values
-                }
+                )
                 family_selector = _support.mo.ui.dropdown(
                     options=_family_options,
                     value=(
@@ -144,13 +147,16 @@ def render_selector_cells() -> tuple[str, ...]:
                     if str(_geometry.geometry_control.get("default_context")) in context_values
                     else context_values[0]
                 )
-                _context_options = {
-                    {
-                        "anchor_60bp": "60 bp anchor",
-                        "full_context_1kb": "1 kb construct context",
-                    }.get(value, value.replace("_", " ")): value
+                _context_options = _support.labeled_options(
+                    (
+                        {
+                            "anchor_60bp": "60 bp anchor",
+                            "full_context_1kb": "1 kb construct context",
+                        }.get(value, value.replace("_", " ")),
+                        value,
+                    )
                     for value in context_values
-                }
+                )
                 context_selector = _support.mo.ui.dropdown(
                     options=_context_options,
                     value=(
@@ -177,22 +183,25 @@ def render_selector_cells() -> tuple[str, ...]:
                     and str(row.get("family")) == selected_family
                     and str(row.get("context")) == _selected_context
                 ]
-                geometry_options = {
-                    str(row.get("label") or row["view_id"]): str(row["view_id"])
+                geometry_options = _support.labeled_options(
+                    (
+                        str(row.get("label") or row["view_id"]),
+                        str(row["view_id"]),
+                    )
                     for row in compatible_geometries
-                } or {
-                    str(row.get("label") or row["view_id"]): str(row["view_id"])
-                    for row in _geometry.geometry_rows
-                }
+                )
                 geometry_default = next(iter(geometry_options.values()), "")
+                _empty_geometry_options = {"No compatible geometry for this selection": ""}
                 geometry_selector = _support.mo.ui.dropdown(
-                    options=geometry_options or {"No geometry": ""},
+                    options=geometry_options or _empty_geometry_options,
                     value=(
                         _support.option_key_for_value(geometry_options, geometry_default)
                         if geometry_options
-                        else "No geometry"
+                        else next(iter(_empty_geometry_options))
                     ),
                     label="Geometry",
+                    searchable=True,
+                    full_width=True,
                 )
                 return (geometry_selector,)
             """
@@ -204,9 +213,29 @@ def render_selector_cells() -> tuple[str, ...]:
                 _geometry = runtime.geometry
                 _support = runtime.support
 
-                compare_options = {
-                    str(row.get("label") or row["view_id"]): str(row["view_id"]) for row in _geometry.geometry_rows
-                } or {"No geometries": ""}
+                default_hue = (
+                    _geometry.selected_hue_default
+                    if _geometry.selected_hue_default in _geometry.preferred_hues
+                    else ""
+                )
+                get_requested_hue, set_requested_hue = _support.mo.state(default_hue)
+                return (get_requested_hue, set_requested_hue)
+            """
+        ),
+        dedent(
+            """\
+            @app.cell
+            def _(runtime):
+                _geometry = runtime.geometry
+                _support = runtime.support
+
+                compare_options = _support.labeled_options(
+                    (
+                        str(row.get("label") or row["view_id"]),
+                        str(row["view_id"]),
+                    )
+                    for row in _geometry.geometry_rows
+                ) or {"No geometries": ""}
                 compare_left_selector = _support.mo.ui.dropdown(
                     options=compare_options,
                     value=(
@@ -214,6 +243,8 @@ def render_selector_cells() -> tuple[str, ...]:
                         or next(iter(compare_options))
                     ),
                     label="Left geometry",
+                    searchable=True,
+                    full_width=True,
                 )
                 compare_right_selector = _support.mo.ui.dropdown(
                     options=compare_options,
@@ -222,6 +253,8 @@ def render_selector_cells() -> tuple[str, ...]:
                         or next(iter(compare_options))
                     ),
                     label="Right geometry",
+                    searchable=True,
+                    full_width=True,
                 )
                 return (compare_left_selector, compare_right_selector)
             """

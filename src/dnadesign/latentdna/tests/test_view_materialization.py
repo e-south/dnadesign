@@ -164,6 +164,98 @@ def test_materialize_view_rejects_synthetic_rows_without_sig35_token(tmp_path: P
         materialize_view_artifact(context, view_id="intermediate_embedding_20b_anchor_60bp")
 
 
+def test_materialize_view_canonicalizes_design_regulator_composition(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["synthetic_a", "synthetic_b", "background_a", "control_a"], type=pa.string()),
+                "subject_id": pa.array(["synthetic_a", "synthetic_b", "background_a", "control_a"], type=pa.string()),
+                "usr_label__primary": pa.array(["synthetic_a", "synthetic_b", "background_a", "J23105"]),
+                "densegen__plan": pa.array(
+                    [
+                        "ethanol__sig35=b",
+                        "ethanol_ciprofloxacin__sig35=b",
+                        "background_only__sig35=f",
+                        None,
+                    ],
+                    type=pa.string(),
+                ),
+                "densegen__required_regulators": pa.array(
+                    [
+                        ["cpxR_MANWWHTTTAM"],
+                        ["lexA_CTGTATAWAWWHACA", "baeR_TTTCTSCVHNA"],
+                        [],
+                        None,
+                    ],
+                    type=pa.list_(pa.string()),
+                ),
+                "embedding": pa.array(
+                    [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5], [0.25, 0.75]],
+                    type=pa.list_(pa.float32()),
+                ),
+                "template_id": pa.array(["tpl_a", "tpl_b", "tpl_c", "wt"], type=pa.string()),
+            }
+        ),
+        inputs_dir / "records.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "regulator_composition_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor_60bp": {
+                        "kind": "parquet",
+                        "path": "inputs/records.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {"include": ["design_regulator_composition"]},
+                "views": {
+                    "intermediate_embedding_20b_anchor_60bp": {
+                        "source": "anchor_60bp",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
+                    }
+                },
+                "cohorts": {
+                    "design_regulator_composition": {
+                        "kind": "promoter_metadata",
+                        "source": "anchor_60bp",
+                        "derive": "design_regulator_composition",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="intermediate_embedding_20b_anchor_60bp")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert [row["design_regulator_composition"] for row in rows] == [
+        "cpxR",
+        "baeR+lexA",
+        "background",
+        "control",
+    ]
+
+
 def test_materialize_view_includes_source_scoped_metadata_columns(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -424,3 +516,204 @@ def test_spacer_length_returns_none_when_synthetic_detail_is_missing() -> None:
     }
 
     assert _spacer_length(row) is None
+
+
+def test_materialize_view_populates_coalesced_metadata_from_source_columns(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["row_a", "row_b"], type=pa.string()),
+                "subject_id": pa.array(["row_a", "row_b"], type=pa.string()),
+                "usr_label__primary": pa.array(["row_a", "row_b"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0], [1.0, 0.0]], type=pa.list_(pa.float32())),
+                "score_anchor": pa.array([-1.2, None], type=pa.float32()),
+                "score_context": pa.array([None, -6.3], type=pa.float32()),
+            }
+        ),
+        inputs_dir / "records.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "coalesce_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor_60bp": {
+                        "kind": "parquet",
+                        "path": "inputs/records.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {
+                    "include": ["llr_demo"],
+                    "derivations": {
+                        "llr_demo": {
+                            "kind": "coalesce",
+                            "sources": ["score_anchor", "score_context"],
+                        }
+                    },
+                },
+                "views": {
+                    "demo_embedding": {
+                        "source": "anchor_60bp",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
+                    }
+                },
+                "cohorts": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="demo_embedding")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert [row["llr_demo"] for row in rows] == pytest.approx([-1.2, -6.3])
+
+
+def test_materialize_view_allows_coalesce_derivation_when_one_input_column_is_available(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["row_a"], type=pa.string()),
+                "subject_id": pa.array(["row_a"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0]], type=pa.list_(pa.float32())),
+                "score_context": pa.array([-6.3], type=pa.float32()),
+            }
+        ),
+        inputs_dir / "records.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "missing_derivation_input_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor_60bp": {
+                        "kind": "parquet",
+                        "path": "inputs/records.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {
+                    "include": ["llr_demo"],
+                    "derivations": {
+                        "llr_demo": {
+                            "kind": "coalesce",
+                            "sources": ["score_anchor", "score_context"],
+                        }
+                    },
+                },
+                "views": {
+                    "demo_embedding": {
+                        "source": "anchor_60bp",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
+                    }
+                },
+                "cohorts": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="demo_embedding")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert [row["llr_demo"] for row in rows] == pytest.approx([-6.3])
+
+
+def test_materialize_view_fails_fast_when_all_coalesce_inputs_are_missing(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["row_a"], type=pa.string()),
+                "subject_id": pa.array(["row_a"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0]], type=pa.list_(pa.float32())),
+            }
+        ),
+        inputs_dir / "records.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "missing_all_derivation_inputs_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor_60bp": {
+                        "kind": "parquet",
+                        "path": "inputs/records.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {
+                    "include": ["llr_demo"],
+                    "derivations": {
+                        "llr_demo": {
+                            "kind": "coalesce",
+                            "sources": ["score_anchor", "score_context"],
+                        }
+                    },
+                },
+                "views": {
+                    "demo_embedding": {
+                        "source": "anchor_60bp",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
+                    }
+                },
+                "cohorts": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+
+    with pytest.raises(ContractViolationError, match="metadata derivation inputs are missing"):
+        materialize_view_artifact(context, view_id="demo_embedding")

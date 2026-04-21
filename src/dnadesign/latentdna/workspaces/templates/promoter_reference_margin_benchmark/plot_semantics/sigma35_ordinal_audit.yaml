@@ -8,7 +8,7 @@ guardrails:
   - Keep the exploratory label when the Sigma-35 order file is provisional.
 caption: Sigma-35 ordinal audit across candidate representations.
 alt_text: Bar-panel summary showing Sigma-35 ordinal correlation statistics and permutation support for each candidate representation.
-preprocessing_md: Sigma-35 centroid distances are computed after view-level standardization and row L2 normalization on the sampled candidate rows.
+preprocessing_md: Sigma-35 centroid distances are computed after view-level standardization and row L2 normalization on the sampled candidate rows; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
 math_md: The audit compares expected rank gaps delta_rank(g,h) = |r_g - r_h| to observed centroid distances d_emb(g,h) = 1 - cos(c_g, c_h), reports global Spearman and Kendall correlations, a balanced Spearman, a within-family mean Spearman, a within-regulator mean Spearman, and a shuffled-label permutation null for the global Spearman.
 rationale_md: Provides a focused pre-assay check for ordered Sigma-35 design-axis signal inside the synthetic design.
 limitations_md: The result depends on the declared ordinal prior and remains a design-annotation audit until assay labels exist.

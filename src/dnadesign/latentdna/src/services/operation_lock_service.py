@@ -66,6 +66,11 @@ def _lock_held_error(*, operation: str, lock_path: Path) -> OperationLockError:
             "another projection fit is already in progress for this workspace; "
             "latentdna serializes heavy projection fits to avoid aggregate memory pressure."
         )
+    elif operation == "view_materialize":
+        message = (
+            "another view materialize is already in progress for this workspace; "
+            "latentdna serializes heavy view materializations to avoid aggregate memory pressure."
+        )
     else:
         message = (
             f"another {operation} operation is already in progress for this workspace; "

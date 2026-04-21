@@ -10,6 +10,7 @@ import marimo as mo
 import numpy as np
 import pandas as pd
 
+from ..labels import humanize_column_name
 from ..visual_style import (
     PANEL_BACKGROUND_COLOR,
     PUBLICATION_PALETTE,
@@ -23,7 +24,7 @@ from .browser_runtime_support import (
     load_view_matrix,
     load_view_rows,
     render_matplotlib_figure,
-    shared_join_key,
+    resolve_join_keys,
     style_notebook_axes,
 )
 
@@ -41,7 +42,11 @@ def display_compare_basis(basis_label: str) -> str:
     if text.startswith("alignment:"):
         return f"Alignment: {humanize_display_text(text.split(':', 1)[1])}"
     if text.startswith("shared_key:"):
-        return f"Shared key: {humanize_display_text(text.split(':', 1)[1])}"
+        key = text.split(":", 1)[1].strip()
+        if "->" in key:
+            left_key, right_key = (part.strip() for part in key.split("->", 1))
+            return f"Shared key: {humanize_column_name(left_key)} -> {humanize_column_name(right_key)}"
+        return f"Shared key: {humanize_column_name(key)}"
     return humanize_display_text(text)
 
 
@@ -93,23 +98,33 @@ def resolve_shared_key_pair_indices(
     left_rows: pd.DataFrame,
     right_rows: pd.DataFrame,
 ) -> tuple[np.ndarray, np.ndarray, str] | None:
-    join_key = shared_join_key(left_rows, right_rows)
-    if join_key is None:
+    join_keys = resolve_join_keys(left_rows, right_rows)
+    if join_keys is None:
         return None
-    if left_rows[join_key].duplicated().any() or right_rows[join_key].duplicated().any():
-        raise ValueError(f"shared-key comparison requires unique `{join_key}` rows on both sides")
-    merged = left_rows.reset_index().merge(
-        right_rows.reset_index(),
-        on=join_key,
-        how="inner",
-        suffixes=("_left", "_right"),
-    )
+    left_key, right_key = join_keys
+    if left_rows[left_key].duplicated().any() or right_rows[right_key].duplicated().any():
+        raise ValueError(f"shared-key comparison requires unique `{left_key}` / `{right_key}` rows on both sides")
+    if left_key == right_key:
+        merged = left_rows.reset_index().merge(
+            right_rows.reset_index(),
+            on=left_key,
+            how="inner",
+            suffixes=("_left", "_right"),
+        )
+    else:
+        merged = left_rows.reset_index().merge(
+            right_rows.reset_index(),
+            left_on=left_key,
+            right_on=right_key,
+            how="inner",
+            suffixes=("_left", "_right"),
+        )
     if merged.empty:
         return None
     return (
         merged["index_left"].to_numpy(dtype=np.int64),
         merged["index_right"].to_numpy(dtype=np.int64),
-        join_key,
+        left_key if left_key == right_key else f"{left_key}->{right_key}",
     )
 
 

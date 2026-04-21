@@ -18,6 +18,15 @@ from ..io.parquet_io import read_table, write_table
 from ..workspaces.loader import WorkspaceContext
 from ..workspaces.validation import _view_declares_reduced_space
 
+_JOIN_KEY_CANDIDATES: tuple[tuple[str, str], ...] = (
+    ("construct__anchor_id", "construct__anchor_id"),
+    ("construct__anchor_id", "id"),
+    ("id", "construct__anchor_id"),
+    ("id", "id"),
+    ("subject_id", "subject_id"),
+    ("context_id", "context_id"),
+)
+
 
 def _view_artifact_paths(context: WorkspaceContext, view_id: str) -> tuple[Path, Path, Path]:
     view_dir = context.output_root / "views" / view_id
@@ -56,6 +65,106 @@ def _constant_group_columns(rows: list[dict[str, Any]], column_names: list[str])
         if all(len({row[column] for row in group}) == 1 for group in rows):
             kept.append(column)
     return kept
+
+
+def _resolve_join_keys(left_rows: pa.Table, right_rows: pa.Table) -> tuple[str, str] | None:
+    left_columns = set(left_rows.column_names)
+    right_columns = set(right_rows.column_names)
+    for left_key, right_key in _JOIN_KEY_CANDIDATES:
+        if left_key in left_columns and right_key in right_columns:
+            return left_key, right_key
+    return None
+
+
+def _candidate_join_keys(left_rows: pa.Table, right_rows: pa.Table) -> list[tuple[str, str]]:
+    left_columns = set(left_rows.column_names)
+    right_columns = set(right_rows.column_names)
+    return [
+        (left_key, right_key)
+        for left_key, right_key in _JOIN_KEY_CANDIDATES
+        if left_key in left_columns and right_key in right_columns
+    ]
+
+
+def _project_matrix_to_reference_rows_for_keys(
+    reference_rows: pa.Table,
+    candidate_rows: pa.Table,
+    candidate_matrix: np.ndarray,
+    *,
+    input_view: str,
+    left_key: str,
+    right_key: str,
+) -> np.ndarray:
+    seen_reference_keys: set[object] = set()
+    duplicate_reference_keys: list[object] = []
+    for row in reference_rows.select([left_key]).to_pylist():
+        key = row[left_key]
+        if key in seen_reference_keys:
+            duplicate_reference_keys.append(key)
+            continue
+        seen_reference_keys.add(key)
+    if duplicate_reference_keys:
+        preview = ", ".join(str(value) for value in duplicate_reference_keys[:5])
+        raise ContractViolationError(f"concatenate reference rows are non-unique on {left_key!r}: {preview}")
+    candidate_index_by_key: dict[object, int] = {}
+    for index, row in enumerate(candidate_rows.select([right_key]).to_pylist()):
+        key = row[right_key]
+        if key in candidate_index_by_key:
+            raise ContractViolationError(f"concatenate input {input_view!r} is non-unique on {right_key!r}")
+        candidate_index_by_key[key] = index
+
+    ordered_indices: list[int] = []
+    missing_keys: list[object] = []
+    for row in reference_rows.select([left_key]).to_pylist():
+        key = row[left_key]
+        index = candidate_index_by_key.get(key)
+        if index is None:
+            missing_keys.append(key)
+            continue
+        ordered_indices.append(index)
+
+    if missing_keys:
+        preview = ", ".join(str(value) for value in missing_keys[:5])
+        raise ContractViolationError(
+            f"concatenate input {input_view!r} is missing aligned rows on {right_key!r}: {preview}"
+        )
+    if len(ordered_indices) != len(candidate_index_by_key):
+        raise ContractViolationError(
+            f"concatenate input {input_view!r} has extra rows outside the reference support on {right_key!r}"
+        )
+    return np.ascontiguousarray(candidate_matrix[np.asarray(ordered_indices, dtype=np.int64)], dtype=np.float32)
+
+
+def _project_matrix_to_reference_rows(
+    reference_rows: pa.Table,
+    candidate_rows: pa.Table,
+    candidate_matrix: np.ndarray,
+    *,
+    input_view: str,
+) -> np.ndarray:
+    candidates = _candidate_join_keys(reference_rows, candidate_rows)
+    if not candidates:
+        raise ContractViolationError(
+            f"concatenate requires matching rows or joinable key support; {input_view!r} shares no supported join key"
+        )
+    failures: list[str] = []
+    for left_key, right_key in candidates:
+        try:
+            return _project_matrix_to_reference_rows_for_keys(
+                reference_rows,
+                candidate_rows,
+                candidate_matrix,
+                input_view=input_view,
+                left_key=left_key,
+                right_key=right_key,
+            )
+        except ContractViolationError as exc:
+            failures.append(f"{left_key}->{right_key}: {exc}")
+    if len(failures) == 1:
+        raise ContractViolationError(failures[0].split(": ", 1)[1])
+    raise ContractViolationError(
+        f"concatenate could not align {input_view!r} on any supported join key: {'; '.join(failures)}"
+    )
 
 
 def _derive_vector_difference_artifact(
@@ -303,8 +412,11 @@ def _derive_concatenate_artifact(
             record_key = str(manifest["params"]["record_key"])
             row_columns = list(candidate_rows.column_names)
         elif not rows_table.equals(candidate_rows, check_metadata=False):
-            raise ContractViolationError(
-                f"concatenate requires identical row support across inputs; {input_view!r} does not match"
+            matrix = _project_matrix_to_reference_rows(
+                rows_table,
+                candidate_rows,
+                matrix,
+                input_view=input_view,
             )
         matrices.append(matrix)
     assert rows_table is not None and record_key is not None and row_columns is not None

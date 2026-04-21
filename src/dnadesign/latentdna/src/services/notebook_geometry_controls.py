@@ -24,10 +24,9 @@ _CANONICAL_GEOMETRY_ORDER = [
     "pooled_logits_7b_anchor_60bp",
     "intermediate_embedding_7b_full_context_1kb",
     "pooled_logits_7b_full_context_1kb",
-    "intermediate_embedding_20b_anchor_60bp",
-    "pooled_logits_20b_anchor_60bp",
-    "intermediate_embedding_20b_full_context_1kb",
-    "pooled_logits_20b_full_context_1kb",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_anchor_plus_full_context_concat",
+    "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
 ]
 
 _PREFERRED_HUES = [
@@ -39,10 +38,7 @@ _PREFERRED_HUES = [
     "is_control",
     "synthetic_margin_ethanol_vs_background",
     "synthetic_margin_cipro_vs_background",
-    "log_likelihood_per_token_20b_anchor_60bp",
-    "log_likelihood_per_token_20b_full_context_1kb",
-    "log_likelihood_per_token_7b_anchor_60bp",
-    "log_likelihood_per_token_7b_full_context_1kb",
+    "log_likelihood_per_token_7b",
     "context_self_cosine",
     "context_shift_l2",
 ]
@@ -51,14 +47,18 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "design_family": "categorical",
     "design_regulator_composition": "categorical",
     "sig35_variant": "categorical",
-    "spacer_length": "continuous",
+    "spacer_length": "ordinal",
     "source_class": "categorical",
     "is_control": "binary",
     "synthetic_margin_ethanol_vs_background": "continuous",
     "synthetic_margin_cipro_vs_background": "continuous",
+    "log_likelihood_per_token_7b": "continuous",
     "context_self_cosine": "continuous",
     "context_shift_l2": "continuous",
 }
+
+_JOINABLE_KEY_COLUMNS = {"construct__anchor_id", "id", "subject_id", "context_id"}
+_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
@@ -142,14 +142,11 @@ def _geometry_inventory(context, *, projection_ids_by_view: dict[str, list[str]]
     order = {view_id: index for index, view_id in enumerate(_CANONICAL_GEOMETRY_ORDER)}
     for view_id, view in sorted(context.config.views.items(), key=lambda item: (order.get(item[0], 999), item[0])):
         tags = dict(getattr(view, "tags", {}) or {})
+        role = str(getattr(view, "role", "") or "").strip().lower()
         model = str(tags.get("model") or "")
         family = str(tags.get("family") or "")
         scope_name = str(tags.get("scope") or "")
-        if model.lower() not in {"20b", "7b"}:
-            continue
-        if family not in {"intermediate_embedding", "pooled_logits"}:
-            continue
-        if scope_name not in {"anchor_60bp", "full_context_1kb"}:
+        if role == "hidden":
             continue
         shape = _view_shape(context, view_id)
         view_dir = context.output_root / "views" / view_id
@@ -171,37 +168,87 @@ def _geometry_inventory(context, *, projection_ids_by_view: dict[str, list[str]]
     return geometries
 
 
-def _table_inventory(context) -> tuple[list[WorkspaceNotebookTableRef], dict[str, object]]:
+def _manifest_view_ids(
+    manifest: dict[str, object],
+    *,
+    input_kinds: set[str] | None = None,
+) -> set[str]:
+    return {
+        str(item.get("id"))
+        for item in manifest.get("inputs", [])
+        if isinstance(item, dict)
+        and item.get("kind") in (input_kinds or {"view_matrix", "view_rows"})
+        and str(item.get("id") or "").strip()
+    }
+
+
+def _table_targets_visible_views(
+    *,
+    artifact_id: str,
+    manifest: dict[str, object],
+    visible_view_ids: set[str],
+) -> bool:
+    manifest_view_ids = _manifest_view_ids(manifest)
+    if manifest_view_ids:
+        return bool(manifest_view_ids.intersection(visible_view_ids))
+    if "20b" in artifact_id.casefold() and not any("20b" in view_id.casefold() for view_id in visible_view_ids):
+        return False
+    return True
+
+
+def _table_inventory(
+    context,
+    *,
+    visible_view_ids: set[str],
+) -> tuple[list[WorkspaceNotebookTableRef], dict[str, object]]:
     inventory: list[WorkspaceNotebookTableRef] = []
     schemas: dict[str, object] = {}
     table_roots = [
-        ("scalar", "scalars", "table.parquet", set(getattr(context.config, "scalars", {}))),
-        ("distance", "distances", "table.parquet", set(getattr(context.config, "distances", {}))),
-        ("cluster", "clusters", "assignments.parquet", set(getattr(context.config, "clusters", {}))),
+        ("scalar", "scalars", "table.parquet"),
+        ("distance", "distances", "table.parquet"),
+        ("cluster", "clusters", "assignments.parquet"),
     ]
-    for kind, root_name, filename, configured_ids in table_roots:
+    for kind, root_name, filename in table_roots:
         root = context.output_root / root_name
         if not root.is_dir():
             continue
         for artifact_dir in sorted(path for path in root.iterdir() if path.is_dir()):
-            if artifact_dir.name not in configured_ids:
-                continue
             table_path = artifact_dir / filename
             manifest_path = artifact_dir / "manifest.json"
             if not table_path.is_file():
                 continue
+            manifest: dict[str, object] = {}
+            if manifest_path.is_file():
+                try:
+                    manifest = read_json(manifest_path)
+                except Exception:
+                    manifest = {}
+            if not _table_targets_visible_views(
+                artifact_id=artifact_dir.name,
+                manifest=manifest,
+                visible_view_ids=visible_view_ids,
+            ):
+                continue
             relative_path = table_path.relative_to(context.output_root).as_posix()
             schema = read_schema(table_path)
+            field_names = [field.name for field in schema]
+            if not _JOINABLE_KEY_COLUMNS.intersection(field_names):
+                continue
+            if not _JOINABLE_VALUE_COLUMNS.intersection(field_names):
+                continue
             schemas[relative_path] = schema
+            row_scope_view_ids = _manifest_view_ids(manifest, input_kinds={"view_rows"})
+            table_view_ids = row_scope_view_ids or _manifest_view_ids(manifest)
             inventory.append(
                 WorkspaceNotebookTableRef(
                     kind=kind,
                     artifact_id=artifact_dir.name,
                     relative_path=relative_path,
-                    columns=[field.name for field in schema],
+                    columns=field_names,
                     manifest_path=(
                         manifest_path.relative_to(context.output_root).as_posix() if manifest_path.is_file() else None
                     ),
+                    view_ids=sorted(table_view_ids),
                 )
             )
     return inventory, schemas
@@ -229,16 +276,21 @@ def _preferred_hue_kinds(
 ) -> dict[str, str]:
     kinds: dict[str, str] = {}
     preferred = set(_PREFERRED_HUES)
+    discovered: set[str] = set()
     for table_ref in joinable_tables:
         schema = schemas_by_path[table_ref.relative_path]
         for field in schema:
-            if field.name not in preferred or field.name in kinds:
+            if field.name not in preferred:
+                continue
+            discovered.add(field.name)
+            if field.name in kinds:
                 continue
             kind = _infer_hue_kind_from_type(field.type)
             if kind is not None:
                 kinds[field.name] = kind
     for column, kind in _PREFERRED_HUE_KIND_DEFAULTS.items():
-        kinds.setdefault(column, kind)
+        if column in discovered:
+            kinds[column] = kind
     return {column: kinds[column] for column in _PREFERRED_HUES if column in kinds}
 
 
@@ -251,31 +303,23 @@ def _layout_presets(geometry_rows: list[WorkspaceNotebookGeometry]) -> list[Work
             mode="single_view",
             description="Render one persisted projection with the selected hue.",
         ),
-        WorkspaceNotebookLayoutPreset(
-            id="model_pair",
-            label="Side-by-side pair",
-            mode="model_pair",
-            description="Render the selected context/family as a 7B versus 20B pair when both views exist.",
-            view_order=_CANONICAL_GEOMETRY_ORDER,
-        ),
     ]
     if set(_CANONICAL_GEOMETRY_ORDER).issubset(available):
         presets.append(
             WorkspaceNotebookLayoutPreset(
-                id="appendix_umap_gallery",
-                label="UMAP gallery",
+                id="candidate_grid",
+                label="Candidate grid",
                 mode="fixed_grid",
-                description="UMAP gallery across the eight canonical study spaces.",
+                description="Projection grid across the surfaced 7B intermediate candidates and concat experiments.",
                 view_ids=_CANONICAL_GEOMETRY_ORDER,
                 panel_titles=[
                     "Evo 2 7B · 60 bp anchor · Intermediate block mean",
                     "Evo 2 7B · 60 bp anchor · Pooled logits",
                     "Evo 2 7B · 1 kb construct context · Intermediate block mean",
                     "Evo 2 7B · 1 kb construct context · Pooled logits",
-                    "Evo 2 20B · 60 bp anchor · Intermediate block mean",
-                    "Evo 2 20B · 60 bp anchor · Pooled logits",
-                    "Evo 2 20B · 1 kb construct context · Intermediate block mean",
-                    "Evo 2 20B · 1 kb construct context · Pooled logits",
+                    "Evo 2 7B · 1 kb context anchor mean · Intermediate block mean",
+                    "Evo 2 7B · Anchor + 1 kb context concat · Intermediate block mean",
+                    "Evo 2 7B · Anchor + anchor-mean concat · Intermediate block mean",
                 ],
             )
         )
@@ -342,10 +386,8 @@ def _default_compare_views(
 ) -> tuple[str | None, str | None]:
     view_ids = {row.view_id for row in geometry_rows}
     for left_view, right_view in [
-        ("intermediate_embedding_20b_anchor_60bp", "intermediate_embedding_20b_full_context_1kb"),
-        ("pooled_logits_20b_anchor_60bp", "pooled_logits_20b_full_context_1kb"),
+        ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_anchor_mean"),
         ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_1kb"),
-        ("pooled_logits_7b_anchor_60bp", "pooled_logits_7b_full_context_1kb"),
     ]:
         if left_view in view_ids and right_view in view_ids:
             return left_view, right_view
@@ -360,13 +402,16 @@ def _default_compare_views(
 def build_workspace_geometry_controls(context) -> WorkspaceNotebookGeometryControls:
     projection_ids_by_view = _projection_inventory(context)
     geometries = _geometry_inventory(context, projection_ids_by_view=projection_ids_by_view)
-    joinable_tables, schemas_by_path = _table_inventory(context)
+    joinable_tables, schemas_by_path = _table_inventory(
+        context,
+        visible_view_ids={row.view_id for row in geometries},
+    )
     hue_kinds = _preferred_hue_kinds(joinable_tables, schemas_by_path=schemas_by_path)
     preferred_hues = [column for column in _PREFERRED_HUES if column in hue_kinds]
     comparison_bases = _comparison_bases(context, geometries)
     default_compare_left, default_compare_right = _default_compare_views(geometries)
     return WorkspaceNotebookGeometryControls(
-        default_model="20b",
+        default_model="7b",
         default_family="intermediate_embedding",
         default_context="anchor_60bp",
         default_layout="single_view",

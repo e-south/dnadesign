@@ -13,11 +13,13 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ..annotation_layout import choose_annotation_placement
 from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..contracts.plot_semantics import PlotSemantics
 from ..labels import humanize_candidate
 from ..visual_style import (
+    ANNOTATION_LABEL_BOX_ALPHA,
     DEFAULT_PLOT_PNG_DPI,
     GRID_COLOR,
     PANEL_BACKGROUND_COLOR,
@@ -31,7 +33,10 @@ from ..visual_style import (
     TEXT_COLOR,
     ZERO_LINE_COLOR,
     categorical_color_map,
+    compact_candidate_title,
+    display_category_text,
     humanize_display_text,
+    legend_layout,
     ordered_categories,
     scatter_style,
     wrap_plot_title,
@@ -39,6 +44,13 @@ from ..visual_style import (
 from ..workspaces.loader import WorkspaceContext
 
 _SHAPE_MARKERS = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h"]
+_SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
+    {
+        "design_centroid_margin_gallery",
+        "representation_scree_diagnostic",
+        "appendix_umap_gallery",
+    }
+)
 
 
 def _pyplot():
@@ -58,8 +70,8 @@ def _category_color_map(row_groups: list[list[dict]], column: str | None) -> tup
     flattened = [row for rows in row_groups for row in rows]
     if flattened and column not in flattened[0]:
         raise ContractViolationError(f"plot color column is missing: {column!r}")
-    categories = ordered_categories(str(row[column]) for row in flattened)
-    color_map = categorical_color_map(categories)
+    categories = ordered_categories((str(row[column]) for row in flattened), column=column)
+    color_map = categorical_color_map(categories, column=column)
     return color_map, categories
 
 
@@ -74,7 +86,7 @@ def _color_series(
     if rows and column not in rows[0]:
         raise ContractViolationError(f"plot color column is missing: {column!r}")
     resolved_map = color_map or _category_color_map([rows], column)[0]
-    categories = ordered_categories(resolved_map)
+    categories = ordered_categories(resolved_map, column=column)
     return [resolved_map[str(row[column])] for row in rows], categories
 
 
@@ -181,6 +193,45 @@ def _apply_axes_style(ax: Any, *, grid: bool, square: bool = False) -> None:
         ax.set_axisbelow(True)
 
 
+def _render_placeholder_panel(
+    ax: Any,
+    *,
+    panel_title: str,
+    message: str,
+    detail: str | None = None,
+    square: bool = False,
+) -> None:
+    ax.cla()
+    ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
+    _apply_axes_style(ax, grid=False, square=square)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.text(
+        0.5,
+        0.58,
+        message,
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=11.0,
+        color=TEXT_COLOR,
+        fontweight="semibold",
+    )
+    if detail:
+        ax.text(
+            0.5,
+            0.42,
+            detail,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9.0,
+            color=SPINE_COLOR,
+        )
+
+
 def _style_legend(legend: Any) -> None:
     if legend is None:
         return
@@ -193,7 +244,13 @@ def _style_legend(legend: Any) -> None:
         text.set_fontfamily(PLOT_FONT_FAMILY)
 
 
-def _legend_handles(plt: Any, categories: list[str], color_map: dict[str, str]) -> list[Any]:
+def _legend_handles(
+    plt: Any,
+    categories: list[str],
+    color_map: dict[str, str],
+    *,
+    column: str | None = None,
+) -> list[Any]:
     return [
         plt.Line2D(
             [],
@@ -204,7 +261,7 @@ def _legend_handles(plt: Any, categories: list[str], color_map: dict[str, str]) 
             color=color_map[category],
             markeredgecolor="white",
             markeredgewidth=0.35,
-            label=humanize_display_text(category),
+            label=display_category_text(category, column=column),
         )
         for category in categories
     ]
@@ -290,7 +347,7 @@ def _add_axis_legends(
     color_legend = None
     if color_categories and color_title is not None:
         color_legend = ax.legend(
-            handles=_legend_handles(plt, color_categories, color_map),
+            handles=_legend_handles(plt, color_categories, color_map, column=color_title),
             frameon=False,
             loc="upper left",
         )
@@ -310,6 +367,7 @@ def _add_figure_legends(
     fig: Any,
     plt: Any,
     *,
+    plot_id: str | None,
     color_categories: list[str],
     color_map: dict[str, str],
     color_title: str | None,
@@ -319,27 +377,54 @@ def _add_figure_legends(
 ) -> float:
     legend_specs: list[list[Any]] = []
     if color_categories and color_title is not None:
-        legend_specs.append(_legend_handles(plt, color_categories, color_map))
+        legend_specs.append(_legend_handles(plt, color_categories, color_map, column=color_title))
     if shape_categories and shape_title is not None:
         legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
     if not legend_specs:
         return 0.0
 
-    legend_y = 0.012
+    legend_y = 0.008 if plot_id in {"design_centroid_margin_gallery", "appendix_umap_gallery"} else 0.012
+    base_margin = 0.065 if plot_id in {"design_centroid_margin_gallery", "appendix_umap_gallery"} else 0.055
     for handles in legend_specs:
+        legend_labels = [handle.get_label() for handle in handles]
+        layout = legend_layout(
+            legend_labels,
+            plot_id=plot_id,
+            default_anchor_y=legend_y,
+            default_base_margin=base_margin,
+            row_step=0.038,
+            single_row=True,
+        )
         legend = fig.legend(
             handles=handles,
             loc="lower center",
-            bbox_to_anchor=(0.5, legend_y),
-            ncol=max(1, len(handles)),
+            bbox_to_anchor=(0.5, layout.anchor_y),
+            ncol=layout.columns,
             frameon=False,
             borderaxespad=0.0,
-            columnspacing=0.95,
-            handletextpad=0.45,
+            columnspacing=1.05,
+            handletextpad=0.5,
         )
         _style_legend(legend)
-        legend_y += 0.055
-    return min(max(legend_y + 0.014, 0.1), 0.18)
+        legend_y = layout.anchor_y + layout.bottom_margin
+    return min(max(legend_y + 0.014, 0.1), 0.24)
+
+
+def _tight_layout_kwargs(spec: ResolvedPlotSpec, *, legend_bottom: float) -> dict[str, object]:
+    kwargs: dict[str, object] = {
+        "pad": 0.95,
+        "h_pad": 1.4,
+        "w_pad": 0.95,
+    }
+    if spec.plot_id == "design_centroid_margin_gallery":
+        kwargs["w_pad"] = 1.18
+    if spec.plot_id == "representation_health_summary":
+        kwargs["w_pad"] = 1.85
+    if spec.plot_id == "dataset_overview":
+        kwargs["w_pad"] = 1.2
+    if legend_bottom > 0.0:
+        kwargs["rect"] = (0.0, legend_bottom, 1.0, 0.995)
+    return kwargs
 
 
 def _selected_label_rows(rows: list[dict], *, label_column: str | None, label_values: list[str]) -> list[dict]:
@@ -358,21 +443,6 @@ def _add_zero_reference_lines(ax: Any, *, x_values: list[float], y_values: list[
         ax.axhline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9, zorder=0)
 
 
-def _annotation_offsets() -> list[tuple[float, float]]:
-    return [
-        (10.0, 10.0),
-        (10.0, -18.0),
-        (-72.0, 10.0),
-        (-72.0, -18.0),
-        (18.0, 24.0),
-        (-80.0, 24.0),
-        (18.0, -32.0),
-        (-80.0, -32.0),
-        (40.0, 0.0),
-        (-94.0, 0.0),
-    ]
-
-
 def _draw_annotation_callouts(
     ax: Any,
     *,
@@ -386,8 +456,10 @@ def _draw_annotation_callouts(
         return
     x_values = [float(row[resolved_x]) for row in rows]
     y_values = [float(row[resolved_y]) for row in rows]
-    offsets = _annotation_offsets()
-    placed: list[tuple[float, float]] = []
+    placed_boxes: list[tuple[float, float, float, float]] = []
+    axes_box = ax.get_window_extent()
+    display_x_mid = float((axes_box.x0 + axes_box.x1) / 2.0)
+    display_y_mid = float((axes_box.y0 + axes_box.y1) / 2.0)
     ax.scatter(
         x_values,
         y_values,
@@ -405,26 +477,35 @@ def _draw_annotation_callouts(
         point_x = float(row[resolved_x])
         point_y = float(row[resolved_y])
         display_x, display_y = ax.transData.transform((point_x, point_y))
-        target_offset = offsets[0]
-        for offset_x, offset_y in offsets:
-            candidate_x = display_x + offset_x
-            candidate_y = display_y + offset_y
-            if all(
-                abs(candidate_x - placed_x) > 54.0 or abs(candidate_y - placed_y) > 24.0
-                for placed_x, placed_y in placed
-            ):
-                target_offset = (offset_x, offset_y)
-                break
-        placed.append((display_x + target_offset[0], display_y + target_offset[1]))
+        placement = choose_annotation_placement(
+            display_x=display_x,
+            display_y=display_y,
+            label_text=label_text,
+            axes_box=axes_box,
+            placed_boxes=placed_boxes,
+            x_mid=display_x_mid,
+            y_mid=display_y_mid,
+            font_size=9.5,
+            left_padding_px=10.0,
+            right_padding_px=10.0,
+        )
+        placed_boxes.append(placement.box)
         annotation = ax.annotate(
             label_text,
             xy=(point_x, point_y),
-            xytext=target_offset,
-            textcoords="offset points",
+            xytext=(placement.offset_x, placement.offset_y),
+            textcoords="offset pixels",
             fontsize=9.5,
             fontweight="semibold",
+            ha=placement.ha,
+            va=placement.va,
             color=TEXT_COLOR,
-            bbox={"boxstyle": "round,pad=0.18", "fc": "white", "ec": "none", "alpha": 0.94},
+            bbox={
+                "boxstyle": "round,pad=0.18",
+                "fc": "white",
+                "ec": "none",
+                "alpha": ANNOTATION_LABEL_BOX_ALPHA,
+            },
             arrowprops={"arrowstyle": "-", "color": SPINE_COLOR, "linewidth": 0.9},
             zorder=6,
         )
@@ -606,25 +687,43 @@ def _agreement_summary_metrics(summary: dict[str, object]) -> list[tuple[str, fl
     return metrics
 
 
-def _panel_grid_dimensions(panel_count: int) -> tuple[int, int]:
+def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int) -> bool:
+    return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 4)
+
+
+def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False) -> tuple[int, int]:
     if panel_count <= 1:
         return 1, 1
+    if prefer_single_row and panel_count <= 4:
+        return 1, panel_count
+    if panel_count == 5:
+        return 2, 3
+    if panel_count == 6:
+        return 2, 3
+    if panel_count in {7, 8}:
+        return 2, 4
     if panel_count == 4:
         return 2, 2
-    if panel_count == 8:
-        return 2, 4
     columns = min(4, max(1, int(math.ceil(math.sqrt(panel_count)))))
     rows = int(np.ceil(panel_count / columns))
     return rows, columns
 
 
-def _grid_figure_size(panel_count: int, *, square_panels: bool) -> tuple[float, float]:
+def _grid_figure_size(panel_count: int, *, square_panels: bool, prefer_single_row: bool = False) -> tuple[float, float]:
     if panel_count <= 1:
         return (5.15, 5.0 if square_panels else 4.7)
-    rows, columns = _panel_grid_dimensions(panel_count)
-    panel_width = 4.15 if columns >= 4 else 4.3
-    panel_height = 4.35 if square_panels else 4.05
+    rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=prefer_single_row)
+    panel_width = 3.55 if prefer_single_row and columns >= 4 else 4.15 if columns >= 4 else 4.3
+    panel_height = 4.2 if square_panels and prefer_single_row else 4.35 if square_panels else 4.05
     return (panel_width * columns, panel_height * rows)
+
+
+def _coerce_finite_float(value: object) -> float | None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _scatter_axis_label(
@@ -639,12 +738,126 @@ def _scatter_axis_label(
     return humanize_display_text(resolved_column)
 
 
-def _wrapped_tick_label(value: object, *, width: int = 16) -> str:
-    return wrap_plot_title(humanize_display_text(str(value)), width=width)
+def _wrapped_tick_label(value: object, *, width: int = 16, max_lines: int | None = None) -> str:
+    return wrap_plot_title(humanize_display_text(str(value)), width=width, max_lines=max_lines)
 
 
-def _wrapped_axis_label(value: object, *, width: int = 22) -> str:
-    return wrap_plot_title(humanize_display_text(str(value)), width=width)
+def _wrapped_axis_label(value: object, *, width: int = 22, max_lines: int | None = 4) -> str:
+    return wrap_plot_title(humanize_display_text(str(value)), width=width, max_lines=max_lines)
+
+
+def _short_candidate_model(value: object) -> str:
+    text = humanize_display_text(value)
+    normalized = text.casefold()
+    if "20b" in normalized:
+        return "20B"
+    if "7b" in normalized:
+        return "7B"
+    return text
+
+
+def _short_candidate_scope(value: object) -> str:
+    text = humanize_display_text(value)
+    normalized = text.casefold()
+    if normalized == "60 bp anchor":
+        return "60 bp"
+    if normalized == "1 kb construct context":
+        return "1 kb ctx"
+    if normalized == "1 kb context anchor mean":
+        return "1 kb anchor mean"
+    if normalized == "anchor + anchor-mean concat":
+        return "anchor + anchor-mean"
+    if normalized == "anchor + 1 kb context concat":
+        return "anchor + 1 kb ctx"
+    return text
+
+
+def _compact_candidate_scope(value: object) -> str:
+    text = humanize_display_text(value)
+    normalized = text.casefold()
+    if normalized == "60 bp anchor":
+        return "60bp"
+    if normalized == "1 kb construct context":
+        return "1kb ctx"
+    if normalized == "1 kb context anchor mean":
+        return "1kb anchor mean"
+    if normalized == "anchor + anchor-mean concat":
+        return "anchor+anchor-mean"
+    if normalized == "anchor + 1 kb context concat":
+        return "anchor+1kb ctx"
+    return text
+
+
+def _short_candidate_family(value: object) -> str:
+    text = humanize_display_text(value)
+    normalized = text.casefold()
+    if normalized == "intermediate block mean":
+        return "Block"
+    if normalized == "pooled logits":
+        return "Logits"
+    return text
+
+
+def _candidate_tick_label(
+    row: dict[str, object],
+    *,
+    fallback_column: str,
+    include_family: bool = True,
+    include_scope: bool = True,
+    multiline: bool = True,
+) -> str:
+    model = str(row.get("candidate_model") or "").strip()
+    scope = str(row.get("candidate_scope") or "").strip()
+    family = str(row.get("candidate_family") or "").strip()
+    if model:
+        short_model = _short_candidate_model(model)
+        parts = [short_model]
+        if include_scope and scope:
+            scope_label = _compact_candidate_scope(scope) if not multiline else _short_candidate_scope(scope)
+            parts[-1] = f"{short_model} {scope_label}"
+        if include_family and family:
+            short_family = _short_candidate_family(family)
+            parts.append(short_family)
+        separator = "\n" if multiline else " "
+        return separator.join(part for part in parts if part)
+    base_label = _candidate_row_label(
+        row,
+        fallback_column=fallback_column,
+        include_family=include_family,
+    )
+    if multiline:
+        return _wrapped_tick_label(base_label, width=12, max_lines=4)
+    return base_label
+
+
+def _style_metric_tick_labels(
+    ax: Any,
+    *,
+    label_count: int,
+    axis: str = "x",
+    rotation: float = 0.0,
+    ha: str | None = None,
+    va: str | None = None,
+) -> None:
+    if label_count >= 8:
+        font_size = PLOT_TICK_FONT_SIZE - 3.1
+    elif label_count >= 6:
+        font_size = PLOT_TICK_FONT_SIZE - 1.4
+    else:
+        font_size = PLOT_TICK_FONT_SIZE - 0.6
+    if axis == "x" and rotation:
+        font_size -= 0.8
+    tick_labels = ax.get_xticklabels() if axis == "x" else ax.get_yticklabels()
+    default_ha = "right" if axis == "y" or rotation else "center"
+    default_va = "center" if axis == "y" else "top"
+    for label in tick_labels:
+        label.set_fontsize(font_size)
+        label.set_linespacing(0.95)
+        label.set_multialignment("right" if rotation else "center")
+        label.set_rotation(rotation)
+        label.set_rotation_mode("anchor")
+        label.set_ha(ha or default_ha)
+        label.set_va(va or default_va)
 
 
 def _render_xy_panel(
@@ -659,19 +872,83 @@ def _render_xy_panel(
     color_map: dict[str, str],
     shape_map: dict[str, str],
 ) -> dict[str, object]:
-    x_values = [float(row[resolved_x]) for row in rows]
-    y_values = [float(row[resolved_y]) for row in rows]
+    finite_rows = [
+        row
+        for row in rows
+        if _coerce_finite_float(row.get(resolved_x)) is not None
+        and _coerce_finite_float(row.get(resolved_y)) is not None
+    ]
+    if not finite_rows:
+        _render_placeholder_panel(
+            ax,
+            panel_title=compact_candidate_title(panel_title),
+            message="Margins unavailable",
+            detail="No finite values in this snapshot",
+            square=True,
+        )
+        ax.set_xlabel(
+            _wrapped_axis_label(
+                _scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"),
+                width=28,
+                max_lines=2,
+            )
+        )
+        ax.set_ylabel(
+            _wrapped_axis_label(
+                _scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"),
+                width=28,
+                max_lines=2,
+            )
+        )
+        return {}
+
+    x_values = [float(row[resolved_x]) for row in finite_rows]
+    y_values = [float(row[resolved_y]) for row in finite_rows]
+    x_span = float(np.ptp(np.asarray(x_values, dtype=np.float64))) if x_values else 0.0
+    y_span = float(np.ptp(np.asarray(y_values, dtype=np.float64))) if y_values else 0.0
+    collapsed_panel = x_span <= 1e-12 and y_span <= 1e-12
     render_mode = spec.render_mode or "points"
-    colors, _ = _color_series(rows, spec.color_column, color_map=color_map if color_map else None)
-    if render_mode == "hexbin":
-        ax.hexbin(x_values, y_values, gridsize=max(12, min(48, int(np.sqrt(len(rows))) * 2)), cmap="cividis")
+    colors, _ = _color_series(finite_rows, spec.color_column, color_map=color_map if color_map else None)
+    if collapsed_panel:
+        centroid_x = x_values[0] if x_values else 0.0
+        centroid_y = y_values[0] if y_values else 0.0
+        point_style = scatter_style(len(rows))
+        ax.scatter(
+            [centroid_x],
+            [centroid_y],
+            c="#111111",
+            s=max(point_style.point_size * 18.0, 90.0),
+            alpha=0.92,
+            edgecolors="white",
+            linewidths=0.7,
+            zorder=3,
+        )
+        ax.set_xlim(centroid_x - 0.055, centroid_x + 0.055)
+        ax.set_ylim(centroid_y - 0.055, centroid_y + 0.055)
+        ax.text(
+            0.5,
+            0.93,
+            "Collapsed to one point",
+            transform=ax.transAxes,
+            ha="center",
+            va="top",
+            fontsize=9.0,
+            color=SPINE_COLOR,
+        )
+    elif render_mode == "hexbin":
+        ax.hexbin(
+            x_values,
+            y_values,
+            gridsize=max(12, min(48, int(np.sqrt(len(finite_rows))) * 2)),
+            cmap="cividis",
+        )
     elif render_mode == "density_contour":
-        bins = max(10, min(30, int(np.sqrt(len(rows))) * 2))
+        bins = max(10, min(30, int(np.sqrt(len(finite_rows))) * 2))
         histogram, x_edges, y_edges = np.histogram2d(x_values, y_values, bins=bins)
         x_centers = 0.5 * (x_edges[:-1] + x_edges[1:])
         y_centers = 0.5 * (y_edges[:-1] + y_edges[1:])
         ax.contour(x_centers, y_centers, histogram.T, levels=4, cmap="cividis")
-        density_style = scatter_style(len(rows))
+        density_style = scatter_style(len(finite_rows))
         ax.scatter(
             x_values,
             y_values,
@@ -685,7 +962,7 @@ def _render_xy_panel(
         point_style = scatter_style(len(rows))
         _scatter_points(
             ax,
-            rows,
+            finite_rows,
             resolved_x=resolved_x,
             resolved_y=resolved_y,
             color_column=spec.color_column,
@@ -700,14 +977,26 @@ def _render_xy_panel(
         )
     _add_zero_reference_lines(ax, x_values=x_values, y_values=y_values)
     ax.set_xlabel(
-        _wrapped_axis_label(_scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"))
+        _wrapped_axis_label(
+            _scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"),
+            width=28,
+            max_lines=2,
+        )
     )
     ax.set_ylabel(
-        _wrapped_axis_label(_scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"))
+        _wrapped_axis_label(
+            _scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"),
+            width=28,
+            max_lines=2,
+        )
     )
-    ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
+    ax.set_title(wrap_plot_title(compact_candidate_title(panel_title), width=22, max_lines=3), pad=8)
     _apply_axes_style(ax, grid=True, square=True)
-    selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(context, rows, spec=spec)
+    selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
+        context,
+        finite_rows,
+        spec=spec,
+    )
     if selected_rows and resolved_label_column is not None:
         label_mode = (
             "label_and_highlight"
@@ -904,15 +1193,24 @@ def _sorted_metric_rows(rows: list[dict[str, object]], *, spec: ResolvedPlotSpec
     sort_rule = spec.sort_rule or "panel_direction"
     if sort_rule == "label_asc":
         return sorted(rows, key=lambda row: str(row.get(label_column) or "").casefold())
+
+    def _value_sort_key(row: dict[str, object], *, descending: bool) -> tuple[int, float, str]:
+        value = _coerce_finite_float(row.get(spec.value_column))
+        label = str(row.get(label_column) or "").casefold()
+        if value is None:
+            return (1, 0.0, label)
+        sortable = -value if descending else value
+        return (0, sortable, label)
+
     if sort_rule == "value_asc":
-        return sorted(rows, key=lambda row: float(row[spec.value_column]))
+        return sorted(rows, key=lambda row: _value_sort_key(row, descending=False))
     if sort_rule == "value_desc":
-        return sorted(rows, key=lambda row: float(row[spec.value_column]), reverse=True)
+        return sorted(rows, key=lambda row: _value_sort_key(row, descending=True))
     direction = ""
     if spec.direction_column is not None and rows:
         direction = str(rows[0].get(spec.direction_column) or "").strip().lower()
-    reverse = direction != "lower_is_better"
-    return sorted(rows, key=lambda row: float(row[spec.value_column]), reverse=reverse)
+    descending = direction != "lower_is_better"
+    return sorted(rows, key=lambda row: _value_sort_key(row, descending=descending))
 
 
 def _render_metric_panel(
@@ -930,25 +1228,22 @@ def _render_metric_panel(
     if label_column is None:
         raise ContractViolationError("metric_panel_grid rendering requires label_column")
     ordered_rows = _sorted_metric_rows(rows, spec=spec)
-    include_family = not (spec.color_column == "candidate_family")
-    label_width = 11 if include_family else 10
-    labels = [
-        _wrapped_tick_label(
-            _candidate_row_label(
-                row,
-                fallback_column=label_column,
-                include_family=include_family,
-            ),
-            width=label_width,
-        )
-        for row in ordered_rows
-    ]
-    values = np.asarray([float(row[spec.value_column]) for row in ordered_rows], dtype=np.float64)
     grouped_family_bars = (
         spec.color_column == "candidate_family"
         and all(str(row.get("candidate_model") or "").strip() for row in ordered_rows)
         and all(str(row.get("candidate_scope") or "").strip() for row in ordered_rows)
     )
+    horizontal_metric = spec.plot_id == "representation_health_summary" and not grouped_family_bars
+    include_family = not (spec.color_column == "candidate_family")
+    labels = [
+        _candidate_tick_label(
+            row,
+            fallback_column=label_column,
+            include_family=include_family,
+            multiline=not horizontal_metric,
+        )
+        for row in ordered_rows
+    ]
     if spec.color_column is not None:
         if ordered_rows and spec.color_column not in ordered_rows[0]:
             raise ContractViolationError(f"metric_panel_grid color column is missing: {spec.color_column!r}")
@@ -957,8 +1252,117 @@ def _render_metric_panel(
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
     ci_enabled = spec.ci_lower_column is not None and spec.ci_upper_column is not None and ordered_rows
 
+    if horizontal_metric:
+        positions = np.arange(len(ordered_rows), dtype=float)
+        finite_positions: list[float] = []
+        finite_values: list[float] = []
+        finite_colors: list[str] = []
+        finite_rows: list[dict[str, object]] = []
+        missing_positions: list[float] = []
+        for position, row, color in zip(positions, ordered_rows, bar_colors, strict=True):
+            value = _coerce_finite_float(row.get(spec.value_column))
+            if value is None:
+                missing_positions.append(float(position))
+                continue
+            finite_positions.append(float(position))
+            finite_values.append(value)
+            finite_colors.append(color)
+            finite_rows.append(row)
+
+        bars = ax.barh(
+            finite_positions,
+            finite_values,
+            color=finite_colors,
+            edgecolor="white",
+            linewidth=0.6,
+            alpha=0.92,
+        )
+        if ci_enabled:
+            errorbar_specs: list[tuple[float, float, float, float]] = []
+            for position, row in zip(finite_positions, finite_rows, strict=True):
+                lower = _coerce_finite_float(row.get(spec.ci_lower_column))
+                upper = _coerce_finite_float(row.get(spec.ci_upper_column))
+                if lower is None or upper is None:
+                    continue
+                errorbar_specs.append((float(position), float(row[spec.value_column]), lower, upper))
+            if errorbar_specs:
+                ys = np.asarray([item[0] for item in errorbar_specs], dtype=np.float64)
+                xs = np.asarray([item[1] for item in errorbar_specs], dtype=np.float64)
+                lowers = np.asarray([max(item[1] - item[2], 0.0) for item in errorbar_specs], dtype=np.float64)
+                uppers = np.asarray([max(item[3] - item[1], 0.0) for item in errorbar_specs], dtype=np.float64)
+                ax.errorbar(
+                    xs,
+                    ys,
+                    xerr=np.vstack([lowers, uppers]),
+                    fmt="none",
+                    ecolor=SPINE_COLOR,
+                    elinewidth=0.9,
+                    capsize=2.0,
+                    alpha=0.85,
+                )
+
+        ax.set_yticks(positions, labels)
+        ax.tick_params(axis="y", pad=6)
+        _style_metric_tick_labels(ax, label_count=len(labels), axis="y")
+        finite_value_array = np.asarray(finite_values, dtype=np.float64)
+        if spec.reference_line is not None:
+            ax.axvline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+        if finite_value_array.size and float(finite_value_array.min()) < 0.0 < float(finite_value_array.max()):
+            ax.axvline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+        ax.set_ylabel("")
+        ax.set_xlabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
+        ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
+        _apply_axes_style(ax, grid=True, square=square)
+        ax.margins(x=0.02, y=0.02)
+        if not finite_value_array.size:
+            _render_placeholder_panel(
+                ax,
+                panel_title=panel_title,
+                message="Metric unavailable",
+                detail="No finite values in this snapshot",
+                square=square,
+            )
+            return
+        if finite_value_array.size:
+            span = float(finite_value_array.max() - finite_value_array.min())
+            offset = max(span * 0.03, 0.018) if span > 0 else 0.018
+            low = min(0.0, float(finite_value_array.min()))
+            high = max(0.0, float(finite_value_array.max()))
+            padding = max((high - low) * 0.1, 0.04)
+            ax.set_xlim(low - padding, high + padding)
+            missing_label_x = low + (padding * 0.6)
+        else:
+            offset = 0.018
+            ax.set_xlim(-0.2, 0.2)
+            missing_label_x = 0.04
+        ax.invert_yaxis()
+        for bar, value in zip(bars, finite_values, strict=True):
+            x_text = value + offset if value >= 0 else value - offset
+            ha = "left" if value >= 0 else "right"
+            ax.text(
+                x_text,
+                bar.get_y() + (bar.get_height() / 2.0),
+                f"{value:.3g}",
+                va="center",
+                ha=ha,
+                fontsize=9,
+                color=TEXT_COLOR,
+            )
+        for position in missing_positions:
+            ax.text(
+                missing_label_x,
+                float(position),
+                "NA",
+                va="center",
+                ha="left",
+                fontsize=8.5,
+                color=SPINE_COLOR,
+            )
+        return
+
     bar_value_pairs: list[tuple[Any, float]] = []
     errorbar_specs: list[tuple[float, float, float, float]] = []
+    missing_positions: list[float] = []
     if grouped_family_bars:
         family_order = ordered_categories([str(row["candidate_family"]) for row in ordered_rows])
         group_keys = list(
@@ -970,10 +1374,22 @@ def _render_metric_panel(
                 for row in ordered_rows
             )
         )
+        shared_scope = {
+            str(row.get("candidate_scope") or "").strip()
+            for row in ordered_rows
+            if str(row.get("candidate_scope") or "").strip()
+        }
+        include_scope = len(shared_scope) > 1
         group_labels = [
-            _wrapped_tick_label(
-                humanize_candidate({"candidate_model": model, "candidate_scope": scope}),
-                width=10,
+            _candidate_tick_label(
+                {
+                    "candidate_model": model,
+                    "candidate_scope": scope,
+                },
+                fallback_column=label_column,
+                include_family=False,
+                include_scope=include_scope,
+                multiline=False,
             )
             for model, scope in group_keys
         ]
@@ -993,27 +1409,35 @@ def _render_metric_panel(
             }
             family_positions: list[float] = []
             family_values: list[float] = []
+            family_ci_rows: list[dict[str, object]] = []
             for group_position, group_key in zip(group_positions, group_keys, strict=False):
                 row = family_rows.get(group_key)
                 if row is None:
                     continue
-                family_positions.append(float(group_position + offset))
-                family_values.append(float(row[spec.value_column]))
-                family_bars = ax.bar(
-                    family_positions,
-                    family_values,
-                    width=bar_width * 0.9,
-                    color=color_map[family],
-                    edgecolor="white",
-                    linewidth=0.6,
-                    alpha=0.92,
-                )
+                x_position = float(group_position + offset)
+                value = _coerce_finite_float(row.get(spec.value_column))
+                if value is None:
+                    missing_positions.append(x_position)
+                    continue
+                family_positions.append(x_position)
+                family_values.append(value)
+                family_ci_rows.append(row)
+            if not family_positions:
+                continue
+            family_bars = ax.bar(
+                family_positions,
+                family_values,
+                width=bar_width * 0.9,
+                color=color_map[family],
+                edgecolor="white",
+                linewidth=0.6,
+                alpha=0.92,
+            )
             bar_value_pairs.extend(zip(family_bars, family_values, strict=True))
             if ci_enabled:
-                family_ci_rows = [family_rows[key] for key in group_keys if key in family_rows]
                 for bar, row in zip(family_bars, family_ci_rows, strict=False):
-                    lower = row.get(spec.ci_lower_column)
-                    upper = row.get(spec.ci_upper_column)
+                    lower = _coerce_finite_float(row.get(spec.ci_lower_column))
+                    upper = _coerce_finite_float(row.get(spec.ci_upper_column))
                     if lower is None or upper is None:
                         continue
                     errorbar_specs.append(
@@ -1027,19 +1451,32 @@ def _render_metric_panel(
         ax.set_xticks(group_positions, group_labels)
     else:
         positions = np.arange(len(ordered_rows), dtype=float)
+        finite_positions: list[float] = []
+        finite_values: list[float] = []
+        finite_colors: list[str] = []
+        finite_rows: list[dict[str, object]] = []
+        for position, row, color in zip(positions, ordered_rows, bar_colors, strict=True):
+            value = _coerce_finite_float(row.get(spec.value_column))
+            if value is None:
+                missing_positions.append(float(position))
+                continue
+            finite_positions.append(float(position))
+            finite_values.append(value)
+            finite_colors.append(color)
+            finite_rows.append(row)
         bars = ax.bar(
-            positions,
-            values,
-            color=bar_colors,
+            finite_positions,
+            finite_values,
+            color=finite_colors,
             edgecolor="white",
             linewidth=0.6,
             alpha=0.92,
         )
-        bar_value_pairs.extend(zip(bars, values, strict=True))
+        bar_value_pairs.extend(zip(bars, finite_values, strict=True))
         if ci_enabled:
-            for position, row in zip(positions, ordered_rows, strict=True):
-                lower = row.get(spec.ci_lower_column)
-                upper = row.get(spec.ci_upper_column)
+            for position, row in zip(finite_positions, finite_rows, strict=True):
+                lower = _coerce_finite_float(row.get(spec.ci_lower_column))
+                upper = _coerce_finite_float(row.get(spec.ci_upper_column))
                 if lower is None or upper is None:
                     continue
                 errorbar_specs.append(
@@ -1052,9 +1489,19 @@ def _render_metric_panel(
                 )
         ax.set_xticks(positions, labels)
     ax.tick_params(axis="x", pad=6)
+    tick_labels_for_count = group_labels if grouped_family_bars else labels
+    tick_rotation = 32.0 if grouped_family_bars else 0.0
+    _style_metric_tick_labels(
+        ax,
+        label_count=max(len(tick_labels_for_count), len(bar_value_pairs)),
+        rotation=tick_rotation,
+        ha="right" if tick_rotation else None,
+    )
+    finite_values = [value for _, value in bar_value_pairs]
+    finite_value_array = np.asarray(finite_values, dtype=np.float64)
     if spec.reference_line is not None:
         ax.axhline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
-    if values.size and float(values.min()) < 0.0 < float(values.max()):
+    if finite_value_array.size and float(finite_value_array.min()) < 0.0 < float(finite_value_array.max()):
         ax.axhline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
     if errorbar_specs:
         xs = np.asarray([item[0] for item in errorbar_specs], dtype=np.float64)
@@ -1073,14 +1520,30 @@ def _render_metric_panel(
         )
     ax.set_xlabel("")
     ax.set_ylabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=20))
-    ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
+    ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
     _apply_axes_style(ax, grid=True, square=square)
-    span = float(values.max() - values.min()) if values.size else 0.0
-    offset = max(span * 0.04, 0.02) if span > 0 else 0.02
-    low = min(0.0, float(values.min())) if values.size else 0.0
-    high = max(0.0, float(values.max())) if values.size else 1.0
-    padding = max((high - low) * 0.16, 0.06)
-    ax.set_ylim(low - padding, high + padding)
+    ax.margins(x=0.02, y=0.02)
+    if not finite_value_array.size:
+        _render_placeholder_panel(
+            ax,
+            panel_title=panel_title,
+            message="Metric unavailable",
+            detail="No finite values in this snapshot",
+            square=square,
+        )
+        return
+    if finite_value_array.size:
+        span = float(finite_value_array.max() - finite_value_array.min())
+        offset = max(span * 0.03, 0.018) if span > 0 else 0.018
+        low = min(0.0, float(finite_value_array.min()))
+        high = max(0.0, float(finite_value_array.max()))
+        padding = max((high - low) * 0.1, 0.045)
+        ax.set_ylim(low - padding, high + padding)
+        missing_label_y = low + (padding * 0.55)
+    else:
+        offset = 0.018
+        ax.set_ylim(-0.2, 0.2)
+        missing_label_y = 0.03
     for bar, value in bar_value_pairs:
         y_text = value + offset if value >= 0 else value - offset
         va = "bottom" if value >= 0 else "top"
@@ -1092,6 +1555,16 @@ def _render_metric_panel(
             ha="center",
             fontsize=9,
             color=TEXT_COLOR,
+        )
+    for position in missing_positions:
+        ax.text(
+            float(position),
+            missing_label_y,
+            "NA",
+            va="bottom",
+            ha="center",
+            fontsize=8.5,
+            color=SPINE_COLOR,
         )
 
 
@@ -1336,11 +1809,12 @@ def render_plot_artifact(
                 value_column=spec.value_column,
             )
             scalar_tables.append((scalar_id, _table_rows(table_path), resolved_x, resolved_y))
-        rows_count, columns = _panel_grid_dimensions(len(scalar_tables))
+        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(scalar_tables))
+        rows_count, columns = _panel_grid_dimensions(len(scalar_tables), prefer_single_row=prefer_single_row)
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=_grid_figure_size(len(scalar_tables), square_panels=True),
+            figsize=_grid_figure_size(len(scalar_tables), square_panels=True, prefer_single_row=prefer_single_row),
             squeeze=False,
         )
         color_map, categories = _category_color_map([rows for _, rows, _, _ in scalar_tables], spec.color_column)
@@ -1375,6 +1849,7 @@ def render_plot_artifact(
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
                 plt,
+                plot_id=spec.plot_id,
                 color_categories=categories,
                 color_map=color_map,
                 color_title=spec.color_column,
@@ -1399,14 +1874,23 @@ def render_plot_artifact(
             if spec.panel_column is not None
             else [None]
         )
-        if len(panel_values) <= 2:
+        square_count_panels = spec.plot_id == "dataset_overview"
+        if square_count_panels and len(panel_values) <= 3:
+            rows_count, columns = 1, len(panel_values)
+        elif len(panel_values) <= 2:
             rows_count, columns = len(panel_values), 1
         else:
             rows_count, columns = _panel_grid_dimensions(len(panel_values))
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=(6.6 * columns, 5.8 * rows_count),
+            figsize=(
+                ((4.0 * columns) + 0.35, 4.55)
+                if square_count_panels and rows_count == 1
+                else _grid_figure_size(len(panel_values), square_panels=True)
+                if square_count_panels
+                else (6.6 * columns, 5.8 * rows_count)
+            ),
             squeeze=False,
         )
         color_map, categories = _category_color_map([rows], spec.color_column)
@@ -1483,12 +1967,13 @@ def render_plot_artifact(
                     fontsize=9.5,
                     color=TEXT_COLOR,
                 )
-            _apply_axes_style(axis, grid=True)
+            _apply_axes_style(axis, grid=True, square=square_count_panels)
         grid_legend_bottom_margin = 0.0
         if categories and spec.color_column is not None:
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
                 plt,
+                plot_id=spec.plot_id,
                 color_categories=categories,
                 color_map=color_map,
                 color_title=spec.color_column,
@@ -1524,10 +2009,13 @@ def render_plot_artifact(
         panel_values = list(dict.fromkeys(str(row[spec.row_column]) for row in rows))
         rows_count, columns = _panel_grid_dimensions(len(panel_values))
         square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
+        metric_figsize = _grid_figure_size(len(panel_values), square_panels=square_metric_panels)
+        if spec.plot_id == "representation_health_summary":
+            metric_figsize = (metric_figsize[0] + (1.45 * columns), metric_figsize[1])
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=_grid_figure_size(len(panel_values), square_panels=square_metric_panels),
+            figsize=metric_figsize,
             squeeze=False,
         )
         color_map, categories = _category_color_map([rows], spec.color_column)
@@ -1554,6 +2042,7 @@ def render_plot_artifact(
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
                 plt,
+                plot_id=spec.plot_id,
                 color_categories=categories,
                 color_map=color_map,
                 color_title=spec.color_column,
@@ -1673,12 +2162,20 @@ def render_plot_artifact(
             if not reducer_path.exists():
                 raise MissingArtifactError(f"reducer artifact is missing for curve rendering: {reducer_id}")
             reducer_summaries.append((reducer_id, json.loads(reducer_path.read_text(encoding="utf-8"))))
-        rows_count, columns = _panel_grid_dimensions(len(reducer_summaries))
+        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(reducer_summaries))
+        rows_count, columns = _panel_grid_dimensions(
+            len(reducer_summaries),
+            prefer_single_row=prefer_single_row,
+        )
         square_curve_panels = spec.plot_id == "representation_scree_diagnostic"
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=_grid_figure_size(len(reducer_summaries), square_panels=square_curve_panels),
+            figsize=_grid_figure_size(
+                len(reducer_summaries),
+                square_panels=square_curve_panels,
+                prefer_single_row=prefer_single_row,
+            ),
             squeeze=False,
         )
         titles = spec.panel_titles or [reducer_id for reducer_id, _ in reducer_summaries]
@@ -1698,6 +2195,15 @@ def render_plot_artifact(
                 square=square_curve_panels,
                 show_legend=False,
             )
+        legend_labels = ["Explained variance ratio", "Cumulative variance ratio"]
+        layout = legend_layout(
+            legend_labels,
+            plot_id=spec.plot_id,
+            default_anchor_y=0.02,
+            default_base_margin=0.11,
+            row_step=0.038,
+            single_row=True,
+        )
         legend = fig.legend(
             handles=[
                 plt.Line2D(
@@ -1706,7 +2212,7 @@ def render_plot_artifact(
                     marker="o",
                     linewidth=1.8,
                     color=PUBLICATION_PALETTE[0],
-                    label="Explained variance ratio",
+                    label=legend_labels[0],
                 ),
                 plt.Line2D(
                     [],
@@ -1714,19 +2220,19 @@ def render_plot_artifact(
                     marker="s",
                     linewidth=1.8,
                     color=PUBLICATION_PALETTE[2],
-                    label="Cumulative variance ratio",
+                    label=legend_labels[1],
                 ),
             ],
             loc="lower center",
-            bbox_to_anchor=(0.5, 0.02),
-            ncol=2,
+            bbox_to_anchor=(0.5, layout.anchor_y),
+            ncol=layout.columns,
             frameon=False,
             borderaxespad=0.0,
             columnspacing=1.1,
             handletextpad=0.5,
         )
         _style_legend(legend)
-        grid_legend_bottom_margin = 0.11
+        grid_legend_bottom_margin = layout.bottom_margin
     elif spec.kind == "correspondence_heatmap":
         left_path = context.output_root / "clusters" / spec.left_cluster_id / "assignments.parquet"
         right_path = context.output_root / "clusters" / spec.right_cluster_id / "assignments.parquet"
@@ -1905,12 +2411,19 @@ def render_plot_artifact(
                 shape_title=effective_shape_column,
             )
         else:
-            columns = min(2, max(1, len(projection_tables)))
-            rows_count = int(np.ceil(len(projection_tables) / columns))
+            prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(projection_tables))
+            rows_count, columns = _panel_grid_dimensions(
+                len(projection_tables),
+                prefer_single_row=prefer_single_row,
+            )
             fig, axes = plt.subplots(
                 rows_count,
                 columns,
-                figsize=_grid_figure_size(len(projection_tables), square_panels=True),
+                figsize=_grid_figure_size(
+                    len(projection_tables),
+                    square_panels=True,
+                    prefer_single_row=prefer_single_row,
+                ),
                 squeeze=False,
             )
             color_map, categories = _category_color_map(projection_tables, spec.color_column)
@@ -1942,7 +2455,10 @@ def render_plot_artifact(
                     edgecolors=point_style.edgecolors,
                     linewidths=point_style.linewidths,
                 )
-                axis.set_title(wrap_plot_title(panel_title, width=24), pad=8)
+                axis.set_title(
+                    wrap_plot_title(compact_candidate_title(panel_title), width=22, max_lines=3),
+                    pad=8,
+                )
                 axis.set_xlabel("Projection 1")
                 axis.set_ylabel("Projection 2")
                 _apply_axes_style(axis, grid=True, square=True)
@@ -1987,6 +2503,7 @@ def render_plot_artifact(
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
                 plt,
+                plot_id=spec.plot_id,
                 color_categories=categories,
                 color_map=color_map,
                 color_title=spec.color_column,
@@ -2007,9 +2524,9 @@ def render_plot_artifact(
         }
         and grid_legend_bottom_margin > 0.0
     ):
-        fig.tight_layout(rect=(0.0, grid_legend_bottom_margin, 1.0, 0.995), pad=0.95, h_pad=1.4, w_pad=0.95)
+        fig.tight_layout(**_tight_layout_kwargs(spec, legend_bottom=grid_legend_bottom_margin))
     else:
-        fig.tight_layout(pad=0.95, h_pad=1.4, w_pad=0.95)
+        fig.tight_layout(**_tight_layout_kwargs(spec, legend_bottom=0.0))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     try:

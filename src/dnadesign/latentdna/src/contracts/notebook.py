@@ -40,6 +40,7 @@ class WorkspaceNotebookTableRef(StrictNotebookModel):
     relative_path: str
     columns: list[str]
     manifest_path: str | None = None
+    view_ids: list[str] = Field(default_factory=list)
 
 
 class WorkspaceNotebookLayoutPreset(StrictNotebookModel):
@@ -79,7 +80,7 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     default_compare_right: str | None = None
     geometries: list[WorkspaceNotebookGeometry]
     preferred_hues: list[str]
-    hue_kinds: dict[str, Literal["categorical", "binary", "continuous"]] = Field(default_factory=dict)
+    hue_kinds: dict[str, Literal["categorical", "binary", "continuous", "ordinal"]] = Field(default_factory=dict)
     joinable_tables: list[WorkspaceNotebookTableRef]
     layout_presets: list[WorkspaceNotebookLayoutPreset]
     comparison_bases: list[WorkspaceNotebookComparisonBasis]
@@ -110,6 +111,8 @@ class WorkspaceNotebookPlotEntry(StrictNotebookModel):
     deliverable_id: str
     deliverable_title: str
     visibility_tier: Literal["primary", "appendix", "debug", "hidden"]
+    status: str | None = None
+    stale: bool = False
 
 
 class WorkspaceNotebookPlotControls(StrictNotebookModel):

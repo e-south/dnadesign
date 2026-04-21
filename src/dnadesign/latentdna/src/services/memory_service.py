@@ -10,16 +10,25 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+import pyarrow as pa
 
-from ..contracts.errors import MemoryPreflightError, MissingArtifactError
+from ..contracts.errors import ContractViolationError, MemoryPreflightError, MissingArtifactError
 from ..contracts.workspace import ReducedViewExportBlockConfig, TableColumnsExportBlockConfig
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_row_count
 from ..neighbors.backends.approximate import approximate_backend_available
+from ..sources.resolver import (
+    inspect_source_schema,
+    iter_records_batches,
+    missing_overlay_merge_columns,
+    require_matrix_bundle_paths,
+    resolve_source,
+)
 from ..views.pca_policy import select_pca_method, streaming_batch_rows
 from ..workspaces.loader import WorkspaceContext
 
 ArtifactState = Literal["ok", "warning", "blocked"]
+_VIEW_MATERIALIZE_BATCH_ROWS = 2048
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +174,76 @@ def evaluate_reduce_preflight(
         rows=fit_rows,
         dims=input_dims,
         dtype=dtype,
+        notes=notes,
+    )
+
+
+def evaluate_materialize_preflight(
+    context: WorkspaceContext,
+    *,
+    view_id: str,
+) -> MemoryPreflight:
+    view = context.require_source_view(view_id)
+    source = context.require_source(view.source)
+    resolved = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
+    output_dtype = np.dtype(context.analysis_dtype)
+    output_itemsize = int(output_dtype.itemsize)
+    if view.vector.kind == "bundle_matrix":
+        rows_path, matrix_path, _ = require_matrix_bundle_paths(resolved)
+        rows, dims, source_dtype, source_itemsize = _artifact_matrix_metadata(matrix_path)
+        source_bytes = _matrix_bytes(rows, dims, source_itemsize)
+        output_bytes = _matrix_bytes(rows, dims, output_itemsize)
+        schema_columns = inspect_source_schema(resolved)["columns"]
+        rows_bytes = max(
+            rows_path.stat().st_size,
+            _row_count(rows_path) * max(len(schema_columns), 1) * 8,
+        )
+        estimated_peak = rows_bytes + source_bytes + (output_bytes if source_dtype != output_dtype.name else 0)
+        notes = [
+            "view materialize copies an existing matrix-bundle source into a workspace-owned artifact",
+            "bundle-backed materialization eagerly loads rows.parquet before copying the matrix payload",
+        ]
+        if source_dtype != output_dtype.name:
+            notes.append("the source matrix dtype differs from analysis_dtype, so materialization also casts values")
+        return _build_preflight(
+            context,
+            operation="view materialize",
+            algorithm="view_materialize_bundle_copy",
+            estimated_peak_bytes=estimated_peak,
+            rows=rows,
+            dims=dims,
+            dtype=output_dtype.name,
+            notes=notes,
+        )
+
+    try:
+        source_schema = inspect_source_schema(resolved)
+        rows = int(source_schema["row_count"])
+        dims = _source_vector_dims(resolved, vector_column=view.vector.name)
+    except Exception as exc:
+        missing_columns = missing_overlay_merge_columns(exc)
+        if view.vector.name in missing_columns:
+            raise ContractViolationError(
+                f"view {view_id} vector column is missing from source {view.source}: {view.vector.name}"
+            ) from exc
+        raise
+    batch_rows = min(rows, _VIEW_MATERIALIZE_BATCH_ROWS)
+    batch_bytes = _matrix_bytes(batch_rows, dims, output_itemsize)
+    estimated_peak = max(batch_bytes * 2, 64 * 1024**2)
+    notes = [
+        "view materialize streams source vectors in fixed-size batches into a disk-backed memmap",
+        f"batch size for the current contract is {_VIEW_MATERIALIZE_BATCH_ROWS} rows",
+    ]
+    if rows > batch_rows:
+        notes.append("the destination matrix is disk-backed, so resident RAM should stay batch-bounded")
+    return _build_preflight(
+        context,
+        operation="view materialize",
+        algorithm="view_materialize_streaming_source",
+        estimated_peak_bytes=estimated_peak,
+        rows=rows,
+        dims=dims,
+        dtype=output_dtype.name,
         notes=notes,
     )
 
@@ -488,6 +567,27 @@ def _artifact_matrix_metadata(path: Path) -> tuple[int, int, str, int]:
         raise MemoryPreflightError(f"expected 2D matrix for memory preflight: {path}")
     dtype = str(matrix.dtype)
     return int(matrix.shape[0]), int(matrix.shape[1]), dtype, int(matrix.dtype.itemsize)
+
+
+def _source_vector_dims(resolved, *, vector_column: str) -> int:
+    for batch in iter_records_batches(resolved, columns=[vector_column], batch_size=1):
+        column = batch.column(vector_column)
+        if pa.types.is_fixed_size_list(column.type):
+            return int(column.type.list_size)
+        for scalar in column:
+            value = scalar.as_py() if hasattr(scalar, "as_py") else scalar
+            if value is None:
+                raise MemoryPreflightError(
+                    f"source vector column {vector_column!r} contains null rows and cannot be materialized"
+                )
+            if hasattr(value, "tolist"):
+                value = value.tolist()
+            if not isinstance(value, list | tuple):
+                raise MemoryPreflightError(
+                    f"source vector column {vector_column!r} must contain list-like rows for materialization"
+                )
+            return len(value)
+    raise MemoryPreflightError(f"source vector column {vector_column!r} produced no rows for memory preflight")
 
 
 def _row_count(path: Path) -> int:

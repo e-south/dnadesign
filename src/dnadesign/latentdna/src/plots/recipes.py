@@ -153,6 +153,8 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             column_column=config.category_column,
             label_column=config.label_column,
             value_column=config.value_column,
+            ci_lower_column=config.ci_lower_column,
+            ci_upper_column=config.ci_upper_column,
             color_column=_resolved_color_column(config),
             measure_kind=config.measure_kind,
             value_kind=config.value_kind,
@@ -369,6 +371,8 @@ def _inline_payload(
             payload["render_mode"] = render_mode
         return payload
     if kind == "metric_panel_grid":
+        if shape_column is not None:
+            raise ContractViolationError("metric_panel_grid does not support shape_column")
         payload = {
             "kind": kind,
             "scalar": scalar_id,
@@ -380,8 +384,6 @@ def _inline_payload(
             "value_kind": "score",
             "value_label": value_column or "value",
         }
-        if shape_column is not None:
-            payload["color_column"] = shape_column
         return payload
     if kind == "curve":
         return {"kind": kind, "reducer": reducer_id}

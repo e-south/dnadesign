@@ -20,6 +20,8 @@ from ..io.parquet_io import read_row_count, read_schema, read_table
 from . import parquet_source, usr_source
 from .provenance import source_provenance_digest
 
+_OVERLAY_MISSING_COLUMNS_PREFIX = "Requested columns not found after overlay merge:"
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedSource:
@@ -87,6 +89,14 @@ def require_matrix_bundle_paths(resolved: ResolvedSource) -> tuple[Path, Path, P
     if not manifest_path.exists():
         raise SourceResolutionError(f"manifest.json not found for source {resolved.source_id}: {manifest_path}")
     return rows_path, matrix_path, manifest_path
+
+
+def missing_overlay_merge_columns(exc: Exception) -> list[str]:
+    message = str(exc).strip()
+    if not message.startswith(_OVERLAY_MISSING_COLUMNS_PREFIX):
+        return []
+    columns_text = message.split(":", 1)[1]
+    return [column.strip() for column in columns_text.split(",") if column.strip()]
 
 
 def inspect_source_schema(resolved: ResolvedSource) -> dict[str, Any]:

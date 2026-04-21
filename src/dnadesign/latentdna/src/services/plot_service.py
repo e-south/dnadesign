@@ -19,6 +19,7 @@ from ..io.manifest_io import write_manifest
 from ..plots.recipes import resolve_plot_spec
 from ..plots.render import render_plot_artifact
 from ..runs.recorder import record_audit
+from ..sources.provenance import source_provenance_digest
 from ..version import __version__
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
 from ..workspaces.plot_semantics import resolve_plot_semantics
@@ -209,6 +210,26 @@ def render_plot(
             plot_id=spec.config_id or spec.plot_id,
             allow_generated_fallback=spec.config_id is None,
         )
+        source_provenance = [
+            {
+                "id": "workspace_config",
+                "role": "workspace_config",
+                "path": context.config_path.as_posix(),
+                "digest": source_provenance_digest({"path": context.config_path.as_posix()}),
+            }
+        ]
+        plot_config = context.config.plots.get(spec.config_id or spec.plot_id)
+        semantics_ref = getattr(plot_config, "semantics_ref", None) if plot_config is not None else None
+        if isinstance(semantics_ref, str) and semantics_ref.strip():
+            semantics_path = (context.workspace_dir / semantics_ref).resolve()
+            source_provenance.append(
+                {
+                    "id": f"plot_semantics:{spec.config_id or spec.plot_id}",
+                    "role": "plot_semantics",
+                    "path": semantics_path.as_posix(),
+                    "digest": source_provenance_digest({"path": semantics_path.as_posix()}),
+                }
+            )
         _, outputs, plot_metadata = render_plot_artifact(
             context,
             spec=spec,
@@ -224,6 +245,7 @@ def render_plot(
             tool_version=__version__,
             command="plot render",
             inputs=inputs,
+            source_provenance=source_provenance,
             params=manifest_params_for_plot(spec),
             outputs=[
                 ArtifactOutput(

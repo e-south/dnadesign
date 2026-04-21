@@ -315,10 +315,14 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert controls_path.is_file()
     notebook_manifest = json.loads((notebook_dir / "manifest.json").read_text(encoding="utf-8"))
     assert notebook_manifest["inputs"][0]["path"].endswith("/plots/atlas_demo_plot/manifest.json")
+    assert any(
+        entry["role"] == "workspace_config" and entry["path"].endswith("/config.yaml")
+        for entry in notebook_manifest["source_provenance"]
+    )
     notebook_text = notebook_path.read_text(encoding="utf-8")
     assert "import marimo" in notebook_text
     assert "__generated_with" in notebook_text
-    assert 'app = marimo.App(width="medium")' in notebook_text
+    assert 'app = marimo.App(width="full")' in notebook_text
     assert "Atlas workspace notebook" in notebook_text
     assert "load_workspace_notebook_controls(CONTROL_PATH)" in notebook_text
     assert "build_workspace_browser_runtime(" in notebook_text
@@ -343,6 +347,8 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert 'label="Layout"' in notebook_text
     assert 'label="Geometry"' in notebook_text
     assert 'label="Hue"' in notebook_text
+    assert notebook_text.count("searchable=True") == 3
+    assert "on_change=set_requested_hue" in notebook_text
     assert 'label="Left geometry"' in notebook_text
     assert 'label="Right geometry"' in notebook_text
     assert "Plots" in notebook_text
@@ -352,11 +358,14 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "value=active_top_tab" in notebook_text
     assert "on_change=set_active_top_tab" in notebook_text
     assert "lazy=True" in notebook_text
-    assert "This notebook is the LatentDNA pre-assay review surface for the current " in notebook_text
-    assert "`infer_batch_preparation` study snapshot." in notebook_text
+    assert "Review the current artifact set for representation health" in notebook_text
     assert "Point positions are fixed by the saved coordinates" in notebook_text
     assert "Jump list:" not in notebook_text
     assert "mo.accordion(" in notebook_text
+    assert '"Caption", "caption_md"' in notebook_text
+    assert '_section_blocks.append(_support.mo.md(str(_active_card["caption_md"])))' not in notebook_text
+    assert "(compatible_geometries or _geometry.geometry_rows)" not in notebook_text
+    assert "No compatible geometry for this selection" in notebook_text
     assert "Deliverable: **" not in notebook_text
     assert "_badge =" not in notebook_text
     assert "Overview" not in notebook_text
@@ -369,7 +378,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert controls_payload["runtime_paths"]["workspace_relative_path"] == "../../.."
     assert controls_payload["runtime_paths"]["output_relative_path"] == "../.."
     assert controls_payload["runtime_paths"]["catalog_relative_path"] == "../../catalog.json"
-    assert controls_payload["runtime_paths"]["health_relative_path"] == "../health.json"
+    assert controls_payload["runtime_paths"]["health_relative_path"] == "health.json"
     assert controls_payload["plot_controls"]["default_surface"] == "plots"
     assert controls_payload["plot_controls"]["ordered_plot_ids"] == ["atlas_demo_plot"]
 
@@ -391,6 +400,13 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert status_after_payload["status"] == "ok"
     outputs = {entry["name"]: entry for entry in status_after_payload["outputs"]}
     assert outputs["notebook:atlas_review"]["status"] == "ok"
+    health_after = _RUNNER.invoke(
+        app,
+        ["inspect", "notebook-health", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert health_after.exit_code == 0, health_after.stdout
+    health_after_payload = json.loads(health_after.stdout)
+    assert health_after_payload["data"]["health"]["status"] == "ok"
 
     export_path = workspace_dir / "atlas_review.html"
     export_result = subprocess.run(
@@ -515,6 +531,143 @@ def test_notebook_smoke_uses_live_default_deliverable_status(tmp_path: Path, mon
     assert smoke_payload["status"] == "error"
     assert smoke_payload["checks"]["default_deliverable_ready"] is False
     assert "plot freshness requires attention" in "".join(smoke_payload["warnings"])
+
+
+def test_notebook_generate_records_smoke_failures_in_manifest_status(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            }
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+
+    def _broken_smoke(_workspace, *, notebook_id=None):
+        assert notebook_id == "atlas_review"
+        return {
+            "workspace_id": "stress_ethanol_cipro_latent_atlas",
+            "notebook_id": "atlas_review",
+            "status": "error",
+            "checks": {
+                "notebook_exists": True,
+                "control_plane_loads": True,
+                "imports_resolve": False,
+                "plot_catalog_loads": True,
+                "default_deliverable_ready": True,
+                "static_links_resolve": True,
+            },
+            "warnings": ["imports_resolve failed: broken import"],
+        }
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.notebook_service.smoke_workspace_notebook",
+        _broken_smoke,
+    )
+
+    generate_result = _RUNNER.invoke(
+        app,
+        ["notebook", "generate", "atlas_review", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert generate_result.exit_code == 0, generate_result.stdout
+    payload = json.loads(generate_result.stdout)
+    assert payload["status"] == "error"
+    assert "imports_resolve failed: broken import" in "".join(payload["warnings"])
+
+    manifest = json.loads(
+        (workspace_dir / "outputs" / "notebooks" / "atlas_review" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["status"] == "error"
+    assert "imports_resolve failed: broken import" in "".join(manifest["warnings"])
+
+    health = json.loads(
+        (workspace_dir / "outputs" / "notebooks" / "atlas_review" / "health.json").read_text(encoding="utf-8")
+    )
+    assert health["status"] == "error"
+    assert health["checks"]["imports_resolve"] is False
+    assert "imports_resolve failed: broken import" in "".join(health["warnings"])
+
+
+def test_notebook_generate_overwrites_stale_health_when_smoke_refresh_raises(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            }
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+    health_path = workspace_dir / "outputs" / "notebooks" / "atlas_review" / "health.json"
+    health_path.parent.mkdir(parents=True, exist_ok=True)
+    health_path.write_text(
+        json.dumps(
+            {
+                "workspace_id": "stress_ethanol_cipro_latent_atlas",
+                "notebook_id": "atlas_review",
+                "status": "ok",
+                "checks": {
+                    "notebook_exists": True,
+                    "control_plane_loads": True,
+                    "imports_resolve": True,
+                    "plot_catalog_loads": True,
+                    "default_deliverable_ready": True,
+                    "static_links_resolve": True,
+                },
+                "warnings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def _raising_smoke(_workspace, *, notebook_id=None):
+        assert notebook_id == "atlas_review"
+        raise RuntimeError("simulated smoke refresh failure")
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.notebook_service.smoke_workspace_notebook",
+        _raising_smoke,
+    )
+
+    generate_result = _RUNNER.invoke(
+        app,
+        ["notebook", "generate", "atlas_review", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert generate_result.exit_code == 0, generate_result.stdout
+    payload = json.loads(generate_result.stdout)
+    assert payload["status"] == "error"
+    assert "notebook health refresh failed: simulated smoke refresh failure" in "".join(payload["warnings"])
+
+    health = json.loads(health_path.read_text(encoding="utf-8"))
+    assert health["status"] == "error"
+    assert health["checks"]["imports_resolve"] is False
+    assert health["checks"]["static_links_resolve"] is False
+    assert "notebook health refresh failed: simulated smoke refresh failure" in "".join(health["warnings"])
 
 
 def test_load_catalog_payload_reuses_loaded_context_when_catalog_missing(monkeypatch, tmp_path: Path) -> None:

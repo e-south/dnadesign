@@ -21,6 +21,7 @@ from ..sources.resolver import (
     ResolvedSource,
     inspect_source_schema,
     iter_records_batches,
+    missing_overlay_merge_columns,
     require_matrix_bundle_paths,
     resolve_source,
 )
@@ -32,11 +33,43 @@ _SIG35_PATTERN = re.compile(r"__sig35[=_]([A-Za-z0-9]+)")
 _CONTROL_LABELS = {"spyp", "sulap", "soxsp", "j23105", "spy_p", "sul_ap", "sox_sp"}
 
 
+def _reraise_missing_vector_column(
+    exc: Exception,
+    *,
+    view_id: str,
+    source_id: str,
+    vector_column: str,
+) -> None:
+    missing_columns = missing_overlay_merge_columns(exc)
+    if vector_column not in missing_columns:
+        return
+    raise ContractViolationError(
+        f"view {view_id} vector column is missing from source {source_id}: {vector_column}"
+    ) from exc
+
+
 def _normalize_text(value: object) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _canonical_regulator_name(value: object) -> str | None:
+    text = _normalize_text(value)
+    if text is None:
+        return None
+    token = text.split("_", 1)[0].strip()
+    if not token:
+        return None
+    return {
+        "baer": "baeR",
+        "background": "background",
+        "background_only": "background",
+        "cpxr": "cpxR",
+        "control": "control",
+        "lexa": "lexA",
+    }.get(token.lower(), token)
 
 
 def _normalized_regulators(value: object) -> list[str]:
@@ -46,7 +79,10 @@ def _normalized_regulators(value: object) -> list[str]:
         values = value
     else:
         values = [value]
-    normalized = sorted({_normalize_text(item) for item in values if _normalize_text(item) is not None}, key=str)
+    normalized = sorted(
+        {_canonical_regulator_name(item) for item in values if _canonical_regulator_name(item) is not None},
+        key=str.casefold,
+    )
     return [str(item) for item in normalized]
 
 
@@ -88,22 +124,27 @@ def _design_family(row: dict[str, object]) -> str:
 def _design_regulator_composition(row: dict[str, object]) -> str:
     if _is_control_row(row):
         return "control"
+    family = _design_family(row)
     regulators = _normalized_regulators(row.get("densegen__required_regulators"))
+    if family == "background_only" and not regulators:
+        return "background"
     if regulators:
-        if regulators == ["baeR", "lexA"]:
-            return "baeR+lexA"
-        if regulators == ["cpxR", "lexA"]:
-            return "cpxR+lexA"
-        if len(regulators) == 1:
-            return regulators[0]
-        return "+".join(regulators)
+        return regulators[0] if len(regulators) == 1 else "+".join(regulators)
 
     plan = _normalize_text(row.get("densegen__plan")) or ""
     tokens = [token for token in plan.split("__") if token]
     if len(tokens) >= 2 and not tokens[1].startswith("sigma70_"):
-        composition = tokens[1].replace("_", "+")
-        return composition or "unknown"
-    family = _design_family(row)
+        composition_parts = [_canonical_regulator_name(token) for token in tokens[1].replace("_", "+").split("+")]
+        composition_parts = sorted(
+            {
+                part
+                for part in composition_parts
+                if part not in {None, "control"} and not str(part).startswith("sig35=")
+            },
+            key=str.casefold,
+        )
+        if composition_parts:
+            return composition_parts[0] if len(composition_parts) == 1 else "+".join(composition_parts)
     if family == "background_only":
         return "background"
     return "unknown"
@@ -331,7 +372,7 @@ def _materialize_matrix_bundle_artifact(
     resolved: ResolvedSource,
     source,
     artifact_dir: Path,
-) -> tuple[Path, int, int, str, list[str]]:
+) -> tuple[Path, int, int, str, list[str], list[str]]:
     rows_path, matrix_path, _ = require_matrix_bundle_paths(resolved)
     inspect_source_schema(resolved)
     rows = read_table(rows_path)
@@ -354,7 +395,8 @@ def _materialize_matrix_bundle_artifact(
 
     write_matrix(artifact_dir / "matrix.npy", np.ascontiguousarray(matrix))
     write_table(rows, artifact_dir / "rows.parquet")
-    return artifact_dir, rows.num_rows, int(matrix.shape[1]), source.record_key, list(rows.column_names)
+    row_columns = list(rows.column_names)
+    return artifact_dir, rows.num_rows, int(matrix.shape[1]), source.record_key, row_columns, row_columns
 
 
 def _materialize_tabular_vector_artifact(
@@ -365,9 +407,13 @@ def _materialize_tabular_vector_artifact(
     source,
     vector_column: str,
     artifact_dir: Path,
-) -> tuple[Path, int, int, str, list[str]]:
+) -> tuple[Path, int, int, str, list[str], list[str]]:
     view = context.require_source_view(view_id)
-    source_schema = inspect_source_schema(resolved)
+    try:
+        source_schema = inspect_source_schema(resolved)
+    except Exception as exc:
+        _reraise_missing_vector_column(exc, view_id=view_id, source_id=view.source, vector_column=vector_column)
+        raise
     available_columns = set(source_schema["columns"])
     if vector_column not in available_columns:
         raise ContractViolationError(
@@ -477,6 +523,9 @@ def _materialize_tabular_vector_artifact(
                 row_writer = pq.ParquetWriter(rows_path, rows_batch.schema)
             row_writer.write_batch(rows_batch)
             write_offset = next_offset
+    except Exception as exc:
+        _reraise_missing_vector_column(exc, view_id=view_id, source_id=view.source, vector_column=vector_column)
+        raise
     finally:
         if row_writer is not None:
             row_writer.close()
@@ -490,7 +539,14 @@ def _materialize_tabular_vector_artifact(
         raise ContractViolationError(
             f"view {view_id} materialized {write_offset} rows but source schema reported {row_count}"
         )
-    return artifact_dir, row_count, dims, source.record_key, row_contract.materialized_row_columns
+    return (
+        artifact_dir,
+        row_count,
+        dims,
+        source.record_key,
+        row_contract.materialized_row_columns,
+        processing_row_columns,
+    )
 
 
 def materialize_view_artifact(
@@ -498,7 +554,7 @@ def materialize_view_artifact(
     *,
     view_id: str,
     artifact_dir: Path | None = None,
-) -> tuple[Path, int, int, str, list[str]]:
+) -> tuple[Path, int, int, str, list[str], list[str]]:
     view = context.require_source_view(view_id)
     source = context.require_source(view.source)
     resolved = resolve_source(view.source, source, workspace_dir=context.workspace_dir)

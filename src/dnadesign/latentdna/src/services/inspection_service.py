@@ -178,13 +178,25 @@ def inspect_plots(workspace: str | Path) -> dict[str, object]:
 
 def inspect_notebook_health(workspace: str | Path) -> dict[str, object]:
     context = load_workspace_config(workspace)
-    health_path = context.output_root / "notebooks" / "health.json"
-    if not health_path.is_file():
-        raise FileNotFoundError(f"notebook health artifact not found: {health_path}")
-    payload = read_json(health_path)
+    notebook_ids = list(getattr(context.config, "notebooks", {}) or {})
+    if not notebook_ids:
+        raise FileNotFoundError("workspace does not declare any notebooks")
+    if len(notebook_ids) == 1:
+        health_path = context.output_root / "notebooks" / notebook_ids[0] / "health.json"
+        if not health_path.is_file():
+            raise FileNotFoundError(f"notebook health artifact not found: {health_path}")
+        data = {"health": read_json(health_path)}
+    else:
+        health_by_notebook: dict[str, object] = {}
+        for notebook_id in notebook_ids:
+            health_path = context.output_root / "notebooks" / notebook_id / "health.json"
+            if not health_path.is_file():
+                raise FileNotFoundError(f"notebook health artifact not found: {health_path}")
+            health_by_notebook[notebook_id] = read_json(health_path)
+        data = {"health_by_notebook": health_by_notebook}
     return {
         "schema_version": "latentdna.inspect_result.v1",
         "workspace_id": context.workspace_id,
         "status": "ok",
-        "data": {"health": payload},
+        "data": data,
     }

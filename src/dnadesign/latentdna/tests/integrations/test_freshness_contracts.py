@@ -319,16 +319,83 @@ def test_view_manifest_records_overlay_part_provenance(tmp_path: Path) -> None:
     densegen_part_entries = [
         entry for entry in provenance if entry.get("role") == "overlay_part" and entry.get("namespace") == "densegen"
     ]
-    overlay_entries = [entry for entry in provenance if entry.get("role") == "overlay"]
 
     assert infer_part_entries
     assert densegen_part_entries
-    assert overlay_entries
-    assert all(entry["kind"] == "file" for entry in infer_part_entries)
-    assert all(Path(str(entry["path"])).suffix == ".parquet" for entry in infer_part_entries)
-    assert {tuple(entry.get("columns") or []) for entry in infer_part_entries} == {("infer__x_representation",)}
-    assert {tuple(entry.get("columns") or []) for entry in densegen_part_entries} == {("densegen__plan",)}
-    assert all(entry.get("digest_mode") == "inventory" for entry in overlay_entries)
+
+
+def test_dependency_only_overlay_column_drift_marks_view_attention(tmp_path: Path) -> None:
+    workspace_dir, usr_root = _build_overlay_backed_workspace(tmp_path)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["metadata"] = {
+        "include": ["generation_plan_copy"],
+        "derivations": {
+            "generation_plan_copy": {
+                "kind": "copy",
+                "source": "densegen__plan",
+            }
+        },
+    }
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    materialize_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert materialize_result.exit_code == 0, materialize_result.stdout
+
+    status_before = _RUNNER.invoke(
+        app,
+        ["deliverable", "status", "view_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert status_before.exit_code == 0, status_before.stdout
+    assert json.loads(status_before.stdout)["status"] == "ok"
+
+    dataset = Dataset(usr_root, "promoter/demo_anchor_set")
+    ids = dataset.head(n=4, columns=["id"], include_derived=False)["id"].tolist()
+    dataset.write_overlay_part(
+        "densegen",
+        pa.table(
+            {
+                "id": ids,
+                "densegen__plan": ["plan_z", "plan_z", "plan_y", "plan_y"],
+            }
+        ),
+        key="id",
+    )
+
+    status_after = _RUNNER.invoke(
+        app,
+        ["deliverable", "status", "view_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert status_after.exit_code == 0, status_after.stdout
+    status_after_payload = json.loads(status_after.stdout)
+    assert status_after_payload["status"] == "attention"
+    outputs = {entry["name"]: entry for entry in status_after_payload["outputs"]}
+    assert outputs["view:z20_60"]["status"] == "attention"
+    assert "stale" in str(outputs["view:z20_60"]["reason"] or "")
+
+
+def test_view_vector_column_drift_marks_view_attention(tmp_path: Path) -> None:
+    workspace_dir, _ = _build_overlay_backed_workspace(tmp_path)
+
+    materialize_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert materialize_result.exit_code == 0, materialize_result.stdout
+
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["z20_60"]["vector"]["name"] = "mock__label_vec8"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    status_payload = deliverable_status(workspace_dir, "view_bundle")
+    assert status_payload.status == "attention"
+    outputs = {entry.name: entry for entry in status_payload.outputs}
+    assert outputs["view:z20_60"].status == "attention"
+    assert "vector_column" in str(outputs["view:z20_60"].reason or "")
 
 
 def test_view_manifest_records_overlay_ledger_when_explicit_contract_enabled(tmp_path: Path) -> None:
@@ -357,10 +424,13 @@ def test_view_manifest_records_overlay_ledger_when_explicit_contract_enabled(tmp
         infer_ledger.resolve(),
         densegen_ledger.resolve(),
     }
+    assert all(
+        entry.get("digest_mode") == provenance_module.OVERLAY_LEDGER_PAYLOAD_DIGEST_MODE for entry in ledger_entries
+    )
     assert overlay_part_entries == []
 
 
-def test_deliverable_status_avoids_overlay_part_hashes_when_ledgers_are_enabled(
+def test_deliverable_status_uses_overlay_ledger_contract_without_raw_path_hashes_when_ledgers_are_enabled(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -387,7 +457,8 @@ def test_deliverable_status_avoids_overlay_part_hashes_when_ledgers_are_enabled(
     status = deliverable_status(workspace_dir, "view_bundle")
 
     assert status.status == "ok"
-    assert any(path.endswith("/digest_ledger.json") for path in hash_counts)
+    assert any(path.endswith("/records.parquet") for path in hash_counts)
+    assert not any(path.endswith("/digest_ledger.json") for path in hash_counts)
     assert not any("/_derived/" in path and path.endswith(".parquet") for path in hash_counts)
 
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dnadesign.latentdna.src.notebooks.browser_runtime_compare import compare_pair_payload
+from dnadesign.latentdna.src.notebooks.browser_runtime_compare import compare_pair_payload, display_compare_basis
 
 
 def _write_view(output_root: Path, *, view_id: str, rows: pd.DataFrame, matrix: np.ndarray | None = None) -> None:
@@ -115,3 +115,9 @@ def test_compare_pair_payload_rejects_duplicate_shared_key_rows(tmp_path: Path) 
 
     assert payload["status"] == "error"
     assert "shared-key comparison requires unique" in str(payload["error"])
+
+
+def test_display_compare_basis_preserves_asymmetric_shared_key_labels() -> None:
+    label = display_compare_basis("shared_key:id->construct__anchor_id")
+
+    assert label == "Shared key: ID -> Construct Anchor ID"

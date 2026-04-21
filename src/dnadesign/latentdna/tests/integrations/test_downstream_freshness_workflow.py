@@ -309,8 +309,8 @@ def test_downstream_freshness_surfaces_stay_ok_when_inputs_are_fresh(tmp_path: P
     )
     assert run_result.exit_code == 0, run_result.stdout
     run_payload = json.loads(run_result.stdout)
-    assert run_payload["status"] == "attention"
-    assert any(
+    assert run_payload["status"] == "ok"
+    assert not any(
         "default deliverable requires attention before the notebook is end-to-end ready" in warning
         for warning in run_payload["warnings"]
     )
@@ -352,7 +352,7 @@ def test_downstream_freshness_surfaces_stay_ok_when_inputs_are_fresh(tmp_path: P
             ("plot", "primary_agreement_summary"),
         }
     }
-    assert statuses[("notebook", "agreement_review")] == "attention"
+    assert statuses[("notebook", "agreement_review")] == "ok"
     assert statuses[("scalar_table", "ethanol_vs_cipro")] == "ok"
     assert statuses[("plot", "control_distance_margins_distribution")] == "ok"
     assert statuses[("plot", "primary_agreement_summary")] == "ok"

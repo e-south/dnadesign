@@ -1438,7 +1438,7 @@ def build_scalar_artifact(
                 "sig35_variant",
                 "Sigma-35 variant",
                 "sig35_variant",
-                [("f", 1), ("d", 2), ("e", 3), ("b", 4), ("c", 5), ("control", 6)],
+                [("f", 1), ("e", 2), ("d", 3), ("c", 4), ("b", 5), ("control", 6)],
             ),
         ]
         output_rows: list[dict[str, object]] = []

@@ -29,6 +29,6 @@ def test_metric_registry_uses_comparison_metadata_and_drops_selection_state() ->
     assert reference_rank.direction == "lower_is_better"
     assert reference_rank.unit == "rank"
 
-    distance_spearman = resolve_metric_definition("geometry_distance_correlation")
-    assert distance_spearman.display_name == "Pairwise distance Spearman"
-    assert "Spearman correlation" in distance_spearman.mathematical_definition
+    distance_correlation = resolve_metric_definition("geometry_distance_correlation")
+    assert distance_correlation.display_name == "Pairwise distance Spearman correlation"
+    assert "Spearman correlation" in distance_correlation.mathematical_definition

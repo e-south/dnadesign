@@ -38,6 +38,37 @@ def requested_source_metadata_columns(context: WorkspaceContext, *, source) -> l
     return _unique_nonempty([*(context.config.metadata.include or []), *(source.metadata_include or [])])
 
 
+def derivation_dependency_columns(
+    context: WorkspaceContext,
+    *,
+    columns: Iterable[str],
+    available_columns: Iterable[str] | None = None,
+) -> tuple[list[str], list[str]]:
+    derivations = context.config.metadata.derivations or {}
+    available = set(available_columns) if available_columns is not None else None
+    dependencies: list[str] = []
+    missing: list[str] = []
+    for column in columns:
+        derivation = derivations.get(column)
+        if derivation is None:
+            continue
+        if derivation.kind in {"copy", "regex_capture", "map_values"}:
+            dependencies.append(derivation.source)
+            if available is not None and derivation.source not in available:
+                missing.append(derivation.source)
+            continue
+        if derivation.kind == "coalesce":
+            if available is None:
+                dependencies.extend(derivation.sources)
+                continue
+            present_sources = [source for source in derivation.sources if source in available]
+            if present_sources:
+                dependencies.extend(present_sources)
+                continue
+            missing.extend(derivation.sources)
+    return _unique_nonempty(dependencies), _unique_nonempty(missing)
+
+
 def promoter_metadata_cohort_ids(context: WorkspaceContext, *, source_id: str | None = None) -> list[str]:
     return [
         cohort_id
@@ -73,6 +104,15 @@ def source_backed_view_row_contract(
     promoter_cohort_ids = promoter_metadata_cohort_ids(context)
     auto_promoter_cohort_ids = promoter_metadata_cohort_ids(context, source_id=source_id)
     configured_derivation_ids = set((context.config.metadata.derivations or {}).keys())
+    metadata_dependency_columns, missing_dependency_columns = derivation_dependency_columns(
+        context,
+        columns=requested_metadata,
+        available_columns=available,
+    )
+    if missing_dependency_columns:
+        raise ContractViolationError(
+            f"metadata derivation inputs are missing from source {source_id}: {missing_dependency_columns}"
+        )
 
     processing_row_columns = [
         column
@@ -80,6 +120,7 @@ def source_backed_view_row_contract(
             [
                 source.record_key,
                 source.subject_key,
+                *metadata_dependency_columns,
                 *requested_metadata,
                 *reference_columns,
                 *_PROMOTER_METADATA_INPUT_COLUMNS,

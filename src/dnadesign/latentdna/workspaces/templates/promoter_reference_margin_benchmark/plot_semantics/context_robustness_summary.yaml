@@ -8,7 +8,7 @@ guardrails:
   - Reference-promoter alignment belongs in the appendix reference panel.
 caption: Context-robustness summary across aligned anchor and construct-context representations.
 alt_text: Bar-panel summary showing self-cosine stability and cohort-geometry retention between anchor and full-context representations.
-preprocessing_md: Anchor and context vectors are each standardized by view and row-normalized before self-cosine or centroid-distance retention is computed on the persisted 4,096-row design-family-stratified sample.
+preprocessing_md: Anchor and context vectors are each standardized by view and row-normalized before self-cosine or centroid-distance retention is computed on the persisted 4,096-row design-family-stratified sample; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
 math_md: Self stability uses cos(z_anchor, z_context); cohort retention correlates the upper triangles of anchor and context centroid-distance matrices for each annotation axis.
 rationale_md: Answers whether full-context mean pooling preserves or washes out the anchor-level design geometry.
 limitations_md: This panel reports a sample estimate rather than the full aligned population, and high agreement can still preserve nuisance structure.

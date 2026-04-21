@@ -82,11 +82,13 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
             [
                 "infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean:list<float32>",
                 "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token:float32",
                 "infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token:float32",
                 "infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
@@ -158,6 +160,10 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     [[1.8, 1.9], [2.0, 2.1], [2.2, 2.3]],
                     type=pa.list_(pa.float32()),
                 ),
+                ("infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token"): pa.array(
+                    [-6.1, -5.8, -6.4],
+                    type=pa.float32(),
+                ),
                 ("infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean"): pa.array(
                     [[2.0, 2.1], [2.2, 2.3], [2.4, 2.5]],
                     type=pa.list_(pa.float32()),
@@ -215,6 +221,10 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                 ("infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean"): pa.array(
                     [[1.9, 1.8], [1.7, 1.6], [1.5, 1.4]],
                     type=pa.list_(pa.float32()),
+                ),
+                ("infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token"): pa.array(
+                    [-5.9, -5.6, -6.2],
+                    type=pa.float32(),
                 ),
                 ("infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean"): pa.array(
                     [[2.0, 1.9], [1.8, 1.7], [1.6, 1.5]],

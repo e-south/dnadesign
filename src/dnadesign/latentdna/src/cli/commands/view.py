@@ -17,6 +17,7 @@ app = typer.Typer(help="View commands for latentdna.")
 def materialize(
     view_id: str = typer.Argument(...),
     workspace: str = typer.Option(..., "--workspace"),
+    allow_memory_overage: bool = typer.Option(False, "--allow-memory-overage"),
     force: bool = typer.Option(False, "--force"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     format_name: str = typer.Option("text", "--format"),
@@ -27,7 +28,12 @@ def materialize(
         payload = (
             preview_view_materialize(workspace, view_id, force=force)
             if dry_run
-            else materialize_view(workspace, view_id, force=force).model_dump(mode="json")
+            else materialize_view(
+                workspace,
+                view_id,
+                allow_memory_overage=allow_memory_overage,
+                force=force,
+            ).model_dump(mode="json")
         )
     except Exception as exc:
         fail(exc)

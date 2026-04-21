@@ -18,14 +18,16 @@ def _recipe_steps(payload: dict[str, object], recipe_id: str) -> list[dict[str, 
 
 def test_template_tracks_canonical_views_and_pre_assay_deliverables() -> None:
     payload = _template_payload()
+    visible_views = [
+        view_id for view_id, view in payload["views"].items() if str(view.get("role", "")).strip().lower() != "hidden"
+    ]
 
-    assert set(payload["views"]) == {
-        "intermediate_embedding_20b_anchor_60bp",
-        "intermediate_embedding_20b_full_context_1kb",
+    assert set(visible_views) == {
         "intermediate_embedding_7b_anchor_60bp",
         "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_20b_anchor_60bp",
-        "pooled_logits_20b_full_context_1kb",
+        "intermediate_embedding_7b_full_context_anchor_mean",
+        "intermediate_embedding_7b_anchor_plus_full_context_concat",
+        "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
         "pooled_logits_7b_anchor_60bp",
         "pooled_logits_7b_full_context_1kb",
     }
@@ -65,9 +67,8 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
     ]
     assert payload["exports"] == {}
     assert set(payload["alignments"]) == {
-        "intermediate_embedding_20b_anchor_to_full_context",
         "intermediate_embedding_7b_anchor_to_full_context",
-        "pooled_logits_20b_anchor_to_full_context",
+        "intermediate_embedding_7b_anchor_to_anchor_mean",
         "pooled_logits_7b_anchor_to_full_context",
     }
     assert all("semantics_ref" in plot for plot in payload["plots"].values())
@@ -84,13 +85,37 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
         "design_regulator_composition",
         "sig35_variant",
         "spacer_length",
+        "log_likelihood_per_token_7b",
+    ]
+    assert payload["plots"]["design_centroid_margin_gallery"]["hue_options"][-1]["type"] == "continuous"
+    assert payload["plots"]["design_centroid_margin_gallery"]["scalars"] == [
+        "design_centroid_margins_intermediate_embedding_7b_anchor_60bp",
+        "design_centroid_margins_pooled_logits_7b_anchor_60bp",
+        "design_centroid_margins_intermediate_embedding_7b_full_context_1kb",
+        "design_centroid_margins_pooled_logits_7b_full_context_1kb",
+        "design_centroid_margins_intermediate_embedding_7b_full_context_anchor_mean",
+        "design_centroid_margins_intermediate_embedding_7b_anchor_plus_full_context_concat",
+        "design_centroid_margins_intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     ]
     assert payload["plots"]["reference_alignment_summary"]["kind"] == "metric_panel_grid"
     assert payload["plots"]["reference_alignment_summary"]["visibility_tier"] == "appendix"
     assert payload["plots"]["representation_scree_diagnostic"]["kind"] == "curve_grid"
     assert payload["plots"]["representation_scree_diagnostic"]["visibility_tier"] == "appendix"
+    assert payload["plots"]["representation_scree_diagnostic"]["reducers"] == [
+        "pca_intermediate_embedding_7b_anchor_60bp",
+        "pca_pooled_logits_7b_anchor_60bp",
+        "pca_intermediate_embedding_7b_full_context_1kb",
+        "pca_pooled_logits_7b_full_context_1kb",
+        "pca_intermediate_embedding_7b_full_context_anchor_mean",
+        "pca_intermediate_embedding_7b_anchor_plus_full_context_concat",
+        "pca_intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
+    ]
     assert payload["plots"]["context_delta_distributions"]["kind"] == "distribution_grid"
     assert payload["plots"]["context_delta_distributions"]["visibility_tier"] == "debug"
+    assert payload["plots"]["context_delta_distributions"]["scalars"] == [
+        "context_delta_distribution_intermediate_embedding_7b",
+        "context_delta_distribution_pooled_logits_7b",
+    ]
     assert payload["plots"]["context_delta_distributions"]["metric_columns"] == [
         "context_self_cosine",
         "context_shift_l2",
@@ -103,6 +128,17 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
         "design_regulator_composition",
         "sig35_variant",
         "spacer_length",
+        "log_likelihood_per_token_7b",
+    ]
+    assert payload["plots"]["appendix_umap_gallery"]["hue_options"][-1]["type"] == "continuous"
+    assert payload["plots"]["appendix_umap_gallery"]["projections"] == [
+        "umap_intermediate_embedding_7b_anchor_60bp",
+        "umap_pooled_logits_7b_anchor_60bp",
+        "umap_intermediate_embedding_7b_full_context_1kb",
+        "umap_pooled_logits_7b_full_context_1kb",
+        "umap_intermediate_embedding_7b_full_context_anchor_mean",
+        "umap_intermediate_embedding_7b_anchor_plus_full_context_concat",
+        "umap_intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     ]
 
     assert payload["deliverables"]["representation_health_summary"]["outputs"]["plots"] == [
@@ -124,7 +160,7 @@ def test_template_uses_background_relative_internal_margins_and_declared_sig35_o
 
     pre_assay_steps = {step["id"]: step for step in _recipe_steps(payload, "pre_assay_representation_triage_recipe")}
 
-    design_margin_step = pre_assay_steps["build_design_centroid_margins_intermediate_embedding_20b_anchor_60bp"]
+    design_margin_step = pre_assay_steps["build_design_centroid_margins_intermediate_embedding_7b_anchor_60bp"]
     assert design_margin_step["params"]["kind"] == "cohort_similarity_margin"
     assert design_margin_step["params"]["leave_one_out"] is True
     assert design_margin_step["params"]["margin_pairs"][0] == {
@@ -147,11 +183,13 @@ def test_template_recipes_are_self_materializing() -> None:
     pre_assay_steps = {step["id"]: step for step in _recipe_steps(payload, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step["id"]: step for step in _recipe_steps(payload, "appendix_umap_gallery_recipe")}
 
-    assert "materialize_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
-    assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" in pre_assay_steps
-    assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
-    assert "reduce_pca_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
-    assert "build_design_centroid_margins_intermediate_embedding_20b_anchor_60bp" in pre_assay_steps
+    assert "materialize_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
+    assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" not in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
+    assert "reduce_pca_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
+    assert "build_design_centroid_margins_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
+    assert "build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean" in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean" in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
@@ -161,9 +199,16 @@ def test_template_recipes_are_self_materializing() -> None:
     assert "render_representation_scree_diagnostic" in pre_assay_steps
     assert "render_context_delta_distributions" in pre_assay_steps
 
-    assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" in appendix_steps
-    assert "fit_umap_intermediate_embedding_20b_anchor_60bp" in appendix_steps
-    assert appendix_steps["build_umap_sample_intermediate_embedding_20b_anchor_60bp"]["params"]["strategy"] == "all"
+    assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
+    assert "fit_umap_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
+    assert (
+        appendix_steps["materialize_intermediate_embedding_7b_anchor_plus_full_context_concat"]["op"] == "view.derive"
+    )
+    assert appendix_steps["materialize_intermediate_embedding_7b_anchor_plus_anchor_mean_concat"]["op"] == "view.derive"
+    assert (
+        appendix_steps["build_umap_sample_intermediate_embedding_7b_full_context_anchor_mean"]["params"]["strategy"]
+        == "all"
+    )
     assert set(appendix_steps["generate_latent_geometry_browser"]["depends_on"]) >= {
         "render_dataset_overview",
         "render_representation_health_summary",

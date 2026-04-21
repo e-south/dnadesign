@@ -5,6 +5,24 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from .metrics.definitions import resolve_metric_definition
+
+_REFERENCE_NEIGHBOR_CENSORED_RANK_LABEL = resolve_metric_definition(
+    "reference_neighbor_topk_censored_rank_median"
+).display_name
+_GEOMETRY_DISTANCE_CORRELATION_LABEL = resolve_metric_definition("geometry_distance_correlation").display_name
+_SIG35_VARIANT_SEQUENCE_BY_ID = {
+    "a": "CCCGGG",
+    "b": "CTGACA",
+    "c": "TTGTGA",
+    "d": "TTTACA",
+    "e": "TAGACA",
+    "f": "TTGACA",
+}
+_SIG35_VARIANT_LABEL_BY_ID = {
+    variant_id: f"{sequence} ({variant_id})" for variant_id, sequence in _SIG35_VARIANT_SEQUENCE_BY_ID.items()
+}
+
 _DIRECT_LABELS = {
     "appendix_umap_gallery": "UMAP gallery",
     "dataset_overview": "Dataset inventory by cohort dimension",
@@ -20,6 +38,9 @@ _DIRECT_LABELS = {
     "pooled_logits": "Pooled logits",
     "anchor_60bp": "60 bp anchor",
     "full_context_1kb": "1 kb construct context",
+    "1 kb context anchor mean": "1 kb context anchor mean",
+    "anchor + anchor-mean concat": "Anchor + anchor-mean concat",
+    "anchor + 1 kb context concat": "Anchor + 1 kb context concat",
     "anchor_vs_context": "Anchor vs 1 kb context",
     "sig35_variant": "Sigma-35 variant",
     "sigma35_variant": "Sigma-35 variant",
@@ -46,7 +67,7 @@ _DIRECT_LABELS = {
     "context_shift_l2": "Context-shift L2 distance",
     "context_self_cosine_median": "Median context self-cosine",
     "reference_in_knn_rate": "Reference in-kNN rate",
-    "reference_neighbor_topk_censored_rank_median": "Median reference-neighbor top-k-censored rank",
+    "reference_neighbor_topk_censored_rank_median": _REFERENCE_NEIGHBOR_CENSORED_RANK_LABEL,
     "effective_rank": "Effective rank",
     "pc1_variance_fraction": "PC1 variance fraction",
     "pairwise_cosine_distance_median": "Median pairwise cosine distance",
@@ -73,14 +94,17 @@ _DIRECT_LABELS = {
     "context_margin_delta_cipro": "Δ ciprofloxacin margin",
     "generation_plan": "Generation plan",
     "provenance": "Provenance",
-    "variant b": "Variant b",
-    "variant c": "Variant c",
-    "variant d": "Variant d",
-    "variant e": "Variant e",
-    "variant f": "Variant f",
+    "variant a": _SIG35_VARIANT_LABEL_BY_ID["a"],
+    "variant b": _SIG35_VARIANT_LABEL_BY_ID["b"],
+    "variant c": _SIG35_VARIANT_LABEL_BY_ID["c"],
+    "variant d": _SIG35_VARIANT_LABEL_BY_ID["d"],
+    "variant e": _SIG35_VARIANT_LABEL_BY_ID["e"],
+    "variant f": _SIG35_VARIANT_LABEL_BY_ID["f"],
     "neighbor_overlap_fraction": "Neighbor-overlap fraction",
-    "geometry_distance_correlation": "Pairwise distance Spearman",
-    "pairwise distance spearman": "Geometry-distance Spearman",
+    "geometry_distance_correlation": _GEOMETRY_DISTANCE_CORRELATION_LABEL,
+    "pairwise distance correlation": _GEOMETRY_DISTANCE_CORRELATION_LABEL,
+    "pairwise distance pearson correlation": _GEOMETRY_DISTANCE_CORRELATION_LABEL,
+    "pairwise distance spearman": _GEOMETRY_DISTANCE_CORRELATION_LABEL,
     "x_metric_value": "Evidence metric value",
     "y_metric_value": "Median context self-cosine",
     "candidate_family": "Representation family",
@@ -101,6 +125,7 @@ _TOKEN_LABELS = {
     "7b": "7B",
     "60bp": "60 bp",
     "1kb": "1 kb",
+    "kb": "kb",
     "l2": "L2",
     "umap": "UMAP",
     "pca": "PCA",
@@ -115,6 +140,19 @@ _TOKEN_LABELS = {
     "sulap": "sulAp",
     "j23105": "J23105",
 }
+
+
+def sigma35_variant_display(value: object) -> str | None:
+    text = _normalize_key(value)
+    if not text:
+        return None
+    lowered = text.casefold()
+    if lowered in _SIG35_VARIANT_LABEL_BY_ID:
+        return _SIG35_VARIANT_LABEL_BY_ID[lowered]
+    match = re.fullmatch(r"variant\s+([a-z])", lowered)
+    if match is None:
+        return None
+    return _SIG35_VARIANT_LABEL_BY_ID.get(match.group(1))
 
 
 def _normalize_key(value: object) -> str:
@@ -165,6 +203,19 @@ def humanize_label(value: object) -> str:
     normalized = text.replace("_", " ")
     normalized = re.sub(r"\bintermediate embedding\b", "Intermediate block mean", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\bpooled logits\b", "Pooled logits", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bfull context anchor mean\b", "1 kb context anchor mean", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(
+        r"\banchor plus anchor mean concat\b",
+        "Anchor + anchor-mean concat",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(
+        r"\banchor plus full context concat\b",
+        "Anchor + 1 kb context concat",
+        normalized,
+        flags=re.IGNORECASE,
+    )
     normalized = re.sub(r"\banchor 60 ?bp\b", "60 bp anchor", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\bfull context 1 ?kb\b",
@@ -207,6 +258,19 @@ def humanize_candidate(candidate_key: str | Mapping[str, str]) -> str:
     normalized = text.replace("_", " ")
     normalized = re.sub(r"\bintermediate embedding\b", "Intermediate block mean", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\bpooled logits\b", "Pooled logits", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bfull context anchor mean\b", "1 kb context anchor mean", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(
+        r"\banchor plus anchor mean concat\b",
+        "Anchor + anchor-mean concat",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(
+        r"\banchor plus full context concat\b",
+        "Anchor + 1 kb context concat",
+        normalized,
+        flags=re.IGNORECASE,
+    )
     normalized = re.sub(r"\banchor 60 ?bp\b", "60 bp anchor", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\bfull context 1 ?kb\b",

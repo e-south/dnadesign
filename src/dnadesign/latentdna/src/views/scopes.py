@@ -94,13 +94,77 @@ def _sample_scope(
     return np.asarray(matrix[indices], dtype=np.float32), pa.Table.from_pylist(sample_rows), "sample_set", sample_id
 
 
+def _group_candidate_rows(candidate_rows: pa.Table, *, key_columns: list[str]) -> dict[tuple[object, ...], list[int]]:
+    missing_columns = [column for column in key_columns if column not in candidate_rows.column_names]
+    if missing_columns:
+        raise ContractViolationError(f"aligned metadata projection is missing required key columns: {missing_columns}")
+    grouped: dict[tuple[object, ...], list[int]] = {}
+    for index, row in enumerate(candidate_rows.select(key_columns).to_pylist()):
+        key = tuple(row[column] for column in key_columns)
+        grouped.setdefault(key, []).append(index)
+    return grouped
+
+
+def _project_rows_to_alignment(
+    alignment_rows: pa.Table,
+    candidate_rows: pa.Table,
+    *,
+    alignment_key_columns: list[str],
+    candidate_key_columns: list[str],
+    label: str,
+) -> list[list[int]]:
+    grouped = _group_candidate_rows(candidate_rows, key_columns=candidate_key_columns)
+    index_groups: list[list[int]] = []
+    missing: list[tuple[object, ...]] = []
+    for row in alignment_rows.select(alignment_key_columns).to_pylist():
+        key = tuple(row[column] for column in alignment_key_columns)
+        indices = grouped.get(key)
+        if indices is None:
+            missing.append(key)
+            continue
+        index_groups.append(indices)
+    if missing:
+        raise ContractViolationError(f"{label} is missing rows for aligned keys: {missing[:5]}")
+    return index_groups
+
+
+def _project_metadata_to_alignment_rows(
+    alignment_rows: pa.Table,
+    candidate_rows: pa.Table,
+    *,
+    index_groups: list[list[int]],
+    label: str,
+) -> pa.Table:
+    if len(index_groups) != alignment_rows.num_rows:
+        raise ContractViolationError(
+            f"{label} produced {len(index_groups)} index groups for {alignment_rows.num_rows} aligned rows"
+        )
+    projected = alignment_rows
+    for field in candidate_rows.schema:
+        column_name = field.name
+        if column_name in projected.column_names:
+            continue
+        source_values = candidate_rows[column_name].to_pylist()
+        projected_values: list[object] = []
+        for indices in index_groups:
+            first_value = source_values[indices[0]]
+            for index in indices[1:]:
+                if source_values[index] != first_value:
+                    raise ContractViolationError(
+                        f"{label} metadata column {column_name!r} disagrees within one aligned row"
+                    )
+            projected_values.append(first_value)
+        projected = projected.append_column(column_name, pa.array(projected_values, type=field.type))
+    return projected
+
+
 def _alignment_scope(
     context: WorkspaceContext,
     view_id: str,
     *,
     alignment_id: str,
 ) -> tuple[np.ndarray, pa.Table, str, str | None]:
-    matrix_path, _, _ = view_artifact_paths(context, view_id)
+    matrix_path, view_rows_path, _ = view_artifact_paths(context, view_id)
     alignment_dir = context.output_root / "alignments" / alignment_id
     alignment_manifest_path = alignment_dir / "manifest.json"
     mapping_path = alignment_dir / "mapping.parquet"
@@ -113,6 +177,9 @@ def _alignment_scope(
     matrix = np.asarray(read_matrix(matrix_path), dtype=np.float32)
     mapping_rows = read_table(mapping_path).to_pylist()
     rows = read_table(rows_path)
+    candidate_rows = read_table(view_rows_path)
+    left_key_columns = [str(name) for name in alignment_manifest["params"]["key_columns"]]
+    right_key_columns = [str(name) for name in alignment_manifest["params"].get("right_key_columns", left_key_columns)]
     if alignment_manifest["params"]["left"] == view_id:
         index_field = "left_indices"
         mode = str(alignment_manifest["params"]["left_aggregation"])
@@ -121,6 +188,31 @@ def _alignment_scope(
         mode = str(alignment_manifest["params"]["right_aggregation"])
     else:
         raise ContractViolationError(f"alignment {alignment_id} does not include view {view_id}")
+
+    candidate_key_columns = (
+        left_key_columns
+        if set(left_key_columns).issubset(set(candidate_rows.column_names))
+        else right_key_columns
+        if set(right_key_columns).issubset(set(candidate_rows.column_names))
+        else []
+    )
+    if not candidate_key_columns:
+        raise ContractViolationError(
+            f"alignment {alignment_id} shares neither {left_key_columns} nor {right_key_columns} with {view_id!r}"
+        )
+    index_groups = _project_rows_to_alignment(
+        rows,
+        candidate_rows,
+        alignment_key_columns=left_key_columns,
+        candidate_key_columns=candidate_key_columns,
+        label=f"alignment scope {alignment_id}:{view_id}",
+    )
+    rows = _project_metadata_to_alignment_rows(
+        rows,
+        candidate_rows,
+        index_groups=index_groups,
+        label=f"alignment scope {alignment_id}:{view_id}",
+    )
 
     aligned_matrix = np.vstack(
         [aggregate_rows(matrix, list(row[index_field]), mode=mode) for row in mapping_rows]

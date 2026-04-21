@@ -710,6 +710,44 @@ def test_projection_fit_rejects_parallel_lock_contention(tmp_path: Path) -> None
         assert holder.returncode == 0, stdout + stderr
 
 
+def test_view_materialize_rejects_parallel_lock_contention(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set")
+    _write_workspace_config(workspace_dir, usr_root)
+
+    lock_path = operation_lock_path(workspace_dir / "outputs", operation="view_materialize")
+    ready_path = tmp_path / "view-materialize-lock.ready"
+    stop_path = tmp_path / "view-materialize-lock.stop"
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _LOCK_HOLDER_SCRIPT,
+            lock_path.as_posix(),
+            ready_path.as_posix(),
+            stop_path.as_posix(),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        _wait_for_file(ready_path)
+        result = _RUNNER.invoke(
+            app,
+            ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+        )
+        assert result.exit_code == 21
+        assert "another view materialize is already in progress for this workspace" in result.stdout
+        assert "serializes heavy view materializations to avoid aggregate memory pressure" in result.stdout
+    finally:
+        stop_path.write_text("stop", encoding="utf-8")
+        stdout, stderr = holder.communicate(timeout=5)
+        assert holder.returncode == 0, stdout + stderr
+
+
 def test_recipe_run_rejects_parallel_projection_lock_contention(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

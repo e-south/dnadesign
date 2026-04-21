@@ -18,10 +18,13 @@ from pathlib import Path
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
+from dnadesign.latentdna.src.contracts.errors import ContractViolationError
+from dnadesign.latentdna.src.views.derive import _project_matrix_to_reference_rows
 
 _RUNNER = CliRunner()
 
@@ -300,9 +303,57 @@ def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
 
     concatenated_matrix = np.load(outputs / "views" / "bundle_concat" / "matrix.npy")
     assert concatenated_matrix.shape == (3, 4)
-
     renamed_table = pq.read_table(outputs / "scalars" / "bundle_norm_renamed" / "table.parquet")
     assert "bundle_norm_value" in renamed_table.column_names
+
+
+def test_concatenate_rejects_non_unique_reference_join_keys() -> None:
+    reference_rows = pa.Table.from_pylist(
+        [
+            {"id": "row_a"},
+            {"id": "row_a"},
+        ]
+    )
+    candidate_rows = pa.Table.from_pylist(
+        [
+            {"id": "row_a"},
+            {"id": "row_b"},
+        ]
+    )
+    candidate_matrix = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+
+    with pytest.raises(ContractViolationError, match="concatenate reference rows are non-unique"):
+        _project_matrix_to_reference_rows(
+            reference_rows,
+            candidate_rows,
+            candidate_matrix,
+            input_view="candidate_view",
+        )
+
+
+def test_concatenate_tries_alternate_join_keys_when_first_candidate_is_invalid() -> None:
+    reference_rows = pa.Table.from_pylist(
+        [
+            {"construct__anchor_id": "anchor_a", "id": "context_a"},
+            {"construct__anchor_id": "anchor_b", "id": "context_b"},
+        ]
+    )
+    candidate_rows = pa.Table.from_pylist(
+        [
+            {"construct__anchor_id": "duplicate_anchor", "id": "anchor_a"},
+            {"construct__anchor_id": "duplicate_anchor", "id": "anchor_b"},
+        ]
+    )
+    candidate_matrix = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+
+    projected = _project_matrix_to_reference_rows(
+        reference_rows,
+        candidate_rows,
+        candidate_matrix,
+        input_view="candidate_view",
+    )
+
+    assert np.allclose(projected, candidate_matrix)
 
 
 def test_matrix_bundle_view_requires_manifest(tmp_path: Path) -> None:
