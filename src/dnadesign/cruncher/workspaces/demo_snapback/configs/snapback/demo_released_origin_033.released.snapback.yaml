@@ -1,0 +1,33 @@
+released_snapback:
+  schema_version: 1
+  kind: single_nick_released_snapback_v1
+  name: demo_released_origin_033
+input:
+  precursor_top_strand: AACGTTGTTCCAA
+nick_stage:
+  nickase_variant_id: Nx.Exact7
+  catalog:
+    additional_paths:
+    - inputs/nickases/local.nickases.yaml
+  normalized_to_top_strand_nick: true
+  require_site_sequence_preserved_pre_nick: true
+release_stage:
+  release_variant_id: Re.Exact
+  catalog:
+    additional_paths:
+    - inputs/release_enzymes/local.release.yaml
+  retained_side: upstream
+  stage_order: nick_then_release
+  require_site_sequence_preserved_pre_release: true
+final_target:
+  nick_boundary_from_left: 0
+  paired_bp: 3
+  cap_nt: 3
+constraints:
+  allow_post_release_loss_of_nickase_site: true
+  allow_post_release_loss_of_release_site: true
+  require_nick_survives_in_retained_product: true
+  require_release_site_downstream_of_nick: true
+  require_complete_downstream_fragment_separation: true
+output:
+  run_dir: outputs/released_design
