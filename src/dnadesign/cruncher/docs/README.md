@@ -6,10 +6,11 @@
 
 **Last updated by:** cruncher-maintainers on 2026-04-07
 
-Cruncher has three workflow families:
+Cruncher has four workflow families:
 
 - fixed-length optimization workspaces for sequence sampling, analysis, studies, and aggregation
 - cassette workspaces for cassette design and ranked search
+- snapback workspaces for narrow single-nick foldback validation and bounded search
 - payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
 
 Studies and portfolio aggregation build on the fixed-length optimization lane.
@@ -18,6 +19,7 @@ Studies and portfolio aggregation build on the fixed-length optimization lane.
 
 - **Fixed-length optimization:** [Pairwise Demo](demos/demo_pairwise.md), [Sampling and Analysis](guides/sampling_and_analysis.md), and [Intent and Lifecycle](guides/intent_and_lifecycle.md)
 - **Cassette workflows:** [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), and [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
+- **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), and the checked-in [demo_snapback workspace README](../workspaces/demo_snapback/README.md)
 - **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
 - **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 - **Studies and aggregation:** [Studies](guides/studies.md) and [Portfolio Aggregation](guides/portfolio_aggregation.md)
@@ -46,6 +48,12 @@ Studies and portfolio aggregation build on the fixed-length optimization lane.
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
+#### Validate and Search Single-Nick Foldbacks
+- [Snapback Workflow](guides/snapback_workflow.md)
+- [Snapback Artifacts](reference/snapback_artifacts.md)
+- [demo_snapback README](../workspaces/demo_snapback/README.md)
+- [demo_snapback runbook](../workspaces/demo_snapback/runbook.md)
+
 #### Payload-Centric YIU Workflows
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
@@ -70,6 +78,7 @@ Studies and portfolio aggregation build on the fixed-length optimization lane.
 - [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
+- [Snapback Artifacts](reference/snapback_artifacts.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)

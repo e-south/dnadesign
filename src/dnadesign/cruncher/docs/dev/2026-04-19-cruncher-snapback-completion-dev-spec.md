@@ -4,6 +4,7 @@
 **Last verified:** 2026-04-19
 
 > **Last updated by:** cruncher-maintainers on 2026-04-19
+> **Historical note:** this developer spec captures the 2026-04-19 design cut. The shipped solve lane was later promoted to co-design-first `single_nick_snapback_solve_v3`. Use [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md), [`../reference/snapback_artifacts.md`](../reference/snapback_artifacts.md), and [`../reference/architecture.md`](../reference/architecture.md) for the active workflow, ranking, and artifact layout.
 
 ### Contents
 - [Purpose](#purpose)
@@ -17,7 +18,7 @@
 - [Required Domain Semantics](#required-domain-semantics)
 - [Public Workflow Contract](#public-workflow-contract)
 - [Explicit V2 Spec Contract](#explicit-v2-spec-contract)
-- [Solve V2 Spec Contract](#solve-v2-spec-contract)
+- [Historical Solve V2 Spec Contract](#historical-solve-v2-spec-contract)
 - [Geometry And Pairing Rules](#geometry-and-pairing-rules)
 - [Ranking Policy](#ranking-policy)
 - [Artifact Contract](#artifact-contract)
@@ -141,7 +142,7 @@ The command family remains:
 Implementation stance:
 
 - replace `single_nick_snapback_v1` with `single_nick_snapback_v2`
-- add `single_nick_snapback_solve_v2`
+- add the historical `single_nick_snapback_solve_v2` design cut later superseded by `single_nick_snapback_solve_v3`
 - `show` must distinguish explicit versus solve bundles from bundle metadata
 - `init-workspace` should scaffold only `v2` examples
 
@@ -234,48 +235,37 @@ For solve `v2`:
 
 - the solver optimizes `nick_boundary_from_left`
 
-### Post-nick released-strand decomposition
+### Post-nick active-strand decomposition
 
-Replace the implicit `retained_target + hinge + foldback_arm` model with an explicit four-part released topology:
+For `v2`, the nick is the single snapback origin. After nicking, the released top strand is no longer the active structural strand; the active post-nick model is the remaining complement strand folding back toward the former nick position.
 
-- `released_prefix_window`
-  - derived segment from intended nick boundary to `retained_homology_window.start`
+The explicit active-strand topology is:
+
 - `retained_homology_window`
-  - target segment on the released strand that will be paired by the foldback arm
+  - the canonical-top interval that begins exactly at `nick_boundary`
+- derived `source_cap_window`
+  - the canonical-top suffix from `retained_homology_window.end` to `input_sequence.end`
 - `cap_sequence`
-  - unpaired turn/cap segment
+  - any authored cap extension appended after the source-side suffix
+- derived `effective_cap_sequence = source_cap_sequence + cap_sequence`
+  - the true unpaired turn between the retained stem and the foldback arm
 - `foldback_arm`
   - sequence that pairs back onto `retained_homology_window`
 
-The released prefix may be zero length.
+Compatibility metrics remain published:
 
-This is required because:
+- `released_prefix_nt = 0`
+- `retained_start_from_nick = 0`
 
-- the current lane cannot distinguish "nick as close to zero as possible" from "retained target chosen somewhere later"
-- the current lane omits the released prefix entirely from the post-nick model
-
-### Explicit nick-to-homology relation
-
-Add a required derived metric:
-
-- `retained_start_from_nick = retained_homology_window.start - nick_boundary`
-
-Admissibility:
-
-- must be `>= 0`
-
-Ranking:
-
-- secondary after `nick_boundary_from_left`
-
-This makes the nick-relative geometry explicit and machine-visible.
+The lane no longer permits a free nick-to-stem offset. `retained_homology_window.start` must equal `nick_boundary`.
 
 ### Cap semantics
 
 Replace `hinge` in `v2` with:
 
 - `cap_sequence`
-- derived `cap_nt = len(cap_sequence)`
+- derived `cap_extension_nt = len(cap_sequence)`
+- derived `cap_nt = len(effective_cap_sequence)`
 
 Do not use `hinge` as the public name in `v2`.
 
@@ -283,6 +273,13 @@ Reason:
 
 - "hinge" is too generic
 - the current user intent is specifically a cap/turn region
+- the effective loop must include any source-side suffix that remains between retained stem and foldback start
+
+`v2` cap invariant:
+
+- `cap_nt` is fixed at `3`
+- `search.cap_nt` is therefore fixed at `{min: 3, max: 3}`
+- the solver derives the authored cap-extension length from `3 - source_cap_nt`
 
 ### Homology policy
 
@@ -348,7 +345,7 @@ uv run cruncher snapback show --run <run_dir>
 ### Version behavior
 
 - `validate|design` accept only `single_nick_snapback_v2`
-- `solve` emits only `single_nick_snapback_solve_v2` reports and `single_nick_snapback_v2` hit bundles
+- historical design cut: `solve` emitted only `single_nick_snapback_solve_v2` reports and `single_nick_snapback_v2` hit bundles
 - `show` distinguishes explicit versus solve bundles from bundle metadata without guessing
 
 ## Explicit V2 Spec Contract
@@ -426,6 +423,7 @@ The report must publish:
 - `released_prefix_nt`
 - `retained_start_from_nick`
 - `cap_nt`
+- `cap_extension_nt`
 - `paired_bp`
 - `mismatch_count`
 - `terminal_ligatable_duplex_bp`
@@ -433,7 +431,7 @@ The report must publish:
 - `added_nt`
 - `extra_nick_event_count`
 
-## Solve V2 Spec Contract
+## Historical Solve V2 Spec Contract
 
 File suffix:
 
@@ -464,11 +462,11 @@ nickase_policy:
 
 goal:
   nick_boundary_window: {min: 0, max: 8}
-  retained_start_from_nick: {min: 0, max: 4}
+  retained_start_from_nick: {min: 0, max: 0}
 
 search:
   retained_homology_length: {min: 4, max: 8}
-  cap_nt: {min: 1, max: 4}
+  cap_nt: {min: 3, max: 3}
   max_added_nt: 12
   max_mismatches: 1
   max_enumerated_candidates: 50000
@@ -498,14 +496,16 @@ The solver must enumerate over:
 - resolved site orientations
 - intended nick boundaries inside the declared boundary window
 - retained homology lengths
-- cap lengths
-- concrete cap sequences
+- derived source-side cap lengths from `input_sequence`
+- concrete cap-extension sequences whose total effective cap stays at `3 nt`
 - concrete foldback-arm sequences compatible with `max_mismatches`
 
 The solver must not enumerate:
 
 - outside `pre_nick_duplex_window`
 - outside bounded search settings
+- retained windows that do not start at the resolved nick
+- candidates whose effective cap loop is not exactly `3 nt`
 - candidates that mutate the protected region
 
 Materialized hits must round-trip through `single_nick_snapback_v2`.
@@ -514,18 +514,20 @@ Materialized hits must round-trip through `single_nick_snapback_v2`.
 
 ### Canonical post-nick model
 
-For `v2`, the modeled released top-strand sequence is:
+For `v2`, the modeled post-nick active-strand sequence is:
 
 ```text
-released_prefix + retained_homology + cap_sequence + foldback_arm
+retained_homology + source_cap_sequence + cap_sequence + foldback_arm
 ```
 
 Where:
 
-- `released_prefix` is the top-strand segment from `nick_boundary` to `retained_homology_window.start`
-- `retained_homology` is taken from the authored top strand
-- `cap_sequence` is authored
+- `retained_homology` is taken from the authored top strand and begins at the nick
+- `source_cap_sequence` is the canonical-top suffix after `retained_homology_window.end`
+- `cap_sequence` is the authored cap extension
 - `foldback_arm` is authored or solver-generated
+
+The released top strand may still be shown in the exposed QA view, but it is not the modeled foldback substrate.
 
 ### Pairing evaluation
 
@@ -563,8 +565,9 @@ A candidate is admissible only if:
 - exactly one intended nick resolves inside `nick_boundary_window`
 - the intended nick is on the normalized top strand
 - the intended recognition site lies fully inside `pre_nick_duplex_window`
-- `retained_homology_window.start >= nick_boundary`
-- `retained_start_from_nick` is inside goal bounds
+- `retained_homology_window.start == nick_boundary`
+- `retained_start_from_nick == 0`
+- `cap_nt == 3`
 - pairing satisfies `homology_policy`
 - `terminal_ligatable_duplex_bp` is within requested bounds
 - `max_uninterrupted_duplex_bp` is within requested bounds
@@ -577,18 +580,18 @@ A candidate is admissible only if:
 Rank admissible candidates by:
 
 1. `nick_boundary_from_left`
-2. `retained_start_from_nick`
-3. `added_nt`
-4. `max_uninterrupted_duplex_bp`
-5. `extra_nick_event_count`
-6. `gc_distance`
-7. `homopolymer_penalty`
+2. `added_nt`
+3. `max_uninterrupted_duplex_bp`
+4. `extra_nick_event_count`
+5. `gc_distance`
+6. `homopolymer_penalty`
+7. `cap_extension_nt`
 8. lexical stability key
 
 Why:
 
 - the first biological objective is to nick as early as possible
-- the second is to minimize released-prefix burden before foldback homology begins
+- the nick is the fixed snapback origin, so there is no longer a second nick-to-stem distance objective
 - only then does total added sequence length dominate
 
 ### Low-GC stance
@@ -650,12 +653,16 @@ They must show coordinate truth and topology decomposition only:
 
 - `pre_nick_duplex`
   - canonical top strand plus complement row in duplex context
-  - intended site, intended nick boundary, protected region, retained homology, cap, and foldback-arm spans
+  - one shared `Nick / origin` boundary
+  - intended site, protected region, retained homology, source-cap/effective-cap, and foldback-arm spans
 - `post_nick_exposed`
-  - same top-strand coordinate axis after nicking
-  - released top span, anchored top span, released prefix, retained homology, cap, and foldback-arm spans
+  - same coordinate axis after nicking
+  - released top span plus the active complement strand
+  - the nick is still the single snapback origin boundary
+  - retained homology, source-cap/effective-cap, and foldback-arm spans are interpreted on the active strand
 - `post_nick_foldback`
-  - post-nick local foldback sequence with pair map, mismatch positions, terminal ligatable run, max uninterrupted duplex, and protected-overlap projection
+  - post-nick local active-strand foldback sequence with origin at coordinate `0`
+  - pair map, mismatch positions, terminal ligatable run, max uninterrupted duplex, and protected-overlap projection
 
 The visual contracts may stay on version `1` if they remain structurally compatible, but they must include the `v2` semantic fields and remain independent of baserender output geometry.
 

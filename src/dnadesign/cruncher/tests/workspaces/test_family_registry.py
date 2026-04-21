@@ -48,6 +48,35 @@ def test_infer_runbook_workflow_families_reports_yiu() -> None:
     assert families == ("yiu",)
 
 
+def test_workflow_family_descriptor_registers_snapback_as_runbook_family() -> None:
+    descriptor = workflow_family_descriptor("snapback")
+
+    assert descriptor.id == "snapback"
+    assert descriptor.workspace_kind == "runbook_family"
+    assert descriptor.runbook_command_roots == ("snapback",)
+    assert descriptor.spec_globs == ("configs/snapback/*.snapback.yaml", "configs/snapback/*.snapback.solve.yaml")
+    assert descriptor.default_output_root == "outputs"
+
+
+def test_infer_runbook_workflow_families_reports_snapback() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo_snapback",
+            "steps": [
+                {
+                    "id": "snapback_validate",
+                    "run": ["snapback", "validate", "--spec", "configs/snapback/example.snapback.yaml"],
+                }
+            ],
+        }
+    }
+
+    families = infer_runbook_workflow_families(payload)
+
+    assert families == ("snapback",)
+
+
 def test_workspace_kind_from_presence_formalizes_registry_kinds() -> None:
     assert workspace_kind_from_presence(has_config=True, has_runbook=False) == "config"
     assert workspace_kind_from_presence(has_config=False, has_runbook=True) == "runbook_family"

@@ -60,6 +60,15 @@ _WORKFLOW_FAMILIES: tuple[WorkflowFamilyDescriptor, ...] = (
         docs_section_id="yiu",
     ),
     WorkflowFamilyDescriptor(
+        id="snapback",
+        display_name="single-nick snapback workflow",
+        workspace_kind="runbook_family",
+        runbook_command_roots=("snapback",),
+        spec_globs=("configs/snapback/*.snapback.yaml", "configs/snapback/*.snapback.solve.yaml"),
+        default_output_root="outputs",
+        docs_section_id="snapback",
+    ),
+    WorkflowFamilyDescriptor(
         id="study",
         display_name="Study orchestration",
         workspace_kind="hybrid",

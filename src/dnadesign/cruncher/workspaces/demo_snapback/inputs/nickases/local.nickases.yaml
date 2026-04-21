@@ -1,0 +1,21 @@
+nickases:
+  schema_version: 1
+  entries:
+  - id: Nt.Bpu10I
+    specificity_id: Bpu10I
+    motif_top_5to3: CCTNAGC
+    top_cut_offset: 2
+    source: local_overlay
+    vendor: Thermo Fisher Scientific
+    vendor_catalog_number: ER2011
+    selection:
+      outside_site: false
+      snapback_tier: tier3
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+      - NONSPECIFIC_NICKING_ASSAY_SIGNAL
+    operational:
+      incubation_temp_c: 37
+      buffer_family: R
+    notes:
+    - "Thermo manual raw geometry: CC\u2193TNAGC."

@@ -31,7 +31,7 @@ Cruncher is organized as peer workflow families, not one monolithic run shape:
 
 - **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
-- **Snapback workspaces** use `snapback init-workspace|validate|design|solve|show` and publish snapback-specific reports, candidate tables, a three-state QA triptych, and optional BaseRender job files.
+- **Snapback workspaces** use `snapback init-workspace|validate|design|solve|show` and publish snapback-specific reports, candidate tables, a three-state QA triptych, and an optional single composite BaseRender job/output.
 - **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
 
 These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
@@ -84,6 +84,8 @@ The snapback workflow is a peer lane, not a cassette or YIU submode:
 7. **snapback show** -> inspect explicit or solve bundle metadata, artifacts, and drift checks without guessing
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.
+
+For operator-facing usage, start with [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md). For the file-by-file output contract, use [`snapback_artifacts.md`](snapback_artifacts.md).
 
 ---
 
@@ -174,7 +176,7 @@ Core contract:
 - no dependency on legacy `sample` or cassette-specific planner contracts
 
 #### `snapback/` (single-nick foldback domain)
-- snapback v2 spec schema for explicit and solve contracts
+- snapback explicit `single_nick_snapback_v2` and co-design solve `single_nick_snapback_solve_v3` contracts
 - canonical top-strand nick-relative geometry and bounded search
 - protected-region, homology, and extra-nick invariant enforcement
 - typed producer-owned QA view models live in `snapback/view_models.py`
@@ -246,12 +248,13 @@ Cassette runs do not call baserender directly; they publish the contracts and jo
 
 For snapback runs, Cruncher publishes both producer-owned QA views and shared evidence-map contracts:
 
-* `views/pre_nick_duplex.v1.json`, `views/post_nick_exposed.v1.json`, `views/post_nick_foldback.v1.json`
-* `views/pre_nick_duplex.snapback_visual.v1.json`, `views/post_nick_exposed.snapback_visual.v1.json`, `views/post_nick_foldback.snapback_visual.v1.json`
-* `views/views_manifest.v1.json`
-* sibling `baserender_jobs/*.job.yaml` files that reference the evidence-map contracts by path
+* `analysis/views/pre_nick_duplex.v1.json`, `analysis/views/post_nick_exposed.v1.json`, `analysis/views/post_nick_foldback.v1.json`
+* `analysis/views/pre_nick_duplex.snapback_visual.v1.json`, `analysis/views/post_nick_exposed.snapback_visual.v1.json`, `analysis/views/post_nick_foldback.snapback_visual.v1.json`
+* `analysis/views/snapback_triptych.snapback_visual.v1.jsonl`
+* `analysis/views/views_manifest.v1.json`
+* sibling `baserender_jobs/snapback_triptych.job.yaml` that references the triptych evidence-map rows by path
 
-These views are a topology and coordinate QA surface, not a biophysical rendering claim. The producer-owned JSON captures snapback-specific semantics such as released-prefix, retained-stem, cap, foldback-revcomp, and junction boundaries; the shared `snapback_visual_v1` contracts carry the nucleotide-resolution publication surface for downstream BaseRender rendering.
+These views are a topology and coordinate QA surface, not a biophysical rendering claim. The producer-owned JSON captures snapback-specific semantics such as a nick-anchored retained stem, source-side cap, effective `3 nt` cap loop, active-strand foldback geometry, and the shared nick/origin boundary in the pre/exposed states. The shared `snapback_visual_v1` contracts carry the nucleotide-resolution publication surface for downstream BaseRender rendering.
 
 The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
@@ -415,31 +418,32 @@ YIU runs are intentionally isolated from both `sample` and `cassette` runs:
 
 #### Snapback artifacts
 
-A typical **snapback explicit** run directory contains:
+A typical **snapback explicit** run directory at `<workspace>/outputs/design/` contains:
 
 - `meta/snapback_manifest.json`, `meta/snapback_status.json` - explicit-run metadata + status
 - `provenance/spec_used.yaml`, `provenance/nickase_catalog.yaml` - frozen input snapshots
 - `analysis/reports/report.json`, `analysis/reports/report.md` - deterministic explicit report
 - `export/table__candidates.csv` - candidate table with one row for the explicit candidate when satisfied
-- `views/pre_nick_duplex.v1.json`, `views/post_nick_exposed.v1.json`, `views/post_nick_foldback.v1.json` - producer-owned QA views
-- `views/*.snapback_visual.v1.json` - shared snapback visual contracts for the QA triptych
-- `views/views_manifest.v1.json` - grouped view inventory plus recommended render jobs
-- `baserender_jobs/*.job.yaml` - optional downstream render jobs for the three QA states
-- `renders/*.png` - optional rendered QA triptych after downstream BaseRender execution
+- `analysis/views/pre_nick_duplex.v1.json`, `analysis/views/post_nick_exposed.v1.json`, `analysis/views/post_nick_foldback.v1.json` - producer-owned QA views
+- `analysis/views/*.snapback_visual.v1.json` - shared snapback visual contracts for the QA triptych
+- `analysis/views/snapback_triptych.snapback_visual.v1.jsonl` - ordered shared triptych contracts for one composite render
+- `analysis/views/views_manifest.v1.json` - grouped view inventory plus recommended render jobs
+- `baserender_jobs/snapback_triptych.job.yaml` - optional downstream render job for the composite QA triptych
+- `plots/snapback_triptych.<png|svg|pdf>` - optional rendered QA triptych after downstream BaseRender execution
 
-A typical **snapback solve** run directory contains:
+A typical **snapback solve** run directory at `<workspace>/outputs/solve/` contains:
 
-- `solve_report.json`, `solve_report.md` - solve-level report outputs
-- `table__hits.csv` - ranked admissible hit table
-- `solve_manifest.json`, `solve_status.json` - solve metadata + status
-- `specs/input_solve_spec.yaml`, `specs/resolved_catalog.yaml` - frozen solve inputs
-- `hits/<rank>__<design_id>/...` - materialized explicit hit bundles under the explicit snapback artifact contract
+- `meta/solve_manifest.json`, `meta/solve_status.json` - solve metadata + status
+- `provenance/input_solve_spec.yaml`, `provenance/resolved_catalog.yaml` - frozen solve inputs
+- `analysis/reports/solve_report.json`, `analysis/reports/solve_report.md` - solve-level report outputs
+- `export/table__hits.csv`, `export/table__frontier.csv` - ranked hit table plus compactness frontier
+- `analysis/materialized_hits/hit_<rank>/...` - materialized explicit hit bundles under stable rank paths
 
 Snapback runs are intentionally isolated from `sample`, `cassette`, and `yiu` runs:
 
 - they do not write `meta/run_manifest.json`
 - they do not append to workspace `run_index.json`
-- they do not emit shared baserender jobs at this stage
+- they do not invoke baserender directly
 - they do not reuse cassette or YIU view contracts
 
 ---
@@ -530,7 +534,7 @@ Key points:
 #### Related docs
 
 - [Intent + lifecycle](../guides/intent_and_lifecycle.md)
+- [Snapback workflow](../guides/snapback_workflow.md)
 - [Portfolio aggregation](../guides/portfolio_aggregation.md)
 - [Config reference](config.md)
-
-@e-south
+- [Snapback artifacts](snapback_artifacts.md)

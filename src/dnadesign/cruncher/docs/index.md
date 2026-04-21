@@ -19,6 +19,9 @@
 #### Design or search cassettes
 - [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), [Cassette Solve Workflow](guides/cassette_solve_workflow.md), [Cassette Spec Reference](reference/cassette_spec.md), [Cassette Solve Spec Reference](reference/cassette_solve_spec.md), [Nickase Catalog Reference](reference/nickase_catalog.md), and [Cassette Artifacts](reference/cassette_artifacts.md). Start with the demo for a runnable workspace, then move to the guide or reference that matches your task.
 
+#### Validate or search single-nick foldbacks
+- [Snapback Workflow](guides/snapback_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [demo_snapback README](../workspaces/demo_snapback/README.md), and [demo_snapback runbook](../workspaces/demo_snapback/runbook.md). Use this lane when you need narrow single-nick foldback validation or bounded deterministic search with explicit geometry contracts and strict QA publication.
+
 #### Run YIU workflows
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md). Use the demo to start from a checked-in workspace, the workflow guide for the operator path, and the references when you need schema or bundle details.
 

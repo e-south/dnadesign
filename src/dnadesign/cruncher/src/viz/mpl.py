@@ -9,8 +9,10 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
+import tempfile
 from collections.abc import MutableMapping
 from pathlib import Path
 
@@ -44,6 +46,12 @@ def _default_mpl_cache_dir() -> Path:
     if repo_root is None:
         raise RuntimeError("Unable to determine repository root for Matplotlib cache. Set MPLCONFIGDIR explicitly.")
     return repo_root / ".cache" / "matplotlib" / "cruncher"
+
+
+def _workspace_cache_key(workspace_root: Path) -> str:
+    resolved = workspace_root.expanduser().resolve()
+    digest = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()[:10]
+    return f"{resolved.name}-{digest}"
 
 
 def _ensure_writable_dir(dest: Path) -> None:
@@ -81,7 +89,11 @@ def bind_mpl_config_dir(
 
 
 def workspace_mpl_cache_dir(workspace_root: Path) -> Path:
-    return workspace_root.expanduser().resolve() / ".cruncher" / ".runtime_mplconfig"
+    repo_root = _repo_root_from(workspace_root)
+    cache_key = _workspace_cache_key(workspace_root)
+    if repo_root is not None:
+        return repo_root / ".cache" / "matplotlib" / "cruncher" / "workspaces" / cache_key
+    return Path(tempfile.gettempdir()) / "dnadesign" / "cruncher" / "matplotlib" / "workspaces" / cache_key
 
 
 def ensure_workspace_mpl_cache(

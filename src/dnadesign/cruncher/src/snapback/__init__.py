@@ -20,12 +20,15 @@ from dnadesign.cruncher.snapback.models import SingleNickSnapbackSpec, SnapbackE
 from dnadesign.cruncher.snapback.planner import build_snapback_report, render_markdown_report
 from dnadesign.cruncher.snapback.solve_models import SingleNickSnapbackSolveSpec, SnapbackSolveReport
 from dnadesign.cruncher.snapback.solver import render_solve_markdown_report, solve_snapback_search
+from dnadesign.cruncher.snapback.target_models import SnapbackTargetSearchReport
+from dnadesign.cruncher.snapback.target_search import render_target_search_markdown_report, search_snapback_target_hits
 
 __all__ = [
     "SnapbackError",
     "SnapbackEvaluationReport",
     "SnapbackPlanningError",
     "SnapbackSolveReport",
+    "SnapbackTargetSearchReport",
     "SnapbackSpecError",
     "SingleNickSnapbackSolveSpec",
     "SingleNickSnapbackSpec",
@@ -34,7 +37,9 @@ __all__ = [
     "load_snapback_spec",
     "render_markdown_report",
     "render_solve_markdown_report",
+    "render_target_search_markdown_report",
     "resolve_workspace_root_for_snapback_solve_spec",
     "resolve_workspace_root_for_snapback_spec",
+    "search_snapback_target_hits",
     "solve_snapback_search",
 ]

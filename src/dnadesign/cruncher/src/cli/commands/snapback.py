@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/cli/commands/snapback.py
 
-CLI entrypoints for v2 snapback workflows.
+CLI entrypoints for explicit v2 and co-design solve v3 snapback workflows.
 
 Module Author(s): Codex
 --------------------------------------------------------------------------------
@@ -40,6 +40,14 @@ def run_snapback_solve(*args, **kwargs):
     from dnadesign.cruncher.app.snapback_solve_workflow import run_snapback_solve as _run_snapback_solve
 
     return _run_snapback_solve(*args, **kwargs)
+
+
+def run_snapback_target_search(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_target_search_workflow import (
+        run_snapback_target_search as _run_snapback_target_search,
+    )
+
+    return _run_snapback_target_search(*args, **kwargs)
 
 
 def snapback_show_payload(*args, **kwargs):
@@ -87,13 +95,31 @@ def _print_solve_report(report) -> None:
         console.print(f"Solve id -> {report.solve_id}")
     if report.run_dir:
         console.print(f"Outputs -> {report.run_dir}")
+    resolved = report.metadata.resolved_search_space
+    console.print(
+        "Resolved compact search -> "
+        f"boundary={resolved.nick_boundary_window.min}..{resolved.nick_boundary_window.max}, "
+        f"paired_bp={resolved.retained_homology_length.min}..{resolved.retained_homology_length.max}, "
+        f"terminal_duplex={resolved.terminal_ligatable_duplex_bp.min}..{resolved.terminal_ligatable_duplex_bp.max}, "
+        f"max_uninterrupted={resolved.max_uninterrupted_duplex_bp}"
+    )
     console.print(
         "Search -> "
         f"nodes={report.metadata.visited_search_node_count}, "
         f"enumerated={report.metadata.enumerated_candidate_count}, "
         f"accepted={report.metadata.accepted_candidate_count}, "
+        f"frontier_rows={report.metadata.frontier_row_count}, "
         f"materialized={report.metadata.materialized_hit_count}"
     )
+    if report.metadata.first_satisfied_frontier is not None:
+        frontier = report.metadata.first_satisfied_frontier
+        console.print(
+            "First satisfied frontier -> "
+            f"boundary={frontier.nick_boundary_from_left}, "
+            f"paired_bp={frontier.paired_bp}, "
+            f"cap_ext_nt={frontier.cap_extension_nt}, "
+            f"accepted={frontier.accepted_candidate_count}"
+        )
     for code, warning in zip(report.metadata.warning_codes, report.metadata.warnings, strict=False):
         console.print(f"Warning -> {code}: {warning}")
     if report.hits:
@@ -101,11 +127,12 @@ def _print_solve_report(report) -> None:
         for hit in report.hits:
             line = (
                 f"  - rank {hit.rank}: {hit.hit_id} "
-                f"{hit.variant_id}@{hit.nick_boundary} cap={hit.cap_sequence} "
-                f"added_nt={hit.added_nt}"
+                f"{hit.variant_id}@{hit.nick_boundary} "
+                f"site={hit.intended_site_orientation}:{hit.intended_site_sequence} "
+                f"site_mutations={hit.site_mutation_count} cap={hit.cap_sequence} added_nt={hit.added_nt}"
             )
             if hit.materialized_run_dir is not None:
-                line += f" run={hit.materialized_run_dir}"
+                line += f" bundle={hit.materialized_run_dir}"
             console.print(line)
     if report.issues:
         console.print("Issues:")
@@ -113,11 +140,67 @@ def _print_solve_report(report) -> None:
             console.print(f"  - {issue.code}: {issue.message}")
 
 
+def _print_target_search_report(report) -> None:
+    console.print("Snapback target search")
+    console.print(f"Status -> {report.status}")
+    console.print(
+        "Target -> "
+        f"boundary={report.metadata.target.nick_boundary_from_left}, "
+        f"paired_bp={report.metadata.target.paired_bp}, "
+        f"cap_nt={report.metadata.target.cap_nt}"
+    )
+    console.print(f"Catalog -> {report.metadata.catalog_source}")
+    console.print(f"Orientations evaluated -> {report.metadata.evaluated_orientation_count}")
+    console.print(f"Exact hits -> {report.metadata.exact_hit_count}")
+    console.print(f"Near hits -> {report.metadata.near_hit_count}")
+    if report.exact_hits:
+        console.print("Exact hits:")
+        for hit in report.exact_hits:
+            outside_site = hit.nickase.selection.outside_site if hit.nickase.selection is not None else "unknown"
+            console.print(
+                "  - "
+                f"rank {hit.rank}: {hit.variant_id} "
+                f"boundary={hit.nick_boundary_from_left} "
+                f"site={hit.intended_site_orientation}:{hit.intended_site_sequence} "
+                f"input_nt={hit.input_length_nt} "
+                f"extra_target_nicks={hit.extra_target_strand_nick_count} "
+                f"extra_nicks={hit.extra_nick_event_count} "
+                f"outside_site={outside_site}"
+            )
+    if report.near_hits:
+        console.print("Near hits:")
+        for hit in report.near_hits:
+            outside_site = hit.nickase.selection.outside_site if hit.nickase.selection is not None else "unknown"
+            console.print(
+                "  - "
+                f"rank {hit.rank}: {hit.variant_id} "
+                f"boundary={hit.nick_boundary_from_left} "
+                f"site={hit.intended_site_orientation}:{hit.intended_site_sequence} "
+                f"input_nt={hit.input_length_nt} "
+                f"extra_target_nicks={hit.extra_target_strand_nick_count} "
+                f"extra_nicks={hit.extra_nick_event_count} "
+                f"outside_site={outside_site}"
+            )
+    if report.feasibility:
+        console.print("Feasibility:")
+        for row in report.feasibility[:8]:
+            blockers = ",".join(row.exact_boundary_blockers) if row.exact_boundary_blockers else "-"
+            console.print(
+                "  - "
+                f"{row.variant_id} {row.orientation} "
+                f"exact={row.exact_boundary_hit_possible} "
+                f"target_site_start={row.site_start_at_target_boundary} "
+                "earliest_boundary="
+                f"{row.earliest_feasible_boundary if row.earliest_feasible_boundary is not None else '-'} "
+                f"blockers={blockers}"
+            )
+
+
 def _echo_scaffold_line(label: str, value: str | Path) -> None:
     typer.echo(f"{label} -> {value}")
 
 
-@app.command("init-workspace", help="Scaffold a snapback workspace with v2 explicit and solve examples.")
+@app.command("init-workspace", help="Scaffold a snapback workspace with v2 explicit and v3 co-design solve examples.")
 def init_workspace_cmd(
     workspace: str | None = typer.Argument(
         None,
@@ -154,7 +237,8 @@ def init_workspace_cmd(
         raise typer.Exit(code=1) from exc
     _echo_scaffold_line("Snapback workspace scaffold", result.workspace_root)
     _echo_scaffold_line("README", result.readme_path)
-    _echo_scaffold_line("Manifest", result.manifest_path)
+    _echo_scaffold_line("Runbook", result.runbook_path)
+    _echo_scaffold_line("Runbook config", result.runbook_config_path)
     _echo_scaffold_line("Example spec", result.example_spec_path)
     _echo_scaffold_line("Example solve spec", result.example_solve_spec_path)
     _echo_scaffold_line("Catalog", result.catalog_path)
@@ -192,7 +276,7 @@ def design_cmd(
     force_overwrite: bool = typer.Option(
         False,
         "--force-overwrite",
-        help="Replace an existing run directory if it already exists.",
+        help="Replace the existing workspace output root if it already exists.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Print the run payload as JSON."),
 ) -> None:
@@ -222,7 +306,13 @@ def design_cmd(
         raise typer.Exit(code=1)
 
 
-@app.command("solve", help="Search for concrete snapback designs that satisfy a v2 solve spec.")
+@app.command(
+    "solve",
+    help=(
+        "Search for concrete snapback designs that satisfy a v3 co-design solve spec. "
+        "Omitted boundary and size windows resolve to compact-first defaults."
+    ),
+)
 def solve_cmd(
     spec: Path = typer.Option(
         ...,
@@ -232,7 +322,7 @@ def solve_cmd(
     force_overwrite: bool = typer.Option(
         False,
         "--force-overwrite",
-        help="Replace an existing deterministic solve run directory.",
+        help="Replace the existing workspace solve output root.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Print the solve report as JSON."),
 ) -> None:
@@ -250,9 +340,85 @@ def solve_cmd(
         raise typer.Exit(code=1)
 
 
-@app.command("show", help="Read a snapback design or solve bundle and print a path-oriented summary.")
+@app.command(
+    "target-search",
+    help=(
+        "Search the nickase catalog for shortest preserved-site snapback hits at a requested geometry. "
+        "This mode is target-first and does not assume an authored canonical top strand."
+    ),
+)
+def target_search_cmd(
+    preset: str | None = typer.Option(
+        None,
+        "--preset",
+        help="Primary builtin nickase preset. Defaults to neb_nicking_v1 when no catalog source is provided.",
+    ),
+    additional_preset: list[str] = typer.Option(
+        [],
+        "--additional-preset",
+        help="Additional builtin nickase preset ids (repeatable).",
+    ),
+    additional_path: list[Path] = typer.Option(
+        [],
+        "--additional-path",
+        help="Additional workspace-relative nickase catalog overlays (repeatable).",
+    ),
+    workspace_root: Path = typer.Option(
+        Path("."),
+        "--workspace-root",
+        help="Workspace root for resolving --additional-path values.",
+    ),
+    nick_boundary: int = typer.Option(0, "--nick-boundary", help="Requested nick_boundary_from_left."),
+    paired_bp: int = typer.Option(3, "--paired-bp", help="Requested retained homology length."),
+    cap_nt: int = typer.Option(3, "--cap-nt", help="Requested effective cap nt. Must equal 3."),
+    max_results: int = typer.Option(8, "--max-results", help="Maximum exact or near hits to return."),
+    normalize_to_top_strand_nick: bool = typer.Option(
+        True,
+        "--normalize-to-top-strand-nick/--allow-complement-nick",
+        help="Restrict search to orientations that normalize to a top-strand nick.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Print the target-search report as JSON."),
+) -> None:
+    try:
+        from dnadesign.cruncher.snapback.models import CatalogSources
+        from dnadesign.cruncher.snapback.target_models import SnapbackTargetGeometry
+
+        resolved_workspace_root = workspace_root.expanduser().resolve()
+        if preset is None and not additional_preset and not additional_path:
+            preset = "neb_nicking_v1"
+            additional_preset = ["thermo_nicking_v1"]
+        catalog = CatalogSources(
+            preset=preset,
+            additional_presets=additional_preset,
+            additional_paths=additional_path,
+        )
+        target = SnapbackTargetGeometry(
+            nick_boundary_from_left=nick_boundary,
+            paired_bp=paired_bp,
+            cap_nt=cap_nt,
+            require_site_sequence_preserved=True,
+        )
+        report = run_snapback_target_search(
+            catalog=catalog,
+            workspace_root=resolved_workspace_root,
+            target=target,
+            normalize_to_top_strand_nick=normalize_to_top_strand_nick,
+            max_results=max_results,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        _print_target_search_report(report)
+    if report.status == "no_hits":
+        raise typer.Exit(code=1)
+
+
+@app.command("show", help="Read a snapback design or solve workspace output root and print a path-oriented summary.")
 def show_cmd(
-    run: Path = typer.Option(..., "--run", help="Path to a snapback run directory."),
+    run: Path = typer.Option(..., "--run", help="Path to a snapback design or solve output root."),
     json_output: bool = typer.Option(False, "--json", help="Print the show payload as JSON."),
 ) -> None:
     try:

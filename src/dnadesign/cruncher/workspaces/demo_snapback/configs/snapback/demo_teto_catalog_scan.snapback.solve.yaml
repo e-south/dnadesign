@@ -1,0 +1,39 @@
+snapback_solve:
+  schema_version: 3
+  contract: single_nick_snapback_solve_v3
+  name: demo_teto_catalog_scan
+input:
+  canonical_top_strand:
+    sequence: CCTCAGCA
+    protected_region:
+      start: 0
+      end: 8
+    pre_nick_duplex_window:
+      start: 0
+      end: 8
+catalog:
+  preset: neb_nicking_v1
+  additional_presets:
+  - thermo_nicking_v1
+  additional_paths: []
+orientation_policy:
+  normalize_to_top_strand_nick: true
+search:
+  min_paired_bp: 3
+  max_added_nt: 5
+  max_mismatches: 0
+  max_enumerated_candidates: 4096
+  max_search_nodes: 4096
+  max_hits: 8
+  materialize_top_k: 3
+constraints: {}
+sequence_quality:
+  gc_fraction:
+    min: 0.0
+    max: 0.75
+  max_homopolymer_run: 3
+output:
+  run_dir: outputs/solve
+  emit_visual_contracts: true
+  emit_baserender_jobs: true
+  render_format: png

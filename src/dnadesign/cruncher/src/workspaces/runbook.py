@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import subprocess
@@ -177,13 +178,19 @@ def _normalize_runbook_locale_env(env: dict[str, str]) -> None:
         env.setdefault("PYTHONUTF8", "1")
 
 
+def _runbook_runtime_home(workspace_root: Path) -> Path:
+    resolved = workspace_root.expanduser().resolve()
+    digest = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()[:10]
+    return Path(tempfile.gettempdir()) / "dnadesign" / "cruncher" / "runbooks" / f"{resolved.name}-{digest}" / "home"
+
+
 def _runbook_subprocess_env(*, workspace_root: Path) -> dict[str, str]:
     env = dict(os.environ)
     _normalize_runbook_locale_env(env)
     home_raw = str(env.get("HOME", "")).strip()
     home_path = Path(home_raw).expanduser() if home_raw else Path.home()
     if not _is_writable_directory(home_path):
-        runtime_home = (workspace_root / ".cruncher" / ".runtime_home").resolve()
+        runtime_home = _runbook_runtime_home(workspace_root)
         runtime_home.mkdir(parents=True, exist_ok=True)
         env["HOME"] = str(runtime_home)
     ensure_workspace_mpl_cache(workspace_root, environ=env)

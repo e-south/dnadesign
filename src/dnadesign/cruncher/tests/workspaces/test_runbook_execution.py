@@ -111,6 +111,25 @@ def test_runbook_accepts_yiu_cli_surface() -> None:
     assert runbook.steps[0].run[0] == "yiu"
 
 
+def test_runbook_accepts_snapback_cli_surface() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo",
+            "steps": [
+                {
+                    "id": "snapback_solve",
+                    "run": ["snapback", "solve", "--spec", "configs/snapback/example.snapback.solve.yaml"],
+                }
+            ],
+        }
+    }
+
+    runbook = load_workspace_runbook(Path("runbook.yaml"), raw=payload)
+
+    assert runbook.steps[0].run[0] == "snapback"
+
+
 def test_runbook_executes_selected_steps_in_runbook_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace = tmp_path / "workspace"
     runbook_path = _write_runbook(
@@ -273,9 +292,10 @@ def test_runbook_sets_writable_home_for_child_processes_when_home_is_not_writabl
     assert len(call_kwargs) == 1
     env = call_kwargs[0].get("env")
     assert isinstance(env, dict)
-    expected_home = (workspace / ".cruncher" / ".runtime_home").resolve()
+    expected_home = runbook_module._runbook_runtime_home(workspace).resolve()
     assert Path(str(env["HOME"])).resolve() == expected_home
     assert expected_home.is_dir()
+    assert workspace not in expected_home.parents
 
 
 def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
@@ -308,9 +328,10 @@ def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
     assert len(call_kwargs) == 1
     env = call_kwargs[0].get("env")
     assert isinstance(env, dict)
-    expected_cache = (workspace / ".cruncher" / ".runtime_mplconfig").resolve()
+    expected_cache = runbook_module.ensure_workspace_mpl_cache(workspace).resolve()
     assert Path(str(env["MPLCONFIGDIR"])).resolve() == expected_cache
     assert expected_cache.is_dir()
+    assert workspace not in expected_cache.parents
 
 
 def test_runbook_normalizes_c_utf8_locale_for_child_processes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
