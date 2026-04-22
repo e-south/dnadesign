@@ -16,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
@@ -533,6 +534,75 @@ def test_notebook_smoke_uses_live_default_deliverable_status(tmp_path: Path, mon
     assert "plot freshness requires attention" in "".join(smoke_payload["warnings"])
 
 
+def test_notebook_smoke_errors_when_ordered_plot_live_inputs_fail(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            },
+            {
+                "id": "anchor_02",
+                "subject_id": "subject_02",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 1.0],
+            },
+            {
+                "id": "anchor_03",
+                "subject_id": "subject_03",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [10.0, 0.0],
+            },
+            {
+                "id": "anchor_04",
+                "subject_id": "subject_04",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [10.0, 1.0],
+            },
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "atlas_review_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    def _broken_plot_review_frames(plot_spec, *, joinable_tables, output_root):
+        del plot_spec, joinable_tables, output_root
+        frame = pd.DataFrame()
+        frame.attrs["load_error"] = "projection artifact is not fresh for `umap_z20_60`: status=attention"
+        return [frame]
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.notebook_service.load_plot_review_frames",
+        _broken_plot_review_frames,
+    )
+
+    smoke_result = _RUNNER.invoke(
+        app,
+        ["notebook", "smoke", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert smoke_result.exit_code == 18, smoke_result.stdout
+    smoke_payload = json.loads(smoke_result.stdout)
+    assert smoke_payload["status"] == "error"
+    assert smoke_payload["checks"]["ordered_plot_live_inputs_ready"] is False
+    assert "ordered plot `atlas_demo_plot` live inputs failed" in "".join(smoke_payload["warnings"])
+
+
 def test_notebook_generate_records_smoke_failures_in_manifest_status(
     tmp_path: Path,
     monkeypatch,
@@ -568,6 +638,7 @@ def test_notebook_generate_records_smoke_failures_in_manifest_status(
                 "plot_catalog_loads": True,
                 "default_deliverable_ready": True,
                 "static_links_resolve": True,
+                "ordered_plot_live_inputs_ready": True,
             },
             "warnings": ["imports_resolve failed: broken import"],
         }
@@ -637,6 +708,7 @@ def test_notebook_generate_overwrites_stale_health_when_smoke_refresh_raises(
                     "plot_catalog_loads": True,
                     "default_deliverable_ready": True,
                     "static_links_resolve": True,
+                    "ordered_plot_live_inputs_ready": True,
                 },
                 "warnings": [],
             }

@@ -90,6 +90,7 @@ def load_artifact_manifest(
     artifact_kind: str,
     artifact_id: str,
     allow_missing_status: bool = False,
+    allowed_statuses: set[str] | None = None,
 ) -> dict[str, object]:
     manifest_path = artifact_dir / "manifest.json"
     if not manifest_path.is_file():
@@ -110,7 +111,8 @@ def load_artifact_manifest(
     if manifest_artifact_id != artifact_id:
         raise ValueError(f"{artifact_kind} manifest is stale for `{artifact_id}`: artifact_id=`{manifest_artifact_id}`")
     status = str(manifest.get("status") or "").strip().lower()
-    if bool(manifest.get("stale")) or (status and status != "ok"):
+    valid_statuses = {str(item).strip().lower() for item in (allowed_statuses or {"ok"}) if str(item).strip()}
+    if bool(manifest.get("stale")) or (status and status not in valid_statuses):
         stale_reason = "stale" if bool(manifest.get("stale")) else f"status={status}"
         raise ValueError(f"{artifact_kind} artifact is not fresh for `{artifact_id}`: {stale_reason}")
     if not status and not allow_missing_status:
@@ -127,20 +129,47 @@ def _table_artifact_metadata(path: Path) -> tuple[Path, str, str] | None:
     return artifact_dir, artifact_kind, artifact_dir.name
 
 
-def load_table(path: Path, *, require_fresh_manifest: bool = False) -> pd.DataFrame:
+def _manifest_attention_warning(manifest: dict[str, object], *, artifact_kind: str, artifact_id: str) -> str | None:
+    status = str(manifest.get("status") or "").strip().lower()
+    if status != "attention":
+        return None
+    warnings = [str(item).strip() for item in manifest.get("warnings", []) if str(item).strip()]
+    if warnings:
+        return f"{artifact_kind} `{artifact_id}` is rendered from an attention-state artifact: {warnings[0]}"
+    return f"{artifact_kind} `{artifact_id}` is rendered from an attention-state artifact."
+
+
+def load_table(
+    path: Path,
+    *,
+    require_fresh_manifest: bool = False,
+    allowed_statuses: set[str] | None = None,
+) -> pd.DataFrame:
     if not path.is_file():
         return pd.DataFrame()
+    manifest: dict[str, object] | None = None
+    artifact_kind = ""
+    artifact_id = ""
     if require_fresh_manifest:
         metadata = _table_artifact_metadata(path)
         if metadata is not None:
             artifact_dir, artifact_kind, artifact_id = metadata
-            load_artifact_manifest(
+            manifest = load_artifact_manifest(
                 artifact_dir,
                 artifact_kind=artifact_kind,
                 artifact_id=artifact_id,
                 allow_missing_status=artifact_kind != "view",
+                allowed_statuses=allowed_statuses,
             )
-    return pd.read_parquet(path)
+    frame = pd.read_parquet(path)
+    if manifest is not None:
+        status = str(manifest.get("status") or "").strip().lower()
+        if status and status != "ok":
+            frame.attrs["artifact_status"] = status
+            warning = _manifest_attention_warning(manifest, artifact_kind=artifact_kind, artifact_id=artifact_id)
+            if warning:
+                frame.attrs["artifact_warning"] = warning
+    return frame
 
 
 def read_text(path_text: str | None) -> str | None:

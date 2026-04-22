@@ -14,7 +14,9 @@ from ..contracts.notebook import WorkspaceNotebookConfig, WorkspaceNotebookContr
 from ..contracts.result import CommandResult
 from ..io.json_io import read_json, write_json
 from ..io.manifest_io import write_manifest
+from ..notebooks.browser_runtime_plot_review import load_plot_review_frames
 from ..notebooks.scaffold import render_workspace_notebook
+from ..plots.recipes import resolve_plot_spec
 from ..runs.recorder import record_audit
 from ..sources.provenance import source_provenance_digest
 from ..version import __version__
@@ -138,6 +140,70 @@ def _load_catalog_payload(context) -> dict[str, object]:
     return workspace_catalog_from_context(context)
 
 
+def _resolve_notebook_plot_spec(context, *, plot_id: str):
+    return resolve_plot_spec(
+        plots=context.config.plots,
+        plot_id=plot_id,
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        scalar_ids=[],
+        agreement_id=None,
+        agreement_ids=[],
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        shape_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
+
+
+def _frame_load_error(frame) -> str:
+    if not isinstance(getattr(frame, "attrs", None), dict):
+        return ""
+    return str(frame.attrs.get("load_error") or "").strip()
+
+
+def _ordered_plot_live_inputs_readiness(
+    context,
+    *,
+    notebook: WorkspaceNotebookConfig,
+    controls: WorkspaceNotebookControls,
+) -> tuple[bool, list[str]]:
+    ordered_plot_ids = _notebook_plot_ids(context, notebook)
+    if not ordered_plot_ids:
+        return True, []
+    joinable_tables = [row.model_dump(mode="json") for row in controls.geometry_controls.joinable_tables]
+    warnings: list[str] = []
+    ready = True
+    for plot_id in ordered_plot_ids:
+        try:
+            plot_spec = _resolve_notebook_plot_spec(context, plot_id=plot_id).model_dump(mode="json")
+            frames = load_plot_review_frames(
+                plot_spec,
+                joinable_tables=joinable_tables,
+                output_root=context.output_root,
+            )
+        except Exception as exc:
+            ready = False
+            warnings.append(f"ordered plot `{plot_id}` live inputs failed: {exc}")
+            continue
+        frame_errors = list(dict.fromkeys(_frame_load_error(frame) for frame in frames if _frame_load_error(frame)))
+        if frame_errors:
+            ready = False
+            warnings.append(f"ordered plot `{plot_id}` live inputs failed: " + "; ".join(frame_errors))
+    return ready, warnings
+
+
 def _notebook_smoke_status(payload: dict[str, object]) -> str:
     checks = payload.get("checks")
     if not isinstance(checks, dict):
@@ -150,7 +216,7 @@ def _notebook_smoke_status(payload: dict[str, object]) -> str:
     )
     if any(not bool(checks.get(name)) for name in blocking_checks):
         return "error"
-    degraded_checks = ("default_deliverable_ready", "static_links_resolve")
+    degraded_checks = ("default_deliverable_ready", "static_links_resolve", "ordered_plot_live_inputs_ready")
     if any(not bool(checks.get(name)) for name in degraded_checks):
         return "attention"
     return "ok"
@@ -254,6 +320,7 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
                 "plot_catalog_loads": False,
                 "default_deliverable_ready": default_deliverable_status == "ok",
                 "static_links_resolve": False,
+                "ordered_plot_live_inputs_ready": False,
             },
             warnings=[error_warning],
         )
@@ -348,8 +415,10 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
         "plot_catalog_loads": False,
         "default_deliverable_ready": False,
         "static_links_resolve": False,
+        "ordered_plot_live_inputs_ready": False,
     }
     warnings: list[str] = []
+    controls: WorkspaceNotebookControls | None = None
 
     if checks["notebook_exists"]:
         try:
@@ -379,6 +448,14 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
         warnings.append("default_deliverable_ready failed: " + " | ".join(default_deliverable_reasons))
     output_paths = _notebook_plot_output_paths(context, notebook)
     checks["static_links_resolve"] = bool(output_paths) and all(path.is_file() for path in output_paths)
+    if controls is not None:
+        ordered_plot_inputs_ready, ordered_plot_warnings = _ordered_plot_live_inputs_readiness(
+            context,
+            notebook=notebook,
+            controls=controls,
+        )
+        checks["ordered_plot_live_inputs_ready"] = ordered_plot_inputs_ready
+        warnings.extend(ordered_plot_warnings)
 
     status = "ok" if all(checks.values()) else "error"
     return _write_notebook_health(

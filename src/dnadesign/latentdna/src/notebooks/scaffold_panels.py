@@ -381,7 +381,6 @@ def render_geometry_frames_cell() -> str:
         @app.cell
         def _(panel_specs, runtime):
             _geometry = runtime.geometry
-            _identity = runtime.identity
             _renderers = runtime.renderers
             _support = runtime.support
 
@@ -393,18 +392,13 @@ def render_geometry_frames_cell() -> str:
                     projection_frames.append(_support.pd.DataFrame())
                     continue
                 try:
-                    frame = _support.load_table(
-                        _identity.output_root / "projections" / _projection_id / "coords.parquet",
-                        require_fresh_manifest=True,
+                    frame = _renderers.load_projection_frame(
+                        _view_id or None,
+                        _projection_id,
+                        _geometry.joinable_tables,
+                        required_columns=_geometry.preferred_hues,
+                        strict_required_columns=False,
                     )
-                    if not frame.empty:
-                        frame = _renderers.enrich_projection_frame(
-                            frame,
-                            _geometry.joinable_tables,
-                            view_id=_view_id or None,
-                            required_columns=_geometry.preferred_hues,
-                            strict_required_columns=False,
-                        )
                 except ValueError as exc:
                     frame = _support.pd.DataFrame()
                     frame.attrs["load_error"] = str(exc)

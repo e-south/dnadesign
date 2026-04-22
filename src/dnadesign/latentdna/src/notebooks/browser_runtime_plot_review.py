@@ -90,6 +90,7 @@ def _projection_view_id(output_root: Path, projection_id: str) -> str | None:
             artifact_kind="projection",
             artifact_id=projection_id,
             allow_missing_status=True,
+            allowed_statuses={"ok", "attention"},
         )
     except ValueError:
         return None

@@ -26,7 +26,7 @@ from .browser_runtime_compare import (
     render_rowwise_distribution,
 )
 from .browser_runtime_plot_review import load_plot_review_frames, render_plot_review_surface
-from .browser_runtime_projection import enrich_projection_frame, render_projection_grid
+from .browser_runtime_projection import enrich_projection_frame, load_projection_frame, render_projection_grid
 from .browser_runtime_support import (
     available_hues_for_frames,
     candidate_hue_columns,
@@ -134,7 +134,7 @@ class BrowserSupport:
     key_value_table: Callable[..., object]
     labeled_options: Callable[..., dict[str, object]]
     load_json: Callable[[Path], dict[str, object]]
-    load_table: Callable[[Path], pd.DataFrame]
+    load_table: Callable[..., pd.DataFrame]
     mo: ModuleType
     notebook_theme: Callable[[], object]
     option_key_for_value: Callable[[dict[str, object], object], str | None]
@@ -151,6 +151,7 @@ class BrowserSupport:
 class BrowserRenderers:
     compare_pair_payload: Callable[..., dict[str, object]]
     enrich_projection_frame: Callable[[pd.DataFrame, list[dict[str, object]]], pd.DataFrame]
+    load_projection_frame: Callable[..., pd.DataFrame]
     load_plot_review_frames: Callable[..., list[pd.DataFrame]]
     render_distance_correlation: Callable[..., object]
     render_plot_asset: Callable[[Path], object]
@@ -616,6 +617,7 @@ def build_workspace_browser_runtime(
     )
 
     enrich_projection_frame_for_output = partial(enrich_projection_frame, output_root=output_root)
+    load_projection_frame_for_output = partial(load_projection_frame, output_root=output_root)
     render_plot_asset_for_workspace = partial(render_plot_asset, workspace_dir=workspace_dir)
     load_plot_review_frames_for_workspace = partial(
         load_plot_review_frames,
@@ -711,6 +713,7 @@ def build_workspace_browser_runtime(
         renderers=BrowserRenderers(
             compare_pair_payload=compare_pair_payload_for_output,
             enrich_projection_frame=enrich_projection_frame_for_output,
+            load_projection_frame=load_projection_frame_for_output,
             load_plot_review_frames=load_plot_review_frames_for_workspace,
             render_distance_correlation=render_distance_correlation,
             render_plot_asset=render_plot_asset_for_workspace,

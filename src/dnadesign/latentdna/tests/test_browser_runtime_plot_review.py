@@ -390,6 +390,68 @@ def test_load_plot_review_frames_rejects_scalar_manifest_without_identity_fields
     assert "artifact_id=missing" in str(frames[0].attrs.get("load_error"))
 
 
+def test_load_plot_review_frames_allows_attention_projection_manifest_and_recovers_view_id(tmp_path: Path) -> None:
+    view_dir = tmp_path / "views" / "intermediate_embedding_7b_anchor_plus_full_context_concat"
+    view_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "id": ["row0", "row1"],
+            "design_family": ["ethanol", "cipro"],
+        }
+    ).to_parquet(view_dir / "rows.parquet", index=False)
+    (view_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "view",
+                "artifact_id": "intermediate_embedding_7b_anchor_plus_full_context_concat",
+                "status": "ok",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    projection_dir = tmp_path / "projections" / "umap_intermediate_embedding_7b_anchor_plus_full_context_concat"
+    projection_dir.mkdir(parents=True)
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        projection_dir / "coords.parquet",
+        index=False,
+    )
+    (projection_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "projection",
+                "artifact_id": "umap_intermediate_embedding_7b_anchor_plus_full_context_concat",
+                "status": "attention",
+                "inputs": [
+                    {
+                        "kind": "view_matrix",
+                        "id": "intermediate_embedding_7b_anchor_plus_full_context_concat",
+                    }
+                ],
+                "warnings": ["projection fit estimated peak 8.45 GiB exceeds warn threshold"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    frames = plot_review_runtime.load_plot_review_frames(
+        {
+            "plot_id": "appendix_umap_gallery",
+            "kind": "projection_grid",
+            "projection_ids": ["umap_intermediate_embedding_7b_anchor_plus_full_context_concat"],
+            "hue_options": [{"column": "design_family"}],
+        },
+        joinable_tables=[],
+        output_root=tmp_path,
+    )
+
+    assert len(frames) == 1
+    assert not frames[0].empty
+    assert frames[0]["design_family"].tolist() == ["ethanol", "cipro"]
+    assert frames[0].attrs["artifact_status"] == "attention"
+    assert "attention-state artifact" in str(frames[0].attrs["artifact_warning"])
+
+
 def test_render_plot_review_surface_allows_projection_grids_with_partial_panel_errors(
     monkeypatch, tmp_path: Path
 ) -> None:

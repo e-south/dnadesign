@@ -53,6 +53,12 @@ def _frame_load_error(frame: pd.DataFrame) -> str:
     return str(frame.attrs.get("load_error") or "").strip()
 
 
+def _frame_artifact_warning(frame: pd.DataFrame) -> str:
+    if not isinstance(getattr(frame, "attrs", None), dict):
+        return ""
+    return str(frame.attrs.get("artifact_warning") or "").strip()
+
+
 def _render_projection_placeholder(
     ax,
     *,
@@ -78,6 +84,26 @@ def _render_projection_placeholder(
             color="#5C6874",
             transform=ax.transAxes,
         )
+
+
+def _render_projection_attention_badge(ax) -> None:
+    ax.text(
+        0.98,
+        0.98,
+        "Attention",
+        ha="right",
+        va="top",
+        fontsize=7.8,
+        color="#8C5A00",
+        transform=ax.transAxes,
+        bbox={
+            "boxstyle": "round,pad=0.22",
+            "facecolor": "#FFF1D6",
+            "edgecolor": "#D9A441",
+            "linewidth": 0.8,
+            "alpha": 0.96,
+        },
+    )
 
 
 def _assert_unique_join_key(table: pd.DataFrame, join_key: str, *, artifact_id: str) -> None:
@@ -334,13 +360,19 @@ def load_projection_frame(
     strict_required_columns: bool = True,
 ) -> pd.DataFrame:
     try:
-        frame = load_table(output_root / "projections" / projection_id / "coords.parquet", require_fresh_manifest=True)
+        frame = load_table(
+            output_root / "projections" / projection_id / "coords.parquet",
+            require_fresh_manifest=True,
+            allowed_statuses={"ok", "attention"},
+        )
     except ValueError as exc:
         return _error_frame(str(exc))
     if frame.empty:
         return frame
+    artifact_warning = _frame_artifact_warning(frame)
+    artifact_status = str(frame.attrs.get("artifact_status") or "").strip()
     try:
-        return enrich_projection_frame(
+        enriched = enrich_projection_frame(
             frame,
             joinable_tables,
             output_root=output_root,
@@ -348,6 +380,11 @@ def load_projection_frame(
             required_columns=required_columns,
             strict_required_columns=strict_required_columns,
         )
+        if artifact_warning:
+            enriched.attrs["artifact_warning"] = artifact_warning
+        if artifact_status:
+            enriched.attrs["artifact_status"] = artifact_status
+        return enriched
     except ValueError as exc:
         return _error_frame(str(exc))
 
@@ -498,6 +535,7 @@ def render_projection_grid(
         )
         max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
         load_error = _frame_load_error(frame)
+        artifact_warning = _frame_artifact_warning(frame)
         if load_error:
             _render_projection_placeholder(
                 ax,
@@ -558,6 +596,8 @@ def render_projection_grid(
                 )
 
         ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
+        if artifact_warning:
+            _render_projection_attention_badge(ax)
         ax.set_xlabel("Projection 1")
         ax.set_ylabel("Projection 2")
         ax.margins(x=0.06, y=0.06)

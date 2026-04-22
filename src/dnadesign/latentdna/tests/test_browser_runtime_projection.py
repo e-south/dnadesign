@@ -325,6 +325,139 @@ def test_render_projection_grid_preserves_healthy_panels_when_some_preloaded_fra
         plt.close(fig)
 
 
+def test_load_projection_frame_allows_attention_manifest_and_preserves_warning_attrs(tmp_path: Path) -> None:
+    output_root = tmp_path
+    _write_view_rows(
+        output_root,
+        "view_a",
+        pd.DataFrame(
+            {
+                "id": ["row0", "row1"],
+                "design_family": ["ethanol", "cipro"],
+            }
+        ),
+    )
+    projection_dir = output_root / "projections" / "proj_attention"
+    _write_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id="proj_attention",
+        status="attention",
+        inputs=[{"kind": "view_matrix", "id": "view_a"}],
+    )
+    (projection_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "projection",
+                "artifact_id": "proj_attention",
+                "status": "attention",
+                "inputs": [{"kind": "view_matrix", "id": "view_a"}],
+                "warnings": ["projection fit estimated peak 8.45 GiB exceeds warn threshold"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        projection_dir / "coords.parquet",
+        index=False,
+    )
+
+    frame = projection_runtime.load_projection_frame(
+        "view_a",
+        "proj_attention",
+        [],
+        output_root=output_root,
+        required_columns=["design_family"],
+    )
+
+    assert not frame.empty
+    assert frame["design_family"].tolist() == ["ethanol", "cipro"]
+    assert frame.attrs["artifact_status"] == "attention"
+    assert "attention-state artifact" in str(frame.attrs["artifact_warning"])
+
+
+def test_load_projection_frame_does_not_badge_warning_only_ok_manifest(tmp_path: Path) -> None:
+    output_root = tmp_path
+    _write_view_rows(
+        output_root,
+        "view_a",
+        pd.DataFrame(
+            {
+                "id": ["row0", "row1"],
+                "design_family": ["ethanol", "cipro"],
+            }
+        ),
+    )
+    projection_dir = output_root / "projections" / "proj_ok_warning"
+    _write_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id="proj_ok_warning",
+        status="ok",
+        inputs=[{"kind": "view_matrix", "id": "view_a"}],
+    )
+    (projection_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "projection",
+                "artifact_id": "proj_ok_warning",
+                "status": "ok",
+                "inputs": [{"kind": "view_matrix", "id": "view_a"}],
+                "warnings": ["projection fit estimated peak 8.45 GiB exceeds warn threshold"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        projection_dir / "coords.parquet",
+        index=False,
+    )
+
+    frame = projection_runtime.load_projection_frame(
+        "view_a",
+        "proj_ok_warning",
+        [],
+        output_root=output_root,
+        required_columns=["design_family"],
+    )
+
+    assert not frame.empty
+    assert frame["design_family"].tolist() == ["ethanol", "cipro"]
+    assert "artifact_status" not in frame.attrs
+    assert "artifact_warning" not in frame.attrs
+
+
+def test_render_projection_grid_marks_attention_artifacts_without_hiding_panel(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0],
+            "y": [1.0, 0.0],
+            "design_family": ["ethanol", "cipro"],
+        }
+    )
+    frame.attrs["artifact_warning"] = "projection `proj_attention` is rendered from an attention-state artifact."
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_attention", "title": "Attention panel"}],
+        frames=[frame],
+        hue_column="design_family",
+        hue_kinds={"design_family": "categorical"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        axis_text = " ".join(text.get_text() for text in fig.axes[0].texts)
+        assert "Attention" in axis_text
+        assert len(fig.axes[0].collections) == 2
+    finally:
+        plt.close(fig)
+
+
 def test_render_projection_grid_places_continuous_colorbar_below_panels_and_uses_margin_palette(
     monkeypatch, tmp_path: Path
 ) -> None:
