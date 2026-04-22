@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-04-17
+**Last verified:** 2026-04-22
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
@@ -69,7 +69,9 @@ This page keeps the downstream handoff map in one place.
 - Appendix deliverables:
   - `appendix_geometry_audit`
   - `appendix_umap_gallery`
-- Snapshot attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Snapshot attention surfaces: none
+- Snapshot ok primary surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Snapshot ok appendix surfaces: `appendix_geometry_audit`, `appendix_umap_gallery`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
 - Browser default geometries: the real seven-view 7B-first surface across `intermediate_embedding` and `pooled_logits`; 20B views stay materializable in the workspace but are hidden from the study browser

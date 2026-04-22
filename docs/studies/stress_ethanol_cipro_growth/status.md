@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-17
+- Last verified: 2026-04-22
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -23,7 +23,8 @@
 - The study phase is `infer_batch_preparation`
 - LatentDNA browser default family: `evo2_7b` for the seven-view scientist-facing review surface; 20B views remain materializable but hidden in the browser
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
-- Current attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Current attention surfaces: none
+- Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
 - Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
 - Appendix and debug surfaces remain secondary audit material
 
@@ -45,6 +46,8 @@
 - Cluster: `planned`
 - OPAL: `not_configured`
 - Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
+- Current appendix attention: none
+- Current appendix ok: `appendix_geometry_audit`, `appendix_umap_gallery`
 - The active comparison is `anchor_60bp` versus `full_context_1kb`
 
 ### Next actions
