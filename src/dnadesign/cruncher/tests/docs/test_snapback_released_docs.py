@@ -55,12 +55,14 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
     assert "cruncher snapback released-target-search" in cli_ref
     assert "cruncher snapback released-show" in cli_ref
     assert "type_iis_release_v1" in cli_ref
+    assert "requires at least one explicit nickase source and one explicit release-enzyme source" in cli_ref
 
     assert "two-stage precursor" in guide
     assert "nick_then_release" in guide
     assert "retained post-release product" in guide
     assert "Type IIS enzymes are modeled here as release enzymes, not nickases." in guide
     assert "not a thermodynamic predictor and not a retron biology engine" in guide
+    assert "Provide at least one explicit nickase source and one explicit release-enzyme source." in guide
 
     assert "outputs/released_design/" in artifacts_ref
     assert "released_snapback_manifest.json" in artifacts_ref

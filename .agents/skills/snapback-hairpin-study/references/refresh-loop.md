@@ -12,8 +12,9 @@ smallest surface that answers the question.
 4. Escalate to
    `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
    only for blockers or next-run readiness.
-5. Open `routes.md` or `pipeline.yaml` only after the record or blocker answer
-   is settled.
+5. Open `routes.md` after the record or blocker answer is settled.
+6. Open `pipeline.yaml` only when machine-readable command-group or native-agent
+   bootstrap context is still needed.
 
 ## Minimum evidence by question
 
@@ -21,7 +22,7 @@ smallest surface that answers the question.
 | --- | --- | --- | --- |
 | Where is the shortening effort now? | `cruncher.data-plane.cruncher-study-status` | study id, current phase, primary lane, command groups, next route | required record files or the pinned study directory are missing |
 | What blocks the next step here? | `cruncher.data-plane.cruncher-study-preflight --scope next` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `ops.study.yaml` or declared execution surfaces are missing |
-| Which command group should I run next? | `routes.md` plus `pipeline.yaml` | route purpose, workspace, first read-only command, mutating follow-up | the study omits the route map or pipeline context |
+| Which command group should I run next? | `routes.md` | route purpose, workspace, first read-only command, mutating follow-up | the study omits the route map |
 | Does this task need harness or contract work? | study skill plus paired companion skill | explicit route to `harness-engineering` or `pragmatic-programming-principles` | the task starts changing study-owned contracts without an explicit pair-with decision |
 
 ## Pair-with rules

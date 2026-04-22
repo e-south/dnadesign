@@ -649,7 +649,7 @@ Notes:
 
 #### `cruncher snapback target-search`
 
-Search the resolved nickase catalog for the shortest preserved-site hit at an exact snapback geometry without assuming an authored canonical top strand.
+Search the resolved nickase catalog for the shortest preserved-site hit at an exact snapback geometry without assuming an authored top strand.
 
 Examples:
 
@@ -699,9 +699,9 @@ Search paired nickase plus release-enzyme combinations for an exact retained-pro
 
 Examples:
 
-* `uv run cruncher snapback released-target-search --json`
-* `uv run cruncher snapback released-target-search --nick-boundary 0 --paired-bp 3 --cap-nt 3`
-* `uv run cruncher snapback released-target-search --release-preset type_iis_release_v1 --json`
+* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/demo_snapback --nick-additional-path inputs/nickases/local.nickases.yaml --release-additional-path inputs/release_enzymes/local.release.yaml --json`
+* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/demo_snapback --nick-additional-path inputs/nickases/local.nickases.yaml --release-additional-path inputs/release_enzymes/local.release.yaml --nick-boundary 0 --paired-bp 3 --cap-nt 3`
+* `uv run cruncher snapback released-target-search --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --json`
 
 Outputs:
 
@@ -713,7 +713,7 @@ Notes:
 
 * this mode is target-first and separate from preserved-site `target-search`
 * final geometry is evaluated in retained-product space after the projected release event
-* when no sources are provided, the command defaults to `neb_nicking_v1` plus `thermo_nicking_v1` for nickases and `type_iis_release_v1` for release enzymes
+* the command requires at least one explicit nickase source and one explicit release-enzyme source
 
 #### `cruncher snapback released-show`
 

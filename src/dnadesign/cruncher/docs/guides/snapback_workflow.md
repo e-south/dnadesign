@@ -24,7 +24,7 @@
 
 `snapback` is a narrow Cruncher lane for one question:
 
-> given one canonical top strand and an allowed nickase catalog, can Cruncher validate one single-nick foldback design or search a bounded space of single-nick foldback candidates under an explicit geometry contract?
+> given one authored top strand and an allowed nickase catalog, can Cruncher validate one single-nick foldback design or search a bounded space of single-nick foldback candidates under an explicit geometry contract?
 
 It is separate from `sample`, `cassette`, and `yiu`.
 
@@ -32,7 +32,7 @@ Use `snapback` when you need:
 
 - deterministic validation of one authored single-nick foldback design
 - bounded search over nick boundary, retained homology length, cap extension, motif-compatible site edits, and foldback-arm choices
-- target-first catalog search for an exact preserved-site geometry with the shortest feasible canonical top strand
+- target-first catalog search for an exact preserved-site geometry with the shortest feasible authored top strand
 - explicit reports, stable tables, and a three-state QA triptych for the accepted design or top-ranked hits
 - released-product evaluation of a retained post-release object without forcing the nickase site itself into the final 6 nt budget
 
@@ -65,16 +65,16 @@ For the two-stage precursor sibling lane, use [`snapback_released_workflow.md`](
 
 - **explicit design**: one authored `single_nick_snapback_v2` spec at `configs/snapback/<name>.snapback.yaml`
 - **solve spec**: one bounded search spec at `configs/snapback/<name>.snapback.solve.yaml`
-- **canonical top strand**: the authored reference sequence and coordinate frame for the snapback lane
+- **authored top strand**: the reference sequence and coordinate frame for the snapback lane
 - **nick boundary**: the resolved zero-based closed boundary where the intended nick lands
 - **retained homology**: the nick-anchored segment that remains paired to the foldback arm after nicking
-- **source cap sequence**: the sequence already present between the retained homology and the end of the canonical top strand
-- **cap sequence**: the authored cap extension appended after the canonical top strand
+- **source cap sequence**: the sequence already present between the retained homology and the end of the authored top strand
+- **cap sequence**: the authored cap extension appended after the authored top strand
 - **effective cap sequence**: `source_cap_sequence + cap_sequence`; in the live contract this must total exactly `3 nt`
 - **foldback arm**: the appended sequence that pairs against retained homology in the post-nick foldback state
 - **QA triptych**: the three published snapback states: `pre_nick_duplex`, `post_nick_exposed`, and `post_nick_foldback`
 
-The preferred public vocabulary is `canonical_top_strand`, `nick_boundary`, `retained_homology`, `source_cap`, `cap extension`, and `foldback_arm`. Treat older `v1` or historical `solve_v2` names as historical only.
+The preferred public vocabulary is `canonical_top_strand`, `nick_boundary`, `retained_homology`, `source_cap`, `cap extension`, and `foldback_arm`. Treat the code identifier literally and avoid repeating it as prose when authored top strand is clearer. Treat older `v1` or historical `solve_v2` names as historical only.
 
 ### Workspace layout
 
@@ -221,9 +221,9 @@ Use `snapback target-search` when the question is:
 
 Use `snapback solve` when the question is:
 
-- given one authored canonical top strand, what bounded co-design candidates satisfy the live snapback contract?
+- given one authored top strand, what bounded co-design candidates satisfy the live snapback contract?
 
-The two lanes are intentionally different. `target-search` treats canonical top-strand length as a search output. `solve` treats the canonical top strand as authored input.
+The two lanes are intentionally different. `target-search` treats authored top-strand length as a search output. `solve` treats the authored top strand as authored input.
 
 ### Current solve ranking
 

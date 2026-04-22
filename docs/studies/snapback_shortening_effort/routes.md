@@ -19,12 +19,35 @@ This page keeps the study-owned handoff map in one place.
   `harness-engineering` for study-surface hardening and
   `pragmatic-programming-principles` for boundary or contract changes.
 
+### Cold-start contract
+
+- If the request is explicitly about `snapback_shortening_effort`, pin the
+  study with the two `cruncher-study-*` commands above even when
+  `docs/studies/index.yaml` names another repo-wide active study.
+- After study status or preflight answers the state or blocker question, stay
+  on this page for the ordered post-probe handoff.
+- Open `pipeline.yaml` only when the task needs machine-readable command-group
+  or native-agent bootstrap metadata.
+- Open `ops.study.yaml` only when the task needs lifecycle or preflight
+  declarations.
+
 ### Boundary shorthand
 
 - `released-product Snapback` means the dual-enzyme precursor lane where final geometry is evaluated on the retained post-release product.
 - `preserved-site Snapback` means the older one-enzyme lane and stays a separate contract.
 - `YIU` means mismatch-centric payload rendering over a fixed 4 nt internal window; it is not the shortening topology engine here.
 - `retron context` means biological framing from the checked-in audit notes, not scoring hooks or implicit solver relaxations.
+
+### Ordered post-probe handoff
+
+1. Recover state with the pinned snapshot command above, or use the pinned
+   preflight command above when the question is blocker or execution readiness.
+2. Stay on the primary route below for the read-only released-product probe in
+   `demo_snapback` and inspect exact-hit versus bounded near-hit posture.
+3. Materialize the explicit released-product bundle only after the read-only
+   probe is clean, then inspect it with `released-show`.
+4. Use the YIU contrast route below only when the task is boundary auditing or
+   contrast rendering, not when the task is shortening design.
 
 ### Primary route: released-product Snapback
 
@@ -74,8 +97,12 @@ reminder of what YIU does and does not model.
 - Study note:
   `docs/studies/snapback_shortening_effort/status.md`
 - Study command ladder:
-  `docs/studies/snapback_shortening_effort/pipeline.yaml`
+  `docs/studies/snapback_shortening_effort/pipeline.yaml` for machine-readable
+  command groups and native-agent bootstrap support
+- Study lifecycle and preflight contract:
+  `docs/studies/snapback_shortening_effort/ops.study.yaml`
 - Consolidated retron/P4 and YIU executive summary:
   `src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md`
 - Route note:
-  these notes are study context, not executable contracts.
+  `routes.md` is the canonical human handoff; the other notes are study
+  context or machine-readable support, not replacement route maps.

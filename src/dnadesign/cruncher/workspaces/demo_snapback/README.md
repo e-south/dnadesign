@@ -11,7 +11,7 @@ Included files:
 - `inputs/release_enzymes/local.release.yaml`
 - `runbook.md`
 
-Canonical single-command refresh:
+Single-command refresh:
 - `uv run cruncher workspaces run --workspace demo_snapback --runbook configs/runbook.yaml`
 
 Suggested next steps:
@@ -20,7 +20,7 @@ Suggested next steps:
 3. `uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml`
 4. `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml`
 
-Canonical refresh:
+Refresh sequence:
 1. `uv run cruncher snapback design --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml --force-overwrite`
 2. `uv run cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml --force-overwrite`
 3. `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml --force-overwrite`

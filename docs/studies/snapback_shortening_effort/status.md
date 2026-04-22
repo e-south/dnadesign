@@ -48,15 +48,19 @@ bulge or scaffold model.
   separate contracts.
 - Keep retron logic in the study as motivation and review context, not as
   hidden scoring hooks or silent solver relaxations.
-- Keep the route ladder explicit: status first, preflight for blockers, route
-  map and pipeline for the next command surface.
+- Keep the route ladder explicit: status first, preflight for blockers, and
+  `routes.md` as the canonical post-probe handoff. Use `pipeline.yaml` and
+  `ops.study.yaml` only when machine-readable command grouping or preflight
+  declarations are the real need.
 
 ### Evidence ladder
 
 - Study route map:
-  `docs/studies/snapback_shortening_effort/routes.md`
+  `docs/studies/snapback_shortening_effort/routes.md` for the canonical
+  post-probe handoff
 - Study command ladder:
-  `docs/studies/snapback_shortening_effort/pipeline.yaml`
+  `docs/studies/snapback_shortening_effort/pipeline.yaml` for machine-readable
+  command groups and bootstrap support
 - Released-product workflow:
   `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md`
 - YIU workflow:
@@ -66,7 +70,8 @@ bulge or scaffold model.
 
 ### Next actions
 
-1. Run the pinned study preflight and confirm the record, workspace, and read-only probe surfaces still resolve.
-2. Run the released-product target-search probe in `demo_snapback` and inspect exact-hit versus near-hit posture.
-3. Materialize the explicit released-design bundle only after the read-only probe is clean.
-4. Re-run the direct TetR/TetO YIU validate and render path only when the task is contrast or boundary checking, not when the task is shortening design.
+1. Run the pinned study preflight when the real question is blocker or
+   next-run readiness.
+2. Open `docs/studies/snapback_shortening_effort/routes.md` for the ordered
+   post-probe handoff; it owns the released probe, bundle materialization, and
+   contrast-only YIU branch.

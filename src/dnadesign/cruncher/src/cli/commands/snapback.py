@@ -571,7 +571,7 @@ def released_target_search_cmd(
     nick_preset: str | None = typer.Option(
         None,
         "--nick-preset",
-        help="Primary builtin nickase preset. Defaults to neb_nicking_v1 when no nick sources are provided.",
+        help="Primary builtin nickase preset. Explicit nickase sources are required for hermetic runs.",
     ),
     nick_additional_preset: list[str] = typer.Option(
         [],
@@ -586,9 +586,7 @@ def released_target_search_cmd(
     release_preset: str | None = typer.Option(
         None,
         "--release-preset",
-        help=(
-            "Primary builtin release-enzyme preset. Defaults to type_iis_release_v1 when no release source is provided."
-        ),
+        help="Primary builtin release-enzyme preset. Explicit release-enzyme sources are required for hermetic runs.",
     ),
     release_additional_preset: list[str] = typer.Option(
         [],
@@ -612,7 +610,10 @@ def released_target_search_cmd(
     near_boundary_search_limit: int = typer.Option(
         8,
         "--near-boundary-search-limit",
-        help="How many later boundaries to probe per paired placement when the exact target is unavailable.",
+        help=(
+            "How many boundary offsets on either side of the target to probe per pair "
+            "when the exact target is unavailable."
+        ),
     ),
     json_output: bool = typer.Option(False, "--json", help="Print the released target-search report as JSON."),
 ) -> None:
@@ -627,10 +628,15 @@ def released_target_search_cmd(
 
         resolved_workspace_root = workspace_root.expanduser().resolve()
         if nick_preset is None and not nick_additional_preset and not nick_additional_path:
-            nick_preset = "neb_nicking_v1"
-            nick_additional_preset = ["thermo_nicking_v1"]
+            raise ValueError(
+                "released-target-search requires at least one explicit nickase source "
+                "(--nick-preset, --nick-additional-preset, or --nick-additional-path)."
+            )
         if release_preset is None and not release_additional_preset and not release_additional_path:
-            release_preset = "type_iis_release_v1"
+            raise ValueError(
+                "released-target-search requires at least one explicit release-enzyme source "
+                "(--release-preset, --release-additional-preset, or --release-additional-path)."
+            )
         request = SingleNickReleasedTargetSearchRequest(
             target=ReleasedFinalTargetGeometry(
                 nick_boundary_from_left=nick_boundary,

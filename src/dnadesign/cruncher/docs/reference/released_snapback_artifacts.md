@@ -76,7 +76,7 @@ Released-product explicit bundles can report:
 
 - manifest and status contract drift
 - manifest artifact-inventory drift
-- source spec hash drift
+- spec provenance hash drift
 - provenance snapshot hash drift
 - missing required provenance snapshots or analysis payloads
 - report and projection inconsistency

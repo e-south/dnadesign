@@ -162,7 +162,7 @@ Disallowed:
 
 The minimal complete snapback model must be able to evaluate or search designs in this normalized frame:
 
-1. A canonical top strand is defined left to right as the authored reference axis.
+1. An authored top strand is defined left to right as the reference axis.
 2. A duplex-only pre-nick window defines where nickase recognition may occur.
 3. A single intended nick boundary is resolved on that top strand after orientation normalization.
 4. The released top-strand segment to the right of that nick boundary is decomposed into:
@@ -193,14 +193,14 @@ Rule:
 
 - spans and boundaries must never share a type
 
-### Canonical strand and orientation model
+### Authored-strand and orientation model
 
 Define a public orientation policy:
 
 - `canonical_top_strand`
   - the reference top strand, always reported 5' to 3' left to right
 - `normalize_to_top_strand_nick`
-  - when true, solver may flip site orientation but only admits candidates whose resolved intended nick occurs on the canonical top strand
+  - when true, solver may flip site orientation but only admits candidates whose resolved intended nick occurs on the authored top strand
 - `release_direction`
   - fixed to `left_to_right_from_nick` in `v2`
 
@@ -225,7 +225,7 @@ Add:
 - `nick_boundary_window`
   - allowed boundary interval for the intended nick
 - `nick_boundary_from_left`
-  - derived metric on the canonical top strand
+  - derived metric on the authored top strand
 
 For explicit `v2`:
 
@@ -242,9 +242,9 @@ For `v2`, the nick is the single snapback origin. After nicking, the released to
 The explicit active-strand topology is:
 
 - `retained_homology_window`
-  - the canonical-top interval that begins exactly at `nick_boundary`
+  - the authored-top interval that begins exactly at `nick_boundary`
 - derived `source_cap_window`
-  - the canonical-top suffix from `retained_homology_window.end` to `input_sequence.end`
+  - the authored-top suffix from `retained_homology_window.end` to `input_sequence.end`
 - `cap_sequence`
   - any authored cap extension appended after the source-side suffix
 - derived `effective_cap_sequence = source_cap_sequence + cap_sequence`
@@ -512,7 +512,7 @@ Materialized hits must round-trip through `single_nick_snapback_v2`.
 
 ## Geometry And Pairing Rules
 
-### Canonical post-nick model
+### Post-nick model
 
 For `v2`, the modeled post-nick active-strand sequence is:
 
@@ -523,7 +523,7 @@ retained_homology + source_cap_sequence + cap_sequence + foldback_arm
 Where:
 
 - `retained_homology` is taken from the authored top strand and begins at the nick
-- `source_cap_sequence` is the canonical-top suffix after `retained_homology_window.end`
+- `source_cap_sequence` is the authored-top suffix after `retained_homology_window.end`
 - `cap_sequence` is the authored cap extension
 - `foldback_arm` is authored or solver-generated
 
@@ -652,7 +652,7 @@ Optional sibling `baserender_jobs/*.job.yaml` files may reference those evidence
 They must show coordinate truth and topology decomposition only:
 
 - `pre_nick_duplex`
-  - canonical top strand plus complement row in duplex context
+  - authored top strand plus complement row in duplex context
   - one shared `Nick / origin` boundary
   - intended site, protected region, retained homology, source-cap/effective-cap, and foldback-arm spans
 - `post_nick_exposed`

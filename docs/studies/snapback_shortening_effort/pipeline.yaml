@@ -44,7 +44,6 @@ native_agent_bootstrap:
     - repo:.agents/skills/snapback-hairpin-study/SKILL.md
     - manifest:status.md
     - manifest:routes.md
-    - manifest:pipeline.yaml
   pair_with:
     - harness-engineering
     - pragmatic-programming-principles

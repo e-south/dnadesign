@@ -19,6 +19,7 @@ import yaml
 
 from dnadesign.cruncher.app.snapback_released_show import released_show_payload
 from dnadesign.cruncher.app.snapback_released_workflow import run_released_snapback_design
+from dnadesign.cruncher.snapback.released_artifacts import RELEASED_SUMMARY_FIELDNAMES
 
 
 def _write_workspace(tmp_path: Path) -> Path:
@@ -140,13 +141,79 @@ def test_released_design_writes_bundle_and_released_show_revalidates_it(tmp_path
     assert projection_payload["release_top_cut_precursor"] == 9
 
 
-def test_released_show_detects_source_spec_drift(tmp_path: Path) -> None:
+def test_released_show_uses_snapshots_when_source_spec_drifts_or_is_missing(tmp_path: Path) -> None:
     spec_path = _write_workspace(tmp_path)
 
     run_dir, _report = run_released_snapback_design(spec_path)
     spec_path.write_text("# drift\n", encoding="utf-8")
+    payload = released_show_payload(run_dir)
+    assert payload["status"] == "satisfied"
+    spec_path.unlink()
 
-    with pytest.raises(ValueError, match="Released-product source spec drift detected."):
+    payload = released_show_payload(run_dir)
+    assert payload["status"] == "satisfied"
+
+
+def test_released_show_detects_report_run_dir_drift(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    report_path = run_dir / "analysis" / "report.json"
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    report_payload["run_dir"] = "/tmp/drifted"
+    report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Released-product report run_dir drift detected."):
+        released_show_payload(run_dir)
+
+
+def test_released_show_detects_summary_csv_drift(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    summary_path = run_dir / "export" / "released_design_summary.csv"
+    summary_path.write_text(
+        ",".join(RELEASED_SUMMARY_FIELDNAMES) + "\nbad,drifted,Nx.Bad,Re.Bad,99,99,99,99,99,99,99,99\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Released-product summary CSV content drift detected."):
+        released_show_payload(run_dir)
+
+
+def test_released_show_detects_status_issue_count_drift(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    status_path = run_dir / "meta" / "released_snapback_status.json"
+    status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+    status_payload["issue_count"] = 99
+    status_path.write_text(json.dumps(status_payload, indent=2), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Released-product status/report issue_count drift detected."):
+        released_show_payload(run_dir)
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "replacement_text", "expected_message"),
+    [
+        ("meta/released_snapback_manifest.json", "[]\n", "Released-product manifest must be a JSON object."),
+        ("meta/released_snapback_status.json", "[]\n", "Released-product status record must be a JSON object."),
+        ("analysis/report.json", "[]\n", "Released-product report must be a JSON object."),
+    ],
+)
+def test_released_show_rejects_non_object_json(
+    tmp_path: Path,
+    relative_path: str,
+    replacement_text: str,
+    expected_message: str,
+) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    (run_dir / relative_path).write_text(replacement_text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=expected_message):
         released_show_payload(run_dir)
 
 

@@ -11,6 +11,7 @@
 ### Documentation map
 <!-- docs:map:start -->
 #### Optimize Fixed-Length Sequences
+Run the fixed-length optimization lane for pairwise, multitf, and project workspaces.
 - [Pairwise Demo](demos/demo_pairwise.md)
 - [MultiTF Demo](demos/demo_multitf.md)
 - [Project Workspace Demo](demos/project_all_tfs.md)
@@ -21,6 +22,7 @@
 - [Artifacts Reference](reference/artifacts.md)
 
 #### Design and Search Cassettes
+Design or search cassettes, then inspect the emitted artifact surface.
 - [Cassette Workspace Demo](demos/demo_cassette_workspace.md)
 - [Cassette Workflow](guides/cassette_workflow.md)
 - [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
@@ -30,11 +32,13 @@
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
 #### Payload-Centric YIU Workflows
+Run YIU workflows. Reuse Sample outputs in YIU when the payload comes from a selected hit.
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)
+- [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md)
 
 #### Validate and Search Single-Nick Foldbacks
 - [Snapback Workflow](guides/snapback_workflow.md)
@@ -46,6 +50,7 @@
 - [demo_snapback runbook](../workspaces/demo_snapback/runbook.md)
 
 #### Run Studies and Portfolio Aggregation
+Run studies and portfolio aggregation across workspace outputs.
 - [Studies](guides/studies.md)
 - [Study Length vs Score](guides/study_length_vs_score.md)
 - [Study Diversity vs Score](guides/study_diversity_vs_score.md)

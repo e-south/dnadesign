@@ -17,6 +17,9 @@ Family note:
   `usr.data-plane.promoter-study-preflight`.
 - `cruncher` studies use `cruncher.data-plane.cruncher-study-status` and
   `cruncher.data-plane.cruncher-study-preflight`.
+- `docs/studies/index.yaml` is a repo-wide selector, not a family-wide one. If
+  the request names a checked-in study that is not `active_study_id`, keep the
+  selector untouched and pin that study with `--study-dir docs/studies/<study-id>`.
 - If the active checked-in study belongs to another family, pin the desired
   study with `--study-dir docs/studies/<study-id>`.
 - The worked examples below remain promoter-oriented; Cruncher studies lean
@@ -41,6 +44,8 @@ Use these surfaces in order:
   `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
 - Checked-in Cruncher shortening-study preflight:
   `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
+- Checked-in Cruncher shortening-study route handoff:
+  `docs/studies/snapback_shortening_effort/routes.md`
 - Repo-local shortening-study skill:
   `.agents/skills/snapback-hairpin-study/SKILL.md`
 
@@ -50,17 +55,24 @@ Use this sequence when a new thread starts cold or the repo-local skill is not
 visible:
 
 1. Read `docs/studies/index.yaml`.
-2. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`.
-3. Run
+2. If the request names a checked-in study that is not `active_study_id`, pin
+   that study immediately with the family-specific `--study-dir` command and
+   treat the registry as discovery only.
+3. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`
+   only when the question is about the repo-wide active promoter study.
+4. Run
    `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
-   only when the question is blocker or next-run readiness.
-4. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
+   only when the question is blocker or next-run readiness for that same active
+   promoter study.
+5. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
    is answered and the next owner surface is the real need.
 
 For the checked-in Cruncher shortening example, pin the study explicitly:
 
 - `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
 - `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
+- Open `docs/studies/snapback_shortening_effort/routes.md` for the canonical
+  post-probe handoff after the state or blocker answer is settled.
 
 Authority chain: `docs/studies/index.yaml` selects the active study,
 the matching `docs/studies/<study-id>/` directory holds the required
@@ -68,6 +80,9 @@ the matching `docs/studies/<study-id>/` directory holds the required
 also carry optional `routes.md` and `pipeline.yaml` surfaces when the study
 needs explicit cross-tool handoff navigation plus study-owned runtime context
 that should not be reconstructed from generic tool docs.
+For a named non-active study, the pinned `--study-dir` path overrides the
+registry selector for that lookup without changing the repo-wide active-study
+record.
 
 Keep four complementary artifacts for each real study:
 
@@ -232,6 +247,9 @@ for the first pull rather than relying on local name guessing.
 - The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.
 - The repo-local shortening-study skill lives at `.agents/skills/snapback-hairpin-study/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the pinned `cruncher-study-status` and `cruncher-study-preflight` commands above directly.
 - Read `docs/studies/index.yaml` first.
+- If the request names a checked-in study that is not `active_study_id`, pin it
+  with `--study-dir docs/studies/<study-id>` instead of treating the registry
+  selector as a redirect.
 - `active_study_id` must name a study declared under `studies:`.
 - The selected study entry must declare `family` and `record_root`.
 - The selected study directory must contain `campaign.yaml`, `datasets.yaml`,

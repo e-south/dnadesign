@@ -39,7 +39,8 @@ Out of scope:
   or preflight surface
 - released-product Snapback remains the active shortening lane
 - YIU remains a contrast-only boundary surface
-- the next route goes through `routes.md` or `pipeline.yaml`, not hand-built
+- the next route goes through `routes.md`; open `pipeline.yaml` only for
+  machine-readable command-group or bootstrap confirmation, not hand-built
   command guesses
 - harness or contract changes stay explicit and fail fast
 
@@ -48,9 +49,10 @@ Out of scope:
 1. Load the checked-in study surfaces.
 - Read `docs/studies/README.md` and `docs/studies/index.yaml`.
 - Read `docs/studies/snapback_shortening_effort/status.md`.
-- Use `docs/studies/snapback_shortening_effort/routes.md` and
-  `docs/studies/snapback_shortening_effort/pipeline.yaml` for the current
-  command ladder and native-agent bootstrap context.
+- Use `docs/studies/snapback_shortening_effort/routes.md` as the canonical
+  next-command handoff.
+- Open `docs/studies/snapback_shortening_effort/pipeline.yaml` only when the
+  task needs machine-readable command-group or native-agent bootstrap context.
 - Use [study-surfaces.md](references/study-surfaces.md) for ownership
   boundaries.
 
@@ -79,6 +81,8 @@ Out of scope:
 - `YIU` stays mismatch-centric and contrast-only here.
 - the retron/P4 note is framing context, not a hidden scoring hook
 - use the pinned study commands and paths; do not rebuild them from memory
+- do not require `pipeline.yaml` or `ops.study.yaml` to recover the next human
+  step when `routes.md` already answers it
 
 ## Required Deliverables
 

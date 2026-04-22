@@ -382,6 +382,23 @@ def test_snapback_show_fails_fast_when_manifest_and_status_disagree(tmp_path: Pa
     assert "manifest/status status drift" in show_result.output
 
 
+def test_snapback_show_fails_when_explicit_report_run_dir_drifts(tmp_path: Path) -> None:
+    workspace, explicit_path, _solve_path = _write_workspace(tmp_path)
+
+    design_result = runner.invoke(app, ["snapback", "design", "--spec", str(explicit_path)], color=False)
+    assert design_result.exit_code == 0
+    run_dir = workspace / "outputs" / "design"
+    report_path = run_dir / "analysis" / "reports" / "report.json"
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    report_payload["run_dir"] = "/tmp/drifted"
+    report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+
+    show_result = runner.invoke(app, ["snapback", "show", "--run", str(run_dir)], color=False)
+
+    assert show_result.exit_code == 1
+    assert "Snapback report run_dir drift detected." in show_result.output
+
+
 def test_snapback_solve_writes_artifacts_and_show_reads_solve_bundle(tmp_path: Path) -> None:
     workspace, _explicit_path, solve_path = _write_workspace(tmp_path)
 
@@ -415,6 +432,24 @@ def test_snapback_solve_writes_artifacts_and_show_reads_solve_bundle(tmp_path: P
     assert (materialized_dirs[0] / "analysis" / "views" / "post_nick_foldback.snapback_visual.v1.json").exists()
     assert (materialized_dirs[0] / "analysis" / "views" / "snapback_triptych.snapback_visual.v1.jsonl").exists()
     assert (materialized_dirs[0] / "baserender_jobs" / "snapback_triptych.job.yaml").exists()
+
+
+def test_snapback_show_fails_when_solve_report_workspace_root_drifts(tmp_path: Path) -> None:
+    workspace, _explicit_path, solve_path = _write_workspace(tmp_path)
+
+    result = runner.invoke(app, ["snapback", "solve", "--spec", str(solve_path)], color=False)
+
+    assert result.exit_code == 0
+    run_dir = workspace / "outputs" / "solve"
+    solve_report_path = run_dir / "analysis" / "reports" / "solve_report.json"
+    solve_report = json.loads(solve_report_path.read_text(encoding="utf-8"))
+    solve_report["workspace_root"] = "/tmp/drifted"
+    solve_report_path.write_text(json.dumps(solve_report, indent=2), encoding="utf-8")
+
+    show_result = runner.invoke(app, ["snapback", "show", "--run", str(run_dir)], color=False)
+
+    assert show_result.exit_code == 1
+    assert "Snapback solve report workspace_root drift detected." in show_result.output
 
 
 def test_snapback_show_fails_when_materialized_hit_bundle_is_missing(tmp_path: Path) -> None:

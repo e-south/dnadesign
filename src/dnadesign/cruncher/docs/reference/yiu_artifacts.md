@@ -163,10 +163,10 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 - one ligation summary line with profile, whether ligation-aware ranking applied, chosen mismatch classes, position classes, and the decision note
 - selected junction and mismatch plan
 - PWM mode and effective status
-- no machine-facing bundle ledger paths by default
+- human-readable output keeps the machine-facing bundle ledger paths out of the default summary
 
-Default `show --json` keeps the operator bundle surface and omits machine ledger paths, normalized payload detail, `motif_context`, `optimization_decision`, and `split_row_debug` unless `--verbose` is set.
-Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail, machine-facing artifact paths, and split-row debug lines; the optimizer trace and PWM context remain JSON-only.
+Default `show --json` includes the bundle artifact paths, integrity report, `motif_context`, and `optimization_decision`; `split_row_debug` remains `--verbose` only.
+Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail, and split-row debug lines; the optimizer trace and PWM context remain JSON-only.
 
 ### Integrity checks
 

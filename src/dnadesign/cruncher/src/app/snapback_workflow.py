@@ -98,6 +98,16 @@ def _existing_triptych_render(run_dir: Path) -> Path | None:
     return None
 
 
+def _required_existing_manifest_path(payload: dict[str, object], *, field: str, label: str) -> Path:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} drift detected.")
+    resolved = Path(value).expanduser().resolve()
+    if not resolved.exists():
+        raise FileNotFoundError(f"{label} missing: {resolved}")
+    return resolved
+
+
 def _validate_explicit_publication_alignment(run_dir: Path, *, candidate: dict[str, object]) -> None:
     manifest_payload = json.loads(views_manifest_path(run_dir).read_text(encoding="utf-8"))
     solution_id = manifest_payload.get("solution_id")
@@ -248,6 +258,12 @@ def _explicit_show_payload(run_dir: Path) -> dict[str, object]:
     manifest = load_manifest(run_dir)
     status = load_status(run_dir)
     expected_run_dir = str(run_dir)
+    workspace_root = _required_existing_manifest_path(
+        manifest,
+        field="workspace_root",
+        label="Snapback explicit manifest workspace_root",
+    )
+    expected_workspace_root = str(workspace_root)
     if manifest.get("kind") != "explicit":
         raise ValueError("Snapback explicit manifest kind drift detected.")
     if manifest.get("workflow") != "snapback_design":
@@ -296,6 +312,10 @@ def _explicit_show_payload(run_dir: Path) -> dict[str, object]:
             if not candidate.exists():
                 raise FileNotFoundError(f"Declared snapback visual artifact missing: {candidate}")
     report_payload = json.loads(report_json_path(run_dir).read_text(encoding="utf-8"))
+    if report_payload.get("run_dir") != expected_run_dir:
+        raise ValueError("Snapback report run_dir drift detected.")
+    if report_payload.get("workspace_root") != expected_workspace_root:
+        raise ValueError("Snapback report workspace_root drift detected.")
     if views_manifest_path(run_dir).exists():
         candidate = report_payload.get("candidate")
         if not isinstance(candidate, dict):
@@ -401,6 +421,12 @@ def _solve_show_payload(run_dir: Path) -> dict[str, object]:
     manifest = load_solve_manifest(run_dir)
     status = load_solve_status(run_dir)
     expected_run_dir = str(run_dir)
+    workspace_root = _required_existing_manifest_path(
+        manifest,
+        field="workspace_root",
+        label="Snapback solve manifest workspace_root",
+    )
+    expected_workspace_root = str(workspace_root)
     if manifest.get("kind") != "solve":
         raise ValueError("Snapback solve manifest kind drift detected.")
     if manifest.get("workflow") != "snapback_solve":
@@ -435,6 +461,11 @@ def _solve_show_payload(run_dir: Path) -> dict[str, object]:
     for path in required_paths:
         if not path.exists():
             raise FileNotFoundError(f"Required snapback solve artifact missing: {path}")
+    solve_report_payload = json.loads(solve_report_json_path(run_dir).read_text(encoding="utf-8"))
+    if solve_report_payload.get("run_dir") != expected_run_dir:
+        raise ValueError("Snapback solve report run_dir drift detected.")
+    if solve_report_payload.get("workspace_root") != expected_workspace_root:
+        raise ValueError("Snapback solve report workspace_root drift detected.")
     _validate_materialized_hit_bundles(run_dir)
     return {
         "kind": "solve",

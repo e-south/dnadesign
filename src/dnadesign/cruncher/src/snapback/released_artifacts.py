@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 import json
 from datetime import datetime, timezone
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,20 @@ RUN_META_DIR = "meta"
 RUN_PROVENANCE_DIR = "provenance"
 RUN_ANALYSIS_DIR = "analysis"
 RUN_EXPORT_DIR = "export"
+RELEASED_SUMMARY_FIELDNAMES = [
+    "status",
+    "spec_name",
+    "nickase_variant_id",
+    "release_variant_id",
+    "nick_boundary_from_left",
+    "paired_bp",
+    "cap_nt",
+    "retained_input_length_nt",
+    "retained_product_length_nt",
+    "precursor_length_nt",
+    "sacrificial_downstream_tail_nt",
+    "extra_nick_event_count",
+]
 
 
 def released_design_id(*, spec_bytes: bytes, nick_catalog_bytes: bytes, release_catalog_bytes: bytes) -> str:
@@ -193,22 +208,8 @@ def write_released_report(run_dir: Path, report: ReleasedSnapbackEvaluationRepor
 
 
 def write_released_summary_table(run_dir: Path, report: ReleasedSnapbackEvaluationReport) -> None:
-    fieldnames = [
-        "status",
-        "spec_name",
-        "nickase_variant_id",
-        "release_variant_id",
-        "nick_boundary_from_left",
-        "paired_bp",
-        "cap_nt",
-        "retained_input_length_nt",
-        "retained_product_length_nt",
-        "precursor_length_nt",
-        "sacrificial_downstream_tail_nt",
-        "extra_nick_event_count",
-    ]
     with released_summary_csv_path(run_dir).open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=RELEASED_SUMMARY_FIELDNAMES)
         writer.writeheader()
         if (
             report.candidate is None
@@ -236,21 +237,36 @@ def write_released_summary_table(run_dir: Path, report: ReleasedSnapbackEvaluati
         )
 
 
+def _load_json_value(path: Path, *, label: str) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except JSONDecodeError as exc:
+        raise ValueError(f"Released-product {label} JSON is invalid.") from exc
+
+
+def _load_json_mapping(path: Path, *, label: str) -> dict[str, Any]:
+    payload = _load_json_value(path, label=label)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Released-product {label} must be a JSON object.")
+    return payload
+
+
 def load_released_manifest(run_dir: Path) -> dict[str, Any]:
     path = released_manifest_path(run_dir)
     if not path.exists():
         raise FileNotFoundError(f"Released-product snapback manifest missing: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_mapping(path, label="manifest")
 
 
 def load_released_status(run_dir: Path) -> dict[str, Any]:
     path = released_status_path(run_dir)
     if not path.exists():
         raise FileNotFoundError(f"Released-product snapback status missing: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _load_json_mapping(path, label="status record")
 
 
 __all__ = [
+    "RELEASED_SUMMARY_FIELDNAMES",
     "build_released_manifest",
     "build_released_run_dir",
     "ensure_released_run_dirs",

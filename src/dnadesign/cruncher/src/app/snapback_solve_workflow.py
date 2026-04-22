@@ -150,6 +150,7 @@ def _write_materialized_hit_bundle(
     report = SnapbackEvaluationReport(
         status="satisfied",
         spec_name=spec_payload["snapback"]["name"],
+        run_dir=str(hit_run_dir.resolve()),
         workspace_root=str(workspace_root),
         spec_path=str(spec_snapshot_path(hit_run_dir)),
         catalog_source=catalog_source,

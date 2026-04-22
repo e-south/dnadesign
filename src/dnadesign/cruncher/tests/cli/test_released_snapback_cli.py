@@ -178,3 +178,22 @@ def test_released_target_search_json_reports_exact_and_near_hits(tmp_path: Path)
     assert any(
         hit["nickase_variant_id"] == "Nx.Near7" and hit["nick_boundary_from_left"] == 1 for hit in payload["near_hits"]
     )
+
+
+def test_released_target_search_requires_explicit_sources(tmp_path: Path) -> None:
+    workspace, _spec_path, _release_catalog_path = _write_workspace(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "snapback",
+            "released-target-search",
+            "--workspace-root",
+            str(workspace),
+            "--json",
+        ],
+        color=False,
+    )
+
+    assert result.exit_code == 1
+    assert "requires at least one explicit nickase source" in result.output

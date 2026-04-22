@@ -144,7 +144,8 @@ The report surfaces:
 - blocker counts by reason
 - pre-truncation and post-truncation hit counts
 
-When no sources are provided, the command defaults to `neb_nicking_v1` plus `thermo_nicking_v1` for nickases and `type_iis_release_v1` for release enzymes.
+Provide at least one explicit nickase source and one explicit release-enzyme source.
+The checked-in `demo_snapback` route uses workspace-local overlays so released-product probes stay hermetic and reproducible.
 
 ### Failure modes
 

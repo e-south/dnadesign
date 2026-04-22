@@ -179,7 +179,7 @@ Core contract:
 
 #### `snapback/` (single-nick foldback domain)
 - snapback explicit `single_nick_snapback_v2` and co-design solve `single_nick_snapback_solve_v3` contracts
-- canonical top-strand nick-relative geometry and bounded search
+- authored top-strand nick-relative geometry and bounded search
 - protected-region, homology, and extra-nick invariant enforcement
 - typed producer-owned QA view models live in `snapback/view_models.py`
 - local view-contract assembly and validation live in `snapback/view_contracts.py`

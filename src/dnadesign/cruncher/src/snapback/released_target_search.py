@@ -343,7 +343,7 @@ def _search_pair(
     nick_placement: _NickPlacement,
     release_placement: _ReleasePlacement,
     blocker_counts: dict[str, int],
-) -> tuple[ReleasedTargetSearchHit | None, ReleasedTargetSearchHit | None]:
+) -> tuple[ReleasedTargetSearchHit | None, list[ReleasedTargetSearchHit]]:
     target = request.target
     if request.search.retained_side != "upstream" or request.search.stage_order != "nick_then_release":
         raise ValueError(
@@ -351,11 +351,9 @@ def _search_pair(
         )
     if not release_placement.starts_downstream_of_boundary():
         _blocker(blocker_counts, "RELEASE_OVERLAPS_REQUIRED_RETAINED_REGION")
-        return None, None
-    exact_hit: ReleasedTargetSearchHit | None = None
+        return None, []
     target_boundary = target.nick_boundary_from_left
-    lower_bound = max(
-        target_boundary,
+    minimum_boundary = max(
         nick_placement.earliest_nonnegative_boundary(),
         release_placement.earliest_nonnegative_boundary(),
     )
@@ -364,12 +362,13 @@ def _search_pair(
         *[
             (boundary_value, "nearest")
             for boundary_value in range(
-                lower_bound,
-                lower_bound + request.search.near_boundary_search_limit + 1,
+                max(minimum_boundary, target_boundary - request.search.near_boundary_search_limit),
+                target_boundary + request.search.near_boundary_search_limit + 1,
             )
             if boundary_value != target_boundary
         ],
     ]
+    near_hits: list[ReleasedTargetSearchHit] = []
     for boundary, hit_kind in boundaries:
         precursor_top_strand = _build_precursor_sequence(
             boundary=boundary,
@@ -409,9 +408,10 @@ def _search_pair(
                 evaluation=evaluation,
             )
             if hit_kind == "exact":
-                exact_hit = hit
-                return exact_hit, None
-            return None, hit
+                return hit, []
+            if hit is not None:
+                near_hits.append(hit)
+            continue
         for issue in evaluation.issues:
             if issue.code == "POST_RELEASE_NICK_LOST":
                 _blocker(blocker_counts, "POST_RELEASE_NICK_LOST")
@@ -421,7 +421,7 @@ def _search_pair(
                 _blocker(blocker_counts, "POST_RELEASE_PROJECTION_INVALID")
             else:
                 _blocker(blocker_counts, "FINAL_GEOMETRY_UNSATISFIED")
-    return None, None
+    return None, near_hits
 
 
 def search_released_target_hits(
@@ -447,7 +447,7 @@ def search_released_target_hits(
     for nick_placement in nick_placements:
         for release_placement in release_placements:
             evaluated_pair_count += 1
-            exact_hit, near_hit = _search_pair(
+            exact_hit, pair_near_hits = _search_pair(
                 request=request,
                 nick_placement=nick_placement,
                 release_placement=release_placement,
@@ -455,8 +455,8 @@ def search_released_target_hits(
             )
             if exact_hit is not None:
                 exact_hits.append(exact_hit)
-            elif near_hit is not None:
-                near_hits.append(near_hit)
+            elif pair_near_hits:
+                near_hits.extend(pair_near_hits)
     pre_exact = len(exact_hits)
     pre_near = len(near_hits)
     exact_hits = _rank_hits(exact_hits, target=request.target, exact=True)[: request.search.max_results]

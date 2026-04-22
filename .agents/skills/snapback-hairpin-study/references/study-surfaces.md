@@ -5,11 +5,13 @@ Keep the shortening study boundaries explicit.
 ## Checked-in study surfaces
 
 - `docs/studies/snapback_shortening_effort/status.md`: the short factual study
-  note and decision ladder
-- `docs/studies/snapback_shortening_effort/routes.md`: the study-owned route
-  map for released-product Snapback and the YIU contrast lane
+  note and entrypoint into the next route
+- `docs/studies/snapback_shortening_effort/routes.md`: the canonical
+  study-owned post-probe handoff for released-product Snapback and the YIU
+  contrast lane
 - `docs/studies/snapback_shortening_effort/pipeline.yaml`: the exact command
-  groups and native-agent bootstrap context
+  groups and native-agent bootstrap support when machine-readable detail is the
+  real need
 - `docs/studies/snapback_shortening_effort/ops.study.yaml`: lifecycle order,
   artifacts, execution surfaces, and preflight grouping
 - `docs/studies/snapback_shortening_effort/campaign.yaml`: tracked status and
@@ -30,6 +32,9 @@ Keep the shortening study boundaries explicit.
 
 ## Router rule
 
-When the next question needs exact commands, use the study route map.
+When the next question needs exact commands or the next human step, use the
+study route map first.
+When the next question needs machine-readable command groups or bootstrap
+metadata, open `pipeline.yaml`.
 When the next question needs harness or contract hardening, leave the study
 surface and pair with the owning companion skill.

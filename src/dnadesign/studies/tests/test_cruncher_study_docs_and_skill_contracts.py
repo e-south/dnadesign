@@ -30,6 +30,7 @@ def _read(rel_path: str) -> str:
 
 def test_snapback_shortening_study_is_visible_through_docs_and_agents() -> None:
     docs_index = _read("docs/README.md")
+    study_registry = _read("docs/studies/index.yaml")
     studies_index = _read("docs/studies/README.md")
     cruncher_docs = _read("src/dnadesign/cruncher/docs/README.md")
     root_agents = _read("AGENTS.md")
@@ -39,8 +40,10 @@ def test_snapback_shortening_study_is_visible_through_docs_and_agents() -> None:
     assert "cruncher-study-status.md" in docs_index
     assert "cruncher-study-preflight.md" in docs_index
     assert "studies/snapback_shortening_effort/status.md" in docs_index
+    assert "pin the desired record with `--study-dir docs/studies/<study-id>`" in study_registry
     assert ".agents/skills/snapback-hairpin-study/SKILL.md" in studies_index
     assert "docs/studies/snapback_shortening_effort" in studies_index
+    assert "selector untouched and pin that study with `--study-dir docs/studies/<study-id>`" in studies_index
     assert "snapback_shortening_effort/status.md" in cruncher_docs
     assert "snapback_shortening_effort/routes.md" in cruncher_docs
     assert ".agents/skills/snapback-hairpin-study/SKILL.md" in cruncher_docs
@@ -62,9 +65,13 @@ def test_snapback_shortening_study_record_and_skill_keep_boundary_language_expli
     assert "released-product Snapback" in status
     assert "YIU" in status
     assert "Repo-local study shortcut" in status
+    assert "canonical post-probe handoff" in status
     assert "This page keeps the study-owned handoff map in one place." in routes
+    assert "Ordered post-probe handoff" in routes
+    assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes
     assert "Pair with:" in routes
     assert "repo:.agents/skills/snapback-hairpin-study/SKILL.md" in pipeline
+    assert "manifest:pipeline.yaml" not in pipeline
     assert "pair_with:" in pipeline
     assert "harness-engineering" in pipeline
     assert "pragmatic-programming-principles" in pipeline
@@ -76,12 +83,15 @@ def test_snapback_shortening_study_record_and_skill_keep_boundary_language_expli
     assert "knowledge-integrity" in skill
     assert "autonomy-capability" in skill
     assert "architecture-invariants" in skill
+    assert "do not require `pipeline.yaml` or `ops.study.yaml`" in skill
     assert "docs/studies/snapback_shortening_effort/status.md" in skill
     assert "cruncher.data-plane.cruncher-study-status" in route_matrix
     assert "cruncher.data-plane.cruncher-study-preflight" in route_matrix
     assert "Blank-thread bootstrap" in refresh_loop
+    assert "Open `routes.md` after the record or blocker answer is settled." in refresh_loop
     assert "Pair with `harness-engineering`" in refresh_loop
     assert "Pair with `pragmatic-programming-principles`" in refresh_loop
+    assert "canonical" in study_surfaces
     assert "docs/studies/snapback_shortening_effort/status.md" in study_surfaces
     assert ".agents/skills/snapback-hairpin-study/SKILL.md" in study_surfaces
 

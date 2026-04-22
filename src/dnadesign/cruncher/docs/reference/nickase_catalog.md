@@ -104,7 +104,7 @@ Cruncher scans both the recorded motif and its reverse complement in the evaluat
 - `Nb.Bpu10I`
 - `Nt.Bpu10I`
 
-The separation is intentional: catalytic rule additions live in their own preset, while alternate product vendors stay modeled as aliases of the canonical catalytic entry.
+The separation is intentional: catalytic rule additions live in their own preset, while alternate product vendors stay modeled as aliases of the primary catalytic entry.
 
 If you want a local copy of the packaged preset for inspection or overlay authoring, export it with:
 
