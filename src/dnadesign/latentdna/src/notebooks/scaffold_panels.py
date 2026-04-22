@@ -213,6 +213,12 @@ def render_plot_review_cell() -> str:
                         _support.mo.hstack(_selectors, justify="start", align="end", wrap=True, gap=0.28),
                     )
                 _status = str(_active_card.get("status") or "missing")
+                if (
+                    _active_card.get("render_path") is None
+                    and not bool(_active_card.get("live_render"))
+                    and _status == "ok"
+                ):
+                    _status = "missing"
                 _stale = bool(_active_card.get("stale"))
                 if _status != "ok" or _stale:
                     _status_message = (
@@ -386,15 +392,22 @@ def render_geometry_frames_cell() -> str:
                 if not _projection_id:
                     projection_frames.append(_support.pd.DataFrame())
                     continue
-                frame = _support.load_table(_identity.output_root / "projections" / _projection_id / "coords.parquet")
-                if not frame.empty:
-                    frame = _renderers.enrich_projection_frame(
-                        frame,
-                        _geometry.joinable_tables,
-                        view_id=_view_id or None,
-                        required_columns=_geometry.preferred_hues,
-                        strict_required_columns=False,
+                try:
+                    frame = _support.load_table(
+                        _identity.output_root / "projections" / _projection_id / "coords.parquet",
+                        require_fresh_manifest=True,
                     )
+                    if not frame.empty:
+                        frame = _renderers.enrich_projection_frame(
+                            frame,
+                            _geometry.joinable_tables,
+                            view_id=_view_id or None,
+                            required_columns=_geometry.preferred_hues,
+                            strict_required_columns=False,
+                        )
+                except ValueError as exc:
+                    frame = _support.pd.DataFrame()
+                    frame.attrs["load_error"] = str(exc)
                 projection_frames.append(frame)
             available_hues = _support.available_hues_for_frames(
                 projection_frames,

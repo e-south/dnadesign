@@ -19,6 +19,30 @@ from dnadesign.latentdna.src.services.notebook_controls_service import (
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
+def _write_artifact_manifest(
+    artifact_dir: Path,
+    *,
+    artifact_kind: str,
+    artifact_id: str,
+    status: str = "ok",
+    inputs: list[dict[str, object]] | None = None,
+    params: dict[str, object] | None = None,
+    stats: dict[str, object] | None = None,
+) -> None:
+    payload: dict[str, object] = {
+        "artifact_kind": artifact_kind,
+        "artifact_id": artifact_id,
+        "status": status,
+    }
+    if inputs is not None:
+        payload["inputs"] = inputs
+    if params is not None:
+        payload["params"] = params
+    if stats is not None:
+        payload["stats"] = stats
+    (artifact_dir / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
 def _write_workspace_config(workspace_dir: Path) -> None:
     inputs_dir = workspace_dir / "inputs"
     inputs_dir.mkdir(parents=True, exist_ok=True)
@@ -130,24 +154,22 @@ def test_notebook_controls_sort_projection_ids_by_role_then_full_population(tmp_
             projection_dir / "coords.parquet",
             index=False,
         )
-        (projection_dir / "manifest.json").write_text(
-            json.dumps(
-                {
-                    "inputs": [{"kind": "view_matrix", "id": "intermediate_embedding_7b_anchor_60bp"}],
-                    "params": {
-                        "projection_role": role,
-                        "default_rank": default_rank,
-                        "sampling_strategy": "all",
-                    },
-                    "stats": {
-                        "rows": 2,
-                        "projected_rows": 2,
-                        "population_rows": 2,
-                        "is_full_population": True,
-                    },
-                }
-            ),
-            encoding="utf-8",
+        _write_artifact_manifest(
+            projection_dir,
+            artifact_kind="projection",
+            artifact_id=projection_id,
+            inputs=[{"kind": "view_matrix", "id": "intermediate_embedding_7b_anchor_60bp"}],
+            params={
+                "projection_role": role,
+                "default_rank": default_rank,
+                "sampling_strategy": "all",
+            },
+            stats={
+                "rows": 2,
+                "projected_rows": 2,
+                "population_rows": 2,
+                "is_full_population": True,
+            },
         )
 
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
@@ -327,18 +349,16 @@ def test_notebook_controls_exclude_hidden_model_joinable_tables(tmp_path: Path) 
                 "synthetic_margin_ethanol_vs_background": [0.25, -0.1],
             }
         ).to_parquet(scalar_dir / "table.parquet", index=False)
-        (scalar_dir / "manifest.json").write_text(
-            json.dumps(
+        _write_artifact_manifest(
+            scalar_dir,
+            artifact_kind="scalar_table",
+            artifact_id=artifact_id,
+            inputs=[
                 {
-                    "inputs": [
-                        {
-                            "kind": "view_matrix",
-                            "id": view_id,
-                        }
-                    ]
+                    "kind": "view_matrix",
+                    "id": view_id,
                 }
-            ),
-            encoding="utf-8",
+            ],
         )
 
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
@@ -370,15 +390,83 @@ def test_notebook_controls_only_surface_preferred_hues_backed_by_joinable_tables
             "context_shift_l2": [0.1, 0.2],
         }
     ).to_parquet(scalar_dir / "table.parquet", index=False)
+    _write_artifact_manifest(
+        scalar_dir,
+        artifact_kind="scalar_table",
+        artifact_id="context_delta_distribution_intermediate_embedding_7b_anchor_60bp",
+        inputs=[
+            {
+                "kind": "view_matrix",
+                "id": "intermediate_embedding_7b_anchor_60bp",
+            }
+        ],
+    )
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert controls.geometry_controls.preferred_hues == ["context_shift_l2"]
+    assert controls.geometry_controls.hue_kinds == {"context_shift_l2": "continuous"}
+
+
+def test_notebook_controls_ignore_legacy_scalar_tables_without_manifest_bindings(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "subject_id": ["row0", "row1"]}).to_parquet(
+        view_dir / "rows.parquet",
+        index=False,
+    )
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    scalar_dir = context.output_root / "scalars" / "legacy_debug_distribution"
+    scalar_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["row0", "row1"],
+            "context_shift_l2": [0.1, 0.2],
+        }
+    ).to_parquet(scalar_dir / "table.parquet", index=False)
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    joinable_artifact_ids = {table.artifact_id for table in controls.geometry_controls.joinable_tables}
+    assert "legacy_debug_distribution" not in joinable_artifact_ids
+    assert "context_shift_l2" not in controls.geometry_controls.preferred_hues
+
+
+def test_notebook_controls_ignore_stale_scalar_tables_with_manifest_bindings(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "subject_id": ["row0", "row1"]}).to_parquet(
+        view_dir / "rows.parquet",
+        index=False,
+    )
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    scalar_dir = context.output_root / "scalars" / "stale_distribution"
+    scalar_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["row0", "row1"],
+            "context_shift_l2": [0.1, 0.2],
+        }
+    ).to_parquet(scalar_dir / "table.parquet", index=False)
     (scalar_dir / "manifest.json").write_text(
         json.dumps(
             {
-                "inputs": [
-                    {
-                        "kind": "view_matrix",
-                        "id": "intermediate_embedding_7b_anchor_60bp",
-                    }
-                ]
+                "artifact_kind": "scalar_table",
+                "artifact_id": "stale_distribution",
+                "status": "attention",
+                "inputs": [{"kind": "view_rows", "id": "intermediate_embedding_7b_anchor_60bp"}],
             }
         ),
         encoding="utf-8",
@@ -386,8 +474,9 @@ def test_notebook_controls_only_surface_preferred_hues_backed_by_joinable_tables
 
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
 
-    assert controls.geometry_controls.preferred_hues == ["context_shift_l2"]
-    assert controls.geometry_controls.hue_kinds == {"context_shift_l2": "continuous"}
+    joinable_artifact_ids = {table.artifact_id for table in controls.geometry_controls.joinable_tables}
+    assert "stale_distribution" not in joinable_artifact_ids
+    assert "context_shift_l2" not in controls.geometry_controls.preferred_hues
 
 
 def test_notebook_controls_prefer_default_deliverable_for_shared_plots(tmp_path: Path) -> None:

@@ -38,14 +38,16 @@ from ..visual_style import (
     wrap_plot_title,
 )
 from ..visual_style import scatter_style as shared_scatter_style
-from .browser_runtime_projection import enrich_projection_frame, render_projection_grid
-from .browser_runtime_support import category_color_map as notebook_category_color_map
+from .browser_runtime_projection import load_projection_frame, render_projection_grid
+from .browser_runtime_support import (
+    category_color_map as notebook_category_color_map,
+)
 from .browser_runtime_support import (
     classify_hue_series,
     continuous_hue_render_params,
     display_hue_label,
     draw_reference_labels,
-    load_json,
+    load_artifact_manifest,
     load_table,
     normalize_categorical_hue_series,
     render_matplotlib_figure,
@@ -62,11 +64,22 @@ _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
 )
 
 
+def _load_error_frame(message: str) -> pd.DataFrame:
+    frame = pd.DataFrame()
+    frame.attrs["load_error"] = message
+    return frame
+
+
 def _projection_view_id(output_root: Path, projection_id: str) -> str | None:
-    manifest_path = output_root / "projections" / projection_id / "manifest.json"
-    if not manifest_path.is_file():
+    try:
+        manifest = load_artifact_manifest(
+            output_root / "projections" / projection_id,
+            artifact_kind="projection",
+            artifact_id=projection_id,
+            allow_missing_status=True,
+        )
+    except ValueError:
         return None
-    manifest = load_json(manifest_path)
     return next(
         (
             str(item.get("id"))
@@ -93,29 +106,39 @@ def load_plot_review_frames(
         frames: list[pd.DataFrame] = []
         for projection_id in plot_spec.get("projection_ids", []):
             view_id = _projection_view_id(output_root, str(projection_id))
-            frame = load_table(output_root / "projections" / str(projection_id) / "coords.parquet")
-            if not frame.empty:
-                frame = enrich_projection_frame(
-                    frame,
-                    joinable_tables,
-                    output_root=output_root,
-                    view_id=view_id,
-                    required_columns=requested_columns,
-                    strict_required_columns=False,
-                )
+            frame = load_projection_frame(
+                view_id,
+                str(projection_id),
+                joinable_tables,
+                output_root=output_root,
+                required_columns=requested_columns,
+                strict_required_columns=False,
+            )
+            if view_id is not None and not frame.empty:
                 frame.attrs["view_id"] = view_id
             frames.append(frame)
         return frames
     if kind in {"xy_scatter_grid", "paired_xy_scatter_grid", "distribution_grid"}:
-        return [
-            load_table(output_root / "scalars" / str(scalar_id) / "table.parquet")
-            for scalar_id in plot_spec.get("scalar_ids", [])
-        ]
+        frames: list[pd.DataFrame] = []
+        for scalar_id in plot_spec.get("scalar_ids", []):
+            try:
+                frame = load_table(
+                    output_root / "scalars" / str(scalar_id) / "table.parquet",
+                    require_fresh_manifest=True,
+                )
+            except ValueError as exc:
+                frame = _load_error_frame(str(exc))
+            frames.append(frame)
+        return frames
     if kind in {"metric_panel_grid", "categorical_count"}:
         scalar_id = str(plot_spec.get("scalar_id") or "")
         if not scalar_id:
             return []
-        return [load_table(output_root / "scalars" / scalar_id / "table.parquet")]
+        try:
+            frame = load_table(output_root / "scalars" / scalar_id / "table.parquet", require_fresh_manifest=True)
+        except ValueError as exc:
+            frame = _load_error_frame(str(exc))
+        return [frame]
     return []
 
 
@@ -225,6 +248,14 @@ def render_plot_review_surface(
     plot_alt_text = str(plot_spec.get("alt_text") or plot_spec.get("plot_id") or "latentdna live plot")
     resolved_plot_spec = {key: value for key, value in plot_spec.items() if key != "alt_text"}
     kind = str(resolved_plot_spec.get("kind") or "")
+    load_errors = [
+        str(frame.attrs.get("load_error") or "").strip()
+        for frame in frames
+        if isinstance(getattr(frame, "attrs", None), dict) and str(frame.attrs.get("load_error") or "").strip()
+    ]
+    if load_errors and kind != "projection_grid":
+        unique_errors = list(dict.fromkeys(load_errors))
+        return mo.callout("Live plot data are unavailable: " + "; ".join(unique_errors), kind="warn")
     if kind == "projection_grid":
         prefer_single_row = _prefer_single_row_panel_layout(
             str(resolved_plot_spec.get("plot_id") or ""),

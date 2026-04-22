@@ -268,6 +268,154 @@ def test_render_plot_review_surface_supports_categorical_count_grid(monkeypatch,
     assert "dataset_overview" in rendered.text
 
 
+def test_render_plot_review_surface_does_not_leak_debug_distribution_scalar_ids(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+    frames = [
+        pd.DataFrame(
+            {
+                "score": [0.25, 0.5, 0.75],
+            }
+        )
+    ]
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "context_delta_distributions",
+            "kind": "distribution_grid",
+            "scalar_ids": ["debug_distribution_demo"],
+            "value_column": "score",
+            "metric_columns": ["score"],
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert isinstance(rendered, mo.Html)
+    svg_markup = _decode_svg_markup(rendered)
+    assert "debug_distribution_demo" not in svg_markup
+    assert "debug distribution demo" not in svg_markup.lower()
+    assert "Score" in svg_markup
+
+
+def test_render_plot_review_surface_preserves_context_distribution_family_titles(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame({"score": [0.25, 0.5, 0.75]}),
+        pd.DataFrame({"score": [0.35, 0.55, 0.85]}),
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "context_delta_distributions",
+            "kind": "distribution_grid",
+            "scalar_ids": [
+                "context_delta_distribution_intermediate_embedding_7b",
+                "context_delta_distribution_pooled_logits_7b",
+            ],
+            "value_column": "score",
+            "metric_columns": ["score"],
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        titles = [" ".join(axis.get_title().split()) for axis in fig.axes]
+        assert any("Intermediate Block Mean Evo 2 7B" in title for title in titles)
+        assert any("Pooled Logits Evo 2 7B" in title for title in titles)
+    finally:
+        plt.close(fig)
+
+
+def test_load_plot_review_frames_marks_stale_scalar_manifest_as_unavailable(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "context_delta_distribution_intermediate_embedding_7b"
+    scalar_dir.mkdir(parents=True)
+    pd.DataFrame({"score": [0.2, 0.4, 0.6]}).to_parquet(scalar_dir / "table.parquet", index=False)
+    (scalar_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "scalar_table",
+                "artifact_id": "context_delta_distribution_intermediate_embedding_7b",
+                "status": "attention",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    frames = plot_review_runtime.load_plot_review_frames(
+        {
+            "plot_id": "context_delta_distributions",
+            "kind": "distribution_grid",
+            "scalar_ids": ["context_delta_distribution_intermediate_embedding_7b"],
+            "value_column": "score",
+            "metric_columns": ["score"],
+        },
+        joinable_tables=[],
+        output_root=tmp_path,
+    )
+
+    assert len(frames) == 1
+    assert frames[0].empty
+    assert "scalar_table artifact is not fresh" in str(frames[0].attrs.get("load_error"))
+
+
+def test_load_plot_review_frames_rejects_scalar_manifest_without_identity_fields(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "context_delta_distribution_intermediate_embedding_7b"
+    scalar_dir.mkdir(parents=True)
+    pd.DataFrame({"score": [0.2, 0.4, 0.6]}).to_parquet(scalar_dir / "table.parquet", index=False)
+    (scalar_dir / "manifest.json").write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+
+    frames = plot_review_runtime.load_plot_review_frames(
+        {
+            "plot_id": "context_delta_distributions",
+            "kind": "distribution_grid",
+            "scalar_ids": ["context_delta_distribution_intermediate_embedding_7b"],
+            "value_column": "score",
+            "metric_columns": ["score"],
+        },
+        joinable_tables=[],
+        output_root=tmp_path,
+    )
+
+    assert len(frames) == 1
+    assert frames[0].empty
+    assert "artifact_id=missing" in str(frames[0].attrs.get("load_error"))
+
+
+def test_render_plot_review_surface_allows_projection_grids_with_partial_panel_errors(
+    monkeypatch, tmp_path: Path
+) -> None:
+    sentinel = object()
+    monkeypatch.setattr(plot_review_runtime, "render_projection_grid", lambda *args, **kwargs: sentinel)
+    frames = [pd.DataFrame({"x": [0.0], "y": [1.0]}), pd.DataFrame()]
+    frames[1].attrs["load_error"] = "projection artifact is not fresh for `proj_b`: status=attention"
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "appendix_umap_gallery",
+            "kind": "projection_grid",
+            "projection_ids": ["proj_a", "proj_b"],
+            "panel_titles": ["Panel A", "Panel B"],
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered is sentinel
+
+
 def test_render_plot_review_surface_supports_curve_grid(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
     reducer_dir = tmp_path / "reducers" / "demo_curve"
@@ -528,12 +676,15 @@ def test_load_plot_review_frames_enriches_projection_frames_from_projection_view
     (projection_dir / "manifest.json").write_text(
         json.dumps(
             {
+                "artifact_kind": "projection",
+                "artifact_id": "umap_anchor",
+                "status": "ok",
                 "inputs": [
                     {
                         "kind": "view_matrix",
                         "id": "intermediate_embedding_7b_anchor_60bp",
                     }
-                ]
+                ],
             }
         ),
         encoding="utf-8",
@@ -541,6 +692,16 @@ def test_load_plot_review_frames_enriches_projection_frames_from_projection_view
 
     view_dir = tmp_path / "views" / "intermediate_embedding_7b_anchor_60bp"
     view_dir.mkdir(parents=True)
+    (view_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "view",
+                "artifact_id": "intermediate_embedding_7b_anchor_60bp",
+                "status": "ok",
+            }
+        ),
+        encoding="utf-8",
+    )
     pd.DataFrame(
         {
             "id": ["row0", "row1"],

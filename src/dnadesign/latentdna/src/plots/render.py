@@ -154,7 +154,9 @@ def _candidate_row_label(
 
 def _derived_panel_label(identifier: str) -> str:
     candidate_key = str(identifier or "")
+    matched_prefix = False
     for prefix in (
+        "context_delta_distribution_",
         "context_geometry_metrics_",
         "wildtype_reference_margins_",
         "synthetic_centroid_margins_",
@@ -163,7 +165,10 @@ def _derived_panel_label(identifier: str) -> str:
     ):
         if candidate_key.startswith(prefix):
             candidate_key = candidate_key[len(prefix) :]
+            matched_prefix = True
             break
+    if not matched_prefix:
+        return ""
     candidate_key = candidate_key.replace("_anchor_to_full_context", "")
     return humanize_candidate(candidate_key)
 

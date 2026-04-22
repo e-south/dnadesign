@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import marimo as mo
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -20,6 +22,37 @@ def _panel_offsets(fig) -> list[tuple[float, float]]:
             continue
         offsets.extend((float(x), float(y)) for x, y in collection_offsets.tolist())
     return sorted(offsets)
+
+
+def _write_manifest(
+    artifact_dir: Path,
+    *,
+    artifact_kind: str,
+    artifact_id: str,
+    status: str = "ok",
+    inputs: list[dict[str, object]] | None = None,
+) -> None:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, object] = {
+        "artifact_kind": artifact_kind,
+        "artifact_id": artifact_id,
+        "status": status,
+    }
+    if inputs is not None:
+        payload["inputs"] = inputs
+    (artifact_dir / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _write_view_rows(output_root: Path, view_id: str, rows: pd.DataFrame) -> None:
+    view_dir = output_root / "views" / view_id
+    _write_manifest(view_dir, artifact_kind="view", artifact_id=view_id)
+    rows.to_parquet(view_dir / "rows.parquet")
+
+
+def _write_scalar_table(output_root: Path, scalar_id: str, table: pd.DataFrame) -> None:
+    scalar_dir = output_root / "scalars" / scalar_id
+    _write_manifest(scalar_dir, artifact_kind="scalar_table", artifact_id=scalar_id)
+    table.to_parquet(scalar_dir / "table.parquet")
 
 
 def test_render_projection_grid_keeps_point_coordinates_fixed_across_hues(monkeypatch, tmp_path: Path) -> None:
@@ -233,6 +266,65 @@ def test_render_projection_grid_handles_seven_panel_gallery_without_axis_zip_fai
         plt.close(fig)
 
 
+def test_render_projection_grid_surfaces_preloaded_frame_errors(tmp_path: Path) -> None:
+    errored_frame = pd.DataFrame()
+    errored_frame.attrs["load_error"] = "projection artifact is not fresh for `proj_a`: stale"
+
+    rendered = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[errored_frame],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "projection artifact is not fresh" in rendered.text
+
+
+def test_render_projection_grid_preserves_healthy_panels_when_some_preloaded_frames_error(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+
+    healthy_frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0],
+            "y": [1.0, 0.0],
+            "design_family": ["ethanol", "cipro"],
+        }
+    )
+    errored_frame = pd.DataFrame()
+    errored_frame.attrs["load_error"] = "projection artifact is not fresh for `proj_a`: status=attention"
+
+    fig = projection_runtime.render_projection_grid(
+        [
+            {"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor concat"},
+            {"view_id": "view_b", "projection_id": "proj_b", "title": "Anchor base"},
+        ],
+        frames=[errored_frame, healthy_frame],
+        plot_id="appendix_umap_gallery",
+        hue_column="design_family",
+        hue_kinds={"design_family": "categorical"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        first_axis, second_axis = fig.axes[:2]
+        first_axis_text = " ".join(text.get_text() for text in first_axis.texts)
+        assert "Projection unavailable" in first_axis_text
+        assert "status=attention" in first_axis_text.lower()
+        assert len(second_axis.collections) == 2
+    finally:
+        plt.close(fig)
+
+
 def test_render_projection_grid_places_continuous_colorbar_below_panels_and_uses_margin_palette(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -272,16 +364,18 @@ def test_render_projection_grid_places_continuous_colorbar_below_panels_and_uses
 
 
 def test_enrich_projection_frame_joins_requested_columns_by_same_named_key(tmp_path: Path) -> None:
-    scalar_dir = tmp_path / "scalars" / "design_centroid_margins_demo"
-    scalar_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [0.25, -0.10],
-            "synthetic_margin_cipro_vs_background": [0.05, 0.15],
-            "unused_metric": [5.0, 6.0],
-        }
-    ).to_parquet(scalar_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_demo",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.25, -0.10],
+                "synthetic_margin_cipro_vs_background": [0.05, 0.15],
+                "unused_metric": [5.0, 6.0],
+            }
+        ),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
     enriched = projection_runtime.enrich_projection_frame(
@@ -308,16 +402,18 @@ def test_enrich_projection_frame_joins_requested_columns_by_same_named_key(tmp_p
 
 
 def test_enrich_projection_frame_joins_context_metrics_from_anchor_id(tmp_path: Path) -> None:
-    scalar_dir = tmp_path / "scalars" / "context_delta_distribution_demo"
-    scalar_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["context_row_1", "context_row_2"],
-            "construct__anchor_id": ["anchor_1", "anchor_2"],
-            "context_self_cosine": [0.91, 0.84],
-            "context_shift_l2": [0.02, 0.09],
-        }
-    ).to_parquet(scalar_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "context_delta_distribution_demo",
+        pd.DataFrame(
+            {
+                "id": ["context_row_1", "context_row_2"],
+                "construct__anchor_id": ["anchor_1", "anchor_2"],
+                "context_self_cosine": [0.91, 0.84],
+                "context_shift_l2": [0.02, 0.09],
+            }
+        ),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
     enriched = projection_runtime.enrich_projection_frame(
@@ -339,15 +435,22 @@ def test_enrich_projection_frame_joins_context_metrics_from_anchor_id(tmp_path: 
 
 
 def test_enrich_projection_frame_respects_explicit_table_view_targets(tmp_path: Path) -> None:
-    scalar_dir = tmp_path / "scalars" / "context_delta_distribution_intermediate_embedding_7b"
-    scalar_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["context_row_1", "context_row_2"],
-            "construct__anchor_id": ["anchor_1", "anchor_2"],
-            "context_self_cosine": [0.91, 0.84],
-        }
-    ).to_parquet(scalar_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "context_delta_distribution_intermediate_embedding_7b",
+        pd.DataFrame(
+            {
+                "id": ["context_row_1", "context_row_2"],
+                "construct__anchor_id": ["anchor_1", "anchor_2"],
+                "context_self_cosine": [0.91, 0.84],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "intermediate_embedding_7b_anchor_plus_full_context_concat",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
     enriched = projection_runtime.enrich_projection_frame(
@@ -370,23 +473,31 @@ def test_enrich_projection_frame_respects_explicit_table_view_targets(tmp_path: 
 
 
 def test_enrich_projection_frame_limits_candidate_metric_tables_to_active_view(tmp_path: Path) -> None:
-    wrong_dir = tmp_path / "scalars" / "design_centroid_margins_intermediate_embedding_20b_anchor_60bp"
-    wrong_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [np.nan, np.nan],
-        }
-    ).to_parquet(wrong_dir / "table.parquet")
-
-    right_dir = tmp_path / "scalars" / "design_centroid_margins_pooled_logits_20b_anchor_60bp"
-    right_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [0.35, -0.22],
-        }
-    ).to_parquet(right_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [np.nan, np.nan],
+            }
+        ),
+    )
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.35, -0.22],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "pooled_logits_20b_anchor_60bp",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
     enriched = projection_runtime.enrich_projection_frame(
@@ -412,15 +523,17 @@ def test_enrich_projection_frame_limits_candidate_metric_tables_to_active_view(t
 
 
 def test_enrich_projection_frame_prefers_authoritative_view_row_metadata(tmp_path: Path) -> None:
-    view_dir = tmp_path / "views" / "intermediate_embedding_7b_anchor_60bp"
-    view_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "design_regulator_composition": ["baeR", "background"],
-            "spacer_length": [18, 17],
-        }
-    ).to_parquet(view_dir / "rows.parquet")
+    _write_view_rows(
+        tmp_path,
+        "intermediate_embedding_7b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "design_regulator_composition": ["baeR", "background"],
+                "spacer_length": [18, 17],
+            }
+        ),
+    )
 
     frame = pd.DataFrame(
         {
@@ -444,14 +557,21 @@ def test_enrich_projection_frame_prefers_authoritative_view_row_metadata(tmp_pat
 
 
 def test_enrich_projection_frame_refreshes_required_column_from_joinable_source(tmp_path: Path) -> None:
-    scalar_dir = tmp_path / "scalars" / "design_centroid_margins_intermediate_embedding_20b_anchor_60bp"
-    scalar_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [0.25, -0.10],
-        }
-    ).to_parquet(scalar_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.25, -0.10],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
 
     frame = pd.DataFrame(
         {
@@ -479,14 +599,21 @@ def test_enrich_projection_frame_refreshes_required_column_from_joinable_source(
 
 
 def test_enrich_projection_frame_rejects_required_column_when_joined_values_are_empty(tmp_path: Path) -> None:
-    scalar_dir = tmp_path / "scalars" / "design_centroid_margins_intermediate_embedding_20b_anchor_60bp"
-    scalar_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [None, None],
-        }
-    ).to_parquet(scalar_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [None, None],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
 
@@ -509,23 +636,31 @@ def test_enrich_projection_frame_rejects_required_column_when_joined_values_are_
 
 
 def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_path: Path) -> None:
-    first_dir = tmp_path / "scalars" / "design_centroid_margins_pooled_logits_20b_anchor_60bp"
-    first_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [0.35, -0.22],
-        }
-    ).to_parquet(first_dir / "table.parquet")
-
-    second_dir = tmp_path / "scalars" / "context_delta_distribution_pooled_logits_20b_anchor_60bp"
-    second_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [0.10, 0.20],
-        }
-    ).to_parquet(second_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.35, -0.22],
+            }
+        ),
+    )
+    _write_scalar_table(
+        tmp_path,
+        "context_delta_distribution_pooled_logits_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.10, 0.20],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "pooled_logits_20b_anchor_60bp",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
 
@@ -551,14 +686,21 @@ def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_p
 
 
 def test_enrich_projection_frame_rejects_required_column_when_join_keys_do_not_resolve(tmp_path: Path) -> None:
-    scalar_dir = tmp_path / "scalars" / "design_centroid_margins_intermediate_embedding_20b_anchor_60bp"
-    scalar_dir.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "record_id": ["anchor_1", "anchor_2"],
-            "synthetic_margin_ethanol_vs_background": [0.25, -0.10],
-        }
-    ).to_parquet(scalar_dir / "table.parquet")
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "record_id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.25, -0.10],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "intermediate_embedding_20b_anchor_60bp",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
 
     frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
 

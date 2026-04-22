@@ -32,12 +32,52 @@ from .browser_runtime_support import (
     display_hue_label,
     draw_reference_labels,
     load_table,
+    load_view_rows,
     normalize_categorical_hue_series,
     render_matplotlib_figure,
     resolve_join_keys,
     style_notebook_axes,
     style_notebook_legend,
 )
+
+
+def _error_frame(message: str) -> pd.DataFrame:
+    frame = pd.DataFrame()
+    frame.attrs["load_error"] = message
+    return frame
+
+
+def _frame_load_error(frame: pd.DataFrame) -> str:
+    if not isinstance(getattr(frame, "attrs", None), dict):
+        return ""
+    return str(frame.attrs.get("load_error") or "").strip()
+
+
+def _render_projection_placeholder(
+    ax,
+    *,
+    panel_title: str,
+    message: str,
+    detail: str | None = None,
+) -> None:
+    ax.set_title(panel_title, fontweight="semibold", pad=10 if "\n" in panel_title else 8)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    style_notebook_axes(ax, grid=False, square=True)
+    ax.text(0.5, 0.58, message, ha="center", va="center", fontsize=11, color=TEXT_COLOR, transform=ax.transAxes)
+    if detail:
+        ax.text(
+            0.5,
+            0.41,
+            wrap_plot_title(detail, width=28, max_lines=4),
+            ha="center",
+            va="center",
+            fontsize=8.8,
+            color="#5C6874",
+            transform=ax.transAxes,
+        )
 
 
 def _assert_unique_join_key(table: pd.DataFrame, join_key: str, *, artifact_id: str) -> None:
@@ -74,7 +114,7 @@ def _merge_view_row_columns(
 ) -> tuple[pd.DataFrame, set[str]]:
     if not view_id or not required_columns:
         return frame, set()
-    view_rows = load_table(output_root / "views" / view_id / "rows.parquet")
+    view_rows = load_view_rows(view_id, output_root=output_root)
     if view_rows.empty:
         return frame, set()
     join_keys = resolve_join_keys(frame, view_rows)
@@ -144,7 +184,7 @@ def _merge_required_joinable_column(
 ) -> pd.DataFrame:
     relative_path = str(source["relative_path"])
     artifact_id = str(source["artifact_id"])
-    table = load_table(output_root / relative_path)
+    table = load_table(output_root / relative_path, require_fresh_manifest=True)
     if table.empty:
         raise ValueError(
             f"required metadata source `{artifact_id}` for `{column}` on `{view_id or 'projection'}` is empty"
@@ -248,7 +288,7 @@ def enrich_projection_frame(
                 continue
         else:
             selected_columns = []
-        table = load_table(output_root / relative_path)
+        table = load_table(output_root / relative_path, require_fresh_manifest=True)
         if table.empty:
             continue
         join_keys = resolve_join_keys(enriched, table)
@@ -285,12 +325,31 @@ def enrich_projection_frame(
 
 
 def load_projection_frame(
-    view_id: str, projection_id: str, joinable_tables: list[dict[str, object]], *, output_root: Path
+    view_id: str | None,
+    projection_id: str,
+    joinable_tables: list[dict[str, object]],
+    *,
+    output_root: Path,
+    required_columns: list[str] | set[str] | tuple[str, ...] | None = None,
+    strict_required_columns: bool = True,
 ) -> pd.DataFrame:
-    frame = load_table(output_root / "projections" / projection_id / "coords.parquet")
+    try:
+        frame = load_table(output_root / "projections" / projection_id / "coords.parquet", require_fresh_manifest=True)
+    except ValueError as exc:
+        return _error_frame(str(exc))
     if frame.empty:
         return frame
-    return enrich_projection_frame(frame, joinable_tables, output_root=output_root, view_id=view_id)
+    try:
+        return enrich_projection_frame(
+            frame,
+            joinable_tables,
+            output_root=output_root,
+            view_id=view_id,
+            required_columns=required_columns,
+            strict_required_columns=strict_required_columns,
+        )
+    except ValueError as exc:
+        return _error_frame(str(exc))
 
 
 def _layout_frames(
@@ -353,6 +412,10 @@ def render_projection_grid(
         joinable_tables=joinable_tables,
         output_root=output_root,
     )
+    load_errors = [_frame_load_error(frame) for frame in resolved_frames if _frame_load_error(frame)]
+    if not any(not frame.empty for frame in resolved_frames) and load_errors:
+        unique_errors = list(dict.fromkeys(load_errors))
+        return mo.callout("Projection surface is unavailable: " + "; ".join(unique_errors), kind="warn")
     if not any(not frame.empty for frame in resolved_frames):
         return mo.callout(
             "The selected geometry layout is declared, but none of its projections are materialized yet.",
@@ -428,9 +491,23 @@ def render_projection_grid(
     scatter_artist = None
     max_title_lines = 1
     for axis_index, (ax, spec, frame) in enumerate(zip(panel_axes, panel_specs, resolved_frames, strict=True)):
+        wrapped_title = wrap_plot_title(
+            compact_candidate_title(str(spec.get("title") or spec.get("view_id") or f"Panel {axis_index + 1}")),
+            width=32 if n_panels == 1 else 22,
+            max_lines=3,
+        )
+        max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
+        load_error = _frame_load_error(frame)
+        if load_error:
+            _render_projection_placeholder(
+                ax,
+                panel_title=wrapped_title,
+                message="Projection unavailable",
+                detail=load_error,
+            )
+            continue
         if frame.empty or "x" not in frame.columns or "y" not in frame.columns:
-            ax.text(0.5, 0.5, "Projection missing", ha="center", va="center", fontsize=11, color="#5C6874")
-            ax.set_axis_off()
+            _render_projection_placeholder(ax, panel_title=wrapped_title, message="Projection missing")
             continue
 
         point_style = shared_scatter_style(len(frame))
@@ -480,12 +557,6 @@ def render_projection_grid(
                     label=category,
                 )
 
-        wrapped_title = wrap_plot_title(
-            compact_candidate_title(str(spec.get("title") or spec.get("view_id") or f"Panel {axis_index + 1}")),
-            width=32 if n_panels == 1 else 22,
-            max_lines=3,
-        )
-        max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
         ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
         ax.set_xlabel("Projection 1")
         ax.set_ylabel("Projection 2")

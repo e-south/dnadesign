@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec
 from dnadesign.latentdna.src.plots.render import (
     _category_color_map,
+    _derived_panel_label,
     _grid_figure_size,
     _panel_grid_dimensions,
     _render_metric_panel,
@@ -275,6 +276,10 @@ def test_render_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> No
         assert all(label.get_rotation() == 32.0 for label in ax.get_xticklabels())
     finally:
         plt.close(fig)
+
+
+def test_derived_panel_label_humanizes_context_delta_distribution_ids() -> None:
+    assert _derived_panel_label("context_delta_distribution_pooled_logits_7b") == "Pooled Logits Evo 2 7B"
 
 
 def test_wrap_plot_title_respects_explicit_max_lines() -> None:

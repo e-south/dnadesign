@@ -124,7 +124,7 @@ def test_resolve_runtime_hue_kinds_preserves_binary_entries() -> None:
     }
 
 
-def test_runtime_hue_columns_require_actual_joinable_backing() -> None:
+def test_runtime_hue_columns_ignore_unbound_legacy_joinable_tables() -> None:
     global_hues, hue_kinds = _runtime_hue_columns(
         joinable_tables=[
             {
@@ -140,8 +140,67 @@ def test_runtime_hue_columns_require_actual_joinable_backing() -> None:
         joinable_artifact_suffixes={"context_delta_distribution_demo"},
     )
 
-    assert global_hues == ["context_shift_l2"]
-    assert hue_kinds == {"context_shift_l2": "continuous"}
+    assert global_hues == []
+    assert hue_kinds == {}
+
+
+def test_plot_review_sections_marks_missing_render_path_as_missing(monkeypatch, tmp_path: Path) -> None:
+    plot_dir = tmp_path / "outputs" / "plots" / "dataset_overview"
+    plot_dir.mkdir(parents=True)
+    (plot_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_id": "dataset_overview",
+                "status": "ok",
+                "stale": False,
+                "outputs": [],
+                "semantics": {"caption": "legacy partial payload"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    context = SimpleNamespace(
+        config=SimpleNamespace(deliverables={}, plots={"dataset_overview": object()}),
+        require_plot=lambda plot_id: SimpleNamespace(visibility_tier="primary", semantics_ref="unused"),
+        workspace_dir=tmp_path,
+    )
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.notebooks.browser_runtime._resolve_review_plot_spec",
+        lambda context, *, plot_id: SimpleNamespace(kind="categorical_count", model_dump=lambda mode="json": {}),
+    )
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.notebooks.browser_runtime.resolve_plot_semantics",
+        lambda context, *, plot_id: PlotSemantics(
+            plot_id=plot_id,
+            question="Fixture question.",
+            decision_role="primary",
+            encoding="Fixture encoding.",
+            scope="Fixture scope.",
+            guardrails=["Fixture guardrail."],
+            caption="Fixture caption.",
+            alt_text="Fixture alt.",
+            preprocessing_md="Fixture preprocessing.",
+            math_md="Fixture math.",
+            rationale_md="Fixture rationale.",
+            limitations_md="Fixture limitations.",
+            failure_modes_md="Fixture failure modes.",
+        ),
+    )
+
+    review = _plot_review_sections(
+        context,
+        output_root=tmp_path / "outputs",
+        controls={
+            "plot_controls": {
+                "ordered_plot_ids": ["dataset_overview"],
+                "plots": [{"plot_id": "dataset_overview", "deliverable_id": "", "status": "ok"}],
+            }
+        },
+    )
+
+    card = review.sections[0]["cards"][0]
+    assert card["render_path"] is None
+    assert card["status"] == "missing"
 
 
 def test_plot_review_sections_fail_closed_when_manifest_lacks_semantics(monkeypatch, tmp_path: Path) -> None:
@@ -291,7 +350,8 @@ def test_plot_review_sections_fall_back_to_manifest_status_when_controls_omit_it
         },
     )
 
-    assert review.sections[0]["cards"][0]["status"] == "ok"
+    assert review.sections[0]["cards"][0]["render_path"] is None
+    assert review.sections[0]["cards"][0]["status"] == "missing"
     assert review.sections[0]["cards"][0]["stale"] is False
 
 

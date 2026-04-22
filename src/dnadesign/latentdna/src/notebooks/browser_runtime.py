@@ -193,6 +193,7 @@ def _runtime_hue_columns(
     actual_columns = unique_in_order(
         str(column)
         for row in joinable_tables
+        if isinstance(row, dict) and list(row.get("view_ids") or [])
         for column in row.get("columns", [])
         if isinstance(column, str) and include_hue_column(str(column), joinable_artifact_suffixes)
     )
@@ -471,7 +472,14 @@ def _plot_review_sections(
                 "failure_modes_md": str(semantics.get("failure_modes_md") or "").strip(),
                 "study_doc_warning": doc_block.get("warning"),
                 "artifact_warning": manifest_warning,
-                "status": str(live_entry.get("status") or entry.get("status") or manifest.get("status") or "missing"),
+                "status": (
+                    "missing"
+                    if render_path is None
+                    and not live_render
+                    and str(live_entry.get("status") or entry.get("status") or manifest.get("status") or "missing")
+                    == "ok"
+                    else str(live_entry.get("status") or entry.get("status") or manifest.get("status") or "missing")
+                ),
                 "stale": bool(
                     live_entry.get("stale")
                     if live_entry.get("stale") is not None

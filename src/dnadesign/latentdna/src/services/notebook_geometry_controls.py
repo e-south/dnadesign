@@ -92,6 +92,8 @@ def _projection_inventory(context) -> dict[str, list[str]]:
         if not manifest_path.is_file() or not coords_path.is_file():
             continue
         manifest = read_json(manifest_path)
+        if not _manifest_is_current(manifest, artifact_id=projection_dir.name, artifact_kind="projection"):
+            continue
         view_id = next(
             (
                 str(item.get("id"))
@@ -182,6 +184,21 @@ def _manifest_view_ids(
     }
 
 
+def _manifest_is_current(manifest: dict[str, object], *, artifact_id: str, artifact_kind: str | None = None) -> bool:
+    if not manifest:
+        return False
+    manifest_artifact_id = str(manifest.get("artifact_id") or "").strip()
+    if not manifest_artifact_id or manifest_artifact_id != artifact_id:
+        return False
+    manifest_kind = str(manifest.get("artifact_kind") or "").strip()
+    if artifact_kind and (not manifest_kind or manifest_kind != artifact_kind):
+        return False
+    status = str(manifest.get("status") or "").strip().lower()
+    if status and status != "ok":
+        return False
+    return not bool(manifest.get("stale"))
+
+
 def _table_targets_visible_views(
     *,
     artifact_id: str,
@@ -189,11 +206,8 @@ def _table_targets_visible_views(
     visible_view_ids: set[str],
 ) -> bool:
     manifest_view_ids = _manifest_view_ids(manifest)
-    if manifest_view_ids:
-        return bool(manifest_view_ids.intersection(visible_view_ids))
-    if "20b" in artifact_id.casefold() and not any("20b" in view_id.casefold() for view_id in visible_view_ids):
-        return False
-    return True
+    del artifact_id
+    return bool(manifest_view_ids.intersection(visible_view_ids))
 
 
 def _table_inventory(
@@ -204,11 +218,11 @@ def _table_inventory(
     inventory: list[WorkspaceNotebookTableRef] = []
     schemas: dict[str, object] = {}
     table_roots = [
-        ("scalar", "scalars", "table.parquet"),
-        ("distance", "distances", "table.parquet"),
-        ("cluster", "clusters", "assignments.parquet"),
+        ("scalar", "scalars", "table.parquet", "scalar_table"),
+        ("distance", "distances", "table.parquet", "distance_set"),
+        ("cluster", "clusters", "assignments.parquet", "cluster_set"),
     ]
-    for kind, root_name, filename in table_roots:
+    for kind, root_name, filename, artifact_kind in table_roots:
         root = context.output_root / root_name
         if not root.is_dir():
             continue
@@ -223,6 +237,8 @@ def _table_inventory(
                     manifest = read_json(manifest_path)
                 except Exception:
                     manifest = {}
+            if not _manifest_is_current(manifest, artifact_id=artifact_dir.name, artifact_kind=artifact_kind):
+                continue
             if not _table_targets_visible_views(
                 artifact_id=artifact_dir.name,
                 manifest=manifest,
