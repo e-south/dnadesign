@@ -70,6 +70,19 @@ def _load_error_frame(message: str) -> pd.DataFrame:
     return frame
 
 
+def _frame_load_error(frame: pd.DataFrame) -> str:
+    if not isinstance(getattr(frame, "attrs", None), dict):
+        return ""
+    return str(frame.attrs.get("load_error") or "").strip()
+
+
+def _callout_from_frame_errors(frames: list[pd.DataFrame], *, fallback_message: str):
+    unique_errors = list(dict.fromkeys(_frame_load_error(frame) for frame in frames if _frame_load_error(frame)))
+    if unique_errors:
+        return mo.callout("Live plot data are unavailable: " + "; ".join(unique_errors), kind="warn")
+    return mo.callout(fallback_message, kind="warn")
+
+
 def _projection_view_id(output_root: Path, projection_id: str) -> str | None:
     try:
         manifest = load_artifact_manifest(
@@ -248,14 +261,6 @@ def render_plot_review_surface(
     plot_alt_text = str(plot_spec.get("alt_text") or plot_spec.get("plot_id") or "latentdna live plot")
     resolved_plot_spec = {key: value for key, value in plot_spec.items() if key != "alt_text"}
     kind = str(resolved_plot_spec.get("kind") or "")
-    load_errors = [
-        str(frame.attrs.get("load_error") or "").strip()
-        for frame in frames
-        if isinstance(getattr(frame, "attrs", None), dict) and str(frame.attrs.get("load_error") or "").strip()
-    ]
-    if load_errors and kind != "projection_grid":
-        unique_errors = list(dict.fromkeys(load_errors))
-        return mo.callout("Live plot data are unavailable: " + "; ".join(unique_errors), kind="warn")
     if kind == "projection_grid":
         prefer_single_row = _prefer_single_row_panel_layout(
             str(resolved_plot_spec.get("plot_id") or ""),
@@ -314,7 +319,10 @@ def _render_scatter_grid(
     alt_text: str,
 ):
     if not frames or not any(not frame.empty for frame in frames):
-        return mo.callout("The selected plot has no persisted scalar data to render.", kind="warn")
+        return _callout_from_frame_errors(
+            frames,
+            fallback_message="The selected plot has no persisted scalar data to render.",
+        )
 
     x_column = str(plot_spec.get("x_column") or "x")
     y_column = str(plot_spec.get("y_column") or "y")
@@ -368,12 +376,13 @@ def _render_scatter_grid(
 
     for index, (ax, frame) in enumerate(zip(axes_flat, resolved_frames, strict=False)):
         panel_title = compact_candidate_title(_plot_panel_title(plot_spec, index, f"Panel {index + 1}"))
+        load_error = _frame_load_error(frame)
         if frame.empty or x_column not in frame.columns or y_column not in frame.columns:
             _render_placeholder_panel(
                 ax,
                 panel_title=panel_title,
-                message="Panel data missing",
-                detail="The required coordinates are not available in this snapshot",
+                message="Panel unavailable" if load_error else "Panel data missing",
+                detail=load_error or "The required coordinates are not available in this snapshot",
                 square=True,
             )
             annotation_frames.append(None)
@@ -664,7 +673,10 @@ def _render_scatter_grid(
 
 def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFrame], alt_text: str):
     if not frames or frames[0].empty:
-        return mo.callout("The selected plot has no persisted scalar data to render.", kind="warn")
+        return _callout_from_frame_errors(
+            frames,
+            fallback_message="The selected plot has no persisted scalar data to render.",
+        )
 
     frame = frames[0]
     spec = ResolvedPlotSpec.model_validate(plot_spec)
@@ -744,14 +756,33 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
 
 
 def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFrame], alt_text: str):
-    resolved_frames = [frame for frame in frames if not frame.empty]
-    if not resolved_frames:
-        return mo.callout("The selected plot has no persisted scalar data to render.", kind="warn")
+    if not frames or not any(not frame.empty for frame in frames):
+        return _callout_from_frame_errors(
+            frames,
+            fallback_message="The selected plot has no persisted scalar data to render.",
+        )
 
     spec = ResolvedPlotSpec.model_validate(plot_spec)
     metric_columns = list(spec.metric_columns or [])
-    scalar_tables: list[tuple[str, pd.DataFrame, str]] = []
-    for scalar_id, frame in zip(spec.scalar_ids, resolved_frames, strict=False):
+    panel_entries: list[tuple[str, pd.DataFrame | None, str | None, str | None]] = []
+    panel_titles = list(spec.panel_titles or [])
+    panel_title_index = 0
+
+    def next_panel_title(*, scalar_id: str, metric_column: str | None) -> str:
+        nonlocal panel_title_index
+        if panel_title_index < len(panel_titles):
+            title = str(panel_titles[panel_title_index])
+        else:
+            title = (
+                f"{_derived_panel_label(scalar_id)} · {humanize_display_text(metric_column)}"
+                if metric_column and _derived_panel_label(scalar_id)
+                else humanize_display_text(metric_column or scalar_id)
+            )
+        panel_title_index += 1
+        return title
+
+    for scalar_id, frame in zip(spec.scalar_ids, frames, strict=False):
+        load_error = _frame_load_error(frame)
         numeric_columns = [
             column
             for column in frame.columns
@@ -759,38 +790,61 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
         ]
         if metric_columns:
             for metric_column in metric_columns:
-                if metric_column in numeric_columns:
-                    scalar_tables.append((str(scalar_id), frame, metric_column))
+                panel_title = next_panel_title(scalar_id=str(scalar_id), metric_column=metric_column)
+                if frame.empty:
+                    panel_entries.append((panel_title, None, None, load_error or "Panel data missing"))
+                    continue
+                if metric_column not in numeric_columns:
+                    panel_entries.append(
+                        (
+                            panel_title,
+                            None,
+                            None,
+                            f"`{metric_column}` is missing or non-numeric in `{scalar_id}`",
+                        )
+                    )
+                    continue
+                panel_entries.append((panel_title, frame, metric_column, None))
         else:
             metric_column = (
                 spec.value_column
                 if spec.value_column in numeric_columns
                 else (numeric_columns[0] if numeric_columns else None)
             )
-            if metric_column is not None:
-                scalar_tables.append((str(scalar_id), frame, metric_column))
-    if not scalar_tables:
-        return mo.callout("The selected plot has no numeric distributions to render.", kind="warn")
+            panel_title = next_panel_title(scalar_id=str(scalar_id), metric_column=metric_column)
+            if frame.empty:
+                panel_entries.append((panel_title, None, None, load_error or "Panel data missing"))
+                continue
+            if metric_column is None:
+                panel_entries.append((panel_title, None, None, f"no numeric columns are available in `{scalar_id}`"))
+                continue
+            panel_entries.append((panel_title, frame, metric_column, None))
+    if not any(frame is not None and metric_column is not None for _, frame, metric_column, _ in panel_entries):
+        return _callout_from_frame_errors(
+            frames,
+            fallback_message="The selected plot has no numeric distributions to render.",
+        )
 
-    rows_count, columns = static_panel_grid_dimensions(len(scalar_tables))
+    rows_count, columns = static_panel_grid_dimensions(len(panel_entries))
     square_distribution_panels = spec.plot_id == "context_delta_distributions"
     fig, axes = plt.subplots(
         rows_count,
         columns,
-        figsize=static_grid_figure_size(len(scalar_tables), square_panels=square_distribution_panels),
+        figsize=static_grid_figure_size(len(panel_entries), square_panels=square_distribution_panels),
         squeeze=False,
     )
-    titles = spec.panel_titles or [
-        (
-            f"{_derived_panel_label(scalar_id)} · {humanize_display_text(metric_column)}"
-            if _derived_panel_label(scalar_id)
-            else humanize_display_text(metric_column)
-        )
-        for scalar_id, _, metric_column in scalar_tables
-    ]
-    for axis in axes.ravel()[len(scalar_tables) :]:
+    for axis in axes.ravel()[len(panel_entries) :]:
         axis.set_axis_off()
-    for axis, (_, frame, metric_column), panel_title in zip(axes.ravel(), scalar_tables, titles, strict=False):
+    for axis, (panel_title, frame, metric_column, error_detail) in zip(axes.ravel(), panel_entries, strict=False):
+        if frame is None or metric_column is None:
+            _render_placeholder_panel(
+                axis,
+                panel_title=panel_title,
+                message="Panel unavailable",
+                detail=wrap_plot_title(str(error_detail or "Panel data missing"), width=34, max_lines=4),
+                square=square_distribution_panels,
+            )
+            continue
         _render_distribution_panel(
             axis,
             rows=frame.to_dict(orient="records"),
@@ -872,7 +926,10 @@ def _render_curve_grid(plot_spec: dict[str, object], *, output_root: Path, alt_t
 
 def _render_categorical_count_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFrame], alt_text: str):
     if not frames or frames[0].empty:
-        return mo.callout("The selected plot has no persisted scalar data to render.", kind="warn")
+        return _callout_from_frame_errors(
+            frames,
+            fallback_message="The selected plot has no persisted scalar data to render.",
+        )
 
     frame = frames[0].copy()
     spec = ResolvedPlotSpec.model_validate(plot_spec)

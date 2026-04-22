@@ -416,6 +416,71 @@ def test_render_plot_review_surface_allows_projection_grids_with_partial_panel_e
     assert rendered is sentinel
 
 
+def test_render_plot_review_surface_allows_scatter_grids_with_partial_panel_errors(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame({"x": [0.0, 1.0], "y": [1.0, 0.0]}),
+        pd.DataFrame(),
+    ]
+    frames[1].attrs["load_error"] = "scalar_table artifact is not fresh for `stale_scalar`: status=attention"
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "design_centroid_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "x",
+            "y_column": "y",
+            "scalar_ids": ["healthy_scalar", "stale_scalar"],
+            "panel_titles": ["Healthy panel", "Stale panel"],
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert fig.axes[0].get_title() == "Healthy Panel"
+    assert fig.axes[1].get_title() == "Stale Panel"
+    stale_panel_text = " ".join(text.get_text().replace("\n", " ") for text in fig.axes[1].texts).lower()
+    assert "artifact is not fresh" in stale_panel_text
+    assert "status=attention" in stale_panel_text
+
+
+def test_render_plot_review_surface_allows_distribution_grids_with_partial_panel_errors(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame({"score": [0.2, 0.4, 0.6]}),
+        pd.DataFrame(),
+    ]
+    frames[1].attrs["load_error"] = "scalar_table artifact is not fresh for `stale_scalar`: status=attention"
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "context_delta_distributions",
+            "kind": "distribution_grid",
+            "scalar_ids": ["healthy_scalar", "stale_scalar"],
+            "value_column": "score",
+            "panel_titles": ["Healthy panel", "Stale panel"],
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert fig.axes[0].get_title() == "Healthy Panel"
+    assert fig.axes[1].get_title() == "Stale Panel"
+    stale_panel_text = " ".join(text.get_text().replace("\n", " ") for text in fig.axes[1].texts).lower()
+    assert "artifact is not fresh" in stale_panel_text
+    assert "status=attention" in stale_panel_text
+
+
 def test_render_plot_review_surface_supports_curve_grid(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
     reducer_dir = tmp_path / "reducers" / "demo_curve"

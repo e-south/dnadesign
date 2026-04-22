@@ -48,6 +48,7 @@ REFERENCE_DISPLAY = {
 }
 
 _RUNTIME_TABLE_ARTIFACT_KINDS = {
+    "alignments": "alignment_set",
     "clusters": "cluster_set",
     "distances": "distance_set",
     "projections": "projection",

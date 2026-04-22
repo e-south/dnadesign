@@ -183,6 +183,49 @@ def test_notebook_controls_sort_projection_ids_by_role_then_full_population(tmp_
     assert geometry.projection_ids == ["umap_anchor", "audit_umap_anchor"]
 
 
+def test_notebook_controls_keep_attention_projection_visible_for_geometry_browser(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "subject_id": ["row0", "row1"]}).to_parquet(
+        view_dir / "rows.parquet",
+        index=False,
+    )
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    projection_dir = context.output_root / "projections" / "umap_anchor_attention"
+    projection_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        projection_dir / "coords.parquet",
+        index=False,
+    )
+    _write_artifact_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id="umap_anchor_attention",
+        status="attention",
+        inputs=[{"kind": "view_matrix", "id": "intermediate_embedding_7b_anchor_60bp"}],
+        params={"projection_role": "appendix", "default_rank": 10},
+        stats={
+            "rows": 2,
+            "projected_rows": 2,
+            "population_rows": 2,
+            "is_full_population": True,
+        },
+    )
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    geometry = next(
+        row for row in controls.geometry_controls.geometries if row.view_id == "intermediate_embedding_7b_anchor_60bp"
+    )
+    assert geometry.projection_ids == ["umap_anchor_attention"]
+
+
 def test_notebook_controls_degrade_invalid_plot_manifest_to_error_status(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

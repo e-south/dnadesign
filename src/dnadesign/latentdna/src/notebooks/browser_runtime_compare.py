@@ -78,12 +78,16 @@ def resolve_alignment_pair_indices(
     output_root: Path,
     swapped: bool,
 ) -> tuple[np.ndarray, np.ndarray] | None:
-    mapping = load_table(output_root / "alignments" / alignment_id / "mapping.parquet")
+    mapping = load_table(
+        output_root / "alignments" / alignment_id / "mapping.parquet",
+        require_fresh_manifest=True,
+    )
     if mapping.empty:
         return None
     required = {"left_indices", "right_indices", "left_count", "right_count"}
     if not required.issubset(set(mapping.columns)):
-        return None
+        missing = sorted(required.difference(set(mapping.columns)))
+        raise ValueError(f"alignment mapping is invalid for `{alignment_id}`: missing columns {missing}")
     mapping = mapping[(mapping["left_count"] == 1) & (mapping["right_count"] == 1)].copy()
     if mapping.empty:
         return None
@@ -120,7 +124,11 @@ def resolve_shared_key_pair_indices(
                 suffixes=("_left", "_right"),
             )
         if merged.empty:
-            continue
+            join_label = left_key if left_key == right_key else f"{left_key}->{right_key}"
+            raise ValueError(
+                "shared unique row key exposes zero overlap between the selected views; "
+                f"refusing fallback to a weaker join basis: `{join_label}`"
+            )
         return (
             merged["index_left"].to_numpy(dtype=np.int64),
             merged["index_right"].to_numpy(dtype=np.int64),

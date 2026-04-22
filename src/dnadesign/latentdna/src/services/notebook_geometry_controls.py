@@ -92,7 +92,12 @@ def _projection_inventory(context) -> dict[str, list[str]]:
         if not manifest_path.is_file() or not coords_path.is_file():
             continue
         manifest = read_json(manifest_path)
-        if not _manifest_is_current(manifest, artifact_id=projection_dir.name, artifact_kind="projection"):
+        if not _manifest_is_current(
+            manifest,
+            artifact_id=projection_dir.name,
+            artifact_kind="projection",
+            allowed_statuses={"ok", "attention"},
+        ):
             continue
         view_id = next(
             (
@@ -184,7 +189,13 @@ def _manifest_view_ids(
     }
 
 
-def _manifest_is_current(manifest: dict[str, object], *, artifact_id: str, artifact_kind: str | None = None) -> bool:
+def _manifest_is_current(
+    manifest: dict[str, object],
+    *,
+    artifact_id: str,
+    artifact_kind: str | None = None,
+    allowed_statuses: set[str] | None = None,
+) -> bool:
     if not manifest:
         return False
     manifest_artifact_id = str(manifest.get("artifact_id") or "").strip()
@@ -194,7 +205,10 @@ def _manifest_is_current(manifest: dict[str, object], *, artifact_id: str, artif
     if artifact_kind and (not manifest_kind or manifest_kind != artifact_kind):
         return False
     status = str(manifest.get("status") or "").strip().lower()
-    if status and status != "ok":
+    if not status:
+        return False
+    valid_statuses = {item.strip().lower() for item in (allowed_statuses or {"ok"}) if str(item).strip()}
+    if status not in valid_statuses:
         return False
     return not bool(manifest.get("stale"))
 

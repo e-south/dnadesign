@@ -40,6 +40,30 @@ def _write_view(
     )
 
 
+def _write_alignment(
+    output_root: Path,
+    *,
+    alignment_id: str,
+    rows: list[dict[str, object]],
+    status: str = "ok",
+    stale: bool = False,
+) -> None:
+    alignment_dir = output_root / "alignments" / alignment_id
+    alignment_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_parquet(alignment_dir / "mapping.parquet", index=False)
+    alignment_dir.joinpath("manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "alignment_set",
+                "artifact_id": alignment_id,
+                "status": status,
+                "stale": stale,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_compare_pair_payload_falls_back_to_shared_key_basis(tmp_path: Path) -> None:
     output_root = tmp_path / "outputs"
     _write_view(
@@ -195,6 +219,57 @@ def test_compare_pair_payload_errors_when_no_unique_shared_key_exists(tmp_path: 
     assert "shared unique row key" in str(payload["error"])
 
 
+def test_compare_pair_payload_errors_when_preferred_unique_join_key_has_zero_overlap(tmp_path: Path) -> None:
+    output_root = tmp_path / "outputs"
+    _write_view(
+        output_root,
+        view_id="left_view",
+        rows=pd.DataFrame(
+            {
+                "construct__anchor_id": ["anchor_a", "anchor_b", "anchor_c"],
+                "id": ["shared_0", "shared_1", "shared_2"],
+            }
+        ),
+        matrix=np.asarray(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+            ]
+        ),
+    )
+    _write_view(
+        output_root,
+        view_id="right_view",
+        rows=pd.DataFrame(
+            {
+                "construct__anchor_id": ["context_a", "context_b", "context_c"],
+                "id": ["shared_0", "shared_1", "shared_2"],
+            }
+        ),
+        matrix=np.asarray(
+            [
+                [0.0, 1.0],
+                [0.8, 0.2],
+                [1.0, 0.9],
+            ]
+        ),
+    )
+
+    payload = compare_pair_payload(
+        "left_view",
+        "right_view",
+        geometry_rows_by_id={},
+        comparison_bases=[],
+        compare_metrics={"sample_rows": 3},
+        output_root=output_root,
+    )
+
+    assert payload["status"] == "error"
+    assert "refusing fallback to a weaker join basis" in str(payload["error"])
+    assert "construct__anchor_id" in str(payload["error"])
+
+
 def test_compare_pair_payload_refuses_stale_view_manifests(tmp_path: Path) -> None:
     output_root = tmp_path / "outputs"
     _write_view(
@@ -246,6 +321,49 @@ def test_compare_pair_payload_refuses_stale_view_manifests(tmp_path: Path) -> No
 
     assert payload["status"] == "missing"
     assert "view artifact is not fresh" in str(payload["error"])
+
+
+def test_compare_pair_payload_refuses_non_fresh_explicit_alignment_manifest(tmp_path: Path) -> None:
+    output_root = tmp_path / "outputs"
+    _write_view(
+        output_root,
+        view_id="left_view",
+        rows=pd.DataFrame({"id": ["row0", "row1"]}),
+        matrix=np.asarray([[0.0, 1.0], [1.0, 0.0]]),
+    )
+    _write_view(
+        output_root,
+        view_id="right_view",
+        rows=pd.DataFrame({"id": ["row0", "row1"]}),
+        matrix=np.asarray([[0.0, 1.0], [0.8, 0.2]]),
+    )
+    _write_alignment(
+        output_root,
+        alignment_id="left_to_right",
+        rows=[
+            {"left_indices": [0], "right_indices": [0], "left_count": 1, "right_count": 1},
+            {"left_indices": [1], "right_indices": [1], "left_count": 1, "right_count": 1},
+        ],
+        status="attention",
+    )
+
+    payload = compare_pair_payload(
+        "left_view",
+        "right_view",
+        geometry_rows_by_id={},
+        comparison_bases=[
+            {
+                "left_view": "left_view",
+                "right_view": "right_view",
+                "alignment_id": "left_to_right",
+            }
+        ],
+        compare_metrics={"sample_rows": 2},
+        output_root=output_root,
+    )
+
+    assert payload["status"] == "error"
+    assert "alignment_set artifact is not fresh" in str(payload["error"])
 
 
 def test_compare_pair_payload_errors_when_matrix_row_count_drift_exists(tmp_path: Path) -> None:
