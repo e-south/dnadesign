@@ -50,7 +50,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: snapshot posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract
+- Current state: 7B-first browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane infer preference remains `evo2_20b` in `pipeline.yaml`
 - Entry artifact: `promoter/stress_ethanol_cipro_anchor_set` and `promoter/stress_ethanol_cipro_construct_contexts`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
@@ -72,7 +72,7 @@ This page keeps the downstream handoff map in one place.
 - Snapshot attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
-- Browser default geometries: the eight canonical anchor/full-context spaces across `intermediate_embedding` and `pooled_logits` for `evo2_7b` and `evo2_20b`
+- Browser default geometries: the real seven-view 7B-first surface across `intermediate_embedding` and `pooled_logits`; 20B views stay materializable in the workspace but are hidden from the study browser
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors

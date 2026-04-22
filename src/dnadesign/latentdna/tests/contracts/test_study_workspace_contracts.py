@@ -80,6 +80,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
     snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
 
     assert snapshot["schema_version"] == "latentdna.workspace_snapshot.v1"
     assert snapshot["workspace_id"] == "stress_ethanol_cipro_growth"
@@ -98,6 +99,8 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "intermediate_embedding_7b_anchor_plus_full_context_concat",
         "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     ]
+    assert controls.geometry_controls.default_model == "7b"
+    assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
     assert "log_likelihood_per_token_7b" in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_ethanol_vs_control" not in snapshot["browser"]["preferred_hues"]

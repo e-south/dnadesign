@@ -21,6 +21,7 @@
 - Preferred infer family: `evo2_20b`
 - Supported infer families: `evo2_20b`, `evo2_7b`
 - The study phase is `infer_batch_preparation`
+- LatentDNA browser default family: `evo2_7b` for the seven-view scientist-facing review surface; 20B views remain materializable but hidden in the browser
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
 - Current attention surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
 - Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
@@ -40,7 +41,7 @@
 - LatentDNA: `configured` for downstream comparison; the study-status authority remains the checked-in record plus `usr.data-plane.promoter-study-status`
 - LatentDNA gate: `representation_health_summary`
 - LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
-- LatentDNA notebook role: plot-first review surface for the five-step pre-assay ladder, with appendix and debug material kept secondary
+- LatentDNA notebook role: plot-first review surface for the seven-view 7B-first pre-assay ladder, with appendix and debug material kept secondary
 - Cluster: `planned`
 - OPAL: `not_configured`
 - Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`

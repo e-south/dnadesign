@@ -5,9 +5,9 @@ source_datasets:
   anchor_60bp: promoter/stress_ethanol_cipro_anchor_set
   full_context_1kb: promoter/stress_ethanol_cipro_construct_contexts
 supported_model_families:
-  - evo2_20b
   - evo2_7b
-default_model_family: evo2_20b
+  - evo2_20b
+default_model_family: evo2_7b
 required_wildtype_references:
   - spyp
   - sulap

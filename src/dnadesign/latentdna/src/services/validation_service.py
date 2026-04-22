@@ -143,10 +143,15 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                     column for column in required_materialized_columns if column not in materialized_columns
                 )
                 if missing_materialized_columns:
-                    raise WorkspaceValidationError(
-                        "materialized view rows are missing configured metadata columns: "
-                        f"{view_id} ({missing_materialized_columns})"
-                    )
+                    if str(getattr(view, "role", "") or "").strip().lower() != "hidden":
+                        raise WorkspaceValidationError(
+                            "materialized view rows are missing configured metadata columns: "
+                            f"{view_id} ({missing_materialized_columns})"
+                        )
+                    view_detail["materialized_contract_status"] = "skipped_hidden"
+                    view_detail["missing_materialized_row_columns"] = missing_materialized_columns
+                else:
+                    view_detail["materialized_contract_status"] = "ok"
                 view_detail["materialized"] = True
                 view_detail["materialized_row_columns"] = sorted(materialized_columns)
             else:
