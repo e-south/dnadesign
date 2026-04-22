@@ -1,0 +1,106 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/test_cruncher_study_docs_and_skill_contracts.py
+
+Docs and repo-local skill contracts for the checked-in Cruncher shortening study.
+
+Module Author(s): Codex
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+from pathlib import Path
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
+
+
+def _read(rel_path: str) -> str:
+    return (_repo_root() / rel_path).read_text(encoding="utf-8")
+
+
+def test_snapback_shortening_study_is_visible_through_docs_and_agents() -> None:
+    docs_index = _read("docs/README.md")
+    studies_index = _read("docs/studies/README.md")
+    cruncher_docs = _read("src/dnadesign/cruncher/docs/README.md")
+    root_agents = _read("AGENTS.md")
+    cruncher_agents = _read("src/dnadesign/cruncher/AGENTS.md")
+    dev_docs = _read("docs/dev/README.md")
+
+    assert "cruncher-study-status.md" in docs_index
+    assert "cruncher-study-preflight.md" in docs_index
+    assert "studies/snapback_shortening_effort/status.md" in docs_index
+    assert ".agents/skills/snapback-hairpin-study/SKILL.md" in studies_index
+    assert "docs/studies/snapback_shortening_effort" in studies_index
+    assert "snapback_shortening_effort/status.md" in cruncher_docs
+    assert "snapback_shortening_effort/routes.md" in cruncher_docs
+    assert ".agents/skills/snapback-hairpin-study/SKILL.md" in cruncher_docs
+    assert ".agents/skills/snapback-hairpin-study/SKILL.md" in root_agents
+    assert ".agents/skills/snapback-hairpin-study/SKILL.md" in cruncher_agents
+    assert ".agents/skills/snapback-hairpin-study/scripts/audit-snapback-hairpin-study-skill.sh" in dev_docs
+
+
+def test_snapback_shortening_study_record_and_skill_keep_boundary_language_explicit() -> None:
+    skill = _read(".agents/skills/snapback-hairpin-study/SKILL.md")
+    route_matrix = _read(".agents/skills/snapback-hairpin-study/references/route-matrix.md")
+    refresh_loop = _read(".agents/skills/snapback-hairpin-study/references/refresh-loop.md")
+    study_surfaces = _read(".agents/skills/snapback-hairpin-study/references/study-surfaces.md")
+    status = _read("docs/studies/snapback_shortening_effort/status.md")
+    routes = _read("docs/studies/snapback_shortening_effort/routes.md")
+    pipeline = _read("docs/studies/snapback_shortening_effort/pipeline.yaml")
+    ops_study = _read("docs/studies/snapback_shortening_effort/ops.study.yaml")
+
+    assert "released-product Snapback" in status
+    assert "YIU" in status
+    assert "Repo-local study shortcut" in status
+    assert "This page keeps the study-owned handoff map in one place." in routes
+    assert "Pair with:" in routes
+    assert "repo:.agents/skills/snapback-hairpin-study/SKILL.md" in pipeline
+    assert "pair_with:" in pipeline
+    assert "harness-engineering" in pipeline
+    assert "pragmatic-programming-principles" in pipeline
+    assert "skill_ref: repo:.agents/skills/snapback-hairpin-study/SKILL.md" not in ops_study
+    assert "repo_local_skill" not in ops_study
+    assert "study.skill.present" not in ops_study
+    assert "harness-engineering" in skill
+    assert "pragmatic-programming-principles" in skill
+    assert "knowledge-integrity" in skill
+    assert "autonomy-capability" in skill
+    assert "architecture-invariants" in skill
+    assert "docs/studies/snapback_shortening_effort/status.md" in skill
+    assert "cruncher.data-plane.cruncher-study-status" in route_matrix
+    assert "cruncher.data-plane.cruncher-study-preflight" in route_matrix
+    assert "Blank-thread bootstrap" in refresh_loop
+    assert "Pair with `harness-engineering`" in refresh_loop
+    assert "Pair with `pragmatic-programming-principles`" in refresh_loop
+    assert "docs/studies/snapback_shortening_effort/status.md" in study_surfaces
+    assert ".agents/skills/snapback-hairpin-study/SKILL.md" in study_surfaces
+
+
+def test_repo_local_snapback_hairpin_skill_audit_is_present_and_passes() -> None:
+    skill_root = _repo_root() / ".agents" / "skills" / "snapback-hairpin-study"
+
+    assert (skill_root / "SKILL.md").exists()
+    assert (skill_root / "references" / "route-matrix.md").exists()
+    assert (skill_root / "references" / "refresh-loop.md").exists()
+    assert (skill_root / "references" / "study-surfaces.md").exists()
+    assert (skill_root / "references" / "external-sources.md").exists()
+    assert (skill_root / "scripts" / "audit-snapback-hairpin-study-skill.sh").exists()
+
+    result = subprocess.run(
+        [shutil.which("bash") or "bash", str(skill_root / "scripts" / "audit-snapback-hairpin-study-skill.sh")],
+        cwd=_repo_root(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

@@ -33,6 +33,17 @@ Use these surfaces in order:
 | What blocks the next execution step here? | `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` | Command-level readiness for the next actionable phase on this host. |
 | Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
 
+### Family shortcuts
+
+- Active promoter-study snapshot:
+  `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- Checked-in Cruncher shortening-study snapshot:
+  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
+- Checked-in Cruncher shortening-study preflight:
+  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
+- Repo-local shortening-study skill:
+  `.agents/skills/snapback-hairpin-study/SKILL.md`
+
 ### Fresh-thread bootstrap
 
 Use this sequence when a new thread starts cold or the repo-local skill is not
@@ -45,6 +56,11 @@ visible:
    only when the question is blocker or next-run readiness.
 4. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
    is answered and the next owner surface is the real need.
+
+For the checked-in Cruncher shortening example, pin the study explicitly:
+
+- `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
+- `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
 
 Authority chain: `docs/studies/index.yaml` selects the active study,
 the matching `docs/studies/<study-id>/` directory holds the required
@@ -214,6 +230,7 @@ for the first pull rather than relying on local name guessing.
 - To pin a non-active study or run from outside the repo checkout, add:
   `--repo-root <repo-root> --study-dir docs/studies/<study-id>`
 - The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.
+- The repo-local shortening-study skill lives at `.agents/skills/snapback-hairpin-study/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the pinned `cruncher-study-status` and `cruncher-study-preflight` commands above directly.
 - Read `docs/studies/index.yaml` first.
 - `active_study_id` must name a study declared under `studies:`.
 - The selected study entry must declare `family` and `record_root`.

@@ -75,6 +75,9 @@ Released-product explicit bundles can report:
 `released-show` is strict on purpose. It fails fast when it finds:
 
 - manifest and status contract drift
+- manifest artifact-inventory drift
+- source spec hash drift
+- provenance snapshot hash drift
 - missing required provenance snapshots or analysis payloads
 - report and projection inconsistency
 - run-dir, workflow, or stage drift

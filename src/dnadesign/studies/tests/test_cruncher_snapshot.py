@@ -31,6 +31,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
         snapback_workspace / "inputs" / "release_enzymes",
         yiu_workspace / "configs" / "yiu",
         repo_root / "src" / "dnadesign" / "cruncher" / "docs" / "dev",
+        repo_root / ".agents" / "skills" / "snapback-hairpin-study",
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -58,11 +59,27 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
         "# yiu\n",
         encoding="utf-8",
     )
+    (repo_root / ".agents" / "skills" / "snapback-hairpin-study" / "SKILL.md").write_text(
+        "# skill\n",
+        encoding="utf-8",
+    )
 
     study_root = repo_root / "docs" / "studies" / "demo_study"
     study_root.mkdir(parents=True, exist_ok=True)
     (study_root / "status.md").write_text(
-        "# Demo study\n\nCurrent phase: snapback_released_probe\n",
+        (
+            "# Demo study\n\n"
+            "**Owner:** dnadesign-maintainers\n"
+            "**Last verified:** 2026-04-21\n\n"
+            "### At a glance\n\n"
+            "- Released-product Snapback stays active.\n"
+            "- YIU remains contrast only.\n\n"
+            "### Current phase and surfaces\n\n"
+            "- Current phase: `snapback_released_probe`\n"
+            "- Next owner surface: `docs/studies/demo_study/routes.md`\n"
+            "- Primary workspace: `src/dnadesign/cruncher/workspaces/demo_snapback`\n"
+            "- Contrast workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`\n"
+        ),
         encoding="utf-8",
     )
     (study_root / "routes.md").write_text("# Routes\n", encoding="utf-8")
@@ -93,6 +110,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                 "intent": {
                     "primary_goal": "Evaluate released-product Snapback as the shortening lane.",
                     "primary_lane": "released-product snapback",
+                    "operator_question": "Can released-product Snapback own the compact post-release object?",
                     "context_refs": [
                         "repo:src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md",
                         "repo:src/dnadesign/cruncher/docs/dev/2026-04-19-yiu-retron-mismatch-bulge-audit.md",
@@ -122,9 +140,14 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                 ],
                 "native_agent_bootstrap": {
                     "open_first": [
+                        "repo:.agents/skills/snapback-hairpin-study/SKILL.md",
                         "manifest:status.md",
                         "manifest:routes.md",
                         "manifest:pipeline.yaml",
+                    ],
+                    "pair_with": [
+                        "harness-engineering",
+                        "pragmatic-programming-principles",
                     ],
                     "must_preserve": [
                         "released-product Snapback is the active shortening lane",
@@ -371,9 +394,22 @@ def test_provide_cruncher_status_exposes_command_groups_and_agent_bootstrap(tmp_
         "yiu_boundary_check",
     ]
     assert evidence["native_agent_bootstrap"]["open_first"] == [
+        str(tmp_path / ".agents" / "skills" / "snapback-hairpin-study" / "SKILL.md"),
         str(study_root / "status.md"),
         str(study_root / "routes.md"),
         str(study_root / "pipeline.yaml"),
+    ]
+    assert evidence["native_agent_bootstrap"]["pair_with"] == [
+        "harness-engineering",
+        "pragmatic-programming-principles",
+    ]
+    assert "skill_ref" not in evidence["record_sources"]
+    assert "repo_local_skill" not in evidence["artifacts"]
+    assert evidence["status_excerpt"] == [
+        "- Current phase: `snapback_released_probe`",
+        "- Next owner surface: `docs/studies/demo_study/routes.md`",
+        "- Primary workspace: `src/dnadesign/cruncher/workspaces/demo_snapback`",
+        "- Contrast workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`",
     ]
 
 

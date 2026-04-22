@@ -225,7 +225,9 @@ def _project_released_product(
         entry=release_match.variant,
     )
     release_site_survives = any(
-        match.site.orientation == release_match.site.orientation for match in retained_release_matches
+        match.key() == release_match.key()
+        and match.site.matched_span_sequence == release_match.site.matched_span_sequence
+        for match in retained_release_matches
     )
     if not constraints.allow_post_release_loss_of_nickase_site and not nickase_site_survives:
         return (

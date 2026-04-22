@@ -115,6 +115,9 @@ def build_released_manifest(
         "contract": report.metadata.kind,
         "spec_path": str(spec_path.resolve()),
         "spec_sha256": sha256_path(spec_path),
+        "spec_snapshot_sha256": sha256_path(released_spec_snapshot_path(run_dir)),
+        "nickase_catalog_sha256": sha256_path(released_nickase_catalog_snapshot_path(run_dir)),
+        "release_catalog_sha256": sha256_path(released_release_catalog_snapshot_path(run_dir)),
         "artifacts": [
             {"name": "report_json", "path": str(released_report_json_path(run_dir).relative_to(run_dir))},
             {"name": "spec_snapshot", "path": str(released_spec_snapshot_path(run_dir).relative_to(run_dir))},

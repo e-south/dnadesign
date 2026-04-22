@@ -9,6 +9,7 @@ record_sources:
   pipeline_ref: manifest:pipeline.yaml
   campaign_ref: manifest:campaign.yaml
   routes_ref: manifest:routes.md
+  skill_ref: repo:.agents/skills/<study-skill>/SKILL.md
 
 lifecycle:
   phase_order:
@@ -40,6 +41,9 @@ artifacts:
   pipeline_doc:
     artifact_type: file
     ref: manifest:pipeline.yaml
+  repo_local_skill:
+    artifact_type: file
+    ref: repo:.agents/skills/<study-skill>/SKILL.md
 
 execution_surfaces:
   primary_workspace:
@@ -76,6 +80,12 @@ preflight:
         summary: Study status note is present.
         required: true
         artifact: status_note
+      - kind: path_exists
+        check_id: study.skill.present
+        check_group: study_record
+        summary: Repo-local study skill is present.
+        required: true
+        artifact: repo_local_skill
     <current-phase>:
       - kind: workspace_layout
         check_id: primary.workspace

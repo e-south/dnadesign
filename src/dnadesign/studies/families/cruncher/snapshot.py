@@ -26,7 +26,11 @@ def build_cruncher_study_status(
             "study_id": study_context.study_id,
             "family": study_context.ops_contract.family,
             "title": study_context.ops_contract.title,
+            "record_sources": dict(study_context.ops_contract.record_sources),
             "record_paths": {name: str(path) for name, path in study_context.record_paths.items()},
+            "artifacts": {
+                artifact_id: dict(payload) for artifact_id, payload in study_context.ops_contract.artifacts.items()
+            },
             "current_phase": study_context.current_phase,
             "current_phase_status": _phase_status(study_context, study_context.current_phase),
             "phase_states": list(study_context.phase_states),

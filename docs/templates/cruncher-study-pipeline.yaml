@@ -4,6 +4,7 @@ study_id: <study-id>
 intent:
   primary_goal: <what the study is trying to settle>
   primary_lane: <lane name>
+  operator_question: <what exact narrowing question is active now>
   non_goals:
     - <non-goal>
   context_refs:
@@ -21,8 +22,12 @@ command_groups:
 
 native_agent_bootstrap:
   open_first:
+    - repo:.agents/skills/<study-skill>/SKILL.md
     - manifest:status.md
     - manifest:routes.md
     - manifest:pipeline.yaml
+  pair_with:
+    - harness-engineering
+    - pragmatic-programming-principles
   must_preserve:
     - <hard boundary>

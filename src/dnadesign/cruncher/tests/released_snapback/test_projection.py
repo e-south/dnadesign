@@ -89,6 +89,19 @@ def test_released_projection_enforces_release_site_survival_when_requested() -> 
     assert any(issue.code == "POST_RELEASE_RELEASE_SITE_LOST" for issue in evaluation.issues)
 
 
+def test_released_projection_does_not_treat_another_same_orientation_site_as_survival() -> None:
+    evaluation = evaluate_released_precursor(
+        precursor_top_strand="CCAATTTGGCCAA",
+        nick_entry=_nick_entry(motif="CCAATTT"),
+        release_entry=_release_entry(),
+        target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
+        constraints=ReleasedSnapbackConstraintsSpec(allow_post_release_loss_of_release_site=False),
+    )
+
+    assert evaluation.status == "no_release_path"
+    assert any(issue.code == "POST_RELEASE_RELEASE_SITE_LOST" for issue in evaluation.issues)
+
+
 def test_released_projection_reuses_explicit_geometry_checks_for_foldback_mismatches() -> None:
     evaluation = evaluate_released_precursor(
         precursor_top_strand="AACGTTATTCCAA",

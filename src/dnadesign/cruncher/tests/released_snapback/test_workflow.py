@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.cruncher.app.snapback_released_show import released_show_payload
@@ -137,3 +138,44 @@ def test_released_design_writes_bundle_and_released_show_revalidates_it(tmp_path
         (run_dir / "analysis" / "released_product_projection.json").read_text(encoding="utf-8")
     )
     assert projection_payload["release_top_cut_precursor"] == 9
+
+
+def test_released_show_detects_source_spec_drift(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    spec_path.write_text("# drift\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Released-product source spec drift detected."):
+        released_show_payload(run_dir)
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "replacement_text", "expected_message"),
+    [
+        ("provenance/spec.snapshot.yaml", "# drift\n", "Released-product spec snapshot integrity drift detected."),
+        (
+            "provenance/nickase_catalog.yaml",
+            "nickases: {schema_version: 1, entries: []}\n",
+            "Released-product nickase catalog snapshot integrity drift detected.",
+        ),
+        (
+            "provenance/release_catalog.yaml",
+            "release_enzymes: {schema_version: 1, entries: []}\n",
+            "Released-product release catalog snapshot integrity drift detected.",
+        ),
+    ],
+)
+def test_released_show_detects_provenance_snapshot_drift(
+    tmp_path: Path,
+    relative_path: str,
+    replacement_text: str,
+    expected_message: str,
+) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    (run_dir / relative_path).write_text(replacement_text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=expected_message):
+        released_show_payload(run_dir)

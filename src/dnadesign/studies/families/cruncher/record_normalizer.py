@@ -198,17 +198,71 @@ def _load_yaml_mapping(path: Path, *, label: str) -> dict[str, object]:
 def _load_status_excerpt(path: Path, *, max_lines: int = 8) -> tuple[str, ...]:
     if not path.exists():
         return ()
+    raw_lines = path.read_text(encoding="utf-8").splitlines()
+    preferred = _extract_status_section_excerpt(
+        raw_lines,
+        section_titles={"current phase and surfaces", "current phase"},
+        max_lines=max_lines,
+    )
+    if preferred:
+        return preferred
+    return _fallback_status_excerpt(raw_lines, max_lines=max_lines)
+
+
+def _extract_status_section_excerpt(
+    raw_lines: Sequence[str],
+    *,
+    section_titles: set[str],
+    max_lines: int,
+) -> tuple[str, ...]:
     lines: list[str] = []
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
+    in_section = False
+    for raw_line in raw_lines:
         line = raw_line.strip()
-        if not line:
+        heading = _markdown_heading_title(line)
+        if heading is not None:
+            if in_section:
+                break
+            if heading in section_titles:
+                in_section = True
             continue
-        if line.startswith("#"):
+        if not in_section:
+            continue
+        if not _should_include_status_excerpt_line(line):
             continue
         lines.append(line)
         if len(lines) >= max_lines:
             break
     return tuple(lines)
+
+
+def _fallback_status_excerpt(raw_lines: Sequence[str], *, max_lines: int) -> tuple[str, ...]:
+    lines: list[str] = []
+    for raw_line in raw_lines:
+        line = raw_line.strip()
+        if not _should_include_status_excerpt_line(line):
+            continue
+        lines.append(line)
+        if len(lines) >= max_lines:
+            break
+    return tuple(lines)
+
+
+def _markdown_heading_title(line: str) -> str | None:
+    if not line.startswith("#"):
+        return None
+    return line.lstrip("#").strip().lower() or None
+
+
+def _should_include_status_excerpt_line(line: str) -> bool:
+    metadata_prefixes = ("**Owner:**", "**Last verified:**")
+    if not line:
+        return False
+    if line.startswith("#"):
+        return False
+    if line.startswith(metadata_prefixes):
+        return False
+    return True
 
 
 def _load_command_groups(
