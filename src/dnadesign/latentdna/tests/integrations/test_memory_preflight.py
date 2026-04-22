@@ -321,6 +321,59 @@ def test_projection_fit_memory_preflight_accounts_for_full_population_all_sample
     assert "reuses the full source view directly" in preflight.notes[0]
 
 
+def test_projection_fit_memory_preflight_warning_preserves_ok_status(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = _prepare_workspace(tmp_path)
+    sample_result = _RUNNER.invoke(
+        app,
+        [
+            "sample",
+            "build",
+            "demo_sample",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--view",
+            "z_demo",
+            "--strategy",
+            "all",
+            "--json",
+        ],
+    )
+    assert sample_result.exit_code == 0, sample_result.stdout
+
+    monkeypatch.setattr(memory_service, "_view_metadata", lambda *args, **kwargs: (157164, 8192, "float32", 4))
+    monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 16 * 1024**3)
+    monkeypatch.setattr(memory_service, "_row_count", lambda *args, **kwargs: 157164)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "projection",
+            "fit",
+            "z_demo",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--sample",
+            "demo_sample",
+            "--run-id",
+            "z_demo_umap",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["warnings"]
+    assert payload["metrics"]["memory_preflight"]["state"] == "warning"
+
+    projection_manifest = json.loads(
+        (workspace_dir / "outputs" / "projections" / "z_demo_umap" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert projection_manifest["status"] == "ok"
+    assert projection_manifest["warnings"]
+    assert projection_manifest["params"]["memory_preflight"]["state"] == "warning"
+
+
 def test_view_reduce_memory_preflight_override_records_attention(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = _prepare_workspace(tmp_path)
     monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 1)

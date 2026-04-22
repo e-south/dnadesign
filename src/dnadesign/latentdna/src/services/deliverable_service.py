@@ -18,6 +18,7 @@ from ..runs.recorder import record_audit
 from ..studies.docs_refs import resolve_docs_ref
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
 from ._artifacts import artifact_dir, artifact_exists, artifact_kind_for_category
+from ._status import merge_statuses
 from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 from .progress_service import build_run_id, heartbeat_scope, start_run_progress
 from .recipe_service import run_recipe
@@ -162,11 +163,14 @@ def deliverable_status_from_context(
         for item_id in ids
     ]
     acceptance_results: list[dict[str, object]] = []
+    acceptance_statuses: list[str] = []
     warnings: list[str] = []
     for acceptance_check in deliverable.acceptance_checks:
         result = _evaluate_acceptance_check(context, deliverable, acceptance_check)
         acceptance_results.append(result)
-        if result["status"] != "ok":
+        result_status = str(result["status"])
+        if result_status != "ok":
+            acceptance_statuses.append(result_status)
             warnings.append(str(result["reason"]))
     base_status = _status_from_entries(checks, outputs)
     return DeliverableStatusResult(
@@ -175,7 +179,7 @@ def deliverable_status_from_context(
         section=deliverable.section,
         question=deliverable.question,
         summary=deliverable.summary,
-        status="attention" if warnings and base_status == "ok" else base_status,
+        status=merge_statuses(base_status, *acceptance_statuses),
         checks=checks,
         outputs=outputs,
         docs_refs=[resolve_docs_ref(context, docs_ref) for docs_ref in deliverable.docs_refs],
@@ -268,9 +272,7 @@ def run_deliverable(
         raise
     output_paths = [entry.path for entry in status.outputs if entry.path is not None and entry.status == "ok"]
     warnings = [*recipe_result.warnings, *status.warnings]
-    result_status = status.status
-    if warnings and result_status == "ok":
-        result_status = "attention"
+    result_status = merge_statuses(recipe_result.status, status.status)
     result = CommandResult(
         command="deliverable run",
         workspace_id=context.workspace_id,

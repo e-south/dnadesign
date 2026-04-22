@@ -26,6 +26,7 @@ from ..sources.resolver import (
 )
 from ..views.pca_policy import select_pca_method, streaming_batch_rows
 from ..workspaces.loader import WorkspaceContext
+from ._status import merge_statuses
 
 ArtifactState = Literal["ok", "warning", "blocked"]
 _VIEW_MATERIALIZE_BATCH_ROWS = 2048
@@ -468,7 +469,7 @@ def apply_memory_preflight(
         if not allow_memory_overage:
             raise MemoryPreflightError(message)
         return "attention", [f"{message}; proceeding because --allow-memory-overage was set"]
-    return "attention", [message]
+    return "ok", [message]
 
 
 def approximate_backend_warning(*, requested_backend: str, resolved_backend: str) -> tuple[str, list[str]]:
@@ -487,11 +488,8 @@ def approximate_backend_warning(*, requested_backend: str, resolved_backend: str
 
 
 def merge_attention_status(statuses: list[str], warnings: list[str]) -> str:
-    if any(status == "error" for status in statuses):
-        return "error"
-    if warnings or any(status == "attention" for status in statuses):
-        return "attention"
-    return "ok"
+    del warnings
+    return merge_statuses(*statuses)
 
 
 def _build_preflight(

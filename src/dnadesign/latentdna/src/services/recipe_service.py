@@ -15,6 +15,7 @@ from ..contracts.result import CommandResult
 from ..runs.recorder import record_audit
 from ..workspaces.loader import load_workspace_config
 from ._artifacts import artifact_exists
+from ._status import merge_statuses
 from .agreement_service import compare_agreement
 from .alignment_service import build_alignment
 from .cluster_service import fit_cluster
@@ -459,6 +460,7 @@ def run_recipe(
     rebuilt_steps = 0
     skipped_steps = 0
     warnings: list[str] = []
+    step_statuses: list[str] = []
     step_summaries: list[dict[str, Any]] = []
     freshness_cache = FreshnessCache()
     progress = start_run_progress(
@@ -524,6 +526,7 @@ def run_recipe(
             if rebuilt:
                 rebuilt_steps += 1
             outputs.extend(step_result.outputs)
+            step_statuses.append(str(step_result.status))
             summary_status = "attention" if step_result.status == "attention" else ("rebuilt" if rebuilt else "ok")
             summary = {
                 "step_id": step_id,
@@ -549,7 +552,7 @@ def run_recipe(
     result = CommandResult(
         command="recipe run",
         workspace_id=context.workspace_id,
-        status="attention" if warnings else "ok",
+        status=merge_statuses(*step_statuses),
         run_id=run_id,
         artifact_kind="recipe",
         artifact_id=recipe_id,

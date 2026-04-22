@@ -21,6 +21,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
+from dnadesign.latentdna.src.services import memory_service
 
 _RUNNER = CliRunner()
 
@@ -290,3 +291,66 @@ def test_recipe_and_deliverable_flow(tmp_path: Path) -> None:
     outputs = {entry["name"]: entry for entry in partial_payload["outputs"]}
     assert outputs["plot:atlas_demo_plot"]["status"] == "missing"
     assert outputs["projection:umap_z20_60"]["status"] == "ok"
+
+
+def test_deliverable_run_stays_ok_when_projection_preflight_only_warns(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            },
+            {
+                "id": "anchor_02",
+                "subject_id": "subject_02",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 1.0],
+            },
+            {
+                "id": "anchor_03",
+                "subject_id": "subject_03",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [10.0, 0.0],
+            },
+            {
+                "id": "anchor_04",
+                "subject_id": "subject_04",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [10.0, 1.0],
+            },
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+
+    monkeypatch.setattr(memory_service, "_view_metadata", lambda *args, **kwargs: (157164, 8192, "float32", 4))
+    monkeypatch.setattr(memory_service, "_row_count", lambda *args, **kwargs: 157164)
+    monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 16 * 1024**3)
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "atlas_demo", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert run_result.exit_code == 0, run_result.stdout
+    run_payload = json.loads(run_result.stdout)
+    assert run_payload["status"] == "ok"
+    assert run_payload["warnings"]
+    assert run_payload["metrics"]["recipe_warnings"] == 1
+
+    projection_manifest = json.loads(
+        (workspace_dir / "outputs" / "projections" / "umap_z20_60" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert projection_manifest["status"] == "ok"
+    assert projection_manifest["warnings"]
+    assert projection_manifest["params"]["memory_preflight"]["state"] == "warning"
