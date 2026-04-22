@@ -251,11 +251,34 @@ def _notebook_health_freshness_reasons(
     notebook_id = str(payload.get("notebook_id") or "")
     if notebook_id and notebook_id != artifact_id:
         return [f"stale notebook health for notebook:{artifact_id}: notebook_id={notebook_id}"], True
+    checks_payload = payload.get("checks")
+    invalid_checks_payload = checks_payload is not None and not isinstance(checks_payload, dict)
+    checks_dict = checks_payload if isinstance(checks_payload, dict) else {}
+    failing_checks = [str(name) for name, value in checks_dict.items() if str(name).strip() and not bool(value)]
+    warnings = [str(item).strip() for item in payload.get("warnings", []) or [] if str(item).strip()]
     status = str(payload.get("status") or "")
     if status == "ok":
+        contradictions: list[str] = []
+        if invalid_checks_payload:
+            contradictions.append("invalid checks payload")
+        if failing_checks:
+            contradictions.append("failing checks: " + ", ".join(sorted(failing_checks)))
+        if warnings:
+            contradictions.append("; ".join(warnings))
+        if contradictions:
+            return [
+                f"stale notebook health for notebook:{artifact_id}: "
+                + "; ".join(part for part in contradictions if part)
+            ], True
         return [], True
-    warnings = [str(item).strip() for item in payload.get("warnings", []) or [] if str(item).strip()]
-    detail = "; ".join(warnings) if warnings else (status or "status unavailable")
+    detail_parts: list[str] = []
+    if invalid_checks_payload:
+        detail_parts.append("invalid checks payload")
+    if failing_checks:
+        detail_parts.append("failing checks: " + ", ".join(sorted(failing_checks)))
+    if warnings:
+        detail_parts.append("; ".join(warnings))
+    detail = "; ".join(detail_parts) if detail_parts else (status or "status unavailable")
     return [f"notebook health requires attention for notebook:{artifact_id}: {detail}"], True
 
 

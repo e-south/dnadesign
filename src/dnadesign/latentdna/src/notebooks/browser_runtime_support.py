@@ -47,6 +47,14 @@ REFERENCE_DISPLAY = {
     "j23105": "J23105",
 }
 
+_RUNTIME_TABLE_ARTIFACT_KINDS = {
+    "clusters": "cluster_set",
+    "distances": "distance_set",
+    "projections": "projection",
+    "scalars": "scalar_table",
+    "views": "view",
+}
+
 PREFERRED_RASTER_PLOT_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 PREFERRED_PLOT_RENDER_SUFFIXES = (".svg", *PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf")
 MAX_INLINE_SVG_BYTES = 5_000_000
@@ -75,9 +83,62 @@ def load_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_table(path: Path) -> pd.DataFrame:
+def load_artifact_manifest(
+    artifact_dir: Path,
+    *,
+    artifact_kind: str,
+    artifact_id: str,
+    allow_missing_status: bool = False,
+) -> dict[str, object]:
+    manifest_path = artifact_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise ValueError(f"{artifact_kind} manifest is missing for `{artifact_id}`")
+    manifest = load_json(manifest_path)
+    if not isinstance(manifest, dict):
+        raise ValueError(f"{artifact_kind} manifest is invalid for `{artifact_id}`")
+    manifest_artifact_id = str(manifest.get("artifact_id") or "").strip()
+    manifest_kind = str(manifest.get("artifact_kind") or "").strip()
+    if not manifest_artifact_id:
+        raise ValueError(f"{artifact_kind} manifest is invalid for `{artifact_id}`: artifact_id=missing")
+    if not manifest_kind:
+        raise ValueError(f"{artifact_kind} manifest is invalid for `{artifact_id}`: artifact_kind=missing")
+    if manifest_kind and manifest_kind != artifact_kind:
+        raise ValueError(
+            f"{artifact_kind} manifest has unexpected artifact kind for `{artifact_id}`: `{manifest_kind}`"
+        )
+    if manifest_artifact_id != artifact_id:
+        raise ValueError(f"{artifact_kind} manifest is stale for `{artifact_id}`: artifact_id=`{manifest_artifact_id}`")
+    status = str(manifest.get("status") or "").strip().lower()
+    if bool(manifest.get("stale")) or (status and status != "ok"):
+        stale_reason = "stale" if bool(manifest.get("stale")) else f"status={status}"
+        raise ValueError(f"{artifact_kind} artifact is not fresh for `{artifact_id}`: {stale_reason}")
+    if not status and not allow_missing_status:
+        raise ValueError(f"{artifact_kind} artifact is not fresh for `{artifact_id}`: status=missing")
+    return manifest
+
+
+def _table_artifact_metadata(path: Path) -> tuple[Path, str, str] | None:
+    artifact_dir = path.parent
+    root_name = artifact_dir.parent.name
+    artifact_kind = _RUNTIME_TABLE_ARTIFACT_KINDS.get(root_name)
+    if artifact_kind is None:
+        return None
+    return artifact_dir, artifact_kind, artifact_dir.name
+
+
+def load_table(path: Path, *, require_fresh_manifest: bool = False) -> pd.DataFrame:
     if not path.is_file():
         return pd.DataFrame()
+    if require_fresh_manifest:
+        metadata = _table_artifact_metadata(path)
+        if metadata is not None:
+            artifact_dir, artifact_kind, artifact_id = metadata
+            load_artifact_manifest(
+                artifact_dir,
+                artifact_kind=artifact_kind,
+                artifact_id=artifact_id,
+                allow_missing_status=artifact_kind != "view",
+            )
     return pd.read_parquet(path)
 
 
@@ -497,6 +558,13 @@ def normalize_categorical_hue_series(column: str | None, values: pd.Series) -> p
 
 
 def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str] | None:
+    candidates = candidate_join_keys(left, right)
+    if not candidates:
+        return None
+    return candidates[0]
+
+
+def candidate_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> list[tuple[str, str]]:
     candidate_pairs = [
         ("construct__anchor_id", "construct__anchor_id"),
         ("construct__anchor_id", "id"),
@@ -506,10 +574,13 @@ def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str
         ("subject_id", "subject_id"),
         ("context_id", "context_id"),
     ]
-    for left_key, right_key in candidate_pairs:
-        if left_key in left.columns and right_key in right.columns:
-            return left_key, right_key
-    return None
+    left_columns = set(left.columns)
+    right_columns = set(right.columns)
+    return [
+        (left_key, right_key)
+        for left_key, right_key in candidate_pairs
+        if left_key in left_columns and right_key in right_columns
+    ]
 
 
 def shared_join_key(left: pd.DataFrame, right: pd.DataFrame) -> str | None:
@@ -527,14 +598,25 @@ def geometry_map(geometry_rows: list[dict[str, object]]) -> dict[str, dict[str, 
 
 
 def load_view_rows(view_id: str, *, output_root: Path) -> pd.DataFrame:
-    return load_table(output_root / "views" / view_id / "rows.parquet")
+    view_dir = output_root / "views" / view_id
+    load_view_manifest(view_id, output_root=output_root)
+    rows_path = view_dir / "rows.parquet"
+    if not rows_path.is_file():
+        raise ValueError(f"view rows artifact is missing for `{view_id}`")
+    return load_table(rows_path)
 
 
-def load_view_matrix(view_id: str, *, output_root: Path):
-    matrix_path = output_root / "views" / view_id / "matrix.npy"
+def load_view_matrix(view_id: str, *, output_root: Path) -> np.ndarray:
+    view_dir = output_root / "views" / view_id
+    load_view_manifest(view_id, output_root=output_root)
+    matrix_path = view_dir / "matrix.npy"
     if not matrix_path.is_file():
-        return None
+        raise ValueError(f"view matrix artifact is missing for `{view_id}`")
     return np.load(matrix_path, mmap_mode="r")
+
+
+def load_view_manifest(view_id: str, *, output_root: Path) -> dict[str, object]:
+    return load_artifact_manifest(output_root / "views" / view_id, artifact_kind="view", artifact_id=view_id)
 
 
 def include_hue_column(column: str, artifact_suffixes: set[str] | None = None) -> bool:

@@ -20,11 +20,11 @@ from ..visual_style import (
     wrap_plot_title,
 )
 from .browser_runtime_support import (
+    candidate_join_keys,
     load_table,
     load_view_matrix,
     load_view_rows,
     render_matplotlib_figure,
-    resolve_join_keys,
     style_notebook_axes,
 )
 
@@ -98,34 +98,35 @@ def resolve_shared_key_pair_indices(
     left_rows: pd.DataFrame,
     right_rows: pd.DataFrame,
 ) -> tuple[np.ndarray, np.ndarray, str] | None:
-    join_keys = resolve_join_keys(left_rows, right_rows)
-    if join_keys is None:
+    join_key_pairs = candidate_join_keys(left_rows, right_rows)
+    if not join_key_pairs:
         return None
-    left_key, right_key = join_keys
-    if left_rows[left_key].duplicated().any() or right_rows[right_key].duplicated().any():
-        raise ValueError(f"shared-key comparison requires unique `{left_key}` / `{right_key}` rows on both sides")
-    if left_key == right_key:
-        merged = left_rows.reset_index().merge(
-            right_rows.reset_index(),
-            on=left_key,
-            how="inner",
-            suffixes=("_left", "_right"),
+    for left_key, right_key in join_key_pairs:
+        if left_rows[left_key].duplicated().any() or right_rows[right_key].duplicated().any():
+            continue
+        if left_key == right_key:
+            merged = left_rows.reset_index().merge(
+                right_rows.reset_index(),
+                on=left_key,
+                how="inner",
+                suffixes=("_left", "_right"),
+            )
+        else:
+            merged = left_rows.reset_index().merge(
+                right_rows.reset_index(),
+                left_on=left_key,
+                right_on=right_key,
+                how="inner",
+                suffixes=("_left", "_right"),
+            )
+        if merged.empty:
+            continue
+        return (
+            merged["index_left"].to_numpy(dtype=np.int64),
+            merged["index_right"].to_numpy(dtype=np.int64),
+            left_key if left_key == right_key else f"{left_key}->{right_key}",
         )
-    else:
-        merged = left_rows.reset_index().merge(
-            right_rows.reset_index(),
-            left_on=left_key,
-            right_on=right_key,
-            how="inner",
-            suffixes=("_left", "_right"),
-        )
-    if merged.empty:
-        return None
-    return (
-        merged["index_left"].to_numpy(dtype=np.int64),
-        merged["index_right"].to_numpy(dtype=np.int64),
-        left_key if left_key == right_key else f"{left_key}->{right_key}",
-    )
+    return None
 
 
 def l2_normalize(matrix: np.ndarray) -> np.ndarray:
@@ -200,8 +201,11 @@ def compare_pair_payload(
     compare_metrics: dict[str, object],
     output_root: Path,
 ) -> dict[str, object]:
-    left_rows = load_view_rows(left_view_id, output_root=output_root)
-    right_rows = load_view_rows(right_view_id, output_root=output_root)
+    try:
+        left_rows = load_view_rows(left_view_id, output_root=output_root)
+        right_rows = load_view_rows(right_view_id, output_root=output_root)
+    except ValueError as exc:
+        return {"status": "missing", "error": str(exc)}
     if left_rows.empty or right_rows.empty:
         return {"status": "missing", "error": "one or both selected views are not materialized"}
     basis, swapped = explicit_compare_basis(left_view_id, right_view_id, comparison_bases)
@@ -216,7 +220,7 @@ def compare_pair_payload(
         else:
             shared = resolve_shared_key_pair_indices(left_rows, right_rows)
             if shared is None:
-                return {"status": "missing", "error": "no explicit alignment or shared unique row key exists"}
+                return {"status": "error", "error": "no explicit alignment or shared unique row key exists"}
             left_indices, right_indices, join_key = shared
             indices = (left_indices, right_indices)
             basis_label = f"shared_key:{join_key}"
@@ -228,10 +232,15 @@ def compare_pair_payload(
     if left_indices.size == 0:
         return {"status": "missing", "error": "comparison support is empty"}
     take = deterministic_take(int(left_indices.size), int(compare_metrics.get("sample_rows", 192)))
-    left_matrix = load_view_matrix(left_view_id, output_root=output_root)
-    right_matrix = load_view_matrix(right_view_id, output_root=output_root)
-    if left_matrix is None or right_matrix is None:
-        return {"status": "missing", "error": "one or both selected matrices are not materialized"}
+    try:
+        left_matrix = load_view_matrix(left_view_id, output_root=output_root)
+        right_matrix = load_view_matrix(right_view_id, output_root=output_root)
+    except ValueError as exc:
+        return {"status": "missing", "error": str(exc)}
+    if int(left_matrix.shape[0]) != int(len(left_rows)):
+        return {"status": "error", "error": f"view matrix row count does not match rows artifact for `{left_view_id}`"}
+    if int(right_matrix.shape[0]) != int(len(right_rows)):
+        return {"status": "error", "error": f"view matrix row count does not match rows artifact for `{right_view_id}`"}
     left_sample = np.asarray(left_matrix[left_indices[take]], dtype=np.float32)
     right_sample = np.asarray(right_matrix[right_indices[take]], dtype=np.float32)
     left_distance = cosine_distance_matrix(left_sample)

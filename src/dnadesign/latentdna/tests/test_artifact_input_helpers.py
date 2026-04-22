@@ -1118,6 +1118,74 @@ def test_notebook_freshness_rejects_workspace_mismatched_health_payload(tmp_path
     assert "workspace_id=other_workspace" in str(freshness["reason"])
 
 
+def test_notebook_freshness_rejects_ok_status_with_failing_checks(tmp_path: Path) -> None:
+    notebook_dir = tmp_path / "notebooks" / "atlas_review"
+    notebook_dir.mkdir(parents=True)
+    (notebook_dir / "manifest.json").write_text(
+        json.dumps({"artifact_kind": "notebook", "artifact_id": "atlas_review", "status": "ok", "outputs": []}),
+        encoding="utf-8",
+    )
+    (notebook_dir / "health.json").write_text(
+        json.dumps(
+            {
+                "workspace_id": "freshness_demo",
+                "notebook_id": "atlas_review",
+                "status": "ok",
+                "checks": {
+                    "notebook_exists": True,
+                    "control_plane_loads": False,
+                    "imports_resolve": True,
+                },
+                "warnings": ["control_plane_loads failed: invalid controls payload"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = SimpleNamespace(
+        output_root=tmp_path,
+        workspace_id="freshness_demo",
+        read_manifest=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+    )
+
+    freshness = evaluate_artifact_freshness(context, artifact_kind="notebook", artifact_id="atlas_review")
+
+    assert freshness["status"] == "attention"
+    assert "control_plane_loads" in str(freshness["reason"])
+    assert "invalid controls payload" in str(freshness["reason"])
+
+
+def test_notebook_freshness_rejects_invalid_checks_payload_shape(tmp_path: Path) -> None:
+    notebook_dir = tmp_path / "notebooks" / "atlas_review"
+    notebook_dir.mkdir(parents=True)
+    (notebook_dir / "manifest.json").write_text(
+        json.dumps({"artifact_kind": "notebook", "artifact_id": "atlas_review", "status": "ok", "outputs": []}),
+        encoding="utf-8",
+    )
+    (notebook_dir / "health.json").write_text(
+        json.dumps(
+            {
+                "workspace_id": "freshness_demo",
+                "notebook_id": "atlas_review",
+                "status": "ok",
+                "checks": ["not", "a", "mapping"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = SimpleNamespace(
+        output_root=tmp_path,
+        workspace_id="freshness_demo",
+        read_manifest=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+    )
+
+    freshness = evaluate_artifact_freshness(context, artifact_kind="notebook", artifact_id="atlas_review")
+
+    assert freshness["status"] == "attention"
+    assert "invalid checks payload" in str(freshness["reason"])
+
+
 def test_notebook_freshness_is_isolated_per_notebook_health_file(tmp_path: Path) -> None:
     source_path = tmp_path / "inputs" / "workspace.yaml"
     source_path.parent.mkdir(parents=True)
