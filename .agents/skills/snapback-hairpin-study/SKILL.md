@@ -38,6 +38,7 @@ Out of scope:
 - the answer comes from the checked-in study record plus the pinned ops status
   or preflight surface
 - released-product Snapback remains the active shortening lane
+- released-product Snapback means the nick-at-origin, exposed-bottom-strand geometry lane for this study
 - YIU remains a contrast-only boundary surface
 - the next route goes through `routes.md`; open `pipeline.yaml` only for
   machine-readable command-group or bootstrap confirmation, not hand-built
@@ -77,6 +78,19 @@ Out of scope:
 ## Guardrails
 
 - `released-product Snapback` is the shortening architecture under test.
+- in this study, released-product Snapback scores the exposed post-release bottom strand, not the retained top strand.
+- outside-site type IIS nickases keep their downstream spacer geometry, but the
+  released-product lane only permits left-of-origin nickase geometry when the
+  omitted leading prefix is one contiguous fully degenerate `N` block in the
+  oriented top-strand view; protected bases and all release-site geometry must
+  still remain at or to the right of logical origin `0`.
+- treat released-product exact hits as multi-invariant: the nick must come from
+  a real nickase recognition site positioned at the resolved boundary, any
+  top-prefix fragment that remains left of the nick must stay Watson-Crick
+  paired to the exposed active bottom across that residual duplex overlap, and
+  the active bottom stem and foldback return must also remain Watson-Crick
+  paired.
+- default released-product operational policy excludes nickases carrying `FREQUENT_CUTTER`; do not route operators to `Nt.CviPII` or a pinned explicit `de033` bundle unless the task is an explicit policy-comparison audit.
 - `preserved-site Snapback` stays a separate contract.
 - `YIU` stays mismatch-centric and contrast-only here.
 - the retron/P4 note is framing context, not a hidden scoring hook

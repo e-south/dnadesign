@@ -62,14 +62,14 @@ def test_cruncher_preflight_next_scope_limits_checks_to_current_phase(tmp_path: 
 
     assert state == "ok"
     assert "blockers 0" in summary
-    assert evidence["phase_id"] == "snapback_released_probe"
+    assert evidence["phase_id"] == "snapback_released_solve"
     assert evidence["included_groups"] == [
         "study_record",
         "snapback_workspace",
         "snapback_probe",
     ]
     scoped_ids = [check["id"] for check in evidence["checks"]]
-    assert "demo_snapback.released_target_search" in scoped_ids
+    assert "de033.released_target_search" in scoped_ids
     assert "demo_monotypic_tetr.yiu_validate" not in scoped_ids
 
 
@@ -101,4 +101,4 @@ def test_cruncher_preflight_reports_required_command_blockers(tmp_path: Path) ->
     )
 
     assert state == "attention"
-    assert evidence["blocked_by_ids"] == ["demo_snapback.released_target_search"]
+    assert evidence["blocked_by_ids"] == ["de033.released_target_search"]

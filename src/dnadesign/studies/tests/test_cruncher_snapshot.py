@@ -23,25 +23,18 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
     repo_root = tmp_path
     (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
 
-    snapback_workspace = repo_root / "src" / "dnadesign" / "cruncher" / "workspaces" / "demo_snapback"
+    snapback_workspace = repo_root / "src" / "dnadesign" / "cruncher" / "workspaces" / "de033"
     yiu_workspace = repo_root / "src" / "dnadesign" / "cruncher" / "workspaces" / "demo_monotypic_tetr"
     for path in (
         snapback_workspace / "configs" / "snapback",
-        snapback_workspace / "inputs" / "nickases",
-        snapback_workspace / "inputs" / "release_enzymes",
         yiu_workspace / "configs" / "yiu",
         repo_root / "src" / "dnadesign" / "cruncher" / "docs" / "dev",
         repo_root / ".agents" / "skills" / "snapback-hairpin-study",
     ):
         path.mkdir(parents=True, exist_ok=True)
 
-    (snapback_workspace / "configs" / "snapback" / "demo_released_origin_033.released.snapback.yaml").write_text(
+    (snapback_workspace / "configs" / "snapback" / "de033.released.snapback.yaml").write_text(
         "released_snapback: {}\n",
-        encoding="utf-8",
-    )
-    (snapback_workspace / "inputs" / "nickases" / "local.nickases.yaml").write_text("nickases: []\n", encoding="utf-8")
-    (snapback_workspace / "inputs" / "release_enzymes" / "local.release.yaml").write_text(
-        "release_enzymes: []\n",
         encoding="utf-8",
     )
     (yiu_workspace / "configs" / "yiu" / "tetr_teto2_wt_direct.yiu.yaml").write_text("yiu: {}\n", encoding="utf-8")
@@ -75,9 +68,9 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
             "- Released-product Snapback stays active.\n"
             "- YIU remains contrast only.\n\n"
             "### Current phase and surfaces\n\n"
-            "- Current phase: `snapback_released_probe`\n"
-            "- Next owner surface: `docs/studies/demo_study/routes.md`\n"
-            "- Primary workspace: `src/dnadesign/cruncher/workspaces/demo_snapback`\n"
+            "- Current phase: `snapback_released_solve`\n"
+            "- Next owner surface: `src/dnadesign/cruncher/workspaces/de033/runbook.md`\n"
+            "- Primary workspace: `src/dnadesign/cruncher/workspaces/de033`\n"
             "- Contrast workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`\n"
         ),
         encoding="utf-8",
@@ -116,17 +109,38 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                         "repo:src/dnadesign/cruncher/docs/dev/2026-04-19-yiu-retron-mismatch-bulge-audit.md",
                     ],
                     "decision_refs": [
-                        "repo:src/dnadesign/cruncher/workspaces/demo_snapback/runbook.md",
+                        "repo:src/dnadesign/cruncher/workspaces/de033/runbook.md",
                     ],
                 },
                 "command_groups": [
                     {
                         "id": "snapback_released_probe",
                         "purpose": "Check the released-product read-only probe.",
-                        "workspace_ref": "repo:src/dnadesign/cruncher/workspaces/demo_snapback",
+                        "workspace_ref": "repo:src/dnadesign/cruncher/workspaces/de033",
                         "validation_role": "read_only_probe",
                         "commands": [
-                            "uv run cruncher snapback released-target-search --workspace-root . --json",
+                            (
+                                "uv run cruncher snapback released-target-search --workspace-root . "
+                                "--nick-preset neb_nicking_v1 --release-preset type_iis_release_v1 --json"
+                            ),
+                        ],
+                    },
+                    {
+                        "id": "snapback_released_solve",
+                        "purpose": (
+                            "Materialize the whole-catalog released-product hit bundle after the "
+                            "read-only probe is clean."
+                        ),
+                        "workspace_ref": "repo:src/dnadesign/cruncher/workspaces/de033",
+                        "mutates_outputs": True,
+                        "commands": [
+                            (
+                                "uv run cruncher snapback released-solve --workspace-root . "
+                                "--nick-preset neb_nicking_v1 --release-preset type_iis_release_v1 "
+                                "--nick-boundary 0 --paired-bp 3 --cap-nt 3 "
+                                "--run-dir outputs/released_solve --materialize-top-k 8 "
+                                "--render-format pdf --emit-renders --force-overwrite --json"
+                            ),
                         ],
                     },
                     {
@@ -177,11 +191,12 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                     "phase_order": [
                         "context_consolidation",
                         "snapback_released_probe",
+                        "snapback_released_solve",
                         "yiu_boundary_check",
                     ],
                     "current_phase": {
                         "strategy": "explicit",
-                        "id": "snapback_released_probe",
+                        "id": "snapback_released_solve",
                     },
                 },
                 "phases": [
@@ -192,8 +207,13 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                     },
                     {
                         "id": "snapback_released_probe",
-                        "status": "in_progress",
+                        "status": "complete",
                         "next_surface": "manifest:routes.md",
+                    },
+                    {
+                        "id": "snapback_released_solve",
+                        "status": "in_progress",
+                        "next_surface": "repo:src/dnadesign/cruncher/workspaces/de033/runbook.md",
                     },
                     {
                         "id": "yiu_boundary_check",
@@ -213,8 +233,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                     "snapback_released_spec": {
                         "artifact_type": "file",
                         "ref": (
-                            "repo:src/dnadesign/cruncher/workspaces/demo_snapback/"
-                            "configs/snapback/demo_released_origin_033.released.snapback.yaml"
+                            "repo:src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml"
                         ),
                     },
                     "yiu_direct_spec": {
@@ -226,9 +245,9 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                     },
                 },
                 "execution_surfaces": {
-                    "demo_snapback_workspace": {
+                    "de033_workspace": {
                         "surface_type": "workspace",
-                        "workspace_ref": "repo:src/dnadesign/cruncher/workspaces/demo_snapback",
+                        "workspace_ref": "repo:src/dnadesign/cruncher/workspaces/de033",
                     },
                     "demo_monotypic_tetr_workspace": {
                         "surface_type": "workspace",
@@ -236,7 +255,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                     },
                     "snapback_released_target_search": {
                         "surface_type": "command",
-                        "cwd_ref": "repo:src/dnadesign/cruncher/workspaces/demo_snapback",
+                        "cwd_ref": "repo:src/dnadesign/cruncher/workspaces/de033",
                         "argv": [
                             "uv",
                             "run",
@@ -245,10 +264,10 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                             "released-target-search",
                             "--workspace-root",
                             ".",
-                            "--nick-additional-path",
-                            "inputs/nickases/local.nickases.yaml",
-                            "--release-additional-path",
-                            "inputs/release_enzymes/local.release.yaml",
+                            "--nick-preset",
+                            "neb_nicking_v1",
+                            "--release-preset",
+                            "type_iis_release_v1",
                             "--nick-boundary",
                             "0",
                             "--paired-bp",
@@ -310,15 +329,15 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                         "snapback_released_probe": [
                             {
                                 "kind": "workspace_layout",
-                                "check_id": "demo_snapback.workspace",
+                                "check_id": "de033.workspace",
                                 "check_group": "snapback_workspace",
-                                "summary": "demo_snapback workspace is present.",
+                                "summary": "de033 workspace is present.",
                                 "required": True,
-                                "surface": "demo_snapback_workspace",
+                                "surface": "de033_workspace",
                             },
                             {
                                 "kind": "path_exists",
-                                "check_id": "demo_snapback.released_spec",
+                                "check_id": "de033.released_spec",
                                 "check_group": "snapback_workspace",
                                 "summary": "Released-product demo spec is present.",
                                 "required": True,
@@ -326,7 +345,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                             },
                             {
                                 "kind": "command",
-                                "check_id": "demo_snapback.released_target_search",
+                                "check_id": "de033.released_target_search",
                                 "check_group": "snapback_probe",
                                 "summary": "Released-product target-search probe completed.",
                                 "required": True,
@@ -364,6 +383,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                         "target_phase_groups": {
                             "context_consolidation": ["study_record"],
                             "snapback_released_probe": ["study_record", "snapback_workspace", "snapback_probe"],
+                            "snapback_released_solve": ["study_record", "snapback_workspace", "snapback_probe"],
                             "yiu_boundary_check": ["study_record", "yiu_workspace", "yiu_validate"],
                         },
                         "runtime_phase_groups": [],
@@ -388,9 +408,10 @@ def test_provide_cruncher_status_exposes_command_groups_and_agent_bootstrap(tmp_
 
     assert state == "ok"
     assert "primary lane released-product snapback" in summary
-    assert evidence["current_phase"] == "snapback_released_probe"
+    assert evidence["current_phase"] == "snapback_released_solve"
     assert [group["id"] for group in evidence["command_groups"]] == [
         "snapback_released_probe",
+        "snapback_released_solve",
         "yiu_boundary_check",
     ]
     assert evidence["native_agent_bootstrap"]["open_first"] == [
@@ -406,9 +427,9 @@ def test_provide_cruncher_status_exposes_command_groups_and_agent_bootstrap(tmp_
     assert "skill_ref" not in evidence["record_sources"]
     assert "repo_local_skill" not in evidence["artifacts"]
     assert evidence["status_excerpt"] == [
-        "- Current phase: `snapback_released_probe`",
-        "- Next owner surface: `docs/studies/demo_study/routes.md`",
-        "- Primary workspace: `src/dnadesign/cruncher/workspaces/demo_snapback`",
+        "- Current phase: `snapback_released_solve`",
+        "- Next owner surface: `src/dnadesign/cruncher/workspaces/de033/runbook.md`",
+        "- Primary workspace: `src/dnadesign/cruncher/workspaces/de033`",
         "- Contrast workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`",
     ]
 
