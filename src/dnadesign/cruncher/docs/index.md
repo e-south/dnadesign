@@ -1,12 +1,29 @@
 ## Cruncher docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-07
+**Last verified:** 2026-04-23
 
-**Last updated by:** cruncher-maintainers on 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
 ### Contents
+- [Workflow families](#workflow-families)
 - [Documentation map](#documentation-map)
+
+### Workflow families
+
+Cruncher currently registers six peer workflow families.
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`.
+
+- `sample` owns fixed-length optimization, artifact-only analysis, and export
+- `cassette` owns cassette validation, design, solve, and show surfaces
+- `yiu` owns payload-centric validation, render, and show surfaces
+- `snapback` owns preserved-site and released-product single-nick foldback surfaces
+- `study` owns study orchestration over workspace outputs
+- `portfolio` owns cross-study aggregation and reporting
+
+The `study` and `portfolio` families currently orchestrate sample-family
+outputs, but they are still separate command families rather than hidden
+submodes of `sample`.
 
 ### Documentation map
 <!-- docs:map:start -->

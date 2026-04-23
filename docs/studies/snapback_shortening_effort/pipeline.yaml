@@ -52,7 +52,7 @@ native_agent_bootstrap:
     - manifest:routes.md
   pair_with:
     - harness-engineering
-    - pragmatic-programming-principles
+    - code-change-discipline (pragmatic-programming-principles lane)
   must_preserve:
     - released-product Snapback is the active shortening architecture
     - default released-product policy excludes FREQUENT_CUTTER nickases unless explicitly opted in for comparison

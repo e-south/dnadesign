@@ -1,29 +1,35 @@
 ## Cruncher docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-07
+**Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
-Cruncher has four workflow families:
+Cruncher currently registers six peer workflow families.
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`.
 
-- fixed-length optimization workspaces for sequence sampling, analysis, studies, and aggregation
+- fixed-length optimization workspaces for sequence sampling and artifact-only analysis
 - cassette workspaces for cassette design and ranked search
-- snapback workspaces for narrow single-nick foldback validation and bounded search
 - payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
+- snapback workspaces for preserved-site and released-product single-nick foldback workflows
+- study orchestration workspaces for aggregate sweep execution and summary surfaces
+- portfolio orchestration workspaces for cross-study aggregation and handoff tables
 
-Studies and portfolio aggregation build on the fixed-length optimization lane.
+The `study` and `portfolio` families currently orchestrate sample-family
+artifacts, but they remain separate command families with their own workspace
+contracts and docs surfaces.
 
 ### Start here
 
 - **Fixed-length optimization:** [Pairwise Demo](demos/demo_pairwise.md), [Sampling and Analysis](guides/sampling_and_analysis.md), and [Intent and Lifecycle](guides/intent_and_lifecycle.md)
 - **Cassette workflows:** [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), and [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
-- **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Released-product Snapback Workflow](guides/snapback_released_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md), [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md), and the checked-in [de033 released-product workspace README](../workspaces/de033/README.md)
 - **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
+- **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Released-product Snapback Workflow](guides/snapback_released_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md), [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md), and the checked-in [de033 released-product workspace README](../workspaces/de033/README.md)
 - **Tracked study surfaces:** [Cruncher Study Status](operations/cruncher-study-status.md), [Cruncher Study Preflight](operations/cruncher-study-preflight.md), the checked-in [snapback shortening study status](../../../../docs/studies/snapback_shortening_effort/status.md), the study [route map](../../../../docs/studies/snapback_shortening_effort/routes.md), and the repo-local [snapback hairpin study skill](../../../../.agents/skills/snapback-hairpin-study/SKILL.md)
 - **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
-- **Studies and aggregation:** [Studies](guides/studies.md) and [Portfolio Aggregation](guides/portfolio_aggregation.md)
+- **Study orchestration:** [Studies](guides/studies.md) and [Study Length vs Score](guides/study_length_vs_score.md)
+- **Portfolio orchestration:** [Portfolio Aggregation](guides/portfolio_aggregation.md)
 - **Tool-wide references:** [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), [Config Reference](reference/config.md), [Glossary](reference/glossary.md), and [Runbook Step Reference](reference/runbook_steps.md)
 
 <!-- docs:toc:off -->

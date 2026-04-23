@@ -1,6 +1,6 @@
 ---
 name: snapback-hairpin-study
-description: Recover the checked-in Snapback shortening study, its released-product Snapback execution lane, its YIU boundary role, and its study-owned command ladder. Use when the user asks about the snapback hairpin or shortening effort, wants the current phase or next route, or wants to harden the study-owned ops, docs, or native-agent bootstrap surfaces. Pair with `harness-engineering` for study-surface hardening and with `pragmatic-programming-principles` for lane, contract, or fail-fast boundary changes. Do not use for generic Cruncher walkthroughs, unrelated Snapback design work, or bench-level retron advice.
+description: Recover the checked-in Snapback shortening study, its released-product Snapback execution lane, its YIU boundary role, and its study-owned command ladder. Use when the user asks about the snapback hairpin or shortening effort, wants the current phase or next route, or wants to harden the study-owned ops, docs, or native-agent bootstrap surfaces. Pair with `harness-engineering` for study-surface hardening and with `code-change-discipline` in the `pragmatic-programming-principles` lane for lane, contract, or fail-fast boundary changes. Do not use for generic Cruncher walkthroughs, unrelated Snapback design work, or bench-level retron advice.
 metadata:
   version: 0.1.0
   category: workflow-automation
@@ -24,7 +24,7 @@ In scope:
   study-owned native-agent bootstrap context
 - pairing with `harness-engineering` when the work changes study status,
   preflight, skill routing, or docs integrity
-- pairing with `pragmatic-programming-principles` when the work changes lane
+- pairing with `code-change-discipline` in the `pragmatic-programming-principles` lane when the work changes lane
   boundaries, contracts, or failure behavior
 
 Out of scope:
@@ -38,7 +38,7 @@ Out of scope:
 - the answer comes from the checked-in study record plus the pinned ops status
   or preflight surface
 - released-product Snapback remains the active shortening lane
-- released-product Snapback means the nick-at-origin, exposed-bottom-strand geometry lane for this study
+- released-product Snapback means the exposed-bottom-strand geometry lane rebased so the nick boundary is origin `0` in final-geometry space for this study
 - YIU remains a contrast-only boundary surface
 - the next route goes through `routes.md`; open `pipeline.yaml` only for
   machine-readable command-group or bootstrap confirmation, not hand-built
@@ -71,7 +71,8 @@ Out of scope:
   preflight, repo-local skill routing, or docs integrity. Keep the endpoint set
   to `knowledge-integrity`, `autonomy-capability`, and
   `architecture-invariants`.
-- Pair with `pragmatic-programming-principles` when the change touches the
+- Pair with `code-change-discipline` in the `pragmatic-programming-principles`
+  lane when the change touches the
   released-product vs preserved-site boundary, YIU boundary language, explicit
   degraded modes, or fail-fast contract behavior.
 

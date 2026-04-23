@@ -17,7 +17,8 @@ This page keeps the study-owned handoff map in one place.
   `.agents/skills/snapback-hairpin-study/SKILL.md`
 - Pair with:
   `harness-engineering` for study-surface hardening and
-  `pragmatic-programming-principles` for boundary or contract changes.
+  `code-change-discipline` in the `pragmatic-programming-principles` lane for
+  boundary or contract changes.
 
 ### Cold-start contract
 
@@ -33,7 +34,7 @@ This page keeps the study-owned handoff map in one place.
 
 ### Boundary shorthand
 
-- `released-product Snapback` means the dual-enzyme precursor lane where final geometry is evaluated on the exposed post-release bottom strand while the nick stays anchored at origin.
+- `released-product Snapback` means the dual-enzyme precursor lane where final geometry is evaluated on the exposed post-release bottom strand and rebased so the nick boundary is origin `0` in final-geometry space.
 - `preserved-site Snapback` means the older one-enzyme lane and stays a separate contract.
 - `YIU` means mismatch-centric payload rendering over a fixed 4 nt internal window; it is not the shortening topology engine here.
 - `retron context` means biological framing from the checked-in audit notes, not scoring hooks or implicit solver relaxations.
@@ -49,7 +50,8 @@ This page keeps the study-owned handoff map in one place.
    solve bundle so ranked hits and per-hit plots are published under
    `outputs/released_solve`. The solve surface now collapses redundant exact or
    near hits to one representative per exposed post-nick `stem + cap` geometry.
-4. Treat `released-design` and `released-show` as an optional audit path only.
+4. Treat `released-design` and `released-show` as validation-only for the
+   checked-in invalid fixture.
    The checked-in downstream-`BspQI` spec under
    `configs/snapback/de033.released.snapback.yaml` is expected to report
    `invalid_precursor` under the degenerate-prefix-aware nonnegative-origin

@@ -1,10 +1,10 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-26
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
 ### Contents
 - [Cruncher CLI](#cruncher-cli)
@@ -21,14 +21,18 @@
 
 This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow family.
 
-> **Workflow families:** Cruncher currently has four first-class command families.
+> **Workflow families:** Cruncher currently registers six peer command families.
 >
-> - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
+> - `fetch|lock|parse|sample|analyze|export` cover the `sample` family. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
 > - `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|released-solve|show|released-show` cover single-nick foldback workspaces. This lane uses explicit geometry contracts, bounded deterministic search, a strict QA triptych publication surface for preserved-site explicit bundles, and a separate released-product precursor contract.
 > - `yiu init-workspace|validate|render|show` cover payload-centric YIU workflows. This lane uses the strict `split_yiu_payload_rendering_v4` contract, deterministic exhaustive optimization over a 4 nt junction, three published payload views, and one bundle-local `visual_inventory.json`.
+> - `study run|summarize|show` cover the `study` family. This lane orchestrates aggregate sweeps over workspace outputs rather than defining a new design topology.
+> - `portfolio run|show` cover the `portfolio` family. This lane aggregates study-ready workspaces into cross-study tables and plots.
 >
-> Choose the command family by the workspace contract you need. `cassette`, `snapback`, and `yiu` do not fall back to `sample`, and `sample` runs do not reuse their artifacts.
+> Choose the command family by the workspace contract you need. `cassette`, `snapback`, `yiu`, `study`, and `portfolio` do not fall back to `sample`, and `sample` runs do not reuse their artifacts.
+>
+> For Snapback specifically, `cli/commands/snapback.py` is the registry surface only. Subcommand handlers are split across `snapback_workspace.py`, `snapback_explicit.py`, `snapback_released.py`, and `snapback_show.py`, while typed request construction lives in `app/snapback_cli_requests.py`.
 
 #### Workspace discovery and config resolution
 
@@ -685,18 +689,18 @@ Outputs:
 * writes under `<workspace>/outputs/released_design/`
 * writes `meta/released_snapback_manifest.json` and `meta/released_snapback_status.json`
 * writes `analysis/report.json`, `analysis/released_product_projection.json`, `analysis/pre_nick_site.json`, and `analysis/release_site.json`
-* writes `export/released_design_summary.csv`
+* writes `export/released_design_summary.csv` with route-policy, retained-partner fragment, and generic active-product columns
 
 Notes:
 
-* this lane evaluates final geometry on the exposed post-release bottom strand, not the full precursor
+* explicit released-design defaults to `final_geometry_source=exposed_bottom_strand` with `route_family=bottom_active_from_top_nick`, not the full precursor
 * only `nick_then_release` and `retained_side=upstream` are supported in v1
 * the release site and nickase site may be lost post-release when the explicit spec allows that loss
 * by default, explicit released-product specs reject nickases carrying `FREQUENT_CUTTER`
 
 #### `cruncher snapback released-target-search`
 
-Search paired nickase plus release-enzyme combinations for an exact exposed-bottom geometry without assuming an authored precursor.
+Search paired nickase plus release-enzyme combinations for the default exposed-bottom released-product geometry without assuming an authored precursor.
 
 Examples:
 
@@ -712,8 +716,11 @@ Outputs:
 Notes:
 
 * this mode is target-first and separate from preserved-site `target-search`
-* final geometry is evaluated on the exposed bottom strand after the projected release event
+* the default lane evaluates `final_geometry_source=exposed_bottom_strand` via `route_family=bottom_active_from_top_nick`
+* broader retained-active audits use `route_family=top_active_from_bottom_nick` plus `final_geometry_source=retained_active_strand`
+* `--allow-top-active-routes` plus `--allow-precut-footprint-outside-active-product` opt into broader retained-active audits without changing the study default lane
 * the command requires at least one explicit nickase source and one explicit release-enzyme source
+* CLI parsing delegates typed request construction to `app/snapback_cli_requests.py`; the command module does not build released search models inline
 * demo-only catalog entries are excluded unless `--allow-demo-hits` is passed
 * nickases carrying `FREQUENT_CUTTER` are excluded unless `--allow-frequent-cutter-nickases` is passed
 
@@ -732,6 +739,7 @@ Outputs:
 * writes `analysis/solve_report.json` and `export/table__hits.csv`
 * writes materialized released-product hit bundles under `analysis/materialized_hits/hit_<rank>/`
 * writes per-hit `plots/released_hit_triptych.<fmt>` when `--emit-renders` is enabled
+* writes route-policy, retained-partner fragment, and generic active-product columns in `table__hits.csv`
 
 Notes:
 
@@ -739,7 +747,11 @@ Notes:
 * exact hits are materialized first when any exist; otherwise the top ranked near hits are materialized
 * the command requires at least one explicit nickase source and one explicit release-enzyme source
 * `--max-results` is automatically raised to at least `--materialize-top-k`
+* CLI parsing delegates typed request and output construction to `app/snapback_cli_requests.py`; the command module stays on the UX side of the boundary
 * the solve plot keeps `Nick / origin` at the left boundary and is rendered from the released-product projection payloads
+* default solved hits stay on `route_family=bottom_active_from_top_nick`; opt-in retained-active audits can materialize `route_family=top_active_from_bottom_nick`
+* `--allow-top-active-routes` and `--allow-precut-footprint-outside-active-product` mirror the broader retained-active audit path from `released-target-search`
+* demo-only catalog entries are excluded unless `--allow-demo-hits` is passed
 * nickases carrying `FREQUENT_CUTTER` are excluded unless `--allow-frequent-cutter-nickases` is passed
 
 #### `cruncher snapback released-show`
@@ -753,7 +765,7 @@ Examples:
 
 Notes:
 
-* `released-show` accepts released-product bundle roots only
+* `released-show` accepts `released-design` explicit bundle roots only
 * the command fails fast on manifest/status drift and projection/report inconsistency
 
 #### `cruncher snapback show`
