@@ -18,14 +18,14 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Union
 
 import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
 
-from .dataset_activity import append_meta_note as append_dataset_meta_note
-from .dataset_activity import record_dataset_activity_event
-from .dataset_dedupe import dedupe_dataset
-from .dataset_identity import normalize_dataset_id as normalize_dataset_id_impl
-from .dataset_identity import open_dataset
-from .dataset_ingest import (
+from .datasets import lifecycle as dataset_lifecycle
+from .datasets.activity import append_meta_note as append_dataset_meta_note
+from .datasets.activity import record_dataset_activity_event
+from .datasets.dedupe import dedupe_dataset
+from .datasets.identity import normalize_dataset_id as normalize_dataset_id_impl
+from .datasets.identity import open_dataset
+from .datasets.ingest import (
     add_sequences_dataset,
     import_csv_dataset,
     import_jsonl_dataset,
@@ -33,26 +33,28 @@ from .dataset_ingest import (
     prepare_import_rows_dataset,
     write_import_df_dataset,
 )
-from .dataset_materialize import materialize_dataset
-from .dataset_overlay_catalog import build_dataset_info, load_overlay_catalog, merge_dataset_schema
-from .dataset_overlay_maintenance import (
+from .datasets.materialize import materialize_dataset
+from .datasets.overlay import (
+    attach_columns_dataset,
+    attach_dataset,
     compact_overlay_namespace,
     list_overlay_infos,
     remove_overlay_namespace,
-    write_overlay_digest_ledger_namespace,
-)
-from .dataset_overlay_ops import (
-    attach_columns_dataset,
-    attach_dataset,
     write_overlay_dataset,
+    write_overlay_digest_ledger_namespace,
     write_overlay_part_dataset,
 )
-from .dataset_overlay_query import build_overlay_query
-from .dataset_query import create_overlay_view, sql_ident, sql_str
-from .dataset_read_keys import key_list_from_batch
-from .dataset_reporting import describe_dataset, manifest_dataset, manifest_dict_dataset
-from .dataset_reserved_overlay import write_reserved_overlay
-from .dataset_state_facade import (
+from .datasets.query import (
+    build_dataset_info,
+    build_overlay_query,
+    create_overlay_view,
+    load_overlay_catalog,
+    merge_dataset_schema,
+    sql_ident,
+    sql_str,
+)
+from .datasets.reserved_overlay import write_reserved_overlay
+from .datasets.state.facade import (
     clear_dataset_state_fields,
     ensure_dataset_ids_exist,
     get_dataset_state_frame,
@@ -60,31 +62,27 @@ from .dataset_state_facade import (
     set_dataset_state_fields,
     tombstone_dataset_rows,
 )
-from .dataset_validate import validate_dataset
-from .dataset_views import export_dataset, get_dataset, grep_dataset, head_dataset, scan_dataset
-from .dataset_write_session import DatasetWriteSession, init_dataset
-from .errors import (
-    SchemaError,
-    SequencesError,
+from .datasets.validate import validate_dataset
+from .datasets.views import (
+    describe_dataset,
+    export_dataset,
+    get_dataset,
+    grep_dataset,
+    head_dataset,
+    key_list_from_batch,
+    manifest_dataset,
+    manifest_dict_dataset,
+    scan_dataset,
 )
 from .maintenance import maintenance as maintenance_context
-from .maintenance import require_maintenance
-from .overlays import (
-    overlay_path,
-)
 from .registry import (
     USR_STATE_NAMESPACE,
-    load_registry,
-    registry_bytes,
-    registry_hash,
     validate_overlay_schema,
 )
-from .schema import META_REGISTRY_HASH, REQUIRED_COLUMNS, merge_base_metadata
+from .schema import REQUIRED_COLUMNS
 from .storage.locking import dataset_write_lock
 from .storage.parquet import (
-    iter_parquet_batches,
     snapshot_parquet_file,
-    write_parquet_atomic_batches,
 )
 from .types import AddSequencesResult, DatasetInfo, Manifest, OverlayInfo
 
@@ -98,7 +96,9 @@ TOMBSTONE_NAMESPACE = "usr"
 TOMBSTONE_COLUMNS = ("usr__deleted", "usr__deleted_at", "usr__deleted_reason")
 RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE}
 MUTATION_RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE, USR_STATE_NAMESPACE}
-LEGACY_DATASET_PREFIX = "archived"
+ARCHIVE_DATASET_PREFIX = "archived"
+# Backward-compatible internal alias while archive-root callers migrate.
+LEGACY_DATASET_PREFIX = ARCHIVE_DATASET_PREFIX
 USR_STATE_SCHEMA_TYPES = {
     "id": pa.string(),
     "usr_state__masked": pa.bool_(),
@@ -121,7 +121,7 @@ class DedupeStats:
 
 
 def normalize_dataset_id(name: str) -> str:
-    return normalize_dataset_id_impl(name, legacy_dataset_prefix=LEGACY_DATASET_PREFIX)
+    return normalize_dataset_id_impl(name, archive_dataset_prefix=ARCHIVE_DATASET_PREFIX)
 
 
 @dataclass
@@ -141,7 +141,7 @@ class Dataset:
             name_or_path,
             dataset_factory=cls,
             records_name=RECORDS,
-            legacy_dataset_prefix=LEGACY_DATASET_PREFIX,
+            archive_dataset_prefix=ARCHIVE_DATASET_PREFIX,
         )
 
     @property
@@ -167,7 +167,7 @@ class Dataset:
     # ---- quick stats for CLI and sync ----
     def stats(self):
         """Return local primary FileStat (sha/size/rows/cols/mtime)."""
-        from .diff import parquet_stats
+        from .remote_sync.diff import parquet_stats
 
         return parquet_stats(self.records_path)
 
@@ -178,11 +178,11 @@ class Dataset:
 
     def init(self, source: str = "", notes: str = "", actor: Optional[dict] = None) -> None:
         """Create a new, empty dataset directory with canonical schema."""
-        init_dataset(self, source=source, notes=notes, actor=actor, write_lock=dataset_write_lock)
+        dataset_lifecycle.init_dataset(self, source=source, notes=notes, actor=actor, write_lock=dataset_write_lock)
 
-    def write_session(self) -> DatasetWriteSession:
+    def write_session(self) -> dataset_lifecycle.DatasetWriteSession:
         """Return an explicit single-lock producer write session."""
-        return DatasetWriteSession(self)
+        return dataset_lifecycle.DatasetWriteSession(self)
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
     def append_meta_note(self, title: str, code_block: Optional[str] = None) -> None:
@@ -247,40 +247,22 @@ class Dataset:
         """
         Snapshot the current registry into this dataset and persist its hash.
         """
-        ctx = require_maintenance("freeze_registry")
-        self._require_exists()
-        with dataset_write_lock(self.dir):
-            snap_path, reg_hash, updated = self._auto_freeze_registry(record_auto_event=False)
-            self._record_event(
-                "registry_freeze",
-                args={"registry_hash": reg_hash, "snapshot": str(snap_path), "auto": False, "updated": updated},
-                maintenance={"reason": ctx.reason},
-                actor=ctx.actor,
-            )
-            return snap_path
+        return dataset_lifecycle.freeze_registry(self)
 
     def _require_exists(self) -> None:
-        if not self.records_path.exists():
-            raise SequencesError(f"Dataset not initialized: {self.records_path}")
+        dataset_lifecycle.require_dataset_exists(records_path=self.records_path)
 
     def _require_registry_for_mutation(self, action: str) -> dict:
-        try:
-            return load_registry(self.root, required=True)
-        except SchemaError as e:
-            raise SchemaError(f"Registry required for {action}. Create registry.yaml before mutating datasets.") from e
+        return dataset_lifecycle.require_registry_for_mutation(root=self.root, action=action)
 
     def _base_metadata(self, *, created_at: Optional[str] = None) -> Dict[bytes, bytes]:
-        md = None
-        if self.records_path.exists():
-            md = pq.ParquetFile(str(self.records_path)).schema_arrow.metadata
-        reg_hash = registry_hash(self.root, required=True)
-        return merge_base_metadata(md, created_at, reg_hash)
+        return dataset_lifecycle.base_metadata(records_path=self.records_path, root=self.root, created_at=created_at)
 
     def _tombstone_path(self) -> Path:
-        return overlay_path(self.dir, TOMBSTONE_NAMESPACE)
+        return dataset_lifecycle.tombstone_path(dataset_dir=self.dir, namespace=TOMBSTONE_NAMESPACE)
 
     def _registry(self, *, required: bool) -> dict:
-        return load_registry(self.root, required=required)
+        return dataset_lifecycle.load_dataset_registry(root=self.root, required=required)
 
     def _validate_registry_schema(self, *, namespace: str, schema: pa.Schema, key: str) -> None:
         if namespace in RESERVED_NAMESPACES:
@@ -289,55 +271,16 @@ class Dataset:
         validate_overlay_schema(namespace, schema, registry=registry, key=key)
 
     def _registry_hash(self, *, required: bool) -> Optional[str]:
-        return registry_hash(self.root, required=required)
+        return dataset_lifecycle.dataset_registry_hash(root=self.root, required=required)
 
     def _dataset_registry_hash(self) -> str:
-        pf = pq.ParquetFile(str(self.records_path))
-        md = pf.schema_arrow.metadata or {}
-        raw = md.get(META_REGISTRY_HASH.encode("utf-8"))
-        if not raw:
-            raise SchemaError("Dataset does not have a registry_hash; run `usr maintenance registry-freeze`.")
-        return raw.decode("utf-8")
+        return dataset_lifecycle.stored_dataset_registry_hash(records_path=self.records_path)
 
     def _frozen_registry_path(self) -> Path:
-        reg_hash = self._dataset_registry_hash()
-        return self.dir / "_registry" / f"registry.{reg_hash}.yaml"
+        return dataset_lifecycle.frozen_registry_path(dataset_dir=self.dir, records_path=self.records_path)
 
     def _auto_freeze_registry(self, *, record_auto_event: bool = True) -> tuple[Path, str, bool]:
-        reg_hash = registry_hash(self.root, required=True)
-        reg_bytes = registry_bytes(self.root)
-        snap_dir = self.dir / "_registry"
-        snap_dir.mkdir(parents=True, exist_ok=True)
-        snap_path = snap_dir / f"registry.{reg_hash}.yaml"
-        created = False
-        if not snap_path.exists():
-            snap_path.write_bytes(reg_bytes)
-            created = True
-
-        pf = pq.ParquetFile(str(self.records_path))
-        md = pf.schema_arrow.metadata or {}
-        if md.get(META_REGISTRY_HASH.encode("utf-8")) != reg_hash.encode("utf-8"):
-
-            def _iter_batches():
-                for batch in iter_parquet_batches(self.records_path):
-                    yield batch
-
-            metadata = merge_base_metadata(md, registry_hash=reg_hash)
-            write_parquet_atomic_batches(
-                _iter_batches(),
-                pf.schema_arrow,
-                self.records_path,
-                self.snapshot_dir,
-                metadata=metadata,
-            )
-            created = True
-
-        if created and record_auto_event:
-            self._record_event(
-                "registry_freeze",
-                args={"registry_hash": reg_hash, "snapshot": str(snap_path), "auto": True},
-            )
-        return snap_path, reg_hash, created
+        return dataset_lifecycle.auto_freeze_registry(self, record_auto_event=record_auto_event)
 
     # ---- info ----
 

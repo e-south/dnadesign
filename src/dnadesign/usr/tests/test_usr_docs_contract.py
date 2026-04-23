@@ -18,6 +18,8 @@ from pathlib import Path
 
 import yaml
 
+from .source_layout_inventory import TOP_LEVEL_SOURCE_PACKAGES
+
 
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
@@ -238,6 +240,29 @@ def test_usr_agent_and_sync_docs_prefer_explicit_remotes_config() -> None:
     assert not (_repo_root() / "src" / "dnadesign" / "usr" / "skills" / "bu-scc-usr-sync" / "SKILL.md").exists()
 
 
+def test_usr_package_root_avoids_tool_local_skills_tree() -> None:
+    usr_agents = _read("src/dnadesign/usr/AGENTS.md")
+
+    assert ".agents/skills/" in usr_agents
+    assert "src/dnadesign/usr/skills/" in usr_agents
+    assert "Do not add tool-local skills under `src/dnadesign/usr/skills/`" in usr_agents
+    assert not (_repo_root() / "src" / "dnadesign" / "usr" / "skills").exists()
+
+
+def test_usr_agents_document_intentional_non_src_surfaces() -> None:
+    usr_agents = _read("src/dnadesign/usr/AGENTS.md")
+
+    assert "src/dnadesign/usr/ops/" in usr_agents
+    assert "Ops-facing provider glue" in usr_agents
+    assert "src/dnadesign/usr/scripts/" in usr_agents
+    assert "not a public cross-tool API surface" in usr_agents
+    assert "src/dnadesign/usr/assets/demo_material/" in usr_agents
+    assert "src/dnadesign/usr/assets/" in usr_agents
+    assert "src/dnadesign/usr/scripts/archived_pytorch_manager.py" in usr_agents
+    assert "datasets/archived/promoter_misc_pytorch/" in usr_agents
+    assert (_repo_root() / "src" / "dnadesign" / "usr" / "scripts" / "archived_pytorch_manager.py").exists()
+
+
 def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
 
@@ -254,6 +279,152 @@ def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     assert "operations/promoter-study-status-contract.md" in usr_docs
     assert "operations/promoter-characterization-feature-matrix.md" in usr_docs
     assert "choose cluster or prepare OPAL" in usr_docs
+
+
+def test_usr_python_api_docs_declare_package_root_public_surface() -> None:
+    api_doc = _read("src/dnadesign/usr/docs/reference/python-api.md")
+    reference_index = _read("src/dnadesign/usr/docs/reference/README.md")
+
+    assert "Public import surface: `dnadesign.usr`" in api_doc
+    assert "from dnadesign.usr import Dataset" in api_doc
+    assert "dnadesign.usr.src.*" in api_doc
+    assert "dnadesign.usr.dataset" in api_doc
+    assert "dnadesign.usr.roots" in api_doc
+    assert "Python API quickstart" in reference_index
+
+
+def test_usr_archive_docs_distinguish_canonical_and_legacy_roots() -> None:
+    datasets_index = _read("src/dnadesign/usr/datasets/README.md")
+    archive_readme = _read("src/dnadesign/usr/datasets/archived/README.md")
+    pytorch_bucket_readme = _read("src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/README.md")
+    quickstart = _read("src/dnadesign/usr/docs/getting-started/cli-quickstart.md")
+
+    assert "archived/" in datasets_index
+    assert "_archive/" not in datasets_index
+    assert "canonical location for archived datasets" in datasets_index
+    assert "archived/promoter_misc_pytorch/" in datasets_index
+    assert "sanctioned location for archived usr datasets" in archive_readme.lower()
+    assert "outside the default live dataset-id namespace" in archive_readme
+    assert "promoter_misc_pytorch/" in archive_readme
+    assert "archived_pytorch_manager.py" in archive_readme
+    assert "not a `records.parquet` dataset root" in pytorch_bucket_readme
+    assert "archived_pytorch_manager.py" in pytorch_bucket_readme
+    assert (
+        _repo_root() / "src" / "dnadesign" / "usr" / "datasets" / "archived" / "promoter_misc_pytorch" / "README.md"
+    ).exists()
+    assert "src/dnadesign/usr/assets/demo_material/demo_sequences.csv" in quickstart
+    assert "src/dnadesign/usr/demo_material/demo_sequences.csv" not in quickstart
+    assert not (_repo_root() / "src" / "dnadesign" / "usr" / "datasets" / "_archive").exists()
+
+
+def test_usr_assets_surface_uses_assets_demo_material_root() -> None:
+    usr_agents = _read("src/dnadesign/usr/AGENTS.md")
+    code_map = _read("src/dnadesign/usr/docs/reference/dataset-layout-and-code-map.md")
+
+    assert "src/dnadesign/usr/assets/demo_material/" in usr_agents
+    assert "src/dnadesign/usr/demo_material/" not in usr_agents
+    assert "demo_material/" in code_map
+    assert "assets/" in code_map
+    assert (_repo_root() / "src" / "dnadesign" / "usr" / "assets" / "demo_material").exists()
+
+
+def test_usr_source_layout_docs_name_helper_packages_and_coordinator_rule() -> None:
+    usr_agents = _read("src/dnadesign/usr/AGENTS.md")
+    code_map = _read("src/dnadesign/usr/docs/reference/dataset-layout-and-code-map.md")
+    api_doc = _read("src/dnadesign/usr/docs/reference/python-api.md")
+    introspection = _read("src/dnadesign/usr/docs/architecture-introspection.md")
+
+    for package_name in sorted(TOP_LEVEL_SOURCE_PACKAGES - {"cli_commands", "storage"}):
+        token = f"{package_name}/"
+        assert token in usr_agents
+        assert token in code_map
+
+    assert "Root coordinators" in usr_agents
+    assert "High-level coordinators" in code_map
+    assert "root modules are reserved for coordinators" in api_doc
+    assert "cli_commands/datasets/" in usr_agents
+    assert "cli_commands/lifecycle/" in usr_agents
+    assert "cli_commands/maintenance/" in usr_agents
+    assert "cli_commands/namespace/" in usr_agents
+    assert "cli_commands/query/" in usr_agents
+    assert "cli_commands/read_views/" in usr_agents
+    assert "cli_commands/remotes/" in usr_agents
+    assert "cli_commands/sync/" in usr_agents
+    assert "cli_commands/tooling/" in usr_agents
+    assert "datasets/lifecycle/" in usr_agents
+    assert "datasets/merge/" in usr_agents
+    assert "datasets/overlay/" in usr_agents
+    assert "datasets/query/" in usr_agents
+    assert "datasets/state/" in usr_agents
+    assert "datasets/validate/" in usr_agents
+    assert "datasets/views/" in usr_agents
+    assert "cli_commands/datasets/" in code_map
+    assert "cli_commands/lifecycle/" in code_map
+    assert "cli_commands/maintenance/" in code_map
+    assert "cli_commands/namespace/" in code_map
+    assert "cli_commands/query/" in code_map
+    assert "cli_commands/read_views/" in code_map
+    assert "cli_commands/remotes/" in code_map
+    assert "cli_commands/sync/" in code_map
+    assert "cli_commands/tooling/" in code_map
+    assert "datasets/lifecycle/" in code_map
+    assert "datasets/merge/" in code_map
+    assert "datasets/overlay/" in code_map
+    assert "datasets/query/" in code_map
+    assert "datasets/state/" in code_map
+    assert "datasets/validate/" in code_map
+    assert "datasets/views/" in code_map
+    assert "coordinating helpers under `datasets/*`" in introspection
+    assert "coordinating helpers under `remote_sync/*`" in introspection
+    assert "cli_commands/datasets/__init__.py" in introspection
+    assert "cli_commands/lifecycle/__init__.py" in introspection
+    assert "cli_commands/maintenance/__init__.py" in introspection
+    assert "cli_commands/namespace/__init__.py" in introspection
+    assert "cli_commands/query/__init__.py" in introspection
+    assert "cli_commands/read_views/__init__.py" in introspection
+    assert "cli_commands/remotes/__init__.py" in introspection
+    assert "cli_commands/sync/__init__.py" in introspection
+    assert "cli_commands/tooling/__init__.py" in introspection
+    assert "cli_commands/tooling/cli.py" in introspection
+    assert "datasets/lifecycle/__init__.py" in introspection
+    assert "datasets/merge/__init__.py" in introspection
+    assert "datasets/overlay/__init__.py" in introspection
+    assert "datasets/query/__init__.py" in introspection
+    assert "datasets/state/__init__.py" in introspection
+    assert "datasets/validate/__init__.py" in introspection
+    assert "datasets/views/__init__.py" in introspection
+
+
+def test_usr_retired_top_level_support_roots_stay_absent() -> None:
+    repo_root = _repo_root()
+    infer_journal = _read("src/dnadesign/infer/docs/dev/journal.md")
+    demo_meta = _read("src/dnadesign/usr/datasets/demo/meta.md")
+    pre_commit = _read(".pre-commit-config.yaml")
+
+    assert not (repo_root / "src" / "dnadesign" / "usr" / "archived").exists()
+    assert not (repo_root / "src" / "dnadesign" / "usr" / "demo_material").exists()
+    assert "src/dnadesign/usr/assets/demo_material/demo_sequences.csv" in infer_journal
+    assert "src/dnadesign/usr/demo_material/" not in infer_journal
+    assert "src/dnadesign/usr/assets/demo_material/" in demo_meta
+    assert "src/dnadesign/usr/demo_material/" not in demo_meta
+    assert "src/dnadesign/usr/archived/" not in pre_commit
+
+
+def test_usr_surface_does_not_track_transient_cache_artifacts() -> None:
+    result = subprocess.run(
+        ["git", "ls-files", "src/dnadesign/usr"],
+        cwd=_repo_root(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    tracked = [
+        path
+        for path in result.stdout.splitlines()
+        if path.endswith(".DS_Store") or "/__pycache__/" in path or path.endswith(".pyc")
+    ]
+    assert tracked == []
 
 
 def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro_growth() -> None:

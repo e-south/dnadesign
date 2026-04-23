@@ -19,8 +19,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import pandas as pd
 import pyarrow as pa
 
-from .convert_legacy_dedupe import apply_casefold_sequence_dedupe
-from .convert_legacy_inputs import (
+from .dataset import Dataset
+from .errors import ValidationError
+from .events import record_event
+from .legacy.dedupe import apply_casefold_sequence_dedupe
+from .legacy.inputs import (
     Profile,
     _coerce_logits,
     _count_tf,
@@ -29,12 +32,9 @@ from .convert_legacy_inputs import (
     _tf_from_parts,
     profile_60bp_dual_promoter,
 )
-from .convert_legacy_tfbs import _detect_promoter_forward, _parse_tfbs_parts, _scan_used_tfbs
-from .dataset import Dataset
-from .errors import ValidationError
-from .events import record_event
-from .io import read_parquet, write_parquet_atomic
+from .legacy.tfbs import _detect_promoter_forward, _parse_tfbs_parts, _scan_used_tfbs
 from .normalize import compute_id, normalize_sequence
+from .storage.parquet import read_parquet, write_parquet_atomic
 
 # Arrow types for derived columns in this profile
 PA = pa

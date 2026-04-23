@@ -31,6 +31,7 @@ uv run usr maintenance overlay-remove densegen/demo --namespace densegen --mode 
 Compaction retention contract:
 
 - Compaction rewrites active parts into one compact overlay file.
+- Compaction fails fast before registry freeze or file rewrites when the namespace has no overlay parts or is already compact.
 - Previous part snapshots are dropped by default (no lingering compact archives).
 - Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
 - Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run usr state ...`.

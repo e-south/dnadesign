@@ -1,10 +1,28 @@
 # USR Python API quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-23
 
+Public import surface: `dnadesign.usr`
 
 Mutation methods require a registry at the dataset root.
+
+Internal modules under `dnadesign.usr.src.*` are implementation details. Cross-tool callers should
+import from `dnadesign.usr`; the old sibling root modules such as `dnadesign.usr.dataset` and
+`dnadesign.usr.roots` are retired.
+
+Within `dnadesign.usr.src`, root modules are reserved for coordinators. Helper families now live
+under `cli_support/`, `datasets/`, `legacy/`, `overlay_support/`, `remote_sync/`, and `storage/`.
+Remote sync execution orchestration now lives under `remote_sync/`, keeping `sync.py` as the
+sanctioned root coordinator facade.
+Low-level parquet IO, snapshotting, and dataset locking belong under `storage/`, not as sibling
+root modules.
+Internal helper families such as root/path resolution and schema/table presentation now live under
+`cli_support/`, not as sibling root modules; the same applies to CLI-only stderr filtering.
+Closed helper clusters should stay nested under those families, for example
+`cli_commands/datasets/`, `cli_commands/lifecycle/`, `cli_commands/maintenance/`, `cli_commands/namespace/`, `cli_commands/query/`, `cli_commands/read_views/`,
+`cli_commands/remotes/`, `cli_commands/sync/`, `cli_commands/tooling/`, `datasets/lifecycle/`, `datasets/merge/`, `datasets/overlay/`,
+`datasets/query/`, `datasets/state/`, `datasets/validate/`, and `datasets/views/`.
 
 Bootstrap example:
 

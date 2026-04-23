@@ -1,7 +1,7 @@
 # USR CLI quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-23
 
 
 Run commands from repo root with `uv run usr ...`.
@@ -29,15 +29,15 @@ uv run usr --root "$ROOT" namespace register quickstart \
 # 2) Create dataset and import canonical sequence rows.
 uv run usr --root "$ROOT" init "$DATASET" --source "docs quickstart"
 uv run usr --root "$ROOT" import "$DATASET" --from csv \
-  --path src/dnadesign/usr/demo_material/demo_sequences.csv \
+  --path src/dnadesign/usr/assets/demo_material/demo_sequences.csv \
   --bio-type dna --alphabet dna_4
 
 # 3) Attach derived overlays.
 uv run usr --root "$ROOT" attach "$DATASET" \
-  --path src/dnadesign/usr/demo_material/demo_attachment_one.csv \
+  --path src/dnadesign/usr/assets/demo_material/demo_attachment_one.csv \
   --namespace quickstart --key sequence --key-col sequence --columns X_value
 uv run usr --root "$ROOT" attach "$DATASET" \
-  --path src/dnadesign/usr/demo_material/demo_y_sfxi.csv \
+  --path src/dnadesign/usr/assets/demo_material/demo_y_sfxi.csv \
   --namespace quickstart --key sequence --key-col sequence \
   --columns intensity_log2_offset_delta --allow-missing
 

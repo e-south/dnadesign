@@ -19,53 +19,49 @@ from types import SimpleNamespace as NS
 
 import typer
 
-from ..roots import default_usr_root as _default_usr_root_impl
-from ..roots import normalize_usr_root as _normalize_usr_root_impl
-from .cli_bindings import build_cli_bindings
 from .cli_commands import datasets as dataset_commands
 from .cli_commands import deps as deps_commands
 from .cli_commands import error_output as error_output_commands
+from .cli_commands import lifecycle as lifecycle_commands
 from .cli_commands import maintenance as maintenance_commands
-from .cli_commands import materialize as materialize_commands
-from .cli_commands import merge as merge_commands
-from .cli_commands import namespace_handlers as namespace_handlers_commands
+from .cli_commands import namespace as namespace_commands
+from .cli_commands import query as query_commands
 from .cli_commands import read_views as read_views_commands
 from .cli_commands import remotes as remotes_commands
-from .cli_commands import runtime as runtime_commands
 from .cli_commands import tooling as tooling_commands
-from .cli_commands.lifecycle_cli import register_lifecycle_commands
-from .cli_commands.namespace_cli import register_namespace_commands
-from .cli_commands.ops_cli import register_ops_commands
-from .cli_commands.query_cli import register_query_commands
-from .cli_commands.remotes_cli import register_remotes_commands
-from .cli_commands.sync_cli import register_sync_commands
-from .cli_merge_policy import resolve_merge_policy
-from .cli_paths import (
+from .cli_commands.lifecycle import register_lifecycle_commands
+from .cli_commands.maintenance import register_maintenance_commands
+from .cli_commands.namespace.cli import register_namespace_commands
+from .cli_commands.query import register_query_commands
+from .cli_commands.remotes.cli import register_remotes_commands
+from .cli_commands.sync.cli import register_sync_commands
+from .cli_support.bindings import build_cli_bindings
+from .cli_support.merge_policy import resolve_merge_policy
+from .cli_support.paths import (
     LEGACY_DATASET_PATH_ERROR as _LEGACY_DATASET_PATH_ERROR,
 )
-from .cli_paths import (
+from .cli_support.paths import (
     assert_not_legacy_dataset_path as _assert_not_legacy_dataset_path_impl,
 )
-from .cli_paths import (
+from .cli_support.paths import (
     assert_supported_root as _assert_supported_root_impl,
 )
-from .cli_paths import (
+from .cli_support.paths import (
     pkg_usr_root as _pkg_usr_root_impl,
 )
-from .cli_paths import (
+from .cli_support.paths import (
     resolve_dataset_for_read as _resolve_dataset_for_read_impl,
 )
-from .cli_paths import (
+from .cli_support.paths import (
     resolve_path_anywhere as _resolve_path_anywhere_impl,
 )
-from .cli_surface import build_cli_apps
-from .dataset import LEGACY_DATASET_PREFIX, Dataset
+from .cli_support.roots import default_usr_root as _default_usr_root_impl
+from .cli_support.roots import normalize_usr_root as _normalize_usr_root_impl
+from .cli_support.surface import build_cli_apps
+from .dataset import ARCHIVE_DATASET_PREFIX, Dataset
+from .datasets.merge import MergeColumnsMode, merge_usr_to_usr
+from .datasets.mock import add_demo_columns, create_mock_dataset
 from .errors import SequencesError, UserAbort
-from .merge_datasets import (
-    MergeColumnsMode,
-    merge_usr_to_usr,
-)
-from .mock import add_demo_columns, create_mock_dataset
 from .registry import load_registry, parse_columns_spec, register_namespace
 
 # Compatibility exports kept for existing monkeypatch-based tests.
@@ -153,26 +149,29 @@ def _read_view_deps() -> read_views_commands.ReadViewDeps:
         resolve_existing_dataset_id=_resolve_existing_dataset_id,
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
         assert_not_legacy_dataset_path=_assert_not_legacy_dataset_path_for_read_views,
-        legacy_dataset_prefix=LEGACY_DATASET_PREFIX,
+        legacy_dataset_prefix=ARCHIVE_DATASET_PREFIX,
         legacy_dataset_path_error=LEGACY_DATASET_PATH_ERROR,
     )
 
 
-def _runtime_deps() -> runtime_commands.RuntimeDeps:
+def _runtime_deps() -> query_commands.RuntimeDeps:
     return deps_commands.build_runtime_deps(
         resolve_dataset_for_read=_resolve_dataset_for_read,
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
-        resolve_output_format=_resolve_output_format,
-        print_json=_print_json,
-        output_version=USR_OUTPUT_VERSION,
     )
 
 
-def _materialize_deps() -> materialize_commands.MaterializeDeps:
+def _materialize_deps() -> lifecycle_commands.MaterializeDeps:
     return deps_commands.build_materialize_deps(
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
         is_interactive=_is_interactive,
         confirm=lambda message: typer.confirm(message, default=False),
+    )
+
+
+def _snapshot_deps() -> lifecycle_commands.SnapshotDeps:
+    return deps_commands.build_snapshot_deps(
+        resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
     )
 
 
@@ -183,7 +182,7 @@ def _maintenance_deps() -> maintenance_commands.MaintenanceDeps:
     )
 
 
-def _merge_deps() -> merge_commands.MergeDeps:
+def _merge_deps() -> maintenance_commands.MergeDeps:
     return deps_commands.build_merge_deps(
         resolve_merge_policy=resolve_merge_policy,
         merge_usr_to_usr=merge_usr_to_usr,
@@ -192,7 +191,7 @@ def _merge_deps() -> merge_commands.MergeDeps:
     )
 
 
-def _namespace_deps() -> namespace_handlers_commands.NamespaceDeps:
+def _namespace_deps() -> namespace_commands.NamespaceDeps:
     return deps_commands.build_namespace_deps(
         load_registry=load_registry,
         parse_columns_spec=parse_columns_spec,
@@ -262,6 +261,7 @@ _bindings = build_cli_bindings(
     read_view_deps=_read_view_deps,
     runtime_deps=_runtime_deps,
     materialize_deps=_materialize_deps,
+    snapshot_deps=_snapshot_deps,
     maintenance_deps=_maintenance_deps,
     merge_deps=_merge_deps,
     namespace_deps=_namespace_deps,
@@ -381,22 +381,27 @@ register_sync_commands(
     cmd_push=cmd_push,
 )
 
-register_ops_commands(
+register_maintenance_commands(
     maintenance_app,
-    densegen_app,
-    dev_app,
-    legacy_app,
     ctx_args_builder=_ctx_args,
     cmd_dedupe_sequences=cmd_dedupe_sequences,
     cmd_registry_freeze=cmd_registry_freeze,
     cmd_overlay_compact=cmd_overlay_compact,
     cmd_overlay_project=cmd_overlay_project,
     cmd_overlay_remove=cmd_overlay_remove,
+    cmd_merge_datasets=cmd_merge_datasets,
+)
+
+tooling_commands.register_ops_commands(
+    # tooling package owns these subapp registrations now
+    densegen_app,
+    dev_app,
+    legacy_app,
+    ctx_args_builder=_ctx_args,
     cmd_repair_densegen=cmd_repair_densegen,
     cmd_make_mock=cmd_make_mock,
     cmd_add_demo=cmd_add_demo,
     cmd_convert_legacy=cmd_convert_legacy,
-    cmd_merge_datasets=cmd_merge_datasets,
 )
 
 register_query_commands(
@@ -455,7 +460,7 @@ register_namespace_commands(
 
 
 def main() -> None:
-    from .stderr_filter import maybe_install_pyarrow_sysctl_filter
+    from .cli_support.stderr_filter import maybe_install_pyarrow_sysctl_filter
 
     maybe_install_pyarrow_sysctl_filter()
     try:

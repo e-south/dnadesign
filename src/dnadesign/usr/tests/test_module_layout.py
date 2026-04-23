@@ -12,46 +12,130 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
+
+from .source_layout_inventory import (
+    HELPER_PACKAGE_FILES,
+    HELPER_PACKAGE_SUBPACKAGES,
+    NESTED_PACKAGE_FILES,
+    TOP_LEVEL_SOURCE_MODULES,
+    TOP_LEVEL_SOURCE_PACKAGES,
+)
+
+PUBLIC_FACADE_MODULES = {
+    "__init__.py",
+    "__main__.py",
+}
 
 
-def test_storage_package_exports_expected_symbols() -> None:
+def test_public_package_root_only_contains_intentional_facade_modules() -> None:
+    package_root = Path(__file__).resolve().parents[1]
+    actual = {path.name for path in package_root.glob("*.py")}
+    assert actual == PUBLIC_FACADE_MODULES
+
+
+def test_public_package_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr")
+    assert hasattr(module, "Dataset")
+    assert hasattr(module, "RESERVED_NAMESPACES")
+    assert hasattr(module, "MUTATION_RESERVED_NAMESPACES")
+    assert hasattr(module, "load_overlay_catalog")
+    assert hasattr(module, "build_dataset_info")
+    assert hasattr(module, "merge_dataset_schema")
+    assert hasattr(module, "attach_frame_dataset")
+    assert hasattr(module, "write_overlay_dataset")
+    assert hasattr(module, "write_overlay_part_dataset")
+    assert hasattr(module, "overlay_metadata")
+    assert hasattr(module, "overlay_parts")
+    assert hasattr(module, "overlay_schema")
+    assert hasattr(module, "OVERLAY_DIGEST_LEDGER_FILENAME")
+    assert hasattr(module, "overlay_digest_ledger_path")
+    assert hasattr(module, "default_usr_root")
+    assert hasattr(module, "normalize_usr_root")
+    assert hasattr(module, "pkg_usr_root")
+    assert hasattr(module, "resolve_usr_root_from_config")
+    assert hasattr(module, "resolve_usr_root_from_env")
+    assert hasattr(module, "app")
+    assert hasattr(module, "main")
+
+
+def test_storage_parquet_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.storage.parquet")
+    assert hasattr(module, "commit_parquet_atomic_file")
+    assert hasattr(module, "read_parquet_head")
     assert hasattr(module, "write_parquet_atomic")
     assert hasattr(module, "iter_parquet_batches")
 
 
-def test_public_dataset_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.dataset")
-    assert hasattr(module, "Dataset")
-    assert hasattr(module, "RESERVED_NAMESPACES")
-    assert hasattr(module, "MUTATION_RESERVED_NAMESPACES")
+def test_storage_locking_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.storage.locking")
+    assert hasattr(module, "LOCK_FILENAME")
+    assert hasattr(module, "dataset_write_lock")
 
 
-def test_public_overlay_catalog_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.dataset_overlay_catalog")
-    assert hasattr(module, "load_overlay_catalog")
-    assert hasattr(module, "build_dataset_info")
-    assert hasattr(module, "merge_dataset_schema")
+def test_events_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.events")
+    assert hasattr(module, "USR_EVENT_VERSION")
+    assert hasattr(module, "fingerprint_parquet")
+    assert hasattr(module, "record_event")
 
 
-def test_public_overlay_ops_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.dataset_overlay_ops")
-    assert hasattr(module, "attach_frame_dataset")
-    assert hasattr(module, "write_overlay_dataset")
-    assert hasattr(module, "write_overlay_part_dataset")
+def test_usr_source_root_contains_only_sanctioned_modules_and_packages() -> None:
+    src_root = Path(__file__).resolve().parents[1] / "src"
+    actual_modules = {path.name for path in src_root.glob("*.py")}
+    actual_packages = {path.name for path in src_root.iterdir() if path.is_dir() and (path / "__init__.py").exists()}
+
+    assert actual_modules == TOP_LEVEL_SOURCE_MODULES
+    assert actual_packages == TOP_LEVEL_SOURCE_PACKAGES
 
 
-def test_public_overlays_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.overlays")
-    assert hasattr(module, "overlay_metadata")
-    assert hasattr(module, "overlay_parts")
-    assert hasattr(module, "overlay_schema")
+def test_usr_helper_packages_match_layout_inventory() -> None:
+    src_root = Path(__file__).resolve().parents[1] / "src"
+
+    assert set(HELPER_PACKAGE_FILES) == TOP_LEVEL_SOURCE_PACKAGES
+    assert set(HELPER_PACKAGE_SUBPACKAGES) == TOP_LEVEL_SOURCE_PACKAGES
+
+    for package_name, expected_files in HELPER_PACKAGE_FILES.items():
+        package_root = src_root / package_name
+        actual_files = {path.name for path in package_root.glob("*.py")}
+        actual_subpackages = {
+            path.name for path in package_root.iterdir() if path.is_dir() and (path / "__init__.py").exists()
+        }
+
+        assert actual_files == expected_files
+        assert actual_subpackages == HELPER_PACKAGE_SUBPACKAGES[package_name]
+
+
+def test_usr_nested_helper_packages_match_layout_inventory() -> None:
+    src_root = Path(__file__).resolve().parents[1] / "src"
+
+    for (package_name, nested_name), expected_files in NESTED_PACKAGE_FILES.items():
+        package_root = src_root / package_name / nested_name
+        actual_files = {path.name for path in package_root.glob("*.py")}
+        actual_subpackages = {
+            path.name for path in package_root.iterdir() if path.is_dir() and (path / "__init__.py").exists()
+        }
+
+        assert actual_files == expected_files
+        assert actual_subpackages == set()
 
 
 def test_cli_commands_dataset_helpers_available() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.datasets")
     assert hasattr(module, "list_datasets")
     assert hasattr(module, "resolve_existing_dataset_id")
+    assert hasattr(module, "resolve_dataset_name_interactive")
+
+
+def test_cli_commands_dataset_catalog_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.datasets.catalog")
+    assert hasattr(module, "list_datasets")
+
+
+def test_cli_commands_dataset_resolution_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.datasets.resolution")
+    assert hasattr(module, "resolve_existing_dataset_id")
+    assert hasattr(module, "resolve_dataset_name_interactive")
 
 
 def test_cli_deps_module_exports_expected_symbols() -> None:
@@ -59,6 +143,7 @@ def test_cli_deps_module_exports_expected_symbols() -> None:
     assert hasattr(module, "build_read_view_deps")
     assert hasattr(module, "build_runtime_deps")
     assert hasattr(module, "build_materialize_deps")
+    assert hasattr(module, "build_snapshot_deps")
     assert hasattr(module, "build_maintenance_deps")
     assert hasattr(module, "build_merge_deps")
     assert hasattr(module, "build_namespace_deps")
@@ -66,34 +151,128 @@ def test_cli_deps_module_exports_expected_symbols() -> None:
 
 
 def test_cli_paths_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_paths")
+    module = importlib.import_module("dnadesign.usr.src.cli_support.paths")
     assert hasattr(module, "assert_supported_root")
     assert hasattr(module, "resolve_dataset_for_read")
     assert hasattr(module, "resolve_path_anywhere")
 
 
 def test_cli_bindings_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_bindings")
+    module = importlib.import_module("dnadesign.usr.src.cli_support.bindings")
     assert hasattr(module, "CliBindings")
     assert hasattr(module, "build_cli_bindings")
 
 
+def test_cli_pretty_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_support.pretty")
+    assert hasattr(module, "PrettyOpts")
+    assert hasattr(module, "fmt_value")
+    assert hasattr(module, "render_schema_tree")
+    assert hasattr(module, "profile_table")
+    assert hasattr(module, "profile_batches")
+
+
+def test_cli_rendering_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_support.rendering")
+    assert hasattr(module, "print_df_plain")
+    assert hasattr(module, "render_table_rich")
+    assert hasattr(module, "render_schema_tree_rich")
+    assert hasattr(module, "render_diff_rich")
+
+
+def test_cli_roots_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_support.roots")
+    assert hasattr(module, "default_usr_root")
+    assert hasattr(module, "normalize_usr_root")
+    assert hasattr(module, "pkg_usr_root")
+    assert hasattr(module, "resolve_usr_root_from_config")
+    assert hasattr(module, "resolve_usr_root_from_env")
+
+
+def test_cli_stderr_filter_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_support.stderr_filter")
+    assert hasattr(module, "should_filter_pyarrow_sysctl")
+    assert hasattr(module, "maybe_install_pyarrow_sysctl_filter")
+
+
+def test_remote_sync_config_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.remote_sync.config")
+    assert hasattr(module, "SSHRemoteConfig")
+    assert hasattr(module, "default_config_path")
+    assert hasattr(module, "locate_config")
+    assert hasattr(module, "load_all")
+    assert hasattr(module, "save_remote")
+    assert hasattr(module, "get_remote")
+
+
+def test_remote_sync_execution_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.remote_sync.execution")
+    assert hasattr(module, "SyncRuntime")
+    assert hasattr(module, "plan_diff")
+    assert hasattr(module, "plan_diff_file")
+    assert hasattr(module, "execute_pull")
+    assert hasattr(module, "execute_pull_file")
+    assert hasattr(module, "execute_push")
+    assert hasattr(module, "execute_push_file")
+
+
 def test_dataset_query_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_query")
+    module = importlib.import_module("dnadesign.usr.src.datasets.query")
     assert hasattr(module, "sql_ident")
     assert hasattr(module, "sql_str")
     assert hasattr(module, "create_overlay_view")
+    assert hasattr(module, "build_overlay_query")
+    assert hasattr(module, "load_overlay_catalog")
+    assert hasattr(module, "build_dataset_info")
+    assert hasattr(module, "merge_dataset_schema")
+
+
+def test_dataset_lifecycle_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.lifecycle")
+    assert hasattr(module, "DatasetWriteSession")
+    assert hasattr(module, "init_dataset")
+    assert hasattr(module, "freeze_registry")
+    assert hasattr(module, "auto_freeze_registry")
+    assert hasattr(module, "base_metadata")
+    assert hasattr(module, "frozen_registry_path")
+    assert hasattr(module, "tombstone_path")
+
+
+def test_dataset_merge_package_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.merge")
+    assert hasattr(module, "MergeColumnsMode")
+    assert hasattr(module, "MergePolicy")
+    assert hasattr(module, "MergePreview")
+    assert hasattr(module, "OverlayCarryPlan")
+    assert hasattr(module, "apply_overlay_carry")
+    assert hasattr(module, "merge_usr_to_usr")
+    assert hasattr(module, "plan_overlay_carry")
+
+
+def test_dataset_merge_execution_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.merge.execution")
+    assert hasattr(module, "MergeColumnsMode")
+    assert hasattr(module, "MergePolicy")
+    assert hasattr(module, "MergePreview")
+    assert hasattr(module, "merge_usr_to_usr")
+
+
+def test_dataset_merge_overlay_carry_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.merge.overlay_carry")
+    assert hasattr(module, "OverlayCarryPlan")
+    assert hasattr(module, "apply_overlay_carry")
+    assert hasattr(module, "plan_overlay_carry")
 
 
 def test_dataset_reporting_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_reporting")
+    module = importlib.import_module("dnadesign.usr.src.datasets.views.reporting")
     assert hasattr(module, "manifest_dataset")
     assert hasattr(module, "manifest_dict_dataset")
     assert hasattr(module, "describe_dataset")
 
 
 def test_dataset_views_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_views")
+    module = importlib.import_module("dnadesign.usr.src.datasets.views")
     assert hasattr(module, "scan_dataset")
     assert hasattr(module, "head_dataset")
     assert hasattr(module, "get_dataset")
@@ -102,7 +281,7 @@ def test_dataset_views_module_exports_expected_symbols() -> None:
 
 
 def test_dataset_ingest_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_ingest")
+    module = importlib.import_module("dnadesign.usr.src.datasets.ingest")
     assert hasattr(module, "prepare_import_rows_dataset")
     assert hasattr(module, "write_import_df_dataset")
     assert hasattr(module, "import_rows_dataset")
@@ -111,53 +290,85 @@ def test_dataset_ingest_module_exports_expected_symbols() -> None:
     assert hasattr(module, "import_jsonl_dataset")
 
 
+def test_dataset_mock_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.mock")
+    assert hasattr(module, "MockSpec")
+    assert hasattr(module, "make_mock_tables")
+    assert hasattr(module, "create_mock_dataset")
+    assert hasattr(module, "add_demo_columns")
+
+
 def test_dataset_validate_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_validate")
+    module = importlib.import_module("dnadesign.usr.src.datasets.validate")
     assert hasattr(module, "validate_dataset")
 
 
+def test_dataset_validate_registry_modes_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.validate.registry_modes")
+    assert hasattr(module, "normalize_registry_mode")
+    assert hasattr(module, "register_registry_mode")
+
+
 def test_dataset_identity_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_identity")
+    module = importlib.import_module("dnadesign.usr.src.datasets.identity")
     assert hasattr(module, "normalize_dataset_id")
     assert hasattr(module, "open_dataset")
 
 
 def test_dataset_read_keys_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_read_keys")
+    module = importlib.import_module("dnadesign.usr.src.datasets.views.read_keys")
     assert hasattr(module, "key_list_from_batch")
 
 
-def test_dataset_overlay_maintenance_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_overlay_maintenance")
+def test_dataset_overlay_package_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.overlay")
+    assert hasattr(module, "attach_dataset")
+    assert hasattr(module, "attach_columns_dataset")
+    assert hasattr(module, "attach_frame_dataset")
+    assert hasattr(module, "write_overlay_dataset")
+    assert hasattr(module, "write_overlay_part_dataset")
     assert hasattr(module, "list_overlay_infos")
     assert hasattr(module, "remove_overlay_namespace")
     assert hasattr(module, "compact_overlay_namespace")
 
 
+def test_dataset_overlay_maintenance_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.overlay.maintenance")
+    assert hasattr(module, "list_overlay_infos")
+    assert hasattr(module, "remove_overlay_namespace")
+    assert hasattr(module, "compact_overlay_namespace")
+
+
+def test_dataset_overlay_policy_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.datasets.overlay.policy")
+    assert hasattr(module, "validate_overlay_target")
+    assert hasattr(module, "coerce_null_overlay_columns_to_registry_schema")
+
+
 def test_overlay_maintenance_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.overlay_maintenance")
+    module = importlib.import_module("dnadesign.usr.src.overlay_support.maintenance")
     assert hasattr(module, "remove_dataset_overlay")
 
 
 def test_dataset_reserved_overlay_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_reserved_overlay")
+    module = importlib.import_module("dnadesign.usr.src.datasets.reserved_overlay")
     assert hasattr(module, "write_reserved_overlay")
 
 
 def test_dataset_overlay_query_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_overlay_query")
+    module = importlib.import_module("dnadesign.usr.src.datasets.query.planner")
     assert hasattr(module, "build_overlay_query")
 
 
 def test_dataset_overlay_catalog_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_overlay_catalog")
+    module = importlib.import_module("dnadesign.usr.src.datasets.query.catalog")
     assert hasattr(module, "load_overlay_catalog")
     assert hasattr(module, "build_dataset_info")
     assert hasattr(module, "merge_dataset_schema")
 
 
 def test_dataset_state_facade_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_state_facade")
+    module = importlib.import_module("dnadesign.usr.src.datasets.state.facade")
     assert hasattr(module, "ensure_dataset_ids_exist")
     assert hasattr(module, "tombstone_dataset_rows")
     assert hasattr(module, "restore_dataset_rows")
@@ -174,7 +385,7 @@ def test_cli_sync_module_exports_expected_symbols() -> None:
 
 
 def test_cli_sync_output_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_output")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync.output")
     assert hasattr(module, "build_sync_audit_payload")
     assert hasattr(module, "print_diff")
     assert hasattr(module, "print_verify_notes")
@@ -182,7 +393,7 @@ def test_cli_sync_output_module_exports_expected_symbols() -> None:
 
 
 def test_cli_sync_targets_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_targets")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync.targets")
     assert hasattr(module, "is_file_mode_target")
     assert hasattr(module, "is_dataset_dir_target")
     assert hasattr(module, "resolve_dataset_dir_target")
@@ -191,7 +402,7 @@ def test_cli_sync_targets_module_exports_expected_symbols() -> None:
 
 
 def test_cli_sync_execution_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_execution")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync.execution")
     assert hasattr(module, "SyncExecutionDeps")
     assert hasattr(module, "SyncRunResult")
     assert hasattr(module, "assert_dataset_only_flags_for_file_mode")
@@ -202,42 +413,61 @@ def test_cli_sync_execution_module_exports_expected_symbols() -> None:
 
 
 def test_cli_sync_registration_module_exports_register_function() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_cli")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.sync.cli")
     assert hasattr(module, "register_sync_commands")
 
 
 def test_cli_remotes_registration_module_exports_register_function() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.remotes_cli")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.remotes.cli")
     assert hasattr(module, "register_remotes_commands")
 
 
 def test_cli_namespace_registration_module_exports_register_function() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.namespace_cli")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.namespace.cli")
     assert hasattr(module, "register_namespace_commands")
 
 
 def test_cli_query_registration_module_exports_register_function() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.query_cli")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.query.cli")
     assert hasattr(module, "register_query_commands")
 
 
 def test_cli_lifecycle_registration_module_exports_register_function() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle_cli")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle.cli")
     assert hasattr(module, "register_lifecycle_commands")
 
 
 def test_cli_ops_registration_module_exports_register_function() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.ops_cli")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.tooling")
+    assert hasattr(module, "register_ops_commands")
+
+
+def test_cli_tooling_registration_module_exports_register_function() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.tooling.cli")
     assert hasattr(module, "register_ops_commands")
 
 
 def test_cli_surface_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_surface")
+    module = importlib.import_module("dnadesign.usr.src.cli_support.surface")
     assert hasattr(module, "build_cli_apps")
 
 
-def test_cli_read_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.read")
+def test_cli_query_package_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.query")
+    assert hasattr(module, "register_query_commands")
+    assert hasattr(module, "RuntimeDeps")
+    assert hasattr(module, "cmd_ls")
+    assert hasattr(module, "cmd_info")
+    assert hasattr(module, "cmd_schema")
+    assert hasattr(module, "cmd_validate")
+    assert hasattr(module, "cmd_events_tail")
+    assert hasattr(module, "cmd_get")
+    assert hasattr(module, "cmd_grep")
+    assert hasattr(module, "cmd_export")
+
+
+def test_cli_query_read_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.query.read")
     assert hasattr(module, "cmd_ls")
     assert hasattr(module, "cmd_info")
     assert hasattr(module, "cmd_schema")
@@ -252,7 +482,7 @@ def test_cli_read_views_module_exports_expected_symbols() -> None:
 
 
 def test_cli_read_parquet_targets_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.read_parquet_targets")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.read_views.parquet_targets")
     assert hasattr(module, "_list_parquet_candidates")
     assert hasattr(module, "_resolve_parquet_from_dir")
     assert hasattr(module, "_resolve_parquet_target")
@@ -260,40 +490,62 @@ def test_cli_read_parquet_targets_module_exports_expected_symbols() -> None:
 
 
 def test_cli_runtime_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.runtime")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.query.runtime")
     assert hasattr(module, "cmd_validate")
     assert hasattr(module, "cmd_events_tail")
     assert hasattr(module, "cmd_get")
     assert hasattr(module, "cmd_grep")
     assert hasattr(module, "cmd_export")
+
+
+def test_cli_lifecycle_package_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle")
+    assert hasattr(module, "register_lifecycle_commands")
+    assert hasattr(module, "MaterializeDeps")
+    assert hasattr(module, "SnapshotDeps")
+    assert hasattr(module, "cmd_init")
+    assert hasattr(module, "cmd_import")
+    assert hasattr(module, "cmd_attach")
     assert hasattr(module, "cmd_delete")
     assert hasattr(module, "cmd_restore")
     assert hasattr(module, "cmd_state_set")
     assert hasattr(module, "cmd_state_clear")
     assert hasattr(module, "cmd_state_get")
-
-
-def test_cli_materialize_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.materialize")
     assert hasattr(module, "cmd_materialize")
+    assert hasattr(module, "cmd_snapshot")
+
+
+def test_cli_lifecycle_materialize_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle.materialize")
+    assert hasattr(module, "MaterializeDeps")
+    assert hasattr(module, "cmd_materialize")
+
+
+def test_cli_lifecycle_snapshot_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle.snapshot")
+    assert hasattr(module, "SnapshotDeps")
+    assert hasattr(module, "cmd_snapshot")
 
 
 def test_cli_maintenance_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.maintenance")
+    assert hasattr(module, "register_maintenance_commands")
     assert hasattr(module, "cmd_registry_freeze")
     assert hasattr(module, "cmd_overlay_compact")
+    assert hasattr(module, "cmd_overlay_project")
     assert hasattr(module, "cmd_overlay_remove")
-    assert hasattr(module, "cmd_snapshot")
     assert hasattr(module, "cmd_dedupe_sequences")
+    assert hasattr(module, "MergeDeps")
+    assert hasattr(module, "cmd_merge_datasets")
 
 
 def test_cli_merge_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.merge")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.maintenance.merge")
     assert hasattr(module, "cmd_merge_datasets")
 
 
 def test_cli_namespace_handlers_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.namespace_handlers")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.namespace")
     assert hasattr(module, "cmd_namespace_list")
     assert hasattr(module, "cmd_namespace_show")
     assert hasattr(module, "cmd_namespace_register")
@@ -301,10 +553,28 @@ def test_cli_namespace_handlers_module_exports_expected_symbols() -> None:
 
 def test_cli_tooling_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.tooling")
+    assert hasattr(module, "ToolingDeps")
+    assert hasattr(module, "register_ops_commands")
     assert hasattr(module, "cmd_repair_densegen")
     assert hasattr(module, "cmd_convert_legacy")
     assert hasattr(module, "cmd_make_mock")
     assert hasattr(module, "cmd_add_demo")
+
+
+def test_cli_tooling_densegen_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.tooling.densegen")
+    assert hasattr(module, "cmd_repair_densegen")
+
+
+def test_cli_tooling_dev_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.tooling.dev")
+    assert hasattr(module, "cmd_make_mock")
+    assert hasattr(module, "cmd_add_demo")
+
+
+def test_cli_tooling_legacy_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.tooling.legacy")
+    assert hasattr(module, "cmd_convert_legacy")
 
 
 def test_cli_error_output_module_exports_expected_symbols() -> None:
@@ -313,14 +583,14 @@ def test_cli_error_output_module_exports_expected_symbols() -> None:
 
 
 def test_cli_write_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.write")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle.write")
     assert hasattr(module, "cmd_init")
     assert hasattr(module, "cmd_import")
     assert hasattr(module, "cmd_attach")
 
 
 def test_cli_state_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.cli_commands.state")
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.lifecycle.state")
     assert hasattr(module, "cmd_delete")
     assert hasattr(module, "cmd_restore")
     assert hasattr(module, "cmd_state_set")
@@ -329,7 +599,7 @@ def test_cli_state_module_exports_expected_symbols() -> None:
 
 
 def test_dataset_state_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.dataset_state")
+    module = importlib.import_module("dnadesign.usr.src.datasets.state")
     assert hasattr(module, "ensure_ids_exist")
     assert hasattr(module, "tombstone")
     assert hasattr(module, "restore")
@@ -339,7 +609,7 @@ def test_dataset_state_module_exports_expected_symbols() -> None:
 
 
 def test_sync_transfer_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.sync_transfer")
+    module = importlib.import_module("dnadesign.usr.src.remote_sync.transfer")
     assert hasattr(module, "make_pull_staging_dir")
     assert hasattr(module, "copy_file_atomic")
     assert hasattr(module, "collect_staged_entries")
@@ -347,7 +617,7 @@ def test_sync_transfer_module_exports_expected_symbols() -> None:
 
 
 def test_convert_legacy_inputs_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.convert_legacy_inputs")
+    module = importlib.import_module("dnadesign.usr.src.legacy.inputs")
     assert hasattr(module, "Profile")
     assert hasattr(module, "profile_60bp_dual_promoter")
     assert hasattr(module, "_coerce_logits")
@@ -358,12 +628,12 @@ def test_convert_legacy_inputs_module_exports_expected_symbols() -> None:
 
 
 def test_convert_legacy_tfbs_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.convert_legacy_tfbs")
+    module = importlib.import_module("dnadesign.usr.src.legacy.tfbs")
     assert hasattr(module, "_parse_tfbs_parts")
     assert hasattr(module, "_scan_used_tfbs")
     assert hasattr(module, "_detect_promoter_forward")
 
 
 def test_convert_legacy_dedupe_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.usr.src.convert_legacy_dedupe")
+    module = importlib.import_module("dnadesign.usr.src.legacy.dedupe")
     assert hasattr(module, "apply_casefold_sequence_dedupe")

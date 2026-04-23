@@ -27,10 +27,10 @@ import pyarrow.parquet as pq
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.cli_commands import sync as sync_commands
-from dnadesign.usr.src.config import SSHRemoteConfig
+from dnadesign.usr.src.remote_sync.config import SSHRemoteConfig
 from dnadesign.usr.src.errors import TransferError
 from dnadesign.usr.src.registry import parse_columns_spec, register_namespace
-from dnadesign.usr.src.remote import RemoteDatasetStat, RemotePrimaryStat
+from dnadesign.usr.src.remote_sync.remote import RemoteDatasetStat, RemotePrimaryStat
 
 
 def _sha256(path: Path) -> str:

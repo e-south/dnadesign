@@ -20,12 +20,12 @@ from typing import Any, Mapping, Optional
 
 import pyarrow.parquet as pq
 
-from .event_schema import USR_EVENT_VERSION
-from .io import now_utc
 from .registry import registry_hash as _registry_hash
+from .storage.parquet import now_utc
 from .types import Fingerprint
 from .version import __version__
 
+USR_EVENT_VERSION = 1
 _REDACTED_VALUE = "***REDACTED***"
 _SENSITIVE_ARG_KEY_TOKENS = (
     "secret",
@@ -266,3 +266,6 @@ def _event_defaults(action: str) -> dict:
         },
     }
     return defaults.get(action, {"metrics": {}, "artifacts": {}})
+
+
+__all__ = ["USR_EVENT_VERSION", "fingerprint_parquet", "record_event"]

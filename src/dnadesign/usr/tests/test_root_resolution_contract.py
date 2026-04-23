@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.usr import roots as usr_roots
+import dnadesign.usr as usr_roots
 
 
 def test_default_usr_root_matches_packaged_usr_datasets_dir() -> None:
