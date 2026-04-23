@@ -90,21 +90,17 @@ def _write_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "nick_stage": {
                     "nickase_variant_id": "Nx.Exact7",
                     "catalog": {"additional_paths": ["inputs/nickases/local.nickases.yaml"]},
-                    "normalized_to_top_strand_nick": True,
-                    "require_site_sequence_preserved_pre_nick": True,
                 },
                 "release_stage": {
                     "release_variant_id": "Re.Exact",
                     "catalog": {"additional_paths": ["inputs/release_enzymes/local.release.yaml"]},
                     "retained_side": "upstream",
                     "stage_order": "nick_then_release",
-                    "require_site_sequence_preserved_pre_release": True,
                 },
                 "final_target": {"nick_boundary_from_left": 0, "paired_bp": 3, "cap_nt": 3},
                 "constraints": {
                     "allow_post_release_loss_of_nickase_site": True,
                     "allow_post_release_loss_of_release_site": True,
-                    "require_nick_survives_in_retained_product": False,
                     "require_release_site_downstream_of_nick": True,
                     "require_complete_downstream_fragment_separation": True,
                 },
@@ -180,6 +176,37 @@ def test_released_target_search_json_reports_exact_and_near_hits(tmp_path: Path)
     assert all(hit["nick_boundary_from_left"] > 0 for hit in payload["near_hits"])
 
 
+def test_released_target_search_json_reports_route_policy_when_top_active_routes_are_enabled(tmp_path: Path) -> None:
+    workspace, _spec_path, _release_catalog_path = _write_workspace(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "snapback",
+            "released-target-search",
+            "--workspace-root",
+            str(workspace),
+            "--nick-additional-path",
+            "inputs/nickases/local.nickases.yaml",
+            "--release-additional-path",
+            "inputs/release_enzymes/local.release.yaml",
+            "--allow-top-active-routes",
+            "--allow-precut-footprint-outside-active-product",
+            "--json",
+        ],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["metadata"]["final_geometry_source"] == "retained_active_strand"
+    assert payload["metadata"]["allowed_active_strands"] == ["top", "bottom"]
+    assert payload["metadata"]["allowed_route_families"] == [
+        "bottom_active_from_top_nick",
+        "top_active_from_bottom_nick",
+    ]
+
+
 def test_released_target_search_requires_explicit_sources(tmp_path: Path) -> None:
     workspace, _spec_path, _release_catalog_path = _write_workspace(tmp_path)
 
@@ -197,6 +224,17 @@ def test_released_target_search_requires_explicit_sources(tmp_path: Path) -> Non
 
     assert result.exit_code == 1
     assert "requires at least one explicit nickase source" in result.output
+
+
+def test_released_target_search_help_mentions_active_route_flags() -> None:
+    result = runner.invoke(app, ["snapback", "released-target-search", "--help"], color=False)
+
+    assert result.exit_code == 0
+    assert "--allow-top-active-routes" in result.output
+    assert "--allow-precut-footprint-out" in result.output
+    assert "retained-active audits" in result.output
+    assert "vendor nickase" in result.output
+    assert "top strand" in result.output
 
 
 def test_released_target_search_excludes_demo_only_entries_unless_opted_in(tmp_path: Path) -> None:
@@ -309,3 +347,101 @@ def test_released_target_search_excludes_frequent_cutter_nickases_unless_opted_i
     allowed_payload = json.loads(allowed.output)
     assert allowed_payload["status"] == "exact_hits_found"
     assert allowed_payload["exact_hits"][0]["nickase_variant_id"] == "Nx.Exact7"
+
+
+def test_released_solve_json_reports_route_policy_when_top_active_routes_are_enabled(tmp_path: Path) -> None:
+    workspace, _spec_path, _release_catalog_path = _write_workspace(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "snapback",
+            "released-solve",
+            "--workspace-root",
+            str(workspace),
+            "--nick-additional-path",
+            "inputs/nickases/local.nickases.yaml",
+            "--release-additional-path",
+            "inputs/release_enzymes/local.release.yaml",
+            "--allow-top-active-routes",
+            "--allow-precut-footprint-outside-active-product",
+            "--materialize-top-k",
+            "1",
+            "--force-overwrite",
+            "--json",
+        ],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["metadata"]["final_geometry_source"] == "retained_active_strand"
+    assert payload["metadata"]["allowed_active_strands"] == ["top", "bottom"]
+    assert payload["metadata"]["allowed_route_families"] == [
+        "bottom_active_from_top_nick",
+        "top_active_from_bottom_nick",
+    ]
+
+
+def test_released_solve_excludes_demo_only_entries_unless_opted_in(tmp_path: Path) -> None:
+    workspace, _spec_path, _release_catalog_path = _write_workspace(tmp_path)
+    nick_catalog_path = workspace / "inputs" / "nickases" / "local.nickases.yaml"
+    release_catalog_path = workspace / "inputs" / "release_enzymes" / "local.release.yaml"
+
+    nick_payload = yaml.safe_load(nick_catalog_path.read_text(encoding="utf-8"))
+    nick_payload["nickases"]["entries"][0]["metadata"] = {"demo_only": True}
+    nick_catalog_path.write_text(yaml.safe_dump(nick_payload, sort_keys=False), encoding="utf-8")
+
+    release_payload = yaml.safe_load(release_catalog_path.read_text(encoding="utf-8"))
+    release_payload["release_enzymes"]["entries"][0]["metadata"] = {"demo_only": True}
+    release_catalog_path.write_text(yaml.safe_dump(release_payload, sort_keys=False), encoding="utf-8")
+
+    blocked = runner.invoke(
+        app,
+        [
+            "snapback",
+            "released-solve",
+            "--workspace-root",
+            str(workspace),
+            "--nick-additional-path",
+            "inputs/nickases/local.nickases.yaml",
+            "--release-additional-path",
+            "inputs/release_enzymes/local.release.yaml",
+            "--materialize-top-k",
+            "1",
+            "--force-overwrite",
+            "--json",
+        ],
+        color=False,
+    )
+
+    assert blocked.exit_code == 1
+    blocked_payload = json.loads(blocked.output)
+    assert blocked_payload["status"] == "no_hits"
+    assert blocked_payload["metadata"]["evaluated_pair_count"] == 0
+    assert blocked_payload["metadata"]["blocker_counts"]["DEMO_ONLY_PAIR_SUPPRESSED"] >= 1
+
+    allowed = runner.invoke(
+        app,
+        [
+            "snapback",
+            "released-solve",
+            "--workspace-root",
+            str(workspace),
+            "--nick-additional-path",
+            "inputs/nickases/local.nickases.yaml",
+            "--release-additional-path",
+            "inputs/release_enzymes/local.release.yaml",
+            "--allow-demo-hits",
+            "--materialize-top-k",
+            "1",
+            "--force-overwrite",
+            "--json",
+        ],
+        color=False,
+    )
+
+    assert allowed.exit_code == 0
+    allowed_payload = json.loads(allowed.output)
+    assert allowed_payload["status"] == "exact_hits_materialized"
+    assert allowed_payload["metadata"]["materialized_hit_count"] == 1

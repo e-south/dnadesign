@@ -42,8 +42,8 @@ from dnadesign.cruncher.cli.config_resolver import CONFIG_ENV_VAR, WORKSPACE_ENV
 from dnadesign.cruncher.utils.logging import configure_logging
 
 _APP_HELP = (
-    "Design TF-scored sequences, scaffold cassette or YIU workspaces, "
-    "and run explicit workflow families beside the fixed-length sampling lane."
+    "Design TF-scored sequences, run cassette, YIU, and snapback workflows, "
+    "and orchestrate study or portfolio families beside the fixed-length sampling lane."
 )
 
 app = typer.Typer(
@@ -76,7 +76,7 @@ def main(
         help="Select a workspace by name, index, or path.",
     ),
 ) -> None:
-    """Design TF-scored sequences, scaffold cassette or YIU workspaces, and run explicit workflow families."""
+    """Design TF-scored sequences and run peer workflow families across Cruncher."""
     configure_logging(log_level)
     if config:
         os.environ[CONFIG_ENV_VAR] = str(config)

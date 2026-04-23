@@ -23,7 +23,7 @@ Released-product snapback uses two stable workspace-relative output roots:
 <workspace>/outputs/released_design/
 ```
 
-The lane computes a `released_design_id` for provenance and integrity, but the v1 run directory stays stable so an operator-authored runbook can reuse one explicit root when a checked-in released-product precursor exists.
+The v1 run directory stays stable so an operator-authored runbook can reuse one explicit root when a checked-in released-product precursor exists.
 
 ### Bundle layout
 
@@ -75,18 +75,18 @@ The lane computes a `released_design_id` for provenance and integrity, but the v
 - `meta/released_solve_status.json`: lightweight released-product solve status record
 - `provenance/request.snapshot.yaml`: exact released-solve request and output settings used for the run
 - `analysis/solve_report.json`: full machine-readable released-solve report with embedded search evidence and materialized-hit paths
-- `analysis/materialized_hits/hit_<rank>/`: released-product hit bundles with `target_search_hit.json`, projection/site payloads, an origin-anchored exposed-bottom plot context JSON, and an optional rendered exposed-bottom triptych
-- `export/table__hits.csv`: ranked hit summary table with materialized bundle and render paths
+- `analysis/materialized_hits/hit_<rank>/`: released-product hit bundles with `target_search_hit.json`, projection/site payloads, a plot context JSON that records physical top/bottom fragment-row placement plus the origin-anchored active foldback, and an optional rendered triptych
+- `export/table__hits.csv`: ranked hit summary table with route-policy columns (`final_geometry_source`, `route_family`, `active_strand`, `retained_partner_strand`, `physical_nicked_strand`), retained-partner fragment length, generic active-product metrics, and materialized bundle/render paths
 - `meta/released_snapback_manifest.json`: bundle manifest with workspace root, spec path, contract name, status, artifact inventory, catalog-source labels, and the pinned `final_target`
 - `meta/released_snapback_status.json`: lightweight released-product status record
 - `provenance/spec.snapshot.yaml`: exact released-product spec snapshot used for the run
 - `provenance/nickase_catalog.yaml`: resolved nickase catalog snapshot
 - `provenance/release_catalog.yaml`: resolved release-enzyme catalog snapshot
 - `analysis/report.json`: full machine-readable released-product report
-- `analysis/released_product_projection.json`: precursor-to-post-release top/bottom projection payload with the exposed bottom strand called out as the final geometry source
+- `analysis/released_product_projection.json`: precursor-to-post-release projection payload with the retained active strand, surviving partner fragment, and final geometry source called out explicitly
 - `analysis/pre_nick_site.json`: resolved pre-nick recognition site plus nick event
 - `analysis/release_site.json`: resolved release recognition site plus ds-cut event
-- `export/released_design_summary.csv`: one-row released-product summary when a truthful candidate exists, or header-only CSV otherwise
+- `export/released_design_summary.csv`: one-row released-product summary when a truthful candidate exists, or header-only CSV otherwise; the row carries route-policy, retained-partner fragment, and generic active-product metrics
 
 The solve lane publishes a large per-hit render surface. The explicit
 `released-design` bundle stays intentionally small and projection-centric.

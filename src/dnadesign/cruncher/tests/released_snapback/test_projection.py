@@ -59,14 +59,14 @@ def test_released_projection_supports_exact_0_3_3_with_nickase_site_larger_than_
     assert evaluation.candidate is not None
     assert evaluation.projection is not None
     assert evaluation.pre_nick_match.site.end - evaluation.pre_nick_match.site.start == 7
-    assert evaluation.candidate.active_bottom_input_length_nt == 6
-    assert evaluation.candidate.active_bottom_length_nt == 9
+    assert evaluation.candidate.active_product_input_length_nt == 6
+    assert evaluation.candidate.active_product_length_nt == 9
     assert evaluation.candidate.nick_boundary_from_left == 0
     assert evaluation.projection.release_top_cut_precursor == 10
     assert evaluation.projection.release_bottom_cut_precursor == 9
-    assert evaluation.projection.retained_top_strand == ""
-    assert evaluation.projection.retained_top_length_nt == 0
-    assert evaluation.projection.active_bottom_strand == "TTGCAACAA"
+    assert evaluation.projection.retained_partner_strand == "top"
+    assert evaluation.projection.retained_partner_sequence == ""
+    assert evaluation.projection.active_product_sequence == "TTGCAACAA"
     assert evaluation.projection.release_site_survives_post_release is False
 
 
@@ -90,14 +90,14 @@ def test_released_projection_retains_only_top_prefix_left_of_nick_for_nonzero_bo
             source_catalog_id="type_iis_release_v1",
         ),
         target=ReleasedFinalTargetGeometry(nick_boundary_from_left=2, paired_bp=3, cap_nt=3),
-        constraints=ReleasedSnapbackConstraintsSpec(require_nick_survives_in_retained_product=False),
+        constraints=ReleasedSnapbackConstraintsSpec(),
     )
 
     assert evaluation.status == "satisfied"
     assert evaluation.projection is not None
-    assert evaluation.projection.retained_top_strand == "CC"
-    assert evaluation.projection.retained_top_length_nt == 2
-    assert evaluation.projection.active_bottom_strand == "GGATTCGTAAT"
+    assert evaluation.projection.retained_partner_strand == "top"
+    assert evaluation.projection.retained_partner_sequence == "CC"
+    assert evaluation.projection.active_product_sequence == "GGATTCGTAAT"
 
 
 def test_released_projection_rejects_exact_0_3_3_with_left_of_origin_nickase_site() -> None:
@@ -222,19 +222,6 @@ def test_released_projection_reuses_explicit_geometry_checks_for_foldback_mismat
     assert any(issue.code == "HOMOLOGY_MISMATCH_LIMIT_EXCEEDED" for issue in evaluation.issues)
 
 
-def test_released_projection_rejects_legacy_retained_top_nick_survival_constraint() -> None:
-    evaluation = evaluate_released_precursor(
-        precursor_top_strand="AACGTTGTTCCAA",
-        nick_entry=_nick_entry(),
-        release_entry=_release_entry(),
-        target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
-        constraints=ReleasedSnapbackConstraintsSpec(require_nick_survives_in_retained_product=True),
-    )
-
-    assert evaluation.status == "no_release_path"
-    assert any(issue.code == "LEGACY_RETAINED_TOP_NICK_SURVIVAL_UNSUPPORTED" for issue in evaluation.issues)
-
-
 def test_released_projection_preserves_real_precursor_extra_nick_evidence() -> None:
     evaluation = evaluate_released_precursor(
         precursor_top_strand="AACGTTGTTCCAAGAACGTTG",
@@ -253,8 +240,8 @@ def test_released_projection_preserves_real_precursor_extra_nick_evidence() -> N
 
 def test_released_projection_rejects_non_watson_crick_post_release_duplex_overlap() -> None:
     issues = _released_duplex_overlap_pairing_issues(
-        retained_top_strand="AACCAA",
-        active_bottom_strand="TTTG",
+        retained_partner_sequence="AACCAA",
+        active_product_sequence="TTTG",
         coordinate_offset=2,
         release_top_cut_precursor=6,
         release_bottom_cut_precursor=4,
@@ -262,14 +249,14 @@ def test_released_projection_rejects_non_watson_crick_post_release_duplex_overla
 
     assert len(issues) == 1
     assert issues[0].code == "POST_RELEASE_DUPLEX_PAIRING_INVALID"
-    assert issues[0].details["retained_top_overlap"] == "CC"
-    assert issues[0].details["active_bottom_overlap"] == "TT"
+    assert issues[0].details["retained_partner_overlap"] == "CC"
+    assert issues[0].details["active_product_overlap"] == "TT"
 
 
 def test_released_projection_allows_zero_length_top_prefix_after_origin_nick() -> None:
     issues = _released_duplex_overlap_pairing_issues(
-        retained_top_strand="",
-        active_bottom_strand="TTGCAACAA",
+        retained_partner_sequence="",
+        active_product_sequence="TTGCAACAA",
         coordinate_offset=0,
         release_top_cut_precursor=0,
         release_bottom_cut_precursor=9,

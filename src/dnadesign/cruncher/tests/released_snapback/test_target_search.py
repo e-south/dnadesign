@@ -23,7 +23,7 @@ from dnadesign.cruncher.nickases.catalog import load_merged_nickase_catalog
 from dnadesign.cruncher.nickases.models import NickaseCatalog, NickaseCatalogEntry
 from dnadesign.cruncher.nickases.selection import matching_nickase_warning_codes
 from dnadesign.cruncher.release_enzymes.catalog import load_merged_release_enzyme_catalog
-from dnadesign.cruncher.release_enzymes.models import ReleaseEnzymeEntry
+from dnadesign.cruncher.release_enzymes.models import ReleaseEnzymeCatalog, ReleaseEnzymeEntry
 from dnadesign.cruncher.snapback.models import CatalogNormalizationInfo, CatalogSources
 from dnadesign.cruncher.snapback.released_models import (
     ReleaseCatalogNormalizationInfo,
@@ -133,7 +133,6 @@ def test_build_precursor_sequence_rejects_left_of_origin_outside_site_nickase() 
         ),
         orientation="forward",
         motif="CCAA",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=9,
         top_cut_shift_from_boundary=10,
         bottom_cut_shift_from_boundary=9,
@@ -146,7 +145,8 @@ def test_build_precursor_sequence_rejects_left_of_origin_outside_site_nickase() 
         release_placement=release_placement,
     )
 
-    assert built is None
+    assert built.precursor is None
+    assert built.blocker_code == "PRE_NICK_SITE_LEFT_OF_ORIGIN"
 
 
 def test_nick_placements_allow_left_of_origin_only_for_contiguous_leading_degenerate_prefix() -> None:
@@ -163,7 +163,7 @@ def test_nick_placements_allow_left_of_origin_only_for_contiguous_leading_degene
         ],
     )
 
-    placements = released_target_search._nick_placements(catalog, normalize_to_top_strand_nick=True)
+    placements = released_target_search._nick_placements(catalog, physical_nicked_strand="top")
 
     assert len(placements) == 1
     placement = placements[0]
@@ -189,7 +189,7 @@ def test_nick_placements_apply_left_of_origin_slack_in_reverse_complemented_bott
         ],
     )
 
-    placements = released_target_search._nick_placements(catalog, normalize_to_top_strand_nick=True)
+    placements = released_target_search._nick_placements(catalog, physical_nicked_strand="top")
 
     assert len(placements) == 1
     placement = placements[0]
@@ -227,7 +227,6 @@ def test_build_precursor_sequence_allows_left_of_origin_when_truncated_prefix_is
         ),
         orientation="forward",
         motif="CCAA",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=9,
         top_cut_shift_from_boundary=10,
         bottom_cut_shift_from_boundary=9,
@@ -240,9 +239,10 @@ def test_build_precursor_sequence_allows_left_of_origin_when_truncated_prefix_is
         release_placement=release_placement,
     )
 
-    assert built is not None
-    assert built.coordinate_offset == 0
-    assert built.top_strand.startswith("AA")
+    assert built.precursor is not None
+    assert built.blocker_code is None
+    assert built.precursor.coordinate_offset == 0
+    assert built.precursor.top_strand.startswith("AA")
 
 
 def test_builtin_neb_candidates_do_not_gain_origin_slack_without_leading_degenerate_prefix(
@@ -260,7 +260,7 @@ def test_builtin_neb_candidates_do_not_gain_origin_slack_without_leading_degener
         placement.entry.id: placement
         for placement in released_target_search._nick_placements(
             catalog,
-            normalize_to_top_strand_nick=True,
+            physical_nicked_strand="top",
         )
         if placement.entry.id in {"Nb.BsrDI", "Nb.BtsI", "Nt.AlwI", "Nt.BsmAI", "Nt.BspQI", "Nt.BstNBI"}
     }
@@ -310,10 +310,122 @@ def test_released_target_search_reports_exact_hits_near_hits_blockers_and_pre_po
     assert report.exact_hits[0].nickase_variant_id in {"Nx.Exact7", "Nx.ExactAlt7", "Nx.Near7"}
     assert report.exact_hits[0].release_variant_id in {"Re.Exact", "Re.Overlap"}
     assert report.exact_hits[0].nick_boundary_from_left == 0
-    assert report.exact_hits[0].active_bottom_input_length_nt == 6
+    assert report.exact_hits[0].active_product_input_length_nt == 6
     assert report.near_hits[0].hit_kind == "nearest"
     assert report.near_hits[0].nick_boundary_from_left == 1
     assert report.metadata.blocker_counts["RELEASE_OVERLAPS_REQUIRED_TARGET_REGION"] >= 1
+
+
+def test_released_target_search_can_materialize_top_active_routes_with_vendor_footprints(
+    tmp_path: Path,
+) -> None:
+    report = released_target_search.search_released_target_hits(
+        request=SingleNickReleasedTargetSearchRequest(
+            target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
+            nick_sources=CatalogSources(preset="local"),
+            release_sources=ReleaseCatalogSources(preset="local"),
+            search=ReleasedTargetSearchConfig(
+                max_results=4,
+                near_boundary_search_limit=0,
+                disallowed_nickase_warning_codes=[],
+                allow_precut_footprint_outside_active_product=True,
+                allowed_active_strands=["top", "bottom"],
+                allowed_route_families=["top_active_from_bottom_nick"],
+            ),
+        ),
+        nick_catalog=NickaseCatalog(
+            preset_id="local",
+            preset_ids=["local"],
+            entries=[
+                NickaseCatalogEntry(
+                    id="Nt.BsmAI",
+                    specificity_id="Nt.BsmAI",
+                    motif_top_5to3="GTCTC",
+                    vendor_diagram_top_5to3="GTCTCNN",
+                    top_cut_offset=6,
+                )
+            ],
+        ),
+        release_catalog=ReleaseEnzymeCatalog(
+            preset_id="local",
+            preset_ids=["local"],
+            entries=[
+                ReleaseEnzymeEntry(
+                    variant_id="Re.Exact",
+                    display_name="Re.Exact",
+                    recognition_sequence="CCAA",
+                    top_cut_offset=1,
+                    bottom_cut_offset=0,
+                    class_label="other_ds_re",
+                    commercial_confidence="primary_vendor_current",
+                    source_catalog_id="local_release",
+                )
+            ],
+        ),
+        workspace_root=tmp_path,
+        nick_catalog_source="local",
+        release_catalog_source="local",
+    )
+
+    assert report.status == "exact_hits_found"
+    assert report.metadata.final_geometry_source == "retained_active_strand"
+    assert report.metadata.allowed_active_strands == ["top", "bottom"]
+    assert report.metadata.allowed_route_families == ["top_active_from_bottom_nick"]
+    assert report.exact_hits
+    hit = report.exact_hits[0]
+    assert hit.route_family == "top_active_from_bottom_nick"
+    assert hit.active_strand == "top"
+    assert hit.physical_nicked_strand == "bottom"
+    assert hit.pre_nick_site.orientation == "reverse"
+    assert hit.projection.final_geometry_source == "retained_active_strand"
+    assert hit.projection.active_product_length_nt == 9
+    assert any(base.source_constraint == "degenerate_motif_base" for base in hit.projection.active_product_provenance)
+
+
+def test_released_target_search_real_presets_find_expected_retained_active_routes(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+
+    report = run_released_snapback_target_search(
+        request=SingleNickReleasedTargetSearchRequest(
+            target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
+            nick_sources=CatalogSources(preset="neb_nicking_v1", additional_presets=["thermo_nicking_v1"]),
+            release_sources=ReleaseCatalogSources(preset="type_iis_release_v1"),
+            search=ReleasedTargetSearchConfig(
+                max_results=16,
+                near_boundary_search_limit=8,
+                allow_precut_footprint_outside_active_product=True,
+                allowed_active_strands=["top", "bottom"],
+                allowed_route_families=["bottom_active_from_top_nick", "top_active_from_bottom_nick"],
+            ),
+        ),
+        workspace_root=workspace_root,
+    )
+
+    assert report.status == "exact_hits_found"
+    assert report.metadata.final_geometry_source == "retained_active_strand"
+    exact_hits_by_id = {hit.nickase_variant_id: hit for hit in report.exact_hits}
+    assert {"Nt.BsmAI", "Nt.BstNBI", "Nt.AlwI", "Nb.BsrDI", "Nb.BtsI"}.issubset(exact_hits_by_id)
+    assert exact_hits_by_id["Nt.BstNBI"].route_family == "top_active_from_bottom_nick"
+    assert exact_hits_by_id["Nt.BstNBI"].active_strand == "top"
+    assert exact_hits_by_id["Nt.BstNBI"].physical_nicked_strand == "bottom"
+    assert any(
+        base.source_constraint == "degenerate_motif_base"
+        for base in exact_hits_by_id["Nt.BstNBI"].projection.active_product_provenance
+    )
+    assert exact_hits_by_id["Nt.AlwI"].route_family == "top_active_from_bottom_nick"
+    assert exact_hits_by_id["Nt.AlwI"].active_strand == "top"
+    assert exact_hits_by_id["Nt.AlwI"].physical_nicked_strand == "bottom"
+    assert any(
+        base.source_constraint == "degenerate_motif_base"
+        for base in exact_hits_by_id["Nb.BsrDI"].projection.active_product_provenance
+    )
+    assert any(
+        base.source_constraint == "degenerate_motif_base"
+        for base in exact_hits_by_id["Nb.BtsI"].projection.active_product_provenance
+    )
 
 
 def test_rank_hits_ignores_gc_when_other_exact_rank_inputs_match() -> None:
@@ -328,8 +440,8 @@ def test_rank_hits_ignores_gc_when_other_exact_rank_inputs_match() -> None:
             release_site_orientation="forward",
             release_site_sequence="TTTT",
             nick_boundary_from_left=0,
-            active_bottom_input_length_nt=6,
-            active_bottom_length_nt=9,
+            active_product_input_length_nt=6,
+            active_product_length_nt=9,
             precursor_length_nt=12,
             sacrificial_downstream_tail_nt=3,
             extra_nick_event_count=0,
@@ -362,11 +474,11 @@ def test_rank_hits_ignores_gc_when_other_exact_rank_inputs_match() -> None:
                 nick_coordinate_precursor=0,
                 release_top_cut_precursor=9,
                 release_bottom_cut_precursor=9,
-                retained_top_strand="AAAATTTTA",
-                retained_top_length_nt=9,
-                active_bottom_strand=designed_sequence,
-                active_bottom_strand_span=(0, 9),
-                active_bottom_length_nt=9,
+                retained_partner_sequence="AAAATTTTA",
+                retained_partner_length_nt=9,
+                active_product_sequence=designed_sequence,
+                active_product_span=(0, 9),
+                active_product_length_nt=9,
                 rebased_nick_boundary=0,
                 nickase_site_survives_post_release=True,
                 release_site_survives_post_release=False,
@@ -381,8 +493,8 @@ def test_rank_hits_ignores_gc_when_other_exact_rank_inputs_match() -> None:
                 cap_nt=3,
                 source_cap_nt=3,
                 cap_extension_nt=0,
-                active_bottom_length_nt=9,
-                active_bottom_input_length_nt=6,
+                active_product_length_nt=9,
+                active_product_input_length_nt=6,
                 mismatch_count=0,
                 mismatch_positions=[],
                 terminal_ligatable_duplex_bp=3,
@@ -424,8 +536,8 @@ def test_rank_hits_deduplicates_exact_hits_by_post_nick_stem_and_cap() -> None:
             release_site_orientation="forward",
             release_site_sequence="TTTT",
             nick_boundary_from_left=0,
-            active_bottom_input_length_nt=6,
-            active_bottom_length_nt=9,
+            active_product_input_length_nt=6,
+            active_product_length_nt=9,
             precursor_length_nt=12,
             sacrificial_downstream_tail_nt=3,
             extra_nick_event_count=0,
@@ -458,11 +570,11 @@ def test_rank_hits_deduplicates_exact_hits_by_post_nick_stem_and_cap() -> None:
                 nick_coordinate_precursor=0,
                 release_top_cut_precursor=9,
                 release_bottom_cut_precursor=9,
-                retained_top_strand="AAAATTTTA",
-                retained_top_length_nt=9,
-                active_bottom_strand=designed_sequence,
-                active_bottom_strand_span=(0, 9),
-                active_bottom_length_nt=9,
+                retained_partner_sequence="AAAATTTTA",
+                retained_partner_length_nt=9,
+                active_product_sequence=designed_sequence,
+                active_product_span=(0, 9),
+                active_product_length_nt=9,
                 rebased_nick_boundary=0,
                 nickase_site_survives_post_release=True,
                 release_site_survives_post_release=False,
@@ -477,8 +589,8 @@ def test_rank_hits_deduplicates_exact_hits_by_post_nick_stem_and_cap() -> None:
                 cap_nt=3,
                 source_cap_nt=3,
                 cap_extension_nt=0,
-                active_bottom_length_nt=9,
-                active_bottom_input_length_nt=6,
+                active_product_length_nt=9,
+                active_product_input_length_nt=6,
                 mismatch_count=0,
                 mismatch_positions=[],
                 terminal_ligatable_duplex_bp=3,
@@ -499,12 +611,14 @@ def test_rank_hits_deduplicates_exact_hits_by_post_nick_stem_and_cap() -> None:
     stem_cap_a = _exact_hit(variant_id="Nx.A", designed_sequence="TTTTTTAAA")
     stem_cap_a_duplicate = _exact_hit(variant_id="Nx.B", designed_sequence="TTTTTTCCC")
     stem_cap_b = _exact_hit(variant_id="Nx.C", designed_sequence="ATTCGTAAT")
-
-    ranked = released_target_search._rank_hits(
-        [stem_cap_b, stem_cap_a_duplicate, stem_cap_a],
-        target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
-        exact=True,
+    policy = released_target_search.ReleasedRankingPolicy(
+        target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3)
     )
+
+    assert policy.dedupe_key(stem_cap_a) == policy.dedupe_key(stem_cap_a_duplicate)
+    assert policy.dedupe_key(stem_cap_a) != policy.dedupe_key(stem_cap_b)
+
+    ranked = policy.rank_hits([stem_cap_b, stem_cap_a_duplicate, stem_cap_a], exact=True)
 
     assert [hit.nickase_variant_id for hit in ranked] == ["Nx.A", "Nx.C"]
 
@@ -540,14 +654,16 @@ def test_search_pair_collects_all_near_hits_within_bounded_window(monkeypatch: p
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
     )
 
     def fake_build_precursor_sequence(**_: object) -> SimpleNamespace:
-        return SimpleNamespace(top_strand="A" * 12, coordinate_offset=0)
+        return SimpleNamespace(
+            precursor=SimpleNamespace(top_strand="A" * 12, coordinate_offset=0),
+            blocker_code=None,
+        )
 
     def fake_evaluate_released_precursor(*, target: ReleasedFinalTargetGeometry, **_: object) -> SimpleNamespace:
         status = "satisfied" if target.nick_boundary_from_left in {1, 3, 4} else "unsatisfied"
@@ -609,14 +725,16 @@ def test_search_pair_keeps_same_pair_near_hits_when_exact_hit_exists(monkeypatch
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
     )
 
     def fake_build_precursor_sequence(**_: object) -> SimpleNamespace:
-        return SimpleNamespace(top_strand="A" * 12, coordinate_offset=0)
+        return SimpleNamespace(
+            precursor=SimpleNamespace(top_strand="A" * 12, coordinate_offset=0),
+            blocker_code=None,
+        )
 
     def fake_evaluate_released_precursor(*, target: ReleasedFinalTargetGeometry, **_: object) -> SimpleNamespace:
         status = "satisfied" if target.nick_boundary_from_left in {2, 3, 4} else "unsatisfied"
@@ -664,8 +782,8 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
         release_site_orientation="forward",
         release_site_sequence="TTTT",
         nick_boundary_from_left=2,
-        active_bottom_input_length_nt=8,
-        active_bottom_length_nt=11,
+        active_product_input_length_nt=8,
+        active_product_length_nt=11,
         precursor_length_nt=12,
         sacrificial_downstream_tail_nt=1,
         extra_nick_event_count=0,
@@ -698,11 +816,11 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
             nick_coordinate_precursor=2,
             release_top_cut_precursor=11,
             release_bottom_cut_precursor=11,
-            retained_top_strand="AAAAAAAATTT",
-            retained_top_length_nt=11,
-            active_bottom_strand="TTTTTTTTTTT",
-            active_bottom_strand_span=(0, 11),
-            active_bottom_length_nt=11,
+            retained_partner_sequence="AAAAAAAATTT",
+            retained_partner_length_nt=11,
+            active_product_sequence="TTTTTTTTTTT",
+            active_product_span=(0, 11),
+            active_product_length_nt=11,
             rebased_nick_boundary=2,
             nickase_site_survives_post_release=True,
             release_site_survives_post_release=False,
@@ -717,8 +835,8 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
             cap_nt=3,
             source_cap_nt=3,
             cap_extension_nt=0,
-            active_bottom_length_nt=11,
-            active_bottom_input_length_nt=8,
+            active_product_length_nt=11,
+            active_product_input_length_nt=8,
             mismatch_count=0,
             mismatch_positions=[],
             terminal_ligatable_duplex_bp=3,
@@ -761,7 +879,6 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
@@ -814,7 +931,7 @@ def test_released_target_search_against_real_presets_evaluates_the_full_cross_pr
     )
     nick_placements = released_target_search._nick_placements(
         nick_catalog,
-        normalize_to_top_strand_nick=True,
+        physical_nicked_strand="top",
     )
     release_placements = released_target_search._release_placements(
         release_catalog,
@@ -882,7 +999,6 @@ def test_search_released_target_hits_suppresses_demo_only_pairs_by_default(
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
@@ -945,7 +1061,6 @@ def test_search_released_target_hits_allows_demo_only_pairs_when_requested(
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
@@ -960,8 +1075,8 @@ def test_search_released_target_hits_allows_demo_only_pairs_when_requested(
         release_site_orientation="forward",
         release_site_sequence="TTTT",
         nick_boundary_from_left=0,
-        active_bottom_input_length_nt=6,
-        active_bottom_length_nt=9,
+        active_product_input_length_nt=6,
+        active_product_length_nt=9,
         precursor_length_nt=12,
         sacrificial_downstream_tail_nt=3,
         extra_nick_event_count=0,
@@ -994,11 +1109,11 @@ def test_search_released_target_hits_allows_demo_only_pairs_when_requested(
             nick_coordinate_precursor=0,
             release_top_cut_precursor=9,
             release_bottom_cut_precursor=9,
-            retained_top_strand="AAAATTTTA",
-            retained_top_length_nt=9,
-            active_bottom_strand="TTTTAAAAT",
-            active_bottom_strand_span=(0, 9),
-            active_bottom_length_nt=9,
+            retained_partner_sequence="AAAATTTTA",
+            retained_partner_length_nt=9,
+            active_product_sequence="TTTTAAAAT",
+            active_product_span=(0, 9),
+            active_product_length_nt=9,
             rebased_nick_boundary=0,
             nickase_site_survives_post_release=True,
             release_site_survives_post_release=False,
@@ -1013,8 +1128,8 @@ def test_search_released_target_hits_allows_demo_only_pairs_when_requested(
             cap_nt=3,
             source_cap_nt=3,
             cap_extension_nt=0,
-            active_bottom_length_nt=9,
-            active_bottom_input_length_nt=6,
+            active_product_length_nt=9,
+            active_product_input_length_nt=6,
             mismatch_count=0,
             mismatch_positions=[],
             terminal_ligatable_duplex_bp=3,
@@ -1085,7 +1200,6 @@ def test_search_released_target_hits_suppresses_disallowed_warning_code_pairs_by
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
@@ -1149,7 +1263,6 @@ def test_search_released_target_hits_allows_warning_coded_nickase_when_policy_is
         ),
         orientation="forward",
         motif="TTTT",
-        active_bottom_length_offset=9,
         site_shift_from_boundary=0,
         top_cut_shift_from_boundary=9,
         bottom_cut_shift_from_boundary=9,
@@ -1164,8 +1277,8 @@ def test_search_released_target_hits_allows_warning_coded_nickase_when_policy_is
         release_site_orientation="forward",
         release_site_sequence="TTTT",
         nick_boundary_from_left=0,
-        active_bottom_input_length_nt=6,
-        active_bottom_length_nt=9,
+        active_product_input_length_nt=6,
+        active_product_length_nt=9,
         precursor_length_nt=12,
         sacrificial_downstream_tail_nt=3,
         extra_nick_event_count=0,
@@ -1199,11 +1312,11 @@ def test_search_released_target_hits_allows_warning_coded_nickase_when_policy_is
             nick_coordinate_precursor=0,
             release_top_cut_precursor=9,
             release_bottom_cut_precursor=9,
-            retained_top_strand="AAAATTTTA",
-            retained_top_length_nt=9,
-            active_bottom_strand="TTTTAAAAT",
-            active_bottom_strand_span=(0, 9),
-            active_bottom_length_nt=9,
+            retained_partner_sequence="AAAATTTTA",
+            retained_partner_length_nt=9,
+            active_product_sequence="TTTTAAAAT",
+            active_product_span=(0, 9),
+            active_product_length_nt=9,
             rebased_nick_boundary=0,
             nickase_site_survives_post_release=True,
             release_site_survives_post_release=False,
@@ -1218,8 +1331,8 @@ def test_search_released_target_hits_allows_warning_coded_nickase_when_policy_is
             cap_nt=3,
             source_cap_nt=3,
             cap_extension_nt=0,
-            active_bottom_length_nt=9,
-            active_bottom_input_length_nt=6,
+            active_product_length_nt=9,
+            active_product_input_length_nt=6,
             mismatch_count=0,
             mismatch_positions=[],
             terminal_ligatable_duplex_bp=3,

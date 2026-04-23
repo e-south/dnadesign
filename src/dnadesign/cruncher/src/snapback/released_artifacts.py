@@ -20,7 +20,7 @@ from typing import Any
 
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text
 from dnadesign.cruncher.snapback.released_models import ReleasedSnapbackEvaluationReport, ReleasedSolveReport
-from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
+from dnadesign.cruncher.utils.hashing import sha256_path
 
 RUN_META_DIR = "meta"
 RUN_PROVENANCE_DIR = "provenance"
@@ -30,13 +30,19 @@ RUN_EXPORT_DIR = "export"
 RELEASED_SUMMARY_FIELDNAMES = [
     "status",
     "spec_name",
+    "final_geometry_source",
+    "route_family",
+    "active_strand",
+    "retained_partner_strand",
+    "physical_nicked_strand",
     "nickase_variant_id",
     "release_variant_id",
     "nick_boundary_from_left",
     "paired_bp",
     "cap_nt",
-    "active_bottom_input_length_nt",
-    "active_bottom_length_nt",
+    "active_product_input_length_nt",
+    "active_product_length_nt",
+    "retained_partner_length_nt",
     "precursor_length_nt",
     "sacrificial_downstream_tail_nt",
     "extra_nick_event_count",
@@ -44,13 +50,19 @@ RELEASED_SUMMARY_FIELDNAMES = [
 RELEASED_SOLVE_SUMMARY_FIELDNAMES = [
     "rank",
     "hit_kind",
+    "final_geometry_source",
+    "route_family",
+    "active_strand",
+    "retained_partner_strand",
+    "physical_nicked_strand",
     "nickase_variant_id",
     "release_variant_id",
     "nick_boundary_from_left",
     "paired_bp",
     "cap_nt",
-    "active_bottom_input_length_nt",
-    "active_bottom_length_nt",
+    "active_product_input_length_nt",
+    "active_product_length_nt",
+    "retained_partner_length_nt",
     "precursor_length_nt",
     "extra_nick_event_count",
     "extra_target_strand_nick_count",
@@ -58,10 +70,6 @@ RELEASED_SOLVE_SUMMARY_FIELDNAMES = [
     "render_job_path",
     "rendered_plot_path",
 ]
-
-
-def released_design_id(*, spec_bytes: bytes, nick_catalog_bytes: bytes, release_catalog_bytes: bytes) -> str:
-    return sha256_bytes(spec_bytes + b"\n" + nick_catalog_bytes + b"\n" + release_catalog_bytes)[:12]
 
 
 def _scoped_run_dir(workspace_root: Path, *parts: Path | str) -> Path:
@@ -76,8 +84,7 @@ def _scoped_run_dir(workspace_root: Path, *parts: Path | str) -> Path:
     return candidate
 
 
-def build_released_run_dir(*, workspace_root: Path, run_root: Path, released_design_run_id: str) -> Path:
-    del released_design_run_id
+def build_released_run_dir(*, workspace_root: Path, run_root: Path) -> Path:
     return _scoped_run_dir(workspace_root, run_root)
 
 
@@ -292,13 +299,19 @@ def write_released_summary_table(run_dir: Path, report: ReleasedSnapbackEvaluati
             {
                 "status": report.status,
                 "spec_name": report.spec_name,
+                "final_geometry_source": report.metadata.final_geometry_source,
+                "route_family": report.candidate.route_family,
+                "active_strand": report.candidate.active_strand,
+                "retained_partner_strand": report.projection.retained_partner_strand,
+                "physical_nicked_strand": report.candidate.physical_nicked_strand,
                 "nickase_variant_id": report.pre_nick_event.variant_id,
                 "release_variant_id": report.release_event.variant_id,
                 "nick_boundary_from_left": report.candidate.nick_boundary_from_left,
                 "paired_bp": report.candidate.paired_bp,
                 "cap_nt": report.candidate.cap_nt,
-                "active_bottom_input_length_nt": report.candidate.active_bottom_input_length_nt,
-                "active_bottom_length_nt": report.candidate.active_bottom_length_nt,
+                "active_product_input_length_nt": report.candidate.active_product_input_length_nt,
+                "active_product_length_nt": report.candidate.active_product_length_nt,
+                "retained_partner_length_nt": report.projection.retained_partner_length_nt,
                 "precursor_length_nt": report.projection.precursor_length,
                 "sacrificial_downstream_tail_nt": sacrificial_tail_nt,
                 "extra_nick_event_count": report.candidate.extra_nick_event_count,
@@ -332,13 +345,19 @@ def write_released_solve_summary_table(run_dir: Path, report: ReleasedSolveRepor
                 {
                     "rank": hit.rank,
                     "hit_kind": hit.hit_kind,
+                    "final_geometry_source": target_hit.projection.final_geometry_source,
+                    "route_family": target_hit.route_family,
+                    "active_strand": target_hit.active_strand,
+                    "retained_partner_strand": target_hit.projection.retained_partner_strand,
+                    "physical_nicked_strand": target_hit.physical_nicked_strand,
                     "nickase_variant_id": hit.nickase_variant_id,
                     "release_variant_id": hit.release_variant_id,
                     "nick_boundary_from_left": target_hit.nick_boundary_from_left,
                     "paired_bp": target_hit.final_candidate.paired_bp,
                     "cap_nt": target_hit.final_candidate.cap_nt,
-                    "active_bottom_input_length_nt": target_hit.active_bottom_input_length_nt,
-                    "active_bottom_length_nt": target_hit.active_bottom_length_nt,
+                    "active_product_input_length_nt": target_hit.active_product_input_length_nt,
+                    "active_product_length_nt": target_hit.active_product_length_nt,
+                    "retained_partner_length_nt": target_hit.projection.retained_partner_length_nt,
                     "precursor_length_nt": target_hit.precursor_length_nt,
                     "extra_nick_event_count": target_hit.extra_nick_event_count,
                     "extra_target_strand_nick_count": target_hit.extra_target_strand_nick_count,
@@ -472,7 +491,6 @@ __all__ = [
     "load_released_solve_status",
     "load_released_manifest",
     "load_released_status",
-    "released_design_id",
     "released_manifest_path",
     "released_nickase_catalog_snapshot_path",
     "released_pre_nick_site_json_path",
