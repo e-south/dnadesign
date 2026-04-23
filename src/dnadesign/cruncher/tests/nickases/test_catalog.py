@@ -94,6 +94,8 @@ def test_shared_catalog_normalizes_outside_site_raw_cut_offsets_relative_to_moti
 
     assert entries["Nt.BsmAI"].top_cut_offset == 6
     assert entries["Nt.BstNBI"].top_cut_offset == 9
+    assert entries["Nt.BsmAI"].resolved_vendor_diagram_top_5to3 == "GTCTCNN"
+    assert entries["Nt.BstNBI"].resolved_vendor_diagram_top_5to3 == "GAGTCNNNNN"
 
 
 def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() -> None:
@@ -107,6 +109,11 @@ def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() 
     assert "Nt.BbvCI" in entries
     assert entries["Nt.BstNBI"].vendor_catalog_number == "R0607"
     assert entries["Nt.BstNBI"].source_url == "https://www.neb.com/en-us/products/r0607-ntbstnbi"
+    assert entries["Nt.BstNBI"].resolved_vendor_diagram_top_5to3 == "GAGTCNNNNN"
+    assert entries["Nb.BsrDI"].resolved_vendor_diagram_top_5to3 == "GCAATGNN"
+    assert entries["Nb.BtsI"].resolved_vendor_diagram_top_5to3 == "GCAGTGNN"
+    assert entries["Nt.AlwI"].resolved_vendor_diagram_top_5to3 == "GGATCNNNNN"
+    assert entries["Nt.BsmAI"].resolved_vendor_diagram_top_5to3 == "GTCTCNN"
     assert entries["Nt.BstNBI"].selection is not None
     assert entries["Nt.BstNBI"].selection.outside_site is True
     assert entries["Nb.BsmI"].selection is not None

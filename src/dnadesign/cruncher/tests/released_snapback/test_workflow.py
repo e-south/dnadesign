@@ -11,7 +11,9 @@ Module Author(s): Codex
 
 from __future__ import annotations
 
+import csv
 import json
+import struct
 from pathlib import Path
 
 import pytest
@@ -28,9 +30,18 @@ from dnadesign.cruncher.app.snapback_released_workflow import (
 from dnadesign.cruncher.nickases.catalog import load_merged_nickase_catalog
 from dnadesign.cruncher.nickases.selection import matching_nickase_warning_codes
 from dnadesign.cruncher.release_enzymes.catalog import load_merged_release_enzyme_catalog
+from dnadesign.cruncher.snapback.errors import SnapbackSpecError
 from dnadesign.cruncher.snapback.models import CatalogSources
+from dnadesign.cruncher.snapback.publication_support import complement_sequence
 from dnadesign.cruncher.snapback.released_artifacts import RELEASED_SUMMARY_FIELDNAMES
-from dnadesign.cruncher.snapback.released_hit_plot import build_released_hit_plot_context
+from dnadesign.cruncher.snapback.released_hit_plot import (
+    _ROW_BOTTOM_Y,
+    _ROW_TOP_Y,
+    _SITE_FOOTPRINT_VERTICAL_PAD,
+    _site_footprint_bounds,
+    build_released_hit_plot_context,
+    render_released_hit_plot,
+)
 from dnadesign.cruncher.snapback.released_models import (
     ReleaseCatalogSources,
     ReleasedFinalTargetGeometry,
@@ -104,15 +115,12 @@ def _write_workspace(tmp_path: Path, *, precursor_top_strand: str = "AACGTTGTTCC
                 "nick_stage": {
                     "nickase_variant_id": "Nx.Exact7",
                     "catalog": {"additional_paths": ["inputs/nickases/local.nickases.yaml"]},
-                    "normalized_to_top_strand_nick": True,
-                    "require_site_sequence_preserved_pre_nick": True,
                 },
                 "release_stage": {
                     "release_variant_id": "Re.Exact",
                     "catalog": {"additional_paths": ["inputs/release_enzymes/local.release.yaml"]},
                     "retained_side": "upstream",
                     "stage_order": "nick_then_release",
-                    "require_site_sequence_preserved_pre_release": True,
                 },
                 "final_target": {
                     "nick_boundary_from_left": 0,
@@ -122,7 +130,6 @@ def _write_workspace(tmp_path: Path, *, precursor_top_strand: str = "AACGTTGTTCC
                 "constraints": {
                     "allow_post_release_loss_of_nickase_site": True,
                     "allow_post_release_loss_of_release_site": True,
-                    "require_nick_survives_in_retained_product": False,
                     "require_release_site_downstream_of_nick": True,
                     "require_complete_downstream_fragment_separation": True,
                 },
@@ -133,6 +140,15 @@ def _write_workspace(tmp_path: Path, *, precursor_top_strand: str = "AACGTTGTTCC
         encoding="utf-8",
     )
     return spec_path
+
+
+def test_released_hit_plot_site_footprint_bounds_track_the_duplex_band() -> None:
+    fill_y0, fill_y1 = _site_footprint_bounds()
+
+    assert fill_y0 == pytest.approx(_ROW_BOTTOM_Y - _SITE_FOOTPRINT_VERTICAL_PAD)
+    assert fill_y1 == pytest.approx(_ROW_TOP_Y + _SITE_FOOTPRINT_VERTICAL_PAD)
+    assert fill_y0 > (_ROW_BOTTOM_Y - 0.08)
+    assert fill_y1 < (_ROW_TOP_Y + 0.08)
 
 
 def test_released_design_writes_bundle_and_released_show_revalidates_it(tmp_path: Path) -> None:
@@ -226,8 +242,6 @@ def test_released_design_rejects_left_of_origin_outside_site_exact_bundle(tmp_pa
                     "nickase_variant_id": "Nt.BsmAI",
                     "catalog": {"additional_paths": ["inputs/nickases/local.nickases.yaml"]},
                     "intended_site_sequence": "GTCTC",
-                    "normalized_to_top_strand_nick": True,
-                    "require_site_sequence_preserved_pre_nick": True,
                 },
                 "release_stage": {
                     "release_variant_id": "Re.Exact",
@@ -235,7 +249,6 @@ def test_released_design_rejects_left_of_origin_outside_site_exact_bundle(tmp_pa
                     "intended_site_sequence": "CCAA",
                     "retained_side": "upstream",
                     "stage_order": "nick_then_release",
-                    "require_site_sequence_preserved_pre_release": True,
                 },
                 "final_target": {
                     "nick_boundary_from_left": 0,
@@ -245,7 +258,6 @@ def test_released_design_rejects_left_of_origin_outside_site_exact_bundle(tmp_pa
                 "constraints": {
                     "allow_post_release_loss_of_nickase_site": True,
                     "allow_post_release_loss_of_release_site": True,
-                    "require_nick_survives_in_retained_product": False,
                     "require_release_site_downstream_of_nick": True,
                     "require_complete_downstream_fragment_separation": True,
                 },
@@ -296,7 +308,7 @@ def test_released_show_detects_summary_csv_drift(tmp_path: Path) -> None:
     run_dir, _report = run_released_snapback_design(spec_path)
     summary_path = run_dir / "export" / "released_design_summary.csv"
     summary_path.write_text(
-        ",".join(RELEASED_SUMMARY_FIELDNAMES) + "\nbad,drifted,Nx.Bad,Re.Bad,99,99,99,99,99,99,99,99\n",
+        ",".join(RELEASED_SUMMARY_FIELDNAMES) + "\nbad,drifted,Nx.Bad,Re.Bad,99,99,99,99,99,99,99,99,99,99\n",
         encoding="utf-8",
     )
 
@@ -478,6 +490,7 @@ def test_released_solve_materializes_hits_and_emits_per_hit_plots(tmp_path: Path
         assert hit.rendered_plot_path is not None
         assert hit_run_dir.exists()
         assert (workspace_root / hit.rendered_plot_path).exists()
+        assert (workspace_root / hit.rendered_plot_path).read_bytes().startswith(b"%PDF")
         assert (hit_run_dir / "analysis" / "target_search_hit.json").exists()
         assert (hit_run_dir / "analysis" / "released_hit_plot_context.json").exists()
         assert (hit_run_dir / "analysis" / "released_product_projection.json").exists()
@@ -504,6 +517,63 @@ def test_released_design_rejects_frequent_cutter_nickase_by_default(tmp_path: Pa
     assert report.status == "invalid_catalog"
     assert report.issues[0].code == "DISALLOWED_NICKASE_WARNING_CODE"
     assert report.metadata.disallowed_nickase_warning_codes == ["FREQUENT_CUTTER"]
+
+
+def test_released_design_rejects_unknown_nick_stage_key(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path)
+    spec_payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    spec_payload["nick_stage"]["unexpected_unknown_key"] = True
+    spec_path.write_text(yaml.safe_dump(spec_payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(SnapbackSpecError, match="unexpected_unknown_key"):
+        validate_released_snapback_spec(spec_path)
+
+
+def test_released_design_fails_closed_on_ambiguous_precursor_origin(tmp_path: Path) -> None:
+    spec_path = _write_workspace(
+        tmp_path,
+        precursor_top_strand="AACGTTGAACGTTGTTCCAA",
+    )
+
+    report = validate_released_snapback_spec(spec_path)
+
+    assert report.status == "invalid_precursor"
+    assert any(issue.code == "PRECURSOR_ORIGIN_AMBIGUOUS" for issue in report.issues)
+    assert report.projection is None
+    assert report.candidate is None
+
+
+def test_released_show_detects_candidate_route_family_drift(tmp_path: Path) -> None:
+    spec_path = _write_workspace(tmp_path)
+
+    run_dir, _report = run_released_snapback_design(spec_path)
+    report_path = run_dir / "analysis" / "report.json"
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    report_payload["candidate"]["route_family"] = "top_active_from_bottom_nick"
+    report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Released-product report payload drift detected."):
+        released_show_payload(run_dir)
+
+
+def test_checked_in_de033_released_design_fixture_stays_invalid() -> None:
+    repo_root = Path(__file__).resolve().parents[5]
+    spec_path = (
+        repo_root
+        / "src"
+        / "dnadesign"
+        / "cruncher"
+        / "workspaces"
+        / "de033"
+        / "configs"
+        / "snapback"
+        / "de033.released.snapback.yaml"
+    )
+
+    report = validate_released_snapback_spec(spec_path)
+
+    assert report.status == "invalid_precursor"
+    assert any(issue.code == "PRE_NICK_SITE_LEFT_OF_ORIGIN" for issue in report.issues)
 
 
 def test_released_solve_real_presets_materializes_exact_hits_with_bottom_strand_context(tmp_path: Path) -> None:
@@ -536,7 +606,7 @@ def test_released_solve_real_presets_materializes_exact_hits_with_bottom_strand_
             placement
             for placement in released_target_search._nick_placements(
                 nick_catalog,
-                normalize_to_top_strand_nick=True,
+                physical_nicked_strand="top",
             )
             if matching_nickase_warning_codes(
                 placement.entry,
@@ -587,11 +657,59 @@ def test_released_solve_real_presets_materializes_exact_hits_with_bottom_strand_
     plot_context = build_released_hit_plot_context(solve_report.hits[0].target_search_hit)
     assert plot_context["precursor"]["nick_site"]["local_start"] >= 0
     assert plot_context["precursor"]["nick_site"]["local_end"] >= 0
-    assert plot_context["released_product"]["retained_top_span"]["start"] >= 0
-    assert plot_context["released_product"]["active_bottom_span"]["start"] >= 0
-    assert plot_context["released_product"]["duplex_overlap_span"]["start"] >= 0
+    assert (
+        plot_context["precursor"]["nick_boundary"]
+        == solve_report.hits[0].target_search_hit.pre_nick_event.boundary_context
+    )
+    assert plot_context["precursor"]["nicked_strand"] == solve_report.hits[0].target_search_hit.physical_nicked_strand
+    assert plot_context["released_product"]["retained_partner_span"]["start"] >= 0
+    assert plot_context["released_product"]["active_product_span"]["start"] >= 0
+    assert (
+        plot_context["released_product"]["nicked_strand"]
+        == solve_report.hits[0].target_search_hit.physical_nicked_strand
+    )
+    assert plot_context["released_product"]["duplex_overlap_span"] == {"start": 0, "end": 2}
+    assert plot_context["released_product"]["duplex_top_sequence"] == "CC"
+    assert plot_context["released_product"]["duplex_bottom_sequence"] == "GG"
     assert plot_context["released_product"]["duplex_mismatch_positions"] == []
+    assert plot_context["released_product"]["top_only_overhang_span"] is None
+    assert plot_context["released_product"]["bottom_only_overhang_span"] == {
+        "start": 2,
+        "end": plot_context["released_product"]["bottom_row"]["span"]["end"],
+    }
     assert plot_context["foldback"]["foldback_mismatch_positions"] == []
+    assert plot_context["foldback"]["nicked_strand"] == solve_report.hits[0].target_search_hit.physical_nicked_strand
+    assert (
+        plot_context["labels"]["orientation_note"]
+        == "Rows stay on physical top/bottom lanes; foldback keeps the active row at origin."
+    )
+    assert plot_context["labels"]["active_start_terminal"] == "3'"
+    assert plot_context["labels"]["active_end_terminal"] == "5'"
+    assert plot_context["released_product"]["top_row"]["role"] == "retained_partner"
+    assert plot_context["released_product"]["top_row"]["strand"] == "top"
+    assert plot_context["released_product"]["top_row"]["sequence"] == "CC"
+    assert plot_context["released_product"]["top_row"]["start_terminal"] == "5'"
+    assert plot_context["released_product"]["top_row"]["end_terminal"] == "3'"
+    assert plot_context["released_product"]["bottom_row"]["role"] == "active_product"
+    assert plot_context["released_product"]["bottom_row"]["strand"] == "bottom"
+    assert plot_context["released_product"]["bottom_row"]["sequence"] == "GGATTCGTAAT"
+    assert plot_context["precursor"]["retained_partner_span"] == {
+        "start": 0,
+        "end": plot_context["precursor"]["nick_boundary"],
+    }
+    assert plot_context["precursor"]["active_product_span"] == {
+        "start": (
+            solve_report.hits[0].target_search_hit.projection.nick_coordinate_precursor
+            - solve_report.hits[0].target_search_hit.projection.rebased_nick_boundary
+        ),
+        "end": (
+            solve_report.hits[0].target_search_hit.projection.nick_coordinate_precursor
+            - solve_report.hits[0].target_search_hit.projection.rebased_nick_boundary
+            + solve_report.hits[0].target_search_hit.projection.active_product_length_nt
+        ),
+    }
+    assert plot_context["foldback"]["top_row"]["role"] == "foldback_return"
+    assert plot_context["foldback"]["bottom_row"]["role"] == "active_stem"
     first_context = json.loads(
         (
             workspace_root / solve_report.hits[0].materialized_run_dir / "analysis" / "released_hit_plot_context.json"
@@ -599,13 +717,296 @@ def test_released_solve_real_presets_materializes_exact_hits_with_bottom_strand_
     )
     assert first_context["precursor"]["nick_site"]["local_start"] >= 0
     assert first_context["precursor"]["nick_site"]["local_end"] >= 0
-    assert first_context["released_product"]["retained_top_span"]["start"] >= 0
-    assert first_context["released_product"]["active_bottom_span"]["start"] >= 0
-    assert first_context["released_product"]["duplex_overlap_span"]["start"] >= 0
-    assert first_context["released_product"]["duplex_mismatch_positions"] == []
-    assert first_context["released_product"]["nick_origin_boundary"] >= 0
     assert (
-        first_context["released_product"]["retained_top_span"]["end"]
-        == first_context["released_product"]["nick_origin_boundary"]
+        first_context["precursor"]["nick_boundary"]
+        == solve_report.hits[0].target_search_hit.pre_nick_event.boundary_context
+    )
+    assert first_context["precursor"]["nicked_strand"] == solve_report.hits[0].target_search_hit.physical_nicked_strand
+    assert first_context["released_product"]["retained_partner_span"]["start"] >= 0
+    assert first_context["released_product"]["active_product_span"]["start"] >= 0
+    assert first_context["released_product"]["duplex_overlap_span"] == {"start": 0, "end": 2}
+    assert first_context["released_product"]["duplex_top_sequence"] == "CC"
+    assert first_context["released_product"]["duplex_bottom_sequence"] == "GG"
+    assert first_context["released_product"]["duplex_mismatch_positions"] == []
+    assert first_context["released_product"]["top_only_overhang_span"] is None
+    assert first_context["released_product"]["bottom_only_overhang_span"] == {
+        "start": 2,
+        "end": first_context["released_product"]["bottom_row"]["span"]["end"],
+    }
+    assert first_context["released_product"]["nick_boundary"] >= 0
+    assert (
+        first_context["released_product"]["nicked_strand"]
+        == solve_report.hits[0].target_search_hit.physical_nicked_strand
+    )
+    assert (
+        first_context["released_product"]["retained_partner_span"]["end"]
+        == first_context["released_product"]["nick_boundary"]
     )
     assert first_context["released_product"]["nickase_site_survives_post_release"] is False
+    assert first_context["labels"]["active_start_terminal"] == "3'"
+    assert first_context["labels"]["active_end_terminal"] == "5'"
+    assert first_context["released_product"]["top_row"]["role"] == "retained_partner"
+    assert first_context["released_product"]["top_row"]["sequence"] == "CC"
+    assert first_context["released_product"]["bottom_row"]["role"] == "active_product"
+    assert first_context["released_product"]["bottom_row"]["sequence"] == "GGATTCGTAAT"
+    assert first_context["precursor"]["retained_partner_span"] == {
+        "start": 0,
+        "end": first_context["precursor"]["nick_boundary"],
+    }
+    assert first_context["foldback"]["top_row"]["role"] == "foldback_return"
+    assert first_context["foldback"]["bottom_row"]["role"] == "active_stem"
+    assert first_context["foldback"]["nicked_strand"] == solve_report.hits[0].target_search_hit.physical_nicked_strand
+
+
+def test_released_solve_real_presets_materializes_retained_active_hits_with_route_metadata(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    request = SingleNickReleasedTargetSearchRequest(
+        target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
+        nick_sources=CatalogSources(preset="neb_nicking_v1", additional_presets=["thermo_nicking_v1"]),
+        release_sources=ReleaseCatalogSources(preset="type_iis_release_v1"),
+        search=ReleasedTargetSearchConfig(
+            max_results=16,
+            near_boundary_search_limit=8,
+            allow_precut_footprint_outside_active_product=True,
+            allowed_active_strands=["top", "bottom"],
+            allowed_route_families=["bottom_active_from_top_nick", "top_active_from_bottom_nick"],
+        ),
+    )
+
+    search_report = run_released_snapback_target_search(
+        request=request,
+        workspace_root=workspace_root,
+    )
+
+    assert search_report.status == "exact_hits_found"
+    assert search_report.metadata.final_geometry_source == "retained_active_strand"
+    exact_hits_by_id = {hit.nickase_variant_id: hit for hit in search_report.exact_hits}
+    assert {"Nt.BsmAI", "Nt.BstNBI", "Nt.AlwI", "Nb.BsrDI", "Nb.BtsI"}.issubset(exact_hits_by_id)
+
+    run_dir, solve_report = run_released_snapback_solve(
+        request=request,
+        output=ReleasedSolveOutputConfig(
+            run_dir=Path("outputs/released_solve"),
+            materialize_top_k=16,
+            render_format="pdf",
+            emit_renders=False,
+        ),
+        workspace_root=workspace_root,
+        force_overwrite=True,
+    )
+
+    assert run_dir.exists()
+    assert solve_report.status == "exact_hits_materialized"
+    assert solve_report.metadata.final_geometry_source == "retained_active_strand"
+    assert solve_report.metadata.allowed_active_strands == ["top", "bottom"]
+    assert solve_report.metadata.allowed_route_families == [
+        "bottom_active_from_top_nick",
+        "top_active_from_bottom_nick",
+    ]
+    assert any(hit.target_search_hit.active_strand == "top" for hit in solve_report.hits)
+    top_active_hits = [hit for hit in solve_report.hits if hit.target_search_hit.active_strand == "top"]
+    assert any(hit.nickase_variant_id == "Nt.BstNBI" for hit in top_active_hits)
+    top_active_overhang_hit = next(
+        hit
+        for hit in top_active_hits
+        if hit.target_search_hit.projection.active_product_length_nt
+        > hit.target_search_hit.projection.retained_partner_length_nt
+    )
+    assert any(
+        base.source_constraint == "degenerate_motif_base"
+        for hit in top_active_hits
+        for base in hit.target_search_hit.projection.active_product_provenance
+    )
+    top_active_context = build_released_hit_plot_context(top_active_overhang_hit.target_search_hit)
+    top_active_coordinate_offset = (
+        top_active_overhang_hit.target_search_hit.projection.nick_coordinate_precursor
+        - top_active_overhang_hit.target_search_hit.projection.rebased_nick_boundary
+    )
+    assert (
+        top_active_context["precursor"]["nick_boundary"]
+        == top_active_overhang_hit.target_search_hit.pre_nick_event.boundary_context
+    )
+    assert (
+        top_active_context["precursor"]["nicked_strand"]
+        == top_active_overhang_hit.target_search_hit.physical_nicked_strand
+    )
+    assert top_active_context["labels"]["active_start_terminal"] == "5'"
+    assert top_active_context["labels"]["active_end_terminal"] == "3'"
+    assert top_active_context["precursor"]["retained_partner_span"] == {
+        "start": 0,
+        "end": top_active_context["precursor"]["nick_boundary"],
+    }
+    assert top_active_context["precursor"]["active_product_span"] == {
+        "start": (
+            top_active_overhang_hit.target_search_hit.projection.nick_coordinate_precursor
+            - top_active_overhang_hit.target_search_hit.projection.rebased_nick_boundary
+        ),
+        "end": (
+            top_active_overhang_hit.target_search_hit.projection.nick_coordinate_precursor
+            - top_active_overhang_hit.target_search_hit.projection.rebased_nick_boundary
+            + top_active_overhang_hit.target_search_hit.projection.active_product_length_nt
+        ),
+    }
+    assert top_active_context["released_product"]["top_row"]["role"] == "active_product"
+    assert top_active_context["released_product"]["top_row"]["strand"] == "top"
+    assert (
+        top_active_context["released_product"]["nicked_strand"]
+        == top_active_overhang_hit.target_search_hit.physical_nicked_strand
+    )
+    assert top_active_context["released_product"]["bottom_row"]["role"] == "retained_partner"
+    assert top_active_context["released_product"]["bottom_row"]["strand"] == "bottom"
+    assert (
+        top_active_context["released_product"]["bottom_row"]["sequence"]
+        == top_active_overhang_hit.target_search_hit.projection.retained_partner_sequence
+    )
+    assert top_active_context["released_product"]["top_row"]["label"] == "Exposed Top"
+    assert top_active_context["released_product"]["bottom_row"]["label"] == "Bottom"
+    assert top_active_context["released_product"]["bottom_row"]["span"] == {
+        "start": (-top_active_coordinate_offset),
+        "end": (
+            top_active_overhang_hit.target_search_hit.projection.retained_partner_length_nt
+            - top_active_coordinate_offset
+        ),
+    }
+    assert top_active_context["released_product"]["bottom_row"]["start_terminal"] == "3'"
+    assert top_active_context["released_product"]["bottom_row"]["end_terminal"] == "5'"
+    assert top_active_context["released_product"]["top_row"]["sequence"] == (
+        top_active_overhang_hit.target_search_hit.precursor_top_strand[:top_active_coordinate_offset]
+        + top_active_overhang_hit.target_search_hit.projection.active_product_sequence
+    )
+    assert top_active_context["released_product"]["top_row"]["span"] == {
+        "start": -top_active_coordinate_offset,
+        "end": top_active_overhang_hit.target_search_hit.projection.active_product_length_nt,
+    }
+    assert top_active_context["released_product"]["top_only_overhang_span"] == {
+        "start": 0,
+        "end": top_active_context["released_product"]["top_row"]["span"]["end"],
+    }
+    assert top_active_context["released_product"]["bottom_only_overhang_span"] is None
+    assert top_active_context["released_product"]["duplex_overlap_span"] == {
+        "start": -top_active_coordinate_offset,
+        "end": 0,
+    }
+    assert (
+        top_active_context["released_product"]["duplex_top_sequence"]
+        == (top_active_overhang_hit.target_search_hit.precursor_top_strand[:top_active_coordinate_offset])
+    )
+    assert (
+        top_active_context["released_product"]["duplex_bottom_sequence"]
+        == (
+            complement_sequence(top_active_overhang_hit.target_search_hit.precursor_top_strand)[
+                :top_active_coordinate_offset
+            ]
+        )
+    )
+    assert top_active_context["released_product"]["duplex_mismatch_positions"] == []
+    assert top_active_context["foldback"]["top_row"]["role"] == "active_stem"
+    assert top_active_context["foldback"]["bottom_row"]["role"] == "foldback_return"
+    assert (
+        top_active_context["foldback"]["nicked_strand"]
+        == top_active_overhang_hit.target_search_hit.physical_nicked_strand
+    )
+    assert top_active_context["foldback"]["top_row"]["label"] == "Stem"
+    assert top_active_context["foldback"]["bottom_row"]["label"] == "Foldback Stem"
+    assert top_active_context["foldback"]["top_row"]["span"] == {
+        "start": -top_active_coordinate_offset,
+        "end": top_active_overhang_hit.target_search_hit.final_candidate.paired_bp,
+    }
+    assert top_active_context["foldback"]["bottom_row"]["span"] == {
+        "start": -top_active_coordinate_offset,
+        "end": top_active_overhang_hit.target_search_hit.final_candidate.paired_bp,
+    }
+    assert top_active_context["foldback"]["top_row"]["sequence"] == (
+        top_active_overhang_hit.target_search_hit.precursor_top_strand[:top_active_coordinate_offset]
+        + top_active_context["foldback"]["stem_sequence"]
+    )
+    assert top_active_context["foldback"]["bottom_row"]["sequence"] == (
+        complement_sequence(top_active_overhang_hit.target_search_hit.precursor_top_strand)[
+            :top_active_coordinate_offset
+        ]
+        + top_active_context["foldback"]["foldback_partner_sequence"]
+    )
+    invalid_offset_hit = top_active_overhang_hit.target_search_hit.model_copy(
+        update={
+            "projection": top_active_overhang_hit.target_search_hit.projection.model_copy(
+                update={
+                    "rebased_nick_boundary": (
+                        top_active_overhang_hit.target_search_hit.projection.nick_coordinate_precursor + 1
+                    )
+                }
+            )
+        }
+    )
+    with pytest.raises(ValueError, match="nonnegative precursor nick offset"):
+        build_released_hit_plot_context(invalid_offset_hit)
+
+    rendered_top_active_path = workspace_root / "top_active_triptych.png"
+    rendered_top_active_context = render_released_hit_plot(
+        top_active_overhang_hit.target_search_hit, rendered_top_active_path
+    )
+    rendered_bytes = rendered_top_active_path.read_bytes()
+    assert rendered_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    width, height = struct.unpack(">II", rendered_bytes[16:24])
+    assert width > height
+    assert rendered_top_active_context["released_product"]["top_row"]["role"] == "active_product"
+    assert (
+        rendered_top_active_context["released_product"]["nicked_strand"]
+        == top_active_overhang_hit.target_search_hit.physical_nicked_strand
+    )
+    assert (
+        rendered_top_active_context["released_product"]["bottom_row"]["sequence"]
+        == top_active_overhang_hit.target_search_hit.projection.retained_partner_sequence
+    )
+    assert rendered_top_active_context["released_product"]["top_row"]["label"] == "Exposed Top"
+    assert rendered_top_active_context["released_product"]["bottom_row"]["label"] == "Bottom"
+    assert rendered_top_active_context["released_product"]["bottom_row"]["span"] == {
+        "start": (-top_active_coordinate_offset),
+        "end": (
+            top_active_overhang_hit.target_search_hit.projection.retained_partner_length_nt
+            - top_active_coordinate_offset
+        ),
+    }
+    assert rendered_top_active_context["released_product"]["top_row"]["sequence"] == (
+        top_active_overhang_hit.target_search_hit.precursor_top_strand[:top_active_coordinate_offset]
+        + top_active_overhang_hit.target_search_hit.projection.active_product_sequence
+    )
+    assert rendered_top_active_context["released_product"]["top_only_overhang_span"] == {
+        "start": 0,
+        "end": rendered_top_active_context["released_product"]["top_row"]["span"]["end"],
+    }
+    assert rendered_top_active_context["released_product"]["bottom_only_overhang_span"] is None
+    assert rendered_top_active_context["released_product"]["duplex_overlap_span"] == {
+        "start": -top_active_coordinate_offset,
+        "end": 0,
+    }
+    assert rendered_top_active_context["foldback"]["top_row"]["label"] == "Stem"
+    assert rendered_top_active_context["foldback"]["bottom_row"]["label"] == "Foldback Stem"
+    assert (
+        rendered_top_active_context["foldback"]["nicked_strand"]
+        == top_active_overhang_hit.target_search_hit.physical_nicked_strand
+    )
+    assert rendered_top_active_context["foldback"]["top_row"]["sequence"] == (
+        top_active_overhang_hit.target_search_hit.precursor_top_strand[:top_active_coordinate_offset]
+        + rendered_top_active_context["foldback"]["stem_sequence"]
+    )
+    assert rendered_top_active_context["foldback"]["bottom_row"]["sequence"] == (
+        complement_sequence(top_active_overhang_hit.target_search_hit.precursor_top_strand)[
+            :top_active_coordinate_offset
+        ]
+        + rendered_top_active_context["foldback"]["foldback_partner_sequence"]
+    )
+
+    with (run_dir / "export" / "table__hits.csv").open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows
+    assert rows[0]["final_geometry_source"] in {"exposed_bottom_strand", "retained_active_strand"}
+    assert rows[0]["route_family"]
+    assert rows[0]["active_strand"] in {"top", "bottom"}
+    assert rows[0]["retained_partner_strand"] in {"top", "bottom"}
+    assert rows[0]["physical_nicked_strand"] in {"top", "bottom"}
+    assert rows[0]["active_product_input_length_nt"]
+    assert rows[0]["active_product_length_nt"]
+    assert rows[0]["retained_partner_length_nt"]

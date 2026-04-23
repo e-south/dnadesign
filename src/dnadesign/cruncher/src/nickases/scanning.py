@@ -91,8 +91,17 @@ def _raw_nick_geometry(
     return "primary", start + (motif_len - int(entry.bottom_cut_offset))
 
 
-def oriented_prefix_before_boundary(entry: NickaseCatalogEntry, *, orientation: str) -> str:
-    motif = display_motif_for_orientation(entry, orientation=orientation)
+def oriented_prefix_before_boundary(
+    entry: NickaseCatalogEntry,
+    *,
+    orientation: str,
+    use_vendor_diagram: bool = False,
+) -> str:
+    motif = (
+        display_footprint_for_orientation(entry, orientation=orientation)
+        if use_vendor_diagram
+        else display_motif_for_orientation(entry, orientation=orientation)
+    )
     motif_len = len(motif)
     _strand, boundary_context = _raw_nick_geometry(
         entry=entry,
@@ -108,9 +117,18 @@ def oriented_prefix_before_boundary(entry: NickaseCatalogEntry, *, orientation: 
     return prefix
 
 
-def leading_fully_degenerate_prefix_nt(entry: NickaseCatalogEntry, *, orientation: str) -> int:
+def leading_fully_degenerate_prefix_nt(
+    entry: NickaseCatalogEntry,
+    *,
+    orientation: str,
+    use_vendor_diagram: bool = False,
+) -> int:
     count = 0
-    for symbol in oriented_prefix_before_boundary(entry, orientation=orientation):
+    for symbol in oriented_prefix_before_boundary(
+        entry,
+        orientation=orientation,
+        use_vendor_diagram=use_vendor_diagram,
+    ):
         if frozenset(iupac_bases_for_symbol(symbol)) != _ALL_DNA_BASES:
             break
         count += 1
@@ -119,6 +137,13 @@ def leading_fully_degenerate_prefix_nt(entry: NickaseCatalogEntry, *, orientatio
 
 def display_motif_for_orientation(entry: NickaseCatalogEntry, *, orientation: str) -> str:
     for plan in build_entry_scan_plans(entry):
+        if plan.orientation == orientation:
+            return plan.motif_text
+    raise ValueError(f"Unsupported orientation {orientation!r} for nickase {entry.id}.")
+
+
+def display_footprint_for_orientation(entry: NickaseCatalogEntry, *, orientation: str) -> str:
+    for plan in build_entry_scan_plans(entry, use_vendor_diagram=True):
         if plan.orientation == orientation:
             return plan.motif_text
     raise ValueError(f"Unsupported orientation {orientation!r} for nickase {entry.id}.")
@@ -136,9 +161,10 @@ def enumerate_boundary_placements(
     *,
     boundary: int,
     required_strand: str | None = None,
+    use_vendor_diagram: bool = False,
 ) -> list[tuple[str, int]]:
     placements: list[tuple[str, int]] = []
-    for plan in build_entry_scan_plans(entry):
+    for plan in build_entry_scan_plans(entry, use_vendor_diagram=use_vendor_diagram):
         strand, boundary_offset = _raw_nick_geometry(
             entry=entry,
             start=0,
@@ -158,8 +184,11 @@ def build_evaluated_match(
     orientation: str,
     coordinate_offset: int,
     matched_span_sequence: str,
+    use_vendor_diagram: bool = False,
 ) -> EvaluatedMatch:
-    motif_len = entry.motif_len or len(entry.motif_top_5to3)
+    motif_len = (
+        entry.resolved_vendor_diagram_len if use_vendor_diagram else entry.motif_len or len(entry.motif_top_5to3)
+    )
     strand, boundary_context = _raw_nick_geometry(
         entry=entry,
         start=start,
@@ -196,12 +225,14 @@ def enumerate_site_instances(
     *,
     coordinate_offset: int,
     entry: NickaseCatalogEntry,
+    use_vendor_diagram: bool = False,
 ) -> list[EvaluatedMatch]:
     return enumerate_site_instances_starting_at_or_after(
         sequence,
         coordinate_offset=coordinate_offset,
         entry=entry,
         start_min=0,
+        use_vendor_diagram=use_vendor_diagram,
     )
 
 
@@ -211,8 +242,9 @@ def enumerate_site_instances_starting_at_or_after(
     coordinate_offset: int,
     entry: NickaseCatalogEntry,
     start_min: int,
+    use_vendor_diagram: bool = False,
 ) -> list[EvaluatedMatch]:
-    plans = build_entry_scan_plans(entry)
+    plans = build_entry_scan_plans(entry, use_vendor_diagram=use_vendor_diagram)
     if not plans:
         return []
     motif_len = plans[0].motif_len
@@ -240,6 +272,7 @@ def enumerate_site_instances_starting_at_or_after(
                     orientation=plan.orientation,
                     coordinate_offset=coordinate_offset,
                     matched_span_sequence=window,
+                    use_vendor_diagram=use_vendor_diagram,
                 )
             )
     return matches

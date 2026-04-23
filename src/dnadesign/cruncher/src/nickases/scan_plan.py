@@ -59,7 +59,17 @@ def _cached_scan_plans(motif_top_5to3: str) -> tuple[NickaseOrientationScanPlan,
     return tuple(plans)
 
 
-def build_entry_scan_plans(entry: NickaseCatalogEntry) -> tuple[NickaseOrientationScanPlan, ...]:
+def build_scan_plans(sequence_top_5to3: str) -> tuple[NickaseOrientationScanPlan, ...]:
+    return _cached_scan_plans(sequence_top_5to3)
+
+
+def build_entry_scan_plans(
+    entry: NickaseCatalogEntry,
+    *,
+    use_vendor_diagram: bool = False,
+) -> tuple[NickaseOrientationScanPlan, ...]:
+    if use_vendor_diagram:
+        return _cached_scan_plans(entry.resolved_vendor_diagram_top_5to3)
     return _cached_scan_plans(entry.motif_top_5to3)
 
 
@@ -75,6 +85,7 @@ def window_matches_plan(sequence: str, *, start: int, plan: NickaseOrientationSc
 
 __all__ = [
     "NickaseOrientationScanPlan",
+    "build_scan_plans",
     "build_entry_scan_plans",
     "window_matches_plan",
 ]

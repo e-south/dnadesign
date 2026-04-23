@@ -16,13 +16,8 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.cruncher.app.snapback_released_catalogs import resolve_released_catalogs
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
-from dnadesign.cruncher.nickases.catalog import dump_nickase_catalog_yaml, load_merged_nickase_catalog
-from dnadesign.cruncher.release_enzymes.catalog import (
-    dump_release_enzyme_catalog_yaml,
-    load_merged_release_enzyme_catalog,
-)
-from dnadesign.cruncher.snapback.catalog_sources import catalog_source_label
 from dnadesign.cruncher.snapback.released_artifacts import (
     build_released_run_dir,
     build_released_solve_manifest,
@@ -89,6 +84,20 @@ def _ensure_materialized_hit_dirs(hit_run_dir: Path) -> None:
     (hit_run_dir / "plots").mkdir(parents=True, exist_ok=True)
 
 
+def _validate_rendered_plot_artifact(path: Path, *, fmt: str) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"Released solve render missing expected plot: {path}")
+    header = path.read_bytes()[:64]
+    if fmt == "pdf" and not header.startswith(b"%PDF"):
+        raise ValueError(f"Released solve render is not a valid PDF artifact: {path}")
+    if fmt == "png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError(f"Released solve render is not a valid PNG artifact: {path}")
+    if fmt == "svg":
+        normalized = header.lstrip()
+        if not (normalized.startswith(b"<?xml") or normalized.startswith(b"<svg")):
+            raise ValueError(f"Released solve render is not a valid SVG artifact: {path}")
+
+
 def _materialize_hit_bundle(
     *,
     hit: ReleasedTargetSearchHit,
@@ -119,8 +128,7 @@ def _materialize_hit_bundle(
         ensure_workspace_mpl_cache(workspace_root)
         rendered_plot_path = released_solve_hit_plot_path(hit_run_dir, fmt=output.render_format)
         plot_context = render_released_hit_plot(hit, rendered_plot_path)
-        if not rendered_plot_path.exists():
-            raise FileNotFoundError(f"Released solve render missing expected plot: {rendered_plot_path}")
+        _validate_rendered_plot_artifact(rendered_plot_path, fmt=output.render_format)
     else:
         plot_context = build_released_hit_plot_context(hit)
     atomic_write_json(released_solve_hit_plot_context_path(hit_run_dir), plot_context)
@@ -139,37 +147,20 @@ def run_released_snapback_solve(
     workspace_root: Path,
     force_overwrite: bool = False,
 ) -> tuple[Path, ReleasedSolveReport]:
-    nick_catalog, nick_resolved_paths = load_merged_nickase_catalog(
-        preset_id=request.nick_sources.preset,
-        additional_preset_ids=request.nick_sources.additional_presets,
-        additional_paths=request.nick_sources.additional_paths,
+    resolved_catalogs = resolve_released_catalogs(
+        nick_sources=request.nick_sources,
+        release_sources=request.release_sources,
         workspace_root=workspace_root,
-    )
-    release_catalog, release_resolved_paths = load_merged_release_enzyme_catalog(
-        preset_id=request.release_sources.preset,
-        additional_preset_ids=request.release_sources.additional_presets,
-        additional_paths=request.release_sources.additional_paths,
-        workspace_root=workspace_root,
-    )
-    nick_catalog_source = catalog_source_label(
-        preset_ids=request.nick_sources.resolved_preset_ids(),
-        resolved_paths=nick_resolved_paths,
-    )
-    release_catalog_source = catalog_source_label(
-        preset_ids=request.release_sources.resolved_preset_ids(),
-        resolved_paths=release_resolved_paths,
     )
     search_report = search_released_target_hits(
         request=request,
-        nick_catalog=nick_catalog,
-        release_catalog=release_catalog,
+        nick_catalog=resolved_catalogs.nick_catalog,
+        release_catalog=resolved_catalogs.release_catalog,
         workspace_root=workspace_root,
-        nick_catalog_source=nick_catalog_source,
-        release_catalog_source=release_catalog_source,
+        nick_catalog_source=resolved_catalogs.nick_catalog_source,
+        release_catalog_source=resolved_catalogs.release_catalog_source,
     )
 
-    nick_catalog_yaml = dump_nickase_catalog_yaml(nick_catalog)
-    release_catalog_yaml = dump_release_enzyme_catalog_yaml(release_catalog)
     request_yaml = yaml.safe_dump(
         _request_snapshot_payload(request=request, output=output),
         sort_keys=False,
@@ -177,7 +168,6 @@ def run_released_snapback_solve(
     run_dir = build_released_run_dir(
         workspace_root=workspace_root,
         run_root=output.run_dir,
-        released_design_run_id="released_solve",
     )
     if run_dir.exists():
         if not force_overwrite:
@@ -190,8 +180,8 @@ def run_released_snapback_solve(
     snapshot_released_solve_inputs(
         run_dir,
         request_yaml=request_yaml,
-        nick_catalog_yaml=nick_catalog_yaml,
-        release_catalog_yaml=release_catalog_yaml,
+        nick_catalog_yaml=resolved_catalogs.nick_catalog_yaml,
+        release_catalog_yaml=resolved_catalogs.release_catalog_yaml,
     )
 
     selected_hits = search_report.exact_hits if search_report.exact_hits else search_report.near_hits
@@ -231,10 +221,13 @@ def run_released_snapback_solve(
         workspace_root=str(workspace_root.resolve()),
         run_dir=str(run_dir.resolve()),
         metadata=ReleasedSolveReportMetadata(
+            final_geometry_source=search_report.metadata.final_geometry_source,
             target=request.target,
-            nick_catalog_source=nick_catalog_source,
-            release_catalog_source=release_catalog_source,
+            nick_catalog_source=resolved_catalogs.nick_catalog_source,
+            release_catalog_source=resolved_catalogs.release_catalog_source,
             disallowed_nickase_warning_codes=list(request.search.disallowed_nickase_warning_codes),
+            allowed_active_strands=list(request.search.allowed_active_strands),
+            allowed_route_families=list(request.search.allowed_route_families),
             evaluated_pair_count=search_report.metadata.evaluated_pair_count,
             available_exact_hit_count=search_report.metadata.pre_truncation_exact_hit_count,
             available_near_hit_count=search_report.metadata.pre_truncation_near_hit_count,

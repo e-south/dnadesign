@@ -29,6 +29,7 @@ _ENTRY_METADATA_EXCLUDE = {
     "id",
     "specificity_id",
     "motif_top_5to3",
+    "vendor_diagram_top_5to3",
     "motif_len",
     "top_cut_offset",
     "bottom_cut_offset",
@@ -178,6 +179,7 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
         parsed_motif, parsed_top, parsed_bottom = _parse_raw_cut_notation(str(raw_cut_notation))
 
     motif = normalized.get("motif_top_5to3")
+    vendor_diagram = normalized.get("vendor_diagram_top_5to3")
     recognition_sequence = normalized.get("recognition_sequence")
     if motif is not None and recognition_sequence is not None:
         if str(motif).strip().upper() != str(recognition_sequence).strip().upper():
@@ -201,6 +203,15 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
     if canonical_motif is None:
         raise NickaseCatalogError(
             f"CATALOG_ENTRY_NOT_NORMALIZABLE: entry {normalized['id']} must define a motif or raw_cut_notation."
+        )
+    canonical_vendor_diagram = str(vendor_diagram).strip().upper() if vendor_diagram is not None else None
+    if (
+        canonical_vendor_diagram is not None
+        and canonical_vendor_diagram[: len(str(canonical_motif).strip())] != str(canonical_motif).strip().upper()
+    ):
+        raise NickaseCatalogError(
+            f"CATALOG_ENTRY_NOT_NORMALIZABLE: entry {normalized['id']} defines vendor_diagram_top_5to3 "
+            "that does not start with motif_top_5to3."
         )
 
     selection = _normalize_selection(normalized)
@@ -266,6 +277,7 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "id": normalized["id"],
         "specificity_id": specificity_id,
         "motif_top_5to3": str(canonical_motif).strip().upper(),
+        "vendor_diagram_top_5to3": canonical_vendor_diagram,
         "motif_len": len(str(canonical_motif).strip()),
         "top_cut_offset": top_cut_offset,
         "bottom_cut_offset": bottom_cut_offset,

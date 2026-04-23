@@ -50,6 +50,7 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
     guide = _read("docs/guides/snapback_released_workflow.md")
     artifacts_ref = _read("docs/reference/released_snapback_artifacts.md")
     catalog_ref = _read("docs/reference/release_enzyme_catalogs.md")
+    architecture_ref = _read("docs/reference/architecture.md")
 
     assert "cruncher snapback released-design" in cli_ref
     assert "cruncher snapback released-target-search" in cli_ref
@@ -60,6 +61,9 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
     assert "requires at least one explicit nickase source and one explicit release-enzyme source" in cli_ref
     assert "--allow-demo-hits" in cli_ref
     assert "--allow-frequent-cutter-nickases" in cli_ref
+    assert "--allow-top-active-routes" in cli_ref
+    assert "--allow-precut-footprint-outside-active-product" in cli_ref
+    assert "app/snapback_cli_requests.py" in cli_ref
 
     assert "two-stage precursor" in guide
     assert "nick_then_release" in guide
@@ -67,12 +71,16 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
     assert "Type IIS enzymes are modeled here as release enzymes, not nickases." in guide
     assert "not a thermodynamic predictor and not a retron biology engine" in guide
     assert "Provide at least one explicit nickase source and one explicit release-enzyme source." in guide
-    assert "Nick / origin" in guide
+    assert "--allow-top-active-routes" in guide
+    assert "--allow-precut-footprint-outside-active-product" in guide
+    assert "rebased origin" in guide
+    assert "context left of the nick stays visible" in guide
     assert "demo-only" in guide.lower()
     assert "FREQUENT_CUTTER" in guide
     assert "neb_nicking_v1 + thermo_nicking_v1" in guide
-    assert "foldback panel as the same active bottom strand" in guide
-    assert "one representative per exposed post-nick `stem + cap` geometry" in guide
+    assert "physical top/bottom placement" in guide
+    assert "retained bottom fragment" in guide
+    assert "one representative per active-product `stem + cap` geometry" in guide
     assert "single contiguous fully degenerate `N`" in guide
 
     assert "outputs/released_design/" in artifacts_ref
@@ -82,10 +90,18 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
     assert "released_solve_manifest.json" in artifacts_ref
     assert "`released-show` is an integrity check" in artifacts_ref
     assert "final-target drift" in artifacts_ref
-    assert "origin-anchored exposed-bottom plot context" in artifacts_ref
+    assert "physical top/bottom fragment-row placement" in artifacts_ref
+    assert "retained_partner_strand" in artifacts_ref
 
     assert "BsaI-HFv2" in catalog_ref
     assert "BsmBI-v2" in catalog_ref
     assert "BbsI" in catalog_ref
     assert "SapI" in catalog_ref
     assert "BspQI" in catalog_ref
+
+    assert "snapback/released_search/" in architecture_ref
+    assert "snapback/released_target_search.py` is the thin public facade" in architecture_ref
+    assert "snapback/released_explicit_evaluation.py" in architecture_ref
+    assert "app/snapback_cli_requests.py" in architecture_ref
+    assert "app/snapback_released_catalogs.py" in architecture_ref
+    assert "cli/commands/snapback.py` is command registration only" in architecture_ref

@@ -161,6 +161,7 @@ class NickaseCatalogEntry(StrictNickaseModel):
     id: str
     specificity_id: str
     motif_top_5to3: str
+    vendor_diagram_top_5to3: str | None = None
     motif_len: int | None = None
     top_cut_offset: int | None = None
     bottom_cut_offset: int | None = None
@@ -200,9 +201,11 @@ class NickaseCatalogEntry(StrictNickaseModel):
             raise ValueError("nickase notes must not contain blank values.")
         return normalized
 
-    @field_validator("motif_top_5to3")
+    @field_validator("motif_top_5to3", "vendor_diagram_top_5to3")
     @classmethod
-    def _validate_motif(cls, value: str) -> str:
+    def _validate_motif(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return normalize_iupac(value)
 
     @model_validator(mode="after")
@@ -214,6 +217,8 @@ class NickaseCatalogEntry(StrictNickaseModel):
             self.motif_len = expected_len
         elif self.motif_len != expected_len:
             raise ValueError("motif_len must equal len(motif_top_5to3).")
+        if self.vendor_diagram_top_5to3 is not None and len(self.vendor_diagram_top_5to3) < expected_len:
+            raise ValueError("vendor_diagram_top_5to3 must be at least as long as motif_top_5to3.")
         return self
 
     @property
@@ -229,6 +234,19 @@ class NickaseCatalogEntry(StrictNickaseModel):
         if self.selection is None:
             return None
         return self.selection.outside_site
+
+    @property
+    def resolved_vendor_diagram_top_5to3(self) -> str:
+        if self.vendor_diagram_top_5to3 is not None:
+            return self.vendor_diagram_top_5to3
+        if self.active_cut_offset >= len(self.motif_top_5to3):
+            suffix_nt = self.active_cut_offset - len(self.motif_top_5to3) + 1
+            return f"{self.motif_top_5to3}{'N' * suffix_nt}"
+        return self.motif_top_5to3
+
+    @property
+    def resolved_vendor_diagram_len(self) -> int:
+        return len(self.resolved_vendor_diagram_top_5to3)
 
 
 class NickaseProductAlias(StrictNickaseModel):

@@ -26,6 +26,6 @@ Operational invariants in this workspace:
 - any release-site geometry that would begin left of logical origin `0` is rejected, and nickase geometry may extend left of origin only when the omitted leading prefix is one contiguous fully degenerate `N` block after top-strand normalization; the workspace does not permit negative local coordinates in search, solve, or plot outputs
 - current built-in allowed posture is `near_hits_only`; the current near frontier is `Nt.Bpu10I + BsaI-HFv2` at boundary `2` and `Nt.BsmAI + BspQI` at boundary `6`
 - `configs/snapback/de033.released.snapback.yaml` is retained only as an invalid explicit audit fixture for the degenerate-prefix-aware nonnegative-origin contract; `released-design` and `released-show` should report `invalid_precursor`, not a green operational bundle
-- final geometry is evaluated on the exposed post-release bottom strand
+- default operational policy evaluates final geometry on the exposed post-release bottom strand; broader retained-active-strand search is available only when operators opt into `--allow-top-active-routes` and `--allow-precut-footprint-outside-active-product`
 - the effective cap loop is fixed at `3 nt`
 - materialized hit bundles stay under `outputs/released_solve/analysis/materialized_hits/` and publish one triptych plot per hit when `--emit-renders` is enabled

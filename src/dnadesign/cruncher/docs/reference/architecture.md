@@ -181,6 +181,9 @@ Core contract:
 - snapback explicit `single_nick_snapback_v2` and co-design solve `single_nick_snapback_solve_v3` contracts
 - authored top-strand nick-relative geometry and bounded search
 - protected-region, homology, and extra-nick invariant enforcement
+- released explicit origin inference and typed report shaping live in `snapback/released_explicit_evaluation.py`, keeping `app/snapback_released_workflow.py` on orchestration and publication
+- released-product search orchestration is split by ownership under `snapback/released_search/`
+- `snapback/released_target_search.py` is the thin public facade; placement generation, precursor construction, pair evaluation, ranking, and report shaping now live in `released_search/{nick_placements.py,release_placements.py,precursor_builder.py,evaluator_adapter.py,ranking.py,reporting.py,runner.py}`
 - typed producer-owned QA view models live in `snapback/view_models.py`
 - local view-contract assembly and validation live in `snapback/view_contracts.py`
 - no dependency on legacy `sample`, cassette render contracts, or YIU payload semantics
@@ -203,19 +206,24 @@ Core contract:
   - run-level metadata/artifact context resolution in `app/analyze/execution.py`
   - run-level compute/score-space context resolution in `app/analyze/run_context.py`
   - table/metric computation + persistence in `app/analyze/computation.py`
-  - score-space projection helpers in `app/analyze_score_space.py`
-  - plot orchestration surface in `app/analyze/plotting.py`
-  - run-level plot render orchestration in `app/analyze/rendering.py`
-  - lazy plot callable resolution in `app/analyze/plot_resolver.py`
-  - plot artifact bookkeeping in `app/analyze/plotting_registry.py`
-  - trajectory plot/video render paths in `app/analyze/plotting_trajectory.py`
-  - static and FIMO plot render paths in `app/analyze/plotting_static.py`
-  - report/manifest/summary publication in `app/analyze/publish.py`
+- score-space projection helpers in `app/analyze_score_space.py`
+- plot orchestration surface in `app/analyze/plotting.py`
+- run-level plot render orchestration in `app/analyze/rendering.py`
+- lazy plot callable resolution in `app/analyze/plot_resolver.py`
+- plot artifact bookkeeping in `app/analyze/plotting_registry.py`
+- trajectory plot/video render paths in `app/analyze/plotting_trajectory.py`
+- static and FIMO plot render paths in `app/analyze/plotting_static.py`
+- report/manifest/summary publication in `app/analyze/publish.py`
+- snapback CLI request construction lives in `app/snapback_cli_requests.py`, which owns typed preserved-site and released-product search/solve invocation factories
+- released-product catalog loading and source-label normalization shared by explicit validate/design, target-search, and solve now live in `app/snapback_released_catalogs.py`
 
 #### `cli/` (UX only)
 - Typer commands
 - argument parsing, output formatting
-- delegates work to app modules (no business logic)
+- `cli/commands/snapback.py` is command registration only
+- snapback command handlers live in `cli/commands/snapback_{workspace,explicit,released,show}.py`
+- shared report/path presentation lives in `cli/commands/snapback_presenters.py`
+- delegates work to app modules and request factories (no business logic)
 
 #### Baserender integration boundary
 

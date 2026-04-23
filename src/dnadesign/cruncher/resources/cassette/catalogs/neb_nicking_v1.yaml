@@ -44,6 +44,7 @@ variants:
   - id: Nt.BstNBI
     specificity_id: BstNBI
     motif_top_5to3: GAGTC
+    vendor_diagram_top_5to3: GAGTCNNNNN
     raw_cut_notation: GAGTC(4/none)
     vendor: NEB
     vendor_catalog_number: R0607
@@ -58,6 +59,7 @@ variants:
   - id: Nb.BsrDI
     specificity_id: BsrDI
     motif_top_5to3: GCAATG
+    vendor_diagram_top_5to3: GCAATGNN
     raw_cut_notation: GCAATG(none/0)
     vendor: NEB
     vendor_catalog_number: R0648
@@ -74,6 +76,7 @@ variants:
   - id: Nb.BtsI
     specificity_id: BtsI
     motif_top_5to3: GCAGTG
+    vendor_diagram_top_5to3: GCAGTGNN
     raw_cut_notation: GCAGTG(none/0)
     vendor: NEB
     vendor_catalog_number: R0707
@@ -90,6 +93,7 @@ variants:
   - id: Nt.AlwI
     specificity_id: AlwI
     motif_top_5to3: GGATC
+    vendor_diagram_top_5to3: GGATCNNNNN
     raw_cut_notation: GGATC(4/none)
     vendor: NEB
     vendor_catalog_number: R0627
@@ -175,6 +179,7 @@ variants:
   - id: Nt.BsmAI
     specificity_id: BsmAI
     motif_top_5to3: GTCTC
+    vendor_diagram_top_5to3: GTCTCNN
     raw_cut_notation: GTCTC(1/none)
     vendor: NEB
     vendor_catalog_number: R0121

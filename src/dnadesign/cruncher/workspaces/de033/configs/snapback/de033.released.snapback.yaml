@@ -11,8 +11,6 @@ nick_stage:
     additional_presets:
       - thermo_nicking_v1
   intended_site_sequence: GTCTC
-  normalized_to_top_strand_nick: true
-  require_site_sequence_preserved_pre_nick: true
 release_stage:
   release_variant_id: BspQI
   catalog:
@@ -20,7 +18,6 @@ release_stage:
   intended_site_sequence: GAAGAGC
   retained_side: upstream
   stage_order: nick_then_release
-  require_site_sequence_preserved_pre_release: true
 final_target:
   nick_boundary_from_left: 0
   paired_bp: 3
@@ -28,7 +25,6 @@ final_target:
 constraints:
   allow_post_release_loss_of_nickase_site: true
   allow_post_release_loss_of_release_site: true
-  require_nick_survives_in_retained_product: false
   require_release_site_downstream_of_nick: true
   require_complete_downstream_fragment_separation: true
   disallowed_nickase_warning_codes:

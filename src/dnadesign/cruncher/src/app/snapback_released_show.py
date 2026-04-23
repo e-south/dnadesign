@@ -35,7 +35,10 @@ from dnadesign.cruncher.snapback.released_artifacts import (
     released_status_path,
     released_summary_csv_path,
 )
-from dnadesign.cruncher.snapback.released_models import SingleNickReleasedSnapbackSpec
+from dnadesign.cruncher.snapback.released_models import (
+    ReleasedSnapbackEvaluationReport,
+    SingleNickReleasedSnapbackSpec,
+)
 from dnadesign.cruncher.utils.hashing import sha256_path
 
 
@@ -140,7 +143,7 @@ def _validate_released_report_payload(
         raise ValueError("Released-product report metadata drift detected.")
     if metadata.get("kind") != expected_contract:
         raise ValueError("Released-product report contract drift detected.")
-    if metadata.get("final_geometry_source") != "exposed_bottom_strand":
+    if metadata.get("final_geometry_source") not in {"exposed_bottom_strand", "retained_active_strand"}:
         raise ValueError("Released-product report final_geometry_source drift detected.")
     if metadata.get("nick_catalog_source") != expected_nick_catalog_source:
         raise ValueError("Released-product report nick_catalog_source drift detected.")
@@ -195,13 +198,19 @@ def _expected_released_summary_rows(report_payload: dict[str, Any]) -> list[dict
             {
                 "status": str(report_payload["status"]),
                 "spec_name": str(report_payload["spec_name"]),
+                "final_geometry_source": str(report_payload["metadata"]["final_geometry_source"]),
+                "route_family": str(candidate["route_family"]),
+                "active_strand": str(candidate["active_strand"]),
+                "retained_partner_strand": str(projection["retained_partner_strand"]),
+                "physical_nicked_strand": str(candidate["physical_nicked_strand"]),
                 "nickase_variant_id": str(pre_nick_event["variant_id"]),
                 "release_variant_id": str(release_event["variant_id"]),
                 "nick_boundary_from_left": str(candidate["nick_boundary_from_left"]),
                 "paired_bp": str(candidate["paired_bp"]),
                 "cap_nt": str(candidate["cap_nt"]),
-                "active_bottom_input_length_nt": str(candidate["active_bottom_input_length_nt"]),
-                "active_bottom_length_nt": str(candidate["active_bottom_length_nt"]),
+                "active_product_input_length_nt": str(candidate["active_product_input_length_nt"]),
+                "active_product_length_nt": str(candidate["active_product_length_nt"]),
+                "retained_partner_length_nt": str(projection["retained_partner_length_nt"]),
                 "precursor_length_nt": str(projection["precursor_length"]),
                 "sacrificial_downstream_tail_nt": str(sacrificial_tail_nt),
                 "extra_nick_event_count": str(candidate["extra_nick_event_count"]),
@@ -294,6 +303,10 @@ def released_show_payload(run_dir: str | Path) -> dict[str, object]:
     ):
         raise ValueError("Released-product release catalog snapshot integrity drift detected.")
     report_payload = _load_json_mapping(released_report_json_path(resolved_run_dir), label="report")
+    try:
+        ReleasedSnapbackEvaluationReport.model_validate(report_payload)
+    except Exception as exc:
+        raise ValueError("Released-product report payload drift detected.") from exc
     projection_payload = _load_json_value(released_projection_json_path(resolved_run_dir), label="projection")
     pre_nick_payload = _load_json_mapping(released_pre_nick_site_json_path(resolved_run_dir), label="pre-nick payload")
     release_payload = _load_json_mapping(released_release_site_json_path(resolved_run_dir), label="release payload")
@@ -322,6 +335,25 @@ def released_show_payload(run_dir: str | Path) -> dict[str, object]:
         raise ValueError("Released-product report/status drift detected.")
     if report_payload.get("projection") != projection_payload:
         raise ValueError("Released-product projection artifact drift detected.")
+    if (
+        isinstance(report_payload.get("candidate"), dict)
+        and isinstance(report_payload.get("projection"), dict)
+        and report_payload["candidate"].get("route_family") != report_payload["projection"].get("route_family")
+    ):
+        raise ValueError("Released-product candidate/projection route_family drift detected.")
+    if (
+        isinstance(report_payload.get("candidate"), dict)
+        and isinstance(report_payload.get("projection"), dict)
+        and report_payload["candidate"].get("active_strand") != report_payload["projection"].get("active_strand")
+    ):
+        raise ValueError("Released-product candidate/projection active_strand drift detected.")
+    if (
+        isinstance(report_payload.get("candidate"), dict)
+        and isinstance(report_payload.get("projection"), dict)
+        and report_payload["candidate"].get("physical_nicked_strand")
+        != report_payload["projection"].get("physical_nicked_strand")
+    ):
+        raise ValueError("Released-product candidate/projection physical_nicked_strand drift detected.")
     if report_payload.get("pre_nick_site") != pre_nick_payload.get("site"):
         raise ValueError("Released-product pre-nick site artifact drift detected.")
     if report_payload.get("pre_nick_event") != pre_nick_payload.get("event"):
