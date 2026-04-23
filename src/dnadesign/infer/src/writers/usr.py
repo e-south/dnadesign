@@ -22,10 +22,15 @@ import pyarrow as pa
 import pyarrow.dataset as pa_dataset
 import pyarrow.parquet as pq
 
-from dnadesign.usr import SchemaError
-from dnadesign.usr.dataset import MUTATION_RESERVED_NAMESPACES
-from dnadesign.usr.dataset_overlay_ops import attach_frame_dataset as _attach_frame_dataset
-from dnadesign.usr.overlays import overlay_parts, overlay_schema
+from dnadesign.usr import (
+    MUTATION_RESERVED_NAMESPACES,
+    SchemaError,
+    overlay_parts,
+    overlay_schema,
+)
+from dnadesign.usr import (
+    attach_frame_dataset as _attach_frame_dataset,
+)
 
 from .._logging import get_logger
 from ..contracts import infer_usr_column_name

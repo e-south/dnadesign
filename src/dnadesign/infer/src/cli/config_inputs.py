@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from dnadesign.usr.roots import normalize_usr_root, resolve_usr_root_from_env
+from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_env
 
 from ..config import JobConfig
 from ..errors import ConfigError, ValidationError

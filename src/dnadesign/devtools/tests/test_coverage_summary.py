@@ -20,7 +20,7 @@ from dnadesign.devtools.coverage_summary import build_coverage_summary_payload, 
 def test_build_coverage_summary_payload_computes_tool_rows_and_overall() -> None:
     coverage_json = {
         "files": {
-            "src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 9, "num_statements": 10}},
+            "src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 9, "num_statements": 10}},
             "src/dnadesign/densegen/src/main.py": {"summary": {"covered_lines": 3, "num_statements": 10}},
             "src/dnadesign/densegen/tests/test_main.py": {"summary": {"covered_lines": 1, "num_statements": 1}},
         }
@@ -48,7 +48,9 @@ def test_main_scopes_summary_to_selected_tools(tmp_path: Path) -> None:
         json.dumps(
             {
                 "files": {
-                    "src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 90, "num_statements": 100}},
+                    "src/dnadesign/usr/src/storage/parquet.py": {
+                        "summary": {"covered_lines": 90, "num_statements": 100}
+                    },
                     "src/dnadesign/densegen/src/main.py": {"summary": {"covered_lines": 0, "num_statements": 100}},
                 }
             }
@@ -81,7 +83,13 @@ def test_main_fails_when_only_tools_is_unknown(tmp_path: Path) -> None:
     baseline_path = tmp_path / "tool-coverage-baseline.json"
     output_path = tmp_path / "coverage-summary.json"
     coverage_path.write_text(
-        json.dumps({"files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 1, "num_statements": 1}}}}),
+        json.dumps(
+            {
+                "files": {
+                    "src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 1, "num_statements": 1}}
+                }
+            }
+        ),
         encoding="utf-8",
     )
     baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")

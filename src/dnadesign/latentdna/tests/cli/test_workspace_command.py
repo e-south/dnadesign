@@ -21,8 +21,8 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
-from dnadesign.usr.src.dataset import Dataset
-from dnadesign.usr.src.mock import MockSpec, create_mock_dataset
+from dnadesign.usr import Dataset
+from dnadesign.usr.src.datasets.mock import MockSpec, create_mock_dataset
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 _RUNNER = CliRunner()

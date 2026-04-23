@@ -6,14 +6,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.usr import Dataset
-from dnadesign.usr.dataset import RESERVED_NAMESPACES
-from dnadesign.usr.dataset_overlay_catalog import load_overlay_catalog
-from dnadesign.usr.overlay_digest_ledger import (
+from dnadesign.usr import (
+    RESERVED_NAMESPACES,
+    Dataset,
+    load_overlay_catalog,
     overlay_digest_ledger_path,
+    overlay_parts,
     write_overlay_digest_ledger,
 )
-from dnadesign.usr.overlays import overlay_parts
 
 from .provenance import OVERLAY_INVENTORY_DIGEST_MODE, OVERLAY_LEDGER_PAYLOAD_DIGEST_MODE
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
+import dnadesign.usr as usr_roots
 from dnadesign.construct.contracts import resolve_construct_usr_output_contract
 from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
 from dnadesign.infer.contracts import resolve_infer_usr_output_contract
@@ -23,7 +24,6 @@ from dnadesign.notify.events.source_builtin import (
     _resolve_infer_events_from_config,
 )
 from dnadesign.ops.orchestrator.usr_overlay_inputs import parse_usr_overlay_guard_inputs
-from dnadesign.usr import roots as usr_roots
 
 
 def _write_densegen_config(config_path: Path) -> None:
@@ -201,5 +201,6 @@ def test_construct_shared_usr_contract_supports_notify_and_ops(tmp_path: Path) -
 
 
 def test_usr_root_helpers_are_usr_owned() -> None:
-    roots_path = Path(usr_roots.__file__).resolve().as_posix()
-    assert roots_path.endswith("/src/dnadesign/usr/roots.py")
+    package_path = Path(usr_roots.__file__).resolve()
+    assert package_path.as_posix().endswith("/src/dnadesign/usr/__init__.py")
+    assert usr_roots.pkg_usr_root() == package_path.parent.resolve()
