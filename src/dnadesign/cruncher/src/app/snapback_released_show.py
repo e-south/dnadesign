@@ -18,6 +18,8 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from dnadesign.cruncher.snapback.released_artifacts import (
     RELEASED_SUMMARY_FIELDNAMES,
     load_released_manifest,
@@ -33,6 +35,7 @@ from dnadesign.cruncher.snapback.released_artifacts import (
     released_status_path,
     released_summary_csv_path,
 )
+from dnadesign.cruncher.snapback.released_models import SingleNickReleasedSnapbackSpec
 from dnadesign.cruncher.utils.hashing import sha256_path
 
 
@@ -69,6 +72,13 @@ def _required_manifest_text_field(manifest: dict[str, Any], *, field: str) -> st
     return value
 
 
+def _required_manifest_mapping_field(manifest: dict[str, Any], *, field: str) -> dict[str, Any]:
+    value = manifest.get(field)
+    if not isinstance(value, dict):
+        raise ValueError(f"Released-product manifest {field} drift detected.")
+    return value
+
+
 def _load_json_value(path: Path, *, label: str) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -81,6 +91,19 @@ def _load_json_mapping(path: Path, *, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"Released-product {label} must be a JSON object.")
     return payload
+
+
+def _load_released_spec_snapshot(path: Path) -> SingleNickReleasedSnapbackSpec:
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError("Released-product spec snapshot YAML is invalid.") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("Released-product spec snapshot integrity drift detected.")
+    try:
+        return SingleNickReleasedSnapbackSpec.model_validate(payload)
+    except Exception as exc:
+        raise ValueError("Released-product spec snapshot integrity drift detected.") from exc
 
 
 def _validate_timestamp(value: object, *, label: str) -> None:
@@ -98,6 +121,10 @@ def _validate_released_report_payload(
     expected_run_dir: str,
     expected_workspace_root: str,
     expected_contract: str,
+    expected_nick_catalog_source: str,
+    expected_release_catalog_source: str,
+    expected_disallowed_nickase_warning_codes: list[str],
+    expected_final_target: dict[str, int],
 ) -> None:
     if report_payload.get("workflow") != "snapback_released_design":
         raise ValueError("Released-product report workflow drift detected.")
@@ -113,18 +140,36 @@ def _validate_released_report_payload(
         raise ValueError("Released-product report metadata drift detected.")
     if metadata.get("kind") != expected_contract:
         raise ValueError("Released-product report contract drift detected.")
-    for field in ("nick_catalog_source", "release_catalog_source"):
-        value = metadata.get(field)
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"Released-product report {field} drift detected.")
-    candidate = report_payload.get("candidate")
-    if candidate is None:
-        return
-    if not isinstance(candidate, dict):
-        raise ValueError("Released-product report candidate drift detected.")
+    if metadata.get("final_geometry_source") != "exposed_bottom_strand":
+        raise ValueError("Released-product report final_geometry_source drift detected.")
+    if metadata.get("nick_catalog_source") != expected_nick_catalog_source:
+        raise ValueError("Released-product report nick_catalog_source drift detected.")
+    if metadata.get("release_catalog_source") != expected_release_catalog_source:
+        raise ValueError("Released-product report release_catalog_source drift detected.")
+    if metadata.get("disallowed_nickase_warning_codes") != expected_disallowed_nickase_warning_codes:
+        raise ValueError("Released-product report disallowed_nickase_warning_codes drift detected.")
     final_target = metadata.get("final_target")
     if not isinstance(final_target, dict):
         raise ValueError("Released-product report final_target drift detected.")
+    if {field: final_target.get(field) for field in expected_final_target} != expected_final_target:
+        raise ValueError("Released-product report final_target drift detected.")
+    candidate = report_payload.get("candidate")
+    if report_payload.get("status") == "satisfied":
+        for field in (
+            "candidate",
+            "projection",
+            "pre_nick_site",
+            "pre_nick_event",
+            "release_site",
+            "release_event",
+        ):
+            value = report_payload.get(field)
+            if not isinstance(value, dict):
+                raise ValueError(f"Released-product satisfied report {field} drift detected.")
+    elif candidate is None:
+        return
+    if not isinstance(candidate, dict):
+        raise ValueError("Released-product report candidate drift detected.")
     expected_target = {
         "nick_boundary_from_left": candidate.get("nick_boundary_from_left"),
         "paired_bp": candidate.get("paired_bp"),
@@ -142,7 +187,10 @@ def _expected_released_summary_rows(report_payload: dict[str, Any]) -> list[dict
     if not all(isinstance(payload, dict) for payload in (candidate, projection, pre_nick_event, release_event)):
         return []
     try:
-        sacrificial_tail_nt = int(projection["precursor_length"]) - int(projection["release_top_cut_precursor"])
+        sacrificial_tail_nt = int(projection["precursor_length"]) - max(
+            int(projection["release_top_cut_precursor"]),
+            int(projection["release_bottom_cut_precursor"]),
+        )
         return [
             {
                 "status": str(report_payload["status"]),
@@ -152,8 +200,8 @@ def _expected_released_summary_rows(report_payload: dict[str, Any]) -> list[dict
                 "nick_boundary_from_left": str(candidate["nick_boundary_from_left"]),
                 "paired_bp": str(candidate["paired_bp"]),
                 "cap_nt": str(candidate["cap_nt"]),
-                "retained_input_length_nt": str(candidate["input_length_nt"]),
-                "retained_product_length_nt": str(candidate["retained_product_length_nt"]),
+                "active_bottom_input_length_nt": str(candidate["active_bottom_input_length_nt"]),
+                "active_bottom_length_nt": str(candidate["active_bottom_length_nt"]),
                 "precursor_length_nt": str(projection["precursor_length"]),
                 "sacrificial_downstream_tail_nt": str(sacrificial_tail_nt),
                 "extra_nick_event_count": str(candidate["extra_nick_event_count"]),
@@ -190,6 +238,7 @@ def released_show_payload(run_dir: str | Path) -> dict[str, object]:
     resolved_run_dir = Path(run_dir).expanduser().resolve()
     manifest = load_released_manifest(resolved_run_dir)
     status = load_released_status(resolved_run_dir)
+    spec_snapshot = _load_released_spec_snapshot(released_spec_snapshot_path(resolved_run_dir))
     expected_run_dir = str(resolved_run_dir)
     expected_workspace_root = _required_manifest_text_field(manifest, field="workspace_root")
     expected_spec_path = _required_manifest_text_field(manifest, field="spec_path")
@@ -248,11 +297,21 @@ def released_show_payload(run_dir: str | Path) -> dict[str, object]:
     projection_payload = _load_json_value(released_projection_json_path(resolved_run_dir), label="projection")
     pre_nick_payload = _load_json_mapping(released_pre_nick_site_json_path(resolved_run_dir), label="pre-nick payload")
     release_payload = _load_json_mapping(released_release_site_json_path(resolved_run_dir), label="release payload")
+    manifest_target = _required_manifest_mapping_field(manifest, field="final_target")
+    expected_final_target = {
+        "nick_boundary_from_left": manifest_target.get("nick_boundary_from_left"),
+        "paired_bp": manifest_target.get("paired_bp"),
+        "cap_nt": manifest_target.get("cap_nt"),
+    }
     _validate_released_report_payload(
         report_payload,
         expected_run_dir=expected_run_dir,
         expected_workspace_root=expected_workspace_root,
         expected_contract=str(manifest.get("contract")),
+        expected_nick_catalog_source=_required_manifest_text_field(manifest, field="nick_catalog_source"),
+        expected_release_catalog_source=_required_manifest_text_field(manifest, field="release_catalog_source"),
+        expected_disallowed_nickase_warning_codes=list(spec_snapshot.constraints.disallowed_nickase_warning_codes),
+        expected_final_target=expected_final_target,
     )
     _validate_released_status_payload(status, report_payload=report_payload)
     if report_payload.get("spec_path") != expected_spec_path:

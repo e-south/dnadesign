@@ -22,6 +22,7 @@ from dnadesign.cruncher.nickases.catalog import (
     load_nickase_catalog,
 )
 from dnadesign.cruncher.nickases.errors import NickaseCatalogError
+from dnadesign.cruncher.snapback.models import build_catalog_info
 
 
 def test_shared_catalog_parses_raw_cut_notation_into_normalized_offsets(tmp_path: Path) -> None:
@@ -59,20 +60,60 @@ def test_shared_catalog_parses_raw_cut_notation_into_normalized_offsets(tmp_path
     assert entries["Nb.BbvCI"].bottom_cut_offset == -2
 
 
+def test_shared_catalog_normalizes_outside_site_raw_cut_offsets_relative_to_motif_end(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "nickases.yaml"
+    catalog_path.write_text(
+        yaml.safe_dump(
+            {
+                "nickases": {
+                    "schema_version": 1,
+                    "entries": [
+                        {
+                            "id": "Nt.BsmAI",
+                            "specificity_id": "BsmAI",
+                            "raw_cut_notation": "GTCTC(1/none)",
+                            "selection": {"outside_site": True},
+                            "source": "neb",
+                        },
+                        {
+                            "id": "Nt.BstNBI",
+                            "specificity_id": "BstNBI",
+                            "raw_cut_notation": "GAGTC(4/none)",
+                            "selection": {"outside_site": True},
+                            "source": "neb",
+                        },
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    catalog = load_nickase_catalog(catalog_path)
+    entries = catalog.by_id()
+
+    assert entries["Nt.BsmAI"].top_cut_offset == 6
+    assert entries["Nt.BstNBI"].top_cut_offset == 9
+
+
 def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() -> None:
     catalog = load_builtin_nickase_catalog_preset("neb_nicking_v1")
 
     entries = catalog.by_id()
+    aliases = {alias.alias_id: alias for alias in catalog.product_aliases}
 
     assert catalog.preset_id == "neb_nicking_v1"
     assert catalog.preset_ids == ["neb_nicking_v1"]
     assert "Nt.BbvCI" in entries
     assert entries["Nt.BstNBI"].vendor_catalog_number == "R0607"
+    assert entries["Nt.BstNBI"].source_url == "https://www.neb.com/en-us/products/r0607-ntbstnbi"
     assert entries["Nt.BstNBI"].selection is not None
     assert entries["Nt.BstNBI"].selection.outside_site is True
     assert entries["Nb.BsmI"].selection is not None
     assert entries["Nb.BsmI"].selection.warning_codes == ["STAR_ACTIVITY_RISK", "DOUBLE_STRAND_CLEAVAGE_RISK"]
     assert any(alias.alias_id == "WarmStart Nt.BstNBI" for alias in catalog.product_aliases)
+    assert aliases["SibEnzyme N.Bst9 I"].canonical_variant_id == "Nt.BstNBI"
+    assert aliases["SibEnzyme N.Bst9 I"].source_url == "https://sibenzyme.com/product/n-bst9-i/"
 
 
 def test_shared_preset_overlay_merge_rejects_duplicate_variant_ids(tmp_path: Path) -> None:
@@ -124,5 +165,14 @@ def test_shared_multiple_builtin_presets_merge_and_preserve_typed_selection_meta
     assert entries["Nb.Bpu10I"].bottom_cut_offset == -2
     assert entries["Nb.Mva1269I"].operational is not None
     assert entries["Nb.Mva1269I"].operational.buffer_family == "O"
+    assert entries["Nb.Mva1269I"].source_url == "https://www.thermofisher.com/order/catalog/product/ER2051"
     assert entries["Nt.Bpu10I"].selection is not None
     assert entries["Nt.Bpu10I"].selection.warning_codes == ["NONSPECIFIC_NICKING_ASSAY_SIGNAL"]
+
+
+def test_shared_catalog_info_builder_preserves_nickase_source_url() -> None:
+    catalog = load_builtin_nickase_catalog_preset("neb_nicking_v1")
+
+    info = build_catalog_info(catalog.by_id()["Nt.BstNBI"])
+
+    assert info.source_url == "https://www.neb.com/en-us/products/r0607-ntbstnbi"

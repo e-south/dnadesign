@@ -40,6 +40,7 @@ _ENTRY_METADATA_EXCLUDE = {
     "cut_offset",
     "vendor",
     "vendor_catalog_number",
+    "source_url",
     "origin_class",
     "source_family",
     "notes",
@@ -202,6 +203,7 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
             f"CATALOG_ENTRY_NOT_NORMALIZABLE: entry {normalized['id']} must define a motif or raw_cut_notation."
         )
 
+    selection = _normalize_selection(normalized)
     specificity_id = str(normalized.get("specificity_id") or normalized["id"]).strip()
     top_cut_offset = normalized.get("top_cut_offset")
     bottom_cut_offset = normalized.get("bottom_cut_offset")
@@ -213,6 +215,12 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
             )
         top_cut_offset = parsed_top
         bottom_cut_offset = parsed_bottom
+        if selection is not None and selection.get("outside_site") is True:
+            motif_len = len(str(canonical_motif).strip())
+            if top_cut_offset is not None and top_cut_offset >= 0:
+                top_cut_offset += motif_len
+            if bottom_cut_offset is not None and bottom_cut_offset >= 0:
+                bottom_cut_offset += motif_len
 
     has_legacy_geometry = "nicked_site_strand" in normalized or "cut_offset" in normalized
     has_canonical_geometry = top_cut_offset is not None or bottom_cut_offset is not None
@@ -248,7 +256,6 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
 
     source = normalized.get("source")
     notes = _normalize_string_list(normalized.get("notes"), label="entry.notes")
-    selection = _normalize_selection(normalized)
     operational = _normalize_operational(normalized)
     metadata = _normalize_metadata(normalized)
     vendor = normalized.get("vendor")
@@ -265,6 +272,7 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "source": source,
         "vendor": vendor,
         "vendor_catalog_number": normalized.get("vendor_catalog_number"),
+        "source_url": normalized.get("source_url"),
         "origin_class": normalized.get("origin_class"),
         "source_family": normalized.get("source_family"),
         "notes": notes,
@@ -287,6 +295,7 @@ def _normalize_product_alias(entry: dict[str, Any]) -> dict[str, Any]:
         "canonical_variant_id": alias["canonical_variant_id"],
         "vendor": alias.get("vendor"),
         "vendor_catalog_number": alias.get("vendor_catalog_number"),
+        "source_url": alias.get("source_url"),
         "alias_kind": alias.get("alias_kind"),
         "notes": notes,
     }

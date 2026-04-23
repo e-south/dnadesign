@@ -17,8 +17,11 @@ from dnadesign.cruncher.nickases.models import (
     NickaseCatalogEntry,
     NickEvent,
     RecognitionSiteInstance,
+    iupac_bases_for_symbol,
 )
 from dnadesign.cruncher.nickases.scan_plan import build_entry_scan_plans, window_matches_plan
+
+_ALL_DNA_BASES = frozenset({"A", "C", "G", "T"})
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,32 @@ def _raw_nick_geometry(
     if entry.top_cut_offset is not None:
         return "complement", start + (motif_len - entry.top_cut_offset)
     return "primary", start + (motif_len - int(entry.bottom_cut_offset))
+
+
+def oriented_prefix_before_boundary(entry: NickaseCatalogEntry, *, orientation: str) -> str:
+    motif = display_motif_for_orientation(entry, orientation=orientation)
+    motif_len = len(motif)
+    _strand, boundary_context = _raw_nick_geometry(
+        entry=entry,
+        start=0,
+        orientation=orientation,
+        motif_len=motif_len,
+    )
+    if boundary_context <= 0:
+        return ""
+    prefix = motif[: min(boundary_context, motif_len)]
+    if boundary_context > motif_len:
+        prefix += "N" * (boundary_context - motif_len)
+    return prefix
+
+
+def leading_fully_degenerate_prefix_nt(entry: NickaseCatalogEntry, *, orientation: str) -> int:
+    count = 0
+    for symbol in oriented_prefix_before_boundary(entry, orientation=orientation):
+        if frozenset(iupac_bases_for_symbol(symbol)) != _ALL_DNA_BASES:
+            break
+        count += 1
+    return count
 
 
 def display_motif_for_orientation(entry: NickaseCatalogEntry, *, orientation: str) -> str:

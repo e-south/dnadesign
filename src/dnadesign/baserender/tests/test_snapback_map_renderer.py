@@ -100,6 +100,24 @@ def test_foldback_renderer_uses_complement_sequence_and_offsets_terminals_from_l
         plt.close(fig)
 
 
+def test_foldback_renderer_keeps_cap_bulge_clear_of_stem() -> None:
+    fig = _render_foldback(_foldback_payload())
+    try:
+        ax = fig.axes[0]
+        texts_by_gid = {text.get_gid(): text for text in ax.texts if text.get_gid()}
+        stem_tip_x = texts_by_gid["primary-base-3"].get_position()[0]
+        shoulder_xs = [
+            texts_by_gid["cap-base-4"].get_position()[0],
+            texts_by_gid["cap-base-6"].get_position()[0],
+        ]
+        apex_x = texts_by_gid["cap-base-5"].get_position()[0]
+
+        assert min(shoulder_xs) - stem_tip_x >= 0.6
+        assert apex_x - max(shoulder_xs) >= 0.6
+    finally:
+        plt.close(fig)
+
+
 def test_foldback_renderer_omits_extension_label_when_cap_extension_is_empty() -> None:
     payload = _foldback_payload()
     payload["loop_geometry"]["source_cap_span"] = {"start": 4, "end": 7}

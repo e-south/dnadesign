@@ -19,12 +19,13 @@ from pathlib import Path
 from typing import Any
 
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text
-from dnadesign.cruncher.snapback.released_models import ReleasedSnapbackEvaluationReport
+from dnadesign.cruncher.snapback.released_models import ReleasedSnapbackEvaluationReport, ReleasedSolveReport
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
 
 RUN_META_DIR = "meta"
 RUN_PROVENANCE_DIR = "provenance"
 RUN_ANALYSIS_DIR = "analysis"
+RUN_MATERIALIZED_HITS_DIR = "materialized_hits"
 RUN_EXPORT_DIR = "export"
 RELEASED_SUMMARY_FIELDNAMES = [
     "status",
@@ -34,11 +35,28 @@ RELEASED_SUMMARY_FIELDNAMES = [
     "nick_boundary_from_left",
     "paired_bp",
     "cap_nt",
-    "retained_input_length_nt",
-    "retained_product_length_nt",
+    "active_bottom_input_length_nt",
+    "active_bottom_length_nt",
     "precursor_length_nt",
     "sacrificial_downstream_tail_nt",
     "extra_nick_event_count",
+]
+RELEASED_SOLVE_SUMMARY_FIELDNAMES = [
+    "rank",
+    "hit_kind",
+    "nickase_variant_id",
+    "release_variant_id",
+    "nick_boundary_from_left",
+    "paired_bp",
+    "cap_nt",
+    "active_bottom_input_length_nt",
+    "active_bottom_length_nt",
+    "precursor_length_nt",
+    "extra_nick_event_count",
+    "extra_target_strand_nick_count",
+    "materialized_run_dir",
+    "render_job_path",
+    "rendered_plot_path",
 ]
 
 
@@ -69,6 +87,11 @@ def ensure_released_run_dirs(run_dir: Path) -> None:
     (run_dir / RUN_PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_ANALYSIS_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_EXPORT_DIR).mkdir(parents=True, exist_ok=True)
+
+
+def ensure_released_solve_run_dirs(run_dir: Path) -> None:
+    ensure_released_run_dirs(run_dir)
+    released_solve_materialized_hits_dir(run_dir).mkdir(parents=True, exist_ok=True)
 
 
 def released_manifest_path(run_dir: Path) -> Path:
@@ -111,6 +134,46 @@ def released_summary_csv_path(run_dir: Path) -> Path:
     return run_dir / RUN_EXPORT_DIR / "released_design_summary.csv"
 
 
+def released_solve_manifest_path(run_dir: Path) -> Path:
+    return run_dir / RUN_META_DIR / "released_solve_manifest.json"
+
+
+def released_solve_status_path(run_dir: Path) -> Path:
+    return run_dir / RUN_META_DIR / "released_solve_status.json"
+
+
+def released_solve_request_snapshot_path(run_dir: Path) -> Path:
+    return run_dir / RUN_PROVENANCE_DIR / "request.snapshot.yaml"
+
+
+def released_solve_report_json_path(run_dir: Path) -> Path:
+    return run_dir / RUN_ANALYSIS_DIR / "solve_report.json"
+
+
+def released_solve_hits_csv_path(run_dir: Path) -> Path:
+    return run_dir / RUN_EXPORT_DIR / "table__hits.csv"
+
+
+def released_solve_materialized_hits_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_ANALYSIS_DIR / RUN_MATERIALIZED_HITS_DIR
+
+
+def released_solve_hit_run_dir(run_dir: Path, *, rank: int) -> Path:
+    return released_solve_materialized_hits_dir(run_dir) / f"hit_{rank:02d}"
+
+
+def released_solve_hit_json_path(run_dir: Path) -> Path:
+    return run_dir / RUN_ANALYSIS_DIR / "target_search_hit.json"
+
+
+def released_solve_hit_plot_context_path(run_dir: Path) -> Path:
+    return run_dir / RUN_ANALYSIS_DIR / "released_hit_plot_context.json"
+
+
+def released_solve_hit_plot_path(run_dir: Path, *, fmt: str) -> Path:
+    return run_dir / "plots" / f"released_hit_triptych.{fmt}"
+
+
 def build_released_manifest(
     *,
     run_dir: Path,
@@ -133,6 +196,9 @@ def build_released_manifest(
         "spec_snapshot_sha256": sha256_path(released_spec_snapshot_path(run_dir)),
         "nickase_catalog_sha256": sha256_path(released_nickase_catalog_snapshot_path(run_dir)),
         "release_catalog_sha256": sha256_path(released_release_catalog_snapshot_path(run_dir)),
+        "nick_catalog_source": report.metadata.nick_catalog_source,
+        "release_catalog_source": report.metadata.release_catalog_source,
+        "final_target": report.metadata.final_target.model_dump(mode="json"),
         "artifacts": [
             {"name": "report_json", "path": str(released_report_json_path(run_dir).relative_to(run_dir))},
             {"name": "spec_snapshot", "path": str(released_spec_snapshot_path(run_dir).relative_to(run_dir))},
@@ -218,7 +284,10 @@ def write_released_summary_table(run_dir: Path, report: ReleasedSnapbackEvaluati
             or report.release_event is None
         ):
             return
-        sacrificial_tail_nt = report.projection.precursor_length - report.projection.release_top_cut_precursor
+        sacrificial_tail_nt = report.projection.precursor_length - max(
+            report.projection.release_top_cut_precursor,
+            report.projection.release_bottom_cut_precursor,
+        )
         writer.writerow(
             {
                 "status": report.status,
@@ -228,13 +297,125 @@ def write_released_summary_table(run_dir: Path, report: ReleasedSnapbackEvaluati
                 "nick_boundary_from_left": report.candidate.nick_boundary_from_left,
                 "paired_bp": report.candidate.paired_bp,
                 "cap_nt": report.candidate.cap_nt,
-                "retained_input_length_nt": report.candidate.input_length_nt,
-                "retained_product_length_nt": report.candidate.retained_product_length_nt,
+                "active_bottom_input_length_nt": report.candidate.active_bottom_input_length_nt,
+                "active_bottom_length_nt": report.candidate.active_bottom_length_nt,
                 "precursor_length_nt": report.projection.precursor_length,
                 "sacrificial_downstream_tail_nt": sacrificial_tail_nt,
                 "extra_nick_event_count": report.candidate.extra_nick_event_count,
             }
         )
+
+
+def snapshot_released_solve_inputs(
+    run_dir: Path,
+    *,
+    request_yaml: str,
+    nick_catalog_yaml: str,
+    release_catalog_yaml: str,
+) -> None:
+    atomic_write_text(released_solve_request_snapshot_path(run_dir), request_yaml)
+    atomic_write_text(released_nickase_catalog_snapshot_path(run_dir), nick_catalog_yaml)
+    atomic_write_text(released_release_catalog_snapshot_path(run_dir), release_catalog_yaml)
+
+
+def write_released_solve_report(run_dir: Path, report: ReleasedSolveReport) -> None:
+    atomic_write_json(released_solve_report_json_path(run_dir), report.model_dump(mode="json"))
+
+
+def write_released_solve_summary_table(run_dir: Path, report: ReleasedSolveReport) -> None:
+    with released_solve_hits_csv_path(run_dir).open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=RELEASED_SOLVE_SUMMARY_FIELDNAMES)
+        writer.writeheader()
+        for hit in report.hits:
+            target_hit = hit.target_search_hit
+            writer.writerow(
+                {
+                    "rank": hit.rank,
+                    "hit_kind": hit.hit_kind,
+                    "nickase_variant_id": hit.nickase_variant_id,
+                    "release_variant_id": hit.release_variant_id,
+                    "nick_boundary_from_left": target_hit.nick_boundary_from_left,
+                    "paired_bp": target_hit.final_candidate.paired_bp,
+                    "cap_nt": target_hit.final_candidate.cap_nt,
+                    "active_bottom_input_length_nt": target_hit.active_bottom_input_length_nt,
+                    "active_bottom_length_nt": target_hit.active_bottom_length_nt,
+                    "precursor_length_nt": target_hit.precursor_length_nt,
+                    "extra_nick_event_count": target_hit.extra_nick_event_count,
+                    "extra_target_strand_nick_count": target_hit.extra_target_strand_nick_count,
+                    "materialized_run_dir": hit.materialized_run_dir,
+                    "render_job_path": hit.render_job_path,
+                    "rendered_plot_path": hit.rendered_plot_path,
+                }
+            )
+
+
+def build_released_solve_manifest(
+    *,
+    run_dir: Path,
+    workspace_root: Path,
+    report: ReleasedSolveReport,
+) -> dict[str, Any]:
+    return {
+        "kind": "released_solve",
+        "stage": "snapback_released",
+        "workflow": "snapback_released_solve",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "run_dir": str(run_dir.resolve()),
+        "workspace_root": str(workspace_root.resolve()),
+        "status": report.status,
+        "contract": report.metadata.kind,
+        "request_snapshot_sha256": sha256_path(released_solve_request_snapshot_path(run_dir)),
+        "nickase_catalog_sha256": sha256_path(released_nickase_catalog_snapshot_path(run_dir)),
+        "release_catalog_sha256": sha256_path(released_release_catalog_snapshot_path(run_dir)),
+        "nick_catalog_source": report.metadata.nick_catalog_source,
+        "release_catalog_source": report.metadata.release_catalog_source,
+        "selected_hit_kind": report.metadata.selected_hit_kind,
+        "materialized_hit_count": report.metadata.materialized_hit_count,
+        "artifacts": [
+            {"name": "solve_report_json", "path": str(released_solve_report_json_path(run_dir).relative_to(run_dir))},
+            {
+                "name": "request_snapshot",
+                "path": str(released_solve_request_snapshot_path(run_dir).relative_to(run_dir)),
+            },
+            {
+                "name": "nickase_catalog_snapshot",
+                "path": str(released_nickase_catalog_snapshot_path(run_dir).relative_to(run_dir)),
+            },
+            {
+                "name": "release_catalog_snapshot",
+                "path": str(released_release_catalog_snapshot_path(run_dir).relative_to(run_dir)),
+            },
+            {"name": "hits_table", "path": str(released_solve_hits_csv_path(run_dir).relative_to(run_dir))},
+            {
+                "name": "materialized_hits",
+                "path": str(released_solve_materialized_hits_dir(run_dir).relative_to(run_dir)),
+            },
+        ],
+    }
+
+
+def write_released_solve_manifest(run_dir: Path, manifest: dict[str, Any]) -> Path:
+    path = released_solve_manifest_path(run_dir)
+    atomic_write_json(path, manifest)
+    return path
+
+
+def write_released_solve_status(run_dir: Path, *, report: ReleasedSolveReport) -> Path:
+    path = released_solve_status_path(run_dir)
+    payload = {
+        "workflow": "snapback_released_solve",
+        "stage": "snapback_released",
+        "contract": report.metadata.kind,
+        "status": report.status,
+        "status_message": f"released-product snapback solve {report.status}",
+        "run_dir": str(run_dir.resolve()),
+        "issue_count": len(report.issues),
+        "materialized_hit_count": report.metadata.materialized_hit_count,
+        "selected_hit_kind": report.metadata.selected_hit_kind,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    atomic_write_json(path, payload)
+    return path
 
 
 def _load_json_value(path: Path, *, label: str) -> Any:
@@ -265,11 +446,30 @@ def load_released_status(run_dir: Path) -> dict[str, Any]:
     return _load_json_mapping(path, label="status record")
 
 
+def load_released_solve_manifest(run_dir: Path) -> dict[str, Any]:
+    path = released_solve_manifest_path(run_dir)
+    if not path.exists():
+        raise FileNotFoundError(f"Released-product snapback solve manifest missing: {path}")
+    return _load_json_mapping(path, label="solve manifest")
+
+
+def load_released_solve_status(run_dir: Path) -> dict[str, Any]:
+    path = released_solve_status_path(run_dir)
+    if not path.exists():
+        raise FileNotFoundError(f"Released-product snapback solve status missing: {path}")
+    return _load_json_mapping(path, label="solve status record")
+
+
 __all__ = [
     "RELEASED_SUMMARY_FIELDNAMES",
+    "RELEASED_SOLVE_SUMMARY_FIELDNAMES",
     "build_released_manifest",
     "build_released_run_dir",
+    "build_released_solve_manifest",
     "ensure_released_run_dirs",
+    "ensure_released_solve_run_dirs",
+    "load_released_solve_manifest",
+    "load_released_solve_status",
     "load_released_manifest",
     "load_released_status",
     "released_design_id",
@@ -280,12 +480,27 @@ __all__ = [
     "released_release_catalog_snapshot_path",
     "released_release_site_json_path",
     "released_report_json_path",
+    "released_solve_hit_json_path",
+    "released_solve_hit_plot_context_path",
+    "released_solve_hit_plot_path",
+    "released_solve_hit_run_dir",
+    "released_solve_hits_csv_path",
+    "released_solve_manifest_path",
+    "released_solve_materialized_hits_dir",
+    "released_solve_report_json_path",
+    "released_solve_request_snapshot_path",
+    "released_solve_status_path",
     "released_spec_snapshot_path",
     "released_status_path",
     "released_summary_csv_path",
     "snapshot_released_inputs",
+    "snapshot_released_solve_inputs",
     "write_released_manifest",
     "write_released_report",
+    "write_released_solve_manifest",
+    "write_released_solve_report",
+    "write_released_solve_status",
+    "write_released_solve_summary_table",
     "write_released_status",
     "write_released_summary_table",
 ]

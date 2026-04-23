@@ -19,7 +19,7 @@ Studies and portfolio aggregation build on the fixed-length optimization lane.
 
 - **Fixed-length optimization:** [Pairwise Demo](demos/demo_pairwise.md), [Sampling and Analysis](guides/sampling_and_analysis.md), and [Intent and Lifecycle](guides/intent_and_lifecycle.md)
 - **Cassette workflows:** [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), and [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
-- **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Released-product Snapback Workflow](guides/snapback_released_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md), [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md), and the checked-in [demo_snapback workspace README](../workspaces/demo_snapback/README.md)
+- **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Released-product Snapback Workflow](guides/snapback_released_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md), [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md), and the checked-in [de033 released-product workspace README](../workspaces/de033/README.md)
 - **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
 - **Tracked study surfaces:** [Cruncher Study Status](operations/cruncher-study-status.md), [Cruncher Study Preflight](operations/cruncher-study-preflight.md), the checked-in [snapback shortening study status](../../../../docs/studies/snapback_shortening_effort/status.md), the study [route map](../../../../docs/studies/snapback_shortening_effort/routes.md), and the repo-local [snapback hairpin study skill](../../../../.agents/skills/snapback-hairpin-study/SKILL.md)
 - **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
@@ -62,8 +62,8 @@ Studies and portfolio aggregation build on the fixed-length optimization lane.
 - [Snapback Artifacts](reference/snapback_artifacts.md)
 - [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
 - [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
-- [demo_snapback README](../workspaces/demo_snapback/README.md)
-- [demo_snapback runbook](../workspaces/demo_snapback/runbook.md)
+- [de033 README](../workspaces/de033/README.md)
+- [de033 runbook](../workspaces/de033/runbook.md)
 
 #### Run Studies and Portfolio Aggregation
 - [Studies](guides/studies.md)

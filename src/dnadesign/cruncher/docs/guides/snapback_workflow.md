@@ -45,7 +45,7 @@ Current scope:
 - `snapback solve` runs bounded co-design search under `single_nick_snapback_solve_v3`
 - `snapback target-search` asks the catalog whether an exact preserved-site geometry exists and reports the nearest later-boundary fallbacks
 - `snapback released-design` validates one explicit two-stage precursor under `single_nick_released_snapback_v1`
-- `snapback released-target-search` searches paired nickase plus release-enzyme combinations in retained-product space
+- `snapback released-target-search` searches paired nickase plus release-enzyme combinations on the exposed post-release bottom-strand geometry
 - `snapback released-show` inspects released-product bundles and fails fast on projection and manifest drift
 - `snapback show` inspects explicit or solve bundles and fails fast on manifest, visual, or materialized-hit drift
 
@@ -95,8 +95,8 @@ Store snapback specs and nickase catalogs inside the workspace:
     solve/
 ```
 
-The checked-in example workspace lives at
-[`../../workspaces/demo_snapback/README.md`](../../workspaces/demo_snapback/README.md).
+Create a preserved-site workspace with `uv run cruncher snapback init-workspace snapback_lab`
+when you want the scaffolded explicit and solve examples described here.
 
 ### Minimal specs
 
@@ -163,14 +163,14 @@ output:
   run_dir: outputs/solve
 ```
 
-See the checked-in demo specs in
-[`../../workspaces/demo_snapback/configs/snapback/`](../../workspaces/demo_snapback/configs/snapback/).
+The scaffolded examples written by `cruncher snapback init-workspace` use the
+same spec shapes shown here.
 
 ### Standard command sequence
 
 ```bash
 set -euo pipefail
-cd src/dnadesign/cruncher/workspaces/demo_snapback
+cd src/dnadesign/cruncher/workspaces/snapback_lab
 cruncher() { uv run cruncher "$@"; }
 
 # Validate one explicit design.
@@ -188,15 +188,6 @@ cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.
 # Ask the catalog for an exact origin-junction hit with stem 3 and cap 3.
 cruncher snapback target-search --json
 
-# Materialize the checked-in released-product demo bundle.
-cruncher snapback released-design --spec configs/snapback/demo_released_origin_033.released.snapback.yaml --force-overwrite
-
-# Search the released-product lane in retained-product space.
-cruncher snapback released-target-search --workspace-root . --release-additional-path inputs/release_enzymes/local.release.yaml --json
-
-# Inspect the released-product bundle and drift checks.
-cruncher snapback released-show --run outputs/released_design
-
 # Inspect the solve bundle and materialized explicit hit bundles.
 cruncher snapback show --run outputs/solve
 ```
@@ -207,9 +198,9 @@ Notes:
 - `design` still writes a run directory for an unsatisfied explicit spec so the issue report is preserved.
 - `solve` returns `satisfied`, `no_hits`, or `search_truncated` from the live search path.
 - `target-search` does not write a bundle; it prints a typed exact-hit / near-hit report to stdout.
-- the checked-in demo keeps `Nt.Bpu10I` as the explicit authored example, but the solve demo searches the broader NEB + Thermo preset catalog
+- the scaffold keeps `Nt.Bpu10I` as the explicit authored example, but the solve demo searches the broader NEB + Thermo preset catalog
 - `show` reads snapback-specific bundles only and refuses drift instead of guessing.
-- the released-product lane is a sibling contract surface and does not overload preserved-site `target-search` or `solve`
+- the released-product lane is a sibling contract surface and does not overload preserved-site `target-search` or `solve`; use [`snapback_released_workflow.md`](snapback_released_workflow.md) and the checked-in `de033` workspace for dual-enzyme examples
 
 ### Target-first catalog search
 

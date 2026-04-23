@@ -65,6 +65,7 @@ Current shipped entries:
 - `BsmBI-v2`
 - `BbsI`
 - `SapI`
+- `BspQI`
 
 The preset is intentionally small and conservative. It is a release-enzyme seed set for the released-product lane, not a generic all-restriction-enzyme ecosystem.
 

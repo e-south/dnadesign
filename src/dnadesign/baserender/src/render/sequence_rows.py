@@ -642,7 +642,8 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
 
         tag = feature.tags[0] if feature.tags else feature.kind
         fallback = tag.split(":")[-1] if ":" in tag else tag
-        raw_label = str(labels.get(tag, fallback))
+        feature_display_label = feature.attrs.get("display_label")
+        raw_label = str(feature_display_label or labels.get(tag, fallback))
         text = _compact_fixed_element_annotation_label(raw_label)
         if not text:
             continue

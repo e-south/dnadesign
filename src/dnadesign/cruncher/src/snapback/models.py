@@ -361,6 +361,7 @@ class CatalogNormalizationInfo(StrictSnapbackModel):
     source: str | None = None
     vendor: str | None = None
     vendor_catalog_number: str | None = None
+    source_url: str | None = None
     origin_class: str | None = None
     source_family: str | None = None
     notes: list[str] = Field(default_factory=list)
@@ -595,6 +596,7 @@ def build_catalog_info(entry: NickaseCatalogEntry) -> CatalogNormalizationInfo:
         source=entry.source,
         vendor=entry.vendor,
         vendor_catalog_number=entry.vendor_catalog_number,
+        source_url=entry.source_url,
         origin_class=entry.origin_class,
         source_family=entry.source_family,
         notes=list(entry.notes),

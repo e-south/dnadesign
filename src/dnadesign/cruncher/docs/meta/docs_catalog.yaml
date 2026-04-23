@@ -305,21 +305,21 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-02-23"
       next: [demos/demo_pairwise.md, guides/portfolio_aggregation.md]
-    - id: demo_snapback_readme
-      path: ../workspaces/demo_snapback/README.md
-      title: demo_snapback README
+    - id: de033_readme
+      path: ../workspaces/de033/README.md
+      title: de033 README
       kind: tutorial
       audience: [cruncher-maintainers]
       applies_to: schema_v3
-      last_verified: "2026-04-21"
-      next: [guides/snapback_workflow.md, guides/snapback_released_workflow.md]
-    - id: demo_snapback_runbook
-      path: ../workspaces/demo_snapback/runbook.md
-      title: demo_snapback runbook
+      last_verified: "2026-04-22"
+      next: [guides/snapback_released_workflow.md, reference/runbook_steps.md]
+    - id: de033_runbook
+      path: ../workspaces/de033/runbook.md
+      title: de033 runbook
       kind: tutorial
       audience: [cruncher-maintainers]
       applies_to: schema_v3
-      last_verified: "2026-04-21"
+      last_verified: "2026-04-22"
       next: [reference/runbook_steps.md, guides/snapback_released_workflow.md]
     - id: internals_spec
       path: internals/spec.md

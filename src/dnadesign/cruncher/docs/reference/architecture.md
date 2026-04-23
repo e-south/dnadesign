@@ -80,9 +80,9 @@ The snapback workflow is a peer lane, not a cassette or YIU submode:
 3. author or select local nickase and release-enzyme catalogs or use preset-only resolved catalogs
 4. **snapback validate** -> strict schema + invariant check plus deterministic explicit report
 5. **snapback design** -> materialize one preserved-site explicit candidate bundle with reports, provenance snapshots, candidate table, and QA views
-6. **snapback released-design** -> project a two-stage precursor into a retained post-release product and materialize one released-product bundle
+6. **snapback released-design** -> project a two-stage precursor into a retained top plus exposed-bottom post-release product and materialize one released-product bundle
 7. **snapback solve** -> bounded preserved-site search, deterministic hit ranking, selected-hit materialization, and solve-level reports
-8. **snapback released-target-search** -> target-first paired nickase plus release-enzyme search in retained-product space
+8. **snapback released-target-search** -> target-first paired nickase plus release-enzyme search in exposed-bottom geometry space
 9. **snapback show** / **snapback released-show** -> inspect the appropriate bundle type and fail fast on drift without guessing
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.

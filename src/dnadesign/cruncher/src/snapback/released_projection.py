@@ -30,14 +30,22 @@ from dnadesign.cruncher.release_enzymes.scanning import (
 from dnadesign.cruncher.release_enzymes.scanning import (
     enumerate_site_instances as enumerate_release_site_instances,
 )
-from dnadesign.cruncher.snapback.models import CoordinateSpan, SnapbackIssue
+from dnadesign.cruncher.snapback.models import CoordinateSpan, SnapbackCandidateDesign, SnapbackIssue
 from dnadesign.cruncher.snapback.planner import evaluate_snapback_candidate
+from dnadesign.cruncher.snapback.publication_support import complement_sequence
 from dnadesign.cruncher.snapback.released_models import (
     ReleasedFinalCandidate,
     ReleasedFinalTargetGeometry,
     ReleasedProductProjection,
     ReleasedSnapbackConstraintsSpec,
 )
+
+_COMPLEMENT_BASE = {
+    "A": "T",
+    "C": "G",
+    "G": "C",
+    "T": "A",
+}
 
 
 def _issue(code: str, message: str, **details: object) -> SnapbackIssue:
@@ -94,10 +102,13 @@ def _select_nick_match(
 def _select_release_match(
     *,
     matches: list[ReleaseEvaluatedMatch],
-    target_designed_length: int,
+    target_active_bottom_length: int,
+    coordinate_offset: int,
     intended_site_sequence: str | None,
 ) -> tuple[ReleaseEvaluatedMatch | None, list[SnapbackIssue]]:
-    selected = [match for match in matches if match.cut.top_cut_boundary == target_designed_length]
+    selected = [
+        match for match in matches if match.cut.bottom_cut_boundary - coordinate_offset == target_active_bottom_length
+    ]
     if intended_site_sequence is not None:
         selected = [match for match in selected if match.site.matched_span_sequence == intended_site_sequence]
     if not selected:
@@ -106,8 +117,8 @@ def _select_release_match(
             [
                 _issue(
                     "NO_RELEASE_MATCH_FOR_TARGET_LENGTH",
-                    "No release site produced the retained-product top-strand length required by the final target.",
-                    required_release_top_cut=target_designed_length,
+                    "No release site produced the exposed bottom-strand length required by the final target.",
+                    required_release_bottom_cut=target_active_bottom_length,
                 )
             ],
         )
@@ -117,16 +128,47 @@ def _select_release_match(
             [
                 _issue(
                     "RELEASE_SITE_AMBIGUOUS",
-                    "Multiple release sites produced the same retained-product top-strand length.",
+                    "Multiple release sites produced the same exposed bottom-strand length.",
                     match_count=len(selected),
-                    required_release_top_cut=target_designed_length,
+                    required_release_bottom_cut=target_active_bottom_length,
                 )
             ],
         )
     return selected[0], []
 
 
-def _build_rebased_nick_event(original: NickEvent, *, rebased_boundary: int) -> NickEvent:
+def _validate_pre_nick_site_origin_boundary(nick_match: EvaluatedMatch) -> list[SnapbackIssue]:
+    if (
+        nick_match.site.local_start is not None
+        and nick_match.site.local_end is not None
+        and nick_match.site.local_start < 0
+    ):
+        if nick_match.site.local_end > 0:
+            return [
+                _issue(
+                    "PRE_NICK_SITE_OVERLAPS_ACTIVE_STRAND",
+                    (
+                        "The released-product lane rejects pre-nick recognition sites "
+                        "that straddle the active-strand origin."
+                    ),
+                    local_start=nick_match.site.local_start,
+                    local_end=nick_match.site.local_end,
+                    variant_id=nick_match.variant.id,
+                )
+            ]
+        return [
+            _issue(
+                "PRE_NICK_SITE_LEFT_OF_ORIGIN",
+                "The released-product lane rejects pre-nick recognition sites that begin left of logical origin 0.",
+                local_start=nick_match.site.local_start,
+                local_end=nick_match.site.local_end,
+                variant_id=nick_match.variant.id,
+            )
+        ]
+    return []
+
+
+def _build_projected_origin_event(original: NickEvent, *, rebased_boundary: int) -> NickEvent:
     return NickEvent(
         variant_id=original.variant_id,
         specificity_id=original.specificity_id,
@@ -139,22 +181,70 @@ def _build_rebased_nick_event(original: NickEvent, *, rebased_boundary: int) -> 
     )
 
 
+def _released_duplex_overlap_pairing_issues(
+    *,
+    retained_top_strand: str,
+    active_bottom_strand: str,
+    coordinate_offset: int,
+    release_top_cut_precursor: int,
+    release_bottom_cut_precursor: int,
+) -> list[SnapbackIssue]:
+    overlap_length = max(0, min(release_top_cut_precursor, release_bottom_cut_precursor) - coordinate_offset)
+    if overlap_length == 0:
+        return []
+    retained_overlap = retained_top_strand[coordinate_offset : coordinate_offset + overlap_length]
+    active_overlap = active_bottom_strand[:overlap_length]
+    mismatch_positions = [
+        index
+        for index, (top_base, bottom_base) in enumerate(zip(retained_overlap, active_overlap, strict=True))
+        if _COMPLEMENT_BASE[bottom_base] != top_base
+    ]
+    if not mismatch_positions:
+        return []
+    return [
+        _issue(
+            "POST_RELEASE_DUPLEX_PAIRING_INVALID",
+            (
+                "The retained top fragment and active bottom strand are not Watson-Crick paired "
+                "across the surviving duplex overlap."
+            ),
+            overlap_length=overlap_length,
+            mismatch_positions=mismatch_positions,
+            retained_top_overlap=retained_overlap,
+            active_bottom_overlap=active_overlap,
+        )
+    ]
+
+
 def _project_released_product(
     *,
     precursor_top_strand: str,
     nick_match: EvaluatedMatch,
     release_match: ReleaseEvaluatedMatch,
     constraints: ReleasedSnapbackConstraintsSpec,
+    coordinate_offset: int,
 ) -> tuple[ReleasedProductProjection | None, list[SnapbackIssue]]:
     precursor_length = len(precursor_top_strand)
+    nick_coordinate_precursor = nick_match.nick.boundary_context
     issues: list[SnapbackIssue] = []
-    if constraints.require_release_site_downstream_of_nick and release_match.site.start < nick_match.nick.boundary:
+    if constraints.require_nick_survives_in_retained_product:
+        issues.append(
+            _issue(
+                "LEGACY_RETAINED_TOP_NICK_SURVIVAL_UNSUPPORTED",
+                (
+                    "The exposed-bottom-strand released-product lane does not accept the legacy "
+                    "require_nick_survives_in_retained_product constraint. Set it to false."
+                ),
+                nick_boundary=nick_coordinate_precursor,
+            )
+        )
+    if constraints.require_release_site_downstream_of_nick and release_match.site.start < nick_coordinate_precursor:
         issues.append(
             _issue(
                 "RELEASE_SITE_NOT_DOWNSTREAM_OF_NICK",
                 "The release recognition site must start downstream of the intended nick boundary.",
                 release_site_start=release_match.site.start,
-                nick_boundary=nick_match.nick.boundary,
+                nick_boundary=nick_coordinate_precursor,
             )
         )
     if release_match.cut.top_cut_boundary < 0 or release_match.cut.bottom_cut_boundary < 0:
@@ -192,29 +282,29 @@ def _project_released_product(
                 precursor_length=precursor_length,
             )
         )
-    if (
-        constraints.require_nick_survives_in_retained_product
-        and nick_match.nick.boundary >= release_match.cut.top_cut_boundary
-    ):
-        issues.append(
-            _issue(
-                "POST_RELEASE_NICK_LOST",
-                "The retained upstream top strand would not contain the intended nick after release.",
-                nick_boundary=nick_match.nick.boundary,
-                release_top_cut=release_match.cut.top_cut_boundary,
-            )
-        )
     if issues:
         return None, issues
 
-    retained_top_strand = precursor_top_strand[: release_match.cut.top_cut_boundary]
+    retained_top_strand = precursor_top_strand[:nick_coordinate_precursor]
+    active_bottom_strand = complement_sequence(
+        precursor_top_strand[coordinate_offset : release_match.cut.bottom_cut_boundary]
+    )
+    duplex_pairing_issues = _released_duplex_overlap_pairing_issues(
+        retained_top_strand=retained_top_strand,
+        active_bottom_strand=active_bottom_strand,
+        coordinate_offset=coordinate_offset,
+        release_top_cut_precursor=nick_coordinate_precursor,
+        release_bottom_cut_precursor=release_match.cut.bottom_cut_boundary,
+    )
+    if duplex_pairing_issues:
+        return None, duplex_pairing_issues
     retained_nickase_matches = enumerate_nickase_site_instances(
         retained_top_strand,
         coordinate_offset=0,
         entry=nick_match.variant,
     )
     nickase_site_survives = any(
-        match.nick.boundary == nick_match.nick.boundary
+        match.nick.boundary_context == nick_coordinate_precursor
         and match.nick.strand == nick_match.nick.strand
         and match.site.orientation == nick_match.site.orientation
         for match in retained_nickase_matches
@@ -255,18 +345,40 @@ def _project_released_product(
         ReleasedProductProjection(
             precursor_top_strand=precursor_top_strand,
             precursor_length=precursor_length,
-            nick_coordinate_precursor=nick_match.nick.boundary,
+            nick_coordinate_precursor=nick_coordinate_precursor,
             release_top_cut_precursor=release_match.cut.top_cut_boundary,
             release_bottom_cut_precursor=release_match.cut.bottom_cut_boundary,
             retained_top_strand=retained_top_strand,
-            retained_bottom_strand_span=(0, release_match.cut.bottom_cut_boundary),
-            retained_product_length=len(retained_top_strand),
-            rebased_nick_coordinate=nick_match.nick.boundary,
+            retained_top_length_nt=len(retained_top_strand),
+            active_bottom_strand=active_bottom_strand,
+            active_bottom_strand_span=(0, release_match.cut.bottom_cut_boundary - coordinate_offset),
+            active_bottom_length_nt=len(active_bottom_strand),
+            rebased_nick_boundary=nick_match.nick.boundary,
             nickase_site_survives_post_release=nickase_site_survives,
             release_site_survives_post_release=release_site_survives,
         ),
         [],
     )
+
+
+def _precursor_extra_nick_events(
+    *,
+    precursor_top_strand: str,
+    nick_entry: NickaseCatalogEntry,
+    original_nick_match: EvaluatedMatch,
+) -> tuple[list[NickEvent], list[NickEvent]]:
+    coordinate_offset = original_nick_match.nick.boundary_context - original_nick_match.nick.boundary
+    all_matches = enumerate_nickase_site_instances(
+        precursor_top_strand,
+        coordinate_offset=coordinate_offset,
+        entry=nick_entry,
+    )
+    selected_key = original_nick_match.key()
+    extra_nick_events = [match.nick for match in all_matches if match.key() != selected_key]
+    extra_target_strand_nicks = [
+        event for event in extra_nick_events if event.strand == original_nick_match.nick.strand
+    ]
+    return extra_nick_events, extra_target_strand_nicks
 
 
 def _build_projected_selected_match(
@@ -310,15 +422,15 @@ def _build_projected_selected_match(
     )
 
 
-def _evaluate_projected_candidate(
+def build_projected_snapback_candidate(
     *,
     projection: ReleasedProductProjection,
-    original_nick_match: EvaluatedMatch,
     nick_entry: NickaseCatalogEntry,
     target: ReleasedFinalTargetGeometry,
-) -> tuple[ReleasedFinalCandidate | None, list[SnapbackIssue]]:
-    retained_length = projection.retained_product_length
-    input_length = retained_length - target.paired_bp
+    intended_strand: str,
+) -> tuple[SnapbackCandidateDesign | None, list[SnapbackIssue]]:
+    active_bottom_length = projection.active_bottom_length_nt
+    input_length = active_bottom_length - target.paired_bp
     expected_input_length = target.nick_boundary_from_left + target.paired_bp + target.cap_nt
     if input_length != expected_input_length:
         return (
@@ -326,67 +438,46 @@ def _evaluate_projected_candidate(
             [
                 _issue(
                     "RETAINED_PRODUCT_DOES_NOT_PROJECT_TO_FINAL_TARGET",
-                    "The retained product length does not project to the requested final target geometry.",
-                    retained_product_length=retained_length,
+                    "The exposed bottom-strand length does not project to the requested final target geometry.",
+                    active_bottom_length=active_bottom_length,
                     input_length=input_length,
                     required_input_length=expected_input_length,
                 )
             ],
         )
-    if input_length <= target.nick_boundary_from_left or retained_length <= input_length:
+    if input_length <= target.nick_boundary_from_left or active_bottom_length <= input_length:
         return (
             None,
             [
                 _issue(
                     "RETAINED_PRODUCT_PROJECTION_INVALID",
-                    "The retained product could not be partitioned into input sequence and foldback arm.",
-                    retained_product_length=retained_length,
+                    "The exposed bottom strand could not be partitioned into input sequence and foldback arm.",
+                    active_bottom_length=active_bottom_length,
                     input_length=input_length,
                     nick_boundary=target.nick_boundary_from_left,
                 )
             ],
         )
-    input_sequence = projection.retained_top_strand[:input_length]
-    foldback_arm = projection.retained_top_strand[input_length:]
-    retained_matches = enumerate_nickase_site_instances(
-        projection.retained_top_strand,
-        coordinate_offset=0,
-        entry=nick_entry,
-    )
-    intended_retained_match = next(
-        (
-            match
-            for match in retained_matches
-            if match.nick.boundary == projection.rebased_nick_coordinate
-            and match.nick.strand == original_nick_match.nick.strand
-        ),
-        None,
-    )
+    input_sequence = projection.active_bottom_strand[:input_length]
+    foldback_arm = projection.active_bottom_strand[input_length:]
     selected_match = _build_projected_selected_match(
         entry=nick_entry,
         input_sequence=input_sequence,
-        nick_boundary=projection.rebased_nick_coordinate,
-        intended_strand=original_nick_match.nick.strand,
+        nick_boundary=projection.rebased_nick_boundary,
+        intended_strand=intended_strand,
     )
     all_matches: list[EvaluatedMatch] = [selected_match]
-    replaced_intended = False
-    for match in retained_matches:
-        if (
-            not replaced_intended
-            and intended_retained_match is not None
-            and match.key() == intended_retained_match.key()
-        ):
-            replaced_intended = True
-            continue
-        all_matches.append(match)
 
-    candidate, issues = evaluate_snapback_candidate(
+    return evaluate_snapback_candidate(
         input_sequence=input_sequence,
-        protected_region=CoordinateSpan(start=0, end=0),
+        protected_region=CoordinateSpan(
+            start=selected_match.site.start,
+            end=selected_match.site.end,
+        ),
         pre_nick_duplex_window=CoordinateSpan(start=0, end=input_length),
         retained_homology_window=CoordinateSpan(
-            start=projection.rebased_nick_coordinate,
-            end=projection.rebased_nick_coordinate + target.paired_bp,
+            start=projection.rebased_nick_boundary,
+            end=projection.rebased_nick_boundary + target.paired_bp,
         ),
         cap_sequence="",
         foldback_arm=foldback_arm,
@@ -403,35 +494,55 @@ def _evaluate_projected_candidate(
         forbid_additional_target_strand_nicks=False,
         forbid_any_additional_nicks=False,
     )
+
+
+def _evaluate_projected_candidate(
+    *,
+    projection: ReleasedProductProjection,
+    original_nick_match: EvaluatedMatch,
+    nick_entry: NickaseCatalogEntry,
+    target: ReleasedFinalTargetGeometry,
+) -> tuple[ReleasedFinalCandidate | None, list[SnapbackIssue]]:
+    candidate, issues = build_projected_snapback_candidate(
+        projection=projection,
+        nick_entry=nick_entry,
+        target=target,
+        intended_strand=original_nick_match.nick.strand,
+    )
     if issues or candidate is None:
         return None, issues
-    rebased_event = _build_rebased_nick_event(
+    extra_nick_events, extra_target_strand_nicks = _precursor_extra_nick_events(
+        precursor_top_strand=projection.precursor_top_strand,
+        nick_entry=nick_entry,
+        original_nick_match=original_nick_match,
+    )
+    projected_origin_event = _build_projected_origin_event(
         original_nick_match.nick,
-        rebased_boundary=projection.rebased_nick_coordinate,
+        rebased_boundary=projection.rebased_nick_boundary,
     )
     return (
         ReleasedFinalCandidate(
-            designed_sequence=projection.retained_top_strand,
-            input_sequence=input_sequence,
-            foldback_arm=foldback_arm,
+            designed_sequence=projection.active_bottom_strand,
+            input_sequence=candidate.input_sequence,
+            foldback_arm=candidate.foldback_arm,
             nick_boundary_from_left=candidate.nick_boundary_from_left,
             paired_bp=candidate.paired_bp,
             cap_nt=candidate.cap_nt,
             source_cap_nt=len(candidate.source_cap_sequence),
             cap_extension_nt=candidate.cap_extension_nt,
-            retained_product_length_nt=projection.retained_product_length,
-            input_length_nt=len(input_sequence),
+            active_bottom_length_nt=projection.active_bottom_length_nt,
+            active_bottom_input_length_nt=len(candidate.input_sequence),
             mismatch_count=candidate.mismatch_count,
             mismatch_positions=list(candidate.mismatch_positions),
             terminal_ligatable_duplex_bp=candidate.terminal_ligatable_duplex_bp,
             max_uninterrupted_duplex_bp=candidate.max_uninterrupted_duplex_bp,
-            extra_nick_event_count=len(candidate.extra_nick_events),
-            extra_target_strand_nick_count=len(candidate.extra_target_strand_nicks),
+            extra_nick_event_count=len(extra_nick_events),
+            extra_target_strand_nick_count=len(extra_target_strand_nicks),
             gc_fraction_added=candidate.gc_fraction_added,
             max_homopolymer_run_added=candidate.max_homopolymer_run_added,
-            intended_nick=rebased_event,
-            extra_target_strand_nicks=list(candidate.extra_target_strand_nicks),
-            extra_nick_events=list(candidate.extra_nick_events),
+            projected_origin_event=projected_origin_event,
+            extra_target_strand_nicks=extra_target_strand_nicks,
+            extra_nick_events=extra_nick_events,
             post_nick_sequence=candidate.post_nick_sequence,
             nickase_site_survives_post_release=projection.nickase_site_survives_post_release,
             release_site_survives_post_release=projection.release_site_survives_post_release,
@@ -449,9 +560,14 @@ def evaluate_released_precursor(
     constraints: ReleasedSnapbackConstraintsSpec,
     nick_intended_site_sequence: str | None = None,
     release_intended_site_sequence: str | None = None,
+    precursor_coordinate_offset: int = 0,
     normalize_to_top_strand_nick: bool = True,
 ) -> ReleasedEvaluationResult:
-    nick_matches = enumerate_nickase_site_instances(precursor_top_strand, coordinate_offset=0, entry=nick_entry)
+    nick_matches = enumerate_nickase_site_instances(
+        precursor_top_strand,
+        coordinate_offset=precursor_coordinate_offset,
+        entry=nick_entry,
+    )
     nick_match, nick_issues = _select_nick_match(
         matches=nick_matches,
         target=target,
@@ -467,11 +583,26 @@ def evaluate_released_precursor(
             projection=None,
             candidate=None,
         )
-    target_designed_length = target.nick_boundary_from_left + (2 * target.paired_bp) + target.cap_nt
-    release_matches = enumerate_release_site_instances(precursor_top_strand, coordinate_offset=0, entry=release_entry)
+    nick_boundary_issues = _validate_pre_nick_site_origin_boundary(nick_match)
+    if nick_boundary_issues:
+        return ReleasedEvaluationResult(
+            status="invalid_precursor",
+            issues=nick_boundary_issues,
+            pre_nick_match=nick_match,
+            release_match=None,
+            projection=None,
+            candidate=None,
+        )
+    target_active_bottom_length = target.nick_boundary_from_left + (2 * target.paired_bp) + target.cap_nt
+    release_matches = enumerate_release_site_instances(
+        precursor_top_strand,
+        coordinate_offset=precursor_coordinate_offset,
+        entry=release_entry,
+    )
     release_match, release_issues = _select_release_match(
         matches=release_matches,
-        target_designed_length=target_designed_length,
+        target_active_bottom_length=target_active_bottom_length,
+        coordinate_offset=precursor_coordinate_offset,
         intended_site_sequence=release_intended_site_sequence,
     )
     if release_match is None:
@@ -488,6 +619,7 @@ def evaluate_released_precursor(
         nick_match=nick_match,
         release_match=release_match,
         constraints=constraints,
+        coordinate_offset=precursor_coordinate_offset,
     )
     if projection is None:
         return ReleasedEvaluationResult(
@@ -531,4 +663,4 @@ def evaluate_released_precursor(
     )
 
 
-__all__ = ["ReleasedEvaluationResult", "evaluate_released_precursor"]
+__all__ = ["ReleasedEvaluationResult", "build_projected_snapback_candidate", "evaluate_released_precursor"]

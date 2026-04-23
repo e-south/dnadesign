@@ -272,7 +272,7 @@ def _runbook_markdown(*, workspace_name: str) -> str:
             "### Step-by-Step Commands",
             "",
             "    set -euo pipefail",
-            "    cd src/dnadesign/cruncher/workspaces/demo_snapback",
+            f"    cd src/dnadesign/cruncher/workspaces/{workspace_name}",
             '    cruncher() { uv run cruncher "$@"; }',
             "",
             "    # Standard machine-runbook sequence (matches configs/runbook.yaml).",

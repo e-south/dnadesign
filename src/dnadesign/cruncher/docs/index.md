@@ -46,8 +46,8 @@ Run YIU workflows. Reuse Sample outputs in YIU when the payload comes from a sel
 - [Snapback Artifacts](reference/snapback_artifacts.md)
 - [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
 - [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
-- [demo_snapback README](../workspaces/demo_snapback/README.md)
-- [demo_snapback runbook](../workspaces/demo_snapback/runbook.md)
+- [de033 README](../workspaces/de033/README.md)
+- [de033 runbook](../workspaces/de033/runbook.md)
 
 #### Run Studies and Portfolio Aggregation
 Run studies and portfolio aggregation across workspace outputs.

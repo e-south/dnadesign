@@ -85,6 +85,13 @@ def test_yiu_workflow_routes_to_contract_pages() -> None:
     assert "[Sampling and Analysis](../guides/sampling_and_analysis.md)" in guide
     assert "Ambiguous or missing sources fail fast." in guide
     assert "Cross-tool integrations should not import `dnadesign.baserender.src.*`." in guide
+    assert (
+        "Default `show --json` returns the operator summary plus bundle artifact paths and integrity detail." in guide
+    )
+    assert (
+        "`show --json --verbose` also includes `motif_context`, `optimization_decision`, and `split_row_debug`."
+        in guide
+    )
     assert "Human-readable `--verbose` adds provenance, bundle contract, render/integrity details," in guide
     assert "The remaining published JSON files are machine-facing bundle ledgers or render contracts" in guide
     assert "reference duplex and mismatch-present duplex" in guide

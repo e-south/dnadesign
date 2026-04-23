@@ -3,10 +3,10 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** snapback workflow users and maintainers
-**Last updated by:** cruncher-maintainers on 2026-04-21
-**Applies to:** `uv run cruncher snapback released-design|released-show`
-**Last verified:** 2026-04-21
-**Primary artifacts:** released-product reports, projection payloads, pre-event site records, released-design summary tables
+**Last updated by:** cruncher-maintainers on 2026-04-22
+**Applies to:** `uv run cruncher snapback released-design|released-solve|released-show`
+**Last verified:** 2026-04-22
+**Primary artifacts:** released-product solve reports, per-hit bundles, projection payloads, pre-event site records, released-design summary tables
 
 ### Contents
 - [Run root](#run-root)
@@ -16,15 +16,38 @@
 
 ### Run root
 
-Released-product snapback uses one stable workspace-relative output root:
+Released-product snapback uses two stable workspace-relative output roots:
 
 ```text
+<workspace>/outputs/released_solve/
 <workspace>/outputs/released_design/
 ```
 
-The lane computes a `released_design_id` for provenance and integrity, but the v1 run directory stays stable so the checked-in runbook can reuse one explicit root.
+The lane computes a `released_design_id` for provenance and integrity, but the v1 run directory stays stable so an operator-authored runbook can reuse one explicit root when a checked-in released-product precursor exists.
 
 ### Bundle layout
+
+`released-solve` writes:
+
+```text
+<workspace>/outputs/released_solve/
+  meta/
+    released_solve_manifest.json
+    released_solve_status.json
+  provenance/
+    request.snapshot.yaml
+    nickase_catalog.yaml
+    release_catalog.yaml
+  analysis/
+    solve_report.json
+    materialized_hits/
+      hit_01/
+        ...
+      hit_02/
+        ...
+  export/
+    table__hits.csv
+```
 
 `released-design` writes:
 
@@ -48,18 +71,25 @@ The lane computes a `released_design_id` for provenance and integrity, but the v
 
 ### File semantics
 
-- `meta/released_snapback_manifest.json`: bundle manifest with workspace root, spec path, contract name, status, and artifact inventory
+- `meta/released_solve_manifest.json`: solve-bundle manifest with workspace root, artifact inventory, catalog-source labels, and the selected hit kind
+- `meta/released_solve_status.json`: lightweight released-product solve status record
+- `provenance/request.snapshot.yaml`: exact released-solve request and output settings used for the run
+- `analysis/solve_report.json`: full machine-readable released-solve report with embedded search evidence and materialized-hit paths
+- `analysis/materialized_hits/hit_<rank>/`: released-product hit bundles with `target_search_hit.json`, projection/site payloads, an origin-anchored exposed-bottom plot context JSON, and an optional rendered exposed-bottom triptych
+- `export/table__hits.csv`: ranked hit summary table with materialized bundle and render paths
+- `meta/released_snapback_manifest.json`: bundle manifest with workspace root, spec path, contract name, status, artifact inventory, catalog-source labels, and the pinned `final_target`
 - `meta/released_snapback_status.json`: lightweight released-product status record
 - `provenance/spec.snapshot.yaml`: exact released-product spec snapshot used for the run
 - `provenance/nickase_catalog.yaml`: resolved nickase catalog snapshot
 - `provenance/release_catalog.yaml`: resolved release-enzyme catalog snapshot
 - `analysis/report.json`: full machine-readable released-product report
-- `analysis/released_product_projection.json`: precursor-to-retained-product projection payload
+- `analysis/released_product_projection.json`: precursor-to-post-release top/bottom projection payload with the exposed bottom strand called out as the final geometry source
 - `analysis/pre_nick_site.json`: resolved pre-nick recognition site plus nick event
 - `analysis/release_site.json`: resolved release recognition site plus ds-cut event
 - `export/released_design_summary.csv`: one-row released-product summary when a truthful candidate exists, or header-only CSV otherwise
 
-The v1 lane does not publish a large render surface. The projection and site JSON files are the operator-facing analysis contract.
+The solve lane publishes a large per-hit render surface. The explicit
+`released-design` bundle stays intentionally small and projection-centric.
 
 ### Status and drift behavior
 
@@ -80,6 +110,8 @@ Released-product explicit bundles can report:
 - provenance snapshot hash drift
 - missing required provenance snapshots or analysis payloads
 - report and projection inconsistency
+- report and manifest provenance-label drift
+- report and manifest final-target drift
 - run-dir, workflow, or stage drift
 
 `released-show` is an integrity check, not a best-effort artifact browser.

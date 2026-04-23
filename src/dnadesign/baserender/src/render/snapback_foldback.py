@@ -23,6 +23,11 @@ from dnadesign.contracts.visual import SnapbackVisualV1
 from ..config import Style
 from ..core import RenderingError
 
+_CAP_SHOULDER_OFFSET_X = 0.64
+_CAP_APEX_OFFSET_X = 1.28
+_CAP_SHOULDER_VERTICAL_OVERSHOOT = 0.06
+_RIGHT_TERMINAL_PAD_X = 0.56
+
 
 @dataclass(frozen=True)
 class FoldbackCornerLayout:
@@ -71,12 +76,20 @@ def _build_layout(contract: SnapbackVisualV1, style: Style) -> FoldbackCornerLay
     bottom_y = 0.55
     stem_x_positions = [offset + 0.5 for offset in range(len(primary_indices))]
     right_x = stem_x_positions[-1]
-    cap_x_positions = [right_x + 0.46, right_x + 0.92, right_x + 0.46]
-    cap_y_positions = [top_y - 0.04, (top_y + bottom_y) / 2.0, bottom_y + 0.04]
+    cap_x_positions = [
+        right_x + _CAP_SHOULDER_OFFSET_X,
+        right_x + _CAP_APEX_OFFSET_X,
+        right_x + _CAP_SHOULDER_OFFSET_X,
+    ]
+    cap_y_positions = [
+        top_y + _CAP_SHOULDER_VERTICAL_OVERSHOOT,
+        (top_y + bottom_y) / 2.0,
+        bottom_y - _CAP_SHOULDER_VERTICAL_OVERSHOOT,
+    ]
 
     left_x = min(stem_x_positions)
     left_pad = 5.8
-    right_pad = 2.65
+    right_pad = 3.05
     top_extent = top_y + 0.82
     bottom_extent = bottom_y - 0.88
     title_y = top_extent + 0.36
@@ -84,7 +97,7 @@ def _build_layout(contract: SnapbackVisualV1, style: Style) -> FoldbackCornerLay
     figure_height = max(3.9, (title_y - bottom_extent + 0.34) * 0.95 * float(style.figure_scale))
     row_label_x = left_x - 1.65
     left_terminal_x = left_x - 0.72
-    right_terminal_x = max(right_x, max(cap_x_positions)) + 0.44
+    right_terminal_x = max(right_x, max(cap_x_positions)) + _RIGHT_TERMINAL_PAD_X
     return FoldbackCornerLayout(
         primary_indices=primary_indices,
         complement_indices=complement_indices,

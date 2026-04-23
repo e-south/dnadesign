@@ -11,6 +11,8 @@ Module Author(s): Codex
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from dnadesign.cruncher.nickases.models import NickaseCatalogEntry
 
 _SNAPBACK_TIER_RANK = {
@@ -41,4 +43,16 @@ def snapback_entry_priority_key(entry: NickaseCatalogEntry) -> tuple[object, ...
     )
 
 
-__all__ = ["snapback_entry_priority_key"]
+def matching_nickase_warning_codes(
+    entry: NickaseCatalogEntry,
+    *,
+    warning_codes: Iterable[str],
+) -> list[str]:
+    selection = entry.selection
+    if selection is None or not selection.warning_codes:
+        return []
+    present = set(selection.warning_codes)
+    return [code for code in warning_codes if code in present]
+
+
+__all__ = ["matching_nickase_warning_codes", "snapback_entry_priority_key"]

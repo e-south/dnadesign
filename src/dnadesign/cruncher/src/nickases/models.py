@@ -167,6 +167,7 @@ class NickaseCatalogEntry(StrictNickaseModel):
     source: str | None = None
     vendor: str | None = None
     vendor_catalog_number: str | None = None
+    source_url: str | None = None
     origin_class: str | None = None
     source_family: str | None = None
     notes: list[str] = Field(default_factory=list)
@@ -183,7 +184,7 @@ class NickaseCatalogEntry(StrictNickaseModel):
             raise ValueError("nickase id and specificity_id must be non-empty.")
         return text
 
-    @field_validator("source", "vendor", "vendor_catalog_number", "origin_class", "source_family")
+    @field_validator("source", "vendor", "vendor_catalog_number", "source_url", "origin_class", "source_family")
     @classmethod
     def _validate_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -235,6 +236,7 @@ class NickaseProductAlias(StrictNickaseModel):
     canonical_variant_id: str
     vendor: str | None = None
     vendor_catalog_number: str | None = None
+    source_url: str | None = None
     alias_kind: str | None = None
     notes: list[str] = Field(default_factory=list)
 
@@ -245,6 +247,14 @@ class NickaseProductAlias(StrictNickaseModel):
         if not text:
             raise ValueError("product alias ids must be non-empty.")
         return text
+
+    @field_validator("vendor", "vendor_catalog_number", "source_url", "alias_kind")
+    @classmethod
+    def _validate_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
 
 
 class NickaseCatalog(StrictNickaseModel):

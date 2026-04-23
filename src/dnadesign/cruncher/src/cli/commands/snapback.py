@@ -74,6 +74,14 @@ def run_released_snapback_target_search(*args, **kwargs):
     return _run_released_snapback_target_search(*args, **kwargs)
 
 
+def run_released_snapback_solve(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_released_solve_workflow import (
+        run_released_snapback_solve as _run_released_snapback_solve,
+    )
+
+    return _run_released_snapback_solve(*args, **kwargs)
+
+
 def snapback_show_payload(*args, **kwargs):
     from dnadesign.cruncher.app.snapback_workflow import snapback_show_payload as _snapback_show_payload
 
@@ -233,9 +241,9 @@ def _print_released_report(report) -> None:
     console.print(f"Release catalog -> {report.metadata.release_catalog_source}")
     if report.candidate is not None and report.projection is not None:
         console.print(
-            "Retained product -> "
-            f"input_nt={report.candidate.input_length_nt} "
-            f"retained_nt={report.candidate.retained_product_length_nt} "
+            "Active bottom -> "
+            f"input_nt={report.candidate.active_bottom_input_length_nt} "
+            f"bottom_nt={report.candidate.active_bottom_length_nt} "
             f"nick={report.candidate.nick_boundary_from_left} "
             f"paired_bp={report.candidate.paired_bp} cap_nt={report.candidate.cap_nt}"
         )
@@ -285,7 +293,7 @@ def _print_released_target_search_report(report) -> None:
                 "  - "
                 f"rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
                 f"boundary={hit.nick_boundary_from_left} "
-                f"retained_input_nt={hit.retained_input_length_nt} "
+                f"active_bottom_input_nt={hit.active_bottom_input_length_nt} "
                 f"precursor_nt={hit.precursor_length_nt} "
                 f"tail_nt={hit.sacrificial_downstream_tail_nt}"
             )
@@ -296,10 +304,52 @@ def _print_released_target_search_report(report) -> None:
                 "  - "
                 f"rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
                 f"boundary={hit.nick_boundary_from_left} "
-                f"retained_input_nt={hit.retained_input_length_nt} "
+                f"active_bottom_input_nt={hit.active_bottom_input_length_nt} "
                 f"precursor_nt={hit.precursor_length_nt} "
                 f"tail_nt={hit.sacrificial_downstream_tail_nt}"
             )
+
+
+def _print_released_solve_report(report) -> None:
+    console.print("Released-product snapback solve")
+    console.print(f"Status -> {report.status}")
+    if report.run_dir:
+        console.print(f"Outputs -> {report.run_dir}")
+    console.print(
+        "Target -> "
+        f"boundary={report.metadata.target.nick_boundary_from_left}, "
+        f"paired_bp={report.metadata.target.paired_bp}, "
+        f"cap_nt={report.metadata.target.cap_nt}"
+    )
+    console.print(f"Nick catalog -> {report.metadata.nick_catalog_source}")
+    console.print(f"Release catalog -> {report.metadata.release_catalog_source}")
+    console.print(f"Pairs evaluated -> {report.metadata.evaluated_pair_count}")
+    console.print(
+        "Available hits -> "
+        f"exact={report.metadata.available_exact_hit_count}, "
+        f"near={report.metadata.available_near_hit_count}, "
+        f"selected={report.metadata.selected_hit_kind or '-'}"
+    )
+    console.print(
+        "Materialized -> "
+        f"{report.metadata.materialized_hit_count}/{report.metadata.requested_materialize_top_k} "
+        f"render_format={report.metadata.render_format} "
+        f"emit_renders={report.metadata.emit_renders}"
+    )
+    if report.hits:
+        console.print("Hits:")
+        for hit in report.hits:
+            line = (
+                f"  - rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
+                f"kind={hit.hit_kind} bundle={hit.materialized_run_dir}"
+            )
+            if hit.rendered_plot_path is not None:
+                line += f" plot={hit.rendered_plot_path}"
+            console.print(line)
+    if report.issues:
+        console.print("Issues:")
+        for issue in report.issues:
+            console.print(f"  - {issue.code}: {issue.message}")
 
 
 def _echo_scaffold_line(label: str, value: str | Path) -> None:
@@ -563,8 +613,8 @@ def released_design_cmd(
 @app.command(
     "released-target-search",
     help=(
-        "Search paired nickase plus release-enzyme combinations for retained post-release snapback targets. "
-        "This lane evaluates the final geometry in retained-product space."
+        "Search paired nickase plus release-enzyme combinations for exposed-bottom snapback targets. "
+        "This lane evaluates the final geometry on the exposed post-release bottom strand."
     ),
 )
 def released_target_search_cmd(
@@ -615,6 +665,16 @@ def released_target_search_cmd(
             "when the exact target is unavailable."
         ),
     ),
+    allow_demo_hits: bool = typer.Option(
+        False,
+        "--allow-demo-hits",
+        help="Allow hits from entries explicitly marked demo_only in the resolved catalogs.",
+    ),
+    allow_frequent_cutter_nickases: bool = typer.Option(
+        False,
+        "--allow-frequent-cutter-nickases",
+        help="Allow nickases flagged FREQUENT_CUTTER in the released-product lane.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Print the released target-search report as JSON."),
 ) -> None:
     try:
@@ -656,6 +716,8 @@ def released_target_search_cmd(
             search=ReleasedTargetSearchConfig(
                 max_results=max_results,
                 near_boundary_search_limit=near_boundary_search_limit,
+                allow_demo_hits=allow_demo_hits,
+                disallowed_nickase_warning_codes=[] if allow_frequent_cutter_nickases else ["FREQUENT_CUTTER"],
             ),
         )
         report = run_released_snapback_target_search(
@@ -669,6 +731,157 @@ def released_target_search_cmd(
         typer.echo(report.model_dump_json(indent=2))
     else:
         _print_released_target_search_report(report)
+    if report.status == "no_hits":
+        raise typer.Exit(code=1)
+
+
+@app.command(
+    "released-solve",
+    help=(
+        "Search the released-product dual-enzyme catalog space, materialize the top exposed-bottom hits, "
+        "and optionally render one plot per hit."
+    ),
+)
+def released_solve_cmd(
+    nick_preset: str | None = typer.Option(
+        None,
+        "--nick-preset",
+        help="Primary builtin nickase preset. Explicit nickase sources are required for hermetic runs.",
+    ),
+    nick_additional_preset: list[str] = typer.Option(
+        [],
+        "--nick-additional-preset",
+        help="Additional builtin nickase preset ids (repeatable).",
+    ),
+    nick_additional_path: list[Path] = typer.Option(
+        [],
+        "--nick-additional-path",
+        help="Additional workspace-relative nickase catalog overlays (repeatable).",
+    ),
+    release_preset: str | None = typer.Option(
+        None,
+        "--release-preset",
+        help="Primary builtin release-enzyme preset. Explicit release-enzyme sources are required for hermetic runs.",
+    ),
+    release_additional_preset: list[str] = typer.Option(
+        [],
+        "--release-additional-preset",
+        help="Additional builtin release-enzyme preset ids (repeatable).",
+    ),
+    release_additional_path: list[Path] = typer.Option(
+        [],
+        "--release-additional-path",
+        help="Additional workspace-relative release-enzyme catalog overlays (repeatable).",
+    ),
+    workspace_root: Path = typer.Option(
+        Path("."),
+        "--workspace-root",
+        help="Workspace root for resolving additional catalog paths.",
+    ),
+    nick_boundary: int = typer.Option(0, "--nick-boundary", help="Requested nick_boundary_from_left."),
+    paired_bp: int = typer.Option(3, "--paired-bp", help="Requested retained homology length."),
+    cap_nt: int = typer.Option(3, "--cap-nt", help="Requested effective cap nt. Must equal 3."),
+    max_results: int = typer.Option(8, "--max-results", help="Maximum hits to retain from the search report."),
+    near_boundary_search_limit: int = typer.Option(
+        8,
+        "--near-boundary-search-limit",
+        help="How many boundary offsets on either side of the target to probe per pair when exact hits are absent.",
+    ),
+    materialize_top_k: int = typer.Option(
+        8,
+        "--materialize-top-k",
+        help="Maximum number of ranked hits to materialize as released-product hit bundles.",
+    ),
+    run_dir: Path = typer.Option(
+        Path("outputs/released_solve"),
+        "--run-dir",
+        help="Workspace-relative output root for the released solve bundle.",
+    ),
+    render_format: str = typer.Option(
+        "pdf",
+        "--render-format",
+        help="Per-hit render format when plots are emitted.",
+    ),
+    emit_renders: bool = typer.Option(
+        False,
+        "--emit-renders",
+        help="Render the per-hit origin-anchored exposed-bottom plots after materialization.",
+    ),
+    allow_frequent_cutter_nickases: bool = typer.Option(
+        False,
+        "--allow-frequent-cutter-nickases",
+        help="Allow nickases flagged FREQUENT_CUTTER in the released-product lane.",
+    ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace the existing released solve output root.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Print the released solve report as JSON."),
+) -> None:
+    try:
+        from dnadesign.cruncher.snapback.models import CatalogSources
+        from dnadesign.cruncher.snapback.released_models import (
+            ReleaseCatalogSources,
+            ReleasedFinalTargetGeometry,
+            ReleasedSolveOutputConfig,
+            ReleasedTargetSearchConfig,
+            SingleNickReleasedTargetSearchRequest,
+        )
+
+        resolved_workspace_root = workspace_root.expanduser().resolve()
+        if nick_preset is None and not nick_additional_preset and not nick_additional_path:
+            raise ValueError(
+                "released-solve requires at least one explicit nickase source "
+                "(--nick-preset, --nick-additional-preset, or --nick-additional-path)."
+            )
+        if release_preset is None and not release_additional_preset and not release_additional_path:
+            raise ValueError(
+                "released-solve requires at least one explicit release-enzyme source "
+                "(--release-preset, --release-additional-preset, or --release-additional-path)."
+            )
+        request = SingleNickReleasedTargetSearchRequest(
+            target=ReleasedFinalTargetGeometry(
+                nick_boundary_from_left=nick_boundary,
+                paired_bp=paired_bp,
+                cap_nt=cap_nt,
+            ),
+            nick_sources=CatalogSources(
+                preset=nick_preset,
+                additional_presets=nick_additional_preset,
+                additional_paths=nick_additional_path,
+            ),
+            release_sources=ReleaseCatalogSources(
+                preset=release_preset,
+                additional_presets=release_additional_preset,
+                additional_paths=release_additional_path,
+            ),
+            search=ReleasedTargetSearchConfig(
+                max_results=max(max_results, materialize_top_k),
+                near_boundary_search_limit=near_boundary_search_limit,
+                disallowed_nickase_warning_codes=[] if allow_frequent_cutter_nickases else ["FREQUENT_CUTTER"],
+            ),
+        )
+        output = ReleasedSolveOutputConfig(
+            run_dir=run_dir,
+            materialize_top_k=materialize_top_k,
+            render_format=render_format,
+            emit_renders=emit_renders,
+        )
+        resolved_run_dir, report = run_released_snapback_solve(
+            request=request,
+            output=output,
+            workspace_root=resolved_workspace_root,
+            force_overwrite=force_overwrite,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        console.print(f"Released-product solve outputs -> {resolved_run_dir}")
+        _print_released_solve_report(report)
     if report.status == "no_hits":
         raise typer.Exit(code=1)
 

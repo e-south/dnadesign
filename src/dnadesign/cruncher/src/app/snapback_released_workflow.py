@@ -16,6 +16,8 @@ from pathlib import Path
 
 from dnadesign.cruncher.nickases.catalog import dump_nickase_catalog_yaml, load_merged_nickase_catalog
 from dnadesign.cruncher.nickases.errors import NickaseCatalogError
+from dnadesign.cruncher.nickases.scanning import enumerate_site_instances as enumerate_nickase_site_instances
+from dnadesign.cruncher.nickases.selection import matching_nickase_warning_codes
 from dnadesign.cruncher.release_enzymes.catalog import (
     dump_release_enzyme_catalog_yaml,
     load_merged_release_enzyme_catalog,
@@ -43,6 +45,32 @@ from dnadesign.cruncher.snapback.released_models import (
 from dnadesign.cruncher.snapback.released_projection import evaluate_released_precursor
 
 
+def _infer_precursor_coordinate_offset(
+    spec,
+    *,
+    nick_entry,
+) -> int:
+    matches = enumerate_nickase_site_instances(
+        spec.input.precursor_top_strand,
+        coordinate_offset=0,
+        entry=nick_entry,
+    )
+    if spec.nick_stage.normalized_to_top_strand_nick:
+        matches = [match for match in matches if match.nick.strand == "primary"]
+    if spec.nick_stage.intended_site_sequence is not None:
+        matches = [
+            match for match in matches if match.site.matched_span_sequence == spec.nick_stage.intended_site_sequence
+        ]
+    offsets = {
+        match.nick.boundary_context - spec.final_target.nick_boundary_from_left
+        for match in matches
+        if match.nick.boundary_context >= spec.final_target.nick_boundary_from_left
+    }
+    if len(offsets) != 1:
+        return 0
+    return next(iter(offsets))
+
+
 def _invalid_catalog_report(
     spec,
     *,
@@ -50,6 +78,7 @@ def _invalid_catalog_report(
     workspace_root: Path,
     nick_catalog_source: str,
     release_catalog_source: str,
+    disallowed_nickase_warning_codes: list[str],
     code: str,
     message: str,
     details: dict[str, object] | None = None,
@@ -64,6 +93,7 @@ def _invalid_catalog_report(
         metadata=ReleasedSnapbackReportMetadata(
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
+            disallowed_nickase_warning_codes=list(disallowed_nickase_warning_codes),
             final_target=spec.final_target,
         ),
         issues=[SnapbackIssue(code=code, message=message, details=details or {})],
@@ -88,6 +118,7 @@ def _build_report(
             workspace_root=workspace_root,
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
+            disallowed_nickase_warning_codes=spec.constraints.disallowed_nickase_warning_codes,
             code="UNKNOWN_NICKASE_VARIANT_ID",
             message="nick_stage.nickase_variant_id was not found in the resolved nickase catalog.",
             details={"variant_id": spec.nick_stage.nickase_variant_id},
@@ -100,12 +131,35 @@ def _build_report(
             workspace_root=workspace_root,
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
+            disallowed_nickase_warning_codes=spec.constraints.disallowed_nickase_warning_codes,
             code="UNKNOWN_RELEASE_VARIANT_ID",
             message="release_stage.release_variant_id was not found in the resolved release-enzyme catalog.",
             details={"variant_id": spec.release_stage.release_variant_id},
         )
     nick_entry = nick_catalog_by_id[spec.nick_stage.nickase_variant_id]
     release_entry = release_catalog_by_id[spec.release_stage.release_variant_id]
+    disallowed_warning_codes = matching_nickase_warning_codes(
+        nick_entry,
+        warning_codes=spec.constraints.disallowed_nickase_warning_codes,
+    )
+    if disallowed_warning_codes:
+        return _invalid_catalog_report(
+            spec,
+            spec_path=spec_path,
+            workspace_root=workspace_root,
+            nick_catalog_source=nick_catalog_source,
+            release_catalog_source=release_catalog_source,
+            disallowed_nickase_warning_codes=spec.constraints.disallowed_nickase_warning_codes,
+            code="DISALLOWED_NICKASE_WARNING_CODE",
+            message=(
+                "nick_stage.nickase_variant_id is disallowed by released-product operational policy "
+                "because it carries a blocked warning code."
+            ),
+            details={
+                "variant_id": spec.nick_stage.nickase_variant_id,
+                "matching_warning_codes": disallowed_warning_codes,
+            },
+        )
     evaluation = evaluate_released_precursor(
         precursor_top_strand=spec.input.precursor_top_strand,
         nick_entry=nick_entry,
@@ -114,6 +168,7 @@ def _build_report(
         constraints=spec.constraints,
         nick_intended_site_sequence=spec.nick_stage.intended_site_sequence,
         release_intended_site_sequence=spec.release_stage.intended_site_sequence,
+        precursor_coordinate_offset=_infer_precursor_coordinate_offset(spec, nick_entry=nick_entry),
         normalize_to_top_strand_nick=spec.nick_stage.normalized_to_top_strand_nick,
     )
     return ReleasedSnapbackEvaluationReport(
@@ -124,6 +179,7 @@ def _build_report(
         metadata=ReleasedSnapbackReportMetadata(
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
+            disallowed_nickase_warning_codes=list(spec.constraints.disallowed_nickase_warning_codes),
             final_target=spec.final_target,
             nickase_catalog_variants=[build_released_nickase_catalog_info(nick_entry)],
             release_catalog_variants=[build_release_catalog_info(release_entry)],
@@ -168,6 +224,7 @@ def validate_released_snapback_spec(path: str | Path) -> ReleasedSnapbackEvaluat
             workspace_root=workspace_root,
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
+            disallowed_nickase_warning_codes=spec.constraints.disallowed_nickase_warning_codes,
             code="CATALOG_LOAD_FAILED",
             message=str(exc),
         )

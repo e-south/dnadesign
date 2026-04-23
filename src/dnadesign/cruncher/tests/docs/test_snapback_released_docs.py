@@ -30,19 +30,19 @@ def test_docs_hubs_route_to_released_snapback_surfaces() -> None:
         assert "reference/snapback_artifacts.md" in content
         assert "reference/released_snapback_artifacts.md" in content
         assert "reference/release_enzyme_catalogs.md" in content
-        assert "../workspaces/demo_snapback/README.md" in content
-        assert "../workspaces/demo_snapback/runbook.md" in content
+        assert "../workspaces/de033/README.md" in content
+        assert "../workspaces/de033/runbook.md" in content
 
 
-def test_runbook_step_reference_includes_released_snapback_demo_steps() -> None:
+def test_runbook_step_reference_includes_released_snapback_de033_steps() -> None:
     runbook_steps = _read("docs/reference/runbook_steps.md")
 
-    assert "`demo_snapback`" in runbook_steps
-    assert "`snapback_released_design`" in runbook_steps
-    assert "`snapback_released_show`" in runbook_steps
+    assert "`de033`" in runbook_steps
+    assert "`snapback_released_solve`" in runbook_steps
     assert "`snapback_released_target_search`" in runbook_steps
-    assert "demo_released_origin_033.released.snapback.yaml" in runbook_steps
-    assert "inputs/release_enzymes/local.release.yaml" in runbook_steps
+    assert "thermo_nicking_v1" in runbook_steps
+    assert "type_iis_release_v1" in runbook_steps
+    assert "outputs/released_solve" in runbook_steps
 
 
 def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
@@ -53,23 +53,39 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
 
     assert "cruncher snapback released-design" in cli_ref
     assert "cruncher snapback released-target-search" in cli_ref
+    assert "cruncher snapback released-solve" in cli_ref
     assert "cruncher snapback released-show" in cli_ref
     assert "type_iis_release_v1" in cli_ref
+    assert "thermo_nicking_v1" in cli_ref
     assert "requires at least one explicit nickase source and one explicit release-enzyme source" in cli_ref
+    assert "--allow-demo-hits" in cli_ref
+    assert "--allow-frequent-cutter-nickases" in cli_ref
 
     assert "two-stage precursor" in guide
     assert "nick_then_release" in guide
-    assert "retained post-release product" in guide
+    assert "exposed post-release bottom strand" in guide
     assert "Type IIS enzymes are modeled here as release enzymes, not nickases." in guide
     assert "not a thermodynamic predictor and not a retron biology engine" in guide
     assert "Provide at least one explicit nickase source and one explicit release-enzyme source." in guide
+    assert "Nick / origin" in guide
+    assert "demo-only" in guide.lower()
+    assert "FREQUENT_CUTTER" in guide
+    assert "neb_nicking_v1 + thermo_nicking_v1" in guide
+    assert "foldback panel as the same active bottom strand" in guide
+    assert "one representative per exposed post-nick `stem + cap` geometry" in guide
+    assert "single contiguous fully degenerate `N`" in guide
 
     assert "outputs/released_design/" in artifacts_ref
+    assert "outputs/released_solve/" in artifacts_ref
     assert "released_snapback_manifest.json" in artifacts_ref
     assert "released_product_projection.json" in artifacts_ref
+    assert "released_solve_manifest.json" in artifacts_ref
     assert "`released-show` is an integrity check" in artifacts_ref
+    assert "final-target drift" in artifacts_ref
+    assert "origin-anchored exposed-bottom plot context" in artifacts_ref
 
     assert "BsaI-HFv2" in catalog_ref
     assert "BsmBI-v2" in catalog_ref
     assert "BbsI" in catalog_ref
     assert "SapI" in catalog_ref
+    assert "BspQI" in catalog_ref

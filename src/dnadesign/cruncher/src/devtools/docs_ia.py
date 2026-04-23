@@ -150,8 +150,8 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "reference/snapback_artifacts.md",
                 "reference/released_snapback_artifacts.md",
                 "reference/release_enzyme_catalogs.md",
-                "../workspaces/demo_snapback/README.md",
-                "../workspaces/demo_snapback/runbook.md",
+                "../workspaces/de033/README.md",
+                "../workspaces/de033/runbook.md",
             ),
         ),
         "yiu": (

@@ -12,7 +12,7 @@ Module Author(s): Codex
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -43,6 +43,7 @@ class ReleaseEnzymeEntry(StrictReleaseEnzymeModel):
     recommended_5prime_flanking_bases: int | None = Field(default=None, ge=0)
     source_catalog_id: str
     source_url: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("variant_id", "display_name", "source_catalog_id")
     @classmethod

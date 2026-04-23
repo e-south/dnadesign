@@ -165,8 +165,8 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 - PWM mode and effective status
 - human-readable output keeps the machine-facing bundle ledger paths out of the default summary
 
-Default `show --json` includes the bundle artifact paths, integrity report, `motif_context`, and `optimization_decision`; `split_row_debug` remains `--verbose` only.
-Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail, and split-row debug lines; the optimizer trace and PWM context remain JSON-only.
+Default `show --json` includes the bundle artifact paths and integrity report. `show --json --verbose` also includes `motif_context`, `optimization_decision`, and `split_row_debug`.
+Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail, and split-row debug lines; motif context and optimizer decision remain JSON-only.
 
 ### Integrity checks
 

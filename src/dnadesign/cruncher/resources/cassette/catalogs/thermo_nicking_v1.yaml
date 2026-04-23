@@ -1,4 +1,4 @@
-catalog_version: 1
+catalog_version: 2
 preset_id: thermo_nicking_v1
 preset_ids:
   - thermo_nicking_v1
@@ -13,6 +13,7 @@ variants:
     raw_cut_notation: GAATGC(none/-1)
     vendor: Thermo Fisher Scientific
     vendor_catalog_number: ER2051
+    source_url: https://www.thermofisher.com/order/catalog/product/ER2051
     origin_class: naturally_occurring
     source_family: nicking_endonuclease
     selection:
@@ -32,6 +33,7 @@ variants:
     raw_cut_notation: CCTNAGC(none/-2)
     vendor: Thermo Fisher Scientific
     vendor_catalog_number: ER1681
+    source_url: https://www.thermofisher.com/order/catalog/product/ER1681
     origin_class: naturally_occurring
     source_family: nicking_endonuclease
     selection:
@@ -53,6 +55,7 @@ variants:
     raw_cut_notation: CCTNAGC(2/none)
     vendor: Thermo Fisher Scientific
     vendor_catalog_number: ER2011
+    source_url: https://www.thermofisher.com/order/catalog/product/ER2011
     origin_class: engineered
     source_family: nicking_endonuclease
     selection:
