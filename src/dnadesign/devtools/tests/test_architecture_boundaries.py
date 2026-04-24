@@ -384,6 +384,18 @@ def test_find_top_level_layout_violations_accepts_expected_inventory(tmp_path: P
     assert violations == []
 
 
+def test_find_top_level_layout_violations_accepts_missing_optional_legacy_dirs(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    for name in TOP_LEVEL_ROOT_MODULES:
+        _write(src_root / name, "")
+    for name in TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES:
+        _write(src_root / name / "__init__.py", "")
+
+    violations = find_top_level_layout_violations(repo_root=tmp_path)
+
+    assert violations == []
+
+
 def test_find_top_level_layout_violations_flags_unexpected_top_level_directory(tmp_path: Path) -> None:
     _scaffold_top_level_layout(tmp_path)
     unexpected_dir = tmp_path / "src" / "dnadesign" / "scratchpad"

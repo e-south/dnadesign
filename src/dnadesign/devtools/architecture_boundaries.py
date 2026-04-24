@@ -295,9 +295,8 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
     if not src_root.exists():
         raise FileNotFoundError(f"Expected dnadesign source root at {src_root}")
 
-    expected_directories = (
-        TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES | TOP_LEVEL_LEGACY_DIRECTORIES
-    )
+    required_directories = TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES
+    allowed_directories = required_directories | TOP_LEVEL_LEGACY_DIRECTORIES
     actual_directories = {
         path.name
         for path in src_root.iterdir()
@@ -306,14 +305,14 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
     actual_root_modules = {path.name for path in src_root.glob("*.py")}
 
     violations: list[TopLevelLayoutViolation] = []
-    for name in sorted(expected_directories - actual_directories):
+    for name in sorted(required_directories - actual_directories):
         violations.append(
             TopLevelLayoutViolation(
                 path=src_root / name,
                 reason="sanctioned top-level directory missing",
             )
         )
-    for name in sorted(actual_directories - expected_directories):
+    for name in sorted(actual_directories - allowed_directories):
         violations.append(
             TopLevelLayoutViolation(
                 path=src_root / name,
