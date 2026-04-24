@@ -41,17 +41,19 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     assert "reference/yiu_artifacts.md" in docs_readme
     assert "reference/yiu_visual_system.md" in docs_readme
     assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_readme
+    assert "workspaces/demo_monotypic_lexa/runbook.md" in docs_readme
     assert "split_yiu_payload_rendering_v4" not in docs_readme
     assert "yiu init-workspace|validate|render|show" not in docs_readme
 
     assert "Run YIU workflows" in docs_index
-    assert "Reuse Sample outputs in YIU" in docs_index
+    assert "Reuse explicit source-family outputs in YIU" in docs_index
     assert "demos/demo_yiu_workspace.md" in docs_index
     assert "guides/yiu_workflow.md" in docs_index
     assert "reference/yiu_spec.md" in docs_index
     assert "reference/yiu_artifacts.md" in docs_index
     assert "reference/yiu_visual_system.md" in docs_index
     assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_index
+    assert "workspaces/demo_monotypic_lexa/runbook.md" in docs_index
     assert "split_yiu_payload_rendering_v4" not in docs_index
     assert "yiu init-workspace|validate|render|show" not in docs_index
     assert "trace|solve" not in docs_index

@@ -13,12 +13,13 @@ Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfo
 - cassette workspaces for cassette design and ranked search
 - payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
 - snapback workspaces for preserved-site and released-product single-nick foldback workflows
-- study orchestration workspaces for aggregate sweep execution and summary surfaces
-- portfolio orchestration workspaces for cross-study aggregation and handoff tables
+- study orchestration workspaces for aggregate sweep execution and summary surfaces over explicit source-family runs
+- portfolio orchestration workspaces for cross-study aggregation and handoff tables over explicit source-family runs
 
-The `study` and `portfolio` families currently orchestrate sample-family
-artifacts, but they remain separate command families with their own workspace
-contracts and docs surfaces.
+The `study` and `portfolio` families orchestrate explicit source-family runs.
+The currently shipped examples are sample-backed, but the orchestration family
+boundaries remain separate command surfaces with their own workspace contracts
+and docs surfaces.
 
 ### Start here
 

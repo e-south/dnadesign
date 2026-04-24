@@ -18,12 +18,12 @@ Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfo
 - `cassette` owns cassette validation, design, solve, and show surfaces
 - `yiu` owns payload-centric validation, render, and show surfaces
 - `snapback` owns preserved-site and released-product single-nick foldback surfaces
-- `study` owns study orchestration over workspace outputs
+- `study` owns study orchestration over explicit source-family runs
 - `portfolio` owns cross-study aggregation and reporting
 
-The `study` and `portfolio` families currently orchestrate sample-family
-outputs, but they are still separate command families rather than hidden
-submodes of `sample`.
+The `study` and `portfolio` families orchestrate explicit source-family runs.
+The currently shipped examples are sample-backed, but they are still separate
+command families rather than hidden submodes of `sample`.
 
 ### Documentation map
 <!-- docs:map:start -->
@@ -49,13 +49,14 @@ Design or search cassettes, then inspect the emitted artifact surface.
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
 #### Payload-Centric YIU Workflows
-Run YIU workflows. Reuse Sample outputs in YIU when the payload comes from a selected hit.
+Run YIU workflows. Reuse explicit source-family outputs in YIU when the payload comes from a selected hit.
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)
 - [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md)
+- [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 
 #### Validate and Search Single-Nick Foldbacks
 - [Snapback Workflow](guides/snapback_workflow.md)
@@ -67,7 +68,7 @@ Run YIU workflows. Reuse Sample outputs in YIU when the payload comes from a sel
 - [de033 runbook](../workspaces/de033/runbook.md)
 
 #### Run Studies and Portfolio Aggregation
-Run studies and portfolio aggregation across workspace outputs.
+Run study and portfolio orchestration across explicit source-family outputs.
 - [Studies](guides/studies.md)
 - [Study Length vs Score](guides/study_length_vs_score.md)
 - [Study Diversity vs Score](guides/study_diversity_vs_score.md)

@@ -1,10 +1,10 @@
 ## Studies guide
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
 ### Contents
 - [Why studies exist](#why-studies-exist)
@@ -16,9 +16,15 @@
 
 ### Why studies exist
 
-`configs/config.yaml` remains deterministic for normal workspace runs. Study intent (sweep factors, replicate seeds, replay knobs) lives in a separate `*.study.yaml` file so diagnostics/tuning sweeps do not clutter the main config.
+`study` is a peer Cruncher workflow family. It orchestrates deterministic sweeps over explicit source-family runs without redefining those source contracts or collapsing into `sample`.
 
-Use `portfolio` (see `guides/portfolio_aggregation.md`) when you need cross-workspace aggregation for experimental handoff. `study` remains workspace-local by contract.
+#### Current checked-in example posture
+
+The currently shipped study specs in Cruncher are sample-backed, so the concrete examples in this guide use `configs/config.yaml`, `sample.*` sweep factors, and sample output trees. That does not make `study` a hidden `sample` submode; it remains its own family with its own manifests, status surfaces, and CLI lifecycle.
+
+`configs/config.yaml` remains deterministic for the source workspace run. Study intent (sweep factors, replicate seeds, replay knobs) lives in a separate `*.study.yaml` file so diagnostics/tuning sweeps do not clutter the base source config.
+
+Use `portfolio` (see `guides/portfolio_aggregation.md`) when you need cross-workspace aggregation for experimental handoff across explicit source runs. `study` remains workspace-local by contract.
 
 Use studies when you need:
 
@@ -177,11 +183,11 @@ open outputs/plots/study__length_vs_score__<study_id>__plot__sequence_length_tra
 open outputs/plots/study__diversity_vs_score__<study_id>__plot__mmr_diversity_tradeoff.pdf
 ```
 
-`study list` and `workspaces list` treat studies as workspace-scoped entities:
+`study list` and `workspaces list` treat studies as workspace-scoped orchestration entities:
 
 - Study intent files live in `<workspace>/configs/studies/`.
 - Study outputs live in `<workspace>/outputs/studies/`.
-- Studies are not separate top-level workspace roots.
+- Studies are not separate top-level workspace roots, but they are still a distinct workflow family rather than a `sample` submode.
 
 Two standard two-TF examples:
 

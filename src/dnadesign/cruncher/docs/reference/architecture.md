@@ -1,10 +1,10 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-19
+**Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-19
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
@@ -12,6 +12,9 @@
 - [Fixed-length optimization lifecycle](#fixed-length-optimization-lifecycle)
 - [Cassette lifecycle](#cassette-lifecycle)
 - [YIU lifecycle](#yiu-lifecycle)
+- [Snapback lifecycle](#snapback-lifecycle)
+- [Study lifecycle](#study-lifecycle)
+- [Portfolio lifecycle](#portfolio-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
 - [Run artifacts](#run-artifacts)
@@ -27,14 +30,18 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 
 #### Workflow families
 
-Cruncher is organized as peer workflow families, not one monolithic run shape:
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`
 
-- **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
+Cruncher is organized as six peer workflow families, not one monolithic run shape:
+
+- **Sample workspaces** (fixed-length optimization) use `fetch -> lock -> parse -> sample -> analyze -> export` and publish sequence-centric run artifacts for downstream operators.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
-- **Snapback workspaces** use `snapback init-workspace|validate|design|solve|show` and publish snapback-specific reports, candidate tables, a three-state QA triptych, and an optional single composite BaseRender job/output.
 - **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
+- **Snapback workspaces** use `snapback init-workspace|validate|design|target-search|solve|show` plus the released-product `released-design|released-target-search|released-solve|released-show` lane and publish snapback-specific reports, candidate tables, and QA views.
+- **Study workspaces** use `study list|run|summarize|show` to orchestrate sweep-owned manifests, trial tables, and aggregate plots over explicit source-family artifacts without redefining those source contracts.
+- **Portfolio workspaces** use `portfolio run|show` to aggregate explicit source runs into one handoff package without implicit latest-run fallback.
 
-These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
+These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, `yiu`, `snapback`, `study`, or `portfolio`.
 
 #### Fixed-length optimization lifecycle
 
@@ -88,6 +95,28 @@ The snapback workflow is a peer lane, not a cassette or YIU submode:
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.
 
 For operator-facing usage, start with [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md) and [`../guides/snapback_released_workflow.md`](../guides/snapback_released_workflow.md). For the file-by-file output contracts, use [`snapback_artifacts.md`](snapback_artifacts.md) and [`released_snapback_artifacts.md`](released_snapback_artifacts.md).
+
+#### Study lifecycle
+
+The study workflow is a peer family that orchestrates source-family artifacts rather than redefining their geometry:
+
+1. **study list** -> inspect checked-in study specs under `<workspace>/configs/studies/` before choosing a run surface
+2. author `<workspace>/configs/studies/<name>.study.yaml`
+3. **study run** -> freeze the study spec, expand explicit trials and/or `trial_grids`, and write deterministic study/trial outputs under `outputs/studies/`
+4. **study summarize** -> compute aggregate tables, selection summaries, and replay-aware study status from the recorded trial artifacts
+5. **study show** -> inspect deterministic study identity, trial inventory, aggregate outputs, and source-run provenance
+
+This workflow does not rewrite source manifests, append trial sampling to workspace `run_index.json`, or hide trial/source provenance behind "latest run" fallbacks.
+
+#### Portfolio lifecycle
+
+The portfolio workflow is a peer family that packages explicit source runs into one handoff bundle:
+
+1. author `<portfolio_workspace>/configs/<name>.portfolio.yaml`
+2. **portfolio run** -> resolve explicit source runs, aggregate handoff tables/plots, and write one portfolio-scoped output package
+3. **portfolio show** -> inspect deterministic portfolio identity, source provenance, and handoff artifact paths
+
+This workflow does not infer source runs implicitly, mutate source workspaces, or collapse portfolio provenance into `sample` run metadata.
 
 ---
 
@@ -181,9 +210,12 @@ Core contract:
 - snapback explicit `single_nick_snapback_v2` and co-design solve `single_nick_snapback_solve_v3` contracts
 - authored top-strand nick-relative geometry and bounded search
 - protected-region, homology, and extra-nick invariant enforcement
+- preserved-site target search orchestration is split by ownership under `snapback/preserved_search/`
+- `snapback/target_search.py` is the thin public facade; placement enumeration, candidate construction, ranking, and report shaping now live in `preserved_search/{placements.py,candidate_builder.py,ranking.py,reporting.py,runner.py}`
 - released explicit origin inference and typed report shaping live in `snapback/released_explicit_evaluation.py`, keeping `app/snapback_released_workflow.py` on orchestration and publication
 - released-product search orchestration is split by ownership under `snapback/released_search/`
 - `snapback/released_target_search.py` is the thin public facade; placement generation, precursor construction, pair evaluation, ranking, and report shaping now live in `released_search/{nick_placements.py,release_placements.py,precursor_builder.py,evaluator_adapter.py,ranking.py,reporting.py,runner.py}`
+- released precursor projection is split by ownership under `snapback/released_projection_{common,projection,candidate,selection}.py`; `snapback/released_projection.py` is the thin public facade and `snapback/released_models.py` is a model facade, not a legacy compatibility layer
 - typed producer-owned QA view models live in `snapback/view_models.py`
 - local view-contract assembly and validation live in `snapback/view_contracts.py`
 - no dependency on legacy `sample`, cassette render contracts, or YIU payload semantics
@@ -198,7 +230,7 @@ Core contract:
 #### `app/` (orchestration)
 - fetch / lock / parse / sample / analyze coordination
 - cassette workflow coordination in `app/cassette_workflow.py`
-- study coordination (`study run|summarize|show`)
+- study coordination (`study list|run|summarize|show`)
 - portfolio coordination (`portfolio run|show`)
 - translates CLI intent + config into concrete runs and artifacts
 - analyze orchestration is split by concern:
@@ -215,7 +247,12 @@ Core contract:
 - static and FIMO plot render paths in `app/analyze/plotting_static.py`
 - report/manifest/summary publication in `app/analyze/publish.py`
 - snapback CLI request construction lives in `app/snapback_cli_requests.py`, which owns typed preserved-site and released-product search/solve invocation factories
+- preserved-site snapback catalog loading and source-label normalization shared by explicit validate/design and solve now live in `app/snapback_catalogs.py`
+- preserved-site show/readback stays behind `app/snapback_workflow.py`, with bundle loading, drift validation, and payload assembly split across `app/snapback_show_{load,validate,present}.py`
+- preserved-site solve stays behind `app/snapback_solve_workflow.py`, with per-hit explicit-spec snapshot assembly, materialization, and report shaping split across `app/snapback_solve_{snapshot,materialize,reporting}.py`
 - released-product catalog loading and source-label normalization shared by explicit validate/design, target-search, and solve now live in `app/snapback_released_catalogs.py`
+- released-product show/readback stays behind `app/snapback_released_show.py`, with artifact loading, drift validation, and payload assembly split across `app/snapback_released_show_{load,validate,present}.py`
+- released-product solve stays behind `app/snapback_released_solve_workflow.py`, with request snapshot assembly, per-hit materialization, and report shaping split across `app/snapback_released_solve_{snapshot,materialize,reporting}.py`
 
 #### `cli/` (UX only)
 - Typer commands

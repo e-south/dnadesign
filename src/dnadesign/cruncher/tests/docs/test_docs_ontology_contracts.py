@@ -47,6 +47,39 @@ def test_top_level_docs_match_registered_workflow_family_ids() -> None:
     assert _documented_family_ids(_read_package("docs/guides/intent_and_lifecycle.md")) == expected
 
 
+def test_architecture_reference_keeps_six_peer_workflow_families_explicit() -> None:
+    expected = tuple(descriptor.id for descriptor in workflow_family_descriptors())
+    architecture = _read_package("docs/reference/architecture.md")
+
+    assert _documented_family_ids(architecture) == expected
+    assert "Cruncher is organized as six peer workflow families" in architecture
+    assert "**Study workspaces** use `study list|run|summarize|show`" in architecture
+    assert "**Portfolio workspaces** use `portfolio run|show`" in architecture
+    assert "#### Study lifecycle" in architecture
+    assert "#### Portfolio lifecycle" in architecture
+    assert "**study list** -> inspect checked-in study specs" in architecture
+
+
+def test_study_and_portfolio_docs_keep_peer_family_and_source_run_language_explicit() -> None:
+    docs_readme = _read_package("docs/README.md")
+    docs_index = _read_package("docs/index.md")
+    studies = _read_package("docs/guides/studies.md")
+
+    for content in (docs_readme, docs_index):
+        assert "explicit source-family runs" in content
+        assert "sample-family artifacts" not in content
+        assert "sample-family outputs" not in content
+
+    assert "explicit source-family outputs" in docs_index
+    assert "Reuse Sample outputs in YIU" not in docs_index
+    assert "`study` is a peer Cruncher workflow family." in studies
+    assert "#### Current checked-in example posture" in studies
+    assert "The currently shipped study specs in Cruncher are sample-backed" in studies
+    assert "does not make `study` a hidden `sample` submode" in studies
+    assert "cross-workspace aggregation for experimental handoff across explicit source runs" in studies
+    assert "they are still a distinct workflow family rather than a `sample` submode" in studies
+
+
 def test_released_snapback_docs_publish_route_and_geometry_literals() -> None:
     combined = "\n".join(
         (
