@@ -26,7 +26,7 @@ def test_is_file_mode_target_treats_namespaced_dataset_id_as_dataset() -> None:
 
 def test_resolve_dataset_dir_prefers_root_when_relative(tmp_path: Path) -> None:
     root = tmp_path / "usr_root"
-    dataset_dir = root / "densegen" / "demo"
+    dataset_dir = root / "densegen_demo"
     dataset_dir.mkdir(parents=True)
     (dataset_dir / "records.parquet").write_text("stub", encoding="utf-8")
     resolved_root, dataset_id = sync_commands._resolve_dataset_dir_target(dataset_dir, root)
@@ -38,7 +38,7 @@ def test_resolve_dataset_dir_uses_registry_ancestor(tmp_path: Path) -> None:
     root = tmp_path / "workspace" / "outputs" / "usr_datasets"
     root.mkdir(parents=True)
     (root / "registry.yaml").write_text("namespaces: {}\n", encoding="utf-8")
-    dataset_dir = root / "densegen" / "demo_hpc"
+    dataset_dir = root / "densegen_demo_hpc"
     dataset_dir.mkdir(parents=True)
     (dataset_dir / "records.parquet").write_text("stub", encoding="utf-8")
 
@@ -51,7 +51,7 @@ def test_cmd_diff_accepts_dataset_directory_path(tmp_path: Path, monkeypatch) ->
     root = tmp_path / "outputs" / "usr_datasets"
     root.mkdir(parents=True)
     (root / "registry.yaml").write_text("namespaces: {}\n", encoding="utf-8")
-    dataset_dir = root / "densegen" / "demo_hpc"
+    dataset_dir = root / "densegen_demo_hpc"
     dataset_dir.mkdir(parents=True)
     (dataset_dir / "records.parquet").write_text("stub", encoding="utf-8")
 
@@ -94,7 +94,7 @@ def test_cmd_pull_accepts_densegen_workspace_dataset_directory_path(tmp_path: Pa
     root = tmp_path / "workspace" / "outputs" / "usr_datasets"
     root.mkdir(parents=True)
     (root / "registry.yaml").write_text("namespaces: {}\n", encoding="utf-8")
-    dataset_dir = root / "densegen" / "demo_hpc"
+    dataset_dir = root / "densegen_demo_hpc"
     dataset_dir.mkdir(parents=True)
     (dataset_dir / "records.parquet").write_text("stub", encoding="utf-8")
     (dataset_dir / "_derived" / "densegen").mkdir(parents=True, exist_ok=True)

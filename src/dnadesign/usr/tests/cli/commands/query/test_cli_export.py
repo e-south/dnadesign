@@ -72,7 +72,7 @@ def test_cli_export_directory_target_uses_dataset_filename(tmp_path: Path) -> No
 def test_cli_export_accepts_absolute_dataset_directory(tmp_path: Path) -> None:
     root = tmp_path / "datasets"
     _make_dataset(root)
-    dataset_dir = root / "densegen" / "demo"
+    dataset_dir = root / "densegen_demo"
     out_dir = tmp_path / "exports"
     out_dir.mkdir(parents=True, exist_ok=True)
 

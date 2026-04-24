@@ -305,7 +305,7 @@ def test_execute_push_verify_sidecars_fails_when_remote_sidecars_do_not_match_lo
     ds = Dataset(root, "densegen_demo_sidecar_push")
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
-    local_records = root / "densegen" / "demo_sidecar_push" / "records.parquet"
+    local_records = root / "densegen_demo_sidecar_push" / "records.parquet"
     local_size = int(local_records.stat().st_size)
 
     stat_calls = {"count": 0}
