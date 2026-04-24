@@ -279,7 +279,7 @@ def test_run_snapback_solve_codesigns_recognition_site_across_catalog_entries(tm
     assert "run_dir: outputs/solve/analysis/materialized_hits/hit_01" in materialized_spec
 
 
-def test_run_snapback_solve_broad_preset_catalog_prefers_earlier_outside_site_hit(tmp_path: Path) -> None:
+def test_run_snapback_solve_broad_preset_catalog_respects_outside_site_feasibility(tmp_path: Path) -> None:
     payload = _base_payload()
     payload.pop("goal")
     payload["search"].pop("retained_homology_length")
@@ -304,12 +304,13 @@ def test_run_snapback_solve_broad_preset_catalog_prefers_earlier_outside_site_hi
     assert report.metadata.first_satisfied_frontier.nick_boundary_from_left == 1
     assert report.metadata.first_satisfied_frontier.paired_bp == 4
     assert report.metadata.first_satisfied_frontier.cap_extension_nt == 0
-    assert report.hits[0].variant_id == "Nt.BspQI"
+    assert report.hits[0].variant_id == "Nt.CviPII"
     assert report.hits[0].nick_boundary_from_left == 1
     assert report.hits[0].paired_bp == 4
     assert report.hits[0].site_mutation_count == 3
     assert report.hits[0].nickase.selection is not None
-    assert report.hits[0].nickase.selection.outside_site is True
+    assert report.hits[0].nickase.selection.outside_site is False
+    assert all(hit.variant_id != "Nt.BspQI" for hit in report.hits)
     assert any(hit.variant_id == "Nt.Bpu10I" for hit in report.hits)
 
 

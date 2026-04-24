@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from dnadesign.cruncher.nickases.models import NickEvent, RecognitionSiteInstance
 from dnadesign.cruncher.release_enzymes.models import ReleaseCutEvent, ReleaseRecognitionSiteInstance
@@ -28,6 +28,7 @@ from dnadesign.cruncher.snapback.released_route_policy import (
     ReleasedActiveStrand,
     ReleasedFinalGeometrySource,
     ReleasedRouteFamily,
+    infer_released_search_final_geometry_source,
     normalize_active_strand_list,
     normalize_route_family_list,
     normalize_warning_code_list,
@@ -116,7 +117,7 @@ class ReleasedSolveReportMetadata(StrictSnapbackModel):
     kind: Literal["single_nick_released_solve_v1"] = "single_nick_released_solve_v1"
     coordinate_semantics: Literal["half_open_zero_based_v1"] = "half_open_zero_based_v1"
     boundary_semantics: Literal["closed_zero_based_boundary_v1"] = "closed_zero_based_boundary_v1"
-    final_geometry_source: ReleasedFinalGeometrySource = "exposed_bottom_strand"
+    route_policy_final_geometry_source: ReleasedFinalGeometrySource = "exposed_bottom_strand"
     target: ReleasedFinalTargetGeometry
     nick_catalog_source: str
     release_catalog_source: str
@@ -147,6 +148,24 @@ class ReleasedSolveReportMetadata(StrictSnapbackModel):
     @classmethod
     def _validate_solve_allowed_route_families(cls, value: list[str]) -> list[ReleasedRouteFamily]:
         return normalize_route_family_list(value, label="metadata.allowed_route_families")
+
+    @model_validator(mode="after")
+    def _validate_solve_route_policy(self) -> "ReleasedSolveReportMetadata":
+        if self.allowed_active_strands == []:
+            raise ValueError("metadata.allowed_active_strands must not be empty.")
+        if self.allowed_route_families == []:
+            raise ValueError("metadata.allowed_route_families must not be empty.")
+        inferred_final_geometry_source = infer_released_search_final_geometry_source(
+            allowed_active_strands=self.allowed_active_strands,
+            allowed_route_families=self.allowed_route_families,
+        )
+        if (
+            "route_policy_final_geometry_source" in self.model_fields_set
+            and self.route_policy_final_geometry_source != inferred_final_geometry_source
+        ):
+            raise ValueError("metadata.route_policy_final_geometry_source must match metadata.allowed_route_families.")
+        self.route_policy_final_geometry_source = inferred_final_geometry_source
+        return self
 
 
 class ReleasedSolveReport(StrictSnapbackModel):

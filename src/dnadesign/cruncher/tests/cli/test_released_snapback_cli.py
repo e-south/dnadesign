@@ -199,7 +199,8 @@ def test_released_target_search_json_reports_route_policy_when_top_active_routes
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["metadata"]["final_geometry_source"] == "retained_active_strand"
+    assert "final_geometry_source" not in payload["metadata"]
+    assert payload["metadata"]["route_policy_final_geometry_source"] == "retained_active_strand"
     assert payload["metadata"]["allowed_active_strands"] == ["top", "bottom"]
     assert payload["metadata"]["allowed_route_families"] == [
         "bottom_active_from_top_nick",
@@ -375,12 +376,38 @@ def test_released_solve_json_reports_route_policy_when_top_active_routes_are_ena
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["metadata"]["final_geometry_source"] == "retained_active_strand"
+    assert "final_geometry_source" not in payload["metadata"]
+    assert payload["metadata"]["route_policy_final_geometry_source"] == "retained_active_strand"
     assert payload["metadata"]["allowed_active_strands"] == ["top", "bottom"]
     assert payload["metadata"]["allowed_route_families"] == [
         "bottom_active_from_top_nick",
         "top_active_from_bottom_nick",
     ]
+
+
+def test_released_target_search_text_distinguishes_policy_and_hit_geometry(tmp_path: Path) -> None:
+    workspace, _spec_path, _release_catalog_path = _write_workspace(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "snapback",
+            "released-target-search",
+            "--workspace-root",
+            str(workspace),
+            "--nick-additional-path",
+            "inputs/nickases/local.nickases.yaml",
+            "--release-additional-path",
+            "inputs/release_enzymes/local.release.yaml",
+            "--allow-top-active-routes",
+            "--allow-precut-footprint-outside-active-product",
+        ],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    assert "Route policy -> policy_final_geometry=retained_active_strand" in result.output
+    assert "hit_final_geometry=" in result.output
 
 
 def test_released_solve_excludes_demo_only_entries_unless_opted_in(tmp_path: Path) -> None:

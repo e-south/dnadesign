@@ -15,6 +15,7 @@ from dnadesign.cruncher.snapback.released_models import (
     ReleasedTargetSearchConfig,
     SingleNickReleasedTargetSearchRequest,
 )
+from dnadesign.cruncher.snapback.released_route_policy import released_search_route_policy
 from dnadesign.cruncher.snapback.target_models import SnapbackTargetGeometry
 
 
@@ -79,12 +80,6 @@ def build_snapback_target_search_invocation(
     )
 
 
-def _released_route_policy(allow_top_active_routes: bool) -> tuple[list[str], list[str]]:
-    if allow_top_active_routes:
-        return ["top", "bottom"], ["bottom_active_from_top_nick", "top_active_from_bottom_nick"]
-    return ["bottom"], ["bottom_active_from_top_nick"]
-
-
 def _released_disallowed_warning_codes(allow_frequent_cutter_nickases: bool) -> list[str]:
     if allow_frequent_cutter_nickases:
         return []
@@ -141,7 +136,7 @@ def build_released_target_search_invocation(
         release_additional_preset=release_additional_preset,
         release_additional_path=release_additional_path,
     )
-    allowed_active_strands, allowed_route_families = _released_route_policy(allow_top_active_routes)
+    route_policy = released_search_route_policy(allow_top_active_routes=allow_top_active_routes)
     return ReleasedTargetSearchInvocation(
         request=SingleNickReleasedTargetSearchRequest(
             target=ReleasedFinalTargetGeometry(
@@ -160,12 +155,13 @@ def build_released_target_search_invocation(
                 additional_paths=release_additional_path,
             ),
             search=ReleasedTargetSearchConfig(
+                route_policy_final_geometry_source=route_policy.final_geometry_source,
                 max_results=max_results,
                 near_boundary_search_limit=near_boundary_search_limit,
                 allow_demo_hits=allow_demo_hits,
                 allow_precut_footprint_outside_active_product=allow_precut_footprint_outside_active_product,
-                allowed_active_strands=allowed_active_strands,
-                allowed_route_families=allowed_route_families,
+                allowed_active_strands=list(route_policy.allowed_active_strands),
+                allowed_route_families=list(route_policy.allowed_route_families),
                 disallowed_nickase_warning_codes=_released_disallowed_warning_codes(allow_frequent_cutter_nickases),
             ),
         ),
@@ -205,7 +201,7 @@ def build_released_solve_invocation(
         release_additional_preset=release_additional_preset,
         release_additional_path=release_additional_path,
     )
-    allowed_active_strands, allowed_route_families = _released_route_policy(allow_top_active_routes)
+    route_policy = released_search_route_policy(allow_top_active_routes=allow_top_active_routes)
     return ReleasedSolveInvocation(
         request=SingleNickReleasedTargetSearchRequest(
             target=ReleasedFinalTargetGeometry(
@@ -224,12 +220,13 @@ def build_released_solve_invocation(
                 additional_paths=release_additional_path,
             ),
             search=ReleasedTargetSearchConfig(
+                route_policy_final_geometry_source=route_policy.final_geometry_source,
                 max_results=max(max_results, materialize_top_k),
                 near_boundary_search_limit=near_boundary_search_limit,
                 allow_demo_hits=allow_demo_hits,
                 allow_precut_footprint_outside_active_product=allow_precut_footprint_outside_active_product,
-                allowed_active_strands=allowed_active_strands,
-                allowed_route_families=allowed_route_families,
+                allowed_active_strands=list(route_policy.allowed_active_strands),
+                allowed_route_families=list(route_policy.allowed_route_families),
                 disallowed_nickase_warning_codes=_released_disallowed_warning_codes(allow_frequent_cutter_nickases),
             ),
         ),

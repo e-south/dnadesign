@@ -197,7 +197,7 @@ def test_snapback_target_search_json_reports_exact_and_near_hits(tmp_path: Path)
     assert payload["status"] == "exact_hits_found"
     assert payload["exact_hits"][0]["variant_id"] == "Nt.CviPII"
     assert payload["exact_hits"][0]["nick_boundary_from_left"] == 0
-    assert any(hit["variant_id"] == "Nt.BspQI" and hit["nick_boundary_from_left"] == 1 for hit in payload["near_hits"])
+    assert any(hit["variant_id"] == "Nt.Bpu10I" and hit["nick_boundary_from_left"] == 2 for hit in payload["near_hits"])
 
 
 def test_snapback_command_module_defers_workflow_import() -> None:

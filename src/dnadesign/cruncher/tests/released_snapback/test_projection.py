@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dnadesign.cruncher.nickases.models import NickaseCatalogEntry
 from dnadesign.cruncher.release_enzymes.models import ReleaseEnzymeEntry
+from dnadesign.cruncher.snapback.models import SnapbackIssue
 from dnadesign.cruncher.snapback.released_models import (
     ReleasedFinalTargetGeometry,
     ReleasedSnapbackConstraintsSpec,
@@ -21,6 +22,7 @@ from dnadesign.cruncher.snapback.released_projection import (
     _released_duplex_overlap_pairing_issues,
     evaluate_released_precursor,
 )
+from dnadesign.cruncher.snapback.released_projection_candidate import candidate_failure_status
 
 
 def _nick_entry(motif: str = "AACGTTG", *, top_cut_offset: int = 0) -> NickaseCatalogEntry:
@@ -263,3 +265,15 @@ def test_released_projection_allows_zero_length_top_prefix_after_origin_nick() -
     )
 
     assert issues == []
+
+
+def test_released_projection_candidate_failure_status_marks_geometry_mismatches_unsatisfied() -> None:
+    status = candidate_failure_status([SnapbackIssue(code="HOMOLOGY_MISMATCH_LIMIT_EXCEEDED", message="mismatch")])
+
+    assert status == "unsatisfied"
+
+
+def test_released_projection_candidate_failure_status_keeps_non_geometry_failures_separate() -> None:
+    status = candidate_failure_status([SnapbackIssue(code="ACTIVE_PRODUCT_TOO_SHORT", message="too short")])
+
+    assert status == "post_release_projection_failed"

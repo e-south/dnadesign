@@ -104,4 +104,8 @@ def test_cli_and_reference_docs_capture_released_product_boundary() -> None:
     assert "snapback/released_explicit_evaluation.py" in architecture_ref
     assert "app/snapback_cli_requests.py" in architecture_ref
     assert "app/snapback_released_catalogs.py" in architecture_ref
+    assert "app/snapback_released_show.py" in architecture_ref
+    assert "app/snapback_released_show_{load,validate,present}.py" in architecture_ref
+    assert "app/snapback_released_solve_workflow.py" in architecture_ref
+    assert "app/snapback_released_solve_{snapshot,materialize,reporting}.py" in architecture_ref
     assert "cli/commands/snapback.py` is command registration only" in architecture_ref

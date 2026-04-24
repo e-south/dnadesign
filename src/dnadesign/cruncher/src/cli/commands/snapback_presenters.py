@@ -182,7 +182,7 @@ def print_released_target_search_report(report) -> None:
     console.print(f"Release catalog -> {report.metadata.release_catalog_source}")
     console.print(
         "Route policy -> "
-        f"final_geometry={report.metadata.final_geometry_source} "
+        f"policy_final_geometry={report.metadata.route_policy_final_geometry_source} "
         f"active={','.join(report.metadata.allowed_active_strands)} "
         f"routes={','.join(report.metadata.allowed_route_families)}"
     )
@@ -206,6 +206,7 @@ def print_released_target_search_report(report) -> None:
                 f"rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
                 f"route={hit.route_family} "
                 f"active={hit.active_strand} "
+                f"hit_final_geometry={hit.projection.final_geometry_source} "
                 f"boundary={hit.nick_boundary_from_left} "
                 f"active_input_nt={hit.active_product_input_length_nt} "
                 f"precursor_nt={hit.precursor_length_nt} "
@@ -219,6 +220,7 @@ def print_released_target_search_report(report) -> None:
                 f"rank {hit.rank}: {hit.nickase_variant_id}+{hit.release_variant_id} "
                 f"route={hit.route_family} "
                 f"active={hit.active_strand} "
+                f"hit_final_geometry={hit.projection.final_geometry_source} "
                 f"boundary={hit.nick_boundary_from_left} "
                 f"active_input_nt={hit.active_product_input_length_nt} "
                 f"precursor_nt={hit.precursor_length_nt} "
@@ -241,7 +243,7 @@ def print_released_solve_report(report) -> None:
     console.print(f"Release catalog -> {report.metadata.release_catalog_source}")
     console.print(
         "Route policy -> "
-        f"final_geometry={report.metadata.final_geometry_source} "
+        f"policy_final_geometry={report.metadata.route_policy_final_geometry_source} "
         f"active={','.join(report.metadata.allowed_active_strands)} "
         f"routes={','.join(report.metadata.allowed_route_families)}"
     )
@@ -266,6 +268,7 @@ def print_released_solve_report(report) -> None:
                 f"kind={hit.hit_kind} "
                 f"route={hit.target_search_hit.route_family} "
                 f"active={hit.target_search_hit.active_strand} "
+                f"hit_final_geometry={hit.target_search_hit.projection.final_geometry_source} "
                 f"bundle={hit.materialized_run_dir}"
             )
             if hit.rendered_plot_path is not None:

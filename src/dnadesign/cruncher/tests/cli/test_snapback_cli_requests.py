@@ -89,6 +89,7 @@ def test_build_released_target_search_invocation_sets_retained_active_route_poli
         "bottom_active_from_top_nick",
         "top_active_from_bottom_nick",
     ]
+    assert invocation.request.search.route_policy_final_geometry_source == "retained_active_strand"
     assert invocation.request.search.allow_precut_footprint_outside_active_product is True
     assert invocation.request.search.disallowed_nickase_warning_codes == ["FREQUENT_CUTTER"]
 
@@ -118,5 +119,6 @@ def test_build_released_solve_invocation_raises_max_results_to_materialize_top_k
     )
 
     assert invocation.request.search.max_results == 4
+    assert invocation.request.search.route_policy_final_geometry_source == "exposed_bottom_strand"
     assert invocation.request.search.disallowed_nickase_warning_codes == []
     assert invocation.output.materialize_top_k == 4

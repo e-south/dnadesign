@@ -14,130 +14,29 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-import yaml
-
 from dnadesign.cruncher.app.snapback_released_catalogs import resolve_released_catalogs
-from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
+from dnadesign.cruncher.app.snapback_released_solve_materialize import materialize_released_solve_hits
+from dnadesign.cruncher.app.snapback_released_solve_reporting import (
+    build_released_solve_report,
+    select_released_solve_hits,
+)
+from dnadesign.cruncher.app.snapback_released_solve_snapshot import dump_released_solve_request_snapshot_yaml
 from dnadesign.cruncher.snapback.released_artifacts import (
     build_released_run_dir,
     build_released_solve_manifest,
     ensure_released_solve_run_dirs,
-    released_pre_nick_site_json_path,
-    released_projection_json_path,
-    released_release_site_json_path,
-    released_solve_hit_json_path,
-    released_solve_hit_plot_context_path,
-    released_solve_hit_plot_path,
-    released_solve_hit_run_dir,
     snapshot_released_solve_inputs,
     write_released_solve_manifest,
     write_released_solve_report,
     write_released_solve_status,
     write_released_solve_summary_table,
 )
-from dnadesign.cruncher.snapback.released_hit_plot import build_released_hit_plot_context, render_released_hit_plot
 from dnadesign.cruncher.snapback.released_models import (
-    ReleasedSolveHit,
     ReleasedSolveOutputConfig,
     ReleasedSolveReport,
-    ReleasedSolveReportMetadata,
-    ReleasedTargetSearchHit,
     SingleNickReleasedTargetSearchRequest,
 )
 from dnadesign.cruncher.snapback.released_target_search import search_released_target_hits
-from dnadesign.cruncher.viz.mpl import ensure_workspace_mpl_cache
-
-
-def _relative_to_workspace(path: Path, *, workspace_root: Path) -> str:
-    return str(path.resolve().relative_to(workspace_root.resolve()))
-
-
-def _request_snapshot_payload(
-    *,
-    request: SingleNickReleasedTargetSearchRequest,
-    output: ReleasedSolveOutputConfig,
-) -> dict[str, object]:
-    return {
-        "released_solve": {
-            "schema_version": 1,
-            "kind": "single_nick_released_solve_v1",
-        },
-        "target": request.target.model_dump(mode="json"),
-        "nick_sources": {
-            "preset": request.nick_sources.preset,
-            "additional_presets": list(request.nick_sources.additional_presets),
-            "additional_paths": [str(path) for path in request.nick_sources.additional_paths],
-        },
-        "release_sources": {
-            "preset": request.release_sources.preset,
-            "additional_presets": list(request.release_sources.additional_presets),
-            "additional_paths": [str(path) for path in request.release_sources.additional_paths],
-        },
-        "search": request.search.model_dump(mode="json"),
-        "output": output.model_dump(mode="json"),
-    }
-
-
-def _ensure_materialized_hit_dirs(hit_run_dir: Path) -> None:
-    hit_run_dir.mkdir(parents=True, exist_ok=True)
-    (hit_run_dir / "analysis").mkdir(parents=True, exist_ok=True)
-    (hit_run_dir / "plots").mkdir(parents=True, exist_ok=True)
-
-
-def _validate_rendered_plot_artifact(path: Path, *, fmt: str) -> None:
-    if not path.exists():
-        raise FileNotFoundError(f"Released solve render missing expected plot: {path}")
-    header = path.read_bytes()[:64]
-    if fmt == "pdf" and not header.startswith(b"%PDF"):
-        raise ValueError(f"Released solve render is not a valid PDF artifact: {path}")
-    if fmt == "png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise ValueError(f"Released solve render is not a valid PNG artifact: {path}")
-    if fmt == "svg":
-        normalized = header.lstrip()
-        if not (normalized.startswith(b"<?xml") or normalized.startswith(b"<svg")):
-            raise ValueError(f"Released solve render is not a valid SVG artifact: {path}")
-
-
-def _materialize_hit_bundle(
-    *,
-    hit: ReleasedTargetSearchHit,
-    hit_run_dir: Path,
-    workspace_root: Path,
-    output: ReleasedSolveOutputConfig,
-) -> tuple[str, str | None, str | None]:
-    _ensure_materialized_hit_dirs(hit_run_dir)
-    atomic_write_json(released_solve_hit_json_path(hit_run_dir), hit.model_dump(mode="json"))
-    atomic_write_json(released_projection_json_path(hit_run_dir), hit.projection.model_dump(mode="json"))
-    atomic_write_json(
-        released_pre_nick_site_json_path(hit_run_dir),
-        {
-            "site": hit.pre_nick_site.model_dump(mode="json"),
-            "event": hit.pre_nick_event.model_dump(mode="json"),
-        },
-    )
-    atomic_write_json(
-        released_release_site_json_path(hit_run_dir),
-        {
-            "site": hit.release_site.model_dump(mode="json"),
-            "event": hit.release_event.model_dump(mode="json"),
-        },
-    )
-
-    rendered_plot_path: Path | None = None
-    if output.emit_renders:
-        ensure_workspace_mpl_cache(workspace_root)
-        rendered_plot_path = released_solve_hit_plot_path(hit_run_dir, fmt=output.render_format)
-        plot_context = render_released_hit_plot(hit, rendered_plot_path)
-        _validate_rendered_plot_artifact(rendered_plot_path, fmt=output.render_format)
-    else:
-        plot_context = build_released_hit_plot_context(hit)
-    atomic_write_json(released_solve_hit_plot_context_path(hit_run_dir), plot_context)
-
-    return (
-        _relative_to_workspace(hit_run_dir, workspace_root=workspace_root),
-        None,
-        _relative_to_workspace(rendered_plot_path, workspace_root=workspace_root) if rendered_plot_path else None,
-    )
 
 
 def run_released_snapback_solve(
@@ -161,10 +60,7 @@ def run_released_snapback_solve(
         release_catalog_source=resolved_catalogs.release_catalog_source,
     )
 
-    request_yaml = yaml.safe_dump(
-        _request_snapshot_payload(request=request, output=output),
-        sort_keys=False,
-    )
+    request_yaml = dump_released_solve_request_snapshot_yaml(request=request, output=output)
     run_dir = build_released_run_dir(
         workspace_root=workspace_root,
         run_root=output.run_dir,
@@ -184,63 +80,22 @@ def run_released_snapback_solve(
         release_catalog_yaml=resolved_catalogs.release_catalog_yaml,
     )
 
-    selected_hits = search_report.exact_hits if search_report.exact_hits else search_report.near_hits
-    selected_hit_kind = "exact" if search_report.exact_hits else "nearest" if search_report.near_hits else None
-    materialized_hits: list[ReleasedSolveHit] = []
-    issues = list(search_report.issues)
-    for materialize_rank, hit in enumerate(selected_hits[: output.materialize_top_k], start=1):
-        hit_run_dir = released_solve_hit_run_dir(run_dir, rank=materialize_rank)
-        materialized_run_dir, render_job_path, rendered_plot_path = _materialize_hit_bundle(
-            hit=hit,
-            hit_run_dir=hit_run_dir,
-            workspace_root=workspace_root,
-            output=output,
-        )
-        materialized_hits.append(
-            ReleasedSolveHit(
-                rank=materialize_rank,
-                hit_kind=hit.hit_kind,
-                nickase_variant_id=hit.nickase_variant_id,
-                release_variant_id=hit.release_variant_id,
-                materialized_run_dir=materialized_run_dir,
-                render_job_path=render_job_path,
-                rendered_plot_path=rendered_plot_path,
-                target_search_hit=hit,
-            )
-        )
-
-    status = (
-        "exact_hits_materialized"
-        if selected_hit_kind == "exact"
-        else "near_hits_materialized"
-        if selected_hit_kind == "nearest"
-        else "no_hits"
+    selection = select_released_solve_hits(search_report)
+    materialized_hits = materialize_released_solve_hits(
+        hits=selection.hits,
+        run_dir=run_dir,
+        workspace_root=workspace_root,
+        output=output,
     )
-    report = ReleasedSolveReport(
-        status=status,
-        workspace_root=str(workspace_root.resolve()),
-        run_dir=str(run_dir.resolve()),
-        metadata=ReleasedSolveReportMetadata(
-            final_geometry_source=search_report.metadata.final_geometry_source,
-            target=request.target,
-            nick_catalog_source=resolved_catalogs.nick_catalog_source,
-            release_catalog_source=resolved_catalogs.release_catalog_source,
-            disallowed_nickase_warning_codes=list(request.search.disallowed_nickase_warning_codes),
-            allowed_active_strands=list(request.search.allowed_active_strands),
-            allowed_route_families=list(request.search.allowed_route_families),
-            evaluated_pair_count=search_report.metadata.evaluated_pair_count,
-            available_exact_hit_count=search_report.metadata.pre_truncation_exact_hit_count,
-            available_near_hit_count=search_report.metadata.pre_truncation_near_hit_count,
-            selected_hit_kind=selected_hit_kind,
-            materialized_hit_count=len(materialized_hits),
-            requested_materialize_top_k=output.materialize_top_k,
-            render_format=output.render_format,
-            emit_renders=output.emit_renders,
-            blocker_counts=dict(search_report.metadata.blocker_counts),
-        ),
-        issues=issues,
+    report = build_released_solve_report(
         search_report=search_report,
-        hits=materialized_hits,
+        request=request,
+        output=output,
+        resolved_catalogs=resolved_catalogs,
+        workspace_root=workspace_root,
+        run_dir=run_dir,
+        materialized_hits=materialized_hits,
+        selected_hit_kind=selection.selected_hit_kind,
     )
     write_released_solve_report(run_dir, report)
     write_released_solve_summary_table(run_dir, report)

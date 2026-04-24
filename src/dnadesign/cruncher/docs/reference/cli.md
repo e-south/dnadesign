@@ -681,8 +681,8 @@ Validate one explicit two-stage precursor spec and write the released-product bu
 
 Examples:
 
-* `uv run cruncher snapback released-design --spec configs/snapback/example.released.snapback.yaml`
-* `uv run cruncher snapback released-design --spec configs/snapback/example.released.snapback.yaml --force-overwrite`
+* `uv run cruncher snapback released-design --spec src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml`
+* `uv run cruncher snapback released-design --spec src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml --force-overwrite`
 
 Outputs:
 

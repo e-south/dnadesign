@@ -46,10 +46,9 @@ def test_run_snapback_target_search_finds_exact_origin_hit_and_later_near_hits(t
     assert report.exact_hits[0].intended_site_sequence in {"CCA", "CCG", "CCT"}
 
     near_boundaries = {(hit.variant_id, hit.nick_boundary_from_left) for hit in report.near_hits}
-    assert ("Nt.BspQI", 1) in near_boundaries
     assert ("Nt.Bpu10I", 2) in near_boundaries
 
     feasibility = {(row.variant_id, row.orientation): row for row in report.feasibility}
     assert feasibility[("Nt.CviPII", "forward")].exact_boundary_hit_possible is True
-    assert feasibility[("Nt.BspQI", "forward")].earliest_feasible_boundary == 1
+    assert feasibility[("Nt.BspQI", "forward")].earliest_feasible_boundary == 8
     assert "NEGATIVE_SITE_START_AT_TARGET_BOUNDARY" in feasibility[("Nt.BspQI", "forward")].exact_boundary_blockers

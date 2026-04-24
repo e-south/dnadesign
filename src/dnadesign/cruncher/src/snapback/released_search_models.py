@@ -35,6 +35,7 @@ from dnadesign.cruncher.snapback.released_route_policy import (
     ReleasedActiveStrand,
     ReleasedFinalGeometrySource,
     ReleasedRouteFamily,
+    infer_released_search_final_geometry_source,
     normalize_active_strand_list,
     normalize_route_family_list,
     normalize_warning_code_list,
@@ -48,6 +49,7 @@ from dnadesign.cruncher.snapback.released_spec_models import (
 
 
 class ReleasedTargetSearchConfig(StrictSnapbackModel):
+    route_policy_final_geometry_source: ReleasedFinalGeometrySource = "exposed_bottom_strand"
     allow_post_release_loss_of_nickase_site: bool = True
     allow_precut_footprint_outside_active_product: bool = False
     allow_demo_hits: bool = False
@@ -71,9 +73,16 @@ class ReleasedTargetSearchConfig(StrictSnapbackModel):
             raise ValueError("search.allowed_active_strands must not be empty.")
         if self.allowed_route_families == []:
             raise ValueError("search.allowed_route_families must not be empty.")
-        route_active_strands = {route_family_active_strand(route) for route in self.allowed_route_families}
-        if not route_active_strands.issubset(set(self.allowed_active_strands)):
-            raise ValueError("search.allowed_route_families must be compatible with search.allowed_active_strands.")
+        inferred_final_geometry_source = infer_released_search_final_geometry_source(
+            allowed_active_strands=self.allowed_active_strands,
+            allowed_route_families=self.allowed_route_families,
+        )
+        if (
+            "route_policy_final_geometry_source" in self.model_fields_set
+            and self.route_policy_final_geometry_source != inferred_final_geometry_source
+        ):
+            raise ValueError("search.route_policy_final_geometry_source must match search.allowed_route_families.")
+        self.route_policy_final_geometry_source = inferred_final_geometry_source
         return self
 
     @field_validator("disallowed_nickase_warning_codes")
@@ -136,7 +145,7 @@ class ReleasedTargetSearchHit(StrictSnapbackModel):
         return normalize_dna(value)
 
     @model_validator(mode="after")
-    def _validate_active_metric_aliases(self) -> "ReleasedTargetSearchHit":
+    def _validate_route_projection_mirrors(self) -> "ReleasedTargetSearchHit":
         if route_family_active_strand(self.route_family) != self.active_strand:
             raise ValueError("target-search hit route_family must match active_strand.")
         if route_family_physical_nicked_strand(self.route_family) != self.physical_nicked_strand:
@@ -163,7 +172,7 @@ class ReleasedTargetSearchMetadata(StrictSnapbackModel):
     kind: Literal["single_nick_released_target_v1"] = "single_nick_released_target_v1"
     coordinate_semantics: Literal["half_open_zero_based_v1"] = "half_open_zero_based_v1"
     boundary_semantics: Literal["closed_zero_based_boundary_v1"] = "closed_zero_based_boundary_v1"
-    final_geometry_source: ReleasedFinalGeometrySource = "exposed_bottom_strand"
+    route_policy_final_geometry_source: ReleasedFinalGeometrySource = "exposed_bottom_strand"
     target: ReleasedFinalTargetGeometry
     nick_catalog_source: str
     release_catalog_source: str
@@ -191,6 +200,24 @@ class ReleasedTargetSearchMetadata(StrictSnapbackModel):
     @classmethod
     def _validate_metadata_allowed_route_families(cls, value: list[str]) -> list[ReleasedRouteFamily]:
         return normalize_route_family_list(value, label="metadata.allowed_route_families")
+
+    @model_validator(mode="after")
+    def _validate_metadata_route_policy(self) -> "ReleasedTargetSearchMetadata":
+        if self.allowed_active_strands == []:
+            raise ValueError("metadata.allowed_active_strands must not be empty.")
+        if self.allowed_route_families == []:
+            raise ValueError("metadata.allowed_route_families must not be empty.")
+        inferred_final_geometry_source = infer_released_search_final_geometry_source(
+            allowed_active_strands=self.allowed_active_strands,
+            allowed_route_families=self.allowed_route_families,
+        )
+        if (
+            "route_policy_final_geometry_source" in self.model_fields_set
+            and self.route_policy_final_geometry_source != inferred_final_geometry_source
+        ):
+            raise ValueError("metadata.route_policy_final_geometry_source must match metadata.allowed_route_families.")
+        self.route_policy_final_geometry_source = inferred_final_geometry_source
+        return self
 
 
 class ReleasedTargetSearchReport(StrictSnapbackModel):

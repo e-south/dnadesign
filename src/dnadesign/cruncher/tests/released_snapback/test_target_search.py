@@ -35,6 +35,10 @@ from dnadesign.cruncher.snapback.released_models import (
     ReleasedTargetSearchHit,
     SingleNickReleasedTargetSearchRequest,
 )
+from dnadesign.cruncher.snapback.released_search.placement_models import (
+    NickPlacement,
+    ReleasePlacement,
+)
 
 
 def _write_nick_catalog(path: Path) -> None:
@@ -109,7 +113,7 @@ def _write_release_catalog(path: Path) -> None:
 
 def test_build_precursor_sequence_rejects_left_of_origin_outside_site_nickase() -> None:
     target = ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3)
-    nick_placement = released_target_search._NickPlacement(
+    nick_placement = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nt.BsmAI",
             specificity_id="BsmAI",
@@ -120,7 +124,7 @@ def test_build_precursor_sequence_rejects_left_of_origin_outside_site_nickase() 
         motif="GTCTC",
         site_start_at_boundary_zero=-6,
     )
-    release_placement = released_target_search._ReleasePlacement(
+    release_placement = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",
@@ -202,7 +206,7 @@ def test_nick_placements_apply_left_of_origin_slack_in_reverse_complemented_bott
 
 def test_build_precursor_sequence_allows_left_of_origin_when_truncated_prefix_is_all_degenerate() -> None:
     target = ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3)
-    nick_placement = released_target_search._NickPlacement(
+    nick_placement = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.DegeneratePrefix",
             specificity_id="Nx.DegeneratePrefix",
@@ -214,7 +218,7 @@ def test_build_precursor_sequence_allows_left_of_origin_when_truncated_prefix_is
         site_start_at_boundary_zero=-4,
         left_of_origin_slack_nt=2,
     )
-    release_placement = released_target_search._ReleasePlacement(
+    release_placement = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",
@@ -368,7 +372,7 @@ def test_released_target_search_can_materialize_top_active_routes_with_vendor_fo
     )
 
     assert report.status == "exact_hits_found"
-    assert report.metadata.final_geometry_source == "retained_active_strand"
+    assert report.metadata.route_policy_final_geometry_source == "retained_active_strand"
     assert report.metadata.allowed_active_strands == ["top", "bottom"]
     assert report.metadata.allowed_route_families == ["top_active_from_bottom_nick"]
     assert report.exact_hits
@@ -405,7 +409,7 @@ def test_released_target_search_real_presets_find_expected_retained_active_route
     )
 
     assert report.status == "exact_hits_found"
-    assert report.metadata.final_geometry_source == "retained_active_strand"
+    assert report.metadata.route_policy_final_geometry_source == "retained_active_strand"
     exact_hits_by_id = {hit.nickase_variant_id: hit for hit in report.exact_hits}
     assert {"Nt.BsmAI", "Nt.BstNBI", "Nt.AlwI", "Nb.BsrDI", "Nb.BtsI"}.issubset(exact_hits_by_id)
     assert exact_hits_by_id["Nt.BstNBI"].route_family == "top_active_from_bottom_nick"
@@ -630,7 +634,7 @@ def test_search_pair_collects_all_near_hits_within_bounded_window(monkeypatch: p
         release_sources=ReleaseCatalogSources(preset="test_release"),
         search=ReleasedTargetSearchConfig(near_boundary_search_limit=2),
     )
-    nick_placement = released_target_search._NickPlacement(
+    nick_placement = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Test",
             specificity_id="Nx.Test",
@@ -641,7 +645,7 @@ def test_search_pair_collects_all_near_hits_within_bounded_window(monkeypatch: p
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    release_placement = released_target_search._ReleasePlacement(
+    release_placement = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",
@@ -701,7 +705,7 @@ def test_search_pair_keeps_same_pair_near_hits_when_exact_hit_exists(monkeypatch
         release_sources=ReleaseCatalogSources(preset="test_release"),
         search=ReleasedTargetSearchConfig(near_boundary_search_limit=2),
     )
-    nick_placement = released_target_search._NickPlacement(
+    nick_placement = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Test",
             specificity_id="Nx.Test",
@@ -712,7 +716,7 @@ def test_search_pair_keeps_same_pair_near_hits_when_exact_hit_exists(monkeypatch
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    release_placement = released_target_search._ReleasePlacement(
+    release_placement = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",
@@ -855,7 +859,7 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
     )
     near_hit = exact_hit.model_copy(update={"rank": 1, "hit_kind": "nearest", "nick_boundary_from_left": 3})
 
-    nick_placement = released_target_search._NickPlacement(
+    nick_placement = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Test",
             specificity_id="Nx.Test",
@@ -866,7 +870,7 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    release_placement = released_target_search._ReleasePlacement(
+    release_placement = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",
@@ -973,7 +977,7 @@ def test_search_released_target_hits_suppresses_demo_only_pairs_by_default(
         nick_sources=CatalogSources(preset="test_nick"),
         release_sources=ReleaseCatalogSources(preset="test_release"),
     )
-    demo_nick = released_target_search._NickPlacement(
+    demo_nick = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Demo",
             specificity_id="Nx.Demo",
@@ -985,7 +989,7 @@ def test_search_released_target_hits_suppresses_demo_only_pairs_by_default(
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    demo_release = released_target_search._ReleasePlacement(
+    demo_release = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Demo",
             display_name="Re.Demo",
@@ -1035,7 +1039,7 @@ def test_search_released_target_hits_allows_demo_only_pairs_when_requested(
         release_sources=ReleaseCatalogSources(preset="test_release"),
         search=ReleasedTargetSearchConfig(allow_demo_hits=True),
     )
-    demo_nick = released_target_search._NickPlacement(
+    demo_nick = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Demo",
             specificity_id="Nx.Demo",
@@ -1047,7 +1051,7 @@ def test_search_released_target_hits_allows_demo_only_pairs_when_requested(
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    demo_release = released_target_search._ReleasePlacement(
+    demo_release = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Demo",
             display_name="Re.Demo",
@@ -1175,7 +1179,7 @@ def test_search_released_target_hits_suppresses_disallowed_warning_code_pairs_by
         nick_sources=CatalogSources(preset="test_nick"),
         release_sources=ReleaseCatalogSources(preset="test_release"),
     )
-    blocked_nick = released_target_search._NickPlacement(
+    blocked_nick = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Blocked",
             specificity_id="Nx.Blocked",
@@ -1187,7 +1191,7 @@ def test_search_released_target_hits_suppresses_disallowed_warning_code_pairs_by
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    release = released_target_search._ReleasePlacement(
+    release = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",
@@ -1238,7 +1242,7 @@ def test_search_released_target_hits_allows_warning_coded_nickase_when_policy_is
         release_sources=ReleaseCatalogSources(preset="test_release"),
         search=ReleasedTargetSearchConfig(disallowed_nickase_warning_codes=[]),
     )
-    warning_nick = released_target_search._NickPlacement(
+    warning_nick = NickPlacement(
         entry=NickaseCatalogEntry(
             id="Nx.Warning",
             specificity_id="Nx.Warning",
@@ -1250,7 +1254,7 @@ def test_search_released_target_hits_allows_warning_coded_nickase_when_policy_is
         motif="AAAA",
         site_start_at_boundary_zero=0,
     )
-    release = released_target_search._ReleasePlacement(
+    release = ReleasePlacement(
         entry=ReleaseEnzymeEntry(
             variant_id="Re.Test",
             display_name="Re.Test",

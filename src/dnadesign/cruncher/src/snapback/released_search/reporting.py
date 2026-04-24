@@ -18,14 +18,6 @@ def blocker(counts: dict[str, int], code: str) -> None:
     counts[code] = counts.get(code, 0) + 1
 
 
-def final_geometry_source_for_request(request: SingleNickReleasedTargetSearchRequest) -> str:
-    if request.search.allowed_route_families == [
-        "bottom_active_from_top_nick"
-    ] and request.search.allowed_active_strands == ["bottom"]:
-        return "exposed_bottom_strand"
-    return "retained_active_strand"
-
-
 def report_status(
     *,
     exact_hits: list[ReleasedTargetSearchHit],
@@ -55,7 +47,7 @@ def build_search_report(
         status=report_status(exact_hits=exact_hits, near_hits=near_hits),
         workspace_root=str(workspace_root),
         metadata=ReleasedTargetSearchMetadata(
-            final_geometry_source=final_geometry_source_for_request(request),
+            route_policy_final_geometry_source=request.search.route_policy_final_geometry_source,
             target=request.target,
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
@@ -77,6 +69,5 @@ def build_search_report(
 __all__ = [
     "blocker",
     "build_search_report",
-    "final_geometry_source_for_request",
     "report_status",
 ]
