@@ -16,12 +16,12 @@ workspace:
           path: config.forward_anchor.window.yaml
           job_id: stress_ethanol_cipro_pdual10_forward_anchor_window_1kb
       contract:
-        input_dataset: promoter/stress_ethanol_cipro_anchor_set
+        input_dataset: usr_prom_eth_cip_anchor
         template:
           id: pdual10_forward_anchor_window
-          dataset: plasmids
+          dataset: usr_pdual10_plasmid_template
           record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
-        output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+        output_dataset: construct_prom_eth_cip_context
       notes: >
         1 kb centered pDual-10 context around the study's single forward-strand
         anchor cassette, guarded by incumbent, flank, and unique-kmer checks.

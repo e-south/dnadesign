@@ -41,11 +41,15 @@ _KNOWN_ACRONYMS = {
 _DENSEGEN_BASERENDER_FONT_SIZE = 24
 _DENSEGEN_BASERENDER_LEGEND_HEIGHT_PX = 136.0
 _DENSEGEN_BASERENDER_LEGEND_PAD_PX = 36.0
-_DENSEGEN_BASERENDER_LEGEND_PATCH_W = 96.0
+_DENSEGEN_BASERENDER_LEGEND_PATCH_W = 88.0
 _DENSEGEN_BASERENDER_LEGEND_PATCH_H = 34.0
-_DENSEGEN_BASERENDER_LEGEND_GAP_X = 60.0
+_DENSEGEN_BASERENDER_LEGEND_GAP_X = 44.0
 _DENSEGEN_BASERENDER_LEGEND_GAP_PATCH_TEXT = 22.0
 _DENSEGEN_BASERENDER_LEGEND_VERTICAL_ALIGN = 1.0
+
+
+def densegen_baserender_palette_overrides() -> dict[str, str]:
+    return dict(_NOTEBOOK_COLORBLIND_PASTEL_PALETTE)
 
 
 @dataclass(frozen=True)
@@ -121,7 +125,7 @@ def _validate_notebook_render_contract(contract: DenseGenNotebookRenderContract)
 def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
     showcase_style = dict(cruncher_showcase_style_overrides())
     showcase_palette = dict(showcase_style.get("palette") or {})
-    showcase_palette.update(_NOTEBOOK_COLORBLIND_PASTEL_PALETTE)
+    showcase_palette.update(densegen_baserender_palette_overrides())
     style_overrides = dict(showcase_style)
     style_overrides["palette"] = showcase_palette
     style_overrides["layout"] = {

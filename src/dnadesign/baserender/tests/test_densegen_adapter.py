@@ -95,7 +95,7 @@ def test_densegen_adapter_yields_valid_record_and_renderer_works(tmp_path) -> No
     record = adapter.apply(row, row_index=0)
     assert record.id == "row1"
     assert len(record.features) == 2
-    assert record.display.tag_labels.get("tf:lexA") == "LexA"
+    assert record.display.tag_labels.get("tf:lexA") == "LexA sites"
 
     style = resolve_style(preset=None, overrides={})
     palette = Palette(style.palette)
@@ -178,10 +178,10 @@ def test_densegen_adapter_preserves_tf_case_in_tags_and_attrs() -> None:
     assert len(record.features) == 1
     assert record.features[0].tags == ("tf:LexA",)
     assert record.features[0].attrs.get("tf") == "LexA"
-    assert record.display.tag_labels.get("tf:LexA") == "LexA"
+    assert record.display.tag_labels.get("tf:LexA") == "LexA sites"
 
 
-def test_densegen_adapter_title_cases_background_legend_label() -> None:
+def test_densegen_adapter_uses_neutral_sites_for_background_legend_label() -> None:
     row = {
         "id": "row1",
         "sequence": "AAAAAA",
@@ -200,10 +200,10 @@ def test_densegen_adapter_title_cases_background_legend_label() -> None:
     )
 
     record = adapter.apply(row, row_index=0)
-    assert record.display.tag_labels.get("tf:background") == "Background"
+    assert record.display.tag_labels.get("tf:background") == "Neutral sites"
 
 
-def test_densegen_adapter_title_cases_lowercase_tf_legend_labels() -> None:
+def test_densegen_adapter_appends_sites_to_lowercase_tf_legend_labels() -> None:
     row = {
         "id": "row1",
         "sequence": "AAAAAA",
@@ -222,7 +222,7 @@ def test_densegen_adapter_title_cases_lowercase_tf_legend_labels() -> None:
     )
 
     record = adapter.apply(row, row_index=0)
-    assert record.display.tag_labels.get("tf:lexA") == "LexA"
+    assert record.display.tag_labels.get("tf:lexA") == "LexA sites"
 
 
 def test_densegen_adapter_compacts_iupac_suffix_in_tf_legend_labels() -> None:
@@ -247,9 +247,9 @@ def test_densegen_adapter_compacts_iupac_suffix_in_tf_legend_labels() -> None:
 
     record = adapter.apply(row, row_index=0)
     legend_labels = {label for _, label in legend_entries_for_record(record)}
-    assert "LexA" in legend_labels
-    assert "CpxR" in legend_labels
-    assert "BaeR" in legend_labels
+    assert "LexA sites" in legend_labels
+    assert "CpxR sites" in legend_labels
+    assert "BaeR sites" in legend_labels
     assert all("CTGTATAWAWWHACA" not in label for label in legend_labels)
 
 
@@ -290,13 +290,13 @@ def test_densegen_adapter_includes_promoter_components_in_features_and_legend() 
     assert "tf:lexA" in feature_tags
     assert "promoter:sigma70_core:upstream" in feature_tags
     assert "promoter:sigma70_core:downstream" in feature_tags
-    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "σ70 -35 site"
-    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "σ70 -10 site"
+    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "-35 sites"
+    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "-10 sites"
 
     legend = legend_entries_for_record(record)
     legend_labels = {label for _, label in legend}
-    assert "σ70 -35 site" in legend_labels
-    assert "σ70 -10 site" in legend_labels
+    assert "-35 sites" in legend_labels
+    assert "-10 sites" in legend_labels
 
 
 def test_densegen_adapter_reads_fixed_elements_from_used_tfbs_detail() -> None:
@@ -343,11 +343,15 @@ def test_densegen_adapter_reads_fixed_elements_from_used_tfbs_detail() -> None:
     record = adapter.apply(row, row_index=0)
     assert len(record.features) == 3
     assert len(record.effects) == 1
-    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "σ70 -35 site (a)"
-    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "σ70 -10 site (H)"
+    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "-35 sites"
+    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "-10 sites"
+    promoter_features = [feature for feature in record.features if feature.attrs.get("source") == "densegen_promoter"]
+    by_component = {str(feature.attrs.get("component")): feature for feature in promoter_features}
+    assert by_component["upstream"].attrs.get("display_label") == "-35 site (a)"
+    assert by_component["downstream"].attrs.get("display_label") == "-10 site (H)"
     legend_labels = {label for _, label in legend_entries_for_record(record)}
-    assert "σ70 -35 site (a)" in legend_labels
-    assert "σ70 -10 site (H)" in legend_labels
+    assert "-35 sites" in legend_labels
+    assert "-10 sites" in legend_labels
 
 
 def test_densegen_adapter_prefers_offset_raw_for_fixed_elements_from_used_tfbs_detail() -> None:
@@ -401,7 +405,7 @@ def test_densegen_adapter_prefers_offset_raw_for_fixed_elements_from_used_tfbs_d
     assert by_feature_id["row1:promoter:sigma70_core:0:downstream"].span.start == 17
 
 
-def test_densegen_adapter_appends_variant_ids_to_promoter_legend_labels() -> None:
+def test_densegen_adapter_uses_shared_legend_labels_and_variant_annotation_labels() -> None:
     row = {
         "id": "row1",
         "sequence": "AAAAATTTGGGCCCCCCAAAATTTGGG",
@@ -434,22 +438,24 @@ def test_densegen_adapter_appends_variant_ids_to_promoter_legend_labels() -> Non
     )
 
     record = adapter.apply(row, row_index=0)
-    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "σ70 -35 site (a)"
-    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "σ70 -10 site (H)"
+    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "-35 sites"
+    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "-10 sites"
 
     promoter_features = [feature for feature in record.features if feature.attrs.get("source") == "densegen_promoter"]
     assert len(promoter_features) == 2
     by_component = {str(feature.attrs.get("component")): feature for feature in promoter_features}
     assert by_component["upstream"].attrs.get("variant_id") == "a"
     assert by_component["downstream"].attrs.get("variant_id") == "H"
+    assert by_component["upstream"].attrs.get("display_label") == "-35 site (a)"
+    assert by_component["downstream"].attrs.get("display_label") == "-10 site (H)"
 
     legend = legend_entries_for_record(record)
     legend_labels = {label for _, label in legend}
-    assert "σ70 -35 site (a)" in legend_labels
-    assert "σ70 -10 site (H)" in legend_labels
+    assert "-35 sites" in legend_labels
+    assert "-10 sites" in legend_labels
 
 
-def test_densegen_adapter_omits_downstream_consensus_suffix_in_display_labels() -> None:
+def test_densegen_adapter_keeps_variant_suffixes_in_annotation_labels_but_not_legend() -> None:
     row = {
         "id": "row1",
         "sequence": "AAAAATTTGGGCCCCCCAAAATTTGGG",
@@ -482,18 +488,20 @@ def test_densegen_adapter_omits_downstream_consensus_suffix_in_display_labels() 
     )
 
     record = adapter.apply(row, row_index=0)
-    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "σ70 -35 site (a)"
-    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "σ70 -10 site"
+    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "-35 sites"
+    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "-10 sites"
 
     promoter_features = [feature for feature in record.features if feature.attrs.get("source") == "densegen_promoter"]
     by_component = {str(feature.attrs.get("component")): feature for feature in promoter_features}
+    assert by_component["upstream"].attrs.get("display_label") == "-35 site (a)"
+    assert by_component["downstream"].attrs.get("display_label") == "-10 site (consensus)"
     assert by_component["downstream"].attrs.get("variant_id") == "consensus"
 
     legend = legend_entries_for_record(record)
     legend_labels = {label for _, label in legend}
-    assert "σ70 -35 site (a)" in legend_labels
-    assert "σ70 -10 site" in legend_labels
-    assert "σ70 -10 site (consensus)" not in legend_labels
+    assert "-35 sites" in legend_labels
+    assert "-10 sites" in legend_labels
+    assert "-10 sites (consensus)" not in legend_labels
 
 
 def test_densegen_adapter_emits_promoter_spacer_effect_with_shared_track() -> None:

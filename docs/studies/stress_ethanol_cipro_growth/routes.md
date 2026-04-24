@@ -25,7 +25,7 @@ This page keeps the downstream handoff map in one place.
 - Surface role: `producer`
 - Owner-boundary: `densegen`
 - Current state: `parallel_optional`
-- Entry artifact: `densegen/study_stress_ethanol_cipro`
+- Entry artifact: `densegen_prom_eth_cip_source`
 - Exit artifact: `evidence.analysis_surfaces.densegen` plus `outputs/plots/current_inventory.json`
 - Primary doc/workspace: `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md`
 - First command: `uv run dense plot -c src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml`
@@ -38,7 +38,7 @@ This page keeps the downstream handoff map in one place.
 - Surface role: `operator`
 - Owner-boundary: `infer`
 - Current state: `infer_batch_preparation`
-- Entry artifact: `promoter/stress_ethanol_cipro_anchor_set` and `promoter/stress_ethanol_cipro_construct_contexts`
+- Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
 - Exit artifact: checked-in infer lane configs plus the next batch preset declared in `pipeline.yaml`
 - Primary doc/workspace: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md`
 - First command: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
@@ -51,7 +51,7 @@ This page keeps the downstream handoff map in one place.
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
 - Current state: 7B-first browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane infer preference remains `evo2_20b` in `pipeline.yaml`
-- Entry artifact: `promoter/stress_ethanol_cipro_anchor_set` and `promoter/stress_ethanol_cipro_construct_contexts`
+- Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
@@ -66,7 +66,14 @@ This page keeps the downstream handoff map in one place.
   2. `design_structure_summary`
   3. `sigma35_ordinal_audit`
   4. `context_robustness_summary`
+  5. `candidate_decision_frontier`
+- Companion visuals:
+  - `balanced_design_family_margin_gallery`
+  - `sigma35_margin_ladder_gallery`
+  - `sigma35_stress_margin_gallery`
+  - `context_pair_summary`
 - Appendix deliverables:
+  - `sigma35_centroid_distance_gallery`
   - `appendix_geometry_audit`
   - `appendix_umap_gallery`
 - Snapshot attention surfaces: none
@@ -74,7 +81,7 @@ This page keeps the downstream handoff map in one place.
 - Snapshot ok appendix surfaces: `appendix_geometry_audit`, `appendix_umap_gallery`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
-- Browser default geometries: the real seven-view 7B-first surface across `intermediate_embedding` and `pooled_logits`; 20B views stay materializable in the workspace but are hidden from the study browser
+- Browser default geometries: the real five-view 7B-first surface across `intermediate_embedding` and `pooled_logits`; 20B views stay materializable in the workspace but are hidden from the study browser
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors

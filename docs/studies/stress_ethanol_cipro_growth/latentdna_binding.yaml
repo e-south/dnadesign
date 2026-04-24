@@ -2,8 +2,8 @@ workspace_id: stress_ethanol_cipro_growth
 workspace_ref: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
 snapshot_ref: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
 source_datasets:
-  anchor_60bp: promoter/stress_ethanol_cipro_anchor_set
-  full_context_1kb: promoter/stress_ethanol_cipro_construct_contexts
+  anchor_60bp: usr_prom_eth_cip_anchor
+  full_context_1kb: construct_prom_eth_cip_context
 supported_model_families:
   - evo2_7b
   - evo2_20b
@@ -18,6 +18,7 @@ attention_deliverables:
   - design_structure_summary
   - sigma35_ordinal_audit
   - context_robustness_summary
+  - candidate_decision_frontier
 gate_deliverables:
   - representation_health_summary
 decision_deliverables:
@@ -25,3 +26,4 @@ decision_deliverables:
   - design_structure_summary
   - sigma35_ordinal_audit
   - context_robustness_summary
+  - candidate_decision_frontier

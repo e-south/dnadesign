@@ -291,7 +291,7 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
                   alphabet: dna_4
                 usr:
                   root: ../usr_root
-                  dataset: densegen/demo
+                  dataset: densegen_demo
                   chunk_size: 16
               generation:
                 sequence_length: 10

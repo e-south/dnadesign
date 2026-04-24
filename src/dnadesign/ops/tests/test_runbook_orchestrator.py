@@ -105,7 +105,7 @@ def _write_runbook(
     include_smoke: bool = True,
     include_notify: bool = True,
     usr_root: Path | None = None,
-    usr_dataset: str = "densegen/study_stress_ethanol_cipro",
+    usr_dataset: str = "densegen_prom_eth_cip_source",
 ) -> Path:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
@@ -802,7 +802,7 @@ def test_mode_auto_selects_resume_when_attempt_artifacts_exist_with_external_usr
     runbook_path = _write_runbook(
         tmp_path,
         usr_root=external_usr_root,
-        usr_dataset="densegen/study_stress_ethanol_cipro",
+        usr_dataset="densegen_prom_eth_cip_source",
     )
     runbook = load_orchestration_runbook(runbook_path)
 

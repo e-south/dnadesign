@@ -200,6 +200,11 @@ def test_public_api_does_not_export_tool_specific_helpers() -> None:
     assert not hasattr(baserender, "render_densegen_record_figure")
 
 
+def test_public_api_exports_palette_for_sibling_tools() -> None:
+    palette = baserender.Palette({})
+    assert palette is not None
+
+
 def test_public_record_grid_render_helper_renders_multi_panel_figure() -> None:
     from dnadesign.baserender import Record, render_record_grid_figure
 

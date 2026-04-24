@@ -20,6 +20,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import to_rgb, to_rgba
 
+from dnadesign.baserender import Palette
+
+from ..integrations.baserender.notebook_contract import densegen_baserender_palette_overrides
 from .plot_common import _apply_style, _palette, _rename_artifact_path, _save_figure, _stage_b_plan_output_dir, _style
 
 log = logging.getLogger(__name__)
@@ -397,10 +400,59 @@ def _colorblind_palette(style: dict, n: int) -> list:
     return _palette(palette_style, n)
 
 
+def _occupancy_palette_tag(label: str) -> str | None:
+    label_text = str(label).strip()
+    if not label_text:
+        return None
+    if label_text.startswith("tf:"):
+        return label_text
+    if label_text.startswith("fixed:"):
+        if label_text.endswith(":-35"):
+            return "promoter:sigma70_core:upstream"
+        if label_text.endswith(":-10"):
+            return "promoter:sigma70_core:downstream"
+        return None
+    display_label = str(_category_display_label(label_text, include_fixed_sequence=False)).strip()
+    compact_display = display_label.replace(" ", "").replace("_", "").lower()
+    if compact_display in {"background", "neutral", "neutralbg", "neutralsites"}:
+        return "tf:background"
+    sanitized = _sanitize_tf_label(label_text).strip()
+    if not sanitized:
+        return None
+    compact_tf = sanitized.replace(" ", "").replace("_", "").lower()
+    canonical_tf = {
+        "background": "background",
+        "lexa": "lexA",
+        "cpxr": "cpxR",
+        "baer": "baeR",
+    }.get(compact_tf, sanitized)
+    return f"tf:{canonical_tf}"
+
+
+def _occupancy_color_map(categories: list[str], *, style: dict) -> dict[str, object]:
+    fallback_colors = dict(zip(categories, _colorblind_palette(style, len(categories))))
+    palette = Palette(densegen_baserender_palette_overrides())
+    colors: dict[str, object] = {}
+    for label in categories:
+        palette_tag = _occupancy_palette_tag(label)
+        if palette_tag is None:
+            colors[label] = fallback_colors[label]
+            continue
+        colors[label] = palette.color_for(palette_tag)
+    return colors
+
+
 def _darken_color(color: object, *, factor: float) -> tuple[float, float, float]:
     r, g, b = to_rgb(color)
     scale = min(1.0, max(0.0, float(factor)))
     return (r * scale, g * scale, b * scale)
+
+
+def _occupancy_fill_alpha(*, alpha: float, is_fixed: bool) -> float:
+    alpha_base = float(alpha)
+    alpha_scale = 2.35 if is_fixed else 2.15
+    alpha_floor = 0.52 if is_fixed else 0.48
+    return min(0.78, max(alpha_floor, alpha_base * alpha_scale))
 
 
 def _build_occupancy(
@@ -573,7 +625,11 @@ def _place_figure_legend_below_xlabel(
 def _normalize_occupancy_legend_label(label: str) -> str:
     text = str(label).strip()
     if text.lower() == "background":
-        text = "background"
+        return "Neutral sites"
+    if text.lower() == "neutral sites":
+        return "Neutral sites"
+    if text.lower() == "other sites":
+        return "Other sites"
     if text and "a" <= text[0] <= "z":
         return text[0].upper() + text[1:]
     return text
@@ -581,13 +637,42 @@ def _normalize_occupancy_legend_label(label: str) -> str:
 
 def _occupancy_legend_priority(label: str) -> int:
     text = str(label).strip().lower()
-    if text == "background":
+    if text in {"background", "neutral sites"}:
         return 0
-    if "upstream site (-35)" in text or text.endswith(":-35"):
+    if text == "-35 sites" or text.endswith(":-35"):
         return 1
-    if "downstream site (-10)" in text or text.endswith(":-10"):
+    if text == "-10 sites" or text.endswith(":-10"):
         return 2
     return 3
+
+
+def _occupancy_legend_label(
+    label: str,
+    *,
+    fixed_label_sequences: dict[str, str] | None = None,
+) -> str:
+    raw_label = str(label).strip()
+    if not raw_label:
+        return raw_label
+    if raw_label.startswith("fixed:"):
+        if raw_label.endswith(":-35"):
+            return "-35 sites"
+        if raw_label.endswith(":-10"):
+            return "-10 sites"
+        return _sanitize_fixed_label(raw_label)
+    display_label = _category_display_label(
+        raw_label,
+        fixed_label_sequences=fixed_label_sequences,
+        include_fixed_sequence=False,
+    )
+    lowered = str(display_label).strip().lower()
+    if lowered == "background":
+        return "Neutral sites"
+    if lowered == "other":
+        return "Other sites"
+    if lowered.endswith(" site") or lowered.endswith(" sites"):
+        return str(display_label)
+    return f"{display_label} sites"
 
 
 def _render_occupancy(
@@ -605,7 +690,7 @@ def _render_occupancy(
     width = max(8.4, float(seq_len) * 0.2, float(len(categories)) * 1.6)
     fig, ax = plt.subplots(1, 1, figsize=(width, 3.25))
     x_positions = np.arange(seq_len, dtype=float)
-    colors = dict(zip(categories, _colorblind_palette(style, len(categories))))
+    colors = _occupancy_color_map(categories, style=style)
     category_totals = {label: float(np.nansum(np.asarray(occupancy[label], dtype=float))) for label in categories}
     # Draw larger-count categories first so lower-count categories stay visible on top.
     draw_order = sorted(categories, key=lambda label: (-category_totals.get(label, 0.0), str(label)))
@@ -618,8 +703,8 @@ def _render_occupancy(
                 f"(seq_len={seq_len}, got={y.shape[0]} for '{label}')."
             )
         is_fixed = str(label).startswith("fixed:")
-        fill_alpha = max(0.12, alpha * (1.1 if is_fixed else 1.0))
-        fill_rgb = _darken_color(color, factor=0.84 if is_fixed else 0.88)
+        fill_alpha = _occupancy_fill_alpha(alpha=alpha, is_fixed=is_fixed)
+        fill_rgb = to_rgb(color)
         edge_rgb = _darken_color(color, factor=0.56 if is_fixed else 0.62)
         line_width = 0.75 if is_fixed else 0.6
         z_base = 2.0 + float(draw_rank)
@@ -633,10 +718,9 @@ def _render_occupancy(
             color=fill_color,
             edgecolor=edge_color,
             linewidth=line_width,
-            label=_category_display_label(
+            label=_occupancy_legend_label(
                 label,
                 fixed_label_sequences=fixed_label_sequences,
-                include_fixed_sequence=False,
             ),
             zorder=z_base + (0.5 if is_fixed else 0.0),
         )
@@ -700,7 +784,7 @@ def _render_occupancy(
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
-        max_legend_width = 0.92
+        max_legend_width = 0.98
         if legend_bbox.width > max_legend_width and entry_count > 1:
             legend.remove()
             legend = None

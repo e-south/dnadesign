@@ -57,27 +57,21 @@ def _promoter_display_name(name: str) -> str:
 
 
 def _promoter_component_label(name: str, component: str) -> str:
-    display_name = _promoter_display_name(name)
     if str(component).strip().lower() == "upstream":
-        return f"{display_name} -35 site"
+        return "-35 sites"
     if str(component).strip().lower() == "downstream":
-        return f"{display_name} -10 site"
-    return display_name
-
-
-def _append_variant_suffix(label: str, variant_id: str | None) -> str:
-    variant = str(variant_id or "").strip()
-    if variant == "":
-        return label
-    return f"{label} ({variant})"
+        return "-10 sites"
+    return _promoter_display_name(name)
 
 
 def _promoter_component_display_label(name: str, component: str, variant_id: str | None) -> str:
-    label = _promoter_component_label(name, component)
-    variant = str(variant_id or "").strip()
-    if str(component).strip().lower() == "downstream" and variant.lower() == "consensus":
-        return label
-    return _append_variant_suffix(label, variant)
+    base_label = _promoter_component_label(name, component)
+    if str(component).strip().lower() in {"upstream", "downstream"} and base_label.endswith("sites"):
+        base_label = f"{base_label[:-1]}"
+    variant_text = str(variant_id or "").strip()
+    if variant_text == "":
+        return base_label
+    return f"{base_label} ({variant_text})"
 
 
 def _title_case_first(value: str) -> str:
@@ -94,7 +88,14 @@ def _densegen_tf_display_label(value: str) -> str:
     head, sep, suffix = raw.partition("_")
     if sep and len(suffix) >= 6 and _IUPAC_MOTIF_SUFFIX_RE.fullmatch(suffix):
         raw = head
-    return _title_case_first(raw)
+    normalized = raw.replace("_", " ").strip()
+    compact = normalized.replace(" ", "").lower()
+    if compact in {"background", "neutralbg"}:
+        return "Neutral sites"
+    titled = _title_case_first(normalized)
+    if titled.endswith(" site") or titled.endswith(" sites"):
+        return titled
+    return f"{titled} sites"
 
 
 @dataclass(frozen=True)
@@ -328,22 +329,38 @@ class DensegenTfbsAdapter:
 
             upstream_tag = f"promoter:{name}:upstream"
             downstream_tag = f"promoter:{name}:downstream"
+            upstream_display_label = _promoter_component_display_label(name, "upstream", upstream.get("variant_id"))
+            downstream_display_label = _promoter_component_display_label(
+                name,
+                "downstream",
+                downstream.get("variant_id"),
+            )
             labels.setdefault(
                 upstream_tag,
-                _promoter_component_display_label(name, "upstream", upstream.get("variant_id")),
+                _promoter_component_label(name, "upstream"),
             )
             labels.setdefault(
                 downstream_tag,
-                _promoter_component_display_label(name, "downstream", downstream.get("variant_id")),
+                _promoter_component_label(name, "downstream"),
             )
 
             upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
             downstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:downstream"
             track = int(placement_index)
-            upstream_attrs = {"name": name, "component": "upstream", "source": "densegen_promoter"}
+            upstream_attrs = {
+                "name": name,
+                "component": "upstream",
+                "source": "densegen_promoter",
+                "display_label": upstream_display_label,
+            }
             if upstream.get("variant_id"):
                 upstream_attrs["variant_id"] = upstream.get("variant_id")
-            downstream_attrs = {"name": name, "component": "downstream", "source": "densegen_promoter"}
+            downstream_attrs = {
+                "name": name,
+                "component": "downstream",
+                "source": "densegen_promoter",
+                "display_label": downstream_display_label,
+            }
             if downstream.get("variant_id"):
                 downstream_attrs["variant_id"] = downstream.get("variant_id")
             features.append(
@@ -475,13 +492,15 @@ class DensegenTfbsAdapter:
 
             upstream_tag = f"promoter:{name}:upstream"
             downstream_tag = f"promoter:{name}:downstream"
+            upstream_display_label = _promoter_component_display_label(name, "upstream", upstream_variant_id)
+            downstream_display_label = _promoter_component_display_label(name, "downstream", downstream_variant_id)
             promoter_labels.setdefault(
                 upstream_tag,
-                _promoter_component_display_label(name, "upstream", upstream_variant_id),
+                _promoter_component_label(name, "upstream"),
             )
             promoter_labels.setdefault(
                 downstream_tag,
-                _promoter_component_display_label(name, "downstream", downstream_variant_id),
+                _promoter_component_label(name, "downstream"),
             )
             placement_track = int(placement_index)
             upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
@@ -490,6 +509,7 @@ class DensegenTfbsAdapter:
                 "name": name,
                 "component": "upstream",
                 "source": "densegen_promoter",
+                "display_label": upstream_display_label,
             }
             if upstream_variant_id:
                 upstream_attrs["variant_id"] = upstream_variant_id
@@ -497,6 +517,7 @@ class DensegenTfbsAdapter:
                 "name": name,
                 "component": "downstream",
                 "source": "densegen_promoter",
+                "display_label": downstream_display_label,
             }
             if downstream_variant_id:
                 downstream_attrs["variant_id"] = downstream_variant_id

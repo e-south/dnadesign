@@ -93,7 +93,7 @@ def _run_gate_module_via_clean_python(*args: str) -> tuple[int | str | None, str
 def _write_densegen_config(
     path: Path,
     *,
-    dataset: str = "densegen/study_stress_ethanol_cipro",
+    dataset: str = "densegen_prom_eth_cip_source",
     run_root: str = ".",
     usr_root: str = "outputs/usr_datasets",
     chunk_size: int = 128,
@@ -739,7 +739,7 @@ def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_thresho
     config_path = workspace_root / "config.yaml"
     _write_densegen_config(
         config_path,
-        dataset="densegen/demo",
+        dataset="densegen_demo",
         chunk_size=128,
         max_accepted_per_library=64,
         total_sequences=1000,
@@ -751,7 +751,7 @@ def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_thresho
     registry_dst.parent.mkdir(parents=True, exist_ok=True)
     registry_dst.write_text(registry_src.read_text(encoding="utf-8"), encoding="utf-8")
 
-    dataset = usr_pkg.Dataset(usr_root, "densegen/demo")
+    dataset = usr_pkg.Dataset(usr_root, "densegen_demo")
     dataset.init(source="test")
     dataset.import_rows([{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4"}], source="seed")
     row_id = str(dataset.head(1, columns=["id"]).iloc[0]["id"])
@@ -1203,13 +1203,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_entries_exceed_thr
     _write_densegen_config(config_path)
 
     archived_dir = (
-        workspace_root
-        / "outputs"
-        / "usr_datasets"
-        / "densegen"
-        / "study_stress_ethanol_cipro"
-        / "_derived"
-        / "_archived"
+        workspace_root / "outputs" / "usr_datasets" / "densegen_prom_eth_cip_source" / "_derived" / "_archived"
     )
     archived_dir.mkdir(parents=True, exist_ok=True)
     (archived_dir / "a.parquet").write_bytes(b"a")
@@ -1245,13 +1239,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_bytes_exceed_thres
     _write_densegen_config(config_path)
 
     archived_dir = (
-        workspace_root
-        / "outputs"
-        / "usr_datasets"
-        / "densegen"
-        / "study_stress_ethanol_cipro"
-        / "_derived"
-        / "_archived"
+        workspace_root / "outputs" / "usr_datasets" / "densegen_prom_eth_cip_source" / "_derived" / "_archived"
     )
     archived_dir.mkdir(parents=True, exist_ok=True)
     (archived_dir / "big.parquet").write_bytes(b"0123456789")

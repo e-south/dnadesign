@@ -461,7 +461,7 @@ def test_usr_output_requires_root(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
-        "usr": {"dataset": "demo", "chunk_size": 10},
+        "usr": {"dataset": "densegen_demo", "chunk_size": 10},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
@@ -482,7 +482,7 @@ def test_usr_health_event_interval_requires_positive_value(tmp_path: Path) -> No
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {
-            "dataset": "demo",
+            "dataset": "densegen_demo",
             "root": "outputs/usr_datasets",
             "health_event_interval_seconds": 0,
         },
@@ -522,13 +522,28 @@ def test_usr_dataset_must_be_relative_path(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
-def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
+def test_usr_dataset_must_be_densegen_owner_first_id(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {
             "dataset": "demo",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="starting with 'densegen_'"):
+        load_config(cfg_path)
+
+
+def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "densegen_demo",
             "root": "outputs/usr_datasets",
             "chunk_size": 0,
         },
@@ -544,7 +559,7 @@ def test_usr_allow_overwrite_removed(tmp_path: Path) -> None:
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {
-            "dataset": "demo",
+            "dataset": "densegen_demo",
             "root": "outputs/usr_datasets",
             "allow_overwrite": False,
         },
@@ -680,7 +695,7 @@ def test_usr_root_can_live_outside_outputs(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "../usr_root"},
+        "usr": {"dataset": "densegen_demo", "root": "../usr_root"},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     loaded = load_config(cfg_path)
@@ -975,7 +990,7 @@ def test_plots_source_required_for_multi_sink(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10},
+        "usr": {"dataset": "densegen_demo", "root": "usr_root", "chunk_size": 10},
         "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
@@ -988,7 +1003,7 @@ def test_plots_source_must_be_target(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10},
+        "usr": {"dataset": "densegen_demo", "root": "usr_root", "chunk_size": 10},
         "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg["plots"] = {"source": "csv", "out_dir": "plots"}

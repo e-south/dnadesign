@@ -136,7 +136,7 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 
 - `outputs/pools/pool_manifest.json`
 - `outputs/tables/records.parquet`
-- `src/dnadesign/usr/datasets/densegen/demo_sampling_baseline/.events.log`
+- `src/dnadesign/usr/datasets/densegen_demo_sampling_baseline/.events.log`
 - `outputs/plots/`
 - `outputs/notebooks/densegen_run_overview.py`
 

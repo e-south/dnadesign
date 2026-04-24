@@ -26,8 +26,8 @@ from dnadesign.infer.src.features.contracts import (
 )
 from dnadesign.infer.src.features.execution import build_feature_bundle_outputs
 from dnadesign.infer.src.runtime.resume_planner import plan_resume_for_usr, read_usr_column_values, read_usr_columns
+from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
-from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 
 def test_plan_resume_for_usr_overwrite_short_circuits_scan() -> None:

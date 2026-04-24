@@ -26,7 +26,7 @@ lifecycle:
 phases:
   - id: densegen_growth
     status: parallel_optional
-    primary_dataset: densegen/<study-anchor-dataset>
+    primary_dataset: densegen_<study-anchor-dataset>
     next_surface: repo:src/dnadesign/ops/runbooks/presets/<densegen-batch-runbook>.yaml
   - id: merged_anchor_set
     status: complete
@@ -55,8 +55,8 @@ phases:
 artifacts:
   densegen_anchor_source:
     artifact_type: dataset
-    dataset_id: densegen/<study-anchor-dataset>
-    ref: repo:src/dnadesign/usr/datasets/densegen/<study-anchor-dataset>
+    dataset_id: densegen_<study-anchor-dataset>
+    ref: repo:src/dnadesign/usr/datasets/densegen_<study-anchor-dataset>
   densegen_config:
     artifact_type: file
     ref: repo:src/dnadesign/densegen/workspaces/<densegen-workspace>/config.yaml

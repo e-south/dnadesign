@@ -26,15 +26,15 @@ lifecycle:
 phases:
   - id: densegen_growth
     status: parallel_optional
-    primary_dataset: densegen/study_stress_ethanol_cipro
+    primary_dataset: densegen_prom_eth_cip_source
     next_surface: repo:src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
   - id: merged_anchor_set
     status: complete
-    output_dataset: promoter/stress_ethanol_cipro_anchor_set
+    output_dataset: usr_prom_eth_cip_anchor
     next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
   - id: construct_context_expansion
     status: complete
-    output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+    output_dataset: construct_prom_eth_cip_context
     next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
   - id: infer_batch_preparation
     status: in_progress
@@ -55,23 +55,23 @@ phases:
 artifacts:
   densegen_anchor_source:
     artifact_type: dataset
-    dataset_id: densegen/study_stress_ethanol_cipro
-    ref: repo:src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro
+    dataset_id: densegen_prom_eth_cip_source
+    ref: repo:src/dnadesign/usr/datasets/densegen_prom_eth_cip_source
   densegen_config:
     artifact_type: file
     ref: repo:src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
   merged_anchor_dataset:
     artifact_type: dataset
-    dataset_id: promoter/stress_ethanol_cipro_anchor_set
-    ref: repo:src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_anchor_set
+    dataset_id: usr_prom_eth_cip_anchor
+    ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor
   construct_context_dataset:
     artifact_type: dataset
-    dataset_id: promoter/stress_ethanol_cipro_construct_contexts
-    ref: repo:src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_construct_contexts
+    dataset_id: construct_prom_eth_cip_context
+    ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_context
   feature_matrix_dataset:
     artifact_type: dataset
-    dataset_id: promoter/stress_ethanol_cipro_feature_matrix
-    ref: repo:src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_feature_matrix
+    dataset_id: usr_prom_eth_cip_matrix
+    ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_matrix
   infer_config_anchor_only_20b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml

@@ -4604,9 +4604,9 @@ Make USR the explicit, tool-neutral boundary for derived-namespace pruning so si
 
 ### Changes applied
 
-1. `src/dnadesign/usr/src/cli_commands/maintenance.py`
+1. `src/dnadesign/usr/src/cli/commands/maintenance/__init__.py`
    - added the generic overlay-remove command handler.
-2. `src/dnadesign/usr/src/cli_commands/ops_cli.py`
+2. `src/dnadesign/usr/src/cli/commands/maintenance/cli.py`
    - added the `maintenance overlay-remove` CLI surface.
 3. `src/dnadesign/usr/src/cli.py`
    - wired the maintenance command through the existing CLI dependency boundary.
@@ -4673,11 +4673,11 @@ Replace Infer's bespoke dataset-prune path with the generic USR overlay-maintena
    - extracted dataset-id normalization and path-based open logic.
 4. `src/dnadesign/usr/src/dataset.py`
    - delegated identity/open responsibilities to the extracted module.
-5. `src/dnadesign/usr/src/cli_support/bindings.py`
+5. `src/dnadesign/usr/src/cli/support/bindings.py`
    - extracted CLI command forwarding/binding assembly.
 6. `src/dnadesign/usr/src/cli.py`
    - replaced a large set of thin forwarding functions with a single binding assembly call.
-7. `src/dnadesign/usr/src/cli_commands/maintenance.py`
+7. `src/dnadesign/usr/src/cli/commands/maintenance/__init__.py`
    - delegated overlay removal to the shared maintenance seam.
 8. `src/dnadesign/usr/tests/*module_layout*.py`
    - aligned IA contract tests to the new seams.

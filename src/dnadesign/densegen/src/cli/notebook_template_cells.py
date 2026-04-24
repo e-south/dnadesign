@@ -107,6 +107,8 @@ def _(
     set_baserender_export_handled_click,
     set_baserender_export_status,
 ):
+    import matplotlib.pyplot as _plt
+
     _click_count = int(baserender_export_button.value or 0)
     _status_text = str(get_baserender_export_status() or "")
     _should_export, _handled_click = consume_click(
@@ -126,11 +128,14 @@ def _(
             )
             _destination.parent.mkdir(parents=True, exist_ok=True)
             _figure = build_baserender_figure(active_baserender_request)
-            _figure.savefig(
-                _destination,
-                format=_selected_format,
-                dpi=_figure.dpi if _selected_format == "png" else None,
-            )
+            try:
+                _figure.savefig(
+                    _destination,
+                    format=_selected_format,
+                    dpi=_figure.dpi if _selected_format == "png" else None,
+                )
+            finally:
+                _plt.close(_figure)
         except Exception as exc:
             _status_text = f"BaseRender export failed while writing `{_destination}`: {exc}"
         else:

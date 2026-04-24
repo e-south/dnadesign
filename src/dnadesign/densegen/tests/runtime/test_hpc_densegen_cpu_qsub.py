@@ -98,7 +98,7 @@ def _write_workspace_config(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 usr:
-                  dataset: demo_workspace
+                  dataset: densegen_demo_workspace
                   root: outputs/usr
                   chunk_size: 1
 
@@ -398,7 +398,7 @@ def test_densegen_cpu_qsub_real_local_resume_extend_flow(tmp_path: Path) -> None
         text=True,
     )
     assert first.returncode == 0, first.stderr
-    records_path = workspace / "outputs" / "usr" / "demo_workspace" / "records.parquet"
+    records_path = workspace / "outputs" / "usr" / "densegen_demo_workspace" / "records.parquet"
     rows_after_first = int(pq.read_table(records_path).num_rows)
     assert rows_after_first >= 1
 

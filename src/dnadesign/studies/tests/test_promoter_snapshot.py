@@ -75,7 +75,7 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
         canonical_usr_root_path=tmp_path / "usr_root",
         dataset_states=(
             {
-                "dataset": "densegen/demo_anchor",
+                "dataset": "densegen_demo_anchor",
                 "declared_status": "present",
                 "exists": True,
                 "rows": 8,
@@ -127,7 +127,7 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
         next_in_progress_phase={"id": "infer_batch_preparation", "status": "in_progress"},
         next_planned_phase={"id": "infer_anchor_only_20b", "status": "planned"},
         blocked_phases=(),
-        densegen_dataset_id="densegen/demo_anchor",
+        densegen_dataset_id="densegen_demo_anchor",
         densegen_rows=8,
         densegen_row_target=10,
         densegen_row_gap=2,
@@ -140,7 +140,7 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
                 "id": "merged_anchor_from_densegen",
                 "state": "ok",
                 "summary": "Merged anchor dataset is at least as current as the DenseGen source.",
-                "upstream_dataset": "densegen/demo_anchor",
+                "upstream_dataset": "densegen_demo_anchor",
                 "upstream_rows": 8,
                 "downstream_dataset": "promoter/demo_anchor_set",
                 "downstream_rows": 8,
@@ -273,14 +273,14 @@ def test_build_promoter_study_status_preserves_summary_and_attention_contract(tm
     assert state == "attention"
     assert summary == (
         "demo_study: phase infer_batch_preparation; preferred infer evo2_20b; "
-        "source gate active densegen/demo_anchor 8/10 rows (gap=2); "
+        "source gate active densegen_demo_anchor 8/10 rows (gap=2); "
         "handoffs ready anchor=8 construct=8; "
         "next in_progress infer_batch_preparation"
     )
     assert evidence["attention_reasons"] == ["DenseGen source gate is still active"]
     assert evidence["source_growth_state"] == {
         "state": "attention",
-        "dataset": "densegen/demo_anchor",
+        "dataset": "densegen_demo_anchor",
         "current_rows": 8,
         "target_rows": 10,
         "gap_rows": 2,
@@ -291,7 +291,7 @@ def test_build_promoter_study_status_preserves_summary_and_attention_contract(tm
         "superseded_by_handoffs": False,
         "max_handoff_rows": 8,
         "drives_top_level_attention": True,
-        "summary": "source gate active densegen/demo_anchor 8/10 rows (gap=2)",
+        "summary": "source gate active densegen_demo_anchor 8/10 rows (gap=2)",
     }
     assert evidence["handoff_readiness_state"] == {
         "state": "ok",
@@ -321,7 +321,7 @@ def test_build_promoter_study_status_demotes_source_gate_once_handoffs_exceed_ta
         base_context,
         dataset_states=(
             {
-                "dataset": "densegen/demo_anchor",
+                "dataset": "densegen_demo_anchor",
                 "declared_status": "present",
                 "exists": True,
                 "rows": 8,
@@ -349,7 +349,7 @@ def test_build_promoter_study_status_demotes_source_gate_once_handoffs_exceed_ta
             {
                 "id": "densegen_growth",
                 "status": "parallel_optional",
-                "primary_dataset": "densegen/demo_anchor",
+                "primary_dataset": "densegen_demo_anchor",
             },
             {"id": "infer_batch_preparation", "status": "in_progress"},
             {
@@ -365,7 +365,7 @@ def test_build_promoter_study_status_demotes_source_gate_once_handoffs_exceed_ta
                 "id": "merged_anchor_from_densegen",
                 "state": "ok",
                 "summary": "Merged anchor dataset is at least as current as the DenseGen source.",
-                "upstream_dataset": "densegen/demo_anchor",
+                "upstream_dataset": "densegen_demo_anchor",
                 "upstream_rows": 8,
                 "downstream_dataset": "promoter/demo_anchor_set",
                 "downstream_rows": 12,
@@ -425,7 +425,7 @@ def test_build_promoter_study_status_demotes_source_gate_once_handoffs_exceed_ta
     assert summary == (
         "demo_study: phase infer_batch_preparation; preferred infer evo2_20b; "
         "handoffs ready anchor=12 construct=12; "
-        "source gate superseded by downstream handoffs densegen/demo_anchor 8/10 rows (gap=2); "
+        "source gate superseded by downstream handoffs densegen_demo_anchor 8/10 rows (gap=2); "
         "next in_progress infer_batch_preparation"
     )
     assert "attention_reasons" not in evidence
@@ -462,7 +462,7 @@ def test_build_promoter_study_status_surfaces_semantic_completeness_attention(tm
         "state": "attention",
         "drives_top_level_attention": True,
         "summary": (
-            "source overlay needs compaction densegen/demo_anchor:densegen; "
+            "source overlay needs compaction densegen_demo_anchor:densegen; "
             "anchor DenseGen metadata incomplete promoter/demo_anchor_set 6/8"
         ),
     }

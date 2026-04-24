@@ -973,7 +973,7 @@ def test_placement_occupancy_map_uses_selected_output_source_for_solutions(
                   alphabet: dna_4
                 usr:
                   root: ../usr_root
-                  dataset: densegen/demo
+                  dataset: densegen_demo
               generation:
                 sequence_length: 10
                 plan:
@@ -1022,7 +1022,7 @@ def test_placement_occupancy_map_uses_selected_output_source_for_solutions(
 
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting.load_records_from_config",
-        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen_demo"),
     )
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting._load_composition",
@@ -1179,7 +1179,7 @@ def test_placement_occupancy_map_recovers_composition_from_output_records(
     loaded = load_config(cfg_path)
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting.load_records_from_config",
-        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen_demo"),
     )
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting._load_effective_config",
@@ -1253,7 +1253,7 @@ def test_tfbs_concentration_profile_recovers_composition_from_output_records(
     loaded = load_config(cfg_path)
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting.load_records_from_config",
-        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen_demo"),
     )
 
     def _fake_tfbs_concentration_profile(
@@ -1492,7 +1492,7 @@ def test_run_plots_writes_manifest_for_partial_success(tmp_path: Path, monkeypat
     loaded = load_config(cfg_path)
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting.load_records_from_config",
-        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen_demo"),
     )
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting._load_effective_config",

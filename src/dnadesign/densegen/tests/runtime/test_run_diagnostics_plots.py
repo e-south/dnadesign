@@ -28,6 +28,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import ConnectionPatch
 
 from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
+from dnadesign.densegen.src.integrations.baserender.notebook_contract import densegen_baserender_palette_overrides
 from dnadesign.densegen.src.viz.plot_run import (
     _aggregate_reason_pareto,
     _build_run_health_compression_ratio_figure,
@@ -60,6 +61,7 @@ from dnadesign.densegen.src.viz.plot_stage_b_placement import (
     _build_occupancy,
     _category_display_label,
     _normalize_tf_label,
+    _occupancy_fill_alpha,
     _placement_bounds,
     _promoter_constraints,
     _render_occupancy,
@@ -2623,8 +2625,10 @@ def test_occupancy_legend_is_below_xlabel() -> None:
         assert legend.get_frame_on() is False
         assert min(text.get_fontsize() for text in legend.get_texts()) >= 12.0
         legend_text = "\n".join(text.get_text() for text in legend.get_texts())
-        assert "σ70 upstream site (-35)" in legend_text
-        assert "σ70 downstream site (-10)" in legend_text
+        assert "TF_A sites" in legend_text
+        assert "TF_B sites" in legend_text
+        assert "-35 sites" in legend_text
+        assert "-10 sites" in legend_text
         renderer = fig.canvas.get_renderer()
         xlab_bbox = ax.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
         legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
@@ -2735,9 +2739,58 @@ def test_occupancy_legend_orders_background_then_sigma_sites() -> None:
         fig.canvas.draw()
         assert fig.legends
         labels = [text.get_text() for text in fig.legends[0].get_texts()]
-        assert labels[0] == "Background"
-        assert labels[1].startswith("σ70 upstream site (-35)")
-        assert labels[2].startswith("σ70 downstream site (-10)")
+        assert labels[0] == "Neutral sites"
+        assert labels[1] == "-35 sites"
+        assert labels[2] == "-10 sites"
+    finally:
+        fig.clf()
+
+
+def test_occupancy_uses_baserender_contract_colors_for_shared_categories() -> None:
+    matplotlib.use("Agg", force=True)
+    seq_len = 1
+    alpha = 0.22
+    occupancy = {
+        "background": np.full(seq_len, 1.0),
+        "lexA": np.full(seq_len, 2.0),
+        "cpxR": np.full(seq_len, 3.0),
+        "baeR": np.full(seq_len, 4.0),
+        "fixed:promoter:-35": np.full(seq_len, 5.0),
+        "fixed:promoter:-10": np.full(seq_len, 6.0),
+    }
+    categories = list(occupancy.keys())
+    fig, ax = _render_occupancy(
+        occupancy,
+        categories,
+        seq_len=seq_len,
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        n_solutions=2,
+        alpha=alpha,
+        fixed_label_sequences={},
+        style={},
+    )
+    try:
+        fig.canvas.draw()
+        patches_by_height = {float(patch.get_height()): patch for patch in ax.patches if float(patch.get_width()) > 0.0}
+        palette = densegen_baserender_palette_overrides()
+        expected_facecolors = {
+            1.0: to_rgba(palette["tf:background"], alpha=_occupancy_fill_alpha(alpha=alpha, is_fixed=False)),
+            2.0: to_rgba(palette["tf:lexA"], alpha=_occupancy_fill_alpha(alpha=alpha, is_fixed=False)),
+            3.0: to_rgba(palette["tf:cpxR"], alpha=_occupancy_fill_alpha(alpha=alpha, is_fixed=False)),
+            4.0: to_rgba(palette["tf:baeR"], alpha=_occupancy_fill_alpha(alpha=alpha, is_fixed=False)),
+            5.0: to_rgba(
+                palette["promoter:sigma70_core:upstream"],
+                alpha=_occupancy_fill_alpha(alpha=alpha, is_fixed=True),
+            ),
+            6.0: to_rgba(
+                palette["promoter:sigma70_core:downstream"],
+                alpha=_occupancy_fill_alpha(alpha=alpha, is_fixed=True),
+            ),
+        }
+        assert set(patches_by_height) == set(expected_facecolors)
+        for height, expected in expected_facecolors.items():
+            assert tuple(patches_by_height[height].get_facecolor()) == pytest.approx(expected)
     finally:
         fig.clf()
 
@@ -2766,9 +2819,9 @@ def test_occupancy_legend_capitalizes_non_sigma_fixed_labels() -> None:
         fig.canvas.draw()
         assert fig.legends
         labels = [text.get_text() for text in fig.legends[0].get_texts()]
-        assert "Background" in labels
-        assert any(label.startswith("Promoter upstream site (-35)") for label in labels)
-        assert any(label.startswith("Promoter downstream site (-10)") for label in labels)
+        assert "Neutral sites" in labels
+        assert "-35 sites" in labels
+        assert "-10 sites" in labels
     finally:
         fig.clf()
 

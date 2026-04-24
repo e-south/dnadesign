@@ -133,7 +133,7 @@ densegen:
       chunk_size: 64
     usr:
       root: ../../../usr/datasets
-      dataset: densegen/demo_sampling_baseline
+      dataset: densegen_demo_sampling_baseline
       chunk_size: 64
       health_event_interval_seconds: 60
 

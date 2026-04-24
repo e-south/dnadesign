@@ -4,7 +4,7 @@
 dnadesign/densegen/core/canonical.py
 
 Canonical sequence normalization + ID computation.
-Aligned with dnadesign.usr.src.normalize (sha1(bio_type|sequence_norm)).
+Aligned with dnadesign.usr.src.contracts.normalize (sha1(bio_type|sequence_norm)).
 
 Module Author(s): Eric J. South
 Dunlop Lab

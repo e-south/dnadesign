@@ -390,9 +390,13 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
-    get_baserender_display_payload, set_baserender_display_payload = mo.state({})
-    return get_baserender_display_payload, set_baserender_display_payload
+def _(mo, run_root, to_repo_relative_path):
+    baserender_export_format = mo.ui.dropdown(options=["png", "pdf", "svg"], value="png", label="")
+    default_baserender_export_path = run_root / "outputs" / "notebooks" / "baserender_preview.png"
+    default_baserender_export_path_text = to_repo_relative_path(default_baserender_export_path)
+    baserender_export_path = mo.ui.text(value=str(default_baserender_export_path_text), label="", full_width=True)
+    baserender_export_button = mo.ui.run_button(label="Export", kind="neutral")
+    return baserender_export_button, baserender_export_format, baserender_export_path
 
 
 @app.cell
@@ -771,17 +775,19 @@ def _(
 
 @app.cell
 def _(
+    active_baserender_display_payload,
     active_record_id,
     active_row_index,
+    baserender_export_button,
+    baserender_export_format,
+    baserender_export_path,
     filtered_n,
-    get_baserender_display_payload,
     mo,
     next_record_button,
     prev_record_button,
     record_index_jump,
     record_index_slider,
-    run_root,
-    to_repo_relative_path,
+    require,
 ):
     _record_status = mo.md(
         "<div style='text-align:center'>"
@@ -800,7 +806,12 @@ def _(
         widths=[1, 6, 1],
         wrap=False,
     )
-    _display_payload = dict(get_baserender_display_payload() or {})
+    _display_payload = dict(active_baserender_display_payload)
+    _display_record_id = str(_display_payload.get("record_id") or "").strip()
+    require(
+        _display_record_id != str(active_record_id),
+        "BaseRender preview payload drifted away from the active record selection. Regenerate the notebook and rerun.",
+    )
     _display_caption = str(_display_payload.get("caption") or "").strip()
     if not _display_caption:
         _display_caption = (
@@ -808,33 +819,26 @@ def _(
             "Annotated TFBS placements and fixed promoter-core elements are highlighted."
         )
     _display_image_bytes = _display_payload.get("image_bytes")
-    if _display_image_bytes:
-        _baserender_image = mo.image(
-            _display_image_bytes,
-            alt=_display_caption,
-            caption=_display_caption,
-            rounded=True,
-            style={
-                "border-radius": "14px",
-                "width": "100%",
-                "height": "auto",
-                "max-height": "560px",
-                "object-fit": "contain",
-                "background": "white",
-                "display": "block",
-                "margin": "0 auto",
-            },
-        )
-    else:
-        _baserender_image = mo.md(
-            "<div style='min-height:420px; width:100%; border-radius:14px; "
-            "border:1px solid #e5e7eb; background:#ffffff;'></div>"
-        )
-    baserender_export_format = mo.ui.dropdown(options=["png", "pdf"], value="png", label="")
-    default_baserender_export_path = run_root / "outputs" / "notebooks" / "baserender_preview.png"
-    default_baserender_export_path_text = to_repo_relative_path(default_baserender_export_path)
-    baserender_export_path = mo.ui.text(value=str(default_baserender_export_path_text), label="", full_width=True)
-    baserender_export_button = mo.ui.run_button(label="Export", kind="neutral")
+    require(
+        not _display_image_bytes,
+        f"BaseRender preview image bytes were empty for record `{active_record_id}`.",
+    )
+    _baserender_image = mo.image(
+        _display_image_bytes,
+        alt=_display_caption,
+        caption=_display_caption,
+        rounded=True,
+        style={
+            "border-radius": "14px",
+            "width": "100%",
+            "height": "auto",
+            "max-height": "560px",
+            "object-fit": "contain",
+            "background": "white",
+            "display": "block",
+            "margin": "0 auto",
+        },
+    )
     _baserender_export_controls = mo.hstack(
         [baserender_export_format, baserender_export_path, baserender_export_button],
         justify="start",
@@ -853,7 +857,7 @@ def _(
         ],
         align="stretch",
     )
-    return baserender_export_button, baserender_export_format, baserender_export_path
+    return
 
 
 @app.cell
@@ -945,9 +949,7 @@ def _(
 def _(
     active_baserender_request,
     active_record_id,
-    get_baserender_display_payload,
     render_baserender_preview_image,
-    set_baserender_display_payload,
 ):
     _core_summary = str(active_baserender_request.get("core_summary") or "").strip()
     _caption = (
@@ -963,14 +965,12 @@ def _(
         _core_summary,
         str(active_baserender_request.get("plan_summary") or "").strip(),
     )
-    _payload = {
+    active_baserender_display_payload = {
         "record_id": str(active_record_id),
         "image_bytes": baserender_preview_image_bytes,
         "caption": _caption,
     }
-    if dict(get_baserender_display_payload() or {}) != _payload:
-        set_baserender_display_payload(_payload)
-    return baserender_preview_image_bytes
+    return active_baserender_display_payload
 
 
 @app.cell

@@ -27,8 +27,8 @@ from dnadesign.studies.families.promoter.ops.provider import (
     provide_promoter_preflight,
     provide_promoter_status,
 )
+from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr.src.overlays import with_overlay_metadata
-from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 
 def _repo_root() -> Path:
@@ -159,7 +159,7 @@ def _write_usr_dataset(root: Path, dataset: str, *, rows: int = 2) -> None:
         }
     )
     pq.write_table(table, dataset_dir / "records.parquet")
-    if dataset == "densegen/demo_anchor" or dataset.startswith("promoter/"):
+    if dataset == "densegen_demo_anchor" or dataset.startswith("promoter/"):
         densegen_overlay = pa.table(
             {
                 "id": ids,
@@ -187,8 +187,8 @@ def _write_promoter_ops_contract(
     artifacts = {
         "densegen_anchor_source": {
             "artifact_type": "dataset",
-            "dataset_id": "densegen/demo_anchor",
-            "ref": "repo:usr_root/densegen/demo_anchor",
+            "dataset_id": "densegen_demo_anchor",
+            "ref": "repo:usr_root/densegen_demo_anchor",
         }
     }
     if {"merged_anchor_set", "construct_context_expansion", "infer_batch_preparation"} & phase_ids:
@@ -626,7 +626,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
                 "datasets": [
                     {
                         "role": "densegen_anchor",
-                        "dataset": "densegen/demo_anchor",
+                        "dataset": "densegen_demo_anchor",
                         "usr_root": "usr_root",
                         "status": "present",
                     },
@@ -656,7 +656,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
                         "infer_workspace": "workspace/infer",
                     },
                     "datasets": {
-                        "densegen_anchor_source": "densegen/demo_anchor",
+                        "densegen_anchor_source": "densegen_demo_anchor",
                         "merged_anchor_dataset": "promoter/demo_anchor_set",
                     },
                 }
@@ -672,7 +672,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
             {
                 "id": "densegen_growth",
                 "status": "in_progress",
-                "primary_dataset": "densegen/demo_anchor",
+                "primary_dataset": "densegen_demo_anchor",
                 "next_surface": "repo:workspace/densegen_batch.yaml",
             },
             {
@@ -683,7 +683,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
             },
         ],
     )
-    _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
+    _write_usr_dataset(repo_root / "usr_root", "densegen_demo_anchor")
     if densegen_rows != 2:
         dataset_dir = repo_root / "usr_root" / "densegen" / "demo_anchor"
         table = pa.table(
@@ -737,19 +737,19 @@ def _write_promoter_study_preflight_record(
                 "datasets": [
                     {
                         "role": "densegen_anchor",
-                        "dataset": "densegen/demo_anchor",
+                        "dataset": "densegen_demo_anchor",
                         "usr_root": "usr_root",
                         "status": "present",
                     },
                     {
                         "role": "wildtype_manual",
-                        "dataset": "mg1655_promoters",
+                        "dataset": "usr_mg1655_promoter_controls",
                         "usr_root": "usr_root",
                         "status": "present",
                     },
                     {
                         "role": "construct_template_seed",
-                        "dataset": "plasmids",
+                        "dataset": "usr_pdual10_plasmid_template",
                         "usr_root": "usr_root",
                         "status": "present",
                     },
@@ -791,7 +791,7 @@ def _write_promoter_study_preflight_record(
                         },
                     },
                     "datasets": {
-                        "densegen_anchor_source": "densegen/demo_anchor",
+                        "densegen_anchor_source": "densegen_demo_anchor",
                         "merged_anchor_dataset": "promoter/demo_anchor_set",
                         "construct_context_dataset": "promoter/demo_construct_contexts",
                     },
@@ -847,9 +847,9 @@ def _write_promoter_study_preflight_record(
         ],
     )
 
-    _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor", rows=densegen_rows)
-    _write_usr_dataset(repo_root / "usr_root", "mg1655_promoters")
-    _write_usr_dataset(repo_root / "usr_root", "plasmids")
+    _write_usr_dataset(repo_root / "usr_root", "densegen_demo_anchor", rows=densegen_rows)
+    _write_usr_dataset(repo_root / "usr_root", "usr_mg1655_promoter_controls")
+    _write_usr_dataset(repo_root / "usr_root", "usr_pdual10_plasmid_template")
     _write_usr_dataset(repo_root / "usr_root", "promoter/demo_anchor_set", rows=anchor_rows)
     _write_usr_dataset(repo_root / "usr_root", "promoter/demo_construct_contexts", rows=construct_rows)
 
@@ -1136,8 +1136,8 @@ def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
         assert payload["evidence"]["handoff_readiness_state"]["state"] == "attention"
         assert payload["evidence"]["planned_outputs_state"]["state"] == "ok"
         assert payload["evidence"]["next_ready_phase"]["id"] == "merged_anchor_set"
-        assert payload["evidence"]["datasets"][0]["dataset"] == "densegen/demo_anchor"
-        assert "source gate active densegen/demo_anchor 2/5 rows (gap=3)" in payload["summary"]
+        assert payload["evidence"]["datasets"][0]["dataset"] == "densegen_demo_anchor"
+        assert "source gate active densegen_demo_anchor 2/5 rows (gap=3)" in payload["summary"]
         assert "handoff outputs pending promoter/demo_anchor_set" in payload["summary"]
 
 
@@ -1201,7 +1201,7 @@ def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None
         assert evidence["study_dir"] == str(study_dir)
         assert evidence["infer_notify_profiles"] == {}
         assert evidence["infer_notify_profile_errors"] == {}
-        assert "source gate active densegen/demo_anchor 2/5 rows (gap=3)" in summary
+        assert "source gate active densegen_demo_anchor 2/5 rows (gap=3)" in summary
         assert "handoff outputs pending promoter/demo_anchor_set" in summary
 
 
@@ -1258,7 +1258,7 @@ def test_promoter_study_progress_demotes_source_gate_once_handoffs_exceed_target
 
         assert state == "ok"
         assert "handoffs ready anchor=7 construct=7" in summary
-        assert "source gate superseded by downstream handoffs densegen/demo_anchor 2/5 rows (gap=3)" in summary
+        assert "source gate superseded by downstream handoffs densegen_demo_anchor 2/5 rows (gap=3)" in summary
         assert "attention_reasons" not in evidence
         assert evidence["source_growth_state"]["state"] == "ok"
         assert evidence["source_growth_state"]["target_met"] is False
@@ -1281,7 +1281,7 @@ def test_promoter_study_status_surfaces_stale_construct_handoff() -> None:
         state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
 
         assert state == "attention"
-        assert "source rows visible densegen/demo_anchor 5 rows" in summary
+        assert "source rows visible densegen_demo_anchor 5 rows" in summary
         assert "handoff lag promoter/demo_anchor_set, promoter/demo_construct_contexts" in summary
         assert evidence["source_growth_state"]["state"] == "ok"
         assert evidence["handoff_readiness_state"]["state"] == "attention"

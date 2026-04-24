@@ -123,7 +123,7 @@ densegen:
       chunk_size: 128
     usr:
       root: ../../../usr/datasets
-      dataset: densegen/study_constitutive_sigma_panel
+      dataset: densegen_study_constitutive_sigma_panel
       chunk_size: 128
       health_event_interval_seconds: 60
 

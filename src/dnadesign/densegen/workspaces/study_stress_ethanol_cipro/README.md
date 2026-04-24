@@ -28,7 +28,7 @@ uv run dense notebook generate -c "$PWD/config.yaml"
 uv run dense notebook run -c "$PWD/config.yaml"
 ```
 
-Those commands read `densegen/study_stress_ethanol_cipro` through the existing
+Those commands read `densegen_prom_eth_cip_source` through the existing
 workspace config and only write local plot/notebook artifacts under `outputs/`.
 The workspace resolves `output.usr.root` against the git common repo root, so
 the same config works from a normal checkout and from an isolated worktree.

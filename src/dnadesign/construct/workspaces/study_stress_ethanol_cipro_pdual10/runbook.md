@@ -1,6 +1,6 @@
 ## study_stress_ethanol_cipro_pdual10 Runbook
 
-Use this runbook after `densegen/study_stress_ethanol_cipro` grows or when the
+Use this runbook after `densegen_prom_eth_cip_source` grows or when the
 study-owned shared anchor/context datasets need to be refreshed without losing
 existing Construct outputs.
 
@@ -9,14 +9,14 @@ existing Construct outputs.
 ```bash
 # Initialize the shared merged-anchor handoff dataset only once.
 uv run usr --root src/dnadesign/usr/datasets init \
-  promoter/stress_ethanol_cipro_anchor_set \
+  usr_prom_eth_cip_anchor \
   --source stress_ethanol_cipro_growth \
   --notes "Merged anchor set for Construct and Infer"
 
 # Preview the DenseGen delta before mutating the shared anchor dataset.
 uv run usr --root src/dnadesign/usr/datasets maintenance merge \
-  --dest promoter/stress_ethanol_cipro_anchor_set \
-  --src densegen/study_stress_ethanol_cipro \
+  --dest usr_prom_eth_cip_anchor \
+  --src densegen_prom_eth_cip_source \
   --union-columns \
   --if-duplicate error \
   --dry-run
@@ -24,21 +24,21 @@ uv run usr --root src/dnadesign/usr/datasets maintenance merge \
 # Merge the curated wildtype anchors without mutating their source dataset.
 # This is idempotent for the current study handoff and adds 0 rows on refresh.
 uv run usr --root src/dnadesign/usr/datasets maintenance merge \
-  --dest promoter/stress_ethanol_cipro_anchor_set \
-  --src mg1655_promoters \
+  --dest usr_prom_eth_cip_anchor \
+  --src usr_mg1655_promoter_controls \
   --union-columns \
   --if-duplicate error
 
 # Merge the DenseGen study output into the same shared anchor handoff.
 uv run usr --root src/dnadesign/usr/datasets maintenance merge \
-  --dest promoter/stress_ethanol_cipro_anchor_set \
-  --src densegen/study_stress_ethanol_cipro \
+  --dest usr_prom_eth_cip_anchor \
+  --src densegen_prom_eth_cip_source \
   --union-columns \
   --if-duplicate error
 
 # Validate the merged handoff dataset before Construct reads it.
 uv run usr --root src/dnadesign/usr/datasets validate \
-  promoter/stress_ethanol_cipro_anchor_set \
+  usr_prom_eth_cip_anchor \
   --strict
 ```
 
@@ -79,7 +79,7 @@ uv run construct workspace run-project \
 
 # Validate the resulting shared Construct context dataset strictly.
 uv run usr --root src/dnadesign/usr/datasets validate \
-  promoter/stress_ethanol_cipro_construct_contexts \
+  construct_prom_eth_cip_context \
   --strict
 ```
 

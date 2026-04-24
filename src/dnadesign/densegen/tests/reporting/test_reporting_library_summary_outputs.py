@@ -81,7 +81,7 @@ def _write_usr_config(path: Path) -> None:
               alphabet: dna_4
             usr:
               root: ../usr_root
-              dataset: densegen/demo_usr
+              dataset: densegen_demo_usr
           generation:
             sequence_length: 10
             plan:
@@ -220,13 +220,13 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(
         "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
-        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen/demo_usr"),
+        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen_demo_usr"),
     )
 
     loaded = load_config(cfg_path)
     bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
-    assert bundle.run_report["outputs_path"] == "../usr_root/densegen/demo_usr/records.parquet"
-    assert bundle.run_report["output_source"] == "usr:densegen/demo_usr"
+    assert bundle.run_report["outputs_path"] == "../usr_root/densegen_demo_usr/records.parquet"
+    assert bundle.run_report["output_source"] == "usr:densegen_demo_usr"
 
 
 def test_collect_report_data_rejects_missing_record_library_hash(tmp_path: Path, monkeypatch) -> None:
@@ -393,7 +393,7 @@ def test_collect_report_data_recovers_usage_from_composition_when_records_usage_
     )
     monkeypatch.setattr(
         "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
-        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen/demo_usr"),
+        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen_demo_usr"),
     )
 
     loaded = load_config(cfg_path)

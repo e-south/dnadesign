@@ -31,7 +31,7 @@ _KNOWN_LABELS = {
     "metadata": "Metadata",
 }
 _SOURCE_DESCRIPTOR_LABELS = {
-    "background_only": "Background",
+    "background_only": "Neutral",
     "ethanol": "EtOH",
     "ciprofloxacin": "Cipro",
     "ethanol_ciprofloxacin": "EtOH + Cipro",
@@ -165,7 +165,7 @@ def _compact_source_axis_label(value: object) -> str:
         scoped_parts = scoped_parts[1:]
     descriptor_key = _source_descriptor_key(token)
     descriptor_label = {
-        "background_only": "Background",
+        "background_only": "Neutral",
         "ethanol": "EtOH",
         "ciprofloxacin": "Cipro",
         "ethanol_ciprofloxacin": "EtOH+Cipro",

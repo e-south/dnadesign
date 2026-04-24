@@ -197,7 +197,7 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 ### Expected outputs
 
 - `outputs/tables/records.parquet`
-- `src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro/.events.log`
+- `src/dnadesign/usr/datasets/densegen_prom_eth_cip_source/.events.log`
 - `outputs/plots/`
 - `outputs/notebooks/densegen_run_overview.py`
 

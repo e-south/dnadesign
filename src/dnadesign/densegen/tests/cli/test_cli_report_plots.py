@@ -139,7 +139,7 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "get_records_export_handled_click",
         "get_baserender_export_handled_click",
         "get_plot_export_handled_click",
-        "get_baserender_display_payload, set_baserender_display_payload = mo.state({})",
+        "active_baserender_display_payload = {",
         "def build_baserender_request(*, record, preview_row):",
         "def build_baserender_figure(request: dict[str, object]):",
         "_buffer = BytesIO()",
@@ -176,6 +176,7 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "prepare_usr_preview_records",
         "load_records_from_parquet",
         "render_baserender_preview_path",
+        "get_baserender_display_payload, set_baserender_display_payload = mo.state({})",
         "prefetch_indices = (active_row_index, active_row_index - 1, active_row_index + 1)",
         'preview_cache_dir = run_root / "outputs" / "notebooks" / ".baserender_preview_cache"',
         'preview_dir = plot_inventory_path.parent / ".preview_png"',
@@ -226,6 +227,35 @@ def test_notebook_generate_includes_slider_and_numeric_jump_for_record_navigatio
     assert "_slider_row = mo.hstack(" in content
     assert "[record_index_slider]," in content
     assert "_nav_row = mo.hstack(" in content
+
+
+def test_notebook_generate_derives_baserender_preview_from_active_record_and_keeps_export_widgets_stable(
+    tmp_path: Path,
+) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert (
+        "def _(\n    active_baserender_request,\n    active_record_id,\n    render_baserender_preview_image,\n):"
+    ) in content
+    assert "active_baserender_display_payload = {" in content
+    assert (
+        '"BaseRender preview payload drifted away from the active record selection. Regenerate the notebook and rerun."'
+        in content
+    )
+    assert (
+        "def _(mo, run_root, to_repo_relative_path):\n"
+        '    baserender_export_format = mo.ui.dropdown(options=["png", "pdf", "svg"], value="png", label="")'
+    ) in content
+    assert "import matplotlib.pyplot as _plt" in content
+    assert content.count("close(_figure)") == 2
 
 
 def test_notebook_generate_keeps_navigation_state_out_of_preview_loading_cell(tmp_path: Path) -> None:
@@ -610,7 +640,7 @@ def test_notebook_generate_supports_usr_output_target(tmp_path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 usr:
-                  dataset: demo
+                  dataset: densegen_demo
                   root: ../usr_root
               generation:
                 sequence_length: 10
@@ -668,7 +698,7 @@ def test_notebook_generate_uses_plots_source_when_output_targets_are_both(tmp_pa
                 parquet:
                   path: outputs/tables/records.parquet
                 usr:
-                  dataset: demo
+                  dataset: densegen_demo
                   root: ../usr_root
               generation:
                 sequence_length: 10
@@ -2617,7 +2647,7 @@ def test_plot_missing_records_with_dual_sinks_reports_plots_source_hint(tmp_path
                   path: outputs/tables/records.parquet
                 usr:
                   root: ../usr_root
-                  dataset: densegen/demo
+                  dataset: densegen_demo
               generation:
                 sequence_length: 10
                 plan:

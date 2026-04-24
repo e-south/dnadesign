@@ -35,6 +35,7 @@ from .src.api import (
 from .src.config import RenderJobV3
 from .src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS
 from .src.core import ContractError, Display, Effect, Feature, LayoutError, Record, SchemaError, Span
+from .src.render.palette import Palette
 from .src.runtime import initialize_runtime
 
 __all__ = [
@@ -61,6 +62,7 @@ __all__ = [
     "Effect",
     "Display",
     "Span",
+    "Palette",
     "SchemaError",
     "ContractError",
     "LayoutError",

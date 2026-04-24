@@ -208,6 +208,7 @@ the study record routes DenseGen directly to the shared dataset.
 - When multiple targets are set, outputs must be in sync before a run; mismatches are errors.
 - `usr` (required when `targets` includes `usr`)
   - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`
+  - `dataset` must be a flat DenseGen-owned owner-first id such as `densegen_demo_sampling_baseline`; keep provenance in USR metadata and study records instead of nested dataset paths
   - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` USR events
   - `npz_fields` (optional list of metadata keys to offload into NPZ artifacts; see outputs doc)
   - `npz_root` (optional path for NPZ artifacts; defaults to `<dataset>/_artifacts/densegen_npz`)

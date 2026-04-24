@@ -21,9 +21,9 @@ study_pipeline:
       anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
       anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
   datasets:
-    densegen_anchor_source: densegen/study_stress_ethanol_cipro
-    merged_anchor_dataset: promoter/stress_ethanol_cipro_anchor_set
-    construct_context_dataset: promoter/stress_ethanol_cipro_construct_contexts
+    densegen_anchor_source: densegen_prom_eth_cip_source
+    merged_anchor_dataset: usr_prom_eth_cip_anchor
+    construct_context_dataset: construct_prom_eth_cip_context
   infer:
     preferred_model_family: evo2_20b
     supported_model_families:

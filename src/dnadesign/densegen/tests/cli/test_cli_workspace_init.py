@@ -229,12 +229,12 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
     output = cfg["densegen"]["output"]
     assert output["targets"] == ["usr"]
     assert output["usr"]["root"] == expected_root
-    assert output["usr"]["dataset"] == "demo_run"
+    assert output["usr"]["dataset"] == "densegen_demo_run"
     assert not (shared_usr_root / "registry.yaml").exists()
     assert "Shared USR registry is not present yet" in result.output
 
 
-def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
+def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_owner_first_id(tmp_path: Path) -> None:
     shared_usr_root = tmp_path / "usr_root"
     runner = CliRunner()
     result = runner.invoke(
@@ -258,7 +258,7 @@ def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_workspa
     cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
     output = cfg["densegen"]["output"]
     assert output["targets"] == ["usr"]
-    assert output["usr"]["dataset"] == "sampling_run"
+    assert output["usr"]["dataset"] == "densegen_sampling_run"
 
 
 def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> None:
@@ -294,7 +294,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
     assert "Shared USR registry is not present yet" in result.output
 
 
-def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
+def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_owner_first_id(tmp_path: Path) -> None:
     shared_usr_root = tmp_path / "usr_root"
     runner = CliRunner()
     result = runner.invoke(
@@ -318,7 +318,7 @@ def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_worksp
     cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
     output = cfg["densegen"]["output"]
     assert set(output["targets"]) == {"parquet", "usr"}
-    assert output["usr"]["dataset"] == "sampling_run"
+    assert output["usr"]["dataset"] == "densegen_sampling_run"
 
 
 def test_workspace_init_output_mode_usr_requires_explicit_or_env_shared_root_outside_repo(

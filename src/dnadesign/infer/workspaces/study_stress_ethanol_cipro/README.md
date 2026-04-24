@@ -5,8 +5,8 @@ study.
 
 It keeps the study's context planes explicit:
 
-- `anchor_only` reads `promoter/stress_ethanol_cipro_anchor_set`
-- `template_1kb` reads `promoter/stress_ethanol_cipro_construct_contexts`
+- `anchor_only` reads `usr_prom_eth_cip_anchor`
+- `template_1kb` reads `construct_prom_eth_cip_context`
 
 That split is deliberate. The current Evo2 `feature_bundle` contract keeps
 context kind explicit per job, so the study's "full lane set" is represented as
@@ -110,7 +110,7 @@ Interactive watcher cold-start for an existing study stream:
 
 ```bash
 PROFILE=src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json
-EVENTS=src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_anchor_set/.events.log
+EVENTS=src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/.events.log
 CURSOR=src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/cursor
 
 mkdir -p "$(dirname "$CURSOR")"

@@ -10,7 +10,7 @@ jobs:
     operation: extract
     ingest:
       source: usr
-      dataset: promoter/stress_ethanol_cipro_anchor_set
+      dataset: usr_prom_eth_cip_anchor
       root: ../../../usr/datasets
       field: sequence
     feature_bundle:
@@ -28,7 +28,7 @@ jobs:
     operation: extract
     ingest:
       source: usr
-      dataset: promoter/stress_ethanol_cipro_construct_contexts
+      dataset: construct_prom_eth_cip_context
       root: ../../../usr/datasets
       field: sequence
     feature_bundle:

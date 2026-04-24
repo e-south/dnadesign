@@ -52,7 +52,7 @@ def _write_config(path: Path) -> None:
                   deduplicate: true
                   chunk_size: 64
                 usr:
-                  dataset: demo_workspace
+                  dataset: densegen_demo_workspace
                   root: outputs/usr
                   chunk_size: 1
 
@@ -125,7 +125,7 @@ def _write_config_usr_only(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 usr:
-                  dataset: demo_workspace
+                  dataset: densegen_demo_workspace
                   root: outputs/usr
                   chunk_size: 1
 
@@ -188,12 +188,12 @@ def test_real_solver_run_writes_usr_and_resume_is_safe(tmp_path: Path) -> None:
     first = run_pipeline(loaded, resume=False, build_stage_a=True)
     assert first.total_generated >= 1
 
-    records_path = workspace / "outputs" / "usr" / "demo_workspace" / "records.parquet"
+    records_path = workspace / "outputs" / "usr" / "densegen_demo_workspace" / "records.parquet"
     assert records_path.exists()
     row_count_before_resume = pq.read_table(records_path).num_rows
     assert row_count_before_resume >= 1
 
-    overlay_dir = workspace / "outputs" / "usr" / "demo_workspace" / "_derived" / "densegen"
+    overlay_dir = workspace / "outputs" / "usr" / "densegen_demo_workspace" / "_derived" / "densegen"
     assert list(overlay_dir.glob("part-*.parquet"))
 
     run_pipeline(loaded, resume=True, build_stage_a=False)
@@ -215,7 +215,7 @@ def test_real_solver_run_usr_only_resume_is_safe(tmp_path: Path) -> None:
     first = run_pipeline(loaded, resume=False, build_stage_a=True)
     assert first.total_generated >= 1
 
-    records_path = workspace / "outputs" / "usr" / "demo_workspace" / "records.parquet"
+    records_path = workspace / "outputs" / "usr" / "densegen_demo_workspace" / "records.parquet"
     assert records_path.exists()
     row_count_before_resume = pq.read_table(records_path).num_rows
     assert row_count_before_resume >= 1

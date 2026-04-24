@@ -76,8 +76,8 @@ def test_dataset_source_inventory_uses_wide_vertical_layout_and_compact_source_l
     assert len(ax.patches) == 4
     assert len(bar_colors) == 4
     assert bar_heights == sorted(bar_heights, reverse=True)
-    assert labels[0] == "Background σ70-35(f)"
-    assert "Background σ70-35(f)" in labels
+    assert labels[0] == "Neutral σ70-35(f)"
+    assert "Neutral σ70-35(f)" in labels
     assert "EtOH σ70-35(f)" in labels
     assert "Cipro σ70-35(d)" in labels
     assert "EtOH+Cipro σ70-35(e)" in labels

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Callable, Optional
@@ -96,6 +97,13 @@ def _shared_usr_root_for_workspace(workspace_dir: Path, *, usr_root: Path | None
         return shared_root.as_posix()
 
 
+def _densegen_usr_dataset_id(run_id: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9]+", "_", str(run_id).strip().lower()).strip("_") or "workspace"
+    if stem.startswith("densegen_"):
+        return stem
+    return f"densegen_{stem}"
+
+
 def _apply_output_mode(
     output: dict,
     *,
@@ -122,7 +130,7 @@ def _apply_output_mode(
 
     if mode in {"usr", "both"}:
         usr_cfg["root"] = _shared_usr_root_for_workspace(workspace_dir, usr_root=usr_root)
-        usr_cfg["dataset"] = run_id
+        usr_cfg["dataset"] = _densegen_usr_dataset_id(run_id)
         usr_cfg.setdefault("chunk_size", 128)
         out["usr"] = usr_cfg
 

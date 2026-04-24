@@ -2,26 +2,26 @@ study_id: stress_ethanol_cipro_growth
 usr_remotes_path: src/dnadesign/usr/remotes.yaml
 datasets:
   - role: densegen_anchor
-    dataset: densegen/study_stress_ethanol_cipro
+    dataset: densegen_prom_eth_cip_source
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: present
     lifecycle: source
-    owner_tool: usr
+    owner_tool: densegen
     onboard_mode: existing_both
     authority: shared
     notes: Shared study copy written directly by DenseGen to the shared USR root and used for downstream status, construct, infer, and cluster handoff.
     sync:
       enabled: true
       remote_name: cluster
-      remote_dataset: densegen/study_stress_ethanol_cipro
+      remote_dataset: densegen_prom_eth_cip_source
       remote_root_kind: shared
       default_direction: bidirectional
-      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/densegen_study_stress_ethanol_cipro--cluster-diff.json
+      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/densegen_prom_eth_cip_source--cluster-diff.json
       strict_bootstrap_id: true
       remote_path: n/a
   - role: wildtype_manual
-    dataset: mg1655_promoters
+    dataset: usr_mg1655_promoter_controls
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: present
@@ -40,7 +40,7 @@ datasets:
       strict_bootstrap_id: false
       remote_path: n/a
   - role: construct_template_seed
-    dataset: plasmids
+    dataset: usr_pdual10_plasmid_template
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: present
@@ -59,7 +59,7 @@ datasets:
       strict_bootstrap_id: false
       remote_path: n/a
   - role: merged_anchor_source
-    dataset: promoter/stress_ethanol_cipro_anchor_set
+    dataset: usr_prom_eth_cip_anchor
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: present
@@ -67,18 +67,18 @@ datasets:
     owner_tool: usr
     onboard_mode: existing_both
     authority: shared
-    notes: Study-owned merged anchor set materialized from mg1655_promoters plus densegen/study_stress_ethanol_cipro and used as the shared anchor-only Infer handoff. Canonical shared copies now exist both locally and on the SCC cluster root.
+    notes: Study-owned merged anchor set materialized from usr_mg1655_promoter_controls plus densegen_prom_eth_cip_source and used as the shared anchor-only Infer handoff. Canonical shared copies now exist both locally and on the SCC cluster root.
     sync:
       enabled: true
       remote_name: cluster
-      remote_dataset: promoter/stress_ethanol_cipro_anchor_set
+      remote_dataset: usr_prom_eth_cip_anchor
       remote_root_kind: shared
       default_direction: bidirectional
-      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/promoter_stress_ethanol_cipro_anchor_set--cluster-diff.json
+      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/usr_prom_eth_cip_anchor--cluster-diff.json
       strict_bootstrap_id: true
       remote_path: n/a
   - role: construct_context
-    dataset: promoter/stress_ethanol_cipro_construct_contexts
+    dataset: construct_prom_eth_cip_context
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: present
@@ -86,18 +86,18 @@ datasets:
     owner_tool: construct
     onboard_mode: existing_both
     authority: shared
-    notes: Study-owned 1 kb pDual-10 contexts materialized by Construct from the merged anchor set and plasmids template dataset for template-backed Infer lanes. Canonical shared copies now exist both locally and on the SCC cluster root.
+    notes: Study-owned 1 kb pDual-10 contexts materialized by Construct from the merged anchor set and usr_pdual10_plasmid_template template dataset for template-backed Infer lanes. Canonical shared copies now exist both locally and on the SCC cluster root.
     sync:
       enabled: true
       remote_name: cluster
-      remote_dataset: promoter/stress_ethanol_cipro_construct_contexts
+      remote_dataset: construct_prom_eth_cip_context
       remote_root_kind: shared
       default_direction: bidirectional
-      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/promoter_stress_ethanol_cipro_construct_contexts--cluster-diff.json
+      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/construct_prom_eth_cip_context--cluster-diff.json
       strict_bootstrap_id: true
       remote_path: n/a
   - role: feature_matrix
-    dataset: promoter/stress_ethanol_cipro_feature_matrix
+    dataset: usr_prom_eth_cip_matrix
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: planned
@@ -109,9 +109,9 @@ datasets:
     sync:
       enabled: true
       remote_name: cluster
-      remote_dataset: promoter/stress_ethanol_cipro_feature_matrix
+      remote_dataset: usr_prom_eth_cip_matrix
       remote_root_kind: shared
       default_direction: bidirectional
-      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/promoter_stress_ethanol_cipro_feature_matrix--cluster-diff.json
+      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/usr_prom_eth_cip_matrix--cluster-diff.json
       strict_bootstrap_id: true
       remote_path: n/a

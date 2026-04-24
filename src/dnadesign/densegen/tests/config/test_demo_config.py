@@ -15,10 +15,11 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.sources.base import resolve_path
-from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.config import OutputUSRConfig, load_config
 from dnadesign.densegen.src.config.base import LATEST_SCHEMA_VERSION
 from dnadesign.densegen.src.viz.plot_inventory import notebook_visible_plot_ids
 
@@ -153,11 +154,16 @@ def test_demo_sampling_baseline_uses_both_outputs_and_cbc_solver() -> None:
     assert output.parquet.path == "outputs/tables/records.parquet"
     assert output.usr is not None
     assert output.usr.root == "../../../usr/datasets"
-    assert output.usr.dataset == "densegen/demo_sampling_baseline"
+    assert output.usr.dataset == "densegen_demo_sampling_baseline"
     assert solver.backend == "CBC"
     assert solver.threads is None
     assert plots is not None
     assert plots.source == "usr"
+
+
+def test_densegen_usr_output_dataset_rejects_nested_paths() -> None:
+    with pytest.raises(ValueError, match="flat owner-first id"):
+        OutputUSRConfig(root="../../../usr/datasets", dataset="densegen/demo_sampling_baseline")
 
 
 def test_tfbs_baseline_demo_config_exists_and_loads() -> None:
@@ -332,6 +338,11 @@ def test_stress_workspace_uses_four_equal_base_plan_quotas() -> None:
 
 
 def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
+    explicit_shared_dataset_ids = {
+        "demo_sampling_baseline": "densegen_demo_sampling_baseline",
+        "study_constitutive_sigma_panel": "densegen_study_constitutive_sigma_panel",
+        "study_stress_ethanol_cipro": "densegen_prom_eth_cip_source",
+    }
     for workspace_id in (
         "demo_tfbs_baseline",
         "demo_sampling_baseline",
@@ -343,8 +354,10 @@ def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
         assert cfg.root.densegen.run.id == workspace_id
         usr_cfg = cfg.root.densegen.output.usr
         if usr_cfg is not None:
-            assert usr_cfg.dataset.endswith(workspace_id)
-            assert usr_cfg.dataset.startswith("densegen/")
+            expected_dataset = explicit_shared_dataset_ids.get(workspace_id)
+            assert expected_dataset is not None
+            assert usr_cfg.dataset == expected_dataset
+            assert "/" not in usr_cfg.dataset
 
 
 def test_packaged_workspace_configs_exclude_stale_legacy_namespaces() -> None:
@@ -560,7 +573,7 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     solver = cfg.root.densegen.solver
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
-    assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
+    assert output.usr.dataset == "densegen_prom_eth_cip_source"
     assert output.usr.root == "src/dnadesign/usr/datasets"
     assert output.usr.root_scope == "git_common_repo_root"
     assert float(output.usr.health_event_interval_seconds) > 0

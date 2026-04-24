@@ -140,7 +140,7 @@ densegen:
     usr:
       root: src/dnadesign/usr/datasets
       root_scope: git_common_repo_root
-      dataset: densegen/study_stress_ethanol_cipro
+      dataset: densegen_prom_eth_cip_source
       chunk_size: 8192
       health_event_interval_seconds: 60
 

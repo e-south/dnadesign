@@ -11,9 +11,9 @@
 
 ### Current datasets
 
-- DenseGen anchor source: `densegen/study_stress_ethanol_cipro` (`present`, shared source)
-- Anchor-only handoff: `promoter/stress_ethanol_cipro_anchor_set` (`present`, shared infer handoff)
-- Full-context handoff: `promoter/stress_ethanol_cipro_construct_contexts` (`present`, shared infer handoff)
+- DenseGen anchor source: `densegen_prom_eth_cip_source` (`present`, shared source)
+- Anchor-only handoff: `usr_prom_eth_cip_anchor` (`present`, shared infer handoff)
+- Full-context handoff: `construct_prom_eth_cip_context` (`present`, shared infer handoff)
 
 ### Current phase
 
@@ -21,34 +21,37 @@
 - Preferred infer family: `evo2_20b`
 - Supported infer families: `evo2_20b`, `evo2_7b`
 - The study phase is `infer_batch_preparation`
-- LatentDNA browser default family: `evo2_7b` for the seven-view scientist-facing review surface; 20B views remain materializable but hidden in the browser
+- LatentDNA browser default family: `evo2_7b` for the five-view scientist-facing review surface; 20B views remain materializable but hidden in the browser
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
 - Current attention surfaces: none
-- Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
-- Appendix and debug surfaces remain secondary audit material
+- Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
+- Appendix surfaces remain secondary audit material
 
 ### Current row counts
 
 - DenseGen source row target: `100000`
 - DenseGen anchor target before the first full-lane infer gate closes: `100000`
-- `densegen/study_stress_ethanol_cipro`: `157160`
-- `promoter/stress_ethanol_cipro_anchor_set`: `157164`
-- `promoter/stress_ethanol_cipro_construct_contexts`: `157164`
+- `densegen_prom_eth_cip_source`: `157160`
+- `usr_prom_eth_cip_anchor`: `157164`
+- `construct_prom_eth_cip_context`: `157164`
 - Status JSON route: `evidence.analysis_surfaces.{densegen,latentdna,cluster}`
 
 ### Current downstream posture
 
 - LatentDNA: `configured` for downstream comparison; the study-status authority remains the checked-in record plus `usr.data-plane.promoter-study-status`
 - LatentDNA gate: `representation_health_summary`
-- LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
-- LatentDNA notebook role: plot-first review surface for the seven-view 7B-first pre-assay ladder, with appendix and debug material kept secondary
+- LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
+- LatentDNA companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
+- LatentDNA appendix support: `sigma35_centroid_distance_gallery`
+- LatentDNA notebook role: plot-first review surface for the five-view 7B-first pre-assay ladder, with appendix and debug material kept secondary
 - Cluster: `planned`
 - OPAL: `not_configured`
 - Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
 - Current appendix attention: none
 - Current appendix ok: `appendix_geometry_audit`, `appendix_umap_gallery`
-- The active comparison is `anchor_60bp` versus `full_context_1kb`
+- The active comparison is `anchor_60bp` versus `full_context_anchor_mean`, with `full_context_1kb` retained as an orientation view
 
 ### Next actions
 

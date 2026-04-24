@@ -46,7 +46,7 @@ def _write_densegen_config(config_path: Path) -> None:
                   alphabet: dna_4
                 usr:
                   root: ../shared_usr
-                  dataset: densegen/demo
+                  dataset: densegen_demo
                   chunk_size: 128
               generation:
                 sequence_length: 12
@@ -84,7 +84,7 @@ def _write_infer_write_back_config(config_path: Path) -> None:
                 operation: extract
                 ingest:
                   source: usr
-                  dataset: demo
+                  dataset: densegen_demo
                   root: ../shared_usr
                   field: sequence
                 outputs:

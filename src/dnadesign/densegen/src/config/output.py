@@ -52,6 +52,13 @@ class OutputUSRConfig(BaseModel):
             raise ValueError("output.usr.dataset must be a relative path")
         if any(part in {".", ".."} for part in path.parts):
             raise ValueError("output.usr.dataset must not contain '.' or '..'")
+        if len(path.parts) != 1:
+            raise ValueError(
+                "output.usr.dataset must be a flat owner-first id placed directly under output.usr.root; "
+                "use USR metadata, overlays, and study records for provenance instead of nested paths"
+            )
+        if not value.startswith("densegen_"):
+            raise ValueError("output.usr.dataset must be a DenseGen-owned owner-first id starting with 'densegen_'")
         return Path(*path.parts).as_posix()
 
     @field_validator("root")

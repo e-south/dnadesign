@@ -24,8 +24,8 @@ from dnadesign.infer.src.engine import _plan_resume_for_usr, run_extract_job
 from dnadesign.infer.src.errors import RuntimeOOMError, WriteBackError
 from dnadesign.infer.src.runtime.resume_planner import read_usr_columns
 from dnadesign.infer.src.writers.usr import write_back_usr
+from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
-from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 
 class _AttachCaptureDataset:

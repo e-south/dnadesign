@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import dnadesign.baserender as baserender
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.record_values import (
     normalize_used_tfbs_entries as normalize_used_tfbs_entries_impl,
@@ -437,6 +438,7 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
     records_path.write_bytes(b"placeholder")
 
     records_df = _base_records_df().copy()
+    records_df.loc[0, "sequence"] = "TTTTACGTAA"
     records_df.loc[1, "id"] = "abcdefghijklmnopqrstu"
     records_df.loc[0, "densegen__used_tfbs_detail"] = [
         {"tf": "lexA", "orientation": "fwd", "tfbs": "TTTT", "offset": 0}
@@ -477,10 +479,10 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
     assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_seq"] == 24
     assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_label"] == 24
     assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_height_px"] == 136.0
-    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_patch_w"] == 96.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_patch_w"] == 88.0
     assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_patch_h"] == 34.0
     assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_gap_patch_text"] == 22.0
-    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_gap_x"] == 60.0
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_gap_x"] == 44.0
     assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_font_size"] == 24
     assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_vertical_align"] == 1.0
     assert captured["job_mapping"]["render"]["style"]["overrides"]["uniform_display_font_size"] is True
@@ -490,6 +492,22 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
     normalized_annotations = json.loads(legacy_row["densegen__used_tfbs_detail"])
     assert normalized_annotations[0]["regulator"] == "lexA"
     assert normalized_annotations[0]["sequence"] == "TTTT"
+    adapted_record = baserender.adapt_record(
+        legacy_row.to_dict(),
+        adapter_kind="densegen_tfbs",
+        adapter_columns=dict(captured["adapter_columns"]),
+        adapter_policies={"on_missing_kmer": "skip_entry"},
+        alphabet="DNA",
+        row_index=0,
+    )
+    promoter_features = [
+        feature for feature in adapted_record.features if feature.attrs.get("source") == "densegen_promoter"
+    ]
+    promoter_labels = {
+        str(feature.attrs.get("component")): str(feature.attrs.get("display_label")) for feature in promoter_features
+    }
+    assert promoter_labels["upstream"] == "-35 site (a)"
+    assert promoter_labels["downstream"] == "-10 site (B)"
     assert rendered_df["densegen__video_subtitle"].tolist() == [
         "Sequence abcdefgh...rstu | Plan plan a",
         "Sequence rec_b_1 | Plan plan b",

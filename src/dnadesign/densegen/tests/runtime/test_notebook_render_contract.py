@@ -77,10 +77,10 @@ def test_notebook_render_contract_is_explicit_and_complete() -> None:
     assert contract.style_overrides.get("legend_mode") == "bottom"
     assert contract.style_overrides.get("legend_height_px") == 136.0
     assert contract.style_overrides.get("legend_font_size") == 24
-    assert contract.style_overrides.get("legend_patch_w") == 96.0
+    assert contract.style_overrides.get("legend_patch_w") == 88.0
     assert contract.style_overrides.get("legend_patch_h") == 34.0
     assert contract.style_overrides.get("legend_gap_patch_text") == 22.0
-    assert contract.style_overrides.get("legend_gap_x") == 60.0
+    assert contract.style_overrides.get("legend_gap_x") == 44.0
     assert contract.style_overrides.get("legend_vertical_align") == 1.0
     assert contract.style_overrides.get("uniform_display_font_size") is True
     assert contract.record_window_limit == 500
@@ -132,7 +132,7 @@ def test_notebook_render_contract_renders_extended_densegen_tf_tags(tmp_path: Pa
     plt.close(fig)
 
 
-def test_notebook_render_contract_bottom_legend_stays_on_one_row_for_densegen_parts(tmp_path: Path) -> None:
+def test_notebook_render_contract_bottom_legend_keeps_densegen_parts_compact(tmp_path: Path) -> None:
     records_path = tmp_path / "records.parquet"
     pd.DataFrame(
         [
@@ -196,13 +196,75 @@ def test_notebook_render_contract_bottom_legend_stays_on_one_row_for_densegen_pa
         fig.canvas.draw()
         legend_texts = [text for text in axis.texts if float(text.get_zorder()) == 10.0]
         assert len(legend_texts) >= 5
-        assert len({round(float(text.get_position()[1]), 3) for text in legend_texts}) == 1
+        assert len({round(float(text.get_position()[1]), 3) for text in legend_texts}) <= 2
         legend_labels = {text.get_text() for text in legend_texts}
-        assert "LexA" in legend_labels
-        assert "CpxR" in legend_labels
-        assert "BaeR" in legend_labels
-        assert "σ70 -35 site" in legend_labels
-        assert "σ70 -10 site" in legend_labels
+        assert "LexA sites" in legend_labels
+        assert "CpxR sites" in legend_labels
+        assert "BaeR sites" in legend_labels
+        assert "-35 sites" in legend_labels
+        assert "-10 sites" in legend_labels
+    finally:
+        plt.close(fig)
+
+
+def test_notebook_render_contract_uses_variant_specific_promoter_annotation_labels(tmp_path: Path) -> None:
+    records_path = tmp_path / "records.parquet"
+    pd.DataFrame(
+        [
+            {
+                "id": "row1",
+                "sequence": "AAAAATTTGGGCCCCCCAAAATTTGGG",
+                "densegen__used_tfbs_detail": [
+                    {
+                        "regulator": "lexA_CTGTATAWAWWHACA",
+                        "orientation": "fwd",
+                        "sequence": "AAA",
+                        "offset": 0,
+                    },
+                    {
+                        "part_kind": "fixed_element",
+                        "role": "upstream",
+                        "constraint_name": "sigma70_core",
+                        "sequence": "TTTGGG",
+                        "offset": 5,
+                        "length": 6,
+                        "spacer_length": 6,
+                        "variant_id": "f",
+                    },
+                    {
+                        "part_kind": "fixed_element",
+                        "role": "downstream",
+                        "constraint_name": "sigma70_core",
+                        "sequence": "AAAATT",
+                        "offset": 17,
+                        "length": 6,
+                        "spacer_length": 6,
+                        "variant_id": "B",
+                    },
+                ],
+            }
+        ]
+    ).to_parquet(records_path)
+
+    contract = densegen_notebook_render_contract()
+    fig = render_parquet_record_figure(
+        dataset_path=records_path,
+        record_id="row1",
+        adapter_kind=contract.adapter_kind,
+        adapter_columns=contract.adapter_columns,
+        adapter_policies=contract.adapter_policies,
+        style_preset=contract.style_preset,
+        style_overrides=contract.style_overrides,
+    )
+    try:
+        axis = fig.axes[0]
+        fig.canvas.draw()
+        text_labels = {text.get_text() for text in axis.texts}
+        legend_labels = {text.get_text() for text in axis.texts if float(text.get_zorder()) == 10.0}
+        assert "-35 site (f)" in text_labels
+        assert "-10 site (B)" in text_labels
+        assert "-35 sites" in legend_labels
+        assert "-10 sites" in legend_labels
     finally:
         plt.close(fig)
 

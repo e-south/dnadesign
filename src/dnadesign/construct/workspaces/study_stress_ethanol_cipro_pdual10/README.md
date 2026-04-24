@@ -5,10 +5,10 @@ This is the real study-owned Construct surface for `stress_ethanol_cipro_growth`
 It is not a demo. It assumes:
 
 - the shared USR root is `src/dnadesign/usr/datasets`
-- the merged anchor dataset is `promoter/stress_ethanol_cipro_anchor_set`
-- the template dataset is `plasmids`
+- the merged anchor dataset is `usr_prom_eth_cip_anchor`
+- the template dataset is `usr_pdual10_plasmid_template`
 - the pDual-10 template record id is `c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d`
-- the single study project writes into `promoter/stress_ethanol_cipro_construct_contexts`
+- the single study project writes into `construct_prom_eth_cip_context`
 - the study anchor is always placed on the template forward strand at
   `3574..3666`, with upstream flank `CGCCAGCAACCGGGATCC` and downstream flank
   `GAATTCGCCAGCTGTCACCGGA`

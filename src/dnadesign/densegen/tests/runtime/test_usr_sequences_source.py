@@ -22,7 +22,7 @@ from dnadesign.usr.src.registry import USR_STATE_COLUMNS, USR_STATE_NAMESPACE, r
 
 def test_usr_sequences_source_streams_without_full_parquet_read(monkeypatch, tmp_path: Path) -> None:
     root = tmp_path / "usr_root"
-    dataset_name = "densegen/demo_stream"
+    dataset_name = "densegen_demo_stream"
     register_namespace(
         root,
         namespace=USR_STATE_NAMESPACE,

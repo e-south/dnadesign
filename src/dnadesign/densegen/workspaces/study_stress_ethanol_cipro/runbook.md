@@ -60,7 +60,7 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
 
 ### Read-only local DenseGen analysis
 
-These commands read the shared `densegen/study_stress_ethanol_cipro` dataset
+These commands read the shared `densegen_prom_eth_cip_source` dataset
 through the existing workspace config and only write local plot/notebook
 artifacts under `outputs/`. The workspace resolves `output.usr.root` against
 the git common repo root so the same commands work from a normal checkout and

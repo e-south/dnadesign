@@ -3,14 +3,14 @@ job:
   input:
     source:
       kind: usr
-      dataset: promoter/stress_ethanol_cipro_anchor_set
+      dataset: usr_prom_eth_cip_anchor
       root: ../../../usr/datasets
     field: sequence
   template:
     id: pdual10_forward_anchor_window
     source:
       kind: usr
-      dataset: plasmids
+      dataset: usr_pdual10_plasmid_template
       root: ../../../usr/datasets
       record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
       field: sequence
@@ -46,5 +46,5 @@ job:
     on_conflict: ignore
     target:
       kind: usr
-      dataset: promoter/stress_ethanol_cipro_construct_contexts
+      dataset: construct_prom_eth_cip_context
       root: ../../../usr/datasets
