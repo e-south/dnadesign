@@ -10,21 +10,22 @@ archived so collaborators can discover what exists without committing the data.
 - Derived overlays: `_derived/<namespace>.parquet` (namespaced columns only)
 - Generated: `.events.log`, `_snapshots/`
 - Non-canonical workflow artifacts such as `batch_results/`, `outputs/`, and `runs/` may exist in historical datasets; treat them as generated side artifacts, not part of the cross-tool dataset API.
-- Dataset ids: flat ids such as `mg1655_promoters` are first-class; `namespace/dataset` remains available when it improves disambiguation
+- Dataset ids: active shared study datasets use flat owner-first ids such as `densegen_prom_eth_cip_source`; use `root_kind`, `owner_tool`, overlays, and study metadata for provenance instead of nested tool-routing paths.
+- Namespace-qualified ids remain available for non-active or local disambiguation cases; `archived/` is the only special top-level bucket in this shared root.
 - Registry: `registry.yaml` at the datasets root (required for overlays and tracked in repo-owned shared roots because it is the cross-tool namespace contract, not generated run state; byte-stable ordering matters because `usr:registry_hash` is computed from the serialized YAML)
 
 For the shared repo root `src/dnadesign/usr/datasets`, keep `registry.yaml` committed and synced across clones before relying on `usr validate --strict` or SSH sync verification.
 
 ## Local Datasets (update as needed)
 - Flat ids:
-  - `demo/` — demo dataset for CLI examples
-  - `mg1655_promoters/` — curated wildtype promoter source dataset used by construct and promoter-study assembly flows
-  - `plasmids/` — curated plasmid/template source dataset used by construct and promoter-study assembly flows
-- Namespace-qualified ids:
-  - `densegen/demo_sampling_baseline/`
-  - `densegen/study_stress_ethanol_cipro/`
-  - `promoter/stress_ethanol_cipro_anchor_set/`
-  - `promoter/stress_ethanol_cipro_construct_contexts/`
+  - `densegen_demo_sampling_baseline/` — DenseGen-owned demo sampling baseline output dataset
+  - `densegen_prom_eth_cip_source/` — DenseGen-owned promoter ethanol/ciprofloxacin source dataset
+  - `densegen_study_constitutive_sigma_panel/` — DenseGen-owned constitutive sigma-panel study output dataset
+  - `usr_demo_cli_examples/` — USR-owned CLI example dataset for local walkthroughs
+  - `usr_mg1655_promoter_controls/` — USR-curated MG1655 promoter control anchors used by construct and promoter-study assembly flows
+  - `usr_pdual10_plasmid_template/` — USR-curated pDual-10 plasmid template record used by construct context expansion
+  - `usr_prom_eth_cip_anchor/` — USR-owned merged promoter ethanol/ciprofloxacin anchor handoff
+  - `construct_prom_eth_cip_context/` — Construct-owned promoter ethanol/ciprofloxacin context handoff
 - Archive root:
   - `archived/` — canonical location for archived datasets and archive buckets; keep archived material here instead of the live dataset-id namespace
 - Archived datasets:

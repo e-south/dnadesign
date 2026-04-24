@@ -24,6 +24,7 @@ from .registry import (
     stored_dataset_registry_hash,
     tombstone_path,
 )
+from .snapshot import snapshot_dataset
 from .write_session import DatasetWriteSession, init_dataset
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "load_dataset_registry",
     "require_dataset_exists",
     "require_registry_for_mutation",
+    "snapshot_dataset",
     "stored_dataset_registry_hash",
     "tombstone_path",
 ]

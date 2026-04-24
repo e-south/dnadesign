@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/usr/tests/test_cli_imports.py
+src/dnadesign/usr/tests/cli/test_cli_imports.py
 
 CLI import hygiene tests.
 

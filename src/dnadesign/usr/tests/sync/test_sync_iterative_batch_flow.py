@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py
+src/dnadesign/usr/tests/sync/test_sync_iterative_batch_flow.py
 
 Pressure tests for iterative USR sync flows used by HPC batch workloads.
 
@@ -21,12 +21,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from dnadesign.testsupport.usr import ensure_registry, register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
-from dnadesign.usr.src.errors import TransferError
-from dnadesign.usr.src.remote_sync.config import SSHRemoteConfig
-from dnadesign.usr.src.remote_sync.remote import RemoteDatasetStat, RemotePrimaryStat
-from dnadesign.usr.tests.registry_helpers import ensure_registry, register_test_namespace
+from dnadesign.usr.src.contracts import TransferError
+from dnadesign.usr.src.sync.remote.config import SSHRemoteConfig
+from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
 
 
 def _sha256(path: Path) -> str:
@@ -220,7 +220,7 @@ def test_iterative_sync_flow_recovers_after_interrupted_pull(tmp_path: Path, mon
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_hpc_sync"
+    dataset_id = "densegen_demo_hpc_sync"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -271,7 +271,7 @@ def test_iterative_sync_flow_skips_transfer_calls_when_already_up_to_date(
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_noop_sync"
+    dataset_id = "densegen_demo_noop_sync"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -307,7 +307,7 @@ def test_iterative_sync_flow_recovers_after_interrupted_push(tmp_path: Path, mon
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_push_resume"
+    dataset_id = "densegen_demo_push_resume"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -359,7 +359,7 @@ def test_iterative_cross_location_sidecar_fidelity_for_densegen_infer_updates(
     register_test_namespace(remote_root, namespace="infer", columns_spec="infer__llr:float64")
     register_test_namespace(local_root, namespace="densegen", columns_spec="densegen__score:float64")
     register_test_namespace(local_root, namespace="infer", columns_spec="infer__llr:float64")
-    dataset_id = "densegen/demo_hpc_fidelity"
+    dataset_id = "densegen_demo_hpc_fidelity"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="densegen-seed")
@@ -451,7 +451,7 @@ def test_pull_detects_overlay_drift_when_event_sidecar_delta_is_missing(
     ensure_registry(remote_root)
     register_test_namespace(remote_root, namespace="densegen", columns_spec="densegen__score:float64")
     register_test_namespace(local_root, namespace="densegen", columns_spec="densegen__score:float64")
-    dataset_id = "densegen/demo_overlay_pull_gap"
+    dataset_id = "densegen_demo_overlay_pull_gap"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -506,7 +506,7 @@ def test_push_detects_overlay_drift_when_event_sidecar_delta_is_missing(
     ensure_registry(remote_root)
     register_test_namespace(remote_root, namespace="infer", columns_spec="infer__llr:float64")
     register_test_namespace(local_root, namespace="infer", columns_spec="infer__llr:float64")
-    dataset_id = "densegen/demo_overlay_push_gap"
+    dataset_id = "densegen_demo_overlay_push_gap"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -561,7 +561,7 @@ def test_pull_detects_auxiliary_file_drift_when_event_sidecar_delta_is_missing(
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_aux_pull_gap"
+    dataset_id = "densegen_demo_aux_pull_gap"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -603,7 +603,7 @@ def test_push_detects_auxiliary_file_drift_when_event_sidecar_delta_is_missing(
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_aux_push_gap"
+    dataset_id = "densegen_demo_aux_push_gap"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -646,7 +646,7 @@ def test_pull_detects_registry_auxiliary_drift_when_event_sidecar_delta_is_missi
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_registry_pull_gap"
+    dataset_id = "densegen_demo_registry_pull_gap"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")
@@ -688,7 +688,7 @@ def test_push_detects_registry_auxiliary_drift_when_event_sidecar_delta_is_missi
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_registry_push_gap"
+    dataset_id = "densegen_demo_registry_push_gap"
 
     remote_dataset = Dataset(remote_root, dataset_id)
     remote_dataset.init(source="remote-seed")

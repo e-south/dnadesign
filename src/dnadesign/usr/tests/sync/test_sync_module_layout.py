@@ -17,8 +17,8 @@ import inspect
 from dnadesign.usr.src import sync as sync_module
 
 
-def test_remote_sync_execution_module_importable() -> None:
-    module = importlib.import_module("dnadesign.usr.src.remote_sync.execution")
+def test_sync_remote_execution_module_importable() -> None:
+    module = importlib.import_module("dnadesign.usr.src.sync.remote.execution")
     assert hasattr(module, "SyncRuntime")
     assert hasattr(module, "plan_diff")
     assert hasattr(module, "plan_diff_file")

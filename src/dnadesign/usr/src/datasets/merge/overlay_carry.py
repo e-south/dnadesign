@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Iterable
 
 import pyarrow as pa
 
-from ...errors import SchemaError
+from ...contracts import SchemaError
 from ..overlay import write_overlay_dataset
 from ..query import load_overlay_catalog
 

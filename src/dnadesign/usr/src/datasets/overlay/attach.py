@@ -21,8 +21,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ...duckdb_runtime import connect_duckdb_utc
-from ...errors import NamespaceError, SchemaError
+from ...contracts import NamespaceError, SchemaError
 from ...overlays import (
     OVERLAY_META_CREATED,
     OVERLAY_META_KEY,
@@ -34,6 +33,7 @@ from ...overlays import (
     with_overlay_metadata,
 )
 from ...registry import namespace_contract_hash_for_entries, registry_entry
+from ...runtime import connect_duckdb_utc
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import PARQUET_COMPRESSION, now_utc, read_parquet, write_parquet_atomic_batches
 from .policy import (

@@ -11,18 +11,35 @@ Internal modules under `dnadesign.usr.src.*` are implementation details. Cross-t
 import from `dnadesign.usr`; the old sibling root modules such as `dnadesign.usr.dataset` and
 `dnadesign.usr.roots` are retired.
 
-Within `dnadesign.usr.src`, root modules are reserved for coordinators. Helper families now live
-under `cli_support/`, `datasets/`, `legacy/`, `overlay_support/`, `remote_sync/`, and `storage/`.
-Remote sync execution orchestration now lives under `remote_sync/`, keeping `sync.py` as the
-sanctioned root coordinator facade.
+Within `dnadesign.usr.src`, root packages are reserved for coordinators. Helper families now live
+under `cli/support/`, `contracts/`, `datasets/`, `events/`, `legacy/`, `overlays/support/`,
+`overlays/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
+`usr/src` root should contain package directories only plus `__init__.py`; flat implementation
+files at that level are considered an architecture regression.
+Shared error/schema/type/sequence contracts now live under `contracts/`.
+USR event logging helpers now live under `events/`, keeping the event import surface stable while
+separating actor normalization, redaction, fingerprinting, and recording internals.
+Overlay path/metadata helpers now live under `overlays/`, not as a sibling root helper module.
+Registry loading, hashing, and validation now live under `registry/`, not as a sibling root
+helper module.
+Remote sync execution orchestration now lives under `sync/remote/`, keeping `sync/` as the
+sanctioned coordinator package facade.
+DuckDB session initialization and UTC enforcement now live under `runtime/`, not as a sibling
+root helper.
 Low-level parquet IO, snapshotting, and dataset locking belong under `storage/`, not as sibling
 root modules.
-Internal helper families such as root/path resolution and schema/table presentation now live under
-`cli_support/`, not as sibling root modules; the same applies to CLI-only stderr filtering.
+Internal helper families such as root/path resolution, dependency/registration wiring, and
+schema/table presentation now live under `cli/support/resolution/`,
+`cli/support/wiring/`, and `cli/support/presentation/`, not as sibling root modules;
+the same applies to CLI-only stderr filtering.
+Ops-owned stable drill entrypoints live outside `dnadesign.usr.src`; use `uv run usr-sync-audit-drill`
+for the deterministic sync audit drill instead of depending on raw script paths under
+`src/dnadesign/usr/scripts/`.
 Closed helper clusters should stay nested under those families, for example
-`cli_commands/datasets/`, `cli_commands/lifecycle/`, `cli_commands/maintenance/`, `cli_commands/namespace/`, `cli_commands/query/`, `cli_commands/read_views/`,
-`cli_commands/remotes/`, `cli_commands/sync/`, `cli_commands/tooling/`, `datasets/lifecycle/`, `datasets/merge/`, `datasets/overlay/`,
-`datasets/query/`, `datasets/state/`, `datasets/validate/`, and `datasets/views/`.
+`cli/commands/datasets/`, `cli/commands/lifecycle/`, `cli/commands/maintenance/`, `cli/commands/namespace/`, `cli/commands/query/`, `cli/commands/read_views/`,
+`cli/commands/remotes/`, `cli/commands/sync/`, `cli/commands/tooling/`, `datasets/core/`, `datasets/demo/`,
+`datasets/lifecycle/`, `datasets/maintenance/`, `datasets/merge/`, `datasets/overlay/`, `datasets/query/`,
+`datasets/state/`, `datasets/validate/`, and `datasets/views/`.
 
 Bootstrap example:
 
@@ -39,7 +56,7 @@ from dnadesign.usr import Dataset
 
 root = Path("src/dnadesign/usr/datasets").resolve()
 
-ds = Dataset.open(root, "densegen/demo_py")
+ds = Dataset.open(root, "densegen_demo_py")
 ds.init(source="python quickstart")
 
 result = ds.add_sequences(

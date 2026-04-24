@@ -17,10 +17,10 @@ from typing import Protocol, Sequence
 import pandas as pd
 import pyarrow as pa
 
-from ...duckdb_runtime import connect_duckdb_utc
-from ...errors import SchemaError
+from ...contracts import SchemaError
 from ...events import record_event
 from ...overlays import overlay_dir_path, overlay_path
+from ...runtime import connect_duckdb_utc
 from ...storage.locking import dataset_write_lock
 
 TOMBSTONE_SCHEMA_TYPES = {

@@ -16,8 +16,8 @@ from typing import Any, List, Optional
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ...contracts import Manifest
 from ...events import fingerprint_parquet
-from ...types import Manifest
 
 
 def manifest_dataset(dataset: Any, *, include_events: bool = False) -> Manifest:
@@ -58,7 +58,7 @@ def describe_dataset(
     tombstone_columns: tuple[str, ...],
 ) -> List[dict]:
     """Profile columns with optional overlay merge."""
-    from ...cli_support.pretty import profile_batches
+    from ...cli.support.presentation.pretty import profile_batches
 
     merged_schema = dataset.schema()
     cols = columns if columns else list(merged_schema.names)

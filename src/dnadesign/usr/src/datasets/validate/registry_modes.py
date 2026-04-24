@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ...errors import SchemaError
+from ...contracts import SchemaError
 from ...overlays import overlay_metadata, overlay_schema
 from ...registry import (
     load_registry,

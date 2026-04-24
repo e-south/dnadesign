@@ -49,7 +49,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 | Pressure-test schema, sidecar, and overlay fidelity failure paths | [sync-fidelity-drills.md](sync-fidelity-drills.md) |
 | Run one-pass mock batch plus adversarial pressure checks | [workflow-map.md](workflow-map.md#pressure-test-loop-mock-batch--adversarial-schemas) |
 | Run deterministic preflight/run/verify cycle (optional drill toggle) | [workflow-map.md](workflow-map.md#deterministic-harness-cycle) |
-| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) using `run_usr_sync_audit_drill.py` |
+| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) using `uv run usr-sync-audit-drill` |
 
 ## Read order
 
@@ -72,7 +72,7 @@ Use this index to pick the next dataset, sync, or handoff step.
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:
    [sync-fidelity-drills.md](sync-fidelity-drills.md),
-   [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill) using `run_usr_sync_audit_drill.py`
+   [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill) using `uv run usr-sync-audit-drill`
 
 ## Operator contract
 

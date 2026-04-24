@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-dnadesign/src/dnadesign/usr/tests/test_public_api_imports.py
+src/dnadesign/usr/tests/test_public_api_imports.py
 
 Public API import hygiene tests.
 

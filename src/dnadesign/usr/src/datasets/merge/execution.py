@@ -21,12 +21,11 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ...contracts import REQUIRED_COLUMNS, SchemaError, ValidationError
 from ...dataset import Dataset
-from ...duckdb_runtime import connect_duckdb_utc
-from ...errors import SchemaError, ValidationError
 from ...events import record_event
 from ...maintenance import require_maintenance
-from ...schema import REQUIRED_COLUMNS
+from ...runtime import connect_duckdb_utc
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import PARQUET_COMPRESSION, iter_parquet_batches, now_utc, write_parquet_atomic_batches
 from .overlay_carry import apply_overlay_carry, plan_overlay_carry

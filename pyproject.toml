@@ -52,6 +52,7 @@ dependencies = [
 
 [project.scripts]
 usr        = "dnadesign.usr:main"
+usr-sync-audit-drill = "dnadesign.usr.ops.sync_audit_drill:main"
 opal       = "dnadesign.opal.cli:main"
 dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"

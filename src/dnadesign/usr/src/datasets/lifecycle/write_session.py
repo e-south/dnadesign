@@ -16,12 +16,10 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
 
 import pyarrow as pa
 
-from ...errors import SequencesError
-from ...schema import ARROW_SCHEMA, with_base_metadata
+from ...contracts import ARROW_SCHEMA, AddSequencesResult, SequencesError, with_base_metadata
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import now_utc, write_parquet_atomic
-from ...types import AddSequencesResult
-from ..ingest import add_sequences_dataset, import_rows_dataset
+from ..core.ingest import add_sequences_dataset, import_rows_dataset
 from ..overlay import write_overlay_dataset
 
 if TYPE_CHECKING:

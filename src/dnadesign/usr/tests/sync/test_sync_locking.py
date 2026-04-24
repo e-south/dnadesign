@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/usr/tests/test_sync_locking.py
+src/dnadesign/usr/tests/sync/test_sync_locking.py
 
 Ensure sync operations take the dataset write lock.
 
@@ -15,11 +15,11 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from dnadesign.testsupport.usr import ensure_registry
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
-from dnadesign.usr.src.remote_sync.remote import RemoteDatasetStat, RemotePrimaryStat
-from dnadesign.usr.src.schema import REQUIRED_COLUMNS
-from dnadesign.usr.tests.registry_helpers import ensure_registry
+from dnadesign.usr.src.contracts import REQUIRED_COLUMNS
+from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
 
 
 def _write_min_parquet(path: Path) -> None:

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-dnadesign/src/dnadesign/usr/tests/test_cli_command_surface.py
+src/dnadesign/usr/tests/cli/test_cli_command_surface.py
 
 Ensure top-level CLI surface excludes tool-specific commands.
 
@@ -53,3 +53,12 @@ def test_init_help_mentions_registry_precondition() -> None:
 
     normalized = _normalized_help(result.stdout)
     assert "Requires registry.yaml under --root." in normalized
+
+
+def test_status_help_declares_diff_alias_contract() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["status", "--help"])
+    assert result.exit_code == 0
+
+    normalized = _normalized_help(result.stdout)
+    assert "Read-only sync status; alias for diff output." in normalized

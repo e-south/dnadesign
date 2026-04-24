@@ -19,11 +19,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ...duckdb_runtime import connect_duckdb_utc
-from ...errors import NamespaceError, SchemaError
-from ...overlay_support.digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
+from ...contracts import NamespaceError, SchemaError
 from ...overlays import overlay_dir_path, overlay_path, with_overlay_metadata
+from ...overlays.support.digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
 from ...registry import namespace_contract_hash_for_entries
+from ...runtime import connect_duckdb_utc
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import PARQUET_COMPRESSION, now_utc
 from .attach import _attach_frame_dataset

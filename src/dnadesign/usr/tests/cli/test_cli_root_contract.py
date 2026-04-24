@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr/tests/test_cli_root_contract.py
+src/dnadesign/usr/tests/cli/test_cli_root_contract.py
 
 Tests for USR root path contract enforcement.
 
@@ -14,8 +14,8 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import dnadesign.usr.src.cli as cli_module
+from dnadesign.testsupport.usr import ensure_registry
 from dnadesign.usr import Dataset
-from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def test_cli_rejects_historical_package_archive_root_but_allows_canonical_archive_root(

@@ -10,14 +10,14 @@ This page captures common maintenance commands that mutate or package dataset st
 
 ```bash
 # Freeze active registry into dataset artifact.
-uv run usr maintenance registry-freeze densegen/demo
+uv run usr maintenance registry-freeze densegen_demo
 
 # Compact overlay parts for one namespace.
-uv run usr maintenance overlay-compact densegen/demo --namespace densegen
+uv run usr maintenance overlay-compact densegen_demo --namespace densegen
 
 # Project one namespace from a source dataset onto a downstream dataset by join key.
 uv run usr maintenance overlay-project \
-  --src densegen/demo \
+  --src densegen_demo \
   --dest promoter/demo_anchor_set \
   --namespace densegen \
   --src-join id \
@@ -25,7 +25,7 @@ uv run usr maintenance overlay-project \
   --allow-missing
 
 # Remove or archive one derived namespace.
-uv run usr maintenance overlay-remove densegen/demo --namespace densegen --mode archive
+uv run usr maintenance overlay-remove densegen_demo --namespace densegen --mode archive
 ```
 
 Compaction retention contract:
@@ -81,11 +81,11 @@ Merge controls:
 
 ```bash
 # Write timestamped snapshot under _snapshots/.
-uv run usr snapshot densegen/demo
+uv run usr snapshot densegen_demo
 
 # Export canonical data.
-uv run usr export densegen/demo --fmt parquet --out /tmp/usr_exports
-uv run usr export densegen/demo --fmt csv --out /tmp/usr_exports
+uv run usr export densegen_demo --fmt parquet --out /tmp/usr_exports
+uv run usr export densegen_demo --fmt csv --out /tmp/usr_exports
 ```
 
 ## Next steps

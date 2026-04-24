@@ -20,7 +20,7 @@ from typing import Optional
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ..errors import SequencesError
+from ..contracts import SequencesError
 
 SNAPSHOT_DIR_NAME: str = "_snapshots"
 SNAPSHOT_KEEP_N: int = 5

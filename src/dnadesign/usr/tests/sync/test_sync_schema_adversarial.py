@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr/tests/test_sync_schema_adversarial.py
+src/dnadesign/usr/tests/sync/test_sync_schema_adversarial.py
 
 Adversarial sync tests for schema and verification mismatch handling.
 
@@ -20,12 +20,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from dnadesign.testsupport.usr import ensure_registry
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
-from dnadesign.usr.src.errors import VerificationError
-from dnadesign.usr.src.remote_sync.remote import RemoteDatasetStat, RemotePrimaryStat
-from dnadesign.usr.src.schema import REQUIRED_COLUMNS
-from dnadesign.usr.tests.registry_helpers import ensure_registry
+from dnadesign.usr.src.contracts import REQUIRED_COLUMNS, VerificationError
+from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
 
 
 def _write_records(path: Path, rows: int) -> None:
@@ -143,7 +142,7 @@ def test_execute_pull_rejects_staged_symlink_payload_without_mutating_local_prim
     tmp_path: Path, monkeypatch
 ) -> None:
     local_root = tmp_path / "local_usr"
-    dataset_id = "densegen/demo_adversarial"
+    dataset_id = "densegen_demo_adversarial"
     local_dataset_dir = local_root / dataset_id
     local_records = local_dataset_dir / "records.parquet"
     _write_records(local_records, rows=1)
@@ -214,7 +213,7 @@ def test_execute_pull_verify_sidecars_rejects_mismatched_staged_sidecars_before_
     remote_root = tmp_path / "remote_usr"
     ensure_registry(local_root)
     ensure_registry(remote_root)
-    dataset_id = "densegen/demo_sidecar_pull"
+    dataset_id = "densegen_demo_sidecar_pull"
 
     local_dataset = Dataset(local_root, dataset_id)
     local_dataset.init(source="local-seed")
@@ -303,7 +302,7 @@ def test_execute_push_verify_sidecars_fails_when_remote_sidecars_do_not_match_lo
 ) -> None:
     root = tmp_path / "datasets"
     ensure_registry(root)
-    ds = Dataset(root, "densegen/demo_sidecar_push")
+    ds = Dataset(root, "densegen_demo_sidecar_push")
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
     local_records = root / "densegen" / "demo_sidecar_push" / "records.parquet"
@@ -357,7 +356,7 @@ def test_execute_push_verify_sidecars_fails_when_remote_sidecars_do_not_match_lo
     with pytest.raises(VerificationError, match="post-push-sidecars"):
         sync_module.execute_push(
             root,
-            "densegen/demo_sidecar_push",
+            "densegen_demo_sidecar_push",
             "mock-remote",
             sync_module.SyncOptions(verify="size", verify_sidecars=True),
         )
@@ -365,7 +364,7 @@ def test_execute_push_verify_sidecars_fails_when_remote_sidecars_do_not_match_lo
 
 def test_execute_pull_verify_sidecars_rejects_missing_derived_overlay_payload(tmp_path: Path, monkeypatch) -> None:
     local_root = tmp_path / "local_usr"
-    dataset_id = "densegen/demo_pull_missing_derived"
+    dataset_id = "densegen_demo_pull_missing_derived"
     local_dataset_dir = local_root / dataset_id
     _write_records(local_dataset_dir / "records.parquet", rows=1)
 
@@ -429,7 +428,7 @@ def test_execute_push_verify_sidecars_rejects_remote_missing_derived_overlay_inv
 ) -> None:
     root = tmp_path / "datasets"
     ensure_registry(root)
-    dataset_id = "densegen/demo_push_missing_derived"
+    dataset_id = "densegen_demo_push_missing_derived"
     ds = Dataset(root, dataset_id)
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
@@ -505,7 +504,7 @@ def test_execute_push_verify_sidecars_rejects_remote_missing_derived_overlay_inv
 
 def test_execute_pull_verify_sidecars_rejects_missing_auxiliary_payload(tmp_path: Path, monkeypatch) -> None:
     local_root = tmp_path / "local_usr"
-    dataset_id = "densegen/demo_pull_missing_aux"
+    dataset_id = "densegen_demo_pull_missing_aux"
     local_dataset_dir = local_root / dataset_id
     _write_records(local_dataset_dir / "records.parquet", rows=1)
 
@@ -567,7 +566,7 @@ def test_execute_pull_verify_sidecars_rejects_missing_auxiliary_payload(tmp_path
 def test_execute_push_verify_sidecars_rejects_remote_missing_auxiliary_inventory(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
     ensure_registry(root)
-    dataset_id = "densegen/demo_push_missing_aux"
+    dataset_id = "densegen_demo_push_missing_aux"
     ds = Dataset(root, dataset_id)
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
@@ -642,7 +641,7 @@ def test_execute_push_verify_sidecars_rejects_remote_missing_auxiliary_inventory
 
 def test_execute_pull_verify_derived_hashes_rejects_mismatched_overlay_hashes(tmp_path: Path, monkeypatch) -> None:
     local_root = tmp_path / "local_usr"
-    dataset_id = "densegen/demo_pull_derived_hash_mismatch"
+    dataset_id = "densegen_demo_pull_derived_hash_mismatch"
     local_dataset_dir = local_root / dataset_id
     _write_records(local_dataset_dir / "records.parquet", rows=1)
 
@@ -708,7 +707,7 @@ def test_execute_pull_verify_derived_hashes_rejects_mismatched_overlay_hashes(tm
 def test_execute_push_verify_derived_hashes_rejects_remote_hash_mismatch(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
     ensure_registry(root)
-    dataset_id = "densegen/demo_push_derived_hash_mismatch"
+    dataset_id = "densegen_demo_push_derived_hash_mismatch"
     ds = Dataset(root, dataset_id)
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
@@ -785,7 +784,7 @@ def test_execute_push_verify_derived_hashes_rejects_remote_hash_mismatch(tmp_pat
 
 def test_execute_pull_verify_derived_hashes_rejects_auxiliary_hash_mismatch(tmp_path: Path, monkeypatch) -> None:
     local_root = tmp_path / "local_usr"
-    dataset_id = "densegen/demo_pull_aux_hash_mismatch"
+    dataset_id = "densegen_demo_pull_aux_hash_mismatch"
     local_dataset_dir = local_root / dataset_id
     _write_records(local_dataset_dir / "records.parquet", rows=1)
 
@@ -851,7 +850,7 @@ def test_execute_pull_verify_derived_hashes_rejects_auxiliary_hash_mismatch(tmp_
 def test_execute_push_verify_derived_hashes_rejects_remote_auxiliary_hash_mismatch(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
     ensure_registry(root)
-    dataset_id = "densegen/demo_push_aux_hash_mismatch"
+    dataset_id = "densegen_demo_push_aux_hash_mismatch"
     ds = Dataset(root, dataset_id)
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
@@ -936,7 +935,7 @@ def test_verify_sidecars_requires_full_dataset_transfer_options(tmp_path: Path, 
     with pytest.raises(VerificationError, match="requires full dataset transfer"):
         sync_module.execute_pull(
             tmp_path,
-            "densegen/demo",
+            "densegen_demo",
             "mock-remote",
             sync_module.SyncOptions(verify="auto", verify_sidecars=True, primary_only=True),
         )
@@ -944,7 +943,7 @@ def test_verify_sidecars_requires_full_dataset_transfer_options(tmp_path: Path, 
     with pytest.raises(VerificationError, match="requires full dataset transfer"):
         sync_module.execute_push(
             tmp_path,
-            "densegen/demo",
+            "densegen_demo",
             "mock-remote",
             sync_module.SyncOptions(verify="auto", verify_sidecars=True, skip_snapshots=True),
         )

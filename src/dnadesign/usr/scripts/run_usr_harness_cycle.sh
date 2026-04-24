@@ -107,12 +107,12 @@ if is_truthy "${RUN_SYNC_AUDIT_DRILL}"; then
   if [[ -n "${SYNC_AUDIT_REPORT_PATH}" ]]; then
     run_step \
       "preflight-sync-audit-drill" \
-      uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
+      uv run usr-sync-audit-drill \
       --report-json "${SYNC_AUDIT_REPORT_PATH}"
   else
     run_step \
       "preflight-sync-audit-drill" \
-      uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py
+      uv run usr-sync-audit-drill
   fi
 fi
 run_step "run-full-usr-tests" uv run pytest -q src/dnadesign/usr/tests

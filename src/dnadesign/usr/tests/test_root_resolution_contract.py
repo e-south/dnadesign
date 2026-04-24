@@ -19,7 +19,7 @@ import dnadesign.usr as usr_roots
 
 
 def test_default_usr_root_matches_packaged_usr_datasets_dir() -> None:
-    expected = (Path(usr_roots.__file__).resolve().parent / "datasets").resolve()
+    expected = (usr_roots.pkg_usr_root() / "datasets").resolve()
     assert usr_roots.default_usr_root() == expected
 
 

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/usr/tests/test_cli_typer.py
+src/dnadesign/usr/tests/cli/test_cli_typer.py
 
 Typer CLI integration tests for USR.
 
@@ -16,10 +16,12 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.usr import pkg_usr_root
 from dnadesign.usr.src.cli import app
+from dnadesign.usr.src.contracts import SequencesError
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.datasets.merge import MergePolicy, MergePreview
-from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -72,6 +74,18 @@ def test_head_requires_existing_path_for_explicit_path_target(tmp_path: Path) ->
     assert "Path target not found" in result.stdout
 
 
+def test_head_rejects_negative_row_count(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _make_dataset(root)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["--root", str(root), "head", "demo", "-n", "-1"])
+
+    assert result.exit_code != 0
+    assert isinstance(result.exception, SequencesError)
+    assert "head row count" in str(result.exception)
+
+
 def test_head_accepts_existing_relative_directory_path_with_separator(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
     _make_dataset(root)
@@ -118,6 +132,83 @@ def test_cell_requires_existing_path_for_explicit_path_target(tmp_path: Path) ->
     assert "Path target not found" in result.stdout
 
 
+def test_public_cli_quickstart_sequence_is_hermetic(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    out_dir = tmp_path / "exports"
+    root.mkdir()
+    out_dir.mkdir()
+    assets = pkg_usr_root() / "assets" / "demo_material"
+    dataset = "quickstart_demo"
+    runner = CliRunner()
+
+    def invoke_ok(args: list[str]) -> None:
+        result = runner.invoke(app, ["--root", str(root), *args])
+        assert result.exit_code == 0, result.stdout
+
+    invoke_ok(
+        [
+            "namespace",
+            "register",
+            "quickstart",
+            "--columns",
+            "quickstart__X_value:list<float64>,quickstart__intensity_log2_offset_delta:float64",
+        ]
+    )
+    invoke_ok(["init", dataset, "--source", "test quickstart"])
+    invoke_ok(
+        [
+            "import",
+            dataset,
+            "--from",
+            "csv",
+            "--path",
+            str(assets / "demo_sequences.csv"),
+            "--bio-type",
+            "dna",
+            "--alphabet",
+            "dna_4",
+        ]
+    )
+    invoke_ok(
+        [
+            "attach",
+            dataset,
+            "--path",
+            str(assets / "demo_attachment_one.csv"),
+            "--namespace",
+            "quickstart",
+            "--key",
+            "sequence",
+            "--key-col",
+            "sequence",
+            "--columns",
+            "X_value",
+        ]
+    )
+    invoke_ok(
+        [
+            "attach",
+            dataset,
+            "--path",
+            str(assets / "demo_y_sfxi.csv"),
+            "--namespace",
+            "quickstart",
+            "--key",
+            "sequence",
+            "--key-col",
+            "sequence",
+            "--columns",
+            "intensity_log2_offset_delta",
+            "--allow-missing",
+        ]
+    )
+    invoke_ok(["materialize", dataset, "--yes", "--snapshot-before"])
+    invoke_ok(["validate", dataset, "--strict"])
+    invoke_ok(["export", dataset, "--fmt", "parquet", "--out", str(out_dir)])
+
+    assert (out_dir / f"{dataset}.parquet").exists()
+
+
 def test_merge_defaults_are_strict(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
     root.mkdir(parents=True, exist_ok=True)
@@ -154,6 +245,7 @@ def test_merge_defaults_are_strict(tmp_path: Path, monkeypatch) -> None:
             "demo_dest",
             "--src",
             "demo_src",
+            "--union-columns",
             "--dry-run",
         ],
     )
@@ -197,6 +289,7 @@ def test_merge_passes_explicit_carry_namespaces(tmp_path: Path, monkeypatch) -> 
             "demo_dest",
             "--src",
             "demo_src",
+            "--union-columns",
             "--carry-namespace",
             "usr_label",
             "--carry-namespace",
@@ -206,6 +299,58 @@ def test_merge_passes_explicit_carry_namespaces(tmp_path: Path, monkeypatch) -> 
     )
     assert result.exit_code == 0
     assert captured["carry_namespaces"] == ["usr_label", "infer"]
+
+
+def test_merge_rejects_conflicting_column_mode_flags(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    root.mkdir(parents=True, exist_ok=True)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(root),
+            "maintenance",
+            "merge",
+            "--dest",
+            "demo_dest",
+            "--src",
+            "demo_src",
+            "--require-same-columns",
+            "--union-columns",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert isinstance(result.exception, SequencesError)
+    assert "Choose exactly one" in str(result.exception)
+
+
+def test_merge_requires_explicit_column_mode(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    root.mkdir(parents=True, exist_ok=True)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(root),
+            "maintenance",
+            "merge",
+            "--dest",
+            "demo_dest",
+            "--src",
+            "demo_src",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert isinstance(result.exception, SequencesError)
+    assert "Choose exactly one" in str(result.exception)
 
 
 def test_pull_help_mentions_verify_sidecars_option() -> None:

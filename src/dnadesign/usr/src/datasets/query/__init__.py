@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Sequence
 
-from ...errors import SchemaError
+from ...contracts import SchemaError
 from ...overlays import overlay_metadata, overlay_parts, overlay_schema
 from .catalog import build_dataset_info, load_overlay_catalog, merge_dataset_schema
 from .planner import build_overlay_query

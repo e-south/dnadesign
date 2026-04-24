@@ -17,9 +17,8 @@ from typing import Protocol
 
 import pyarrow.parquet as pq
 
-from ...errors import NamespaceError, SchemaError
+from ...contracts import Fingerprint, NamespaceError, OverlayInfo, SchemaError
 from ...maintenance import require_maintenance
-from ...overlay_support.digest_ledger import write_overlay_digest_ledger
 from ...overlays import (
     OVERLAY_META_CREATED,
     OVERLAY_META_REGISTRY_HASH,
@@ -29,10 +28,10 @@ from ...overlays import (
     overlay_path,
     overlay_schema,
 )
+from ...overlays.support.digest_ledger import write_overlay_digest_ledger
 from ...registry import validate_overlay_schema
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import now_utc, write_parquet_atomic_batches
-from ...types import Fingerprint, OverlayInfo
 
 _REMOVE_ARCHIVE_KEEP_LAST = 1
 _COMPACT_ARCHIVE_KEEP_LAST = 0

@@ -17,7 +17,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from ..errors import ValidationError
+from ..contracts import ValidationError
 
 
 def _sorted_duplicate_groups(table: pa.Table) -> list[tuple[str, pd.DataFrame]]:

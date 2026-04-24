@@ -16,11 +16,10 @@ from typing import Optional, Protocol
 
 import pyarrow.parquet as pq
 
-from ...errors import SchemaError, SequencesError
+from ...contracts import META_REGISTRY_HASH, SchemaError, SequencesError, merge_base_metadata
 from ...maintenance import require_maintenance
 from ...overlays import overlay_path
 from ...registry import load_registry, registry_bytes, registry_hash
-from ...schema import META_REGISTRY_HASH, merge_base_metadata
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import iter_parquet_batches, write_parquet_atomic_batches
 

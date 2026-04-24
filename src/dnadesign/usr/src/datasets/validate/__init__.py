@@ -19,11 +19,19 @@ from typing import Protocol
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ...errors import AlphabetError, DuplicateIDError, NamespaceError, SchemaError
-from ...normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type
+from ...contracts import (
+    META_REGISTRY_HASH,
+    AlphabetError,
+    DuplicateIDError,
+    NamespaceError,
+    SchemaError,
+    compute_id,
+    normalize_sequence,
+    validate_alphabet,
+    validate_bio_type,
+)
 from ...overlays import list_overlays
 from ...registry import load_registry, load_registry_file, registry_hash_for_entries, validate_overlay_schema
-from ...schema import META_REGISTRY_HASH
 from ...storage.parquet import iter_parquet_batches
 from .registry_modes import normalize_registry_mode, validate_overlays_for_registry_mode
 

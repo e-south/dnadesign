@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr/tests/test_sync_remote_failures.py
+src/dnadesign/usr/tests/sync/test_sync_remote_failures.py
 
 Pressure tests for USR sync behavior when remote stat probing fails.
 
@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 
 from dnadesign.usr.src import sync as sync_module
-from dnadesign.usr.src.errors import RemoteUnavailableError, VerificationError
-from dnadesign.usr.src.remote_sync.remote import RemoteDatasetStat, RemotePrimaryStat
+from dnadesign.usr.src.contracts import RemoteUnavailableError, VerificationError
+from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
 
 
 def _write_stub_records(path: Path) -> None:
@@ -48,7 +48,7 @@ def test_plan_diff_fails_fast_when_remote_stat_unavailable(monkeypatch, tmp_path
     monkeypatch.setattr(sync_module, "SSHRemote", _remote_with_stat_failure("ssh stat failure"))
 
     with pytest.raises(RemoteUnavailableError, match="ssh stat failure"):
-        sync_module.plan_diff(tmp_path, "densegen/demo", "bu-scc", verify="auto")
+        sync_module.plan_diff(tmp_path, "densegen_demo", "bu-scc", verify="auto")
 
 
 def test_execute_pull_does_not_lock_or_transfer_when_remote_stat_fails(monkeypatch, tmp_path) -> None:
@@ -68,7 +68,7 @@ def test_execute_pull_does_not_lock_or_transfer_when_remote_stat_fails(monkeypat
     monkeypatch.setattr(sync_module, "dataset_write_lock", _lock)
 
     with pytest.raises(RemoteUnavailableError, match="pull stat failure"):
-        sync_module.execute_pull(tmp_path, "densegen/demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
+        sync_module.execute_pull(tmp_path, "densegen_demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
 
     assert lock_called["value"] is False
 
@@ -90,7 +90,7 @@ def test_execute_push_does_not_lock_or_transfer_when_remote_stat_fails(monkeypat
     monkeypatch.setattr(sync_module, "dataset_write_lock", _lock)
 
     with pytest.raises(RemoteUnavailableError, match="push stat failure"):
-        sync_module.execute_push(tmp_path, "densegen/demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
+        sync_module.execute_push(tmp_path, "densegen_demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
 
     assert lock_called["value"] is False
 
@@ -130,7 +130,7 @@ def test_execute_pull_refuses_transfer_when_remote_primary_missing(monkeypatch, 
     monkeypatch.setattr(sync_module, "dataset_write_lock", _lock)
 
     with pytest.raises(VerificationError, match="remote records.parquet is missing"):
-        sync_module.execute_pull(tmp_path, "densegen/demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
+        sync_module.execute_pull(tmp_path, "densegen_demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
 
     assert transfer_called["value"] is False
     assert lock_called["value"] is False
@@ -168,7 +168,7 @@ def test_execute_push_refuses_transfer_when_local_primary_missing(monkeypatch, t
     monkeypatch.setattr(sync_module, "dataset_write_lock", _lock)
 
     with pytest.raises(VerificationError, match="local records.parquet is missing"):
-        sync_module.execute_push(tmp_path, "densegen/demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
+        sync_module.execute_push(tmp_path, "densegen_demo", "bu-scc", sync_module.SyncOptions(verify="auto"))
 
     assert transfer_called["value"] is False
     assert lock_called["value"] is False

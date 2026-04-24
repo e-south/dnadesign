@@ -15,7 +15,7 @@ from typing import List
 
 import pyarrow as pa
 
-from ...errors import SchemaError
+from ...contracts import SchemaError
 
 
 def key_list_from_batch(batch: pa.RecordBatch, key: str) -> List[str]:

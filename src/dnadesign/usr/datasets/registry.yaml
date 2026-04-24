@@ -360,13 +360,23 @@ namespaces:
   mock:
     columns:
     - name: mock__X_value
-      type: float64
+      type: list<float64>
     - name: mock__some_other_value
       type: float64
     - name: mock__y_label
       type: list<float64>
     description: Mock attachment columns used in README examples.
     owner: usr
+  opal:
+    columns:
+    - name: opal__demo__label_hist
+      type: list<struct<r:int64,src:string,ts:string,y:list<float64>>>
+    - name: opal__demo__latest_as_of_round
+      type: int64
+    - name: opal__demo__latest_pred_scalar
+      type: float64
+    description: OPAL demo campaign columns materialized in the packaged USR CLI example dataset.
+    owner: opal
   usr_label:
     columns:
     - name: usr_label__primary

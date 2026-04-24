@@ -16,8 +16,8 @@ from typing import Protocol, Sequence
 
 import pyarrow.parquet as pq
 
-from ...duckdb_runtime import connect_duckdb_utc
-from ...errors import NamespaceError, SchemaError
+from ...contracts import NamespaceError, SchemaError
+from ...runtime import connect_duckdb_utc
 
 
 class DatasetOverlayQueryHost(Protocol):

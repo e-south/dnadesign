@@ -16,10 +16,9 @@ from typing import Any, Iterable
 import pandas as pd
 import pyarrow as pa
 
-from ...errors import NamespaceError, SchemaError
+from ...contracts import REQUIRED_COLUMNS, NamespaceError, SchemaError
 from ...overlays import overlay_dir_path
 from ...registry import registry_entry
-from ...schema import REQUIRED_COLUMNS
 
 SUPPORTED_OVERLAY_KEYS = {"id", "sequence", "sequence_norm", "sequence_ci"}
 

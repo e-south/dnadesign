@@ -17,10 +17,9 @@ from typing import Protocol, Sequence
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ...errors import NamespaceError, SchemaError
+from ...contracts import DatasetInfo, NamespaceError, SchemaError
 from ...overlays import list_overlays, overlay_metadata, overlay_schema
 from ...registry import validate_overlay_schema
-from ...types import DatasetInfo
 
 _LOAD_OVERLAYS_CACHE: dict[
     tuple[str, bool, tuple[str, ...] | None, tuple[str, ...]],

@@ -140,5 +140,5 @@ def test_usr_harness_script_runs_optional_sync_audit_drill_when_enabled(tmp_path
     ]
 
     uv_lines = log_path.read_text(encoding="utf-8").splitlines()
-    assert any("run_usr_sync_audit_drill.py" in line for line in uv_lines)
+    assert any("usr-sync-audit-drill" in line for line in uv_lines)
     assert any(f"--report-json {drill_report_path}" in line for line in uv_lines)

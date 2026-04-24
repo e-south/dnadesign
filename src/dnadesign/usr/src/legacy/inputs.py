@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr/src/convert_legacy_inputs.py
+src/dnadesign/usr/src/legacy/inputs.py
 
 Profile and input helper functions for legacy densegen conversion flows.
 
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from ..errors import SchemaError, ValidationError
+from ..contracts import SchemaError, ValidationError
 
 
 @dataclass(frozen=True)

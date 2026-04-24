@@ -12,13 +12,13 @@ Use this when you have an explicit dataset directory path outside `--root`.
 
 ```bash
 # Diff dataset directory path outside --root.
-uv run usr diff /path/to/dnadesign/src/dnadesign/usr/datasets/densegen/demo_hpc bu-scc
+uv run usr diff /path/to/dnadesign/src/dnadesign/usr/datasets/densegen_demo_hpc bu-scc
 
 # Pull dataset directory by explicit path.
-uv run usr pull /path/to/dnadesign/src/dnadesign/usr/datasets/densegen/demo_hpc bu-scc -y
+uv run usr pull /path/to/dnadesign/src/dnadesign/usr/datasets/densegen_demo_hpc bu-scc -y
 
 # Push dataset directory by explicit path.
-uv run usr push /path/to/dnadesign/src/dnadesign/usr/datasets/densegen/demo_hpc bu-scc -y
+uv run usr push /path/to/dnadesign/src/dnadesign/usr/datasets/densegen_demo_hpc bu-scc -y
 ```
 
 ## File mode

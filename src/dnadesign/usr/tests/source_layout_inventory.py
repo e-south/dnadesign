@@ -13,75 +13,114 @@ from __future__ import annotations
 
 TOP_LEVEL_SOURCE_MODULES = {
     "__init__.py",
-    "api.py",
-    "cli.py",
-    "convert_legacy.py",
-    "dataset.py",
-    "duckdb_runtime.py",
-    "errors.py",
-    "events.py",
-    "maintenance.py",
-    "normalize.py",
-    "overlays.py",
-    "registry.py",
-    "schema.py",
-    "sync.py",
-    "types.py",
-    "version.py",
 }
 
 TOP_LEVEL_SOURCE_PACKAGES = {
-    "cli_commands",
-    "cli_support",
+    "api",
+    "cli",
+    "contracts",
+    "dataset",
     "datasets",
+    "events",
     "legacy",
-    "overlay_support",
-    "remote_sync",
+    "maintenance",
+    "overlays",
+    "registry",
+    "runtime",
     "storage",
+    "sync",
+    "version",
 }
 
-HELPER_PACKAGE_FILES = {
-    "cli_commands": {
+PACKAGE_FILES = {
+    ("api",): {
+        "__init__.py",
+    },
+    ("cli",): {
+        "__init__.py",
+    },
+    ("cli", "commands"): {
         "__init__.py",
         "deps.py",
         "error_output.py",
     },
-    "cli_support": {
+    ("cli", "support"): {
         "__init__.py",
-        "bindings.py",
-        "event_output.py",
-        "merge_policy.py",
-        "paths.py",
-        "pretty.py",
-        "rendering.py",
-        "roots.py",
-        "stderr_filter.py",
-        "surface.py",
     },
-    "datasets": {
+    ("contracts",): {
+        "__init__.py",
+        "errors.py",
+        "normalize.py",
+        "schema.py",
+        "types.py",
+    },
+    ("dataset",): {
+        "__init__.py",
+    },
+    ("datasets",): {
+        "__init__.py",
+    },
+    ("datasets", "core"): {
         "__init__.py",
         "activity.py",
-        "dedupe.py",
         "events.py",
         "identity.py",
         "ingest.py",
-        "materialize.py",
-        "mock.py",
-        "reserved_overlay.py",
     },
-    "legacy": {
+    ("datasets", "demo"): {
         "__init__.py",
+        "mock.py",
+    },
+    ("events",): {
+        "__init__.py",
+        "actor.py",
+        "defaults.py",
+        "fingerprint.py",
+        "recording.py",
+        "redaction.py",
+    },
+    ("legacy",): {
+        "__init__.py",
+        "convert.py",
         "dedupe.py",
         "inputs.py",
         "tfbs.py",
     },
-    "overlay_support": {
+    ("maintenance",): {
+        "__init__.py",
+    },
+    ("overlays",): {
+        "__init__.py",
+        "constants.py",
+        "metadata.py",
+        "paths.py",
+    },
+    ("overlays", "support"): {
         "__init__.py",
         "digest_ledger.py",
         "maintenance.py",
         "projection.py",
     },
-    "remote_sync": {
+    ("registry",): {
+        "__init__.py",
+        "models.py",
+        "storage.py",
+        "typespec.py",
+        "validation.py",
+    },
+    ("runtime",): {
+        "__init__.py",
+        "duckdb.py",
+    },
+    ("storage",): {
+        "__init__.py",
+        "locking.py",
+        "parquet.py",
+    },
+    ("sync",): {
+        "__init__.py",
+    },
+    ("sync", "remote"): {
         "__init__.py",
         "config.py",
         "diff.py",
@@ -90,40 +129,15 @@ HELPER_PACKAGE_FILES = {
         "sidecars.py",
         "transfer.py",
     },
-    "storage": {
+    ("version",): {
         "__init__.py",
-        "locking.py",
-        "parquet.py",
     },
-}
-
-HELPER_PACKAGE_SUBPACKAGES = {
-    "cli_commands": {
-        "datasets",
-        "lifecycle",
-        "maintenance",
-        "namespace",
-        "query",
-        "read_views",
-        "remotes",
-        "sync",
-        "tooling",
-    },
-    "cli_support": set(),
-    "datasets": {"lifecycle", "merge", "overlay", "query", "state", "validate", "views"},
-    "legacy": set(),
-    "overlay_support": set(),
-    "remote_sync": set(),
-    "storage": set(),
-}
-
-NESTED_PACKAGE_FILES = {
-    ("cli_commands", "datasets"): {
+    ("cli", "commands", "datasets"): {
         "__init__.py",
         "catalog.py",
         "resolution.py",
     },
-    ("cli_commands", "lifecycle"): {
+    ("cli", "commands", "lifecycle"): {
         "__init__.py",
         "cli.py",
         "materialize.py",
@@ -131,7 +145,7 @@ NESTED_PACKAGE_FILES = {
         "state.py",
         "write.py",
     },
-    ("cli_commands", "maintenance"): {
+    ("cli", "commands", "maintenance"): {
         "__init__.py",
         "cli.py",
         "dedupe.py",
@@ -139,7 +153,25 @@ NESTED_PACKAGE_FILES = {
         "overlay.py",
         "registry.py",
     },
-    ("cli_commands", "sync"): {
+    ("cli", "commands", "namespace"): {
+        "__init__.py",
+        "cli.py",
+    },
+    ("cli", "commands", "query"): {
+        "__init__.py",
+        "cli.py",
+        "read.py",
+        "runtime.py",
+    },
+    ("cli", "commands", "read_views"): {
+        "__init__.py",
+        "parquet_targets.py",
+    },
+    ("cli", "commands", "remotes"): {
+        "__init__.py",
+        "cli.py",
+    },
+    ("cli", "commands", "sync"): {
         "__init__.py",
         "cli.py",
         "execution.py",
@@ -147,25 +179,7 @@ NESTED_PACKAGE_FILES = {
         "policy.py",
         "targets.py",
     },
-    ("cli_commands", "read_views"): {
-        "__init__.py",
-        "parquet_targets.py",
-    },
-    ("cli_commands", "namespace"): {
-        "__init__.py",
-        "cli.py",
-    },
-    ("cli_commands", "query"): {
-        "__init__.py",
-        "cli.py",
-        "read.py",
-        "runtime.py",
-    },
-    ("cli_commands", "remotes"): {
-        "__init__.py",
-        "cli.py",
-    },
-    ("cli_commands", "tooling"): {
+    ("cli", "commands", "tooling"): {
         "__init__.py",
         "cli.py",
         "densegen.py",
@@ -173,10 +187,38 @@ NESTED_PACKAGE_FILES = {
         "legacy.py",
         "shared.py",
     },
+    ("cli", "support", "presentation"): {
+        "__init__.py",
+        "event_output.py",
+        "pretty.py",
+        "rendering.py",
+        "runtime.py",
+        "stderr_filter.py",
+    },
+    ("cli", "support", "resolution"): {
+        "__init__.py",
+        "dataset_targets.py",
+        "merge_policy.py",
+        "paths.py",
+        "roots.py",
+    },
+    ("cli", "support", "wiring"): {
+        "__init__.py",
+        "bindings.py",
+        "dependencies.py",
+        "registration.py",
+        "surface.py",
+    },
     ("datasets", "lifecycle"): {
         "__init__.py",
+        "materialize.py",
         "registry.py",
+        "snapshot.py",
         "write_session.py",
+    },
+    ("datasets", "maintenance"): {
+        "__init__.py",
+        "dedupe.py",
     },
     ("datasets", "merge"): {
         "__init__.py",
@@ -198,6 +240,7 @@ NESTED_PACKAGE_FILES = {
     ("datasets", "state"): {
         "__init__.py",
         "facade.py",
+        "reserved_overlay.py",
     },
     ("datasets", "validate"): {
         "__init__.py",
@@ -208,4 +251,71 @@ NESTED_PACKAGE_FILES = {
         "read_keys.py",
         "reporting.py",
     },
+}
+
+PACKAGE_SUBPACKAGES = {
+    ("api",): set(),
+    ("cli",): {
+        "commands",
+        "support",
+    },
+    ("cli", "commands"): {
+        "datasets",
+        "lifecycle",
+        "maintenance",
+        "namespace",
+        "query",
+        "read_views",
+        "remotes",
+        "sync",
+        "tooling",
+    },
+    ("cli", "commands", "datasets"): set(),
+    ("cli", "commands", "lifecycle"): set(),
+    ("cli", "commands", "maintenance"): set(),
+    ("cli", "commands", "namespace"): set(),
+    ("cli", "commands", "query"): set(),
+    ("cli", "commands", "read_views"): set(),
+    ("cli", "commands", "remotes"): set(),
+    ("cli", "commands", "sync"): set(),
+    ("cli", "commands", "tooling"): set(),
+    ("cli", "support"): {"presentation", "resolution", "wiring"},
+    ("cli", "support", "presentation"): set(),
+    ("cli", "support", "resolution"): set(),
+    ("cli", "support", "wiring"): set(),
+    ("contracts",): set(),
+    ("dataset",): set(),
+    ("datasets",): {
+        "core",
+        "demo",
+        "lifecycle",
+        "maintenance",
+        "merge",
+        "overlay",
+        "query",
+        "state",
+        "validate",
+        "views",
+    },
+    ("datasets", "core"): set(),
+    ("datasets", "demo"): set(),
+    ("datasets", "lifecycle"): set(),
+    ("datasets", "maintenance"): set(),
+    ("datasets", "merge"): set(),
+    ("datasets", "overlay"): set(),
+    ("datasets", "query"): set(),
+    ("datasets", "state"): set(),
+    ("datasets", "validate"): set(),
+    ("datasets", "views"): set(),
+    ("events",): set(),
+    ("legacy",): set(),
+    ("maintenance",): set(),
+    ("overlays",): {"support"},
+    ("overlays", "support"): set(),
+    ("registry",): set(),
+    ("runtime",): set(),
+    ("storage",): set(),
+    ("sync",): {"remote"},
+    ("sync", "remote"): set(),
+    ("version",): set(),
 }

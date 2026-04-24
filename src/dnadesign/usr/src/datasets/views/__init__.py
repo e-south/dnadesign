@@ -18,7 +18,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ...errors import SchemaError, SequencesError
+from ...contracts import SchemaError, SequencesError
 from ...overlays import list_overlays
 from ...storage.parquet import PARQUET_COMPRESSION
 from .read_keys import key_list_from_batch
@@ -99,6 +99,8 @@ def head_dataset(
     include_deleted: bool = False,
 ):
     """Return the first N rows as a pandas DataFrame."""
+    if int(n) < 0:
+        raise SequencesError("head row count must be >= 0.")
     columns_key = tuple(columns) if columns is not None else None
     cache_key = (
         str(dataset.dir.resolve()),

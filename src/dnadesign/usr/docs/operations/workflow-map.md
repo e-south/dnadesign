@@ -245,10 +245,10 @@ Use this when you want an end-to-end `diff/pull/push` drill with machine-readabl
 
 ```bash
 # Run the local sync audit drill with an explicit report path.
-uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
+uv run usr-sync-audit-drill \
   --report-json "$ARTIFACT_ROOT/usr-sync-audit-drill-report.json"
 # Optional: keep local and remote drill roots for manual inspection.
-uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
+uv run usr-sync-audit-drill \
   --work-dir "$ARTIFACT_ROOT/usr-sync-audit-drill" \
   --report-json "$ARTIFACT_ROOT/usr-sync-audit-drill-report.json"
 ```

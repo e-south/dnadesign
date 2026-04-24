@@ -55,7 +55,7 @@ uv run usr namespace show mock
 Freeze registry snapshot into dataset:
 
 ```bash
-uv run usr maintenance registry-freeze densegen/demo
+uv run usr maintenance registry-freeze densegen_demo
 ```
 
 Auto-freeze behavior: on first dataset mutation with a registry present, USR writes `_registry/registry.<hash>.yaml` and stamps `usr:registry_hash` into `records.parquet`.
