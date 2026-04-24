@@ -15,9 +15,7 @@ import torch
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-DEFAULT_ARCHIVE_ROOT = (
-    Path(__file__).resolve().parents[1] / "datasets" / "archived" / "promoter_misc_pytorch"
-)
+DEFAULT_ARCHIVE_ROOT = Path(__file__).resolve().parents[1] / "datasets" / "archived" / "promoter_misc_pytorch"
 
 
 def validate_pt_file(file_path: str) -> bool:
