@@ -170,7 +170,7 @@ def test_usr_writer_import_skips_full_existing_id_scan_when_ids_are_prevalidated
         alphabet="dna_4",
     )
 
-    import dnadesign.usr.src.datasets.ingest as dataset_ingest
+    import dnadesign.usr.src.datasets.core.ingest as dataset_ingest
 
     original_iter = dataset_ingest.iter_parquet_batches
 

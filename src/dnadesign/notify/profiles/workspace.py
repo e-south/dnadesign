@@ -16,12 +16,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.construct.contracts import (
-    list_construct_workspace_selectors,
-    list_construct_workspace_selectors_from_root,
-    resolve_construct_workspace_config_path_from_root,
-)
-
 from ..errors import NotifyConfigError
 
 
@@ -208,6 +202,8 @@ def _construct_workspace_roots(repo_root: Path | None, search_root: Path) -> tup
 
 
 def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
+    from dnadesign.construct.contracts import resolve_construct_workspace_config_path_from_root
+
     workspace_id, _, _ = workspace_name.partition(":")
     explicit_root = str(os.environ.get("CONSTRUCT_WORKSPACE_ROOT") or "").strip()
     if not explicit_root and search_root.name == workspace_id and (search_root / "construct.workspace.yaml").exists():
@@ -238,6 +234,11 @@ def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: P
 
 
 def _list_construct_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
+    from dnadesign.construct.contracts import (
+        list_construct_workspace_selectors,
+        list_construct_workspace_selectors_from_root,
+    )
+
     names: list[str] = []
     if (search_root / "construct.workspace.yaml").exists():
         names.extend(list_construct_workspace_selectors(search_root))

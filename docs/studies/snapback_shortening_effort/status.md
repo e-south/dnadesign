@@ -23,16 +23,22 @@
 
 - The active construction lane is still `released-product Snapback` in `de033`.
 - The tracked study default is still the exposed-bottom released-product policy.
+- The evaluation target is the exposed post-release bottom strand, not the
+  retained preserved-site top-strand geometry.
 - The operational catalog surface is `neb_nicking_v1 + thermo_nicking_v1`, with
   `FREQUENT_CUTTER` nickases excluded by default.
 - The checked-in downstream-`BspQI` explicit spec is a validation fixture and is
   expected to remain `invalid_precursor`.
+- The validation fixture is expected to report `invalid_precursor` under the
+  degenerate-prefix-aware nonnegative-origin rule because it does not provide a
+  single contiguous fully degenerate `N` block.
 - `YIU` stays contrast-only and does not absorb shortening topology semantics.
 - Use `routes.md` for the ordered command ladder and the deeper boundary notes.
 
 ### Current phase and surfaces
 
 - Current phase: `snapback_released_solve`
+- Next-scope preflight stays read-only.
 - Next owner surface: `src/dnadesign/cruncher/workspaces/de033/runbook.md`
 - Primary workspace: `src/dnadesign/cruncher/workspaces/de033`
 - Contrast workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`

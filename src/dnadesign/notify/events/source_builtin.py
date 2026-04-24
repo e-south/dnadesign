@@ -14,16 +14,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from dnadesign.construct.contracts import resolve_construct_usr_output_contract
-from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
-from dnadesign.infer.contracts import resolve_infer_usr_output_contract
-
 from ..errors import NotifyConfigError
 
 ToolEventsSourceRegister = Callable[..., None]
 
 
 def _resolve_densegen_events_from_config(config_path: Path) -> Path:
+    from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
+
     try:
         contract = resolve_densegen_usr_output_contract(config_path)
     except ValueError as exc:
@@ -32,6 +30,8 @@ def _resolve_densegen_events_from_config(config_path: Path) -> Path:
 
 
 def _resolve_infer_events_from_config(config_path: Path) -> Path:
+    from dnadesign.infer.contracts import resolve_infer_usr_output_contract
+
     try:
         contract = resolve_infer_usr_output_contract(config_path)
     except ValueError as exc:
@@ -40,6 +40,8 @@ def _resolve_infer_events_from_config(config_path: Path) -> Path:
 
 
 def _resolve_construct_events_from_config(config_path: Path) -> Path:
+    from dnadesign.construct.contracts import resolve_construct_usr_output_contract
+
     try:
         contract = resolve_construct_usr_output_contract(config_path)
     except ValueError as exc:

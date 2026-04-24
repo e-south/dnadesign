@@ -52,6 +52,7 @@ This page keeps the study-owned handoff map in one place.
    near hits to one representative per exposed post-nick `stem + cap` geometry.
 4. Treat `released-design` and `released-show` as validation-only for the
    checked-in invalid fixture.
+   Treat `released-design` and `released-show` as an optional audit path only.
    The checked-in downstream-`BspQI` spec under
    `configs/snapback/de033.released.snapback.yaml` is expected to report
    `invalid_precursor` under the degenerate-prefix-aware nonnegative-origin

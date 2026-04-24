@@ -71,8 +71,8 @@ Out of scope:
   preflight, repo-local skill routing, or docs integrity. Keep the endpoint set
   to `knowledge-integrity`, `autonomy-capability`, and
   `architecture-invariants`.
-- Pair with `code-change-discipline` in the `pragmatic-programming-principles`
-  lane when the change touches the
+- Pair with `pragmatic-programming-principles` via `code-change-discipline`
+  when the change touches the
   released-product vs preserved-site boundary, YIU boundary language, explicit
   degraded modes, or fail-fast contract behavior.
 
