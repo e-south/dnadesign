@@ -18,6 +18,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.cruncher.cli.app import app
+from dnadesign.cruncher.tests.cli_output import normalized_cli_output
 
 runner = CliRunner()
 
@@ -231,11 +232,12 @@ def test_released_target_search_help_mentions_active_route_flags() -> None:
     result = runner.invoke(app, ["snapback", "released-target-search", "--help"], color=False)
 
     assert result.exit_code == 0
-    assert "--allow-top-active-routes" in result.output
-    assert "--allow-precut-footprint-out" in result.output
-    assert "retained-active audits" in result.output
-    assert "vendor nickase" in result.output
-    assert "top strand" in result.output
+    output = normalized_cli_output(result.output)
+    assert "--allow-top-active-routes" in output
+    assert "--allow-precut-footprint-out" in output
+    assert "retained-active audits" in output
+    assert "vendor nickase" in output
+    assert "top strand" in output
 
 
 def test_released_target_search_excludes_demo_only_entries_unless_opted_in(tmp_path: Path) -> None:
