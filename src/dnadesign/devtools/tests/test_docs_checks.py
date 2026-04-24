@@ -18,6 +18,7 @@ from pathlib import Path
 import yaml
 
 from dnadesign.devtools.docs_checks import (
+    _find_active_shared_usr_dataset_id_issues,
     _find_broken_links,
     _find_cross_tool_doc_metadata_issues,
     _find_densegen_disallowed_term_issues,
@@ -31,6 +32,7 @@ from dnadesign.devtools.docs_checks import (
     _find_root_docs_entrypoint_issues,
     _find_runbook_catalog_issues,
     _find_runbook_demo_snippet_issues,
+    _find_shared_usr_dataset_layout_issues,
     _find_shared_utils_path_issues,
     _find_stale_overlay_guard_term_issues,
     _find_study_execution_source_drift_issues,
@@ -257,6 +259,119 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
     )
     assert any("AGENTS.md" in issue and "docs/studies/index.yaml" in issue for issue in issues)
     assert any("docs/studies/README.md" in issue and "docs/studies/promoter/" in issue for issue in issues)
+
+
+def _write_active_study_datasets(tmp_path: Path, datasets: list[dict[str, object]]) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [
+                    {
+                        "study_id": "demo_study",
+                        "family": "promoter",
+                        "record_root": "docs/studies/demo_study",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "demo_study" / "datasets.yaml",
+        yaml.safe_dump({"datasets": datasets}, sort_keys=False),
+    )
+
+
+def test_active_shared_usr_dataset_id_check_flags_nested_shared_ids(tmp_path: Path) -> None:
+    _write_active_study_datasets(
+        tmp_path,
+        [
+            {
+                "role": "densegen_anchor",
+                "dataset": "densegen/demo_nested_source",
+                "root_kind": "shared",
+                "status": "present",
+                "sync": {
+                    "remote_dataset": "promoter/demo_anchor",
+                    "remote_root_kind": "shared",
+                },
+            }
+        ],
+    )
+
+    issues = _find_active_shared_usr_dataset_id_issues(tmp_path)
+
+    assert any("densegen/demo_nested_source" in issue for issue in issues)
+    assert any("remote_dataset" in issue and "promoter/demo_anchor" in issue for issue in issues)
+    assert all("Active shared USR dataset IDs must be flat owner-first IDs" in issue for issue in issues)
+    assert all("archived/ is the only special top-level bucket" in issue for issue in issues)
+
+
+def test_active_shared_usr_dataset_id_check_allows_flat_ids_and_archived_bucket(tmp_path: Path) -> None:
+    _write_active_study_datasets(
+        tmp_path,
+        [
+            {
+                "role": "densegen_anchor",
+                "dataset": "densegen_prom_eth_cip_source",
+                "root_kind": "shared",
+                "status": "present",
+                "sync": {
+                    "remote_dataset": "densegen_prom_eth_cip_source",
+                    "remote_root_kind": "shared",
+                },
+            },
+            {
+                "role": "archived_prior_anchor",
+                "dataset": "archived/promoter/prior_anchor",
+                "root_kind": "shared",
+                "status": "archived",
+                "sync": {
+                    "remote_dataset": "archived/promoter/prior_anchor",
+                    "remote_root_kind": "shared",
+                },
+            },
+        ],
+    )
+
+    assert _find_active_shared_usr_dataset_id_issues(tmp_path) == []
+
+
+def test_shared_usr_dataset_layout_check_flags_nested_dataset_roots(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "datasets" / "densegen" / "demo_sampling_baseline" / "records.parquet",
+        "placeholder\n",
+    )
+
+    issues = _find_shared_usr_dataset_layout_issues(tmp_path)
+
+    assert any("densegen/demo_sampling_baseline" in issue for issue in issues)
+    assert all("Shared repo USR dataset roots must be flat" in issue for issue in issues)
+    assert all("archived/ is the only special top-level bucket" in issue for issue in issues)
+
+
+def test_shared_usr_dataset_layout_check_allows_flat_roots_and_archived_bucket(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "datasets" / "densegen_demo_sampling_baseline" / "records.parquet",
+        "placeholder\n",
+    )
+    _write(
+        tmp_path
+        / "src"
+        / "dnadesign"
+        / "usr"
+        / "datasets"
+        / "archived"
+        / "densegen"
+        / "demo_sampling_baseline"
+        / "records.parquet",
+        "placeholder\n",
+    )
+
+    assert _find_shared_usr_dataset_layout_issues(tmp_path) == []
 
 
 def test_main_fails_for_broken_relative_link_in_root_sor_doc(tmp_path: Path) -> None:

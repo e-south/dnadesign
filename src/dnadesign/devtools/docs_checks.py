@@ -194,6 +194,17 @@ STUDY_RECORD_ROUTER_FILES = (
 ACTIVE_STUDY_INDEX_PATH = "docs/studies/index.yaml"
 LEGACY_STUDY_INDEX_PATH = "docs/studies/promoter/index.yaml"
 LEGACY_STUDY_RECORD_PREFIX = "docs/studies/promoter/"
+ACTIVE_SHARED_USR_DATASET_ID_NUDGE = (
+    "Active shared USR dataset IDs must be flat owner-first IDs like "
+    "'densegen_prom_eth_cip_source'; use root_kind, owner_tool, overlays, and "
+    "study metadata for provenance. archived/ is the only special top-level bucket."
+)
+SHARED_USR_DATASETS_ROOT = "src/dnadesign/usr/datasets"
+SHARED_USR_DATASET_LAYOUT_NUDGE = (
+    "Shared repo USR dataset roots must be flat under src/dnadesign/usr/datasets; "
+    "move nested roots to owner-first ids like 'densegen_demo_sampling_baseline'. "
+    "archived/ is the only special top-level bucket."
+)
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
     "densegen_batch_with_notify",
@@ -1382,6 +1393,111 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_active_shared_usr_dataset_id_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    resolved_repo_root = repo_root.resolve()
+    index_path = repo_root / ACTIVE_STUDY_INDEX_PATH
+    if not index_path.exists():
+        return issues
+
+    payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        return issues
+
+    active_study = str(payload.get("active_study_id") or "").strip()
+    studies_payload = payload.get("studies") or []
+    if not active_study or not isinstance(studies_payload, list):
+        return issues
+
+    study_root: Path | None = None
+    for entry in studies_payload:
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("study_id") or "").strip() != active_study:
+            continue
+        raw_path = str(entry.get("record_root") or "").strip()
+        if not raw_path:
+            return issues
+        candidate = (repo_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
+        try:
+            candidate.relative_to(resolved_repo_root)
+        except ValueError:
+            return issues
+        study_root = candidate
+        break
+
+    if study_root is None:
+        return issues
+
+    datasets_path = study_root / "datasets.yaml"
+    if not datasets_path.exists():
+        return issues
+
+    datasets_payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(datasets_payload, dict):
+        return issues
+    entries = datasets_payload.get("datasets") or []
+    if not isinstance(entries, list):
+        return issues
+
+    def is_disallowed_nested_id(dataset_id: str, *, status: str) -> bool:
+        if "/" not in dataset_id:
+            return False
+        top_level = dataset_id.split("/", maxsplit=1)[0]
+        return not (top_level == "archived" and status == "archived")
+
+    for index, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        root_kind = str(entry.get("root_kind") or "").strip()
+        if root_kind != "shared":
+            continue
+
+        role = str(entry.get("role") or index).strip()
+        status = str(entry.get("status") or "").strip()
+        dataset_id = str(entry.get("dataset") or "").strip()
+        if dataset_id and is_disallowed_nested_id(dataset_id, status=status):
+            issues.append(
+                f"{datasets_path}: dataset entry {role!r} uses nested active shared "
+                f"dataset id {dataset_id!r}. {ACTIVE_SHARED_USR_DATASET_ID_NUDGE}"
+            )
+
+        sync = entry.get("sync")
+        if not isinstance(sync, dict):
+            continue
+        remote_root_kind = str(sync.get("remote_root_kind") or "").strip()
+        remote_dataset = str(sync.get("remote_dataset") or "").strip()
+        if remote_root_kind == "shared" and remote_dataset not in {"", "n/a"}:
+            if is_disallowed_nested_id(remote_dataset, status=status):
+                issues.append(
+                    f"{datasets_path}: dataset entry {role!r} uses nested active shared "
+                    f"remote_dataset id {remote_dataset!r}. {ACTIVE_SHARED_USR_DATASET_ID_NUDGE}"
+                )
+
+    return issues
+
+
+def _find_shared_usr_dataset_layout_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    datasets_root = repo_root / SHARED_USR_DATASETS_ROOT
+    if not datasets_root.exists():
+        return issues
+
+    for records_path in sorted(datasets_root.rglob("records.parquet")):
+        dataset_dir = records_path.parent
+        relative_dataset = dataset_dir.relative_to(datasets_root).as_posix()
+        parts = Path(relative_dataset).parts
+        if not parts or parts[0] == "archived":
+            continue
+        if len(parts) > 1:
+            issues.append(
+                f"{dataset_dir}: nested shared USR dataset root {relative_dataset!r} is not allowed. "
+                f"{SHARED_USR_DATASET_LAYOUT_NUDGE}"
+            )
+
+    return issues
+
+
 def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
     exec_root = repo_root / "docs" / "exec-plans"
@@ -2041,6 +2157,20 @@ def main(argv: list[str] | None = None) -> int:
     if study_record_doc_issues:
         print("Study record docs check failed:")
         for issue in study_record_doc_issues:
+            print(f" - {issue}")
+        return 1
+
+    active_shared_usr_dataset_id_issues = _find_active_shared_usr_dataset_id_issues(repo_root)
+    if active_shared_usr_dataset_id_issues:
+        print("Active shared USR dataset id check failed:")
+        for issue in active_shared_usr_dataset_id_issues:
+            print(f" - {issue}")
+        return 1
+
+    shared_usr_dataset_layout_issues = _find_shared_usr_dataset_layout_issues(repo_root)
+    if shared_usr_dataset_layout_issues:
+        print("Shared USR dataset layout check failed:")
+        for issue in shared_usr_dataset_layout_issues:
             print(f" - {issue}")
         return 1
 

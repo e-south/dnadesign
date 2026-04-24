@@ -88,6 +88,7 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 | `notify` | `uv run notify --help` | [notify README](../src/dnadesign/notify/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter README](../src/dnadesign/permuter/README.md) |
+| `testsupport` | n/a | [testsupport README](../src/dnadesign/testsupport/README.md) |
 | `tfkdanalysis` | n/a | [tfkdanalysis README](../src/dnadesign/tfkdanalysis/README.md) |
 | `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
 

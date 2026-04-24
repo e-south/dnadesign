@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-04-24
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -19,12 +19,14 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## Repository shape
 - Code: `src/dnadesign/`
+- Top-level `src/dnadesign/` is a controlled namespace: boundary-owning packages plus shared infrastructure (`devtools`, `testsupport`) and reserved legacy buckets (`archived`, `prototypes`) only.
 - Runbooks and references: `docs/`
 - CI/test/devtool orchestration: `.github/workflows/ci.yaml` and `src/dnadesign/devtools/`
 - Package/dependency contracts: `pyproject.toml`, `uv.lock`, `pixi.toml`, `pixi.lock`
 
 ## System boundaries
 - Tool packages: each top-level tool under `src/dnadesign/<tool>/` owns its CLI behavior, configs, and tests.
+- Shared test infrastructure lives under `src/dnadesign/testsupport/` and is test-only by contract; production code must not depend on it.
 - OPS core is a neutral shell around discovery, observation/status, orchestration,
   and generic readiness evaluation; it must not own sibling-specific provider
   implementations or study-family policy.
@@ -67,6 +69,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
   `src/dnadesign/studies/families/<family>/`.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
+- Active shared USR dataset ids are flat owner-first contracts, for example
+  `densegen_prom_eth_cip_source`; provenance belongs in `root_kind`,
+  `owner_tool`, overlays, event metadata, and study records rather than nested
+  tool-routing folders.
 - Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
 - Curated study-facing workspaces that enable USR sinks should default those
   sinks to an explicit shared USR root such as `src/dnadesign/usr/datasets`.
