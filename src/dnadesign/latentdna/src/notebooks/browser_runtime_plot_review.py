@@ -57,7 +57,11 @@ from .browser_runtime_support import (
 
 _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
     {
+        "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
+        "sigma35_margin_ladder_gallery",
+        "sigma35_stress_margin_gallery",
+        "sigma35_centroid_distance_gallery",
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     }
@@ -202,6 +206,26 @@ def _scatter_axis_label(frame: pd.DataFrame, *, value_column: str, label_column:
         if len(labels) == 1:
             return humanize_display_text(next(iter(labels)))
     return humanize_display_text(value_column)
+
+
+def _contains_math_text(value: object) -> bool:
+    text = str(value or "")
+    return "$" in text or "\\(" in text or "\\[" in text
+
+
+def _resolved_axis_label(
+    *,
+    explicit_label: object | None,
+    fallback_label: object,
+    width: int = 28,
+    max_lines: int | None = 2,
+) -> str:
+    text = " ".join(str(explicit_label or "").split()).strip()
+    if text:
+        if _contains_math_text(text):
+            return text
+        return wrap_plot_title(text, width=width, max_lines=max_lines)
+    return wrap_plot_title(humanize_display_text(str(fallback_label)), width=width, max_lines=max_lines)
 
 
 def _shared_numeric_bounds(frames: list[pd.DataFrame], hue_column: str) -> tuple[float | None, float | None]:
@@ -403,15 +427,17 @@ def _render_scatter_grid(
                 square=True,
             )
             ax.set_xlabel(
-                wrap_plot_title(
-                    _scatter_axis_label(frame, value_column=x_column, label_column="x_display_name"),
+                _resolved_axis_label(
+                    explicit_label=plot_spec.get("x_axis_label"),
+                    fallback_label=_scatter_axis_label(frame, value_column=x_column, label_column="x_display_name"),
                     width=28,
                     max_lines=2,
                 )
             )
             ax.set_ylabel(
-                wrap_plot_title(
-                    _scatter_axis_label(frame, value_column=y_column, label_column="y_display_name"),
+                _resolved_axis_label(
+                    explicit_label=plot_spec.get("y_axis_label"),
+                    fallback_label=_scatter_axis_label(frame, value_column=y_column, label_column="y_display_name"),
                     width=28,
                     max_lines=2,
                 )
@@ -567,15 +593,17 @@ def _render_scatter_grid(
         max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
         ax.set_title(wrapped_title, pad=10 if "\n" in wrapped_title else 8)
         ax.set_xlabel(
-            wrap_plot_title(
-                _scatter_axis_label(frame, value_column=x_column, label_column="x_display_name"),
+            _resolved_axis_label(
+                explicit_label=plot_spec.get("x_axis_label"),
+                fallback_label=_scatter_axis_label(frame, value_column=x_column, label_column="x_display_name"),
                 width=28,
                 max_lines=2,
             )
         )
         ax.set_ylabel(
-            wrap_plot_title(
-                _scatter_axis_label(frame, value_column=y_column, label_column="y_display_name"),
+            _resolved_axis_label(
+                explicit_label=plot_spec.get("y_axis_label"),
+                fallback_label=_scatter_axis_label(frame, value_column=y_column, label_column="y_display_name"),
                 width=28,
                 max_lines=2,
             )
@@ -588,11 +616,16 @@ def _render_scatter_grid(
     colorbar_bottom = 0.0
     if category_values and effective_hue is not None:
         legend_labels = [display_category_text(category, column=effective_hue) for category in category_values]
+        dense_legend_plot_ids = {
+            "balanced_design_family_margin_gallery",
+            "design_centroid_margin_gallery",
+            "sigma35_stress_margin_gallery",
+        }
         layout = legend_layout(
             legend_labels,
             plot_id=plot_id,
-            default_anchor_y=0.012 if plot_id == "design_centroid_margin_gallery" else 0.02,
-            default_base_margin=0.11,
+            default_anchor_y=0.008 if plot_id in dense_legend_plot_ids else 0.02,
+            default_base_margin=0.13 if plot_id in dense_legend_plot_ids else 0.11,
             row_step=0.043,
             single_row=True,
         )
@@ -619,7 +652,7 @@ def _render_scatter_grid(
         )
         style_notebook_legend(legend)
         legend_bottom = layout.bottom_margin
-        if plot_id == "design_centroid_margin_gallery":
+        if plot_id in dense_legend_plot_ids:
             legend_bottom = max(legend_bottom + 0.015, 0.125)
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
         label_right_padding_px = 28.0
@@ -630,12 +663,14 @@ def _render_scatter_grid(
 
     top_margin = max(0.8, 0.96 - (0.042 * max(max_title_lines - 1, 0)))
     fig.subplots_adjust(
-        left=0.09,
+        left=0.11 if plot_id in {"balanced_design_family_margin_gallery", "sigma35_stress_margin_gallery"} else 0.09,
         right=0.98,
         top=top_margin,
         bottom=bottom_margin,
         wspace=(
-            0.31
+            0.34
+            if plot_id in {"balanced_design_family_margin_gallery", "sigma35_stress_margin_gallery"} and panel_count > 1
+            else 0.31
             if plot_id == "design_centroid_margin_gallery" and panel_count > 1
             else 0.24
             if panel_count > 1
@@ -826,12 +861,17 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
             fallback_message="The selected plot has no numeric distributions to render.",
         )
 
-    rows_count, columns = static_panel_grid_dimensions(len(panel_entries))
-    square_distribution_panels = spec.plot_id == "context_delta_distributions"
+    prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(panel_entries))
+    rows_count, columns = static_panel_grid_dimensions(len(panel_entries), prefer_single_row=prefer_single_row)
+    square_distribution_panels = spec.plot_id == "sigma35_margin_ladder_gallery"
     fig, axes = plt.subplots(
         rows_count,
         columns,
-        figsize=static_grid_figure_size(len(panel_entries), square_panels=square_distribution_panels),
+        figsize=static_grid_figure_size(
+            len(panel_entries),
+            square_panels=square_distribution_panels,
+            prefer_single_row=prefer_single_row,
+        ),
         squeeze=False,
     )
     for axis in axes.ravel()[len(panel_entries) :]:
@@ -843,7 +883,7 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
                 panel_title=panel_title,
                 message="Panel unavailable",
                 detail=wrap_plot_title(str(error_detail or "Panel data missing"), width=34, max_lines=4),
-                square=square_distribution_panels,
+                square=False,
             )
             continue
         _render_distribution_panel(
@@ -854,6 +894,8 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
             render_mode=spec.render_mode or "histogram",
             panel_title=panel_title,
             square=square_distribution_panels,
+            x_axis_label=spec.x_axis_label,
+            y_axis_label=spec.y_axis_label,
         )
     fig.tight_layout(pad=0.95, h_pad=1.4, w_pad=0.95)
     return render_matplotlib_figure(fig, alt=alt_text)

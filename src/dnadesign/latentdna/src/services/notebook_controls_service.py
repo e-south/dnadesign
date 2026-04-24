@@ -102,6 +102,6 @@ def build_workspace_notebook_controls_payload(
         generated_at=datetime.now(UTC).isoformat(),
         runtime_paths=_runtime_paths(context, notebook_id=notebook_id),
         plot_controls=_plot_controls(context, notebook_id=notebook_id, catalog_payload=catalog_payload),
-        geometry_controls=build_workspace_geometry_controls(context),
+        geometry_controls=build_workspace_geometry_controls(context, notebook_id=notebook_id),
         context_audit=build_workspace_notebook_context_audit(context),
     )

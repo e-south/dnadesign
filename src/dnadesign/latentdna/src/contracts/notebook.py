@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictNotebookModel(BaseModel):
@@ -18,6 +18,21 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     default_deliverable: str
     default_surface: Literal["plots", "geometry_audit", "comparison_audit"] = "plots"
     ordered_plots: list[str] = Field(default_factory=list)
+    context_audit_scalar_ids: list[str] = Field(default_factory=list)
+    geometry_order: list[str] = Field(default_factory=list)
+    candidate_grid_views: list[str] = Field(default_factory=list)
+    candidate_grid_panel_titles: list[str] = Field(default_factory=list)
+    default_compare_views: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_geometry_controls(self) -> "WorkspaceNotebookConfig":
+        if self.candidate_grid_panel_titles and not self.candidate_grid_views:
+            raise ValueError("candidate_grid_panel_titles require candidate_grid_views")
+        if self.candidate_grid_panel_titles and len(self.candidate_grid_panel_titles) != len(self.candidate_grid_views):
+            raise ValueError("candidate_grid_panel_titles must match candidate_grid_views length")
+        if self.default_compare_views and len(self.default_compare_views) != 2:
+            raise ValueError("default_compare_views must declare exactly two view ids when provided")
+        return self
 
 
 class WorkspaceNotebookGeometry(StrictNotebookModel):

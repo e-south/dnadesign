@@ -19,14 +19,12 @@ from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..labels import humanize_candidate
 
-_CANONICAL_GEOMETRY_ORDER = [
+_DEFAULT_GEOMETRY_ORDER = [
     "intermediate_embedding_7b_anchor_60bp",
     "pooled_logits_7b_anchor_60bp",
     "intermediate_embedding_7b_full_context_1kb",
     "pooled_logits_7b_full_context_1kb",
     "intermediate_embedding_7b_full_context_anchor_mean",
-    "intermediate_embedding_7b_anchor_plus_full_context_concat",
-    "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
 ]
 
 _PREFERRED_HUES = [
@@ -136,6 +134,22 @@ def _projection_inventory(context) -> dict[str, list[str]]:
     }
 
 
+def _resolve_notebook(context, notebook_id: str | None):
+    if notebook_id is not None:
+        return context.require_notebook(notebook_id)
+    if "latent_geometry_browser" in context.config.notebooks:
+        return context.config.notebooks["latent_geometry_browser"]
+    if context.config.notebooks:
+        return next(iter(context.config.notebooks.values()))
+    return None
+
+
+def _geometry_order(context, *, notebook_id: str | None) -> list[str]:
+    notebook = _resolve_notebook(context, notebook_id)
+    configured = list(getattr(notebook, "geometry_order", []) or []) if notebook is not None else []
+    return configured or list(_DEFAULT_GEOMETRY_ORDER)
+
+
 def _view_shape(context, view_id: str) -> tuple[int, int] | None:
     matrix_path = context.output_root / "views" / view_id / "matrix.npy"
     if not matrix_path.is_file():
@@ -144,9 +158,14 @@ def _view_shape(context, view_id: str) -> tuple[int, int] | None:
     return int(matrix.shape[0]), int(matrix.shape[1])
 
 
-def _geometry_inventory(context, *, projection_ids_by_view: dict[str, list[str]]) -> list[WorkspaceNotebookGeometry]:
+def _geometry_inventory(
+    context,
+    *,
+    projection_ids_by_view: dict[str, list[str]],
+    geometry_order: list[str],
+) -> list[WorkspaceNotebookGeometry]:
     geometries: list[WorkspaceNotebookGeometry] = []
-    order = {view_id: index for index, view_id in enumerate(_CANONICAL_GEOMETRY_ORDER)}
+    order = {view_id: index for index, view_id in enumerate(geometry_order)}
     for view_id, view in sorted(context.config.views.items(), key=lambda item: (order.get(item[0], 999), item[0])):
         tags = dict(getattr(view, "tags", {}) or {})
         role = str(getattr(view, "role", "") or "").strip().lower()
@@ -324,8 +343,18 @@ def _preferred_hue_kinds(
     return {column: kinds[column] for column in _PREFERRED_HUES if column in kinds}
 
 
-def _layout_presets(geometry_rows: list[WorkspaceNotebookGeometry]) -> list[WorkspaceNotebookLayoutPreset]:
+def _layout_presets(
+    context,
+    geometry_rows: list[WorkspaceNotebookGeometry],
+    *,
+    notebook_id: str | None,
+) -> list[WorkspaceNotebookLayoutPreset]:
     available = {row.view_id for row in geometry_rows}
+    notebook = _resolve_notebook(context, notebook_id)
+    candidate_grid_views = list(getattr(notebook, "candidate_grid_views", []) or []) if notebook is not None else []
+    candidate_grid_titles = (
+        list(getattr(notebook, "candidate_grid_panel_titles", []) or []) if notebook is not None else []
+    )
     presets: list[WorkspaceNotebookLayoutPreset] = [
         WorkspaceNotebookLayoutPreset(
             id="single_view",
@@ -334,23 +363,15 @@ def _layout_presets(geometry_rows: list[WorkspaceNotebookGeometry]) -> list[Work
             description="Render one persisted projection with the selected hue.",
         ),
     ]
-    if set(_CANONICAL_GEOMETRY_ORDER).issubset(available):
+    if candidate_grid_views and set(candidate_grid_views).issubset(available):
         presets.append(
             WorkspaceNotebookLayoutPreset(
                 id="candidate_grid",
                 label="Candidate grid",
                 mode="fixed_grid",
-                description="Projection grid across the surfaced 7B intermediate candidates and concat experiments.",
-                view_ids=_CANONICAL_GEOMETRY_ORDER,
-                panel_titles=[
-                    "Evo 2 7B · 60 bp anchor · Intermediate block mean",
-                    "Evo 2 7B · 60 bp anchor · Pooled logits",
-                    "Evo 2 7B · 1 kb construct context · Intermediate block mean",
-                    "Evo 2 7B · 1 kb construct context · Pooled logits",
-                    "Evo 2 7B · 1 kb context anchor mean · Intermediate block mean",
-                    "Evo 2 7B · Anchor + 1 kb context concat · Intermediate block mean",
-                    "Evo 2 7B · Anchor + anchor-mean concat · Intermediate block mean",
-                ],
+                description="Projection grid across the surfaced 7B intermediate candidates.",
+                view_ids=candidate_grid_views,
+                panel_titles=candidate_grid_titles,
             )
         )
     return presets
@@ -412,13 +433,24 @@ def _comparison_bases(
 
 
 def _default_compare_views(
+    context,
     geometry_rows: list[WorkspaceNotebookGeometry],
+    *,
+    notebook_id: str | None,
 ) -> tuple[str | None, str | None]:
     view_ids = {row.view_id for row in geometry_rows}
-    for left_view, right_view in [
-        ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_anchor_mean"),
-        ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_1kb"),
-    ]:
+    notebook = _resolve_notebook(context, notebook_id)
+    configured_pairs: list[tuple[str, str]] = []
+    configured_compare = list(getattr(notebook, "default_compare_views", []) or []) if notebook is not None else []
+    if len(configured_compare) == 2:
+        configured_pairs.append((configured_compare[0], configured_compare[1]))
+    configured_pairs.extend(
+        [
+            ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_anchor_mean"),
+            ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_1kb"),
+        ]
+    )
+    for left_view, right_view in configured_pairs:
         if left_view in view_ids and right_view in view_ids:
             return left_view, right_view
     if len(geometry_rows) >= 2:
@@ -429,9 +461,14 @@ def _default_compare_views(
     return None, None
 
 
-def build_workspace_geometry_controls(context) -> WorkspaceNotebookGeometryControls:
+def build_workspace_geometry_controls(context, *, notebook_id: str | None = None) -> WorkspaceNotebookGeometryControls:
     projection_ids_by_view = _projection_inventory(context)
-    geometries = _geometry_inventory(context, projection_ids_by_view=projection_ids_by_view)
+    geometry_order = _geometry_order(context, notebook_id=notebook_id)
+    geometries = _geometry_inventory(
+        context,
+        projection_ids_by_view=projection_ids_by_view,
+        geometry_order=geometry_order,
+    )
     joinable_tables, schemas_by_path = _table_inventory(
         context,
         visible_view_ids={row.view_id for row in geometries},
@@ -439,7 +476,11 @@ def build_workspace_geometry_controls(context) -> WorkspaceNotebookGeometryContr
     hue_kinds = _preferred_hue_kinds(joinable_tables, schemas_by_path=schemas_by_path)
     preferred_hues = [column for column in _PREFERRED_HUES if column in hue_kinds]
     comparison_bases = _comparison_bases(context, geometries)
-    default_compare_left, default_compare_right = _default_compare_views(geometries)
+    default_compare_left, default_compare_right = _default_compare_views(
+        context,
+        geometries,
+        notebook_id=notebook_id,
+    )
     return WorkspaceNotebookGeometryControls(
         default_model="7b",
         default_family="intermediate_embedding",
@@ -451,7 +492,7 @@ def build_workspace_geometry_controls(context) -> WorkspaceNotebookGeometryContr
         preferred_hues=preferred_hues,
         hue_kinds=hue_kinds,
         joinable_tables=joinable_tables,
-        layout_presets=_layout_presets(geometries),
+        layout_presets=_layout_presets(context, geometries, notebook_id=notebook_id),
         comparison_bases=comparison_bases,
         reference_labels=_reference_labels(context),
         compare_metrics=WorkspaceNotebookCompareMetrics(

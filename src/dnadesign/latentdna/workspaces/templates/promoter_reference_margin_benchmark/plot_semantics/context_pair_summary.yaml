@@ -1,0 +1,23 @@
+plot_id: context_pair_summary
+question: "Which context pooling choice preserves anchor-local geometry more gently: anchor-mean pooling or whole-sequence 1 kb pooling?"
+decision_role: primary
+encoding: Two-panel metric summary comparing median context self cosine and median context-shift L2 for aligned anchor -> anchor-mean versus anchor -> 1 kb seq-mean pairs in the 7B intermediate family.
+scope: Densegen-only aligned 7B intermediate row-level context-delta scalars aggregated to pair medians for the two sanctioned context comparisons.
+guardrails:
+  - Read this as the direct context comparison; the broader context-robustness panel remains the cohort-retention summary.
+  - Higher self cosine and lower shift L2 indicate less destructive contextualization, not promoter activity.
+caption: Direct context comparison for anchor-local versus whole-sequence pooling.
+alt_text: Two bar panels comparing median context self-cosine and median context-shift L2 for 1 kb anchor-mean pooling versus 1 kb whole-sequence mean pooling.
+preprocessing_md: The source row-level scalars reuse the persisted aligned anchor/context pairs after view-level standardization and row L2 normalization. This plot only aggregates those persisted rows to medians.
+math_md: |
+  The two summary metrics are
+  $$
+  \mathrm{median}_i\ \cos\left(z_i^{\mathrm{anchor}}, z_i^{\mathrm{context}}\right)
+  $$
+  and
+  $$
+  \mathrm{median}_i\ \left\|z_i^{\mathrm{anchor}} - z_i^{\mathrm{context}}\right\|_2.
+  $$
+rationale_md: This is the shortest visual proof for the context claim. It replaces the more arbitrary row-distribution gallery with a direct same-scale comparison between the chosen anchor-mean path and the dilution-prone 1 kb seq-mean contrast.
+limitations_md: Median summaries intentionally suppress subgroup shape and tail behavior. Use the main context-robustness summary or the underlying row-level scalars when subgroup diagnostics are needed.
+failure_modes_md: If the two comparisons are read without the surrounding retention panel, a modest median win can be mistaken for a complete context argument.

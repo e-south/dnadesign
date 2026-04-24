@@ -30,19 +30,17 @@ def test_context_audit_summary_aggregates_configured_context_shift_scalars(tmp_p
     _write_context_audit_table(output_root, scalar_id="context_delta_distribution_intermediate_embedding_20b")
     _write_context_audit_table(output_root, scalar_id="context_delta_distribution_pooled_logits_20b")
 
-    distribution_plot = SimpleNamespace(
-        kind="distribution_grid",
-        scalars=[
-            "context_delta_distribution_intermediate_embedding_20b",
-            "context_delta_distribution_intermediate_embedding_7b",
-            "context_delta_distribution_pooled_logits_20b",
-        ],
-    )
     context = SimpleNamespace(
         output_root=output_root,
         config=SimpleNamespace(
-            plots={
-                "context_delta_distributions": distribution_plot,
+            notebooks={
+                "latent_geometry_browser": SimpleNamespace(
+                    context_audit_scalar_ids=[
+                        "context_delta_distribution_intermediate_embedding_20b",
+                        "context_delta_distribution_intermediate_embedding_7b",
+                        "context_delta_distribution_pooled_logits_20b",
+                    ]
+                )
             }
         ),
     )

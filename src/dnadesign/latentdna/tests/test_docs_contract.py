@@ -61,7 +61,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "**Plane:** data-plane" in workflow
     assert "**Surface role:** downstream-analysis" in workflow
     assert "**Owner-boundary:** latentdna" in workflow
-    assert "**Entry artifact:** promoter/stress_ethanol_cipro_anchor_set" in workflow
+    assert "**Entry artifact:** usr_prom_eth_cip_anchor" in workflow
     assert (
         "**Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables" in workflow
     )
@@ -69,10 +69,16 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "design_structure_summary" in workflow
     assert "sigma35_ordinal_audit" in workflow
     assert "context_robustness_summary" in workflow
+    assert "candidate_decision_frontier" in workflow
+    assert "balanced_design_family_margin_gallery" in workflow
+    assert "sigma35_margin_ladder_gallery" in workflow
+    assert "sigma35_centroid_distance_gallery" in workflow
+    assert "sigma35_stress_margin_gallery" in workflow
+    assert "context_pair_summary" in workflow
     assert "appendix_umap_gallery" in workflow
     assert "### Gate" in workflow
     assert "pre-assay representation triage" in workflow
-    assert "seven-view 7B-first browser" in workflow
+    assert "five-view 7B-first browser" in workflow
     assert "eight canonical 7B+20B" not in workflow
     assert "Leave geodesic pilots in study notes" in workflow
     assert 'zero_variance_policy="drop_or_zero"' in workflow
@@ -108,6 +114,12 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "dataset_overview" in study_routes
     assert "design_structure_summary" in study_routes
     assert "context_robustness_summary" in study_routes
+    assert "candidate_decision_frontier" in study_routes
+    assert "balanced_design_family_margin_gallery" in study_routes
+    assert "sigma35_margin_ladder_gallery" in study_routes
+    assert "sigma35_centroid_distance_gallery" in study_routes
+    assert "sigma35_stress_margin_gallery" in study_routes
+    assert "context_pair_summary" in study_routes
     assert "Plane: `data-plane`" in study_routes
     assert "Plane: `control-plane`" in study_routes
     assert "Surface role: `producer`" in study_routes
@@ -119,19 +131,25 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Plane: `downstream-analysis`" not in study_routes
     assert "Plane: `downstream-tool`" not in study_routes
     assert "7B-first browser posture" in study_routes
-    assert "seven-view 7B-first surface" in study_routes
+    assert "five-view 7B-first surface" in study_routes
     assert "record-plane infer preference remains `evo2_20b`" in study_routes
     assert "eight canonical 7B+20B" not in study_routes
 
     assert "The study phase is `infer_batch_preparation`" in study_status
     assert "Current attention surfaces:" in study_status
     assert "representation_health_summary" in study_status
+    assert "candidate_decision_frontier" in study_status
+    assert "balanced_design_family_margin_gallery" in study_status
+    assert "sigma35_margin_ladder_gallery" in study_status
+    assert "sigma35_stress_margin_gallery" in study_status
     assert "Preferred infer family: `evo2_20b`" in study_status
     assert "Supported infer families: `evo2_20b`, `evo2_7b`" in study_status
     assert "LatentDNA browser default family: `evo2_7b`" in study_status
     assert "LatentDNA gate:" in study_status
     assert "LatentDNA primary review path:" in study_status
-    assert "seven-view 7B-first pre-assay ladder" in study_status
+    assert "LatentDNA companion visuals:" in study_status
+    assert "LatentDNA appendix support:" in study_status
+    assert "five-view 7B-first pre-assay ladder" in study_status
     assert "eight canonical 7B+20B" not in study_status
     assert "Appendix deliverables remain secondary" in study_status
 

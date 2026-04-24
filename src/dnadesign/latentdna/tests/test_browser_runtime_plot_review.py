@@ -229,6 +229,104 @@ def test_render_plot_review_surface_orders_sig35_legend_by_strength(monkeypatch,
         plt.close(fig)
 
 
+def test_render_plot_review_surface_preserves_explicit_math_axis_labels(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame(
+            {
+                "sig35_margin_f_vs_b": [0.8, -0.1],
+                "synthetic_best_stress_margin": [0.6, 0.2],
+                "sig35_variant": ["f", "b"],
+            }
+        )
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "sigma35_stress_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "sig35_margin_f_vs_b",
+            "y_column": "synthetic_best_stress_margin",
+            "x_axis_label": r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$",
+            "y_axis_label": r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$",
+            "panel_titles": ["Stress margin"],
+            "hue_options": [
+                {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
+            ],
+        },
+        frames=frames,
+        hue_column="sig35_variant",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        axis = fig.axes[0]
+        assert axis.get_xlabel() == r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
+        assert axis.get_ylabel() == r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$"
+    finally:
+        plt.close(fig)
+
+
+def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_square_panels(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame(
+            {
+                "sig35_margin_f_vs_b": [0.8, 0.55, 0.22, -0.15],
+                "sig35_variant": ["f", "e", "d", "b"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "sig35_margin_f_vs_b": [0.62, 0.41, 0.08, -0.24],
+                "sig35_variant": ["f", "e", "d", "b"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "sig35_margin_f_vs_b": [0.93, 0.68, 0.33, -0.09],
+                "sig35_variant": ["f", "e", "d", "b"],
+            }
+        ),
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "sigma35_margin_ladder_gallery",
+            "kind": "distribution_grid",
+            "scalar_ids": ["anchor", "full_context", "anchor_mean"],
+            "panel_titles": ["Anchor", "1 kb seq", "Anchor mean"],
+            "hue_options": [
+                {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
+            ],
+            "metric_columns": ["sig35_margin_f_vs_b"],
+            "color_column": "sig35_variant",
+            "render_mode": "violin_box",
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        fig.canvas.draw()
+        assert len(fig.axes) == 3
+        axis_positions = [axis.get_position() for axis in fig.axes]
+        assert max(position.y0 for position in axis_positions) - min(position.y0 for position in axis_positions) < 0.02
+        for axis in fig.axes:
+            assert abs(float(axis.get_box_aspect()) - 1.0) < 0.05
+    finally:
+        plt.close(fig)
+
+
 def test_render_plot_review_surface_supports_categorical_count_grid(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
     frames = [
@@ -280,7 +378,7 @@ def test_render_plot_review_surface_does_not_leak_debug_distribution_scalar_ids(
 
     rendered = render_plot_review_surface(
         {
-            "plot_id": "context_delta_distributions",
+            "plot_id": "distribution_demo",
             "kind": "distribution_grid",
             "scalar_ids": ["debug_distribution_demo"],
             "value_column": "score",
@@ -310,7 +408,7 @@ def test_render_plot_review_surface_preserves_context_distribution_family_titles
 
     fig = render_plot_review_surface(
         {
-            "plot_id": "context_delta_distributions",
+            "plot_id": "distribution_demo",
             "kind": "distribution_grid",
             "scalar_ids": [
                 "context_delta_distribution_intermediate_embedding_7b",
@@ -352,7 +450,7 @@ def test_load_plot_review_frames_marks_stale_scalar_manifest_as_unavailable(tmp_
 
     frames = plot_review_runtime.load_plot_review_frames(
         {
-            "plot_id": "context_delta_distributions",
+            "plot_id": "distribution_demo",
             "kind": "distribution_grid",
             "scalar_ids": ["context_delta_distribution_intermediate_embedding_7b"],
             "value_column": "score",
@@ -375,7 +473,7 @@ def test_load_plot_review_frames_rejects_scalar_manifest_without_identity_fields
 
     frames = plot_review_runtime.load_plot_review_frames(
         {
-            "plot_id": "context_delta_distributions",
+            "plot_id": "distribution_demo",
             "kind": "distribution_grid",
             "scalar_ids": ["context_delta_distribution_intermediate_embedding_7b"],
             "value_column": "score",
@@ -522,7 +620,7 @@ def test_render_plot_review_surface_allows_distribution_grids_with_partial_panel
 
     fig = render_plot_review_surface(
         {
-            "plot_id": "context_delta_distributions",
+            "plot_id": "distribution_demo",
             "kind": "distribution_grid",
             "scalar_ids": ["healthy_scalar", "stale_scalar"],
             "value_column": "score",

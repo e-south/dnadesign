@@ -81,6 +81,7 @@ Workspace-specific flags:
 - `latentdna neighbors fit` and `latentdna cluster fit` require exactly one of `--view` or `--reduced-view`; reduced views are already scope-fixed and cannot be combined with `--sample` or `--alignment`.
 - `latentdna workspace init --json` emits `latentdna.command_result.v1` with `artifact_kind=workspace`.
 - `latentdna notebook generate` may emit `status=attention` when the notebook artifact exists but the default deliverable plot has not been rendered yet.
+- `latentdna notebook generate` now fails fast when the default deliverable exists but has freshness drift; refresh it with `latentdna deliverable run <deliverable-id>` or `latentdna recipe run <recipe-id>` before regenerating the notebook.
 - `latentdna notebook smoke` exits non-zero when notebook health is `error`.
 - `latentdna inspect notebook-health` exits non-zero when stored notebook health is `error`.
 - Text mode stays concise; JSON mode is the stable automation surface.

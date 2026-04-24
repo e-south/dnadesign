@@ -21,6 +21,7 @@ class PlotSemantics(BaseModel):
     preprocessing_md: str = Field(min_length=1)
     math_md: str = Field(min_length=1)
     rationale_md: str = Field(min_length=1)
+    plot_details_md: str | None = None
     limitations_md: str = Field(min_length=1)
     failure_modes_md: str = Field(min_length=1)
     docs_refs: list[str] = Field(default_factory=list)

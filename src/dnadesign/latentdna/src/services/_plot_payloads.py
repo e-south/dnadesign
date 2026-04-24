@@ -38,6 +38,16 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                     context.output_root / "enrichments" / spec.enrichment_id / "table.parquet",
                 )
             ]
+    if spec.kind == "heatmap_grid":
+        return [
+            _artifact_input(
+                context,
+                "scalar_table",
+                scalar_id,
+                context.output_root / "scalars" / scalar_id / "table.parquet",
+            )
+            for scalar_id in spec.scalar_ids
+        ]
         assert spec.scalar_id is not None
         return [
             _artifact_input(
@@ -236,10 +246,20 @@ def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["pair_id_column"] = spec.pair_id_column
     if spec.shape_column is not None:
         payload["shape_column"] = spec.shape_column
+    if spec.size_column is not None:
+        payload["size_column"] = spec.size_column
+    if spec.size_range is not None:
+        payload["size_range"] = list(spec.size_range)
     if spec.default_hue is not None:
         payload["default_hue"] = spec.default_hue
     if spec.hue_options:
         payload["hue_options"] = [option.model_dump(mode="json") for option in spec.hue_options]
+    if spec.x_axis_label is not None:
+        payload["x_axis_label"] = spec.x_axis_label
+    if spec.y_axis_label is not None:
+        payload["y_axis_label"] = spec.y_axis_label
+    if spec.colorbar_label is not None:
+        payload["colorbar_label"] = spec.colorbar_label
     if spec.direction_column is not None:
         payload["direction_column"] = spec.direction_column
     if spec.unit_column is not None:
@@ -250,6 +270,10 @@ def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["row_column"] = spec.row_column
     if spec.column_column is not None:
         payload["column_column"] = spec.column_column
+    if spec.row_order:
+        payload["row_order"] = spec.row_order
+    if spec.column_order:
+        payload["column_order"] = spec.column_order
     if spec.label_column is not None:
         payload["label_column"] = spec.label_column
     if spec.label_values:
@@ -293,6 +317,10 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["row_column"] = spec.row_column
     if spec.column_column is not None:
         params["column_column"] = spec.column_column
+    if spec.row_order:
+        params["row_order"] = spec.row_order
+    if spec.column_order:
+        params["column_order"] = spec.column_order
     if spec.panel_column is not None:
         params["panel_column"] = spec.panel_column
     if spec.x_column is not None:
@@ -303,6 +331,10 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["color_column"] = spec.color_column
     if spec.shape_column is not None:
         params["shape_column"] = spec.shape_column
+    if spec.size_column is not None:
+        params["size_column"] = spec.size_column
+    if spec.size_range is not None:
+        params["size_range"] = list(spec.size_range)
     if spec.default_hue is not None:
         params["default_hue"] = spec.default_hue
     if spec.hue_options:
@@ -353,6 +385,9 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         elif spec.scalar_id is not None:
             params["input_kind"] = "scalar_table"
             params["input_id"] = spec.scalar_id
+    if spec.kind == "heatmap_grid":
+        params["input_kind"] = "scalar_table"
+        params["input_ids"] = spec.scalar_ids
     if spec.config_id is not None:
         params["plot_config_id"] = spec.config_id
     return params

@@ -1,0 +1,24 @@
+plot_id: sigma35_centroid_distance_gallery
+question: Do the Sigma-35 variants form a coherent centroid ladder inside each candidate space?
+decision_role: appendix
+encoding: Multi-panel heatmap gallery of pairwise Sigma-35 centroid cosine distances for the study-facing 7B intermediate candidates, with a shared sequential sea-green color scale.
+scope: The full shared promoter population using the declared Sigma-35 order for the active study. The gallery focuses on the three study-facing 7B intermediate candidates rather than the full appendix inventory.
+guardrails:
+  - Use this gallery as appendix-only support for the Sigma-35 ordinal audit, not as a standalone ranking rule.
+  - The ordered row and column layout reflects the declared Sigma-35 ladder; it does not prove promoter activity.
+caption: Pairwise Sigma-35 centroid-distance gallery across the main 7B intermediate candidates.
+alt_text: Three heatmaps showing pairwise cosine distances between Sigma-35 variant centroids across the main 7B intermediate representation candidates.
+preprocessing_md: Variant centroids are computed after view-level standardization and row L2 normalization on the full promoter population in each candidate view. Distances are cosine distances between those normalized centroids.
+math_md: |
+  For each variant \(g\), the centroid is
+  $$
+  c_g = \mathrm{normalize}\left(\frac{1}{|g|}\sum_{i \in g} z_i\right),
+  $$
+  and each heatmap entry is
+  $$
+  d_{\mathrm{emb}}(g, h) = 1 - \cos(c_g, c_h).
+  $$
+  Smaller values mean two Sigma-35 variant centroids stay close in the representation; larger values mean they are farther apart.
+rationale_md: This is appendix support for the ordinal audit. A better candidate tends to keep nearby ladder neighbors relatively close and farther-apart variants more separated, but the heatmap is still only a secondary consistency check rather than a primary selector.
+limitations_md: Heatmaps remain pairwise summaries of centroid geometry and do not capture within-variant dispersion or higher-order manifold structure.
+failure_modes_md: Small-cohort instability, confounding by non-Sigma-35 design features, or over-reading block patterns can exaggerate apparent ordinal structure.

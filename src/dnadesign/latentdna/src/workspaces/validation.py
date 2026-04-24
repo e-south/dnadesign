@@ -266,6 +266,15 @@ def _validate_notebook(config: WorkspaceConfig, notebook_id: str, notebook: Note
             raise WorkspaceValidationError(
                 f"notebook {notebook_id} ordered plot {plot_id!r} is not owned by any deliverable output"
             )
+    for label, view_ids in (
+        ("geometry_order", notebook.geometry_order),
+        ("candidate_grid_views", notebook.candidate_grid_views),
+        ("default_compare_views", notebook.default_compare_views),
+    ):
+        for view_id in view_ids:
+            validate_identifier(view_id, label=f"notebook {notebook_id} {label} view")
+            if view_id not in config.views:
+                raise WorkspaceValidationError(f"notebook {notebook_id} references unknown view {view_id!r} in {label}")
 
 
 def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
@@ -290,6 +299,10 @@ def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
             validate_identifier(plot.enrichment, label=f"plot {plot_id} enrichment")
         if plot.scalar is not None:
             validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
+        return
+    if plot.kind == "heatmap_grid":
+        for scalar_id in plot.scalars:
+            validate_identifier(scalar_id, label=f"plot {plot_id} scalar")
         return
     if plot.kind == "distance_scatter":
         validate_identifier(plot.distance, label=f"plot {plot_id} distance")

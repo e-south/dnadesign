@@ -8,8 +8,11 @@ from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec
 from dnadesign.latentdna.src.plots.render import (
     _category_color_map,
     _derived_panel_label,
+    _draw_annotation_callouts,
     _grid_figure_size,
     _panel_grid_dimensions,
+    _render_distribution_panel,
+    _render_heatmap_panel,
     _render_metric_panel,
 )
 from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
@@ -274,6 +277,108 @@ def test_render_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> No
         tick_labels = [label.get_text() for label in ax.get_xticklabels()]
         assert tick_labels == ["7B", "20B"]
         assert all(label.get_rotation() == 32.0 for label in ax.get_xticklabels())
+    finally:
+        plt.close(fig)
+
+
+def test_render_distribution_panel_orders_sig35_categories_by_strength_and_uses_display_labels() -> None:
+    rows = [
+        {"sig35_variant": "b", "sig35_margin_f_vs_b": -0.4},
+        {"sig35_variant": "f", "sig35_margin_f_vs_b": 0.7},
+        {"sig35_variant": "d", "sig35_margin_f_vs_b": 0.1},
+        {"sig35_variant": "e", "sig35_margin_f_vs_b": 0.3},
+        {"sig35_variant": "control", "sig35_margin_f_vs_b": 0.0},
+    ]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    try:
+        _render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="sig35_margin_f_vs_b",
+            color_column="sig35_variant",
+            render_mode="violin_box",
+            panel_title="Sigma-35 ladder",
+            square=False,
+        )
+
+        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        assert tick_labels == [
+            "TTGACA (f)",
+            "TAGACA (e)",
+            "TTTACA (d)",
+            "CTGACA (b)",
+            "Control",
+        ]
+    finally:
+        plt.close(fig)
+
+
+def test_render_distribution_panel_preserves_explicit_math_axis_label() -> None:
+    rows = [
+        {"sig35_variant": "f", "sig35_margin_f_vs_b": 0.7},
+        {"sig35_variant": "b", "sig35_margin_f_vs_b": -0.4},
+    ]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    try:
+        label = r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
+        _render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="sig35_margin_f_vs_b",
+            color_column="sig35_variant",
+            render_mode="violin_box",
+            panel_title="Sigma-35 ladder",
+            square=False,
+            y_axis_label=label,
+        )
+
+        assert ax.get_ylabel() == label
+    finally:
+        plt.close(fig)
+
+
+def test_render_heatmap_panel_can_hide_redundant_y_tick_labels() -> None:
+    fig, ax = plt.subplots(figsize=(4, 3))
+    try:
+        image = _render_heatmap_panel(
+            ax,
+            grid=[[0.0, 0.5], [0.5, 0.0]],
+            row_values=["TTGACA (f)", "CTGACA (b)"],
+            column_values=["TTGACA (f)", "CTGACA (b)"],
+            row_column="row_variant",
+            column_column="column_variant",
+            title="Sigma-35 distance",
+            cmap="cividis",
+            norm=None,
+            show_y_tick_labels=False,
+            show_y_axis_label=False,
+        )
+
+        assert image is not None
+        assert ax.get_ylabel() == ""
+        assert all(not tick.get_text() for tick in ax.get_yticklabels())
+    finally:
+        plt.close(fig)
+
+
+def test_draw_annotation_callouts_can_skip_marker_overlay() -> None:
+    fig, ax = plt.subplots(figsize=(4, 3))
+    try:
+        ax.set_xlim(0.0, 1.0)
+        ax.set_ylim(0.0, 1.0)
+        _draw_annotation_callouts(
+            ax,
+            rows=[{"x": 0.3, "y": 0.7}],
+            resolved_x="x",
+            resolved_y="y",
+            label_texts=["anchor"],
+            marker_colors=["#111111"],
+            marker=None,
+            marker_size=0.0,
+        )
+
+        assert len(ax.collections) == 0
+        assert [text.get_text() for text in ax.texts] == ["anchor"]
     finally:
         plt.close(fig)
 

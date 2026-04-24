@@ -25,6 +25,14 @@ def _resolved_hue_fields(config: PlotConfig) -> dict[str, object]:
     }
 
 
+def _resolved_label_fields(config: PlotConfig) -> dict[str, object]:
+    return {
+        "x_axis_label": getattr(config, "x_axis_label", None),
+        "y_axis_label": getattr(config, "y_axis_label", None),
+        "colorbar_label": getattr(config, "colorbar_label", None),
+    }
+
+
 def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | None) -> ResolvedPlotSpec:
     if config.kind == "projection_scatter":
         return ResolvedPlotSpec(
@@ -37,6 +45,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             label_values=list(config.label_values),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -52,6 +61,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -64,6 +74,26 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             row_column=config.row_column,
             column_column=config.column_column,
             value_column=config.value_column,
+            row_order=list(config.row_order or []),
+            column_order=list(config.column_order or []),
+            color_scale=config.color_scale,
+            **_resolved_label_fields(config),
+            config_id=config_id,
+            semantics_ref=config.semantics_ref,
+        )
+    if config.kind == "heatmap_grid":
+        return ResolvedPlotSpec(
+            plot_id=plot_id,
+            kind=config.kind,
+            scalar_ids=list(config.scalars),
+            row_column=config.row_column,
+            column_column=config.column_column,
+            value_column=config.value_column,
+            panel_titles=list(config.panel_titles or []),
+            row_order=list(config.row_order or []),
+            column_order=list(config.column_order or []),
+            color_scale=config.color_scale,
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -77,6 +107,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -90,9 +121,14 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             y_column=config.y_column,
             color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
+            size_column=config.size_column,
+            size_range=config.size_range,
             render_mode=config.render_mode,
+            label_column=config.label_column,
+            label_values=list(config.label_values),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -109,6 +145,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -126,6 +163,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -140,6 +178,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_column=config.panel_column,
             color_column=_resolved_color_column(config),
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -164,6 +203,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             unit_column=config.unit_column,
             reference_line=config.reference_line,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -179,6 +219,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             color_column=_resolved_color_column(config),
             render_mode=config.render_mode,
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -193,6 +234,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             render_mode=config.render_mode,
             panel_titles=list(config.panel_titles or []),
             **_resolved_hue_fields(config),
+            **_resolved_label_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
@@ -295,6 +337,15 @@ def _inline_payload(
             "column_column": None,
             "value_column": value_column,
         }
+    if kind == "heatmap_grid":
+        return {
+            "kind": kind,
+            "scalars": scalar_ids,
+            "row_column": "row_label",
+            "column_column": "column_label",
+            "value_column": value_column,
+            "panel_titles": panel_titles,
+        }
     if kind == "distance_scatter":
         return {
             "kind": kind,
@@ -313,6 +364,9 @@ def _inline_payload(
             "y_column": y_column,
             "color_column": color_column,
             "shape_column": shape_column,
+            "size_column": None,
+            "label_column": label_column,
+            "label_values": label_values,
         }
         if render_mode is not None:
             payload["render_mode"] = render_mode

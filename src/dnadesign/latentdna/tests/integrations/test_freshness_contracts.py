@@ -18,9 +18,9 @@ from dnadesign.latentdna.src.services.deliverable_service import deliverable_sta
 from dnadesign.latentdna.src.services.freshness_service import FreshnessCache
 from dnadesign.latentdna.src.services.run_service import list_runs
 from dnadesign.latentdna.src.sources import provenance as provenance_module
+from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
-from dnadesign.usr.src.datasets.mock import MockSpec, create_mock_dataset
-from dnadesign.usr.tests.registry_helpers import register_test_namespace
+from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 
 _RUNNER = CliRunner()
 

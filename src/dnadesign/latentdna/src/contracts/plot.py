@@ -15,6 +15,7 @@ SUPPORTED_PLOT_KINDS: frozenset[str] = frozenset(
         "projection_scatter",
         "projection_grid",
         "heatmap",
+        "heatmap_grid",
         "distance_scatter",
         "xy_scatter",
         "xy_scatter_grid",
@@ -55,6 +56,9 @@ class PlotBaseConfig(StrictPlotModel):
     visibility_tier: Literal["primary", "appendix", "debug", "hidden"] = "primary"
     default_hue: str | None = None
     hue_options: list["PlotHueOptionConfig"] = Field(default_factory=list)
+    x_axis_label: str | None = None
+    y_axis_label: str | None = None
+    colorbar_label: str | None = None
 
     @model_validator(mode="after")
     def _validate_hue_defaults(self) -> "PlotBaseConfig":
@@ -121,6 +125,9 @@ class HeatmapPlotConfig(PlotBaseConfig):
     row_column: str | None = None
     column_column: str | None = None
     value_column: str | None = None
+    row_order: list[str] | None = None
+    column_order: list[str] | None = None
+    color_scale: Literal["auto", "diverging", "sequential"] = "auto"
 
     @model_validator(mode="after")
     def _validate_single_input(self) -> "HeatmapPlotConfig":
@@ -132,6 +139,24 @@ class HeatmapPlotConfig(PlotBaseConfig):
             raise ValueError(f"heatmap plots require exactly one input from enrichment or scalar; got {joined}")
         if self.scalar is not None and (self.row_column is None or self.column_column is None):
             raise ValueError("scalar-backed heatmap plots require row_column and column_column")
+        return self
+
+
+class HeatmapGridPlotConfig(PlotBaseConfig):
+    kind: Literal["heatmap_grid"]
+    scalars: list[Identifier] = Field(min_length=1)
+    row_column: str
+    column_column: str
+    value_column: str | None = None
+    panel_titles: list[str] | None = None
+    row_order: list[str] | None = None
+    column_order: list[str] | None = None
+    color_scale: Literal["auto", "diverging", "sequential"] = "auto"
+
+    @model_validator(mode="after")
+    def _validate_grid_shape(self) -> "HeatmapGridPlotConfig":
+        if self.panel_titles is not None and len(self.panel_titles) != len(self.scalars):
+            raise ValueError("heatmap_grid panel_titles must match scalars length")
         return self
 
 
@@ -152,7 +177,11 @@ class XYScatterPlotConfig(PlotBaseConfig):
     y_column: str | None = None
     color_column: str | None = None
     shape_column: str | None = None
+    size_column: str | None = None
+    size_range: tuple[float, float] | None = None
     render_mode: Literal["points", "hexbin", "density_contour"] = "points"
+    label_column: str | None = None
+    label_values: list[str] = Field(default_factory=list)
     annotation: PlotAnnotationConfig | None = None
 
     @model_validator(mode="after")
@@ -161,6 +190,10 @@ class XYScatterPlotConfig(PlotBaseConfig):
         if len(selected) != 1:
             joined = ", ".join(selected) if selected else "none"
             raise ValueError(f"xy_scatter plots require exactly one input from scalar or distance; got {joined}")
+        if self.size_range is not None and (self.size_range[0] <= 0 or self.size_range[1] <= self.size_range[0]):
+            raise ValueError("xy_scatter size_range must be a positive ascending pair")
+        if self.label_values and self.label_column is None:
+            raise ValueError("xy_scatter label_values require label_column")
         return self
 
 
@@ -335,6 +368,7 @@ PlotConfig = Annotated[
     ProjectionScatterPlotConfig
     | ProjectionGridPlotConfig
     | HeatmapPlotConfig
+    | HeatmapGridPlotConfig
     | DistanceScatterPlotConfig
     | XYScatterPlotConfig
     | XYScatterGridPlotConfig
@@ -358,6 +392,7 @@ class ResolvedPlotSpec(StrictPlotModel):
         "projection_scatter",
         "projection_grid",
         "heatmap",
+        "heatmap_grid",
         "distance_scatter",
         "xy_scatter",
         "xy_scatter_grid",
@@ -390,11 +425,16 @@ class ResolvedPlotSpec(StrictPlotModel):
     metric_columns: list[str] = Field(default_factory=list)
     row_column: str | None = None
     column_column: str | None = None
+    row_order: list[str] = Field(default_factory=list)
+    column_order: list[str] = Field(default_factory=list)
     panel_column: str | None = None
     x_column: str | None = None
     y_column: str | None = None
     color_column: str | None = None
     shape_column: str | None = None
+    size_column: str | None = None
+    size_range: tuple[float, float] | None = None
+    color_scale: str | None = None
     direction_column: str | None = None
     unit_column: str | None = None
     reference_line: float | None = None
@@ -410,5 +450,8 @@ class ResolvedPlotSpec(StrictPlotModel):
     sort_rule: str | None = None
     default_hue: str | None = None
     hue_options: list[PlotHueOptionConfig] = Field(default_factory=list)
+    x_axis_label: str | None = None
+    y_axis_label: str | None = None
+    colorbar_label: str | None = None
     config_id: Identifier | None = None
     semantics_ref: str | None = None

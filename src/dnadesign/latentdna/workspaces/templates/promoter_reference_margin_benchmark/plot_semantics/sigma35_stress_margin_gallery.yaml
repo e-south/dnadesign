@@ -1,0 +1,35 @@
+plot_id: sigma35_stress_margin_gallery
+question: Does a deterministic row-level Sigma-35 axis stay visible while the same space also separates stress-family structure?
+decision_role: primary
+encoding: Three-panel scatter gallery comparing a Sigma-35 F-vs-B margin against the best stress-family margin across the main 7B intermediate candidates.
+scope: The full shared promoter population in the main 7B intermediate comparison views.
+guardrails:
+  - Use this gallery as a deterministic companion to the Sigma-35 and design-structure summaries, not as a replacement for them.
+  - Treat the y axis as a study-internal stress-family direction derived from design annotations, not as phenotype evidence.
+  - Do not rank candidates by eye from point-cloud aesthetics alone.
+caption: Deterministic Sigma-35-vs-stress scatter across the main 7B intermediate candidates.
+alt_text: Scatter-panel gallery showing Sigma-35 F-vs-B margin versus best stress-family margin for the full promoter population in the anchor, 1 kb seq-mean, and 1 kb anchor-mean intermediate spaces.
+preprocessing_md: Rows are first standardized within view and L2-normalized. Each axis is then computed as a centroid-similarity margin on the full population in that candidate view, with leave-one-out handling when a row belongs to one of the scored cohorts.
+math_md: |
+  The x axis is
+  $$
+  m_{\sigma35}(x) = \cos(z_x, c_f) - \cos(z_x, c_b),
+  $$
+  where $c_f$ and $c_b$ are the study-internal centroids for Sigma-35 variants $f$ and $b$. Positive values mean a row is closer to the `f` centroid than the `b` centroid.
+
+  The y axis is
+  $$
+  m_{\mathrm{stress}}(x) = \max\left(m_{\mathrm{eth}}(x), m_{\mathrm{cipro}}(x)\right),
+  $$
+  with
+  $$
+  m_{\mathrm{eth}}(x) = \cos(z_x, c_{\mathrm{eth}}) - \cos(z_x, c_{\mathrm{bg}})
+  $$
+  and
+  $$
+  m_{\mathrm{cipro}}(x) = \cos(z_x, c_{\mathrm{cipro}}) - \cos(z_x, c_{\mathrm{bg}}).
+  $$
+  Positive $m_{\mathrm{stress}}(x)$ values mean the row is closer to at least one stress-family centroid than to background.
+rationale_md: This is a deterministic alternative to UMAP. A better candidate keeps the Sigma-35 ladder visible on the x axis without collapsing the stress-family spread on the y axis, so you can see both design themes at once in a row-level cloud.
+limitations_md: Both axes are annotation-conditioned centroid margins. They are useful for orientation and communication, but they do not replace the higher-dimensional summary metrics or imply promoter activity.
+failure_modes_md: Strong overplotting can still hide minority subcohorts, and any regression in leave-one-out handling would make in-cohort points look artificially cleaner than they are.

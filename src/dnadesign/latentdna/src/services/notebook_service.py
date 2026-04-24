@@ -8,6 +8,7 @@ import runpy
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ..contracts.deliverable import DeliverableStatusResult
 from ..contracts.errors import ArtifactConflictError, WorkspaceValidationError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.notebook import WorkspaceNotebookConfig, WorkspaceNotebookControls
@@ -23,6 +24,7 @@ from ..version import __version__
 from ..workspaces.loader import load_workspace_config
 from ._artifact_inputs import artifact_input_from_manifest
 from ._artifacts import artifact_dir, artifact_manifest_path
+from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 from .notebook_controls_service import build_workspace_notebook_controls_payload
 
 
@@ -115,8 +117,9 @@ def _default_deliverable_readiness(
     notebook_id: str,
     default_deliverable: str,
     missing_plot_ids: list[str],
+    deliverable_status: DeliverableStatusResult | None = None,
 ) -> tuple[str, list[str]]:
-    status = _default_deliverable_status(context, default_deliverable)
+    status = deliverable_status or _default_deliverable_status(context, default_deliverable)
     relevant_outputs = [entry for entry in status.outputs if entry.name != f"notebook:{notebook_id}"]
     reasons: list[str] = []
     if missing_plot_ids:
@@ -132,6 +135,80 @@ def _default_deliverable_readiness(
         return "ok", []
     resolved_status = status.status if status.status in {"attention", "missing", "error"} else "attention"
     return resolved_status, reasons
+
+
+def _is_freshness_drift_reason(reason: str | None) -> bool:
+    text = str(reason or "").strip().lower()
+    if not text:
+        return False
+    return any(
+        token in text
+        for token in (
+            "freshness",
+            "stale ",
+            "artifact manifest is marked error",
+        )
+    )
+
+
+def _blocking_default_deliverable_reasons(
+    *,
+    notebook_id: str,
+    deliverable_status: DeliverableStatusResult,
+) -> list[str]:
+    blockers: list[str] = []
+    for entry in [*deliverable_status.checks, *deliverable_status.outputs]:
+        if entry.name == f"notebook:{notebook_id}":
+            continue
+        if entry.status == "error":
+            blockers.append(str(entry.reason or f"{entry.name} status=error"))
+            continue
+        if entry.status == "attention" and _is_freshness_drift_reason(entry.reason):
+            blockers.append(str(entry.reason or f"{entry.name} freshness requires attention"))
+    for warning in deliverable_status.warnings:
+        if _is_freshness_drift_reason(warning):
+            blockers.append(str(warning))
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for blocker in blockers:
+        if blocker in seen:
+            continue
+        deduped.append(blocker)
+        seen.add(blocker)
+    return deduped
+
+
+def _blocking_ordered_plot_freshness_reasons(
+    context,
+    *,
+    notebook: WorkspaceNotebookConfig,
+) -> list[str]:
+    cache = FreshnessCache()
+    blockers: list[str] = []
+    for plot_id in _notebook_plot_ids(context, notebook):
+        freshness = evaluate_artifact_freshness(
+            context,
+            artifact_kind="plot",
+            artifact_id=plot_id,
+            cache=cache,
+        )
+        status = str(freshness.get("status") or "")
+        reason = str(freshness.get("reason") or "")
+        if status == "error":
+            blockers.append(f"ordered plot `{plot_id}` status=error: {reason or 'plot artifact error'}")
+            continue
+        if status == "attention" and _is_freshness_drift_reason(reason):
+            blockers.append(f"ordered plot `{plot_id}` freshness requires attention: {reason}")
+    return blockers
+
+
+def _ordered_plot_owner_deliverables(context, *, notebook: WorkspaceNotebookConfig) -> list[str]:
+    plot_ids = set(_notebook_plot_ids(context, notebook))
+    owners: list[str] = []
+    for deliverable_id, deliverable in context.config.deliverables.items():
+        if plot_ids.intersection(deliverable.outputs.get("plots", [])):
+            owners.append(deliverable_id)
+    return owners
 
 
 def _load_catalog_payload(context) -> dict[str, object]:
@@ -183,9 +260,23 @@ def _ordered_plot_live_inputs_readiness(
     if not ordered_plot_ids:
         return True, []
     joinable_tables = [row.model_dump(mode="json") for row in controls.geometry_controls.joinable_tables]
+    freshness_cache = FreshnessCache()
     warnings: list[str] = []
     ready = True
     for plot_id in ordered_plot_ids:
+        freshness = evaluate_artifact_freshness(
+            context,
+            artifact_kind="plot",
+            artifact_id=plot_id,
+            cache=freshness_cache,
+        )
+        if freshness["status"] != "ok":
+            ready = False
+            warnings.append(
+                f"ordered plot `{plot_id}` freshness requires attention: "
+                + str(freshness.get("reason") or freshness["status"])
+            )
+            continue
         try:
             plot_spec = _resolve_notebook_plot_spec(context, plot_id=plot_id).model_dump(mode="json")
             frames = load_plot_review_frames(
@@ -244,6 +335,47 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
     notebook = context.require_notebook(notebook_id)
     assert isinstance(notebook, WorkspaceNotebookConfig)
 
+    default_deliverable_status = _default_deliverable_status(context, notebook.default_deliverable)
+    freshness_blockers = _blocking_default_deliverable_reasons(
+        notebook_id=notebook_id,
+        deliverable_status=default_deliverable_status,
+    )
+    freshness_blockers.extend(_blocking_ordered_plot_freshness_reasons(context, notebook=notebook))
+    if freshness_blockers:
+        owner_deliverables = _ordered_plot_owner_deliverables(context, notebook=notebook)
+        owner_recipes = sorted(
+            {
+                context.require_deliverable(deliverable_id).recipe
+                for deliverable_id in owner_deliverables
+                if deliverable_id in context.config.deliverables
+            }
+        )
+        deliverable_hints = ", ".join(
+            f"`latentdna deliverable run {deliverable_id} --workspace {context.workspace_dir}`"
+            for deliverable_id in owner_deliverables
+        )
+        recipe_hints = ", ".join(
+            f"`latentdna recipe run {recipe_id} --workspace {context.workspace_dir}`" for recipe_id in owner_recipes
+        )
+        raise WorkspaceValidationError(
+            "notebook generation blocked because one or more notebook inputs have freshness drift: "
+            + "; ".join(freshness_blockers)
+            + ". Refresh the stale plot-owning deliverables "
+            + (
+                deliverable_hints
+                or f"`latentdna deliverable run {notebook.default_deliverable} --workspace {context.workspace_dir}`"
+            )
+            + " or rerun their canonical recipe(s) "
+            + (
+                recipe_hints
+                or (
+                    f"`latentdna recipe run {context.require_deliverable(notebook.default_deliverable).recipe} "
+                    f"--workspace {context.workspace_dir}`"
+                )
+            )
+            + " before regenerating the notebook."
+        )
+
     notebook_dir = _workspace_notebook_dir(context, notebook_id)
     notebook_path = _workspace_notebook_path(context, notebook_id)
     controls_path = notebook_dir / "controls.json"
@@ -266,6 +398,7 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
         notebook_id=notebook_id,
         default_deliverable=notebook.default_deliverable,
         missing_plot_ids=missing_plot_ids,
+        deliverable_status=default_deliverable_status,
     )
     base_status = "ok" if default_deliverable_status == "ok" and not missing_plot_ids else "attention"
     warnings: list[str] = []

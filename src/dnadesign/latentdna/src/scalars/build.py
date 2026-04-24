@@ -11,7 +11,9 @@ from typing import Any
 import numpy as np
 import pyarrow as pa
 
+from ..alignments.aggregators import aggregate_rows
 from ..contracts.errors import ContractViolationError, MissingArtifactError
+from ..geometry.cohorts import balanced_group_indices
 from ..geometry.preprocessing import try_l2_normalize_vector
 from ..io.json_io import read_json, write_json
 from ..io.matrix_io import read_matrix
@@ -489,6 +491,12 @@ def _cohort_similarity_margin_table(
     cohort_column: str,
     margin_pairs: list[dict[str, Any]],
     leave_one_out: bool = False,
+    balance_group_column: str | None = None,
+    balance_columns: list[str] | None = None,
+    balance_reference_only: bool = False,
+    required_group_values: set[str] | None = None,
+    exclude_group_values: set[str] | None = None,
+    seed: int | None = None,
 ) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object]]:
     if sample_id is None:
         matrix_path, rows_path = _view_paths(context, view_id)
@@ -501,62 +509,157 @@ def _cohort_similarity_margin_table(
     else:
         matrix, rows, inputs = _load_view_scope_table(context, view_id=view_id, sample_id=sample_id)
         rows_table = pa.Table.from_pylist(rows)
-    if cohort_column not in rows_table.column_names:
-        raise ContractViolationError(f"cohort column {cohort_column!r} is missing from {view_id!r}")
     rows = rows_table.to_pylist()
     normalized_rows = _normalized_geometry_rows(matrix)
     table = rows_table
     stats: dict[str, object] = {"view_id": view_id, "margin_count": len(margin_pairs)}
     if sample_id is not None:
         stats["sample_id"] = sample_id
+    balanced_groups: dict[str, list[int]] = {}
+    if balance_group_column is not None:
+        resolved_balance_columns = list(balance_columns or [])
+        if not resolved_balance_columns:
+            raise ContractViolationError("cohort_similarity_margin balance_group_column requires balance_columns")
+        missing_columns = [
+            column
+            for column in [balance_group_column, *resolved_balance_columns]
+            if column not in rows_table.column_names
+        ]
+        if missing_columns:
+            raise ContractViolationError(
+                f"balanced cohort_similarity_margin columns are missing from {view_id!r}: {missing_columns}"
+            )
+        rng = np.random.default_rng(seed if seed is not None else context.config.defaults.random_seed)
+        balanced_groups = balanced_group_indices(
+            rows,
+            group_column=balance_group_column,
+            balance_columns=resolved_balance_columns,
+            required_group_values=required_group_values,
+            exclude_group_values=exclude_group_values,
+            rng=rng,
+        )
+        selected_indices = sorted({index for indices in balanced_groups.values() for index in indices})
+        if not selected_indices:
+            raise ContractViolationError(
+                f"cohort_similarity_margin balancing matched no rows for {view_id!r} on {balance_group_column!r}"
+            )
+        if not balance_reference_only:
+            index_array = np.asarray(selected_indices, dtype=np.int64)
+            rows = [rows[index] for index in selected_indices]
+            normalized_rows = normalized_rows[index_array]
+            table = rows_table.take(pa.array(selected_indices, type=pa.int64()))
+        stats["balanced_group_column"] = balance_group_column
+        stats["balanced_columns"] = resolved_balance_columns
+        stats["balanced_row_count"] = len(selected_indices)
+        stats["balanced_group_sizes"] = {group: len(indices) for group, indices in sorted(balanced_groups.items())}
+        stats["balanced_reference_only"] = bool(balance_reference_only)
+        if required_group_values is not None:
+            stats["balanced_required_group_values"] = sorted(required_group_values)
+        if exclude_group_values is not None:
+            stats["balanced_exclude_group_values"] = sorted(exclude_group_values)
     for pair in margin_pairs:
+        pair_cohort_column = str(pair.get("cohort_column") or cohort_column)
+        if pair_cohort_column not in rows_table.column_names:
+            raise ContractViolationError(f"cohort column {pair_cohort_column!r} is missing from {view_id!r}")
         target_values = {str(value) for value in _require_param(pair, "target_values")}
         control_values = {str(value) for value in _require_param(pair, "control_values")}
         output_column = str(_require_param(pair, "output_column"))
-        target_indices = [index for index, row in enumerate(rows) if str(row.get(cohort_column)) in target_values]
-        control_indices = [index for index, row in enumerate(rows) if str(row.get(cohort_column)) in control_values]
+        target_indices = [index for index, row in enumerate(rows) if str(row.get(pair_cohort_column)) in target_values]
+        control_indices = [
+            index for index, row in enumerate(rows) if str(row.get(pair_cohort_column)) in control_values
+        ]
         if not target_indices:
             raise ContractViolationError(f"cohort target matched no rows for {output_column!r}")
         if not control_indices:
             raise ContractViolationError(f"cohort control matched no rows for {output_column!r}")
+        target_reference_indices = target_indices
+        control_reference_indices = control_indices
+        if balance_reference_only and pair_cohort_column == balance_group_column:
+            target_reference_indices = sorted(
+                {index for value in target_values for index in balanced_groups.get(str(value), [])}
+            )
+            control_reference_indices = sorted(
+                {index for value in control_values for index in balanced_groups.get(str(value), [])}
+            )
+            if not target_reference_indices:
+                raise ContractViolationError(f"balanced cohort target matched no reference rows for {output_column!r}")
+            if not control_reference_indices:
+                raise ContractViolationError(f"balanced cohort control matched no reference rows for {output_column!r}")
         # Synthetic cohort centroids are EDA-only companions, not benchmark
         # features. Build their directions from already normalized row vectors so
         # cohorts near the global standardized mean do not collapse to an invalid
         # zero-norm cosine reference.
-        target_sum = np.asarray(normalized_rows[target_indices].sum(axis=0), dtype=np.float32)
-        control_sum = np.asarray(normalized_rows[control_indices].sum(axis=0), dtype=np.float32)
-        target_reference = try_l2_normalize_vector(np.asarray(target_sum / len(target_indices), dtype=np.float32))
-        control_reference = try_l2_normalize_vector(np.asarray(control_sum / len(control_indices), dtype=np.float32))
+        target_sum = np.asarray(normalized_rows[target_reference_indices].sum(axis=0), dtype=np.float32)
+        control_sum = np.asarray(normalized_rows[control_reference_indices].sum(axis=0), dtype=np.float32)
+        target_reference = try_l2_normalize_vector(
+            np.asarray(target_sum / len(target_reference_indices), dtype=np.float32)
+        )
+        control_reference = try_l2_normalize_vector(
+            np.asarray(control_sum / len(control_reference_indices), dtype=np.float32)
+        )
         if target_reference is None or control_reference is None:
             margin = np.full(len(rows), np.nan, dtype=np.float32)
             stats[f"{output_column}_degenerate_reference"] = True
             table = _replace_or_append_column(table, output_column, margin)
             stats[f"{output_column}_target_members"] = len(target_indices)
             stats[f"{output_column}_control_members"] = len(control_indices)
+            if balance_reference_only and pair_cohort_column == balance_group_column:
+                stats[f"{output_column}_target_reference_members"] = len(target_reference_indices)
+                stats[f"{output_column}_control_reference_members"] = len(control_reference_indices)
             stats[f"{output_column}_leave_one_out"] = bool(leave_one_out)
             continue
         target_similarity = np.asarray(normalized_rows @ target_reference, dtype=np.float32)
         control_similarity = np.asarray(normalized_rows @ control_reference, dtype=np.float32)
         if leave_one_out:
-            if len(target_indices) <= 1 or len(control_indices) <= 1:
+            if len(target_reference_indices) <= 1 or len(control_reference_indices) <= 1:
                 raise ContractViolationError(
                     f"leave_one_out cohort margins require at least two rows in each cohort for {output_column!r}"
                 )
-            for index in target_indices:
+            target_reference_set = set(target_reference_indices)
+            control_reference_set = set(control_reference_indices)
+            for index in target_reference_indices:
                 adjusted = try_l2_normalize_vector(
-                    np.asarray((target_sum - normalized_rows[index]) / (len(target_indices) - 1), dtype=np.float32)
+                    np.asarray(
+                        (target_sum - normalized_rows[index]) / (len(target_reference_indices) - 1),
+                        dtype=np.float32,
+                    )
                 )
                 target_similarity[index] = float(normalized_rows[index] @ adjusted) if adjusted is not None else np.nan
-            for index in control_indices:
+            for index in control_reference_indices:
                 adjusted = try_l2_normalize_vector(
-                    np.asarray((control_sum - normalized_rows[index]) / (len(control_indices) - 1), dtype=np.float32)
+                    np.asarray(
+                        (control_sum - normalized_rows[index]) / (len(control_reference_indices) - 1),
+                        dtype=np.float32,
+                    )
                 )
                 control_similarity[index] = float(normalized_rows[index] @ adjusted) if adjusted is not None else np.nan
+            if balance_reference_only and pair_cohort_column == balance_group_column:
+                for index in target_indices:
+                    if index in target_reference_set:
+                        continue
+                    target_similarity[index] = float(normalized_rows[index] @ target_reference)
+                for index in control_indices:
+                    if index in control_reference_set:
+                        continue
+                    control_similarity[index] = float(normalized_rows[index] @ control_reference)
         margin = np.asarray(target_similarity - control_similarity, dtype=np.float32)
         table = _replace_or_append_column(table, output_column, margin)
         stats[f"{output_column}_target_members"] = len(target_indices)
         stats[f"{output_column}_control_members"] = len(control_indices)
+        if balance_reference_only and pair_cohort_column == balance_group_column:
+            stats[f"{output_column}_target_reference_members"] = len(target_reference_indices)
+            stats[f"{output_column}_control_reference_members"] = len(control_reference_indices)
         stats[f"{output_column}_leave_one_out"] = bool(leave_one_out)
+        stats[f"{output_column}_cohort_column"] = pair_cohort_column
+    if {
+        "synthetic_margin_ethanol_vs_background",
+        "synthetic_margin_cipro_vs_background",
+    }.issubset(table.column_names):
+        synthetic_best_stress_margin = np.maximum(
+            np.asarray(table["synthetic_margin_ethanol_vs_background"].to_pylist(), dtype=np.float32),
+            np.asarray(table["synthetic_margin_cipro_vs_background"].to_pylist(), dtype=np.float32),
+        )
+        table = _replace_or_append_column(table, "synthetic_best_stress_margin", synthetic_best_stress_margin)
     return table, inputs, stats
 
 
@@ -566,6 +669,34 @@ def _alignment_projection(context: WorkspaceContext, alignment_id: str) -> tuple
     left_key_columns = [str(value) for value in manifest["params"]["key_columns"]]
     right_key_columns = [str(value) for value in manifest["params"].get("right_key_columns", left_key_columns)]
     return read_table(rows_path), left_key_columns, right_key_columns
+
+
+def _sampled_alignment_scope_matrix(
+    context: WorkspaceContext,
+    *,
+    alignment_id: str,
+    view_id: str,
+    alignment_indices: np.ndarray,
+) -> np.ndarray:
+    alignment = context.require_alignment(alignment_id)
+    manifest_path, _, mapping_path = _alignment_paths(context, alignment_id)
+    manifest = context.read_manifest(manifest_path)
+    if view_id == alignment.left:
+        index_field = "left_indices"
+        mode = str(manifest["params"].get("left_aggregation", "error"))
+    elif view_id == alignment.right:
+        index_field = "right_indices"
+        mode = str(manifest["params"].get("right_aggregation", "error"))
+    else:
+        raise ContractViolationError(f"alignment {alignment_id} does not include view {view_id!r}")
+
+    matrix_path, _ = _view_paths(context, view_id)
+    source_matrix = np.load(matrix_path, mmap_mode="r")
+    mapping_rows = read_table(mapping_path).take(pa.array(alignment_indices, type=pa.int64())).to_pylist()
+    aligned_matrix = np.vstack(
+        [aggregate_rows(source_matrix, [int(index) for index in row[index_field]], mode=mode) for row in mapping_rows]
+    ).astype(np.float32, copy=False)
+    return np.ascontiguousarray(aligned_matrix)
 
 
 def _project_table_to_alignment(
@@ -697,21 +828,68 @@ def _alignment_metrics_table(
     margin_deltas: list[dict[str, Any]],
     sample_size: int,
     sample_group_column: str | None,
+    where: dict[str, Any] | None,
+    table_sample_only: bool,
     seed: int,
 ) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object], list[dict[str, object]]]:
-    left_matrix, _, _, _ = resolve_view_scope(context, view_id=left_view_id, sample_id=None, alignment_id=alignment_id)
-    right_matrix, _, _, _ = resolve_view_scope(
-        context, view_id=right_view_id, sample_id=None, alignment_id=alignment_id
-    )
-    if left_matrix.shape != right_matrix.shape:
-        raise ContractViolationError("alignment_metrics requires left and right aligned matrices to share one shape")
     metadata_table, metadata_inputs = _row_metadata_from_alignment(
         context,
         alignment_id=alignment_id,
         metadata_view_id=metadata_view_id,
     )
-    if metadata_table.num_rows != left_matrix.shape[0]:
-        raise ContractViolationError("alignment metadata rows are not aligned to the aligned matrix row count")
+    metadata_rows = metadata_table.to_pylist()
+    selected_indices = np.arange(metadata_table.num_rows, dtype=np.int64)
+    if where is not None:
+        matched_indices = _select_indices(metadata_rows, where)
+        selected_indices = np.asarray(matched_indices, dtype=np.int64)
+        metadata_rows = [metadata_rows[int(index)] for index in selected_indices]
+        metadata_table = metadata_table.take(pa.array(selected_indices, type=pa.int64()))
+    sampled_indices = _sample_alignment_indices(
+        metadata_table,
+        sample_size=min(sample_size, metadata_table.num_rows),
+        group_column=sample_group_column,
+        seed=seed,
+    )
+    sample_index_array = np.asarray(sampled_indices, dtype=np.int64)
+    if table_sample_only:
+        selected_indices = selected_indices[sample_index_array]
+        metadata_rows = [metadata_rows[int(index)] for index in sample_index_array]
+        metadata_table = metadata_table.take(pa.array(sample_index_array, type=pa.int64()))
+        left_matrix = _sampled_alignment_scope_matrix(
+            context,
+            alignment_id=alignment_id,
+            view_id=left_view_id,
+            alignment_indices=selected_indices,
+        )
+        right_matrix = _sampled_alignment_scope_matrix(
+            context,
+            alignment_id=alignment_id,
+            view_id=right_view_id,
+            alignment_indices=selected_indices,
+        )
+        sampled_left = left_matrix
+        sampled_right = right_matrix
+    else:
+        left_matrix, _, _, _ = resolve_view_scope(
+            context, view_id=left_view_id, sample_id=None, alignment_id=alignment_id
+        )
+        right_matrix, _, _, _ = resolve_view_scope(
+            context, view_id=right_view_id, sample_id=None, alignment_id=alignment_id
+        )
+        if left_matrix.shape != right_matrix.shape:
+            raise ContractViolationError(
+                "alignment_metrics requires left and right aligned matrices to share one shape"
+            )
+        if metadata_table.num_rows != left_matrix.shape[0]:
+            raise ContractViolationError("alignment metadata rows are not aligned to the aligned matrix row count")
+        if where is not None:
+            left_matrix = np.asarray(left_matrix[selected_indices], dtype=np.float32)
+            right_matrix = np.asarray(right_matrix[selected_indices], dtype=np.float32)
+        sampled_left = np.asarray(left_matrix[sampled_indices], dtype=np.float32)
+        sampled_right = np.asarray(right_matrix[sampled_indices], dtype=np.float32)
+    if left_matrix.shape != right_matrix.shape:
+        raise ContractViolationError("alignment_metrics requires left and right aligned matrices to share one shape")
+    geometry_distance_correlation = _cosine_distance_correlation(sampled_left, sampled_right)
     left_norm = _normalized_geometry_rows(left_matrix)
     right_norm = _normalized_geometry_rows(right_matrix)
     self_cosine = np.asarray(np.sum(left_norm * right_norm, axis=1), dtype=np.float32)
@@ -767,30 +945,29 @@ def _alignment_metrics_table(
                 raise ContractViolationError(f"left margin source is missing {left_column!r}")
             if right_column not in aligned_right_margin.column_names:
                 raise ContractViolationError(f"right margin source is missing {right_column!r}")
-            left_values = np.asarray(aligned_left_margin[left_column].to_pylist(), dtype=np.float32)
-            right_values = np.asarray(aligned_right_margin[right_column].to_pylist(), dtype=np.float32)
+            left_values = np.asarray(aligned_left_margin[left_column].to_pylist(), dtype=np.float32)[selected_indices]
+            right_values = np.asarray(aligned_right_margin[right_column].to_pylist(), dtype=np.float32)[
+                selected_indices
+            ]
             table = _replace_or_append_column(
                 table, output_column, np.asarray(left_values - right_values, dtype=np.float32)
             )
-
-    sampled_indices = _sample_alignment_indices(
-        metadata_table,
-        sample_size=min(sample_size, left_matrix.shape[0]),
-        group_column=sample_group_column,
-        seed=seed,
-    )
-    sampled_left = np.asarray(left_matrix[sampled_indices], dtype=np.float32)
-    sampled_right = np.asarray(right_matrix[sampled_indices], dtype=np.float32)
-    geometry_distance_correlation = _cosine_distance_correlation(sampled_left, sampled_right)
     repeated_correlation = np.repeat(np.float32(geometry_distance_correlation), table.num_rows)
     table = _replace_or_append_column(table, "geometry_distance_correlation", repeated_correlation)
-    sample_rows = metadata_table.take(pa.array(sampled_indices, type=pa.int64())).to_pylist()
+    if table_sample_only:
+        sample_rows = list(metadata_rows)
+    else:
+        sample_rows = metadata_table.take(pa.array(sampled_indices, type=pa.int64())).to_pylist()
     stats = {
         "alignment_id": alignment_id,
         "rows": int(table.num_rows),
         "geometry_distance_correlation": geometry_distance_correlation,
-        "sample_size": len(sampled_indices),
+        "sample_size": len(sample_rows),
     }
+    if where is not None:
+        stats["where"] = dict(where)
+    if table_sample_only:
+        stats["table_sample_only"] = True
     return table, inputs, stats, sample_rows
 
 
@@ -1554,6 +1731,18 @@ def build_scalar_artifact(
             cohort_column=str(_require_param(params, "cohort_column")),
             margin_pairs=[dict(value) for value in _require_param(params, "margin_pairs")],
             leave_one_out=bool(_optional_param(params, "leave_one_out", default=False)),
+            balance_group_column=_optional_param(params, "balance_group_column", default=None),
+            balance_columns=[str(value) for value in _optional_param(params, "balance_columns", default=[])] or None,
+            balance_reference_only=bool(_optional_param(params, "balance_reference_only", default=False)),
+            required_group_values={str(value) for value in _optional_param(params, "required_group_values", default=[])}
+            or None,
+            exclude_group_values={str(value) for value in _optional_param(params, "exclude_group_values", default=[])}
+            or None,
+            seed=(
+                int(_optional_param(params, "seed", default=context.config.defaults.random_seed))
+                if "seed" in params
+                else None
+            ),
         )
         write_table(table, artifact_dir / "table.parquet")
         return BuiltScalarArtifact(
@@ -1579,6 +1768,8 @@ def build_scalar_artifact(
             margin_deltas=[dict(value) for value in _optional_param(params, "margin_deltas", default=[])],
             sample_size=int(_optional_param(params, "sample_size", default=256)),
             sample_group_column=_optional_param(params, "sample_group_column", default=None),
+            where=_optional_param(params, "where", default=None),
+            table_sample_only=bool(_optional_param(params, "table_sample_only", default=False)),
             seed=int(_optional_param(params, "seed", default=context.config.defaults.random_seed)),
         )
         write_table(table, artifact_dir / "table.parquet")

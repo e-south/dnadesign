@@ -510,6 +510,105 @@ def test_context_robustness_summary_projects_alignment_metadata_for_retention_me
     assert all(np.isfinite(value) for value in metric_values.values())
 
 
+def test_alignment_metrics_support_densegen_only_filters_and_sampled_tables(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    anchor_rows = [
+        {
+            "anchor_id": "bg_1",
+            "subject_id": "bg_1",
+            "design_family": "background_only",
+            "design_regulator_composition": "background_only",
+            "sig35_variant": "f",
+            "source_class": "densegen",
+            "embedding": [1.0, 0.15, 0.05],
+        },
+        {
+            "anchor_id": "eth_1",
+            "subject_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "source_class": "densegen",
+            "embedding": [0.25, 1.05, 0.2],
+        },
+        {
+            "anchor_id": "ctrl_1",
+            "subject_id": "ctrl_1",
+            "design_family": "control",
+            "design_regulator_composition": "control",
+            "sig35_variant": "control",
+            "source_class": "manual_or_wildtype",
+            "embedding": [0.35, 0.25, 0.95],
+        },
+    ]
+    context_rows = [
+        {
+            "context_id": "ctx_bg_1",
+            "anchor_id": "bg_1",
+            "design_family": "background_only",
+            "design_regulator_composition": "background_only",
+            "sig35_variant": "f",
+            "source_class": "densegen",
+            "embedding": [0.94, 0.2, 0.06],
+        },
+        {
+            "context_id": "ctx_eth_1",
+            "anchor_id": "eth_1",
+            "design_family": "ethanol",
+            "design_regulator_composition": "cpxR_only",
+            "sig35_variant": "d",
+            "source_class": "densegen",
+            "embedding": [0.3, 0.96, 0.18],
+        },
+        {
+            "context_id": "ctx_ctrl_1",
+            "anchor_id": "ctrl_1",
+            "design_family": "control",
+            "design_regulator_composition": "control",
+            "sig35_variant": "control",
+            "source_class": "manual_or_wildtype",
+            "embedding": [0.4, 0.3, 0.9],
+        },
+    ]
+    _write_context_robustness_workspace(
+        workspace_dir,
+        anchor_rows=anchor_rows,
+        context_rows=context_rows,
+        anchor_matrix=np.asarray([row["embedding"] for row in anchor_rows], dtype=np.float32),
+        context_matrix=np.asarray([row["embedding"] for row in context_rows], dtype=np.float32),
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="alignment_metrics_demo",
+        builder_kind="alignment_metrics",
+        params={
+            "alignment_id": "anchor_ctx",
+            "left_view_id": "context_view",
+            "right_view_id": "anchor_view",
+            "metadata_view_id": "context_view",
+            "margin_deltas": [],
+            "sample_size": 1,
+            "sample_group_column": None,
+            "where": {"column": "source_class", "equals": "densegen"},
+            "table_sample_only": True,
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+
+    assert len(table) == 1
+    assert {str(row["source_class"]) for row in table} == {"densegen"}
+    assert str(table[0]["design_family"]) in {"background_only", "ethanol"}
+    assert str(table[0]["anchor_id"]) in {"bg_1", "eth_1"}
+    assert artifact.stats["rows"] == 1
+    assert artifact.stats["where"] == {"column": "source_class", "equals": "densegen"}
+    assert artifact.stats["sample_size"] == 1
+    assert artifact.stats["table_sample_only"] is True
+
+
 def test_context_robustness_summary_skips_only_degenerate_axes(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -773,6 +872,438 @@ def test_cohort_similarity_margin_honors_sample_scope(tmp_path: Path) -> None:
     assert set(table["id"].to_pylist()) == {"bg_1", "bg_2", "eth_1", "eth_2"}
     assert artifact.stats["sample_id"] == "ethanol_background_sample"
     assert any(input_ref.kind == "sample_set" for input_ref in artifact.inputs)
+
+
+def test_cohort_similarity_margin_supports_per_pair_cohort_columns_and_best_stress_margin(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "bg_b",
+            "subject_id": "bg_b",
+            "design_family": "background_only",
+            "sig35_variant": "b",
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "bg_f",
+            "subject_id": "bg_f",
+            "design_family": "background_only",
+            "sig35_variant": "f",
+            "embedding": [0.2, 0.8],
+        },
+        {
+            "id": "eth_f",
+            "subject_id": "eth_f",
+            "design_family": "ethanol",
+            "sig35_variant": "f",
+            "embedding": [0.9, 0.2],
+        },
+        {
+            "id": "eth_b",
+            "subject_id": "eth_b",
+            "design_family": "ethanol",
+            "sig35_variant": "b",
+            "embedding": [0.7, 0.3],
+        },
+        {
+            "id": "cip_f",
+            "subject_id": "cip_f",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "f",
+            "embedding": [0.6, 0.4],
+        },
+        {
+            "id": "cip_b",
+            "subject_id": "cip_b",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "b",
+            "embedding": [0.4, 0.6],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    view_dir = workspace_dir / "outputs" / "views" / "degenerate_view"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    np.save(view_dir / "matrix.npy", np.asarray([row["embedding"] for row in rows], dtype=np.float32))
+    pq.write_table(pa.Table.from_pylist(rows), view_dir / "rows.parquet")
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="sigma35_stress_margins",
+        builder_kind="cohort_similarity_margin",
+        params={
+            "view_id": "degenerate_view",
+            "cohort_column": "design_family",
+            "leave_one_out": True,
+            "margin_pairs": [
+                {
+                    "cohort_column": "sig35_variant",
+                    "target_values": ["f"],
+                    "control_values": ["b"],
+                    "output_column": "sig35_margin_f_vs_b",
+                },
+                {
+                    "target_values": ["ethanol"],
+                    "control_values": ["background_only"],
+                    "output_column": "synthetic_margin_ethanol_vs_background",
+                },
+                {
+                    "target_values": ["ciprofloxacin"],
+                    "control_values": ["background_only"],
+                    "output_column": "synthetic_margin_cipro_vs_background",
+                },
+            ],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet")
+    assert "sig35_margin_f_vs_b" in table.column_names
+    assert "synthetic_best_stress_margin" in table.column_names
+    ethanol = np.asarray(table["synthetic_margin_ethanol_vs_background"].to_pylist(), dtype=np.float32)
+    cipro = np.asarray(table["synthetic_margin_cipro_vs_background"].to_pylist(), dtype=np.float32)
+    best = np.asarray(table["synthetic_best_stress_margin"].to_pylist(), dtype=np.float32)
+    assert np.allclose(best, np.maximum(ethanol, cipro), equal_nan=True)
+    assert artifact.stats["sig35_margin_f_vs_b_cohort_column"] == "sig35_variant"
+
+
+def test_cohort_similarity_margin_can_restrict_rows_to_balanced_design_family_subset(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "bg_f_16",
+            "subject_id": "bg_f_16",
+            "design_family": "background_only",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "bg_f_17",
+            "subject_id": "bg_f_17",
+            "design_family": "background_only",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.1, 0.9],
+        },
+        {
+            "id": "bg_b_16",
+            "subject_id": "bg_b_16",
+            "design_family": "background_only",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.2, 0.8],
+        },
+        {
+            "id": "eth_f_16",
+            "subject_id": "eth_f_16",
+            "design_family": "ethanol",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "eth_f_17",
+            "subject_id": "eth_f_17",
+            "design_family": "ethanol",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.9, 0.1],
+        },
+        {
+            "id": "eth_b_16",
+            "subject_id": "eth_b_16",
+            "design_family": "ethanol",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.8, 0.2],
+        },
+        {
+            "id": "cip_f_16",
+            "subject_id": "cip_f_16",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [0.7, 0.3],
+        },
+        {
+            "id": "cip_f_17",
+            "subject_id": "cip_f_17",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.6, 0.4],
+        },
+        {
+            "id": "cip_b_16",
+            "subject_id": "cip_b_16",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.5, 0.5],
+        },
+        {
+            "id": "dual_f_16",
+            "subject_id": "dual_f_16",
+            "design_family": "ethanol_ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [0.4, 0.6],
+        },
+        {
+            "id": "dual_f_17",
+            "subject_id": "dual_f_17",
+            "design_family": "ethanol_ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.3, 0.7],
+        },
+        {
+            "id": "dual_b_16",
+            "subject_id": "dual_b_16",
+            "design_family": "ethanol_ciprofloxacin",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.2, 0.8],
+        },
+        {
+            "id": "ctrl",
+            "subject_id": "ctrl",
+            "design_family": "control",
+            "sig35_variant": "control",
+            "spacer_length": 16,
+            "embedding": [0.1, 0.1],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    view_dir = workspace_dir / "outputs" / "views" / "degenerate_view"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    np.save(view_dir / "matrix.npy", np.asarray([row["embedding"] for row in rows], dtype=np.float32))
+    pq.write_table(pa.Table.from_pylist(rows), view_dir / "rows.parquet")
+    (view_dir / "manifest.json").write_text(
+        json.dumps({"params": {"record_key": "id"}}, indent=2),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="balanced_design_margins",
+        builder_kind="cohort_similarity_margin",
+        params={
+            "view_id": "degenerate_view",
+            "cohort_column": "design_family",
+            "leave_one_out": True,
+            "balance_group_column": "design_family",
+            "balance_columns": ["sig35_variant", "spacer_length"],
+            "required_group_values": [
+                "background_only",
+                "ethanol",
+                "ciprofloxacin",
+                "ethanol_ciprofloxacin",
+            ],
+            "exclude_group_values": ["control"],
+            "margin_pairs": [
+                {
+                    "target_values": ["ethanol"],
+                    "control_values": ["background_only"],
+                    "output_column": "synthetic_margin_ethanol_vs_background",
+                },
+                {
+                    "target_values": ["ciprofloxacin"],
+                    "control_values": ["background_only"],
+                    "output_column": "synthetic_margin_cipro_vs_background",
+                },
+            ],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet")
+    balanced_ids = set(table["id"].to_pylist())
+    assert balanced_ids == {
+        "bg_f_16",
+        "bg_f_17",
+        "bg_b_16",
+        "eth_f_16",
+        "eth_f_17",
+        "eth_b_16",
+        "cip_f_16",
+        "cip_f_17",
+        "cip_b_16",
+        "dual_f_16",
+        "dual_f_17",
+        "dual_b_16",
+    }
+    assert table.num_rows == 12
+    assert artifact.stats["balanced_group_column"] == "design_family"
+    assert artifact.stats["balanced_row_count"] == 12
+
+
+def test_cohort_similarity_margin_can_balance_references_without_dropping_full_population(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "bg_f_16",
+            "subject_id": "bg_f_16",
+            "design_family": "background_only",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "bg_f_17",
+            "subject_id": "bg_f_17",
+            "design_family": "background_only",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.1, 0.9],
+        },
+        {
+            "id": "bg_b_16",
+            "subject_id": "bg_b_16",
+            "design_family": "background_only",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.2, 0.8],
+        },
+        {
+            "id": "eth_f_16",
+            "subject_id": "eth_f_16",
+            "design_family": "ethanol",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "eth_f_17",
+            "subject_id": "eth_f_17",
+            "design_family": "ethanol",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.9, 0.1],
+        },
+        {
+            "id": "eth_b_16",
+            "subject_id": "eth_b_16",
+            "design_family": "ethanol",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.8, 0.2],
+        },
+        {
+            "id": "cip_f_16",
+            "subject_id": "cip_f_16",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [0.7, 0.3],
+        },
+        {
+            "id": "cip_f_17",
+            "subject_id": "cip_f_17",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.6, 0.4],
+        },
+        {
+            "id": "cip_b_16",
+            "subject_id": "cip_b_16",
+            "design_family": "ciprofloxacin",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.5, 0.5],
+        },
+        {
+            "id": "dual_f_16",
+            "subject_id": "dual_f_16",
+            "design_family": "ethanol_ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 16,
+            "embedding": [0.4, 0.6],
+        },
+        {
+            "id": "dual_f_17",
+            "subject_id": "dual_f_17",
+            "design_family": "ethanol_ciprofloxacin",
+            "sig35_variant": "f",
+            "spacer_length": 17,
+            "embedding": [0.3, 0.7],
+        },
+        {
+            "id": "dual_b_16",
+            "subject_id": "dual_b_16",
+            "design_family": "ethanol_ciprofloxacin",
+            "sig35_variant": "b",
+            "spacer_length": 16,
+            "embedding": [0.2, 0.8],
+        },
+        {
+            "id": "ctrl",
+            "subject_id": "ctrl",
+            "design_family": "control",
+            "sig35_variant": "control",
+            "spacer_length": 16,
+            "embedding": [0.1, 0.1],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    view_dir = workspace_dir / "outputs" / "views" / "degenerate_view"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    np.save(view_dir / "matrix.npy", np.asarray([row["embedding"] for row in rows], dtype=np.float32))
+    pq.write_table(pa.Table.from_pylist(rows), view_dir / "rows.parquet")
+    (view_dir / "manifest.json").write_text(
+        json.dumps({"params": {"record_key": "id"}}, indent=2),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="balanced_design_margins_full_population",
+        builder_kind="cohort_similarity_margin",
+        params={
+            "view_id": "degenerate_view",
+            "cohort_column": "design_family",
+            "leave_one_out": True,
+            "balance_group_column": "design_family",
+            "balance_columns": ["sig35_variant", "spacer_length"],
+            "balance_reference_only": True,
+            "required_group_values": [
+                "background_only",
+                "ethanol",
+                "ciprofloxacin",
+                "ethanol_ciprofloxacin",
+            ],
+            "exclude_group_values": ["control"],
+            "margin_pairs": [
+                {
+                    "target_values": ["ethanol"],
+                    "control_values": ["background_only"],
+                    "output_column": "synthetic_margin_ethanol_vs_background",
+                },
+                {
+                    "target_values": ["ciprofloxacin"],
+                    "control_values": ["background_only"],
+                    "output_column": "synthetic_margin_cipro_vs_background",
+                },
+            ],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet")
+    assert table.num_rows == len(rows)
+    assert set(table["id"].to_pylist()) == {row["id"] for row in rows}
+    assert artifact.stats["balanced_group_column"] == "design_family"
+    assert artifact.stats["balanced_reference_only"] is True
+    assert artifact.stats["balanced_row_count"] == 12
+    assert artifact.stats["synthetic_margin_ethanol_vs_background_target_members"] == 3
+    assert artifact.stats["synthetic_margin_ethanol_vs_background_target_reference_members"] == 3
 
 
 def test_reference_alignment_summary_fails_when_required_references_are_missing(tmp_path: Path) -> None:

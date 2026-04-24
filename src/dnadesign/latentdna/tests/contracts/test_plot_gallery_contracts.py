@@ -251,8 +251,8 @@ def test_distribution_grid_accepts_explicit_metric_inventory() -> None:
     )
 
     spec = resolve_plot_spec(
-        plots={"context_delta_distributions": config},
-        plot_id="context_delta_distributions",
+        plots={"distribution_demo": config},
+        plot_id="distribution_demo",
         kind=None,
         projection_ids=[],
         panel_titles=[],
@@ -285,3 +285,144 @@ def test_distribution_grid_accepts_explicit_metric_inventory() -> None:
         "context_margin_delta_ethanol",
         "context_margin_delta_cipro",
     ]
+
+
+def test_heatmap_grid_accepts_panelled_sigma35_distance_gallery() -> None:
+    config = _PLOT_CONFIG_ADAPTER.validate_python(
+        {
+            "kind": "heatmap_grid",
+            "scalars": [
+                "sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp",
+                "sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean",
+            ],
+            "panel_titles": [
+                "Anchor",
+                "Anchor mean",
+            ],
+            "row_column": "row_variant",
+            "column_column": "column_variant",
+            "value_column": "metric_value",
+            "colorbar_label": r"$d_{\mathrm{emb}}(g,h)=1-\cos(c_g,c_h)$",
+            "row_order": ["TTGACA (f)", "TAGACA (e)"],
+            "column_order": ["TTGACA (f)", "TAGACA (e)"],
+            "color_scale": "sequential",
+        }
+    )
+
+    spec = resolve_plot_spec(
+        plots={"sigma35_centroid_distance_gallery": config},
+        plot_id="sigma35_centroid_distance_gallery",
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        scalar_ids=[],
+        agreement_id=None,
+        agreement_ids=[],
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
+
+    assert spec.kind == "heatmap_grid"
+    assert spec.scalar_ids == [
+        "sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp",
+        "sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean",
+    ]
+    assert spec.row_order == ["TTGACA (f)", "TAGACA (e)"]
+    assert spec.column_order == ["TTGACA (f)", "TAGACA (e)"]
+    assert spec.color_scale == "sequential"
+    assert spec.colorbar_label == r"$d_{\mathrm{emb}}(g,h)=1-\cos(c_g,c_h)$"
+
+
+def test_xy_scatter_accepts_labelled_decision_frontier_config() -> None:
+    config = _PLOT_CONFIG_ADAPTER.validate_python(
+        {
+            "kind": "xy_scatter",
+            "scalar": "candidate_decision_frontier_metrics",
+            "x_column": "design_family_balanced_separation_ratio",
+            "y_column": "sig35_ordinal_spearman",
+            "size_column": "effective_rank",
+            "size_range": [140, 260],
+            "label_column": "frontier_label",
+            "label_values": ["60 bp anchor", "1 kb seq mean", "1 kb anchor mean"],
+        }
+    )
+
+    spec = resolve_plot_spec(
+        plots={"candidate_decision_frontier": config},
+        plot_id="candidate_decision_frontier",
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        scalar_ids=[],
+        agreement_id=None,
+        agreement_ids=[],
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
+
+    assert spec.kind == "xy_scatter"
+    assert spec.scalar_id == "candidate_decision_frontier_metrics"
+    assert spec.label_column == "frontier_label"
+    assert spec.label_values == ["60 bp anchor", "1 kb seq mean", "1 kb anchor mean"]
+    assert spec.size_column == "effective_rank"
+    assert spec.size_range == (140.0, 260.0)
+
+
+def test_distribution_grid_accepts_explicit_math_axis_label() -> None:
+    config = _PLOT_CONFIG_ADAPTER.validate_python(
+        {
+            "kind": "distribution_grid",
+            "scalars": ["sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp"],
+            "metric_columns": ["sig35_margin_f_vs_b"],
+            "y_axis_label": r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$",
+        }
+    )
+
+    spec = resolve_plot_spec(
+        plots={"sigma35_margin_ladder_gallery": config},
+        plot_id="sigma35_margin_ladder_gallery",
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        scalar_ids=[],
+        agreement_id=None,
+        agreement_ids=[],
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
+
+    assert spec.kind == "distribution_grid"
+    assert spec.y_axis_label == r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"

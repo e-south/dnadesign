@@ -56,6 +56,12 @@ _SEMANTIC_CATEGORY_COLORS = {
     "dual_and_responsive": "#CC79A7",
     "ethanol_ciprofloxacin": "#CC79A7",
     "control": "#111111",
+    "selected": "#009E73",
+    "baseline": "#0072B2",
+    "challenger": "#E69F00",
+    "orientation": "#7F8894",
+    "context_anchor_mean": "#009E73",
+    "whole_sequence_context": "#7F8894",
 }
 
 _SEMANTIC_CATEGORY_PRIORITY = {
@@ -70,6 +76,12 @@ _SEMANTIC_CATEGORY_PRIORITY = {
     "dual": 4,
     "dual_and_responsive": 4,
     "ethanol_ciprofloxacin": 4,
+    "selected": 5,
+    "baseline": 6,
+    "challenger": 7,
+    "orientation": 8,
+    "context_anchor_mean": 9,
+    "whole_sequence_context": 10,
 }
 
 _SIG35_VARIANT_STRENGTH_ORDER = ["f", "e", "d", "c", "b", "a"]
@@ -86,18 +98,22 @@ _SIG35_VARIANT_NEUTRAL_COLOR = "#7F8894"
 _SPACER_LENGTH_COLOR_STOPS = ("#2C7BB6", "#ABD9E9", "#FEE090", "#F46D43", "#D73027")
 _SINGLE_ROW_LEGEND_PLOT_IDS = frozenset(
     {
+        "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
+        "sigma35_stress_margin_gallery",
         "appendix_geometry_audit",
         "appendix_umap_gallery",
     }
 )
 _LOWERED_LEGEND_PLOT_IDS = frozenset(
     {
+        "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
+        "sigma35_stress_margin_gallery",
         "appendix_geometry_audit",
         "appendix_umap_gallery",
     }

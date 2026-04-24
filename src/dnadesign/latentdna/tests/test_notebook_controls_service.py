@@ -226,6 +226,48 @@ def test_notebook_controls_keep_attention_projection_visible_for_geometry_browse
     assert geometry.projection_ids == ["umap_anchor_attention"]
 
 
+def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_compare(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["pooled_logits_7b_anchor_60bp"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "demo_space",
+        "tags": {"model": "7b", "family": "pooled_logits", "scope": "anchor_60bp"},
+    }
+    config["notebooks"]["latent_geometry_browser"]["geometry_order"] = [
+        "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_anchor_60bp",
+    ]
+    config["notebooks"]["latent_geometry_browser"]["candidate_grid_views"] = [
+        "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_anchor_60bp",
+    ]
+    config["notebooks"]["latent_geometry_browser"]["candidate_grid_panel_titles"] = [
+        "Pooled logits",
+        "Intermediate",
+    ]
+    config["notebooks"]["latent_geometry_browser"]["default_compare_views"] = [
+        "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_anchor_60bp",
+    ]
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    assert geometry_ids == [
+        "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_anchor_60bp",
+    ]
+    assert controls.geometry_controls.default_compare_left == "pooled_logits_7b_anchor_60bp"
+    assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_anchor_60bp"
+
+
 def test_notebook_controls_degrade_invalid_plot_manifest_to_error_status(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

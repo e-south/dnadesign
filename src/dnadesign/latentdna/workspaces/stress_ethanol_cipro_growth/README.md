@@ -6,7 +6,9 @@ This workspace holds the LatentDNA comparison surfaces for the active stress / e
 - Study binding: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
 - Snapshot artifact: `outputs/status/workspace_snapshot.json`
 - Gate: `representation_health_summary`
-- Primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
+- Companion visuals: `sigma35_stress_margin_gallery`, `context_pair_summary`
+- Appendix support: `sigma35_centroid_distance_gallery`
 - Appendix surfaces: `design_centroid_margin_gallery`, `reference_alignment_summary`, `representation_scree_diagnostic`, `appendix_umap_gallery`
 - UMAP role: appendix orientation only
 

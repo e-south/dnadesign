@@ -534,6 +534,87 @@ def test_notebook_smoke_uses_live_default_deliverable_status(tmp_path: Path, mon
     assert "plot freshness requires attention" in "".join(smoke_payload["warnings"])
 
 
+def test_notebook_generate_refuses_to_overwrite_when_default_deliverable_is_stale(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            },
+            {
+                "id": "anchor_02",
+                "subject_id": "subject_02",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [1.0, 1.0],
+            },
+            {
+                "id": "anchor_03",
+                "subject_id": "subject_03",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 1.0],
+            },
+            {
+                "id": "anchor_04",
+                "subject_id": "subject_04",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [1.0, 0.0],
+            },
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "atlas_review_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    notebook_path = workspace_dir / "outputs" / "notebooks" / "atlas_review" / "notebook.py"
+    notebook_before = notebook_path.read_text(encoding="utf-8")
+
+    def _attention_default_deliverable(*_args, **_kwargs):
+        return DeliverableStatusResult(
+            deliverable_id="atlas_review_bundle",
+            title="Atlas review notebook bundle",
+            section="atlas",
+            question="Can the persisted atlas artifacts be reviewed without recomputation?",
+            summary="Projection plot plus persisted artifact notebook scaffold for the atlas review workflow.",
+            status="attention",
+            checks=[],
+            outputs=[],
+            docs_refs=[],
+            acceptance_checks=[],
+            warnings=["plot freshness requires attention"],
+        )
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.notebook_service._default_deliverable_status",
+        _attention_default_deliverable,
+    )
+
+    generate_result = _RUNNER.invoke(
+        app,
+        ["notebook", "generate", "atlas_review", "--workspace", workspace_dir.as_posix(), "--force", "--json"],
+    )
+
+    assert generate_result.exit_code != 0
+    assert "one or more notebook inputs have freshness drift" in generate_result.stdout
+    assert "`latentdna deliverable run atlas_review_bundle --workspace" in generate_result.stdout
+    assert notebook_path.is_file()
+    assert notebook_path.read_text(encoding="utf-8") == notebook_before
+
+
 def test_notebook_smoke_errors_when_ordered_plot_live_inputs_fail(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -601,6 +682,78 @@ def test_notebook_smoke_errors_when_ordered_plot_live_inputs_fail(tmp_path: Path
     assert smoke_payload["status"] == "error"
     assert smoke_payload["checks"]["ordered_plot_live_inputs_ready"] is False
     assert "ordered plot `atlas_demo_plot` live inputs failed" in "".join(smoke_payload["warnings"])
+
+
+def test_notebook_smoke_errors_when_ordered_plot_freshness_drifts(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            },
+            {
+                "id": "anchor_02",
+                "subject_id": "subject_02",
+                "usr_label__primary": "spyP",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 1.0],
+            },
+            {
+                "id": "anchor_03",
+                "subject_id": "subject_03",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [10.0, 0.0],
+            },
+            {
+                "id": "anchor_04",
+                "subject_id": "subject_04",
+                "usr_label__primary": "sulAp",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [10.0, 1.0],
+            },
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "atlas_review_bundle", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    def _attention_plot_freshness(_context, *, artifact_kind, artifact_id, **_kwargs):
+        if artifact_kind == "plot" and artifact_id == "atlas_demo_plot":
+            return {
+                "status": "attention",
+                "reason": "stale source freshness for plot:atlas_demo_plot: workspace_config",
+                "known": True,
+            }
+        return {"status": "ok", "reason": None, "known": True}
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.notebook_service.evaluate_artifact_freshness",
+        _attention_plot_freshness,
+    )
+
+    smoke_result = _RUNNER.invoke(
+        app,
+        ["notebook", "smoke", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert smoke_result.exit_code == 18, smoke_result.stdout
+    smoke_payload = json.loads(smoke_result.stdout)
+    assert smoke_payload["status"] == "error"
+    assert smoke_payload["checks"]["ordered_plot_live_inputs_ready"] is False
+    assert "ordered plot `atlas_demo_plot` freshness requires attention" in "".join(smoke_payload["warnings"])
 
 
 def test_notebook_generate_records_smoke_failures_in_manifest_status(

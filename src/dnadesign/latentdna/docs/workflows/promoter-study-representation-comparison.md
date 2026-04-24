@@ -5,12 +5,12 @@
 **Surface role:** downstream-analysis
 **Owner-boundary:** latentdna
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-19
+**Last verified:** 2026-04-22
 **Registry-id:** latentdna.promoter-study.representation-comparison
-**Entry artifact:** promoter/stress_ethanol_cipro_anchor_set and promoter/stress_ethanol_cipro_construct_contexts
+**Entry artifact:** usr_prom_eth_cip_anchor and construct_prom_eth_cip_context
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 
-The promoter study binds LatentDNA to two published datasets and a 7B-first notebook candidate inventory. The live notebook surface exposes the real seven-view 7B-first browser, while 20B views remain hidden in the workspace. This browser-default posture is specific to LatentDNA review and does not override the study record's current infer-runtime preference. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
+The promoter study binds LatentDNA to two published datasets and a 7B-first notebook candidate inventory. The live notebook surface exposes the real five-view 7B-first browser, while 20B views remain hidden in the workspace. This browser-default posture is specific to LatentDNA review and does not override the study record's current infer-runtime preference. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
 
 ### Gate
 
@@ -22,9 +22,18 @@ The promoter study binds LatentDNA to two published datasets and a 7B-first note
 2. `design_structure_summary`
 3. `sigma35_ordinal_audit`
 4. `context_robustness_summary`
+5. `candidate_decision_frontier`
+
+### Companion visuals
+
+- `balanced_design_family_margin_gallery`
+- `sigma35_margin_ladder_gallery`
+- `sigma35_stress_margin_gallery`
+- `context_pair_summary`
 
 ### Appendix surfaces
 
+- `sigma35_centroid_distance_gallery`
 - `design_centroid_margin_gallery`
 - `reference_alignment_summary`
 - `representation_scree_diagnostic`
@@ -78,8 +87,6 @@ Use the notes for:
 - `intermediate_embedding_7b_full_context_1kb`
 - `pooled_logits_7b_full_context_1kb`
 - `intermediate_embedding_7b_full_context_anchor_mean`
-- `intermediate_embedding_7b_anchor_plus_full_context_concat`
-- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
 
 20B views remain materializable in the workspace but are hidden from the study notebook and deliverable ladder.
 
@@ -94,6 +101,8 @@ uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --de
 uv run latentdna deliverable status representation_health_summary --workspace stress_ethanol_cipro_growth
 # Check whether the context-robustness summary is fresh enough to review.
 uv run latentdna deliverable status context_robustness_summary --workspace stress_ethanol_cipro_growth
+# Refresh the default review deliverable if freshness drift is reported.
+uv run latentdna deliverable run representation_health_summary --workspace stress_ethanol_cipro_growth
 # Rebuild the `latent_geometry_browser` notebook after persisted artifacts refresh.
 uv run latentdna notebook generate latent_geometry_browser --workspace stress_ethanol_cipro_growth
 ```

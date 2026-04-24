@@ -12,12 +12,10 @@ from ..io.parquet_io import read_schema, read_table
 
 
 def _context_metric_scalar_ids(context) -> list[str]:
-    plot = context.config.plots.get("context_delta_distributions")
-    if plot is None:
+    notebook = context.config.notebooks.get("latent_geometry_browser")
+    if notebook is None:
         return []
-    if getattr(plot, "kind", None) in {"distribution_grid", "xy_scatter_grid", "paired_xy_scatter_grid"}:
-        return [str(scalar_id) for scalar_id in getattr(plot, "scalars", [])]
-    return []
+    return [str(scalar_id) for scalar_id in getattr(notebook, "context_audit_scalar_ids", [])]
 
 
 def _numpy_values(column: Array) -> np.ndarray:

@@ -1162,6 +1162,74 @@ notebooks:
         load_workspace_config(workspace_dir)
 
 
+def test_load_workspace_config_rejects_misaligned_notebook_candidate_panel_titles(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    candidate_grid_views: [z20_60]
+    candidate_grid_panel_titles: [first, second]
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: generate_notebook
+        op: notebook.generate
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="candidate_grid_panel_titles must match candidate_grid_views length"):
+        load_workspace_config(workspace_dir)
+
+
 def test_load_workspace_config_rejects_unknown_export_block_alignment(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

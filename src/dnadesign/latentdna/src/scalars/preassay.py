@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from ..contracts.errors import ContractViolationError
 from ..geometry.cohorts import (
@@ -71,6 +72,29 @@ def _load_candidate_sample(
         rows=rows,
         inputs=inputs,
     )
+
+
+def _load_scalar_rows(
+    context: WorkspaceContext,
+    *,
+    scalar_id: str,
+) -> tuple[list[dict[str, object]], list[ScalarInputRef]]:
+    path = context.output_root / "scalars" / scalar_id / "table.parquet"
+    if not path.is_file():
+        raise ContractViolationError(f"pre-assay scalar source is missing: {scalar_id}")
+    table = pq.read_table(path)
+    return table.to_pylist(), [ScalarInputRef(kind="scalar_table", artifact_id=scalar_id, path=path)]
+
+
+def _rows_by_candidate_and_metric(rows: list[dict[str, object]]) -> dict[str, dict[str, dict[str, object]]]:
+    grouped: dict[str, dict[str, dict[str, object]]] = {}
+    for row in rows:
+        candidate_id = str(row.get("candidate_id") or "").strip()
+        metric_id = str(row.get("metric_id") or "").strip()
+        if not candidate_id or not metric_id:
+            continue
+        grouped.setdefault(candidate_id, {})[metric_id] = row
+    return grouped
 
 
 def _representation_health_summary_table(
@@ -571,6 +595,184 @@ def _reference_alignment_summary_table(
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
 
 
+def _context_pair_summary_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    comparisons = [dict(value) for value in _require_param(params, "comparisons")]
+    metric_specs = [
+        ("context_self_cosine", "context_self_cosine_median"),
+        ("context_shift_l2", "context_shift_l2_median"),
+    ]
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    for comparison in comparisons:
+        scalar_id = str(_require_param(comparison, "scalar_id"))
+        comparison_id = str(_require_param(comparison, "comparison_id"))
+        comparison_label = str(_require_param(comparison, "comparison_label"))
+        comparison_role = str(_require_param(comparison, "comparison_role"))
+        source_rows, source_inputs = _load_scalar_rows(context, scalar_id=scalar_id)
+        inputs.extend(source_inputs)
+        for source_column, metric_id in metric_specs:
+            values = [
+                float(value)
+                for row in source_rows
+                if (value := row.get(source_column)) is not None and np.isfinite(float(value))
+            ]
+            metric_value = float(np.median(np.asarray(values, dtype=np.float64))) if values else float("nan")
+            rows.append(
+                _metric_row(
+                    descriptor={
+                        "comparison_id": comparison_id,
+                        "comparison_label": comparison_label,
+                        "comparison_role": comparison_role,
+                    },
+                    metric_id=metric_id,
+                    metric_value=metric_value,
+                    extra={
+                        "label": comparison_label,
+                        "source_scalar_id": scalar_id,
+                    },
+                )
+            )
+    return pa.Table.from_pylist(rows), inputs, {"comparison_count": len(comparisons), "rows": len(rows)}
+
+
+def _candidate_decision_frontier_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    health_scalar = str(_require_param(params, "health_scalar"))
+    design_scalar = str(_require_param(params, "design_scalar"))
+    sigma35_scalar = str(_require_param(params, "sigma35_scalar"))
+    context_scalar = str(_require_param(params, "context_scalar"))
+    health_metric_id = str(_optional_param(params, "health_metric_id", default="effective_rank"))
+    design_metric_id = str(
+        _optional_param(params, "design_metric_id", default="design_family_balanced_separation_ratio")
+    )
+    sigma35_metric_id = str(_optional_param(params, "sigma35_metric_id", default="sig35_ordinal_spearman"))
+    context_metric_id = str(_optional_param(params, "context_metric_id", default="context_self_cosine_median"))
+    candidate_ids = [str(value) for value in _optional_param(params, "candidate_ids", default=[])]
+    context_pairs = {
+        str(_require_param(entry, "candidate_id")): str(_require_param(entry, "pair_id"))
+        for entry in _optional_param(params, "context_pairs", default=[])
+    }
+    candidate_roles = {
+        str(_require_param(entry, "candidate_id")): str(_require_param(entry, "role"))
+        for entry in _optional_param(params, "candidate_roles", default=[])
+    }
+    annotation_labels = {
+        str(_require_param(entry, "candidate_id")): str(_require_param(entry, "label"))
+        for entry in _optional_param(params, "annotation_labels", default=[])
+    }
+
+    health_rows, health_inputs = _load_scalar_rows(context, scalar_id=health_scalar)
+    design_rows, design_inputs = _load_scalar_rows(context, scalar_id=design_scalar)
+    sigma35_rows, sigma35_inputs = _load_scalar_rows(context, scalar_id=sigma35_scalar)
+    context_rows, context_inputs = _load_scalar_rows(context, scalar_id=context_scalar)
+    inputs = [*health_inputs, *design_inputs, *sigma35_inputs, *context_inputs]
+
+    health_map = _rows_by_candidate_and_metric(health_rows)
+    design_map = _rows_by_candidate_and_metric(design_rows)
+    sigma35_map = _rows_by_candidate_and_metric(sigma35_rows)
+    context_map = _rows_by_candidate_and_metric(context_rows)
+
+    ordered_candidate_ids = candidate_ids or list(health_map)
+    rows: list[dict[str, object]] = []
+    for index, candidate_id in enumerate(ordered_candidate_ids):
+        health_metrics = health_map.get(candidate_id, {})
+        descriptor_source = (
+            health_metrics.get(health_metric_id)
+            or next(iter(health_metrics.values()), None)
+            or next(iter(design_map.get(candidate_id, {}).values()), None)
+            or next(iter(sigma35_map.get(candidate_id, {}).values()), None)
+        )
+        if descriptor_source is None:
+            raise ContractViolationError(f"candidate_decision_frontier is missing descriptor rows for {candidate_id!r}")
+        context_pair_id = context_pairs.get(candidate_id)
+        context_metric_row = (
+            context_map.get(context_pair_id, {}).get(context_metric_id) if context_pair_id is not None else None
+        )
+        health_metric_row = health_metrics.get(health_metric_id)
+        design_metric_row = design_map.get(candidate_id, {}).get(design_metric_id)
+        sigma35_metric_row = sigma35_map.get(candidate_id, {}).get(sigma35_metric_id)
+        rows.append(
+            {
+                "candidate_id": candidate_id,
+                "candidate_label": descriptor_source["candidate_label"],
+                "candidate_family": descriptor_source["candidate_family"],
+                "candidate_model": descriptor_source["candidate_model"],
+                "candidate_scope": descriptor_source["candidate_scope"],
+                "candidate_order": index,
+                "selection_role": candidate_roles.get(candidate_id, "candidate"),
+                "frontier_label": annotation_labels.get(candidate_id, str(descriptor_source["candidate_label"])),
+                "health_status": str(descriptor_source.get("health_status") or "unknown"),
+                "collapse_flag": bool(descriptor_source.get("collapse_flag", False)),
+                "effective_rank": (
+                    float(health_metric_row["metric_value"]) if health_metric_row is not None else float("nan")
+                ),
+                "design_family_balanced_separation_ratio": (
+                    float(design_metric_row["metric_value"]) if design_metric_row is not None else float("nan")
+                ),
+                "sig35_ordinal_spearman": (
+                    float(sigma35_metric_row["metric_value"]) if sigma35_metric_row is not None else float("nan")
+                ),
+                "context_self_cosine_median": (
+                    float(context_metric_row["metric_value"]) if context_metric_row is not None else float("nan")
+                ),
+                "context_pair_id": context_pair_id,
+                "context_validation_status": "direct" if context_pair_id is not None else "not_applicable",
+                "x_display_name": "Balanced design-family separation ratio",
+                "y_display_name": "Sigma-35 ordinal Spearman",
+            }
+        )
+    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(rows), "rows": len(rows)}
+
+
+def _sigma35_centroid_distance_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    candidates = [dict(value) for value in _require_param(params, "candidates")]
+    sig35_order_path = str(_require_param(params, "sig35_order_path"))
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    order_config = _load_sig35_order(context, relative_path=sig35_order_path)
+    inputs.append(ScalarInputRef(kind="workspace_input", artifact_id="sig35_order", path=order_config["path"]))
+    ranks = dict(order_config["ranks"])
+    sequences = dict(order_config["sequences"])
+    ordered_variants = [variant for variant, _ in sorted(ranks.items(), key=lambda item: int(item[1]))]
+    variant_labels = {
+        variant: f"variant {variant}" if not sequences.get(variant) else f"{sequences[variant]} ({variant})"
+        for variant in ordered_variants
+    }
+    for candidate in candidates:
+        candidate_sample = _load_candidate_sample(context, candidate)
+        inputs.extend(candidate_sample.inputs)
+        normalized = _normalized_geometry_rows(candidate_sample.matrix)
+        groups = group_indices(
+            candidate_sample.rows,
+            column="sig35_variant",
+            exclude_values={"control"},
+            allowed_values=set(ranks),
+        )
+        centroids = centroid_map(normalized, groups)
+        for row_variant in ordered_variants:
+            for column_variant in ordered_variants:
+                value = float("nan")
+                if row_variant in centroids and column_variant in centroids:
+                    value = 1.0 - float(np.dot(centroids[row_variant], centroids[column_variant]))
+                rows.append(
+                    {
+                        **candidate_sample.descriptor,
+                        "row_variant": variant_labels[row_variant],
+                        "column_variant": variant_labels[column_variant],
+                        "metric_value": value,
+                    }
+                )
+    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
+
+
 def _sample_metadata_indices(
     rows: list[dict[str, object]],
     *,
@@ -618,7 +820,10 @@ _PREASSAY_BUILDERS: dict[str, ScalarTableBuilder] = {
     "design_structure_summary": _design_structure_summary_table,
     "sigma35_ordinal_audit": _sigma35_ordinal_audit_table,
     "context_robustness_summary": _context_robustness_summary_table,
+    "context_pair_summary": _context_pair_summary_table,
     "reference_alignment_summary": _reference_alignment_summary_table,
+    "candidate_decision_frontier": _candidate_decision_frontier_table,
+    "sigma35_centroid_distance": _sigma35_centroid_distance_table,
 }
 
 PREASSAY_BUILDER_KINDS = frozenset(_PREASSAY_BUILDERS)

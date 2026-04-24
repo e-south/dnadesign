@@ -46,7 +46,11 @@ from ..workspaces.loader import WorkspaceContext
 _SHAPE_MARKERS = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h"]
 _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
     {
+        "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
+        "sigma35_margin_ladder_gallery",
+        "sigma35_stress_margin_gallery",
+        "sigma35_centroid_distance_gallery",
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     }
@@ -88,6 +92,79 @@ def _color_series(
     resolved_map = color_map or _category_color_map([rows], column)[0]
     categories = ordered_categories(resolved_map, column=column)
     return [resolved_map[str(row[column])] for row in rows], categories
+
+
+def _continuous_scatter_encoding(rows: list[dict], column: str | None) -> dict[str, object] | None:
+    if column is None:
+        return None
+    if rows and column not in rows[0]:
+        raise ContractViolationError(f"plot color column is missing: {column!r}")
+    numeric = np.asarray(
+        [
+            _coerce_finite_float(row.get(column)) if _coerce_finite_float(row.get(column)) is not None else np.nan
+            for row in rows
+        ],
+        dtype=np.float64,
+    )
+    finite = numeric[np.isfinite(numeric)]
+    if finite.size < 2 or float(np.nanmin(finite)) == float(np.nanmax(finite)):
+        return None
+    from matplotlib import colors as mcolors
+
+    minimum = float(np.nanmin(finite))
+    maximum = float(np.nanmax(finite))
+    if minimum < 0.0 < maximum:
+        max_abs = max(abs(minimum), abs(maximum), 1e-6)
+        return {
+            "values": numeric,
+            "cmap": "PuOr",
+            "norm": mcolors.TwoSlopeNorm(vmin=-max_abs, vcenter=0.0, vmax=max_abs),
+            "vmin": None,
+            "vmax": None,
+        }
+    return {
+        "values": numeric,
+        "cmap": "cividis",
+        "norm": mcolors.Normalize(vmin=minimum, vmax=maximum),
+        "vmin": minimum,
+        "vmax": maximum,
+    }
+
+
+def _scatter_point_sizes(
+    rows: list[dict],
+    *,
+    size_column: str | None,
+    default_size: float,
+    size_range: tuple[float, float] | None,
+) -> np.ndarray:
+    base = np.full(len(rows), float(default_size), dtype=np.float64)
+    if size_column is None:
+        return base
+    if rows and size_column not in rows[0]:
+        raise ContractViolationError(f"plot size column is missing: {size_column!r}")
+    values = np.asarray(
+        [
+            (
+                _coerce_finite_float(row.get(size_column))
+                if _coerce_finite_float(row.get(size_column)) is not None
+                else np.nan
+            )
+            for row in rows
+        ],
+        dtype=np.float64,
+    )
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return base
+    size_min, size_max = size_range or (max(default_size * 0.75, 18.0), max(default_size * 2.4, 48.0))
+    if float(np.nanmin(finite)) == float(np.nanmax(finite)):
+        midpoint = (size_min + size_max) / 2.0
+        base[np.isfinite(values)] = midpoint
+        return base
+    scaled = (values - float(np.nanmin(finite))) / (float(np.nanmax(finite)) - float(np.nanmin(finite)))
+    base[np.isfinite(values)] = size_min + (scaled[np.isfinite(values)] * (size_max - size_min))
+    return base
 
 
 def _shape_marker_map(row_groups: list[list[dict]], column: str | None) -> tuple[dict[str, str], list[str]]:
@@ -300,42 +377,107 @@ def _scatter_points(
     shape_column: str | None,
     shape_map: dict[str, str],
     point_size: float,
+    point_sizes: np.ndarray | None = None,
     alpha: float,
+    continuous_color: dict[str, object] | None = None,
     rasterized: bool = False,
     edgecolors: str = "white",
     linewidths: float = 0.25,
 ) -> None:
+    sizes = point_sizes if point_sizes is not None else np.full(len(rows), float(point_size), dtype=np.float64)
     if shape_column is None:
-        colors, _ = _color_series(rows, color_column, color_map=color_map if color_map else None)
-        ax.scatter(
-            [float(row[resolved_x]) for row in rows],
-            [float(row[resolved_y]) for row in rows],
-            c=colors,
-            s=point_size,
-            alpha=alpha,
-            edgecolors=edgecolors,
-            linewidths=linewidths,
-            rasterized=rasterized,
-        )
+        if continuous_color is not None:
+            values = np.asarray(continuous_color["values"], dtype=np.float64)
+            valid = np.isfinite(values)
+            invalid = ~valid
+            if np.any(valid):
+                ax.scatter(
+                    [float(rows[index][resolved_x]) for index in np.flatnonzero(valid)],
+                    [float(rows[index][resolved_y]) for index in np.flatnonzero(valid)],
+                    c=values[valid],
+                    cmap=str(continuous_color["cmap"]),
+                    norm=continuous_color["norm"],
+                    s=sizes[valid],
+                    alpha=alpha,
+                    edgecolors=edgecolors,
+                    linewidths=linewidths,
+                    rasterized=rasterized,
+                )
+            if np.any(invalid):
+                ax.scatter(
+                    [float(rows[index][resolved_x]) for index in np.flatnonzero(invalid)],
+                    [float(rows[index][resolved_y]) for index in np.flatnonzero(invalid)],
+                    c="#9AA5B1",
+                    s=sizes[invalid],
+                    alpha=alpha,
+                    edgecolors=edgecolors,
+                    linewidths=linewidths,
+                    rasterized=rasterized,
+                )
+        else:
+            colors, _ = _color_series(rows, color_column, color_map=color_map if color_map else None)
+            ax.scatter(
+                [float(row[resolved_x]) for row in rows],
+                [float(row[resolved_y]) for row in rows],
+                c=colors,
+                s=sizes,
+                alpha=alpha,
+                edgecolors=edgecolors,
+                linewidths=linewidths,
+                rasterized=rasterized,
+            )
         return
     if rows and shape_column not in rows[0]:
         raise ContractViolationError(f"plot shape column is missing: {shape_column!r}")
     for shape_category, marker in shape_map.items():
-        group_rows = [row for row in rows if str(row[shape_column]) == shape_category]
+        group_indices = [index for index, row in enumerate(rows) if str(row[shape_column]) == shape_category]
+        group_rows = [rows[index] for index in group_indices]
         if not group_rows:
             continue
-        colors, _ = _color_series(group_rows, color_column, color_map=color_map if color_map else None)
-        ax.scatter(
-            [float(row[resolved_x]) for row in group_rows],
-            [float(row[resolved_y]) for row in group_rows],
-            c=colors,
-            s=point_size,
-            alpha=alpha,
-            marker=marker,
-            edgecolors=edgecolors,
-            linewidths=linewidths,
-            rasterized=rasterized,
-        )
+        if continuous_color is not None:
+            values = np.asarray(continuous_color["values"], dtype=np.float64)[group_indices]
+            valid = np.isfinite(values)
+            invalid = ~valid
+            group_sizes = sizes[np.asarray(group_indices, dtype=np.int64)]
+            if np.any(valid):
+                ax.scatter(
+                    [float(group_rows[index][resolved_x]) for index in np.flatnonzero(valid)],
+                    [float(group_rows[index][resolved_y]) for index in np.flatnonzero(valid)],
+                    c=values[valid],
+                    cmap=str(continuous_color["cmap"]),
+                    norm=continuous_color["norm"],
+                    s=group_sizes[valid],
+                    alpha=alpha,
+                    marker=marker,
+                    edgecolors=edgecolors,
+                    linewidths=linewidths,
+                    rasterized=rasterized,
+                )
+            if np.any(invalid):
+                ax.scatter(
+                    [float(group_rows[index][resolved_x]) for index in np.flatnonzero(invalid)],
+                    [float(group_rows[index][resolved_y]) for index in np.flatnonzero(invalid)],
+                    c="#9AA5B1",
+                    s=group_sizes[invalid],
+                    alpha=alpha,
+                    marker=marker,
+                    edgecolors=edgecolors,
+                    linewidths=linewidths,
+                    rasterized=rasterized,
+                )
+        else:
+            colors, _ = _color_series(group_rows, color_column, color_map=color_map if color_map else None)
+            ax.scatter(
+                [float(row[resolved_x]) for row in group_rows],
+                [float(row[resolved_y]) for row in group_rows],
+                c=colors,
+                s=sizes[np.asarray(group_indices, dtype=np.int64)],
+                alpha=alpha,
+                marker=marker,
+                edgecolors=edgecolors,
+                linewidths=linewidths,
+                rasterized=rasterized,
+            )
 
 
 def _add_axis_legends(
@@ -388,8 +530,14 @@ def _add_figure_legends(
     if not legend_specs:
         return 0.0
 
-    legend_y = 0.008 if plot_id in {"design_centroid_margin_gallery", "appendix_umap_gallery"} else 0.012
-    base_margin = 0.065 if plot_id in {"design_centroid_margin_gallery", "appendix_umap_gallery"} else 0.055
+    lowered_plot_ids = {
+        "balanced_design_family_margin_gallery",
+        "design_centroid_margin_gallery",
+        "sigma35_stress_margin_gallery",
+        "appendix_umap_gallery",
+    }
+    legend_y = 0.008 if plot_id in lowered_plot_ids else 0.012
+    base_margin = 0.08 if plot_id in lowered_plot_ids else 0.055
     for handles in legend_specs:
         legend_labels = [handle.get_label() for handle in handles]
         layout = legend_layout(
@@ -421,6 +569,8 @@ def _tight_layout_kwargs(spec: ResolvedPlotSpec, *, legend_bottom: float) -> dic
         "h_pad": 1.4,
         "w_pad": 0.95,
     }
+    if spec.plot_id in {"balanced_design_family_margin_gallery", "sigma35_stress_margin_gallery"}:
+        kwargs["w_pad"] = 1.38
     if spec.plot_id == "design_centroid_margin_gallery":
         kwargs["w_pad"] = 1.18
     if spec.plot_id == "representation_health_summary":
@@ -456,6 +606,9 @@ def _draw_annotation_callouts(
     resolved_y: str,
     label_texts: list[str],
     marker_colors: list[str],
+    font_size: float = 9.5,
+    marker_size: float = 128.0,
+    marker: str | None = "*",
 ) -> None:
     if not rows:
         return
@@ -465,16 +618,17 @@ def _draw_annotation_callouts(
     axes_box = ax.get_window_extent()
     display_x_mid = float((axes_box.x0 + axes_box.x1) / 2.0)
     display_y_mid = float((axes_box.y0 + axes_box.y1) / 2.0)
-    ax.scatter(
-        x_values,
-        y_values,
-        c=marker_colors,
-        s=128,
-        marker="*",
-        edgecolors="white",
-        linewidths=0.8,
-        zorder=5,
-    )
+    if marker is not None and marker_size > 0.0:
+        ax.scatter(
+            x_values,
+            y_values,
+            c=marker_colors,
+            s=marker_size,
+            marker=marker,
+            edgecolors="white",
+            linewidths=0.8,
+            zorder=5,
+        )
     for row, label_text in sorted(
         zip(rows, label_texts, strict=True),
         key=lambda item: item[1].casefold(),
@@ -490,7 +644,7 @@ def _draw_annotation_callouts(
             placed_boxes=placed_boxes,
             x_mid=display_x_mid,
             y_mid=display_y_mid,
-            font_size=9.5,
+            font_size=font_size,
             left_padding_px=10.0,
             right_padding_px=10.0,
         )
@@ -500,7 +654,7 @@ def _draw_annotation_callouts(
             xy=(point_x, point_y),
             xytext=(placement.offset_x, placement.offset_y),
             textcoords="offset pixels",
-            fontsize=9.5,
+            fontsize=font_size,
             fontweight="semibold",
             ha=placement.ha,
             va=placement.va,
@@ -592,12 +746,12 @@ def _annotation_label_text(
     resolved_label_column: str,
 ) -> str:
     if spec.annotation is None:
-        return str(row[resolved_label_column])
+        return humanize_display_text(str(row[resolved_label_column]))
     reference_set = context.config.reference_sets[spec.annotation.reference_set]
     display_labels = dict(getattr(reference_set, "display_labels", {}) or {})
     match_column = reference_set.match_column
     match_value = str(row.get(match_column, ""))
-    return str(display_labels.get(match_value, row[resolved_label_column]))
+    return humanize_display_text(str(display_labels.get(match_value, row[resolved_label_column])))
 
 
 def _table_artifact_path(context: WorkspaceContext, spec: ResolvedPlotSpec) -> tuple[str, str, Path]:
@@ -723,6 +877,139 @@ def _grid_figure_size(panel_count: int, *, square_panels: bool, prefer_single_ro
     return (panel_width * columns, panel_height * rows)
 
 
+def _ordered_heatmap_axis_values(rows: list[dict[str, object]], column: str, configured_order: list[str]) -> list[str]:
+    observed = list(dict.fromkeys(str(row[column]) for row in rows))
+    if not configured_order:
+        return observed
+    ordered = [value for value in configured_order if value in set(observed)]
+    ordered.extend(value for value in observed if value not in set(ordered))
+    return ordered
+
+
+def _heatmap_grid_from_rows(
+    rows: list[dict[str, object]],
+    *,
+    row_column: str,
+    column_column: str,
+    value_column: str,
+    row_order: list[str],
+    column_order: list[str],
+) -> tuple[np.ndarray, list[str], list[str]]:
+    if not rows:
+        raise ContractViolationError("heatmap rendering requires at least one input row")
+    if value_column not in rows[0]:
+        raise ContractViolationError(f"heatmap value column is missing from table: {value_column!r}")
+    if row_column not in rows[0]:
+        raise ContractViolationError(f"heatmap row column is missing: {row_column!r}")
+    if column_column not in rows[0]:
+        raise ContractViolationError(f"heatmap column column is missing: {column_column!r}")
+    row_values = _ordered_heatmap_axis_values(rows, row_column, row_order)
+    column_values = _ordered_heatmap_axis_values(rows, column_column, column_order)
+    row_index = {row_value: index for index, row_value in enumerate(row_values)}
+    column_index = {column_value: index for index, column_value in enumerate(column_values)}
+    grid = np.full((len(row_values), len(column_values)), np.nan, dtype=np.float32)
+    for row in rows:
+        grid[
+            row_index[str(row[row_column])],
+            column_index[str(row[column_column])],
+        ] = float(row[value_column])
+    return grid, row_values, column_values
+
+
+def _heatmap_color_params(
+    grids: list[np.ndarray],
+    *,
+    color_scale: str | None,
+    plot_id: str | None = None,
+) -> tuple[str, object]:
+    from matplotlib import colors as mcolors
+
+    finite_chunks = [np.asarray(grid[np.isfinite(grid)], dtype=np.float32) for grid in grids if np.isfinite(grid).any()]
+    if not finite_chunks:
+        raise ContractViolationError("heatmap rendering requires at least one finite value")
+    finite = np.concatenate(finite_chunks)
+    if finite.size == 0:
+        raise ContractViolationError("heatmap rendering requires at least one finite value")
+    resolved_scale = str(color_scale or "auto")
+    if resolved_scale == "auto":
+        resolved_scale = "diverging" if float(np.min(finite)) < 0.0 < float(np.max(finite)) else "sequential"
+    if resolved_scale == "diverging":
+        max_abs = max(float(np.max(np.abs(finite))), 1e-6)
+        return "PuOr", mcolors.TwoSlopeNorm(vmin=-max_abs, vcenter=0.0, vmax=max_abs)
+    minimum = float(np.min(finite))
+    maximum = float(np.max(finite))
+    if minimum == maximum:
+        maximum = minimum + 1e-6
+    if str(plot_id or "").strip() == "sigma35_centroid_distance_gallery":
+        sea_green = mcolors.LinearSegmentedColormap.from_list(
+            "sea_green_seq",
+            ["#EFF8F4", "#A8DCCB", "#2E8B57"],
+        )
+        return sea_green, mcolors.Normalize(vmin=minimum, vmax=maximum)
+    return "cividis", mcolors.Normalize(vmin=minimum, vmax=maximum)
+
+
+def _render_heatmap_panel(
+    ax: Any,
+    *,
+    grid: np.ndarray,
+    row_values: list[str],
+    column_values: list[str],
+    row_column: str,
+    column_column: str,
+    title: str,
+    cmap: str,
+    norm: object,
+    square_cells: bool = False,
+    x_axis_label: str | None = None,
+    y_axis_label: str | None = None,
+    show_y_tick_labels: bool = True,
+    show_y_axis_label: bool = True,
+) -> None:
+    grid = np.asarray(grid, dtype=np.float32)
+    image = ax.imshow(grid, cmap=cmap, norm=norm, aspect="equal" if square_cells else "auto")
+    ax.set_xticks(
+        range(len(column_values)),
+        [humanize_display_text(value) for value in column_values],
+        rotation=30,
+        ha="right",
+    )
+    if show_y_tick_labels:
+        ax.set_yticks(range(len(row_values)), [humanize_display_text(value) for value in row_values])
+    else:
+        ax.set_yticks(range(len(row_values)), [])
+        ax.tick_params(axis="y", length=0)
+    ax.set_xlabel(_resolved_axis_label(explicit_label=x_axis_label, fallback_label=column_column, width=20))
+    ax.set_ylabel(
+        _resolved_axis_label(explicit_label=y_axis_label, fallback_label=row_column, width=20)
+        if show_y_axis_label
+        else ""
+    )
+    ax.set_title(wrap_plot_title(title, width=24), pad=8)
+    finite = np.asarray(grid[np.isfinite(grid)], dtype=np.float32)
+    contrast_midpoint = float(np.mean(finite)) if finite.size else 0.0
+    for row_index_value in range(len(row_values)):
+        for column_index_value in range(len(column_values)):
+            value = grid[row_index_value, column_index_value]
+            if not np.isfinite(value):
+                label = "NA"
+                text_color = TEXT_COLOR
+            else:
+                label = f"{value:.2f}"
+                text_color = "white" if float(value) >= contrast_midpoint else TEXT_COLOR
+            ax.text(
+                column_index_value,
+                row_index_value,
+                label,
+                ha="center",
+                va="center",
+                color=text_color,
+                fontsize=9.2,
+            )
+    _apply_axes_style(ax, grid=False)
+    return image
+
+
 def _coerce_finite_float(value: object) -> float | None:
     try:
         numeric = float(value)
@@ -749,6 +1036,34 @@ def _wrapped_tick_label(value: object, *, width: int = 16, max_lines: int | None
 
 def _wrapped_axis_label(value: object, *, width: int = 22, max_lines: int | None = 4) -> str:
     return wrap_plot_title(humanize_display_text(str(value)), width=width, max_lines=max_lines)
+
+
+def _contains_math_text(value: object) -> bool:
+    text = str(value or "")
+    return "$" in text or "\\(" in text or "\\[" in text
+
+
+def _explicit_axis_label(value: object | None, *, width: int = 22, max_lines: int | None = 4) -> str | None:
+    text = " ".join(str(value or "").split()).strip()
+    if not text:
+        return None
+    if _contains_math_text(text):
+        return text
+    return wrap_plot_title(text, width=width, max_lines=max_lines)
+
+
+def _resolved_axis_label(
+    *,
+    explicit_label: object | None,
+    fallback_label: object,
+    width: int = 22,
+    max_lines: int | None = 4,
+) -> str:
+    return _explicit_axis_label(explicit_label, width=width, max_lines=max_lines) or _wrapped_axis_label(
+        fallback_label,
+        width=width,
+        max_lines=max_lines,
+    )
 
 
 def _short_candidate_model(value: object) -> str:
@@ -892,15 +1207,17 @@ def _render_xy_panel(
             square=True,
         )
         ax.set_xlabel(
-            _wrapped_axis_label(
-                _scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"),
+            _resolved_axis_label(
+                explicit_label=spec.x_axis_label,
+                fallback_label=_scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"),
                 width=28,
                 max_lines=2,
             )
         )
         ax.set_ylabel(
-            _wrapped_axis_label(
-                _scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"),
+            _resolved_axis_label(
+                explicit_label=spec.y_axis_label,
+                fallback_label=_scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"),
                 width=28,
                 max_lines=2,
             )
@@ -982,15 +1299,17 @@ def _render_xy_panel(
         )
     _add_zero_reference_lines(ax, x_values=x_values, y_values=y_values)
     ax.set_xlabel(
-        _wrapped_axis_label(
-            _scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"),
+        _resolved_axis_label(
+            explicit_label=spec.x_axis_label,
+            fallback_label=_scatter_axis_label(rows, resolved_column=resolved_x, display_column="x_display_name"),
             width=28,
             max_lines=2,
         )
     )
     ax.set_ylabel(
-        _wrapped_axis_label(
-            _scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"),
+        _resolved_axis_label(
+            explicit_label=spec.y_axis_label,
+            fallback_label=_scatter_axis_label(rows, resolved_column=resolved_y, display_column="y_display_name"),
             width=28,
             max_lines=2,
         )
@@ -1075,10 +1394,28 @@ def _render_distribution_panel(
     render_mode: str,
     panel_title: str,
     square: bool = False,
+    x_axis_label: str | None = None,
+    y_axis_label: str | None = None,
 ) -> None:
     values = np.asarray([float(row[metric_column]) for row in rows], dtype=np.float32)
     bin_count = max(5, min(30, int(np.sqrt(values.size)) + 1))
+    boxplot_kwargs = {
+        "widths": 0.18,
+        "boxprops": {"color": "#111111", "linewidth": 1.2},
+        "whiskerprops": {"color": "#111111", "linewidth": 1.2},
+        "capprops": {"color": "#111111", "linewidth": 1.2},
+        "medianprops": {"color": "#111111", "linewidth": 1.35},
+        "flierprops": {
+            "marker": "o",
+            "markerfacecolor": "none",
+            "markeredgecolor": "#111111",
+            "markeredgewidth": 1.25,
+            "markersize": 7.0,
+            "linestyle": "none",
+        },
+    }
     if render_mode == "ecdf":
+        x_axis_fallback = metric_column
         if color_column is None:
             ordered = np.sort(values)
             cumulative = np.arange(1, len(ordered) + 1, dtype=np.float32) / float(len(ordered))
@@ -1107,17 +1444,18 @@ def _render_distribution_panel(
             _style_legend(legend)
         ax.set_ylabel("ECDF")
     elif render_mode == "violin_box":
+        x_axis_fallback = color_column or metric_column
         if color_column is None:
             violin = ax.violinplot([values], showmeans=False, showmedians=False)
             for body in violin["bodies"]:
                 body.set_facecolor(PUBLICATION_PALETTE[0])
                 body.set_alpha(0.5)
-            ax.boxplot([values], widths=0.18)
+            ax.boxplot([values], **boxplot_kwargs)
             ax.set_xticks([1], [humanize_display_text(metric_column)])
         else:
             if rows and color_column not in rows[0]:
                 raise ContractViolationError(f"distribution color column is missing: {color_column!r}")
-            categories = sorted({str(row[color_column]) for row in rows})
+            categories = ordered_categories((str(row[color_column]) for row in rows), column=color_column)
             grouped_values = [
                 np.asarray(
                     [float(row[metric_column]) for row in rows if str(row[color_column]) == category],
@@ -1129,15 +1467,22 @@ def _render_distribution_panel(
             for index, body in enumerate(violin["bodies"]):
                 body.set_facecolor(PUBLICATION_PALETTE[index % len(PUBLICATION_PALETTE)])
                 body.set_alpha(0.45)
-            ax.boxplot(grouped_values, widths=0.18)
+            ax.boxplot(grouped_values, **boxplot_kwargs)
             ax.set_xticks(
                 range(1, len(categories) + 1),
-                [humanize_display_text(category) for category in categories],
+                [display_category_text(category, column=color_column) for category in categories],
                 rotation=25,
                 ha="right",
             )
-        ax.set_ylabel(_wrapped_axis_label(humanize_display_text(metric_column), width=18))
+        ax.set_ylabel(
+            _resolved_axis_label(
+                explicit_label=y_axis_label,
+                fallback_label=humanize_display_text(metric_column),
+                width=18,
+            )
+        )
     else:
+        x_axis_fallback = metric_column
         if color_column is None:
             ax.hist(values, bins=bin_count, color=PUBLICATION_PALETTE[0], edgecolor="white", alpha=0.9)
         else:
@@ -1160,7 +1505,13 @@ def _render_distribution_panel(
             legend = ax.legend(frameon=False)
             _style_legend(legend)
         ax.set_ylabel("Count")
-    ax.set_xlabel(_wrapped_axis_label(metric_column, width=20))
+    ax.set_xlabel(
+        _resolved_axis_label(
+            explicit_label=x_axis_label,
+            fallback_label=x_axis_fallback,
+            width=20,
+        )
+    )
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
     _apply_axes_style(ax, grid=True, square=square)
 
@@ -1651,6 +2002,8 @@ def render_plot_artifact(
         raise ContractViolationError("plot rendering requires at least one projection artifact")
     if spec.kind == "heatmap" and spec.enrichment_id is None and spec.scalar_id is None:
         raise ContractViolationError("heatmap rendering requires an enrichment or scalar artifact")
+    if spec.kind == "heatmap_grid" and not spec.scalar_ids:
+        raise ContractViolationError("heatmap_grid rendering requires at least one scalar artifact")
     if spec.kind == "distance_scatter" and spec.distance_id is None:
         raise ContractViolationError("distance_scatter rendering requires a distance artifact")
     if spec.kind == "xy_scatter" and spec.scalar_id is None and spec.distance_id is None:
@@ -1679,8 +2032,6 @@ def render_plot_artifact(
     plot_metadata: dict[str, object] = {}
 
     if spec.kind == "heatmap":
-        from matplotlib import colors as mcolors
-
         if spec.enrichment_id is not None:
             table_path = context.output_root / "enrichments" / spec.enrichment_id / "table.parquet"
             if not table_path.exists():
@@ -1701,65 +2052,137 @@ def render_plot_artifact(
             column_column = spec.column_column
             metric_column = spec.value_column or "metric_value"
         rows = _table_rows(table_path)
-        if not rows:
-            raise ContractViolationError("heatmap rendering requires at least one input row")
-        if metric_column not in rows[0]:
-            raise ContractViolationError(f"heatmap value column is missing from table: {metric_column!r}")
-        if row_column not in rows[0]:
-            raise ContractViolationError(f"heatmap row column is missing: {row_column!r}")
-        if column_column not in rows[0]:
-            raise ContractViolationError(f"heatmap column column is missing: {column_column!r}")
-        column_values = sorted({str(row[column_column]) for row in rows})
-        row_values = list(dict.fromkeys(str(row[row_column]) for row in rows))
-        row_index = {row_value: index for index, row_value in enumerate(row_values)}
-        column_index = {column_value: index for index, column_value in enumerate(column_values)}
-        grid = np.full((len(row_values), len(column_values)), np.nan, dtype=np.float32)
-        for row in rows:
-            grid[
-                row_index[str(row[row_column])],
-                column_index[str(row[column_column])],
-            ] = float(row[metric_column])
-
-        finite = np.asarray(grid[np.isfinite(grid)], dtype=np.float32)
-        if finite.size == 0:
-            raise ContractViolationError("heatmap rendering requires at least one finite value")
-        max_abs = max(float(np.max(np.abs(finite))), 1e-6)
-        norm = mcolors.TwoSlopeNorm(vmin=-max_abs, vcenter=0.0, vmax=max_abs)
-
-        fig, ax = plt.subplots(figsize=(2 + 1.5 * len(column_values), 1.5 + 1.2 * len(row_values)))
-        image = ax.imshow(grid, cmap="PuOr", norm=norm, aspect="auto")
-        ax.set_xticks(
-            range(len(column_values)),
-            [humanize_display_text(value) for value in column_values],
-            rotation=30,
-            ha="right",
+        grid, row_values, column_values = _heatmap_grid_from_rows(
+            rows,
+            row_column=row_column,
+            column_column=column_column,
+            value_column=metric_column,
+            row_order=list(spec.row_order or []),
+            column_order=list(spec.column_order or []),
         )
-        ax.set_yticks(range(len(row_values)), [humanize_display_text(value) for value in row_values])
-        ax.set_xlabel(humanize_display_text(column_column))
-        ax.set_ylabel(humanize_display_text(row_column))
-        ax.set_title(wrap_plot_title(spec.plot_id, width=24), pad=8)
-        for row_index_value in range(len(row_values)):
-            for column_index_value in range(len(column_values)):
-                value = grid[row_index_value, column_index_value]
-                if not np.isfinite(value):
-                    label = "NA"
-                    text_color = TEXT_COLOR
-                else:
-                    label = f"{value:.2f}"
-                    text_color = "white" if abs(value) > max_abs * 0.45 else TEXT_COLOR
-                ax.text(
-                    column_index_value,
-                    row_index_value,
-                    label,
-                    ha="center",
-                    va="center",
-                    color=text_color,
-                    fontsize=10,
-                )
-        colorbar = fig.colorbar(image, ax=ax, label=metric_column)
+        cmap, norm = _heatmap_color_params([grid], color_scale=spec.color_scale, plot_id=spec.plot_id)
+        fig, ax = plt.subplots(figsize=(2.2 + 1.35 * len(column_values), 1.7 + 1.05 * len(row_values)))
+        image = _render_heatmap_panel(
+            ax,
+            grid=grid,
+            row_values=row_values,
+            column_values=column_values,
+            row_column=row_column,
+            column_column=column_column,
+            title=spec.plot_id,
+            cmap=cmap,
+            norm=norm,
+            square_cells=spec.plot_id == "sigma35_centroid_distance_gallery",
+            x_axis_label=spec.x_axis_label,
+            y_axis_label=spec.y_axis_label,
+        )
+        colorbar = fig.colorbar(
+            image,
+            ax=ax,
+            label=_explicit_axis_label(spec.colorbar_label, width=20) or humanize_display_text(metric_column),
+        )
         colorbar.ax.tick_params(labelsize=10, colors=TEXT_COLOR)
-        colorbar.set_label(metric_column, fontsize=11, color=TEXT_COLOR)
-        _apply_axes_style(ax, grid=False)
+        colorbar.set_label(
+            _explicit_axis_label(spec.colorbar_label, width=20) or humanize_display_text(metric_column),
+            fontsize=11,
+            color=TEXT_COLOR,
+        )
+    elif spec.kind == "heatmap_grid":
+        heatmap_tables: list[tuple[str, np.ndarray, list[str], list[str]]] = []
+        for scalar_id in spec.scalar_ids:
+            table_path = context.output_root / "scalars" / scalar_id / "table.parquet"
+            if not table_path.exists():
+                raise MissingArtifactError(f"scalar artifact is missing for heatmap_grid rendering: {scalar_id}")
+            rows = _table_rows(table_path)
+            heatmap_tables.append(
+                (
+                    scalar_id,
+                    *_heatmap_grid_from_rows(
+                        rows,
+                        row_column=str(spec.row_column),
+                        column_column=str(spec.column_column),
+                        value_column=str(spec.value_column or "metric_value"),
+                        row_order=list(spec.row_order or []),
+                        column_order=list(spec.column_order or []),
+                    ),
+                )
+            )
+        grids = [grid for _, grid, _, _ in heatmap_tables]
+        cmap, norm = _heatmap_color_params(grids, color_scale=spec.color_scale, plot_id=spec.plot_id)
+        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(heatmap_tables))
+        rows_count, columns = _panel_grid_dimensions(len(heatmap_tables), prefer_single_row=prefer_single_row)
+        max_row_count = max(len(row_values) for _, _, row_values, _ in heatmap_tables)
+        max_column_count = max(len(column_values) for _, _, _, column_values in heatmap_tables)
+        figure_size = (
+            (
+                max(9.6, (2.9 * columns) + 0.6),
+                max(3.25, (2.55 * rows_count) + 0.12),
+            )
+            if spec.plot_id == "sigma35_centroid_distance_gallery"
+            else (
+                max(4.2, 1.9 + (1.15 * max_column_count)) * columns,
+                max(4.1, 1.6 + (0.9 * max_row_count)) * rows_count,
+            )
+        )
+        fig, axes = plt.subplots(
+            rows_count,
+            columns,
+            figsize=figure_size,
+            squeeze=False,
+        )
+        titles = spec.panel_titles or [scalar_id for scalar_id, _, _, _ in heatmap_tables]
+        for axis in axes.ravel()[len(heatmap_tables) :]:
+            axis.axis("off")
+        image = None
+        for panel_index, (axis, (_, grid, row_values, column_values), panel_title) in enumerate(
+            zip(
+                axes.ravel(),
+                heatmap_tables,
+                titles,
+                strict=False,
+            )
+        ):
+            image = _render_heatmap_panel(
+                axis,
+                grid=grid,
+                row_values=row_values,
+                column_values=column_values,
+                row_column=str(spec.row_column),
+                column_column=str(spec.column_column),
+                title=panel_title,
+                cmap=cmap,
+                norm=norm,
+                square_cells=spec.plot_id == "sigma35_centroid_distance_gallery",
+                x_axis_label=spec.x_axis_label,
+                y_axis_label=spec.y_axis_label,
+                show_y_tick_labels=not (spec.plot_id == "sigma35_centroid_distance_gallery" and panel_index > 0),
+                show_y_axis_label=not (spec.plot_id == "sigma35_centroid_distance_gallery" and panel_index > 0),
+            )
+        assert image is not None
+        if spec.plot_id == "sigma35_centroid_distance_gallery":
+            fig.subplots_adjust(left=0.07, right=0.875, wspace=0.18, bottom=0.18, top=0.79)
+            colorbar = fig.colorbar(
+                image,
+                cax=fig.add_axes([0.922, 0.19, 0.013, 0.58]),
+                label=_explicit_axis_label(spec.colorbar_label, width=20)
+                or humanize_display_text(str(spec.value_column or "metric_value")),
+            )
+        else:
+            colorbar = fig.colorbar(
+                image,
+                ax=axes.ravel().tolist(),
+                fraction=0.03,
+                pad=0.03,
+                label=_explicit_axis_label(spec.colorbar_label, width=20)
+                or humanize_display_text(str(spec.value_column or "metric_value")),
+            )
+        colorbar.ax.tick_params(labelsize=10, colors=TEXT_COLOR)
+        colorbar.set_label(
+            _explicit_axis_label(spec.colorbar_label, width=20)
+            or humanize_display_text(str(spec.value_column or "metric_value")),
+            fontsize=11,
+            color=TEXT_COLOR,
+        )
     elif spec.kind in {"distance_scatter", "xy_scatter"}:
         _, _, table_path = _table_artifact_path(context, spec)
         table = pq.read_table(table_path)
@@ -1772,24 +2195,137 @@ def render_plot_artifact(
 
         rows = _table_rows(table_path)
         fig, ax = plt.subplots(figsize=_grid_figure_size(1, square_panels=True))
-        color_map, categories = _category_color_map([rows], spec.color_column)
+        color_encoding = _continuous_scatter_encoding(rows, spec.color_column)
+        color_map, categories = (
+            ({}, []) if color_encoding is not None else _category_color_map([rows], spec.color_column)
+        )
         effective_shape_column = _effective_shape_column(spec)
         shape_map, shape_categories = _shape_marker_map([rows], effective_shape_column)
-        annotation_state = _render_xy_panel(
-            ax,
-            rows,
-            context=context,
-            spec=spec,
-            resolved_x=resolved_x,
-            resolved_y=resolved_y,
-            panel_title=spec.plot_id,
-            color_map=color_map,
-            shape_map=shape_map,
-        )
+        finite_rows = [
+            row
+            for row in rows
+            if _coerce_finite_float(row.get(resolved_x)) is not None
+            and _coerce_finite_float(row.get(resolved_y)) is not None
+        ]
+        if not finite_rows:
+            _render_placeholder_panel(
+                ax,
+                panel_title=spec.plot_id,
+                message="Margins unavailable",
+                detail="No finite values in this snapshot",
+                square=True,
+            )
+            annotation_state = {}
+        else:
+            point_style = scatter_style(len(finite_rows))
+            point_sizes = _scatter_point_sizes(
+                finite_rows,
+                size_column=spec.size_column,
+                default_size=point_style.point_size,
+                size_range=spec.size_range,
+            )
+            _scatter_points(
+                ax,
+                finite_rows,
+                resolved_x=resolved_x,
+                resolved_y=resolved_y,
+                color_column=spec.color_column,
+                color_map=color_map,
+                shape_column=effective_shape_column,
+                shape_map=shape_map,
+                point_size=point_style.point_size,
+                point_sizes=point_sizes,
+                alpha=point_style.alpha,
+                continuous_color=color_encoding,
+                rasterized=point_style.rasterized,
+                edgecolors=point_style.edgecolors,
+                linewidths=point_style.linewidths,
+            )
+            x_values = [float(row[resolved_x]) for row in finite_rows]
+            y_values = [float(row[resolved_y]) for row in finite_rows]
+            _add_zero_reference_lines(ax, x_values=x_values, y_values=y_values)
+            ax.set_xlabel(
+                _resolved_axis_label(
+                    explicit_label=spec.x_axis_label,
+                    fallback_label=_scatter_axis_label(
+                        rows,
+                        resolved_column=resolved_x,
+                        display_column="x_display_name",
+                    ),
+                    width=28,
+                    max_lines=2,
+                )
+            )
+            ax.set_ylabel(
+                _resolved_axis_label(
+                    explicit_label=spec.y_axis_label,
+                    fallback_label=_scatter_axis_label(
+                        rows,
+                        resolved_column=resolved_y,
+                        display_column="y_display_name",
+                    ),
+                    width=28,
+                    max_lines=2,
+                )
+            )
+            ax.set_title(wrap_plot_title(spec.plot_id, width=24), pad=8)
+            if spec.size_column is not None:
+                ax.text(
+                    0.98,
+                    0.02,
+                    f"Point size: {humanize_display_text(spec.size_column)}",
+                    transform=ax.transAxes,
+                    ha="right",
+                    va="bottom",
+                    fontsize=8.8,
+                    color=SPINE_COLOR,
+                )
+            _apply_axes_style(ax, grid=True, square=True)
+            selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
+                context,
+                finite_rows,
+                spec=spec,
+            )
+            if selected_rows and resolved_label_column is not None:
+                _draw_annotation_callouts(
+                    ax,
+                    rows=selected_rows,
+                    resolved_x=resolved_x,
+                    resolved_y=resolved_y,
+                    label_texts=[
+                        _annotation_label_text(
+                            context,
+                            spec=spec,
+                            row=row,
+                            resolved_label_column=resolved_label_column,
+                        )
+                        for row in selected_rows
+                    ],
+                    marker_colors=["#111111"] * len(selected_rows),
+                    font_size=8.6 if spec.plot_id == "candidate_decision_frontier" else 9.5,
+                    marker_size=0.0 if spec.plot_id == "candidate_decision_frontier" else 128.0,
+                    marker=None if spec.plot_id == "candidate_decision_frontier" else "*",
+                )
         plot_metadata["reference_panels"] = {
             spec.scalar_id or spec.distance_id or spec.plot_id: annotation_state,
         }
-        if (spec.render_mode or "points") == "points":
+        if color_encoding is not None:
+            from matplotlib.cm import ScalarMappable
+
+            colorbar = fig.colorbar(
+                ScalarMappable(norm=color_encoding["norm"], cmap=str(color_encoding["cmap"])),
+                ax=ax,
+                fraction=0.046,
+                pad=0.04,
+                label=humanize_display_text(str(spec.color_column or "value")),
+            )
+            colorbar.ax.tick_params(labelsize=10, colors=TEXT_COLOR)
+            colorbar.set_label(
+                humanize_display_text(str(spec.color_column or "value")),
+                fontsize=11,
+                color=TEXT_COLOR,
+            )
+        elif (spec.render_mode or "points") == "points":
             _add_axis_legends(
                 ax,
                 plt,
@@ -2070,8 +2606,7 @@ def render_plot_artifact(
         rows = _table_rows(table_path)
         if not rows:
             raise ContractViolationError("distribution rendering requires at least one row")
-        square_distribution_panel = spec.plot_id == "context_delta_distributions"
-        fig, ax = plt.subplots(figsize=(5.4, 5.2 if square_distribution_panel else 4.8))
+        fig, ax = plt.subplots(figsize=(5.4, 4.8))
         render_mode = spec.render_mode or "histogram"
         _render_distribution_panel(
             ax,
@@ -2080,7 +2615,9 @@ def render_plot_artifact(
             color_column=spec.color_column,
             render_mode=render_mode,
             panel_title=artifact_id,
-            square=square_distribution_panel,
+            square=False,
+            x_axis_label=spec.x_axis_label,
+            y_axis_label=spec.y_axis_label,
         )
     elif spec.kind == "distribution_grid":
         scalar_tables: list[tuple[str, list[dict[str, object]], str]] = []
@@ -2116,12 +2653,17 @@ def render_plot_artifact(
                     f"distribution_grid value column is missing or non-numeric: {metric_column!r}"
                 )
             scalar_tables.append((scalar_id, rows, metric_column))
-        rows_count, columns = _panel_grid_dimensions(len(scalar_tables))
-        square_distribution_panels = spec.plot_id == "context_delta_distributions"
+        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(scalar_tables))
+        rows_count, columns = _panel_grid_dimensions(len(scalar_tables), prefer_single_row=prefer_single_row)
+        square_distribution_panels = spec.plot_id == "sigma35_margin_ladder_gallery"
         fig, axes = plt.subplots(
             rows_count,
             columns,
-            figsize=_grid_figure_size(len(scalar_tables), square_panels=square_distribution_panels),
+            figsize=_grid_figure_size(
+                len(scalar_tables),
+                square_panels=square_distribution_panels,
+                prefer_single_row=prefer_single_row,
+            ),
             squeeze=False,
         )
         titles = spec.panel_titles or [
@@ -2143,6 +2685,8 @@ def render_plot_artifact(
                 render_mode=spec.render_mode or "histogram",
                 panel_title=panel_title,
                 square=square_distribution_panels,
+                x_axis_label=spec.x_axis_label,
+                y_axis_label=spec.y_axis_label,
             )
         if configured_metric_columns:
             plot_metadata["metric_columns"] = configured_metric_columns
@@ -2517,7 +3061,9 @@ def render_plot_artifact(
                 shape_title=effective_shape_column,
             )
     grid_legend_bottom_margin = float(locals().get("grid_legend_bottom_margin", 0.0))
-    if (
+    if spec.kind == "heatmap_grid":
+        fig.subplots_adjust(left=0.08, right=0.92, top=0.94, bottom=0.08, wspace=0.30, hspace=0.48)
+    elif (
         spec.kind
         in {
             "projection_grid",
