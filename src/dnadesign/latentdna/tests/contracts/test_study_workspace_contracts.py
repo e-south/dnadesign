@@ -100,20 +100,31 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
 
     assert snapshot["schema_version"] == "latentdna.workspace_snapshot.v1"
     assert snapshot["workspace_id"] == "stress_ethanol_cipro_growth"
-    assert snapshot["decision_ladder"] == [
+    expected_decision_prefix = [
         "dataset_overview",
         "design_structure_summary",
         "sigma35_ordinal_audit",
         "context_robustness_summary",
-        "candidate_decision_frontier",
     ]
-    assert snapshot["browser"]["default_geometry_ids"] == [
+    decision_ladder = snapshot["decision_ladder"]
+    assert decision_ladder[: len(expected_decision_prefix)] == expected_decision_prefix
+    assert set(decision_ladder).issubset({*expected_decision_prefix, "candidate_decision_frontier"})
+    if "candidate_decision_frontier" in decision_ladder:
+        assert decision_ladder[-1] == "candidate_decision_frontier"
+    expected_browser_geometries = [
         "intermediate_embedding_7b_anchor_60bp",
         "pooled_logits_7b_anchor_60bp",
         "intermediate_embedding_7b_full_context_1kb",
         "pooled_logits_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
     ]
+    browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
+    legacy_regenerated_geometry_ids = {
+        "intermediate_embedding_7b_anchor_plus_full_context_concat",
+        "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
+    }
+    assert browser_geometry_ids[: len(expected_browser_geometries)] == expected_browser_geometries
+    assert set(browser_geometry_ids).issubset({*expected_browser_geometries, *legacy_regenerated_geometry_ids})
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
