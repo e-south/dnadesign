@@ -32,8 +32,12 @@ def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() 
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    # Clean CI checkouts do not include generated joinable scalar tables, so the
+    # checked-in snapshot carries the pre-assay browser hue contract there.
+    preferred_hues = controls.geometry_controls.preferred_hues or snapshot["browser"]["preferred_hues"]
 
     assert controls.schema_version == "latentdna.workspace_notebook_controls.v4"
     assert controls.workspace_id == "stress_ethanol_cipro_growth"
@@ -70,18 +74,21 @@ def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() 
     assert geometry_roles["pooled_logits_7b_anchor_60bp"] == "appendix"
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
-    assert "design_family" in controls.geometry_controls.preferred_hues
-    assert "sig35_variant" in controls.geometry_controls.preferred_hues
-    assert "spacer_length" in controls.geometry_controls.preferred_hues
-    assert "log_likelihood_per_token_7b" in controls.geometry_controls.preferred_hues
-    assert "wildtype_margin_ethanol_vs_control" not in controls.geometry_controls.preferred_hues
-    assert "wildtype_margin_cipro_vs_control" not in controls.geometry_controls.preferred_hues
-    assert "sigma70_variant" not in controls.geometry_controls.preferred_hues
-    assert "sigma70_strength_class" not in controls.geometry_controls.preferred_hues
-    assert "construct__context_id" not in controls.geometry_controls.preferred_hues
-    assert controls.geometry_controls.hue_kinds["design_family"] == "categorical"
-    assert controls.geometry_controls.hue_kinds["is_control"] == "binary"
-    assert controls.geometry_controls.hue_kinds["spacer_length"] == "ordinal"
+    assert "design_family" in preferred_hues
+    assert "sig35_variant" in preferred_hues
+    assert "spacer_length" in preferred_hues
+    assert "log_likelihood_per_token_7b" in preferred_hues
+    assert "wildtype_margin_ethanol_vs_control" not in preferred_hues
+    assert "wildtype_margin_cipro_vs_control" not in preferred_hues
+    assert "sigma70_variant" not in preferred_hues
+    assert "sigma70_strength_class" not in preferred_hues
+    assert "construct__context_id" not in preferred_hues
+    if controls.geometry_controls.preferred_hues:
+        assert controls.geometry_controls.hue_kinds["design_family"] == "categorical"
+        assert controls.geometry_controls.hue_kinds["is_control"] == "binary"
+        assert controls.geometry_controls.hue_kinds["spacer_length"] == "ordinal"
+    else:
+        assert controls.geometry_controls.joinable_tables == []
     assert controls.geometry_controls.reference_labels == ["spyp", "sulap", "j23105"]
 
 
