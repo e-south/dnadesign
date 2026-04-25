@@ -253,6 +253,43 @@ def _write_attempts(tmp_path: Path) -> None:
     attempts.to_parquet(tables_dir / "attempts.parquet", index=False)
 
 
+def _write_attempts_shard(tmp_path: Path) -> None:
+    tables_dir = tmp_path / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    attempts = pd.DataFrame(
+        [
+            {
+                "attempt_id": "a1",
+                "attempt_index": 1,
+                "run_id": "demo",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "created_at": "2026-01-26T00:00:00+00:00",
+                "status": "success",
+                "reason": "ok",
+                "detail_json": "{}",
+                "sequence": "AAA",
+                "sequence_hash": "hash",
+                "solution_id": "s1",
+                "used_tf_counts_json": "{}",
+                "used_tf_list": [],
+                "sampling_library_index": 1,
+                "sampling_library_hash": "hash1",
+                "solver_status": "ok",
+                "solver_objective": 1.0,
+                "solver_solve_time_s": 0.1,
+                "dense_arrays_version": "0.1.0",
+                "dense_arrays_version_source": "installed",
+                "library_tfbs": ["AAAA", "AAAAT", "CCCCCC"],
+                "library_tfs": ["TF_A", "TF_A", "TF_B"],
+                "library_site_ids": ["", "", ""],
+                "library_sources": ["", "", ""],
+            }
+        ]
+    )
+    attempts.to_parquet(tables_dir / "attempts_part-0001.parquet", index=False)
+
+
 def _write_composition(tmp_path: Path) -> None:
     tables_dir = tmp_path / "outputs" / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
@@ -454,6 +491,21 @@ def test_build_run_metrics_traceability_dense_arrays(tmp_path: Path) -> None:
 
     tiers = metrics[metrics["metric_group"] == "tier_enrichment"]
     assert not tiers.empty
+
+
+def test_build_run_metrics_accepts_attempt_shards(tmp_path: Path) -> None:
+    cfg_path = _write_config(tmp_path)
+    _write_pool_manifest(tmp_path)
+    _write_libraries(tmp_path)
+    _write_attempts_shard(tmp_path)
+    _write_composition(tmp_path)
+
+    loaded = load_config(cfg_path)
+    metrics = build_run_metrics(cfg=loaded.root.densegen, run_root=tmp_path)
+
+    health = metrics[metrics["metric_group"] == "library_health"]
+    assert len(health) == 1
+    assert int(health.iloc[0]["library_size"]) == 3
 
 
 def test_build_run_metrics_rejects_dense_arrays_without_library_hash(tmp_path: Path) -> None:

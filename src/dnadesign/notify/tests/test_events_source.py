@@ -354,7 +354,7 @@ def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path
                 "  output:",
                 "    targets: [usr]",
                 "    usr:",
-                "      dataset: densegen/study_stress_ethanol_cipro",
+                "      dataset: densegen_prom_eth_cip_source",
                 "      root: outputs/usr_datasets",
                 "    schema:",
                 "      bio_type: dna",
@@ -369,7 +369,7 @@ def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path
 
     assert (
         events_path
-        == (run_root / "outputs" / "usr_datasets" / "densegen" / "study_stress_ethanol_cipro" / ".events.log").resolve()
+        == (run_root / "outputs" / "usr_datasets" / "densegen_prom_eth_cip_source" / ".events.log").resolve()
     )
     assert policy == "densegen"
 
@@ -388,7 +388,7 @@ def test_resolve_tool_events_path_densegen_supports_shared_usr_root_outside_outp
                 "  output:",
                 "    targets: [usr]",
                 "    usr:",
-                "      dataset: densegen/study_stress_ethanol_cipro",
+                "      dataset: densegen_prom_eth_cip_source",
                 f"      root: {tmp_path / 'external_usr'}",
                 "    schema:",
                 "      bio_type: dna",
@@ -401,9 +401,7 @@ def test_resolve_tool_events_path_densegen_supports_shared_usr_root_outside_outp
 
     events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
 
-    assert (
-        events_path == (tmp_path / "external_usr" / "densegen" / "study_stress_ethanol_cipro" / ".events.log").resolve()
-    )
+    assert events_path == (tmp_path / "external_usr" / "densegen_prom_eth_cip_source" / ".events.log").resolve()
     assert policy == "densegen"
 
 

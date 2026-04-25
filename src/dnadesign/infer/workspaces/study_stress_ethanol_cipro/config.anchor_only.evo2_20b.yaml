@@ -3,14 +3,14 @@ model:
   device: cuda:0
   precision: bf16
   alphabet: dna
-  batch_size: 8
+  batch_size: 256
 
 jobs:
   - id: anchor_only_20b_features
     operation: extract
     ingest:
       source: usr
-      dataset: promoter/stress_ethanol_cipro_anchor_set
+      dataset: usr_prom_eth_cip_anchor
       root: ../../../usr/datasets
       field: sequence
     feature_bundle:

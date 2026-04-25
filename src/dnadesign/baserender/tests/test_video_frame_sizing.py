@@ -504,6 +504,115 @@ def test_write_video_keeps_title_font_larger_than_subtitle_font(monkeypatch, tmp
     assert writer.title_font_size > writer.subtitle_font_size
 
 
+def test_write_video_can_lock_title_and_subtitle_to_uniform_display_font_size(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    title_text = "DenseGen Workspace | Sequence abcdefgh...wxyz | Plan ethanol ciprofloxacin"
+    subtitle_text = "Sequence abcdefgh...wxyz | Plan ethanol ciprofloxacin"
+
+    class _FontCaptureWriter:
+        class _SavingContext:
+            def __init__(self, path: str):
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self._fig = None
+            self.title_font_size: float | None = None
+            self.subtitle_font_size: float | None = None
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self._fig = fig
+            return self._SavingContext(path)
+
+        def grab_frame(self):
+            if self._fig is None:
+                raise AssertionError("Expected figure to be bound before frame capture.")
+            self._fig.canvas.draw()
+            title_artist = None
+            subtitle_artist = None
+            for artist in self._fig.texts:
+                color = str(artist.get_color()).lower()
+                if color == "#374151":
+                    title_artist = artist
+                elif color == "#4b5563":
+                    subtitle_artist = artist
+            if title_artist is None or subtitle_artist is None:
+                raise AssertionError("Expected both title and subtitle artists in video frame.")
+            self.title_font_size = float(title_artist.get_fontsize())
+            self.subtitle_font_size = float(subtitle_artist.get_fontsize())
+
+    writer_box: dict[str, _FontCaptureWriter] = {}
+
+    def _writer_factory(*args, **kwargs):
+        writer = _FontCaptureWriter(*args, **kwargs)
+        writer_box["writer"] = writer
+        return writer
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del record, renderer_name, style, palette
+        fig, ax = plt.subplots(figsize=(2.8, 1.3), dpi=100)
+        ax.set_axis_off()
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+
+    records = [
+        Record(
+            id="frame-1",
+            alphabet="DNA",
+            sequence="ACGT",
+            display=Display(video_subtitle=subtitle_text),
+        )
+    ]
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "title-subtitle-uniform-font.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=None,
+        height_px=None,
+        aspect_ratio=None,
+        total_duration=None,
+        title_text=title_text,
+        title_font_size=18,
+        title_align="center",
+    )
+
+    out_path = write_video(
+        records,
+        output=output,
+        renderer_name="sequence_rows",
+        style=Style(
+            dpi=100,
+            font_size_seq=18,
+            font_size_label=18,
+            legend_font_size=18,
+            uniform_display_font_size=True,
+        ),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+    writer = writer_box["writer"]
+    assert writer.title_font_size == 18.0
+    assert writer.subtitle_font_size == 18.0
+
+
 def test_write_video_title_avoids_bbox_patch_to_prevent_subtitle_clip(monkeypatch, tmp_path: Path) -> None:
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt

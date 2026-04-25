@@ -7,7 +7,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .src.cli import main
+from . import main
 
 if __name__ == "__main__":
     main()

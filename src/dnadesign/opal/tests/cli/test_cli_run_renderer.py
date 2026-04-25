@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.opal.src.cli.formatting.renderers.run import render_run_summary_human
+from dnadesign.opal.src.cli.formatting.renderers.run import render_run_summary_text
 
 
 def test_render_run_summary_requires_selection_mode_and_tie() -> None:
@@ -29,7 +29,7 @@ def test_render_run_summary_requires_selection_mode_and_tie() -> None:
     }
 
     with pytest.raises(ValueError, match="tie_handling"):
-        render_run_summary_human(summary)
+        render_run_summary_text(summary)
 
 
 def test_render_run_summary_uses_explicit_mode_and_tie() -> None:
@@ -46,5 +46,5 @@ def test_render_run_summary_uses_explicit_mode_and_tie() -> None:
         "objective_mode": "minimize",
     }
 
-    out = render_run_summary_human(summary)
+    out = render_run_summary_text(summary)
     assert "objective=minimize tie=dense_rank" in out

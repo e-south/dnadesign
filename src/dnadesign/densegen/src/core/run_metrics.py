@@ -19,6 +19,7 @@ import pandas as pd
 
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .event_log import load_events
+from .pipeline.attempts import _load_attempts_snapshot
 from .record_values import require_list as _ensure_list
 from .run_metrics_transforms import (
     _assign_score_quantiles,
@@ -32,6 +33,7 @@ from .run_paths import run_outputs_root, run_tables_root
 
 RUN_METRICS_VERSION = "1.0"
 DEFAULT_SCORE_QUANTILES = 5
+_ATTEMPTS_ARTIFACT_LABEL = "outputs/tables/attempts.parquet or attempts_part-*.parquet"
 _ATTEMPTS_METRIC_COLUMNS = [
     "status",
     "input_name",
@@ -130,10 +132,9 @@ def _scan_dense_array_placements(path: Path) -> tuple[pd.DataFrame, int]:
 def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     outputs_root = run_outputs_root(run_root)
     tables_root = run_tables_root(run_root)
-    attempts_path = tables_root / "attempts.parquet"
-    if not attempts_path.exists():
-        raise RuntimeError(f"attempts.parquet not found at {attempts_path}")
-    attempts_df = pd.read_parquet(attempts_path, columns=_ATTEMPTS_METRIC_COLUMNS)
+    attempts_df = _load_attempts_snapshot(tables_root, columns=_ATTEMPTS_METRIC_COLUMNS)
+    if attempts_df.empty:
+        raise RuntimeError(f"{_ATTEMPTS_ARTIFACT_LABEL} not found under {tables_root}")
 
     libraries_dir = outputs_root / "libraries"
     builds_path = libraries_dir / "library_builds.parquet"
@@ -255,7 +256,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     }
     missing_attempt_cols = required_attempt_cols - set(attempts_df.columns)
     if missing_attempt_cols:
-        raise RuntimeError(f"attempts.parquet missing required columns: {sorted(missing_attempt_cols)}")
+        raise RuntimeError(f"{_ATTEMPTS_ARTIFACT_LABEL} missing required columns: {sorted(missing_attempt_cols)}")
 
     offered_by_library: dict[tuple[str, str, int, str], dict[str, int]] = {}
     offered_tfbs_by_library: dict[tuple[str, str, int, str], set[str]] = {}
@@ -273,7 +274,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
         tfbs_list = _ensure_list(row.get("library_tfbs"))
         if len(tf_list) != len(tfbs_list):
             raise RuntimeError(
-                f"attempts.parquet library_tfs/library_tfbs length mismatch for {input_name}/{plan_name}."
+                f"{_ATTEMPTS_ARTIFACT_LABEL} library_tfs/library_tfbs length mismatch for {input_name}/{plan_name}."
             )
         tf_counts: dict[str, int] = {}
         tfbs_set: set[str] = set()

@@ -16,7 +16,32 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes", "studies"}
+TOP_LEVEL_ROOT_MODULES = {"__init__.py"}
+TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
+    "aligner",
+    "baserender",
+    "billboard",
+    "cluster",
+    "construct",
+    "contracts",
+    "cruncher",
+    "densegen",
+    "infer",
+    "latentdna",
+    "libshuffle",
+    "nmf",
+    "notify",
+    "opal",
+    "ops",
+    "permuter",
+    "studies",
+    "tfkdanalysis",
+    "usr",
+}
+TOP_LEVEL_SHARED_INFRA_PACKAGES = {"devtools", "testsupport"}
+TOP_LEVEL_LEGACY_DIRECTORIES = {"archived", "prototypes"}
+_IGNORED_TOP_LEVEL_DIRECTORIES = {"__pycache__"}
+_NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | TOP_LEVEL_LEGACY_DIRECTORIES | _IGNORED_TOP_LEVEL_DIRECTORIES
 _SKIPPED_PATH_SEGMENTS = {
     "tests",
     "notebooks",
@@ -24,10 +49,12 @@ _SKIPPED_PATH_SEGMENTS = {
     "workspaces",
     "jobs",
     "images",
+    "assets",
     "datasets",
     "demo_material",
     "__pycache__",
 }
+_TEST_SUPPORT_PACKAGE = "testsupport"
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("baserender", "contracts"),
     ("billboard", "aligner"),
@@ -41,6 +68,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("densegen", "cruncher"),
     ("densegen", "usr"),
     ("infer", "usr"),
+    ("latentdna", "usr"),
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),
@@ -54,6 +82,10 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("ops", "notify"),
     ("ops", "usr"),
     ("permuter", "infer"),
+    ("studies", "infer"),
+    ("studies", "ops"),
+    ("studies", "densegen"),
+    ("studies", "usr"),
     ("usr", "ops"),
 }
 _FORBIDDEN_LEGACY_SURFACE_PATHS = (
@@ -103,6 +135,12 @@ class ImportViolation:
 @dataclass(frozen=True)
 class LegacySurfaceViolation:
     path: Path
+
+
+@dataclass(frozen=True)
+class TopLevelLayoutViolation:
+    path: Path
+    reason: str
 
 
 def _discover_tools(repo_root: Path) -> set[str]:
@@ -194,6 +232,16 @@ def find_undeclared_cross_tool_imports(
             if len(parts) < 2:
                 continue
             imported_tool = parts[1]
+            if imported_tool == _TEST_SUPPORT_PACKAGE:
+                violations.append(
+                    ImportViolation(
+                        owner_tool=owner_tool,
+                        imported_tool=imported_tool,
+                        file_path=file_path,
+                        import_target=target,
+                    )
+                )
+                continue
             if imported_tool not in tool_names or imported_tool == owner_tool:
                 continue
             if target == f"dnadesign.{imported_tool}.src" or target.startswith(f"dnadesign.{imported_tool}.src."):
@@ -241,6 +289,54 @@ def find_legacy_surface_violations(*, repo_root: Path) -> list[LegacySurfaceViol
     return sorted(violations, key=lambda item: str(item.path))
 
 
+def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutViolation]:
+    resolved_repo_root = repo_root.expanduser().resolve()
+    src_root = resolved_repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        raise FileNotFoundError(f"Expected dnadesign source root at {src_root}")
+
+    required_directories = TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES
+    allowed_directories = required_directories | TOP_LEVEL_LEGACY_DIRECTORIES
+    actual_directories = {
+        path.name
+        for path in src_root.iterdir()
+        if path.is_dir() and not path.name.startswith(".") and path.name not in _IGNORED_TOP_LEVEL_DIRECTORIES
+    }
+    actual_root_modules = {path.name for path in src_root.glob("*.py")}
+
+    violations: list[TopLevelLayoutViolation] = []
+    for name in sorted(required_directories - actual_directories):
+        violations.append(
+            TopLevelLayoutViolation(
+                path=src_root / name,
+                reason="sanctioned top-level directory missing",
+            )
+        )
+    for name in sorted(actual_directories - allowed_directories):
+        violations.append(
+            TopLevelLayoutViolation(
+                path=src_root / name,
+                reason="unexpected top-level directory",
+            )
+        )
+    for name in sorted(TOP_LEVEL_ROOT_MODULES - actual_root_modules):
+        violations.append(
+            TopLevelLayoutViolation(
+                path=src_root / name,
+                reason="sanctioned top-level module missing",
+            )
+        )
+    for name in sorted(actual_root_modules - TOP_LEVEL_ROOT_MODULES):
+        violations.append(
+            TopLevelLayoutViolation(
+                path=src_root / name,
+                reason="unexpected top-level module",
+            )
+        )
+
+    return violations
+
+
 def _is_cache_only_legacy_path(path: Path) -> bool:
     if path.is_file():
         return path.suffix in _ALLOWED_CACHE_FILE_SUFFIXES
@@ -262,7 +358,7 @@ def _is_cache_only_legacy_path(path: Path) -> bool:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Check dnadesign cross-tool import boundaries.")
+    parser = argparse.ArgumentParser(description="Check dnadesign import and top-level layout boundaries.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     return parser
 
@@ -272,11 +368,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         violations = find_undeclared_cross_tool_imports(repo_root=args.repo_root)
         legacy_surface_violations = find_legacy_surface_violations(repo_root=args.repo_root)
+        top_level_layout_violations = find_top_level_layout_violations(repo_root=args.repo_root)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
 
-    if not violations and not legacy_surface_violations:
+    if not violations and not legacy_surface_violations and not top_level_layout_violations:
         print("Architecture boundary checks passed.")
         return 0
 
@@ -285,6 +382,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f" - {item.file_path}: {item.owner_tool} -> {item.imported_tool} via '{item.import_target}'")
     for item in legacy_surface_violations:
         print(f" - forbidden legacy surface still exists: {item.path}")
+    for item in top_level_layout_violations:
+        print(f" - {item.reason}: {item.path}")
     return 1
 
 

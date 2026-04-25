@@ -68,6 +68,12 @@ class PromoterStudyResolvedContext:
     densegen_rows: int | None
     densegen_row_target: int | None
     densegen_row_gap: int | None
+    merged_anchor_dataset_id: str | None
+    merged_anchor_rows: int | None
+    construct_context_dataset_id: str | None
+    construct_context_rows: int | None
+    dataset_refresh_states: tuple[dict[str, object], ...]
+    stale_dataset_ids: tuple[str, ...]
     evidence: dict[str, object]
     derived_execution_surface_states: tuple[dict[str, object], ...] = ()
     derived_execution_surface_index: dict[str, Path] = field(default_factory=dict)
@@ -139,6 +145,12 @@ def resolve_promoter_study_context(
             densegen_rows=None,
             densegen_row_target=None,
             densegen_row_gap=None,
+            merged_anchor_dataset_id=None,
+            merged_anchor_rows=None,
+            construct_context_dataset_id=None,
+            construct_context_rows=None,
+            dataset_refresh_states=(),
+            stale_dataset_ids=(),
             evidence={
                 "requested_study_dir": requested_study_dir,
                 "study_dir": str(resolved_study_dir),
@@ -214,6 +226,12 @@ def resolve_promoter_study_context(
             densegen_rows=None,
             densegen_row_target=None,
             densegen_row_gap=None,
+            merged_anchor_dataset_id=None,
+            merged_anchor_rows=None,
+            construct_context_dataset_id=None,
+            construct_context_rows=None,
+            dataset_refresh_states=(),
+            stale_dataset_ids=(),
             evidence=evidence,
         )
 
@@ -336,6 +354,35 @@ def resolve_promoter_study_context(
     densegen_row_gap = (
         max(int(row_target) - int(densegen_rows), 0) if row_target is not None and densegen_rows is not None else None
     )
+    merged_anchor_dataset_id = dependencies.string_or_none(
+        (study_pipeline.get("datasets") or {}).get("merged_anchor_dataset")
+    ) or dependencies.string_or_none((ops_contract.artifacts.get("merged_anchor_dataset") or {}).get("dataset_id"))
+    merged_anchor_dataset_state = (
+        dataset_index.get(merged_anchor_dataset_id or "") if merged_anchor_dataset_id else None
+    )
+    merged_anchor_rows = merged_anchor_dataset_state.get("rows") if merged_anchor_dataset_state is not None else None
+    construct_context_dataset_id = dependencies.string_or_none(
+        (study_pipeline.get("datasets") or {}).get("construct_context_dataset")
+    ) or dependencies.string_or_none((ops_contract.artifacts.get("construct_context_dataset") or {}).get("dataset_id"))
+    construct_context_dataset_state = (
+        dataset_index.get(construct_context_dataset_id or "") if construct_context_dataset_id else None
+    )
+    construct_context_rows = (
+        construct_context_dataset_state.get("rows") if construct_context_dataset_state is not None else None
+    )
+    dataset_refresh_states = _build_dataset_refresh_states(
+        densegen_dataset_id=densegen_dataset_id,
+        densegen_rows=densegen_rows,
+        merged_anchor_dataset_id=merged_anchor_dataset_id,
+        merged_anchor_rows=merged_anchor_rows,
+        construct_context_dataset_id=construct_context_dataset_id,
+        construct_context_rows=construct_context_rows,
+    )
+    stale_dataset_ids = tuple(
+        str(state.get("downstream_dataset") or "").strip()
+        for state in dataset_refresh_states
+        if str(state.get("state") or "").strip() == "attention" and str(state.get("downstream_dataset") or "").strip()
+    )
 
     evidence.update(
         {
@@ -361,6 +408,12 @@ def resolve_promoter_study_context(
             "densegen_rows": densegen_rows,
             "densegen_row_target": row_target,
             "densegen_row_gap": densegen_row_gap,
+            "merged_anchor_dataset": merged_anchor_dataset_id,
+            "merged_anchor_rows": merged_anchor_rows,
+            "construct_context_dataset": construct_context_dataset_id,
+            "construct_context_rows": construct_context_rows,
+            "dataset_refresh_states": dataset_refresh_states,
+            "stale_dataset_ids": list(stale_dataset_ids),
         }
     )
 
@@ -402,6 +455,12 @@ def resolve_promoter_study_context(
         densegen_rows=densegen_rows,
         densegen_row_target=row_target,
         densegen_row_gap=densegen_row_gap,
+        merged_anchor_dataset_id=merged_anchor_dataset_id,
+        merged_anchor_rows=merged_anchor_rows,
+        construct_context_dataset_id=construct_context_dataset_id,
+        construct_context_rows=construct_context_rows,
+        dataset_refresh_states=tuple(dataset_refresh_states),
+        stale_dataset_ids=stale_dataset_ids,
         evidence=evidence,
     )
 
@@ -483,3 +542,81 @@ def _snapshot_target_rows(*, ops_contract: StudyOpsContract, artifact_id: str) -
             return int(text)
         return None
     return None
+
+
+def _build_dataset_refresh_states(
+    *,
+    densegen_dataset_id: str | None,
+    densegen_rows: int | None,
+    merged_anchor_dataset_id: str | None,
+    merged_anchor_rows: int | None,
+    construct_context_dataset_id: str | None,
+    construct_context_rows: int | None,
+) -> list[dict[str, object]]:
+    states: list[dict[str, object]] = []
+    merged_anchor_state = _dataset_refresh_state(
+        check_id="merged_anchor_from_densegen",
+        upstream_dataset=densegen_dataset_id,
+        upstream_rows=densegen_rows,
+        downstream_dataset=merged_anchor_dataset_id,
+        downstream_rows=merged_anchor_rows,
+        ok_summary="Merged anchor dataset is at least as current as the DenseGen source.",
+        attention_summary="Merged anchor dataset trails DenseGen source rows.",
+    )
+    if merged_anchor_state is not None:
+        states.append(merged_anchor_state)
+    construct_context_state = _dataset_refresh_state(
+        check_id="construct_contexts_from_merged_anchor",
+        upstream_dataset=merged_anchor_dataset_id,
+        upstream_rows=merged_anchor_rows,
+        downstream_dataset=construct_context_dataset_id,
+        downstream_rows=construct_context_rows,
+        ok_summary="Construct context dataset is at least as current as the merged anchor dataset.",
+        attention_summary="Construct context dataset trails merged anchor rows.",
+    )
+    if construct_context_state is not None:
+        if merged_anchor_state is not None and str(merged_anchor_state.get("state") or "").strip() == "attention":
+            construct_context_state = {
+                **construct_context_state,
+                "state": "attention",
+                "summary": (
+                    "Construct context dataset is downstream of a stale merged anchor dataset. "
+                    f"{construct_context_dataset_id}={construct_context_rows} still trails "
+                    f"{densegen_dataset_id}={densegen_rows} through {merged_anchor_dataset_id}={merged_anchor_rows}."
+                ),
+                "upstream_refresh_blocked_by": str(merged_anchor_state.get("id") or "").strip(),
+            }
+        states.append(construct_context_state)
+    return states
+
+
+def _dataset_refresh_state(
+    *,
+    check_id: str,
+    upstream_dataset: str | None,
+    upstream_rows: int | None,
+    downstream_dataset: str | None,
+    downstream_rows: int | None,
+    ok_summary: str,
+    attention_summary: str,
+) -> dict[str, object] | None:
+    if upstream_rows is None or downstream_rows is None:
+        return None
+    lag_rows = max(int(upstream_rows) - int(downstream_rows), 0)
+    state = "ok" if lag_rows == 0 else "attention"
+    summary = ok_summary
+    if lag_rows:
+        summary = (
+            f"{attention_summary} "
+            f"{downstream_dataset}={downstream_rows} < {upstream_dataset}={upstream_rows} (lag={lag_rows})."
+        )
+    return {
+        "id": check_id,
+        "state": state,
+        "summary": summary,
+        "upstream_dataset": upstream_dataset,
+        "upstream_rows": upstream_rows,
+        "downstream_dataset": downstream_dataset,
+        "downstream_rows": downstream_rows,
+        "lag_rows": lag_rows,
+    }

@@ -76,7 +76,7 @@ What changed:
   - `opal guide` (config-driven runbook: text/markdown/json)
   - `opal guide next` (state-aware next-command recommendation)
   - `opal demo-matrix` (isolated pressure test runner across canonical demo flows)
-- Added default human-output next-step hints (opt-out with `--no-hints`) for:
+- Added default text-output next-step hints (opt-out with `--no-hints`) for:
   - `init`, `validate`, `ingest-y`, `run`, `explain`, `verify-outputs`
 - Enhanced `explain` with a preflight block that explicitly states:
   - observed-round vs labels-as-of semantics
@@ -814,7 +814,7 @@ Goal:
 
 Implemented changes:
 - `src/dnadesign/opal/src/cli/formatting/renderers/run.py`
-  - Added required-field validation for `tie_handling` and `objective_mode` in `render_run_summary_human`.
+  - Added required-field validation for `tie_handling` and `objective_mode` in `render_run_summary_text`.
   - Removed fallback display defaults (`competition_rank`, `maximize`) so summary rendering fails fast on malformed payloads.
 
 TDD additions:
@@ -1083,7 +1083,7 @@ Goal:
 Changes:
 - Removed workspace marker creation from init:
   - `src/dnadesign/opal/src/cli/commands/init.py`
-- Updated init human output to only report `outputs/` scaffolding:
+- Updated init text output to only report `outputs/` scaffolding:
   - `src/dnadesign/opal/src/cli/formatting/renderers/init.py`
 - Removed marker/cwd/fallback config resolution paths; now strict explicit config/env only:
   - `src/dnadesign/opal/src/core/config_resolve.py`

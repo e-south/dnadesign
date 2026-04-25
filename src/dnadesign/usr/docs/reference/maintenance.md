@@ -10,21 +10,32 @@ This page captures common maintenance commands that mutate or package dataset st
 
 ```bash
 # Freeze active registry into dataset artifact.
-uv run usr maintenance registry-freeze densegen/demo
+uv run usr maintenance registry-freeze densegen_demo
 
 # Compact overlay parts for one namespace.
-uv run usr maintenance overlay-compact densegen/demo --namespace densegen
+uv run usr maintenance overlay-compact densegen_demo --namespace densegen
+
+# Project one namespace from a source dataset onto a downstream dataset by join key.
+uv run usr maintenance overlay-project \
+  --src densegen_demo \
+  --dest promoter/demo_anchor_set \
+  --namespace densegen \
+  --src-join id \
+  --dest-join id \
+  --allow-missing
 
 # Remove or archive one derived namespace.
-uv run usr maintenance overlay-remove densegen/demo --namespace densegen --mode archive
+uv run usr maintenance overlay-remove densegen_demo --namespace densegen --mode archive
 ```
 
 Compaction retention contract:
 
 - Compaction rewrites active parts into one compact overlay file.
+- Compaction fails fast before registry freeze or file rewrites when the namespace has no overlay parts or is already compact.
 - Previous part snapshots are dropped by default (no lingering compact archives).
 - Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
 - Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run usr state ...`.
+- `overlay-project` is the safe repair path when downstream handoff datasets must inherit authoritative overlay metadata after merge, construct, or infer without rewriting `records.parquet` or disturbing unrelated namespaces such as `infer`.
 
 ## De-duplication
 
@@ -70,11 +81,11 @@ Merge controls:
 
 ```bash
 # Write timestamped snapshot under _snapshots/.
-uv run usr snapshot densegen/demo
+uv run usr snapshot densegen_demo
 
 # Export canonical data.
-uv run usr export densegen/demo --fmt parquet --out /tmp/usr_exports
-uv run usr export densegen/demo --fmt csv --out /tmp/usr_exports
+uv run usr export densegen_demo --fmt parquet --out /tmp/usr_exports
+uv run usr export densegen_demo --fmt csv --out /tmp/usr_exports
 ```
 
 ## Next steps

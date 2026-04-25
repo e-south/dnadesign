@@ -4604,17 +4604,17 @@ Make USR the explicit, tool-neutral boundary for derived-namespace pruning so si
 
 ### Changes applied
 
-1. `src/dnadesign/usr/src/cli_commands/maintenance.py`
+1. `src/dnadesign/usr/src/cli/commands/maintenance/__init__.py`
    - added the generic overlay-remove command handler.
-2. `src/dnadesign/usr/src/cli_commands/ops_cli.py`
+2. `src/dnadesign/usr/src/cli/commands/maintenance/cli.py`
    - added the `maintenance overlay-remove` CLI surface.
 3. `src/dnadesign/usr/src/cli.py`
    - wired the maintenance command through the existing CLI dependency boundary.
 4. `src/dnadesign/usr/src/dataset.py`
    - defined the generic mutation-reserved namespace set and applied it to attach/write/remove paths.
-5. `src/dnadesign/usr/src/dataset_overlay_ops.py`
+5. `src/dnadesign/usr/src/datasets/overlay_ops.py`
    - hardened generic overlay-part writes against reserved namespaces.
-6. `src/dnadesign/usr/src/dataset_overlay_maintenance.py`
+6. `src/dnadesign/usr/src/datasets/overlay_maintenance.py`
    - hardened generic overlay removal against reserved namespaces.
 7. `src/dnadesign/usr/tests/test_cli_maintenance_registry.py`
    - added CLI coverage for archive removal and reserved-namespace rejection.
@@ -4665,19 +4665,19 @@ Replace Infer's bespoke dataset-prune path with the generic USR overlay-maintena
 
 ### Changes applied
 
-1. `src/dnadesign/usr/src/overlay_maintenance.py`
+1. `src/dnadesign/usr/src/overlay_support/maintenance.py`
    - added the shared dataset-overlay removal seam.
 2. `src/dnadesign/infer/src/prune.py`
    - delegated infer prune to USR overlay maintenance and preserved fail-fast missing-overlay behavior.
-3. `src/dnadesign/usr/src/dataset_identity.py`
+3. `src/dnadesign/usr/src/datasets/identity.py`
    - extracted dataset-id normalization and path-based open logic.
 4. `src/dnadesign/usr/src/dataset.py`
    - delegated identity/open responsibilities to the extracted module.
-5. `src/dnadesign/usr/src/cli_bindings.py`
+5. `src/dnadesign/usr/src/cli/support/bindings.py`
    - extracted CLI command forwarding/binding assembly.
 6. `src/dnadesign/usr/src/cli.py`
    - replaced a large set of thin forwarding functions with a single binding assembly call.
-7. `src/dnadesign/usr/src/cli_commands/maintenance.py`
+7. `src/dnadesign/usr/src/cli/commands/maintenance/__init__.py`
    - delegated overlay removal to the shared maintenance seam.
 8. `src/dnadesign/usr/tests/*module_layout*.py`
    - aligned IA contract tests to the new seams.
@@ -4763,7 +4763,7 @@ Shrink `usr/src/dataset.py` by extracting overlay catalog loading and overlay-aw
 
 ### Changes applied
 
-1. `src/dnadesign/usr/src/dataset_overlay_catalog.py`
+1. `src/dnadesign/usr/src/datasets/query/catalog.py`
    - added overlay catalog loading/cache helpers.
    - added overlay-aware dataset info/schema helpers.
 2. `src/dnadesign/usr/src/dataset.py`
@@ -4806,7 +4806,7 @@ Continue shrinking `usr/src/dataset.py` by extracting record-batch key derivatio
    - added module export coverage to `usr/tests/test_module_layout.py`.
    - required `Dataset._key_list_from_batch(...)` to delegate to the new helper module.
 2. Green:
-   - added `usr/src/dataset_read_keys.py`.
+   - added `usr/src/datasets/views/read_keys.py`.
    - moved record-batch key extraction logic into `key_list_from_batch(...)`.
    - rewired `Dataset._key_list_from_batch(...)` to delegate.
 3. Verify:
@@ -4819,7 +4819,7 @@ Continue shrinking `usr/src/dataset.py` by extracting record-batch key derivatio
 
 ### Changes applied
 
-1. `src/dnadesign/usr/src/dataset_read_keys.py`
+1. `src/dnadesign/usr/src/datasets/views/read_keys.py`
    - added record-batch key extraction helper.
 2. `src/dnadesign/usr/src/dataset.py`
    - delegated `_key_list_from_batch(...)`.
@@ -5089,7 +5089,7 @@ Keep the canonical repo `.venv` intact, remove stale Evo2 Hugging Face cache cru
    - `infer__evo2_7b__pressure_evo2_logits_llr__llr_mean:float64`
 2. Initialized dataset `test_stress_ethanol` under:
    - `src/dnadesign/infer/workspaces/test_stress_ethanol/outputs/usr_datasets/test_stress_ethanol`
-3. Imported 8 DNA sequences from a bounded CSV subset derived from `src/dnadesign/usr/demo_material/demo_sequences.csv`.
+3. Imported 8 DNA sequences from a bounded CSV subset derived from `src/dnadesign/usr/assets/demo_material/demo_sequences.csv`.
 
 ### Runtime verification
 

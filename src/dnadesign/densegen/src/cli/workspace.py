@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Callable, Optional
@@ -21,7 +22,7 @@ from typing import Callable, Optional
 import typer
 import yaml
 
-from dnadesign.usr.roots import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
+from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
 
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext
@@ -96,6 +97,13 @@ def _shared_usr_root_for_workspace(workspace_dir: Path, *, usr_root: Path | None
         return shared_root.as_posix()
 
 
+def _densegen_usr_dataset_id(run_id: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9]+", "_", str(run_id).strip().lower()).strip("_") or "workspace"
+    if stem.startswith("densegen_"):
+        return stem
+    return f"densegen_{stem}"
+
+
 def _apply_output_mode(
     output: dict,
     *,
@@ -122,7 +130,7 @@ def _apply_output_mode(
 
     if mode in {"usr", "both"}:
         usr_cfg["root"] = _shared_usr_root_for_workspace(workspace_dir, usr_root=usr_root)
-        usr_cfg["dataset"] = run_id
+        usr_cfg["dataset"] = _densegen_usr_dataset_id(run_id)
         usr_cfg.setdefault("chunk_size", 128)
         out["usr"] = usr_cfg
 
@@ -133,6 +141,34 @@ def _apply_output_mode(
     else:
         out["targets"] = ["parquet", "usr"]
     return out
+
+
+def _note_missing_usr_registry(*, run_dir: Path, output: dict, console, display_path: Callable[..., str]) -> None:
+    targets = output.get("targets")
+    if not isinstance(targets, list) or "usr" not in targets:
+        return
+    usr_cfg = output.get("usr")
+    if not isinstance(usr_cfg, dict):
+        return
+    root_raw = usr_cfg.get("root")
+    if not isinstance(root_raw, str) or not root_raw.strip():
+        return
+    usr_root = resolve_usr_root_from_config(
+        root_raw,
+        config_path=run_dir / "config.yaml",
+        label="output.usr.root",
+    )
+    if usr_root is None:
+        return
+    registry_path = usr_root / "registry.yaml"
+    if registry_path.exists():
+        return
+    console.print(
+        "[yellow]Shared USR registry is not present yet.[/] "
+        "Workspace init leaves shared dataset roots unchanged; create "
+        f"{display_path(registry_path, run_dir, absolute=False)} manually or let "
+        "`uv run dense run` seed it when writes are intended."
+    )
 
 
 def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Callable[..., str]) -> None:
@@ -362,7 +398,7 @@ def register_workspace_commands(
             logging_cfg = dense.get("logging") or {}
             logging_cfg["log_dir"] = "outputs/logs"
             dense["logging"] = logging_cfg
-            _seed_usr_registry(
+            _note_missing_usr_registry(
                 run_dir=workspace_dir,
                 output=output,
                 console=console,

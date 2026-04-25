@@ -36,10 +36,11 @@ Use this index to pick the next dataset, sync, or handoff step.
 
 | Need | Runbook |
 | --- | --- |
-| Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
-| Keep one checked-in promoter-study record for current-status checks | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
-| Run one read-only command preflight across the checked-in promoter-study surfaces | [promoter-study-preflight.md](promoter-study-preflight.md) |
+| Bootstrap a fresh thread, recover a missing study record, or find the next study-owned handoff | [../../../../../docs/studies/README.md](../../../../../docs/studies/README.md) |
+| Current study status | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
+| Current study preflight | [promoter-study-preflight.md](promoter-study-preflight.md) |
 | Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
+| Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
 
 ## Validation and drills
 
@@ -48,7 +49,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 | Pressure-test schema, sidecar, and overlay fidelity failure paths | [sync-fidelity-drills.md](sync-fidelity-drills.md) |
 | Run one-pass mock batch plus adversarial pressure checks | [workflow-map.md](workflow-map.md#pressure-test-loop-mock-batch--adversarial-schemas) |
 | Run deterministic preflight/run/verify cycle (optional drill toggle) | [workflow-map.md](workflow-map.md#deterministic-harness-cycle) |
-| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) using `run_usr_sync_audit_drill.py` |
+| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) using `uv run usr-sync-audit-drill` |
 
 ## Read order
 
@@ -71,7 +72,7 @@ Use this index to pick the next dataset, sync, or handoff step.
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:
    [sync-fidelity-drills.md](sync-fidelity-drills.md),
-   [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill) using `run_usr_sync_audit_drill.py`
+   [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill) using `uv run usr-sync-audit-drill`
 
 ## Operator contract
 

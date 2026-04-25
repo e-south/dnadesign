@@ -41,17 +41,19 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     assert "reference/yiu_artifacts.md" in docs_readme
     assert "reference/yiu_visual_system.md" in docs_readme
     assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_readme
+    assert "workspaces/demo_monotypic_lexa/runbook.md" in docs_readme
     assert "split_yiu_payload_rendering_v4" not in docs_readme
     assert "yiu init-workspace|validate|render|show" not in docs_readme
 
     assert "Run YIU workflows" in docs_index
-    assert "Reuse Sample outputs in YIU" in docs_index
+    assert "Reuse explicit source-family outputs in YIU" in docs_index
     assert "demos/demo_yiu_workspace.md" in docs_index
     assert "guides/yiu_workflow.md" in docs_index
     assert "reference/yiu_spec.md" in docs_index
     assert "reference/yiu_artifacts.md" in docs_index
     assert "reference/yiu_visual_system.md" in docs_index
     assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_index
+    assert "workspaces/demo_monotypic_lexa/runbook.md" in docs_index
     assert "split_yiu_payload_rendering_v4" not in docs_index
     assert "yiu init-workspace|validate|render|show" not in docs_index
     assert "trace|solve" not in docs_index
@@ -85,6 +87,13 @@ def test_yiu_workflow_routes_to_contract_pages() -> None:
     assert "[Sampling and Analysis](../guides/sampling_and_analysis.md)" in guide
     assert "Ambiguous or missing sources fail fast." in guide
     assert "Cross-tool integrations should not import `dnadesign.baserender.src.*`." in guide
+    assert (
+        "Default `show --json` returns the operator summary plus bundle artifact paths and integrity detail." in guide
+    )
+    assert (
+        "`show --json --verbose` also includes `motif_context`, `optimization_decision`, and `split_row_debug`."
+        in guide
+    )
     assert "Human-readable `--verbose` adds provenance, bundle contract, render/integrity details," in guide
     assert "The remaining published JSON files are machine-facing bundle ledgers or render contracts" in guide
     assert "reference duplex and mismatch-present duplex" in guide

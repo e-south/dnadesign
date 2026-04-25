@@ -51,13 +51,15 @@ dependencies = [
 ]
 
 [project.scripts]
-usr        = "dnadesign.usr.cli:main"
+usr        = "dnadesign.usr:main"
+usr-sync-audit-drill = "dnadesign.usr.ops.sync_audit_drill:main"
 opal       = "dnadesign.opal.cli:main"
 dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
 construct  = "dnadesign.construct.cli:main"
 cluster    = "dnadesign.cluster.cli:main"
+latentdna  = "dnadesign.latentdna.src:main"
 permuter   = "dnadesign.permuter.cli:main"
 baserender = "dnadesign.baserender.cli:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
@@ -124,6 +126,10 @@ where = ["src"]
   "workspaces/*/*.yaml",
   "workspaces/*/inputs/*",
 ]
+"dnadesign.latentdna" = [
+  "workspaces/templates/*/*.yaml",
+  "workspaces/templates/*/*.md",
+]
 "dnadesign.ops" = [
   "providers/*/status.registry.yaml",
   "runbooks/init_presets.yaml",
@@ -138,7 +144,20 @@ where = ["src"]
 addopts = "-ra -q --strict-markers --import-mode=importlib"
 testpaths = ["src/dnadesign"]
 pythonpath = ["src"]
-norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
+# Do not collect tests from generated workspace/runtime artifacts.
+norecursedirs = [
+  "*/archived/*",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "*.egg-info",
+  ".hypothesis",
+  ".pytest_cache",
+  "outputs",
+  "batch_results",
+  "runs",
+]
 markers = [
   "slow: sampling-heavy tests (>10 s)",
   "fimo: tests requiring MEME/FIMO external tooling",

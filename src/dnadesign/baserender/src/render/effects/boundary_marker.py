@@ -43,7 +43,11 @@ def draw_boundary_marker(ax, effect: Effect, record, layout, style, palette, fea
             str(label),
             ha="center",
             va="bottom",
-            fontsize=max(8, style.font_size_label - 1),
+            fontsize=(
+                style.display_font_size()
+                if bool(style.uniform_display_font_size)
+                else max(8, style.font_size_label - 1)
+            ),
             color="#111827",
             zorder=6.1,
         )

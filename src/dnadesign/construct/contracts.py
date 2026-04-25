@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError as PydanticValidationError
 
-from dnadesign.usr.roots import resolve_usr_root_from_config
+from dnadesign.usr import resolve_usr_root_from_config
 
 from .src.errors import ConfigError, ConstructError
 from .src.workspace import load_workspace_registry, resolve_workspace_project_config_artifact_path

@@ -1,8 +1,15 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-03-25
+  last_verified: 2026-04-15
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
+  densegen:
+    workspace: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
+    doc: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md
+    notebook: densegen_run_overview
+    analysis_surface:
+      source: workspace:study_stress_ethanol_cipro
+      contract_ref: densegen.analysis_surface.v2
   execution_surfaces:
     construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
     infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
@@ -14,12 +21,9 @@ study_pipeline:
       anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
       anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
   datasets:
-    densegen_anchor_source: densegen/study_stress_ethanol_cipro
-    merged_anchor_dataset: promoter/stress_ethanol_cipro_anchor_set
-    construct_context_dataset: promoter/stress_ethanol_cipro_construct_contexts
-  construct:
-    workspace_projects:
-      - id: forward_anchor_window
+    densegen_anchor_source: densegen_prom_eth_cip_source
+    merged_anchor_dataset: usr_prom_eth_cip_anchor
+    construct_context_dataset: construct_prom_eth_cip_context
   infer:
     preferred_model_family: evo2_20b
     supported_model_families:
@@ -32,3 +36,17 @@ study_pipeline:
       anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
       full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
       full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
+  latentdna:
+    binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
+    doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+  cluster:
+    doc: src/dnadesign/cluster/docs/workflows/exploratory-clustering.md
+    entry_artifact: context_robustness_summary
+    workspace_example: src/dnadesign/cluster/workspaces/promoter_clusters_v1/config.yaml
+    results_root: n/a
+    state: planned
+  opal:
+    doc: src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md
+    entry_artifact: study-owned feature bundle chosen outside LatentDNA
+    config: n/a
+    state: not_configured

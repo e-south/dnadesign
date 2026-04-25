@@ -32,6 +32,9 @@ It owns:
 
 The plane a command belongs to is not always the same as the plane it observes.
 Example: `ops progress show usr.data-plane.promoter-study-preflight` belongs to the observation plane, but it observes the execution-readiness plane.
+When a route or workflow needs more nuance than the plane enum provides, keep
+`Plane` on the canonical enum and add a separate field such as `Surface role`
+instead of inventing replacement plane names.
 
 ### State semantics
 
@@ -40,6 +43,11 @@ OPS uses one global state lattice:
 - `ok`: required evidence exists and satisfies the contract
 - `attention`: evidence exists, but it shows an unsatisfactory or action-needed posture
 - `missing`: required evidence or artifact is absent or unreadable
+
+For snapshot-style study records, `ok` means the record-backed posture is
+coherent for the current phase. It does not imply that all future phases are
+complete. Planned future outputs and historical upstream targets can remain in
+evidence without escalating the current phase to `attention`.
 
 Severity order is global, not subsystem-local:
 

@@ -55,6 +55,13 @@ def register_default_embedding_layer(namespace: str, layer: str) -> None:
 
 
 def get_default_embedding_layer(model_id: str) -> str | None:
+    if get_namespace_for_model(model_id) == "evo2":
+        from .features.selectors import canonical_selector_for_block, default_intermediate_block_for_model
+
+        try:
+            return canonical_selector_for_block(default_intermediate_block_for_model(model_id))
+        except ConfigError:
+            pass
     namespace = get_namespace_for_model(model_id)
     return _DEFAULT_EMBEDDING_LAYER_BY_NAMESPACE.get(namespace)
 

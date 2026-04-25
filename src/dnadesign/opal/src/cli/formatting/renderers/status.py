@@ -18,7 +18,7 @@ from ...tui import kv_table, list_table, tui_enabled
 from ..core import _dim, kv_block
 
 
-def render_status_human(st: Mapping[str, Any]) -> str:
+def render_status_text(st: Mapping[str, Any]) -> str:
     if tui_enabled():
         from rich.console import Group
 

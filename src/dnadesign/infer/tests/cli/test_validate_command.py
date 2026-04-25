@@ -316,6 +316,44 @@ jobs:
     ) in output
 
 
+def test_validate_usr_registry_includes_feature_bundle_metadata_columns(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "usr_registry_feature_bundle.yaml",
+        """
+model:
+  id: evo2_20b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: promoter_bundle
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root
+    feature_bundle:
+      context:
+        kind: anchor_only
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert "infer__evo2_20b__promoter_bundle__log_likelihood__total:float64" in output
+    assert "infer__evo2_20b__promoter_bundle__output_layer_mean__seq_mean:list<float64>" in output
+    assert "infer__evo2_20b__promoter_bundle__intermediate_embedding__block23_mlp_out__seq_mean:list<float64>" in output
+    assert "infer__evo2_20b__promoter_bundle__metadata__context_id:string" in output
+    assert "infer__evo2_20b__promoter_bundle__metadata__is_wildtype:bool" in output
+    assert "infer__evo2_20b__promoter_bundle__metadata__pooling_modes:list<string>" in output
+    assert "infer__evo2_20b__promoter_bundle__metadata__feature_request_digest:string" in output
+
+
 def test_validate_usr_registry_resolves_relative_ingest_root_from_config(tmp_path: Path) -> None:
     cfg = _write(
         tmp_path / "usr_registry_relative_root.yaml",

@@ -21,7 +21,7 @@ def usr_event_version(
     import_module_fn: Callable[[str], Any],
     notify_config_error_cls: type[Exception],
 ) -> int:
-    module = import_module_fn("dnadesign.usr.event_schema")
+    module = import_module_fn("dnadesign.usr")
     version = getattr(module, "USR_EVENT_VERSION", None)
     if not isinstance(version, int):
         raise notify_config_error_cls("USR event schema is invalid: USR_EVENT_VERSION must be an integer")

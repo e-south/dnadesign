@@ -320,7 +320,7 @@ def _write_usr_config(run_root: Path) -> Path:
               alphabet: dna_4
             usr:
               root: ../usr_root
-              dataset: demo
+              dataset: densegen_demo
               chunk_size: 16
           generation:
             sequence_length: 10
@@ -753,7 +753,7 @@ def test_run_refuses_fresh_when_shared_usr_dataset_already_has_state(tmp_path: P
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
     (usr_root / "registry.yaml").write_text("namespaces: {}\n")
-    dataset_dir = usr_root / "demo"
+    dataset_dir = usr_root / "densegen_demo"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     (dataset_dir / "records.parquet").write_text("seed")
 
@@ -784,7 +784,7 @@ def test_run_refuses_new_run_when_shared_usr_dataset_exists_without_workspace_ou
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
     (usr_root / "registry.yaml").write_text("namespaces: {}\n")
-    dataset_dir = usr_root / "demo"
+    dataset_dir = usr_root / "densegen_demo"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     (dataset_dir / "records.parquet").write_text("seed")
 
@@ -839,7 +839,7 @@ def test_campaign_reset_refuses_when_shared_usr_dataset_has_state(tmp_path: Path
     registry_path = usr_root / "registry.yaml"
     usr_root.mkdir(parents=True, exist_ok=True)
     registry_path.write_text("namespaces: {}\n")
-    dataset_dir = usr_root / "demo"
+    dataset_dir = usr_root / "densegen_demo"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     (dataset_dir / "records.parquet").write_text("seed")
 

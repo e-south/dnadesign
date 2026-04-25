@@ -1,39 +1,103 @@
 ## Cruncher docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-07
+**Last verified:** 2026-04-23
 
-**Last updated by:** cruncher-maintainers on 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
 ### Contents
+- [Workflow families](#workflow-families)
 - [Documentation map](#documentation-map)
+
+### Workflow families
+
+Cruncher currently registers six peer workflow families.
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`.
+
+- `sample` owns fixed-length optimization, artifact-only analysis, and export
+- `cassette` owns cassette validation, design, solve, and show surfaces
+- `yiu` owns payload-centric validation, render, and show surfaces
+- `snapback` owns preserved-site and released-product single-nick foldback surfaces
+- `study` owns study orchestration over explicit source-family runs
+- `portfolio` owns cross-study aggregation and reporting
+
+The `study` and `portfolio` families orchestrate explicit source-family runs.
+The currently shipped examples are sample-backed, but they are still separate
+command families rather than hidden submodes of `sample`.
 
 ### Documentation map
 <!-- docs:map:start -->
-#### Start with a packaged demo
-- [Pairwise Demo](demos/demo_pairwise.md), [MultiTF Demo](demos/demo_multitf.md), and [Project Workspace Demo](demos/project_all_tfs.md). Use these when you want a runnable optimization workspace before changing configs or adding studies.
+#### Optimize Fixed-Length Sequences
+Run the fixed-length optimization lane for pairwise, multitf, and project workspaces.
+- [Pairwise Demo](demos/demo_pairwise.md)
+- [MultiTF Demo](demos/demo_multitf.md)
+- [Project Workspace Demo](demos/project_all_tfs.md)
+- [Intent and Lifecycle](guides/intent_and_lifecycle.md)
+- [Sampling and Analysis](guides/sampling_and_analysis.md)
+- [Ingestion](guides/ingestion.md)
+- [MEME Suite](guides/meme_suite.md)
+- [Artifacts Reference](reference/artifacts.md)
 
-#### Run the fixed-length optimization lane
-- [Sampling and Analysis](guides/sampling_and_analysis.md), [Intent and Lifecycle](guides/intent_and_lifecycle.md), [Ingestion](guides/ingestion.md), [MEME Suite](guides/meme_suite.md), and [Artifacts Reference](reference/artifacts.md). These pages cover the core fetch, lock, parse, sample, analyze flow and the artifacts it emits.
+#### Design and Search Cassettes
+Design or search cassettes, then inspect the emitted artifact surface.
+- [Cassette Workspace Demo](demos/demo_cassette_workspace.md)
+- [Cassette Workflow](guides/cassette_workflow.md)
+- [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
+- [Cassette Spec Reference](reference/cassette_spec.md)
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
+- [Nickase Catalog Reference](reference/nickase_catalog.md)
+- [Cassette Artifacts](reference/cassette_artifacts.md)
 
-#### Design or search cassettes
-- [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), [Cassette Solve Workflow](guides/cassette_solve_workflow.md), [Cassette Spec Reference](reference/cassette_spec.md), [Cassette Solve Spec Reference](reference/cassette_solve_spec.md), [Nickase Catalog Reference](reference/nickase_catalog.md), and [Cassette Artifacts](reference/cassette_artifacts.md). Start with the demo for a runnable workspace, then move to the guide or reference that matches your task.
+#### Payload-Centric YIU Workflows
+Run YIU workflows. Reuse explicit source-family outputs in YIU when the payload comes from a selected hit.
+- [YIU Workspace Demo](demos/demo_yiu_workspace.md)
+- [YIU Workflow](guides/yiu_workflow.md)
+- [YIU Spec Reference](reference/yiu_spec.md)
+- [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
+- [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md)
+- [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 
-#### Run YIU workflows
-- [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md). Use the demo to start from a checked-in workspace, the workflow guide for the operator path, and the references when you need schema or bundle details.
+#### Validate and Search Single-Nick Foldbacks
+- [Snapback Workflow](guides/snapback_workflow.md)
+- [Released-product Snapback Workflow](guides/snapback_released_workflow.md)
+- [Snapback Artifacts](reference/snapback_artifacts.md)
+- [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
+- [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
+- [de033 README](../workspaces/de033/README.md)
+- [de033 runbook](../workspaces/de033/runbook.md)
 
-#### Reuse Sample outputs in YIU
-- [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md). These examples show YIU handoffs that stay beside the upstream Sample workspaces that produced the source payloads.
+#### Run Studies and Portfolio Aggregation
+Run study and portfolio orchestration across explicit source-family outputs.
+- [Studies](guides/studies.md)
+- [Study Length vs Score](guides/study_length_vs_score.md)
+- [Study Diversity vs Score](guides/study_diversity_vs_score.md)
+- [Portfolio Aggregation](guides/portfolio_aggregation.md)
 
-#### Run studies and portfolio aggregation
-- [Studies](guides/studies.md), [Study Length vs Score](guides/study_length_vs_score.md), [Study Diversity vs Score](guides/study_diversity_vs_score.md), and [Portfolio Aggregation](guides/portfolio_aggregation.md). These pages cover parameter sweeps and cross-workspace handoff packages built on optimization outputs.
+#### Troubleshooting and Support
+- [Troubleshooting](guides/troubleshooting.md)
 
-#### Look up tool-wide contracts
-- [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), [Config Reference](reference/config.md), [Glossary](reference/glossary.md), [Runbook Step Reference](reference/runbook_steps.md), and [Doc Conventions](reference/doc_conventions.md). Use these when you need exact command behavior, config fields, artifact paths, or terminology.
+#### Reference contracts
+- [Config Reference](reference/config.md)
+- [CLI Reference](reference/cli.md)
+- [Architecture](reference/architecture.md)
+- [Cassette Spec Reference](reference/cassette_spec.md)
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
+- [Nickase Catalog Reference](reference/nickase_catalog.md)
+- [Cassette Artifacts](reference/cassette_artifacts.md)
+- [Snapback Artifacts](reference/snapback_artifacts.md)
+- [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
+- [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
+- [YIU Spec Reference](reference/yiu_spec.md)
+- [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
+- [Glossary](reference/glossary.md)
+- [Runbook Step Reference](reference/runbook_steps.md)
+- [Doc Conventions](reference/doc_conventions.md)
 
-#### Troubleshoot a failing run
-- [Troubleshooting](guides/troubleshooting.md). Start here when you need the shortest path from a symptom to the relevant lane-specific fix.
-
-#### Maintainer internals
-- [Cruncher Internals Spec](internals/spec.md), [Optimizer Improvements Plan](internals/optimizer_improvements_plan.md), [Dev Journal](dev/journal.md), and [Docs Style Guide](meta/style_guide.md). These pages are maintainer-facing and not part of the main operator path.
+#### Maintainer Internals
+- [Cruncher Internals Spec](internals/spec.md)
+- [Optimizer Improvements Plan](internals/optimizer_improvements_plan.md)
+- [Dev Journal](dev/journal.md)
+- [Docs Style Guide](meta/style_guide.md)
 <!-- docs:map:end -->

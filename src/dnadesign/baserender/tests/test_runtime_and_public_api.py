@@ -200,6 +200,11 @@ def test_public_api_does_not_export_tool_specific_helpers() -> None:
     assert not hasattr(baserender, "render_densegen_record_figure")
 
 
+def test_public_api_exports_palette_for_sibling_tools() -> None:
+    palette = baserender.Palette({})
+    assert palette is not None
+
+
 def test_public_record_grid_render_helper_renders_multi_panel_figure() -> None:
     from dnadesign.baserender import Record, render_record_grid_figure
 
@@ -289,6 +294,7 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     assert "sequence_evidence_map_v1" in adapter_kinds
     assert "topology_cartoon" in renderer_names
     assert "nucleotide_evidence_map" in renderer_names
+    assert "snapback_map" in renderer_names
     adapter_descriptor = baserender.get_adapter_descriptor("yiu_topology_cartoon_v1")
     renderer_descriptor = baserender.get_renderer_descriptor("topology_cartoon")
     assert adapter_descriptor.owner_tool == "yiu"
@@ -297,11 +303,15 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     assert "DNA" in renderer_descriptor.accepted_alphabets
     evidence_adapter_descriptor = baserender.get_adapter_descriptor("sequence_evidence_map_v1")
     evidence_renderer_descriptor = baserender.get_renderer_descriptor("nucleotide_evidence_map")
+    snapback_adapter_descriptor = baserender.get_adapter_descriptor("snapback_visual_v1")
+    snapback_renderer_descriptor = baserender.get_renderer_descriptor("snapback_map")
     assert evidence_adapter_descriptor.owner_tool is None
     assert evidence_adapter_descriptor.required_source_columns == ()
     assert evidence_adapter_descriptor.supported_renderers == ("nucleotide_evidence_map",)
     assert evidence_renderer_descriptor.name == "nucleotide_evidence_map"
     assert "span_link" in evidence_renderer_descriptor.optional_record_features
+    assert snapback_adapter_descriptor.supported_renderers == ("snapback_map",)
+    assert snapback_renderer_descriptor.name == "snapback_map"
 
 
 def test_public_api_rejects_unknown_renderer_lookup() -> None:

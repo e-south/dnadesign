@@ -1,10 +1,10 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-26
+**Last updated by:** cruncher-maintainers on 2026-04-23
 
 ### Contents
 - [Cruncher CLI](#cruncher-cli)
@@ -12,6 +12,7 @@
 - [Quick command map](#quick-command-map)
 - [Core lifecycle commands](#core-lifecycle-commands)
 - [Cassette workflows](#cassette-workflows)
+- [Snapback workflows](#snapback-workflows)
 - [YIU workflows](#yiu-workflows)
 - [Study workflows](#study-workflows)
 - [Portfolio workflows](#portfolio-workflows)
@@ -20,13 +21,18 @@
 
 This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow family.
 
-> **Workflow families:** Cruncher currently has three first-class command families.
+> **Workflow families:** Cruncher currently registers six peer command families.
 >
-> - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
+> - `fetch|lock|parse|sample|analyze|export` cover the `sample` family. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
+> - `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|released-solve|show|released-show` cover single-nick foldback workspaces. This lane uses explicit geometry contracts, bounded deterministic search, a strict QA triptych publication surface for preserved-site explicit bundles, and a separate released-product precursor contract.
 > - `yiu init-workspace|validate|render|show` cover payload-centric YIU workflows. This lane uses the strict `split_yiu_payload_rendering_v4` contract, deterministic exhaustive optimization over a 4 nt junction, three published payload views, and one bundle-local `visual_inventory.json`.
+> - `study run|summarize|show` cover the `study` family. This lane orchestrates aggregate sweeps over workspace outputs rather than defining a new design topology.
+> - `portfolio run|show` cover the `portfolio` family. This lane aggregates study-ready workspaces into cross-study tables and plots.
 >
-> Choose the command family by the workspace contract you need. `cassette` and `yiu` do not fall back to `sample`, and `sample` runs do not reuse cassette or YIU artifacts.
+> Choose the command family by the workspace contract you need. `cassette`, `snapback`, `yiu`, `study`, and `portfolio` do not fall back to `sample`, and `sample` runs do not reuse their artifacts.
+>
+> For Snapback specifically, `cli/commands/snapback.py` is the registry surface only. Subcommand handlers are split across `snapback_workspace.py`, `snapback_explicit.py`, `snapback_released.py`, and `snapback_show.py`, while typed request construction lives in `app/snapback_cli_requests.py`.
 
 #### Workspace discovery and config resolution
 
@@ -56,6 +62,7 @@ cruncher study list
 * **Optimize fixed-length sequences** → `sample`
 * **Analyze optimization runs** → `analyze`, `notebook`
 * **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
+* **Validate and search single-nick foldbacks** → `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|released-solve|show|released-show`
 * **Render split YIU payloads** → `yiu init-workspace|validate|render|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
@@ -521,6 +528,261 @@ Notes:
 
 * `show` remains an explicit-lane inspection command; solve runs are inspected via the solve report bundle
 * `show` does not read from the workspace `run_index.json`
+
+---
+
+#### Snapback workflows
+
+The snapback workflow is separate from `sample`, `cassette`, and `yiu`. It expects one explicit preserved-site spec at
+`<workspace>/configs/snapback/<name>.snapback.yaml`, one solve spec at
+`<workspace>/configs/snapback/<name>.snapback.solve.yaml`, or one released-product explicit spec at
+`<workspace>/configs/snapback/<name>.released.snapback.yaml`, plus local or preset-backed nickase catalogs and, for the released-product lane, release-enzyme catalogs.
+
+Current scope:
+
+* deterministic validation of one authored single-nick foldback design
+* bounded co-design search over nick boundary, retained homology length, cap extension, motif-compatible site edits, and foldback-arm choices
+* target-first catalog search for shortest preserved-site hits at an exact requested geometry
+* target-first paired nickase plus release-enzyme search in exposed-bottom geometry space
+* stable explicit, solve, and released-product bundles under `outputs/design/`, `outputs/solve/`, `outputs/released_solve/`, and `outputs/released_design/`
+* strict QA-triptych publication plus fail-fast `show` integrity checks
+
+Current non-scope:
+
+* no thermodynamic folding prediction
+* no ligation-yield or retron/processivity scoring
+* no fallback to `sample`, `cassette`, or `yiu`
+
+Deep contracts live in:
+
+* [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md)
+* [`../guides/snapback_released_workflow.md`](../guides/snapback_released_workflow.md)
+* [`snapback_artifacts.md`](snapback_artifacts.md)
+* [`released_snapback_artifacts.md`](released_snapback_artifacts.md)
+* [`release_enzyme_catalogs.md`](release_enzyme_catalogs.md)
+* [`architecture.md`](architecture.md)
+* [`../../workspaces/de033/README.md`](../../workspaces/de033/README.md)
+* [`../../workspaces/de033/runbook.md`](../../workspaces/de033/runbook.md)
+
+#### `cruncher snapback init-workspace`
+
+Scaffold a snapback-specific workspace with one explicit Bpu10I example, one broader catalog-scan solve example, one local nickase catalog, and one machine runbook.
+
+Examples:
+
+* `uv run cruncher snapback init-workspace snapback_lab`
+* `uv run cruncher snapback init-workspace --output ./snapback_lab --force-overwrite`
+
+Outputs:
+
+* writes `README.md`
+* writes `runbook.md`
+* writes `configs/runbook.yaml`
+* writes `configs/snapback/demo_teto_bpu10i_cap.snapback.yaml`
+* writes `configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml`
+* writes `inputs/nickases/local.nickases.yaml`
+
+Notes:
+
+* this is a snapback-specific scaffold, not a fixed-length optimization workspace
+* the scaffold is designed around stable `outputs/design/` and `outputs/solve/` roots
+* the explicit lane stays pinned to the local `Nt.Bpu10I` overlay, while the solve lane searches built-in `neb_nicking_v1` plus `thermo_nicking_v1`
+* use the shipped runbook for the shortest validate -> design -> show -> solve -> show path
+
+#### `cruncher snapback validate`
+
+Validate one explicit snapback spec and print a deterministic report.
+
+Examples:
+
+* `uv run cruncher snapback validate --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml`
+* `uv run cruncher snapback validate --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml --json`
+
+Notes:
+
+* `--spec` must point to a `.snapback.yaml` file under a workspace `configs/snapback/` tree
+* the explicit lane requires one intended nick inside the requested boundary and duplex windows
+* the effective cap loop is fixed at `3 nt`
+* `--json` prints machine-readable JSON with no Rich formatting
+
+#### `cruncher snapback design`
+
+Validate one explicit snapback spec and write the explicit bundle.
+
+Examples:
+
+* `uv run cruncher snapback design --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml`
+* `uv run cruncher snapback design --spec configs/snapback/demo_teto_bpu10i_cap.snapback.yaml --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/design/`
+* writes `meta/snapback_manifest.json`, `meta/snapback_status.json`, and `analysis/reports/report.{json,md}`
+* writes `export/table__candidates.csv`
+* writes `analysis/views/` QA views and `snapback_visual_v1` contracts when the planner materializes a truthful candidate
+* writes `baserender_jobs/snapback_triptych.job.yaml` when `output.emit_baserender_jobs: true`
+
+Notes:
+
+* unsatisfied explicit specs still write a bundle so the issue report is preserved
+* `show` is the supported way to inspect that bundle later
+* snapback bundles do not register in workspace `run_index.json`
+
+#### `cruncher snapback solve`
+
+Search for ranked single-nick foldback hits and optionally materialize the top hits as explicit bundles.
+
+Examples:
+
+* `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml`
+* `uv run cruncher snapback solve --spec configs/snapback/demo_teto_catalog_scan.snapback.solve.yaml --json`
+
+Outputs:
+
+* writes under `<workspace>/outputs/solve/`
+* writes `analysis/reports/solve_report.{json,md}`
+* writes `export/table__hits.csv` and `export/table__frontier.csv`
+* writes materialized explicit top-hit bundles under `analysis/materialized_hits/hit_<rank>/`
+
+Notes:
+
+* solve is bounded by `search.max_search_nodes` and `search.max_enumerated_candidates`
+* returned status can be `satisfied`, `no_hits`, or `search_truncated`
+* the live ranking is deterministic and geometry-first; see the snapback workflow guide for the current order
+* materialized hits round-trip through the explicit `single_nick_snapback_v2` contract
+
+#### `cruncher snapback target-search`
+
+Search the resolved nickase catalog for the shortest preserved-site hit at an exact snapback geometry without assuming an authored top strand.
+
+Examples:
+
+* `uv run cruncher snapback target-search --json`
+* `uv run cruncher snapback target-search --nick-boundary 0 --paired-bp 3 --cap-nt 3`
+* `uv run cruncher snapback target-search --preset neb_nicking_v1 --additional-preset thermo_nicking_v1 --json`
+
+Outputs:
+
+* prints one typed report to stdout
+* reports exact hits first when any exist
+* reports nearest preserved-site later-boundary hits when no exact boundary hit exists for an entry/orientation
+* includes a feasibility table for every evaluated target-strand placement
+
+Notes:
+
+* this mode is target-first and separate from the fixed-input `solve` lane
+* the effective cap loop is still fixed at `3 nt`
+* recognition sites are preserved exactly in this mode; the search does not mutate the RE site
+* when no catalog source is provided, the command defaults to `neb_nicking_v1` plus `thermo_nicking_v1`
+
+#### `cruncher snapback released-design`
+
+Validate one explicit two-stage precursor spec and write the released-product bundle.
+
+Examples:
+
+* `uv run cruncher snapback released-design --spec src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml`
+* `uv run cruncher snapback released-design --spec src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/released_design/`
+* writes `meta/released_snapback_manifest.json` and `meta/released_snapback_status.json`
+* writes `analysis/report.json`, `analysis/released_product_projection.json`, `analysis/pre_nick_site.json`, and `analysis/release_site.json`
+* writes `export/released_design_summary.csv` with route-policy, retained-partner fragment, and generic active-product columns
+
+Notes:
+
+* explicit released-design defaults to `final_geometry_source=exposed_bottom_strand` with `route_family=bottom_active_from_top_nick`, not the full precursor
+* only `nick_then_release` and `retained_side=upstream` are supported in v1
+* the release site and nickase site may be lost post-release when the explicit spec allows that loss
+* by default, explicit released-product specs reject nickases carrying `FREQUENT_CUTTER`
+
+#### `cruncher snapback released-target-search`
+
+Search paired nickase plus release-enzyme combinations for the default exposed-bottom released-product geometry without assuming an authored precursor.
+
+Examples:
+
+* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --json`
+* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --nick-boundary 0 --paired-bp 3 --cap-nt 3`
+
+Outputs:
+
+* prints one typed report to stdout
+* reports exact hits and near hits separately
+* includes blocker counts plus pre-truncation and post-truncation hit counts
+
+Notes:
+
+* this mode is target-first and separate from preserved-site `target-search`
+* the default lane evaluates `final_geometry_source=exposed_bottom_strand` via `route_family=bottom_active_from_top_nick`
+* broader retained-active audits use `route_family=top_active_from_bottom_nick` plus `final_geometry_source=retained_active_strand`
+* `--allow-top-active-routes` plus `--allow-precut-footprint-outside-active-product` opt into broader retained-active audits without changing the study default lane
+* the command requires at least one explicit nickase source and one explicit release-enzyme source
+* CLI parsing delegates typed request construction to `app/snapback_cli_requests.py`; the command module does not build released search models inline
+* demo-only catalog entries are excluded unless `--allow-demo-hits` is passed
+* nickases carrying `FREQUENT_CUTTER` are excluded unless `--allow-frequent-cutter-nickases` is passed
+
+#### `cruncher snapback released-solve`
+
+Search the released-product dual-enzyme catalog space, materialize ranked hits, and optionally render one plot per hit.
+
+Examples:
+
+* `uv run cruncher snapback released-solve --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --json`
+* `uv run cruncher snapback released-solve --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --run-dir outputs/released_solve --materialize-top-k 8 --render-format pdf --emit-renders --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/released_solve/`
+* writes `analysis/solve_report.json` and `export/table__hits.csv`
+* writes materialized released-product hit bundles under `analysis/materialized_hits/hit_<rank>/`
+* writes per-hit `plots/released_hit_triptych.<fmt>` when `--emit-renders` is enabled
+* writes route-policy, retained-partner fragment, and generic active-product columns in `table__hits.csv`
+
+Notes:
+
+* `released-solve` reuses the full released-target-search cross-product and does not stop at the first exact hit
+* exact hits are materialized first when any exist; otherwise the top ranked near hits are materialized
+* the command requires at least one explicit nickase source and one explicit release-enzyme source
+* `--max-results` is automatically raised to at least `--materialize-top-k`
+* CLI parsing delegates typed request and output construction to `app/snapback_cli_requests.py`; the command module stays on the UX side of the boundary
+* the solve plot keeps `Nick / origin` at the left boundary and is rendered from the released-product projection payloads
+* default solved hits stay on `route_family=bottom_active_from_top_nick`; opt-in retained-active audits can materialize `route_family=top_active_from_bottom_nick`
+* `--allow-top-active-routes` and `--allow-precut-footprint-outside-active-product` mirror the broader retained-active audit path from `released-target-search`
+* demo-only catalog entries are excluded unless `--allow-demo-hits` is passed
+* nickases carrying `FREQUENT_CUTTER` are excluded unless `--allow-frequent-cutter-nickases` is passed
+
+#### `cruncher snapback released-show`
+
+Read one released-product bundle and print a path-oriented summary with drift checks.
+
+Examples:
+
+* `uv run cruncher snapback released-show --run outputs/released_design`
+* `uv run cruncher snapback released-show --run outputs/released_design --json`
+
+Notes:
+
+* `released-show` accepts `released-design` explicit bundle roots only
+* the command fails fast on manifest/status drift and projection/report inconsistency
+
+#### `cruncher snapback show`
+
+Read one snapback explicit or solve bundle and print its key artifact paths.
+
+Examples:
+
+* `uv run cruncher snapback show --run outputs/design`
+* `uv run cruncher snapback show --run outputs/solve`
+* `uv run cruncher snapback show --run outputs/solve --json`
+
+Notes:
+
+* `show` accepts explicit or solve bundle roots only
+* the command fails fast on manifest/status drift, visual drift, and materialized-hit drift
+* `show` is an integrity check, not a best-effort artifact browser
 
 ---
 

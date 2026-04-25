@@ -15,11 +15,13 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.sources.base import resolve_path
-from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.config import OutputUSRConfig, load_config
 from dnadesign.densegen.src.config.base import LATEST_SCHEMA_VERSION
+from dnadesign.densegen.src.viz.plot_inventory import notebook_visible_plot_ids
 
 PACKAGED_WORKSPACE_IDS = (
     "demo_tfbs_baseline",
@@ -79,12 +81,12 @@ def test_demo_artifacts_present() -> None:
     assert not missing, f"Missing demo artifacts: {missing}"
 
 
-def test_demo_sampling_baseline_default_plots_cover_core_diagnostics() -> None:
+def test_demo_sampling_baseline_default_plots_cover_full_notebook_surface() -> None:
     cfg_path = _demo_config_path("demo_sampling_baseline")
     cfg = load_config(cfg_path)
     plots = cfg.root.plots
     assert plots is not None
-    assert list(plots.default or []) == ["stage_a_summary", "placement_map", "run_health", "tfbs_usage"]
+    assert list(plots.default or []) == notebook_visible_plot_ids()
 
 
 def test_demo_sampling_baseline_uses_background_and_plan_specific_sigma70_spacers() -> None:
@@ -152,11 +154,16 @@ def test_demo_sampling_baseline_uses_both_outputs_and_cbc_solver() -> None:
     assert output.parquet.path == "outputs/tables/records.parquet"
     assert output.usr is not None
     assert output.usr.root == "../../../usr/datasets"
-    assert output.usr.dataset == "densegen/demo_sampling_baseline"
+    assert output.usr.dataset == "densegen_demo_sampling_baseline"
     assert solver.backend == "CBC"
     assert solver.threads is None
     assert plots is not None
     assert plots.source == "usr"
+
+
+def test_densegen_usr_output_dataset_rejects_nested_paths() -> None:
+    with pytest.raises(ValueError, match="flat owner-first id"):
+        OutputUSRConfig(root="../../../usr/datasets", dataset="densegen/demo_sampling_baseline")
 
 
 def test_tfbs_baseline_demo_config_exists_and_loads() -> None:
@@ -331,6 +338,11 @@ def test_stress_workspace_uses_four_equal_base_plan_quotas() -> None:
 
 
 def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
+    explicit_shared_dataset_ids = {
+        "demo_sampling_baseline": "densegen_demo_sampling_baseline",
+        "study_constitutive_sigma_panel": "densegen_study_constitutive_sigma_panel",
+        "study_stress_ethanol_cipro": "densegen_prom_eth_cip_source",
+    }
     for workspace_id in (
         "demo_tfbs_baseline",
         "demo_sampling_baseline",
@@ -342,8 +354,10 @@ def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
         assert cfg.root.densegen.run.id == workspace_id
         usr_cfg = cfg.root.densegen.output.usr
         if usr_cfg is not None:
-            assert usr_cfg.dataset.endswith(workspace_id)
-            assert usr_cfg.dataset.startswith("densegen/")
+            expected_dataset = explicit_shared_dataset_ids.get(workspace_id)
+            assert expected_dataset is not None
+            assert usr_cfg.dataset == expected_dataset
+            assert "/" not in usr_cfg.dataset
 
 
 def test_packaged_workspace_configs_exclude_stale_legacy_namespaces() -> None:
@@ -511,12 +525,13 @@ def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None
     assert runtime.max_consecutive_no_progress_resamples >= 1
 
 
-def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() -> None:
+def test_packaged_workspace_plot_defaults_cover_full_notebook_surface() -> None:
+    expected_notebook_surface = set(notebook_visible_plot_ids())
     expected_defaults = {
-        "demo_tfbs_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "demo_sampling_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "study_constitutive_sigma_panel": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "study_stress_ethanol_cipro": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
+        "demo_tfbs_baseline": expected_notebook_surface,
+        "demo_sampling_baseline": expected_notebook_surface,
+        "study_constitutive_sigma_panel": expected_notebook_surface,
+        "study_stress_ethanol_cipro": expected_notebook_surface,
     }
     for workspace_id, expected in expected_defaults.items():
         cfg = load_config(_demo_config_path(workspace_id))
@@ -525,17 +540,31 @@ def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() ->
         assert set(plots.default) == expected
 
 
+def test_study_stress_ethanol_cipro_retains_opt_in_video_configuration() -> None:
+    cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
+    plots = cfg.root.plots
+    assert plots is not None
+    assert plots.video.enabled is True
+
+
 def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
     for workspace_id in ("study_constitutive_sigma_panel", "study_stress_ethanol_cipro"):
         cfg = load_config(_demo_config_path(workspace_id))
         plots = cfg.root.plots
         assert plots is not None
-        placement_opts = dict((plots.options or {}).get("placement_map") or {})
-        tfbs_opts = dict((plots.options or {}).get("tfbs_usage") or {})
+        placement_opts = dict((plots.options or {}).get("placement_occupancy_map") or {})
+        tfbs_opts = dict((plots.options or {}).get("tfbs_concentration_profile") or {})
         assert placement_opts.get("scope") == "auto"
         assert int(placement_opts.get("max_plans", 0)) == 12
         assert tfbs_opts.get("scope") == "auto"
         assert int(tfbs_opts.get("max_plans", 0)) == 12
+
+
+def test_stress_study_defaults_match_full_notebook_surface() -> None:
+    stress_cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
+    stress_plots = stress_cfg.root.plots
+    assert stress_plots is not None
+    assert stress_plots.default == notebook_visible_plot_ids()
 
 
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
@@ -544,8 +573,9 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     solver = cfg.root.densegen.solver
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
-    assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
-    assert output.usr.root == "../../../usr/datasets"
+    assert output.usr.dataset == "densegen_prom_eth_cip_source"
+    assert output.usr.root == "src/dnadesign/usr/datasets"
+    assert output.usr.root_scope == "git_common_repo_root"
     assert float(output.usr.health_event_interval_seconds) > 0
     assert solver.backend == "GUROBI"
     assert solver.strategy == "iterate"

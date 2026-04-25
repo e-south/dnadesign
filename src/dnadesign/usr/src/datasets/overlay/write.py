@@ -1,0 +1,313 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/src/datasets/overlay/write.py
+
+Overlay write helpers for compact and parts-based overlay mutations.
+
+Module Author(s): OpenAI Codex
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import os
+import uuid
+from typing import Any, Mapping, Optional
+
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from ...contracts import NamespaceError, SchemaError
+from ...overlays import overlay_dir_path, overlay_path, with_overlay_metadata
+from ...overlays.support.digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
+from ...registry import namespace_contract_hash_for_entries
+from ...runtime import connect_duckdb_utc
+from ...storage.locking import dataset_write_lock
+from ...storage.parquet import PARQUET_COMPRESSION, now_utc
+from .attach import _attach_frame_dataset
+from .policy import (
+    SUPPORTED_OVERLAY_KEYS,
+    coerce_null_overlay_columns_to_registry_schema,
+    ensure_overlay_columns_allowed,
+    validate_overlay_join_key,
+    validate_overlay_target,
+)
+
+
+def _merge_write_overlay_part_event_args(
+    *,
+    namespace: str,
+    key: str,
+    columns: list[str],
+    rows_incoming: int,
+    rows_written: int,
+    rows_missing: int,
+    allow_missing: bool,
+    event_args: Mapping[str, object] | None,
+) -> dict[str, object]:
+    args: dict[str, object] = {
+        "namespace": namespace,
+        "key": key,
+        "columns": list(columns),
+        "rows_incoming": rows_incoming,
+        "rows_matched": rows_written,
+        "rows_written": rows_written,
+        "rows_missing": rows_missing,
+        "allow_missing": allow_missing,
+    }
+    if event_args is None:
+        return args
+    for event_key, event_value in event_args.items():
+        if event_key in args:
+            raise SchemaError(f"write_overlay_part event_args cannot override reserved key '{event_key}'.")
+        args[event_key] = event_value
+    return args
+
+
+def write_overlay_dataset(
+    *,
+    dataset: Any,
+    namespace: str,
+    table_or_batches: Any,
+    key: str = "id",
+    overwrite: bool = False,
+    allow_missing: bool = False,
+    note: str = "",
+    actor: Optional[dict] = None,
+    namespace_pattern: Any,
+    reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
+) -> int:
+    """Attach a derived overlay from an Arrow/Pandas table or batches."""
+    if isinstance(table_or_batches, pa.Table):
+        tbl = table_or_batches
+    elif isinstance(table_or_batches, pd.DataFrame):
+        tbl = pa.Table.from_pandas(table_or_batches, preserve_index=False)
+    else:
+        tbl = pa.Table.from_batches(list(table_or_batches))
+
+    dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
+    if key not in tbl.schema.names:
+        raise SchemaError(f"Overlay table missing key column '{key}'.")
+    attach_cols = [c for c in tbl.schema.names if c != key]
+    if not attach_cols:
+        return 0
+    validate_overlay_target(
+        dataset=dataset,
+        namespace=namespace,
+        key=key,
+        namespace_pattern=namespace_pattern,
+        reserved_namespaces=reserved_namespaces,
+    )
+    return _attach_frame_dataset(
+        dataset=dataset,
+        incoming=tbl.to_pandas(),
+        namespace=namespace,
+        key=key,
+        key_col=key,
+        columns=attach_cols,
+        allow_overwrite=overwrite,
+        allow_missing=allow_missing,
+        parse_json=False,
+        note=note,
+        actor=actor,
+        reserved_namespaces=reserved_namespaces,
+        write_lock=write_lock,
+    )
+
+
+def write_overlay_part_dataset(
+    *,
+    dataset: Any,
+    namespace: str,
+    table_or_batches: Any,
+    key: str = "id",
+    key_col: Optional[str] = None,
+    allow_missing: bool = False,
+    actor: Optional[dict] = None,
+    event_args: Mapping[str, object] | None = None,
+    reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
+) -> int:
+    """Append an overlay part file under _derived/<namespace>/part-*.parquet."""
+    dataset._require_exists()
+    if namespace in reserved_namespaces:
+        raise NamespaceError(f"Namespace '{namespace}' is reserved.")
+    key = validate_overlay_join_key(key or "", context_label="overlay key")
+    key_col = str(key_col or key)
+
+    file_path = overlay_path(dataset.dir, namespace)
+    dir_path = overlay_dir_path(dataset.dir, namespace)
+    if file_path.exists() and dir_path.exists():
+        raise SchemaError(
+            f"Overlay for namespace '{namespace}' has both file and directory sources. "
+            "Resolve by compacting or removing one source."
+        )
+
+    if isinstance(table_or_batches, pa.Table):
+        tbl = table_or_batches
+    elif isinstance(table_or_batches, pd.DataFrame):
+        tbl = pa.Table.from_pandas(table_or_batches, preserve_index=False)
+    else:
+        batches = list(table_or_batches)
+        if not batches:
+            return 0
+        tbl = pa.Table.from_batches(batches)
+
+    if key_col not in tbl.schema.names:
+        raise SchemaError(f"Overlay table missing key column '{key_col}'.")
+    if key_col != key:
+        if key in tbl.schema.names:
+            raise SchemaError(f"Overlay table already contains a '{key}' column; cannot rename '{key_col}'.")
+        cols = [key if c == key_col else c for c in tbl.schema.names]
+        tbl = tbl.rename_columns(cols)
+
+    attach_cols = [c for c in tbl.schema.names if c != key]
+    if not attach_cols:
+        return 0
+
+    ensure_overlay_columns_allowed(attach_cols)
+
+    tbl = coerce_null_overlay_columns_to_registry_schema(dataset=dataset, namespace=namespace, tbl=tbl, key=key)
+    dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
+
+    def _write_part() -> int:
+        def _sql_ident(name: str) -> str:
+            escaped = str(name).replace('"', '""')
+            return f'"{escaped}"'
+
+        def _key_expr(expr: str, *, key_name: str) -> str:
+            if key_name == "sequence_ci":
+                return f"NULLIF(UPPER(TRIM(CAST({expr} AS VARCHAR))), '')"
+            return f"NULLIF(TRIM(CAST({expr} AS VARCHAR)), '')"
+
+        con = connect_duckdb_utc(
+            missing_dependency_message="write_overlay_part requires duckdb (install duckdb).",
+            error_context="write_overlay_part",
+        )
+        try:
+            base_sql = str(dataset.records_path).replace("'", "''")
+            con.execute(f"CREATE TEMP VIEW base AS SELECT * FROM read_parquet('{base_sql}')")
+            con.register("incoming", tbl)
+
+            incoming_key_expr = _key_expr(f"i.{_sql_ident(key)}", key_name=key)
+
+            dup_incoming = int(
+                con.execute(
+                    "SELECT COUNT(*) FROM "
+                    f"(SELECT {incoming_key_expr} AS k FROM incoming i "
+                    "GROUP BY k HAVING COUNT(*) > 1)"
+                ).fetchone()[0]
+            )
+            if dup_incoming:
+                raise SchemaError(f"Overlay part has duplicate keys for '{key}'.")
+
+            if key in SUPPORTED_OVERLAY_KEYS - {"id"}:
+                bt_count = int(con.execute("SELECT COUNT(DISTINCT bio_type) FROM base").fetchone()[0])
+                if bt_count > 1:
+                    raise SchemaError("Attach by sequence requires dataset with a single bio_type.")
+                if key == "sequence_ci":
+                    bad = int(con.execute("SELECT COUNT(*) FROM base WHERE alphabet != 'dna_4'").fetchone()[0])
+                    if bad:
+                        raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
+                base_key_expr = _key_expr(f"b.{_sql_ident('sequence')}", key_name=key)
+                dup_base = int(
+                    con.execute(
+                        f"SELECT COUNT(*) FROM (SELECT {base_key_expr} AS k FROM base b GROUP BY k HAVING COUNT(*) > 1)"
+                    ).fetchone()[0]
+                )
+                if dup_base:
+                    raise SchemaError(
+                        f"Attach key requires unique base keys; duplicate base keys detected for '{key}'."
+                    )
+            else:
+                base_key_expr = _key_expr(f"b.{_sql_ident('id')}", key_name=key)
+
+            missing = int(
+                con.execute(
+                    "SELECT COUNT(*) FROM incoming i "
+                    f"LEFT JOIN base b ON {base_key_expr} = {incoming_key_expr} "
+                    "WHERE b.id IS NULL"
+                ).fetchone()[0]
+            )
+            if missing and not allow_missing:
+                raise SchemaError(f"{missing} row(s) reference keys not present in the dataset.")
+
+            if allow_missing:
+                tbl_out = con.execute(
+                    f"SELECT i.* FROM incoming i JOIN base b ON {base_key_expr} = {incoming_key_expr}"
+                ).fetch_arrow_table()
+            else:
+                tbl_out = tbl
+        finally:
+            con.close()
+
+        rows_incoming = int(tbl.num_rows)
+        rows_written = int(tbl_out.num_rows)
+        rows_missing = rows_incoming - rows_written
+        if rows_written == 0:
+            return 0
+
+        registry = dataset._registry(required=True)
+        reg_hash = dataset._registry_hash(required=True)
+        namespace_hash = namespace_contract_hash_for_entries(registry, namespace)
+        tbl_out = with_overlay_metadata(
+            tbl_out,
+            namespace=namespace,
+            key=key,
+            created_at=now_utc(),
+            registry_hash=reg_hash,
+            namespace_contract_hash=namespace_hash,
+        )
+
+        if file_path.exists():
+            dir_path.mkdir(parents=True, exist_ok=True)
+            stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+            promoted_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
+            os.replace(file_path, promoted_path)
+            new_parts = [promoted_path]
+        else:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            new_parts = []
+        stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+        part_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
+        tmp_path = part_path.with_suffix(".parquet.tmp")
+        try:
+            pq.write_table(tbl_out, tmp_path, compression=PARQUET_COMPRESSION)
+            os.replace(tmp_path, part_path)
+            new_parts.append(part_path)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
+        ledger_path = overlay_digest_ledger_path(dir_path)
+        if ledger_path is not None and ledger_path.is_file():
+            update_overlay_digest_ledger(dir_path, new_parts=new_parts)
+
+        dataset._record_event(
+            "write_overlay_part",
+            args=_merge_write_overlay_part_event_args(
+                namespace=namespace,
+                key=key,
+                columns=attach_cols,
+                rows_incoming=rows_incoming,
+                rows_written=rows_written,
+                rows_missing=rows_missing,
+                allow_missing=allow_missing,
+                event_args=event_args,
+            ),
+            metrics={
+                "rows_incoming": rows_incoming,
+                "rows_written": rows_written,
+                "rows_missing": rows_missing,
+            },
+            artifacts={"overlay": {"namespace": namespace, "key": key}},
+            target_path=part_path,
+            actor=actor,
+        )
+        return rows_written
+
+    with write_lock(dataset.dir):
+        dataset._auto_freeze_registry()
+        return _write_part()

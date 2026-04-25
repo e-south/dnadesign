@@ -10,7 +10,7 @@
 - [Assemble multiple producer datasets into one shared dataset](operations/multi-source-shared-dataset-assembly.md): shared USR-backed merge/carry path before construct and infer.
 - [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-shared-dataset-runbook.md): one construct -> USR -> infer handoff.
 - [Understand the promoter-study Evo2 path before choosing a concrete branch](operations/promoter-evo2-journey.md): linked route from DenseGen/manual/wildtype inputs through optional construct contexts, infer Evo2 bundles, Notify watcher validation, and Cluster/OPAL branches.
-- [Keep one promoter-study status record for current-status checks](operations/promoter-study-status-contract.md): required manifest, affiliated-dataset registry, checked-in `docs/studies/` location, status note template, and refresh commands for one real study.
+- [Keep one promoter-study status record for current-status checks](operations/promoter-study-status-contract.md): required manifest, affiliated-dataset registry, checked-in `docs/studies/` location, status note template, refresh commands for one real study, and the `routes.md` owner handoff after the snapshot answer.
 - [Build an infer-annotated promoter-study feature dataset, then choose cluster or prepare OPAL](operations/promoter-characterization-feature-matrix.md): shared downstream branch once DenseGen/manual/construct inputs should all become one feature dataset and one explicit `X` column can be selected.
 
 ### Read order

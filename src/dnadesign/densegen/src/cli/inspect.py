@@ -12,12 +12,14 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 import typer
 
+from ..adapters.sources.pwm_artifact import load_artifact
 from ..config import (
     load_config,
     resolve_outputs_scoped_path,
@@ -29,10 +31,12 @@ from ..core.artifacts.pool import pool_status_by_input
 from ..core.event_log import load_events
 from ..core.motif_labels import input_motifs
 from ..core.pipeline import resolve_plan
+from ..core.pipeline.attempts import _load_attempts_snapshot
 from ..core.reporting import collect_report_data
 from ..core.run_manifest import load_run_manifest
 from ..core.run_paths import run_manifest_path, run_state_path
 from ..core.run_state import load_run_state
+from ..viz.motif_logo import render_pwm_logo
 from .context import CliContext
 from .render import stage_a_plan_table
 from .sampling import stage_a_plan_rows
@@ -70,7 +74,12 @@ def _resolve_usr_events_log_path(loaded, *, context: CliContext) -> Path:
     usr_cfg = out_cfg.usr
     if "usr" not in out_cfg.targets or usr_cfg is None:
         raise ValueError("output.targets must include 'usr' with output.usr configured.")
-    usr_root = resolve_usr_root_scoped_path(loaded.path, usr_cfg.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        loaded.path,
+        usr_cfg.root,
+        label="output.usr.root",
+        scope=usr_cfg.root_scope,
+    )
     dataset = str(usr_cfg.dataset).strip()
     if not dataset:
         raise ValueError("output.usr.dataset must be a non-empty string.")
@@ -91,11 +100,9 @@ def _print_failure_outcomes(
     context: CliContext,
     run_root: Path,
 ) -> None:
-    attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
-    if not attempts_path.exists():
-        return
+    tables_root = run_root / "outputs" / "tables"
     try:
-        attempts_df = pd.read_parquet(attempts_path, columns=["plan_name", "status", "reason"])
+        attempts_df = _load_attempts_snapshot(tables_root, columns=["plan_name", "status", "reason"])
     except Exception:
         return
     if attempts_df.empty:
@@ -198,8 +205,122 @@ def _print_inputs_summary(
     context.console.print(f"Tip: run `{rebuild_cmd}` to rebuild pools.")
 
 
+def _is_relative_to(path: Path, base: Path) -> bool:
+    try:
+        path.resolve().relative_to(base.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _resolve_motif_logo_out_dir(
+    loaded,
+    *,
+    out_dir: Path | None,
+) -> Path:
+    run_root = resolve_run_root(loaded.path, loaded.root.densegen.run.root)
+    inputs_root = run_root / "inputs"
+    outputs_root = run_root / "outputs"
+    if out_dir is None:
+        return resolve_outputs_scoped_path(
+            loaded.path,
+            run_root,
+            "outputs/plots/motif_logos",
+            label="motif logo output directory",
+        )
+    resolved = resolve_relative_path(loaded.path, out_dir)
+    if _is_relative_to(resolved, inputs_root):
+        raise ValueError(f"motif logo output directory must not be under inputs/ ({inputs_root}).")
+    if _is_relative_to(resolved, run_root) and not _is_relative_to(resolved, outputs_root):
+        raise ValueError(
+            f"motif logo output directory must stay within outputs/ when writing into the workspace ({outputs_root})."
+        )
+    return resolved
+
+
+def _pwm_artifact_inputs(loaded, *, selected_inputs: list[str] | None = None):
+    candidates = [inp for inp in loaded.root.densegen.inputs if str(inp.type) == "pwm_artifact"]
+    if not candidates:
+        raise ValueError("Config contains no pwm_artifact inputs.")
+    if not selected_inputs:
+        return candidates
+    by_name = {str(inp.name): inp for inp in candidates}
+    missing = [name for name in selected_inputs if name not in by_name]
+    if missing:
+        available = ", ".join(sorted(by_name))
+        raise ValueError("Unknown pwm_artifact input(s): " + ", ".join(sorted(missing)) + f". Available: {available}")
+    return [by_name[name] for name in selected_inputs]
+
+
+def _prepare_logo_targets(
+    loaded,
+    *,
+    out_dir: Path,
+    selected_inputs: list[str] | None = None,
+    overwrite: bool,
+) -> list[tuple[object, Path, Path]]:
+    targets: list[tuple[object, Path, Path]] = []
+    for inp in _pwm_artifact_inputs(loaded, selected_inputs=selected_inputs):
+        artifact_path = resolve_relative_path(loaded.path, getattr(inp, "path"))
+        out_path = out_dir / f"{artifact_path.stem}_logo.png"
+        svg_path = out_path.with_suffix(".svg")
+        if not overwrite:
+            clashes = [path for path in (out_path, svg_path) if path.exists()]
+            if clashes:
+                preview = ", ".join(str(path) for path in clashes)
+                raise ValueError(f"Refusing to overwrite existing logo outputs: {preview}")
+        targets.append((inp, artifact_path, out_path))
+    return targets
+
+
+def _render_motif_logo_targets(
+    loaded,
+    *,
+    out_dir: Path,
+    selected_inputs: list[str] | None = None,
+    overwrite: bool,
+) -> list[dict[str, str]]:
+    targets = _prepare_logo_targets(
+        loaded,
+        out_dir=out_dir,
+        selected_inputs=selected_inputs,
+        overwrite=overwrite,
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, str]] = []
+    for inp, artifact_path, out_path in targets:
+        if overwrite:
+            for existing in (out_path, out_path.with_suffix(".svg")):
+                if existing.exists():
+                    existing.unlink()
+        raw_payload = json.loads(artifact_path.read_text())
+        motif = load_artifact(artifact_path)
+        tf_name = str(raw_payload.get("tf_name") or inp.name).strip() or str(inp.name)
+        source = str(raw_payload.get("source") or "unknown").strip() or "unknown"
+        producer = str(raw_payload.get("producer") or "unknown").strip() or "unknown"
+        title = f"{tf_name} - {motif.motif_id}"
+        subtitle = f"input={inp.name}; source={source}; producer={producer}"
+        png_path, svg_path = render_pwm_logo(
+            motif,
+            out_path,
+            title=title,
+            subtitle=subtitle,
+            mode="information",
+        )
+        rows.append(
+            {
+                "input": str(inp.name),
+                "motif_id": str(motif.motif_id),
+                "artifact": str(artifact_path),
+                "png": str(png_path),
+                "svg": str(svg_path),
+            }
+        )
+    return rows
+
+
 def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) -> None:
-    @inspect_app.command("run", help="Summarize a run manifest or list workspaces.")
+    @inspect_app.command("run", help="Summarize a run or list workspaces.")
     def inspect_run(
         ctx: typer.Context,
         run: Optional[Path] = typer.Option(None, "--run", "-r", help="Run directory (defaults to config run root)."),
@@ -278,116 +399,118 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             typer.echo(str(events_log_path))
             return
         manifest_path = run_manifest_path(run_root)
+        state_mode = False
         if not manifest_path.exists():
             state_path = run_state_path(run_root)
             if state_path.exists():
                 state = load_run_state(state_path)
-                context.console.print("[yellow]Run manifest missing; showing checkpointed run_state.[/]")
+                state_mode = True
+                context.console.print("[yellow]Finalized run manifest missing; showing checkpointed run_state.[/]")
                 root_label = context.display_path(run_root, run_root, absolute=absolute)
+                config_label = f"{state.config_sha256[:8]}…" if str(state.config_sha256).strip() else "-"
                 context.console.print(
                     f"[bold]Run:[/] {state.run_id}  [bold]Root:[/] {root_label}  "
-                    f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {state.config_sha256[:8]}…"
+                    f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {config_label}"
                 )
                 table = context.make_table("input", "plan", "generated")
                 for item in state.items:
                     table.add_row(item.input_name, item.plan_name, str(item.generated))
                 context.console.print(table)
+                _print_failure_outcomes(context=context, run_root=run_root)
+            else:
+                missing_manifest = context.display_path(manifest_path, run_root, absolute=absolute)
+                context.console.print(f"[bold red]Run manifest not found:[/] {missing_manifest}")
+                entries = context.list_dir_entries(run_root, limit=8)
+                if entries:
+                    context.console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
                 context.console.print("[bold]Next steps[/]:")
                 context.console.print(context.workspace_command("dense run", cfg_path=cfg_path, run_root=run_root))
-                return
+                raise typer.Exit(code=1)
 
-            missing_manifest = context.display_path(manifest_path, run_root, absolute=absolute)
-            context.console.print(f"[bold red]Run manifest not found:[/] {missing_manifest}")
-            entries = context.list_dir_entries(run_root, limit=8)
-            if entries:
-                context.console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-            context.console.print("[bold]Next steps[/]:")
-            context.console.print(context.workspace_command("dense run", cfg_path=cfg_path, run_root=run_root))
-            raise typer.Exit(code=1)
-
-        manifest = load_run_manifest(manifest_path)
-        schema_label = manifest.schema_version or "-"
-        dense_arrays_label = manifest.dense_arrays_version or "-"
-        dense_arrays_source = manifest.dense_arrays_version_source or "-"
-        if dense_arrays_label != "-" and dense_arrays_source != "-":
-            dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
-        root_label = context.display_path(run_root, run_root, absolute=absolute)
-        context.console.print(
-            f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {root_label}  "
-            f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
-        )
-        total_generated = int(sum(int(item.generated) for item in manifest.items))
-        total_quota = int(manifest.total_quota)
-        total_progress_pct = (float(total_generated) / float(total_quota) * 100.0) if total_quota > 0 else 0.0
-        context.console.print(f"[bold]Quota:[/] {total_generated}/{total_quota} ({total_progress_pct:.2f}%)")
-        if verbose:
-            table = context.make_table(
-                "input",
-                "plan",
-                "generated",
-                "quota",
-                "progress",
-                "dup_out",
-                "dup_sol",
-                "failed",
-                "fail_tf",
-                "fail_req",
-                "fail_min",
-                "fail_k",
-                "resamples",
-                "libraries",
-                "stalls",
+        if not state_mode:
+            manifest = load_run_manifest(manifest_path)
+            schema_label = manifest.schema_version or "-"
+            dense_arrays_label = manifest.dense_arrays_version or "-"
+            dense_arrays_source = manifest.dense_arrays_version_source or "-"
+            if dense_arrays_label != "-" and dense_arrays_source != "-":
+                dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
+            root_label = context.display_path(run_root, run_root, absolute=absolute)
+            context.console.print(
+                f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {root_label}  "
+                f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
             )
-        else:
-            table = context.make_table(
-                "input",
-                "plan",
-                "generated",
-                "quota",
-                "progress",
-                "duplicates",
-                "failed",
-                "resamples",
-                "libraries",
-                "stalls",
-            )
-        for item in manifest.items:
-            quota = int(item.quota)
-            progress_pct = (float(item.generated) / float(quota) * 100.0) if quota > 0 else 0.0
-            progress_label = f"{int(item.generated)}/{quota} ({progress_pct:.2f}%)"
+            total_generated = int(sum(int(item.generated) for item in manifest.items))
+            total_quota = int(manifest.total_quota)
+            total_progress_pct = (float(total_generated) / float(total_quota) * 100.0) if total_quota > 0 else 0.0
+            context.console.print(f"[bold]Quota:[/] {total_generated}/{total_quota} ({total_progress_pct:.2f}%)")
             if verbose:
-                table.add_row(
-                    item.input_name,
-                    item.plan_name,
-                    str(item.generated),
-                    str(quota),
-                    progress_label,
-                    str(item.duplicates_skipped),
-                    str(item.duplicate_solutions),
-                    str(item.failed_solutions),
-                    str(item.failed_min_count_per_tf),
-                    str(item.failed_required_regulators),
-                    str(item.failed_min_count_by_regulator),
-                    str(item.failed_min_required_regulators),
-                    str(item.total_resamples),
-                    str(item.libraries_built),
-                    str(item.stall_events),
+                table = context.make_table(
+                    "input",
+                    "plan",
+                    "generated",
+                    "quota",
+                    "progress",
+                    "dup_out",
+                    "dup_sol",
+                    "failed",
+                    "fail_tf",
+                    "fail_req",
+                    "fail_min",
+                    "fail_k",
+                    "resamples",
+                    "libraries",
+                    "stalls",
                 )
             else:
-                table.add_row(
-                    item.input_name,
-                    item.plan_name,
-                    str(item.generated),
-                    str(quota),
-                    progress_label,
-                    str(item.duplicates_skipped),
-                    str(item.failed_solutions),
-                    str(item.total_resamples),
-                    str(item.libraries_built),
-                    str(item.stall_events),
+                table = context.make_table(
+                    "input",
+                    "plan",
+                    "generated",
+                    "quota",
+                    "progress",
+                    "duplicates",
+                    "failed",
+                    "resamples",
+                    "libraries",
+                    "stalls",
                 )
-        context.console.print(table)
-        _print_failure_outcomes(context=context, run_root=run_root)
+            for item in manifest.items:
+                quota = int(item.quota)
+                progress_pct = (float(item.generated) / float(quota) * 100.0) if quota > 0 else 0.0
+                progress_label = f"{int(item.generated)}/{quota} ({progress_pct:.2f}%)"
+                if verbose:
+                    table.add_row(
+                        item.input_name,
+                        item.plan_name,
+                        str(item.generated),
+                        str(quota),
+                        progress_label,
+                        str(item.duplicates_skipped),
+                        str(item.duplicate_solutions),
+                        str(item.failed_solutions),
+                        str(item.failed_min_count_per_tf),
+                        str(item.failed_required_regulators),
+                        str(item.failed_min_count_by_regulator),
+                        str(item.failed_min_required_regulators),
+                        str(item.total_resamples),
+                        str(item.libraries_built),
+                        str(item.stall_events),
+                    )
+                else:
+                    table.add_row(
+                        item.input_name,
+                        item.plan_name,
+                        str(item.generated),
+                        str(quota),
+                        progress_label,
+                        str(item.duplicates_skipped),
+                        str(item.failed_solutions),
+                        str(item.total_resamples),
+                        str(item.libraries_built),
+                        str(item.stall_events),
+                    )
+            context.console.print(table)
+            _print_failure_outcomes(context=context, run_root=run_root)
 
         if events:
             events_path = run_root / "outputs" / "meta" / "events.jsonl"
@@ -760,6 +883,49 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             show_motif_ids=show_motif_ids,
             context=context,
         )
+
+    @inspect_app.command("motif-logos", help="Render logos from the exact pwm_artifact JSONs bound in the config.")
+    def inspect_motif_logos(
+        ctx: typer.Context,
+        input_name: list[str] = typer.Option([], "--input", help="pwm_artifact input name to render (repeatable)."),
+        out_dir: Optional[Path] = typer.Option(
+            None,
+            "--out-dir",
+            help="Output directory. Defaults to outputs/plots/motif_logos under the workspace.",
+        ),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing logo files."),
+        absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
+        config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
+    ):
+        cfg_path, is_default = context.resolve_config_path(ctx, config)
+        loaded = context.load_config_or_exit(
+            cfg_path,
+            missing_message=context.default_config_missing_message if is_default else None,
+        )
+        run_root = context.run_root_for(loaded)
+        try:
+            resolved_out_dir = _resolve_motif_logo_out_dir(loaded, out_dir=out_dir)
+            rows = _render_motif_logo_targets(
+                loaded,
+                out_dir=resolved_out_dir,
+                selected_inputs=list(input_name) or None,
+                overwrite=overwrite,
+            )
+        except Exception as exc:
+            context.console.print(f"[bold red]Failed to render motif logos:[/] {exc}")
+            raise typer.Exit(code=1)
+
+        table = context.make_table("input", "motif_id", "artifact", "png", "svg")
+        for row in rows:
+            table.add_row(
+                row["input"],
+                row["motif_id"],
+                context.display_path(Path(row["artifact"]), run_root, absolute=absolute),
+                context.display_path(Path(row["png"]), run_root, absolute=absolute),
+                context.display_path(Path(row["svg"]), run_root, absolute=absolute),
+            )
+        context.console.print("[bold]Rendered motif logos[/]")
+        context.console.print(table)
 
 
 def _count_files(path: Path, pattern: str = "*") -> int:

@@ -11,15 +11,37 @@
 **Status-kind:** promoter-study-preflight
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-04-13
 
-Use this contract after the cheaper
+Use this after the cheaper
 [Promoter Study Status Contract](promoter-study-status-contract.md) when you
-need command-level answers to "what is ready, what is blocked, and why?" for
-the real checked-in study.
-This remains an observation-plane route: it composes read-only preflight checks
-from the checked-in study record and still defers actual submit/execute work to
-the control-plane `ops runbook` commands.
+need command-level answers about what is ready, what is blocked, and why.
+This route stays in the observation plane: it composes read-only preflight
+checks from the study record and still leaves submit/execute work to
+control-plane `ops runbook` commands.
+
+### Choose the next surface
+
+Use preflight after status answers the record question.
+
+| Need | Surface | Why |
+| --- | --- | --- |
+| Where is the study now? | [Promoter Study Status Contract](promoter-study-status-contract.md) | Cheap record-plane snapshot of the checked-in study. |
+| Which blockers remain on this host? | `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` | Command-level readiness for the next actionable phase. |
+| Which owner surface should I open after blockers are clear? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff into DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL. |
+
+This page is the blocker surface, not the downstream route map.
+
+### First-thread bootstrap
+
+Use this order when a thread starts cold:
+
+1. Run [Promoter Study Status Contract](promoter-study-status-contract.md)
+   first.
+2. Run `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+   only when the question is blocker or next-run readiness.
+3. Open `docs/studies/<study-id>/routes.md` after blockers are clear and the
+   next owner surface is the real need.
 
 Fastest active-study preflight:
 
@@ -28,28 +50,25 @@ Fastest active-study preflight:
 uv run ops progress show usr.data-plane.promoter-study-preflight --json
 ```
 
-Fastest next-phase preflight when you want the immediate actionable lane without
-later-lane blocker noise:
+Fastest next-phase preflight:
 
 ```bash
-# Focus the summary on the next actionable study phase and defer later-lane blockers.
+# Focus on the next actionable study phase.
 uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json
 ```
 
-`--scope next` narrows blocker interpretation first. It is not guaranteed to be
-cheap. If the current checked-in phase is a broad preparation phase such as
+`--scope next` is the narrowest supported blocker gate. It is not guaranteed to
+be cheap. If the current checked-in phase is a broad preparation phase such as
 `infer_batch_preparation`, OPS will still run every declared Infer, Notify, and
-runbook-plan check attached to that phase.
+runbook-plan check attached to that phase. Treat that cost as part of the
+checked-in phase contract, not as a reason to bypass the blocker surface.
 
-For the active `stress_ethanol_cipro_growth` study, that checked-in contract is
-now strict submit-readiness for the default notify-enabled Infer presets.
-Missing `NOTIFY_WEBHOOK` or `NOTIFY_WEBHOOK_FILE`, missing `SSL_CERT_FILE`,
-failed `notify profile doctor`, failed `notify setup resolve-events`, or failed
-notify-enabled `ops runbook plan` checks are blockers rather than advisories.
-Those shared notify-environment blockers remain blocking even after the study
-advances from `infer_batch_preparation` into a specific Infer lane.
-Use batch-only runbooks only when you are explicitly opting out of notify for
-that route.
+If the checked-in study contract marks notify-enabled Infer presets as
+blocking, missing webhook env, missing TLS env, failed `notify profile doctor`,
+failed `notify setup resolve-events`, or failed notify-enabled
+`ops runbook plan` checks stay blocking rather than advisory. If the checked-in
+study contract pins a GPU-only lane, report the exact selector from the study
+record or returned preflight metadata instead of hard-coding that lane here.
 
 If you need to pin a non-active study or you are invoking the command from
 outside the repo checkout, add:
@@ -62,12 +81,14 @@ uv run ops progress show usr.data-plane.promoter-study-preflight \
   --json
 ```
 
-This route is still read-only. It does not submit jobs, mutate USR datasets, or
-advance Notify cursors. It composes explicit command preflights from the
-checked-in study record and uses `ops.study.yaml` to decide which study phases
-belong to the next actionable scope versus the full study surface:
+This route is read-only. It does not submit jobs, mutate USR datasets, or
+advance Notify cursors. It composes explicit command preflights from the study
+record and uses `ops.study.yaml` to decide which phases belong to the next
+actionable scope versus the full study surface:
 
 - `path_exists` and `dataset_snapshot` checks over declared study artifacts
+- study-owned freshness checks when merged anchor or Construct context
+  datasets trail upstream row counts despite still being materialized
 - `workspace_layout` checks over declared Construct and Infer workspaces
 - `environment` checks for webhook and TLS contracts
 - `gpu_availability` checks for local infer posture when that scope is relevant
@@ -77,10 +98,10 @@ belong to the next actionable scope versus the full study surface:
 - `scheduler_queue` checks for declared submit-threshold posture
 - `runbook_plan` checks for DenseGen and Infer batch presets
 
-`ops.study.yaml` is now the visible source of readiness shape: it declares the
-phases, groups, artifacts, execution surfaces, and generic checks. The promoter
-family adapter still normalizes family-local paths and derived refs, but it no
-longer hides a second imperative readiness graph behind the contract.
+`ops.study.yaml` is the visible source of readiness shape: it declares phases,
+groups, artifacts, execution surfaces, and generic checks. The promoter-family
+adapter still normalizes family-local paths and derived refs, but it no longer
+hides a second imperative readiness graph behind the contract.
 
 ### Contract rules
 
@@ -92,6 +113,7 @@ longer hides a second imperative readiness graph behind the contract.
 - Keep degraded state explicit:
   - missing datasets => `missing`
   - failed command preflights => `attention`
+  - stale downstream handoffs => `attention`
   - blocked GPU-only lanes remain visible; there is no hidden 20B -> 7B fallback
 - Use `ops.study.yaml` as the OPS-facing source of lifecycle phase order,
   execution surfaces, snapshot scope, and preflight phase-target grouping.
@@ -106,9 +128,17 @@ longer hides a second imperative readiness graph behind the contract.
   `observes_plane`, `summary_scope`, `scope`, `phase_id`, `check_group`,
   `kind`, `surface_id`, and `artifact_id`.
 
+### Minimum blocker evidence
+
+| Question | Command | Minimum evidence | Fail visibly when |
+| --- | --- | --- | --- |
+| Which blockers remain on this host? | `usr.data-plane.promoter-study-preflight --scope next --json` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id`, `state` | required study files or declared execution surfaces are missing |
+| Which environment contract is broken? | same surface | `kind=environment` or `kind=command` plus the failing surface or artifact id | the study record omits the declared environment dependency |
+| Which owner surface should I open after blockers clear? | `docs/studies/<study-id>/routes.md` | owner tool, primary doc or workspace, first command | blockers are clear but no study-owned route map exists |
+
 ### What this route is for
 
-- naive-agent status refresh before deciding the next command
+- status refresh before deciding the next command
 - read-only readiness checks on login or CPU-only nodes
 - explicit blocker reporting for missing USR datasets, Notify secret contracts,
   TLS/profile contracts, solver backends, and GPU-only lanes
@@ -137,4 +167,5 @@ longer hides a second imperative readiness graph behind the contract.
    - materialize the merged anchor set
    - materialize Construct contexts
    - fix Notify secret/profile contracts
-   - move Infer execution to a Hopper/H200-capable GPU node
+   - move Infer execution to a GPU node that satisfies the checked-in lane
+     contract reported by the study record or returned preflight metadata

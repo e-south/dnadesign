@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict
@@ -19,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Dict
 import yaml
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from dnadesign.usr.roots import resolve_usr_root_from_config
+from dnadesign.usr import resolve_usr_root_from_config
 
 if TYPE_CHECKING:
     from .root import RootConfig
@@ -78,6 +79,29 @@ def resolve_relative_path(cfg_path: Path, value: str | os.PathLike) -> Path:
     return (cfg_path.parent / p).resolve()
 
 
+def _git_common_repo_root(cfg_path: Path) -> Path:
+    completed = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=str(cfg_path.parent.resolve()),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        message = (completed.stderr or completed.stdout or "git rev-parse failed").strip()
+        raise ConfigError(f"Failed to resolve git common repo root for {cfg_path}: {message}")
+    raw = str(completed.stdout or "").strip()
+    if not raw:
+        raise ConfigError(f"Failed to resolve git common repo root for {cfg_path}: empty git-common-dir output")
+    common_dir = Path(raw).expanduser()
+    if not common_dir.is_absolute():
+        common_dir = (cfg_path.parent.resolve() / common_dir).resolve()
+    repo_root = common_dir.parent.resolve()
+    if not repo_root.exists() or not repo_root.is_dir():
+        raise ConfigError(f"Resolved git common repo root does not exist: {repo_root}")
+    return repo_root
+
+
 def _is_relative_to(path: Path, base: Path) -> bool:
     try:
         path.resolve().relative_to(base.resolve())
@@ -110,9 +134,28 @@ def resolve_outputs_scoped_path(cfg_path: Path, run_root: Path, value: str | os.
     return resolved
 
 
-def resolve_usr_root_scoped_path(cfg_path: Path, value: str | os.PathLike, *, label: str) -> Path:
+def resolve_usr_root_scoped_path(
+    cfg_path: Path,
+    value: str | os.PathLike,
+    *,
+    label: str,
+    scope: str = "config",
+) -> Path:
     try:
-        resolved = resolve_usr_root_from_config(value, config_path=cfg_path, label=label)
+        if scope == "config":
+            resolved = resolve_usr_root_from_config(value, config_path=cfg_path, label=label)
+        elif scope == "git_common_repo_root":
+            root_text = str(value).strip()
+            if not root_text:
+                raise ValueError(f"{label} must be a non-empty string")
+            candidate = _expand_path(root_text)
+            if candidate.is_absolute():
+                resolved = resolve_usr_root_from_config(candidate, config_path=cfg_path, label=label)
+            else:
+                repo_root = _git_common_repo_root(cfg_path)
+                resolved = resolve_usr_root_from_config(repo_root / candidate, config_path=cfg_path, label=label)
+        else:
+            raise ValueError(f"{label} has unsupported scope '{scope}'")
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
     if resolved is None:

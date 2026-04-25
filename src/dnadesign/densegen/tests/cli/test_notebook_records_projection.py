@@ -119,3 +119,21 @@ def test_records_preview_projection_keeps_declared_pad_literal() -> None:
 
     projected = build_records_preview_table(df)
     assert projected.loc[0, "densegen__pad_literal"] == "GG"
+
+
+def test_records_preview_projection_recovers_plan_and_input_from_source() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "id": "seq-legacy",
+                "sequence": "AACCGGTT",
+                "source": "plan_pool__ciprofloxacin__sig35_d",
+                "densegen__used_tfbs_detail": [],
+            }
+        ]
+    )
+
+    projected = build_records_preview_table(df)
+
+    assert projected.loc[0, "densegen__plan"] == "ciprofloxacin__sig35=d"
+    assert projected.loc[0, "densegen__input_name"] == "plan_pool__ciprofloxacin__sig35_d"

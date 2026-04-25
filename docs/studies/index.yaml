@@ -1,3 +1,6 @@
+# Repo-wide selector for the currently active checked-in study record.
+# If the request names a different checked-in study or family, keep this value
+# truthful and pin the desired record with `--study-dir docs/studies/<study-id>`.
 version: 1
 active_study_id: stress_ethanol_cipro_growth
 studies:
@@ -5,3 +8,9 @@ studies:
     family: promoter
     title: Stress / ethanol / ciprofloxacin growth study
     record_root: docs/studies/stress_ethanol_cipro_growth
+  # Named Cruncher study. Pin `--study-dir docs/studies/snapback_shortening_effort`
+  # for snapback questions instead of assuming the repo-wide active study matches.
+  - study_id: snapback_shortening_effort
+    family: cruncher
+    title: Snapback shortening effort
+    record_root: docs/studies/snapback_shortening_effort

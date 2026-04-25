@@ -93,7 +93,7 @@ def _run_gate_module_via_clean_python(*args: str) -> tuple[int | str | None, str
 def _write_densegen_config(
     path: Path,
     *,
-    dataset: str = "densegen/study_stress_ethanol_cipro",
+    dataset: str = "densegen_prom_eth_cip_source",
     run_root: str = ".",
     usr_root: str = "outputs/usr_datasets",
     chunk_size: int = 128,
@@ -459,6 +459,56 @@ def test_main_session_counts_can_degrade_explicitly_when_qstat_is_missing(
     assert "queue probe degraded:" in captured.err
 
 
+def test_main_session_counts_reports_host_denied_when_qstat_denies_submit_host(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError('error: denied: host "scc1.bu.edu" is neither submit nor admin host')
+        ),
+    )
+
+    exit_code = main(["session-counts", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=host_denied" in captured.out
+    assert "qstat_source=degraded" in captured.out
+    assert "running_jobs=unknown" in captured.out
+    assert "queue probe blocked:" in captured.err
+    assert "Current host is not submit-capable" in captured.err
+
+
+def test_main_submit_shape_advisor_blocks_when_qstat_denies_submit_host(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError('denied: host "scc1.bu.edu" is no submit host')),
+    )
+
+    exit_code = main(
+        [
+            "submit-shape-advisor",
+            "--planned-submits",
+            "2",
+            "--warn-over-running",
+            "3",
+            "--allow-missing-qstat",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "advisor=blocked" in captured.out
+    assert "queue_policy=submit_host_required" in captured.out
+    assert "queue_probe=host_denied" in captured.out
+    assert "next_action=use_submit_host" in captured.out
+
+
 def test_main_operator_brief_can_degrade_explicitly_when_qstat_is_missing(
     monkeypatch: pytest.MonkeyPatch, capsys
 ) -> None:
@@ -475,6 +525,35 @@ def test_main_operator_brief_can_degrade_explicitly_when_qstat_is_missing(
     assert "submit_gate=degraded" in captured.out
     assert "queue_probe=degraded" in captured.out
     assert "next_action=queue_probe_unavailable" in captured.out
+
+
+def test_main_operator_brief_blocks_when_qstat_denies_submit_host(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError('error: denied: host "scc1.bu.edu" is neither submit nor admin host')
+        ),
+    )
+
+    exit_code = main(
+        [
+            "operator-brief",
+            "--planned-submits",
+            "2",
+            "--warn-over-running",
+            "3",
+            "--allow-missing-qstat",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "submit_gate=blocked" in captured.out
+    assert "advisor=blocked" in captured.out
+    assert "queue_probe=host_denied" in captured.out
+    assert "queue_policy=submit_host_required" in captured.out
+    assert "next_action=use_submit_host" in captured.out
 
 
 def test_main_ensure_dir_writable_creates_directory_and_emits_record(tmp_path: Path, capsys) -> None:
@@ -660,7 +739,7 @@ def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_thresho
     config_path = workspace_root / "config.yaml"
     _write_densegen_config(
         config_path,
-        dataset="densegen/demo",
+        dataset="densegen_demo",
         chunk_size=128,
         max_accepted_per_library=64,
         total_sequences=1000,
@@ -672,7 +751,7 @@ def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_thresho
     registry_dst.parent.mkdir(parents=True, exist_ok=True)
     registry_dst.write_text(registry_src.read_text(encoding="utf-8"), encoding="utf-8")
 
-    dataset = usr_pkg.Dataset(usr_root, "densegen/demo")
+    dataset = usr_pkg.Dataset(usr_root, "densegen_demo")
     dataset.init(source="test")
     dataset.import_rows([{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4"}], source="seed")
     row_id = str(dataset.head(1, columns=["id"]).iloc[0]["id"])
@@ -1124,13 +1203,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_entries_exceed_thr
     _write_densegen_config(config_path)
 
     archived_dir = (
-        workspace_root
-        / "outputs"
-        / "usr_datasets"
-        / "densegen"
-        / "study_stress_ethanol_cipro"
-        / "_derived"
-        / "_archived"
+        workspace_root / "outputs" / "usr_datasets" / "densegen_prom_eth_cip_source" / "_derived" / "_archived"
     )
     archived_dir.mkdir(parents=True, exist_ok=True)
     (archived_dir / "a.parquet").write_bytes(b"a")
@@ -1166,13 +1239,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_bytes_exceed_thres
     _write_densegen_config(config_path)
 
     archived_dir = (
-        workspace_root
-        / "outputs"
-        / "usr_datasets"
-        / "densegen"
-        / "study_stress_ethanol_cipro"
-        / "_derived"
-        / "_archived"
+        workspace_root / "outputs" / "usr_datasets" / "densegen_prom_eth_cip_source" / "_derived" / "_archived"
     )
     archived_dir.mkdir(parents=True, exist_ok=True)
     (archived_dir / "big.parquet").write_bytes(b"0123456789")

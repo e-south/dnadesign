@@ -257,7 +257,12 @@ def _capture_usr_registry_snapshots(*, cfg, cfg_path: Path, run_root: Path, cont
     out_cfg = cfg.output
     if "usr" not in out_cfg.targets or out_cfg.usr is None:
         return snapshots
-    usr_root = resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        cfg_path,
+        out_cfg.usr.root,
+        label="output.usr.root",
+        scope=out_cfg.usr.root_scope,
+    )
     registry_path = usr_root / "registry.yaml"
     if registry_path.exists() and registry_path.is_file():
         snapshots[registry_path] = registry_path.read_text()
@@ -314,7 +319,12 @@ def _resolve_usr_output_state(*, cfg, cfg_path: Path, run_root: Path) -> tuple[P
     out_cfg = cfg.output
     if "usr" not in out_cfg.targets or out_cfg.usr is None:
         return None
-    usr_root = resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        cfg_path,
+        out_cfg.usr.root,
+        label="output.usr.root",
+        scope=out_cfg.usr.root_scope,
+    )
     dataset = str(out_cfg.usr.dataset or "").strip()
     if not dataset:
         raise RuntimeError("output.usr.dataset must be a non-empty string.")
@@ -413,7 +423,12 @@ def _ensure_usr_registry_ready(
     out_cfg = cfg.output
     if "usr" not in out_cfg.targets or out_cfg.usr is None:
         return
-    usr_root = resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        cfg_path,
+        out_cfg.usr.root,
+        label="output.usr.root",
+        scope=out_cfg.usr.root_scope,
+    )
     registry_path = usr_root / "registry.yaml"
     if registry_path.exists() and registry_path.is_file():
         return
@@ -620,7 +635,7 @@ def _print_run_next_steps(*, cfg_path: Path, run_root: Path, context: CliContext
         run_root=run_root,
     )
     placement_cmd = context.workspace_command(
-        "dense plot --only placement_map",
+        "dense plot --only placement_occupancy_map",
         cfg_path=cfg_path,
         run_root=run_root,
     )
@@ -1061,7 +1076,12 @@ def register_run_commands(
         if purge_usr_registry:
             usr_cfg = loaded.root.densegen.output.usr
             if usr_cfg is not None:
-                usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+                usr_root = resolve_usr_root_scoped_path(
+                    cfg_path,
+                    usr_cfg.root,
+                    label="output.usr.root",
+                    scope=usr_cfg.root_scope,
+                )
                 registry_path = usr_root / "registry.yaml"
                 if registry_path.exists():
                     registry_path.unlink()

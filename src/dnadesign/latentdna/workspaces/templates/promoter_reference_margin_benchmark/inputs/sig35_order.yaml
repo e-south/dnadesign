@@ -1,0 +1,18 @@
+source: Provisional promoter-study Sigma-35 ordinal prior; keep exploratory until the exact literature note is checked into the repo.
+exploratory: true
+order:
+  - variant_id: f
+    sequence: TTGACA
+    rank: 1
+  - variant_id: b
+    sequence: CTGACA
+    rank: 2
+  - variant_id: e
+    sequence: TAGACA
+    rank: 3
+  - variant_id: d
+    sequence: TTTACA
+    rank: 4
+  - variant_id: c
+    sequence: TTGTGA
+    rank: 5

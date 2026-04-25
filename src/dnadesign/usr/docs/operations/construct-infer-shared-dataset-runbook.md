@@ -24,9 +24,9 @@ declared shared USR root authoritative and repoint construct configs
 deliberately before treating the dataset as the cross-tool source of truth.
 
 For the live `stress_ethanol_cipro_growth` study, the real source datasets are
-not the packaged demo inputs. Merge `densegen/study_stress_ethanol_cipro` and
-`mg1655_promoters` in USR first, then point Construct at that merged source
-dataset while keeping `plasmids` as the pDual-backed template dataset.
+not the packaged demo inputs. Merge `densegen_prom_eth_cip_source` and
+`usr_mg1655_promoter_controls` in USR first, then point Construct at that merged source
+dataset while keeping `usr_pdual10_plasmid_template` as the pDual-backed template dataset.
 
 ### Boundary decisions
 
@@ -49,6 +49,7 @@ dataset while keeping `plasmids` as the pDual-backed template dataset.
 - If upstream records live in multiple USR datasets and must be unified before construct, do that explicitly with `uv run usr maintenance merge ...`; do not hide multi-source consolidation inside one construct config.
 - Use `uv run usr maintenance merge ... --carry-namespace <namespace>` when one compact, `id`-keyed overlay namespace such as `usr_label` must survive consolidation onto rows that actually survive the merge.
 - Plain `uv run usr maintenance merge ...` still rewrites canonical base rows only. For namespaces that are not `id`-keyed or not yet compact, materialize or reattach them explicitly instead of expecting implicit carry-through.
+- After Construct, use `uv run usr maintenance overlay-project ...` when authoritative upstream metadata must be reattached onto the realized downstream dataset through an explicit lineage key such as `construct__anchor_id`. This keeps Construct scoped to `construct__*` lineage and avoids widening it into a generic namespace pass-through tool.
 - If multiple construct projects should accumulate into one semantic output dataset, keep each project auditable and point them at the same `output.target.dataset`.
 - Start with `output.on_conflict=error` for fail-fast duplicate detection. Use `ignore` only for intentional idempotent reruns.
 
@@ -116,6 +117,7 @@ Expected outcome:
 - point multiple projects at the same `output.target.dataset` only when one semantic shared dataset is intentional
 - the packaged `anchor-template-shared-dataset-demo` profile is the turnkey two-project accumulation preset; use it as the tracer bullet before widening the matrix
 - if multiple upstream USR datasets must be consolidated first, run `uv run usr maintenance merge ... --carry-namespace usr_label` when the upstream label overlay is compact and `id`-keyed; otherwise materialize or reattach the needed namespace explicitly before construct
+- when a downstream dataset must recover authoritative upstream overlay metadata through a non-`id` lineage key, run `uv run usr maintenance overlay-project --src <source-dataset> --dest <downstream-dataset> --namespace <namespace> --src-join id --dest-join construct__anchor_id --allow-missing`
 - rerun `construct workspace validate-project --runtime` for every project before `run-project`
 
 ### 5) Shared downstream continuation: prepare infer handoff against the construct dataset

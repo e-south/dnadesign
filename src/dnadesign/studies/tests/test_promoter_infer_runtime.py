@@ -96,6 +96,12 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
         densegen_rows=None,
         densegen_row_target=None,
         densegen_row_gap=None,
+        merged_anchor_dataset_id=None,
+        merged_anchor_rows=None,
+        construct_context_dataset_id=None,
+        construct_context_rows=None,
+        dataset_refresh_states=(),
+        stale_dataset_ids=(),
         evidence={"study_id": "demo_study"},
     )
 

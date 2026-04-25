@@ -189,6 +189,7 @@ class RootConfig(StrictConfigModel):
 
     @model_validator(mode="after")
     def _validate_feature_bundle_model_contracts(self) -> "RootConfig":
+        from .features.execution import build_feature_bundle_outputs
         from .features.selectors import resolve_intermediate_selector
 
         for job in self.jobs:
@@ -198,4 +199,8 @@ class RootConfig(StrictConfigModel):
                 model_id=self.model.id,
                 intermediate_block=job.feature_bundle.intermediate_block,
             )
+            job.outputs = [
+                OutputSpec(**payload)
+                for payload in build_feature_bundle_outputs(bundle=job.feature_bundle, model_id=self.model.id)
+            ]
         return self

@@ -15,7 +15,7 @@ import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.explain import explain_round
-from ..formatting import render_explain_human
+from ..formatting import render_explain_text
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
@@ -41,10 +41,10 @@ def cmd_explain(
     ),
     json: bool = typer.Option(
         False,
-        "--json/--human",
-        help="Output as JSON (default: human).",
+        "--json/--text",
+        help="Output as JSON (default: text).",
     ),
-    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
 ):
     try:
         cfg_path = resolve_config_path(config)
@@ -56,7 +56,7 @@ def cmd_explain(
             json_out(info)
         else:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
-            print_stdout(render_explain_human(info))
+            print_stdout(render_explain_text(info))
             preflight = dict(info.get("preflight") or {})
             if preflight:
                 lines = ["Run preflight"]

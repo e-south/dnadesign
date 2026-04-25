@@ -19,6 +19,7 @@ cd src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
 ```
 
 Use `--mode resume` to continue generation, or `--mode analysis` when you only need plots/notebook refresh.
+For shared records-only study state, analysis mode still refreshes recoverable Stage-B plots instead of requiring a full local rerun.
 
 ### Prerequisites
 
@@ -149,9 +150,12 @@ Use this mode when generation is complete or paused and you only need plots and 
 
 ```bash
 # Render DenseGen analysis artifacts from current run outputs.
+# Records-only analysis still recovers Stage-B placement and TFBS concentration plots.
+# The Stage-B showcase video remains available when dense_array_showcase_video is selected explicitly.
+# Stage-A context/bridge plots require pool artifacts, and run diagnostics require attempts artifacts.
 pixi run dense plot -c "$CONFIG"
 # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
+# pixi run dense plot --only dense_array_showcase_video -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 pixi run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
@@ -174,6 +178,8 @@ Durability knobs for interruption tolerance:
 # Enter the workspace directory so relative paths resolve correctly.
 cd src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
 # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+# If finalized run metadata is absent, the runbook still uses checkpointed state and records artifacts
+# to refresh recoverable diagnostics, Stage-B plots, and the notebook gallery.
 ./runbook.sh --mode analysis
 # Open the generated notebook in marimo app mode.
 pixi run dense notebook run -c "$PWD/config.yaml"
@@ -191,7 +197,7 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 ### Expected outputs
 
 - `outputs/tables/records.parquet`
-- `src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro/.events.log`
+- `src/dnadesign/usr/datasets/densegen_prom_eth_cip_source/.events.log`
 - `outputs/plots/`
 - `outputs/notebooks/densegen_run_overview.py`
 

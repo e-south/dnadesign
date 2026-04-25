@@ -101,8 +101,8 @@ Use this block to render plots and generate the notebook from current outputs.
 ```bash
 # Render DenseGen analysis artifacts from current run outputs.
 # `dense plot` is the analysis entry point; static plots always render.
-# Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
-# at outputs/plots/stage_b/all_plans/showcase.mp4.
+# The Stage-B showcase video is optional. Enable plots.video and either add
+# dense_array_showcase_video to plots.default or render it explicitly with --only.
 pixi run dense plot -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 pixi run dense notebook generate -c "$CONFIG"
@@ -112,7 +112,7 @@ uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
 ```bash
 # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
+# pixi run dense plot --only dense_array_showcase_video -c "$CONFIG"
 ```
 
 ### If outputs already exist (analysis mode)

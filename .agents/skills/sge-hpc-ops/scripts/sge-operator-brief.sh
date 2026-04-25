@@ -26,6 +26,19 @@ Options:
 USAGE
 }
 
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+json_int_or_null() {
+  local value="${1:-}"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$value"
+  else
+    printf 'null'
+  fi
+}
+
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -132,9 +145,10 @@ main() {
   advisor_reason_line="$(printf '%s\n' "$advisor_output" | rg -m 1 '^REASON ' || true)"
   advisor_recommendation_line="$(printf '%s\n' "$advisor_output" | rg -m 1 '^RECOMMENDATION ' || true)"
 
-  local health execution_locus running_line queued_jobs eqw_jobs reason recommendation
+  local health execution_locus queue_probe running_line queued_jobs eqw_jobs reason recommendation
   health="$(parse_status_card_field "$status_card" "Health")"
   execution_locus="$(parse_status_card_field "$status_card" "Execution Locus")"
+  queue_probe="$(parse_status_card_field "$status_card" "Queue Probe")"
   running_line="$(parse_status_card_field "$status_card" "Running Jobs")"
   queued_jobs="$(parse_status_card_field "$status_card" "Queued Jobs")"
   eqw_jobs="$(parse_status_card_field "$status_card" "Eqw Jobs")"
@@ -148,9 +162,11 @@ main() {
 
   [[ -n "$health" ]] || health="unknown"
   [[ -n "$execution_locus" ]] || execution_locus="unknown"
+  [[ -n "$queue_probe" ]] || queue_probe="$(parse_advisor_key "$advisor_line" "queue_probe")"
+  [[ -n "$queue_probe" ]] || queue_probe="unknown"
   [[ -n "$running_line" ]] || running_line="unknown"
-  [[ -n "$queued_jobs" ]] || queued_jobs="0"
-  [[ -n "$eqw_jobs" ]] || eqw_jobs="0"
+  [[ -n "$queued_jobs" ]] || queued_jobs="unknown"
+  [[ -n "$eqw_jobs" ]] || eqw_jobs="unknown"
   [[ -n "$reason" ]] || reason="status reason unavailable"
   [[ -n "$recommendation" ]] || recommendation="status recommendation unavailable"
   [[ -n "$advisor" ]] || advisor="unknown"
@@ -160,11 +176,19 @@ main() {
   local running_jobs threshold
   running_jobs="$(printf '%s\n' "$running_line" | sed -n 's/^\([0-9][0-9]*\).*/\1/p')"
   threshold="$(printf '%s\n' "$running_line" | sed -n 's/.*threshold \([0-9][0-9]*\).*/\1/p')"
-  [[ -n "$running_jobs" ]] || running_jobs=0
+  [[ -n "$running_jobs" ]] || running_jobs="unknown"
   [[ -n "$threshold" ]] || threshold="$warn_over_running"
 
-  local submit_gate next_action
-  if [[ "$health" == "red" || "$advisor" == "hold" ]]; then
+  local submit_gate next_action queue_policy
+  queue_policy="respect_queue"
+  if [[ "$queue_probe" == "host_denied" || "$advisor" == "blocked" ]]; then
+    submit_gate="blocked"
+    next_action="use_submit_host"
+    queue_policy="submit_host_required"
+  elif [[ "$queue_probe" != "ok" ]]; then
+    submit_gate="degraded"
+    next_action="queue_probe_unavailable"
+  elif [[ "$health" == "red" || "$advisor" == "hold" ]]; then
     submit_gate="blocked"
     next_action="triage_eqw"
   elif [[ "$health" == "yellow" ]]; then
@@ -176,20 +200,27 @@ main() {
   fi
 
   if [[ "$json_output" -eq 1 ]]; then
-    printf '{"submit_gate":"%s","health":"%s","execution_locus":"%s","running_jobs":%d,"threshold":%d,"queued_jobs":%d,"eqw_jobs":%d,"planned_submits":%d,"requires_order":%s,"advisor":"%s","status_reason":"%s","advisor_reason":"%s","advisor_recommendation":"%s","next_action":"%s","queue_policy":"respect_queue"}\n' \
-      "$submit_gate" "$health" "$execution_locus" "$running_jobs" "$threshold" "$queued_jobs" "$eqw_jobs" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo true || echo false)" "$advisor" "$reason" "$advisor_reason" "$advisor_recommendation" "$next_action"
+    printf '{"submit_gate":"%s","health":"%s","execution_locus":"%s","running_jobs":%s,"threshold":%d,"queued_jobs":%s,"eqw_jobs":%s,"planned_submits":%d,"requires_order":%s,"advisor":"%s","status_reason":"%s","advisor_reason":"%s","advisor_recommendation":"%s","next_action":"%s","queue_probe":"%s","queue_policy":"%s"}\n' \
+      "$submit_gate" "$health" "$execution_locus" "$(json_int_or_null "$running_jobs")" "$threshold" "$(json_int_or_null "$queued_jobs")" "$(json_int_or_null "$eqw_jobs")" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo true || echo false)" "$advisor" "$(json_escape "$reason")" "$(json_escape "$advisor_reason")" "$(json_escape "$advisor_recommendation")" "$next_action" "$queue_probe" "$queue_policy"
   else
     printf 'HPC Operator Brief\n'
     printf -- '- Submit Gate: %s\n' "$submit_gate"
     printf -- '- Health: %s\n' "$health"
     printf -- '- Execution Locus: %s\n' "$execution_locus"
-    printf -- '- Running Jobs: %d (threshold %d)\n' "$running_jobs" "$threshold"
+    printf -- '- Queue Probe: %s\n' "$queue_probe"
+    printf -- '- Running Jobs: %s (threshold %d)\n' "$running_jobs" "$threshold"
     printf -- '- Queued Jobs: %s\n' "$queued_jobs"
     printf -- '- Eqw Jobs: %s\n' "$eqw_jobs"
     printf -- '- Advisor: %s\n' "$advisor"
     printf -- '- Reason: %s\n' "$advisor_reason"
     printf -- '- Recommendation: %s\n' "$advisor_recommendation"
     case "$next_action" in
+      use_submit_host)
+        printf -- '- Next Action: Move to a submit-capable SCC shell or OnDemand app shell before any real qsub.\n'
+        ;;
+      queue_probe_unavailable)
+        printf -- '- Next Action: Re-run queue status on a submit-capable shell before treating counts as authoritative.\n'
+        ;;
       triage_eqw)
         printf -- '- Next Action: Triage Eqw and failed jobs before any new submission.\n'
         ;;
@@ -203,7 +234,7 @@ main() {
         printf -- '- Next Action: %s\n' "$next_action"
         ;;
     esac
-    printf -- '- Queue Policy: respect queue, do not skip the line\n'
+    printf -- '- Queue Policy: %s\n' "$queue_policy"
   fi
 }
 

@@ -4,7 +4,7 @@
 src/dnadesign/opal/src/cli/formatting/renderers/explain.py
 
 Renders explain command output for OPAL CLI. Formats explain summaries for
-human-readable display.
+readable text display.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ from ...tui import kv_table, list_table, tui_enabled
 from ..core import _fmt_params, kv_block
 
 
-def render_explain_human(info: Mapping[str, Any]) -> str:
+def render_explain_text(info: Mapping[str, Any]) -> str:
     sel = info.get("selection", {}) or {}
     obj = sel.get("objective", {}) or {}
     yops = info.get("training_y_ops") or info.get("training_y_ops", []) or []

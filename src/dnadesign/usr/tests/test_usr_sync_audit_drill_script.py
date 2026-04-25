@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/usr/tests/test_usr_sync_audit_drill_script.py
 
-Contract tests for the deterministic USR sync audit drill script.
+Contract tests for the deterministic USR sync audit drill entrypoint.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -26,16 +26,12 @@ def _repo_root() -> Path:
 
 def test_usr_sync_audit_drill_script_runs_and_emits_audit_report(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script = repo_root / "src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py"
-    assert script.exists()
-
     report_path = tmp_path / "sync-audit-drill-report.json"
     completed = subprocess.run(
         [
             "uv",
             "run",
-            "python",
-            str(script),
+            "usr-sync-audit-drill",
             "--work-dir",
             str(tmp_path / "work"),
             "--report-json",

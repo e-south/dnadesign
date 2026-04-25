@@ -75,6 +75,11 @@ def test_yiu_artifacts_reference_stays_bundle_scoped() -> None:
     assert "`views.payload`" in artifacts_ref
     assert "`views.split_left`" in artifacts_ref
     assert "`views.assembled`" in artifacts_ref
+    assert "Default `show --json` includes the bundle artifact paths and integrity report." in artifacts_ref
+    assert (
+        "`show --json --verbose` also includes `motif_context`, `optimization_decision`, and `split_row_debug`."
+        in artifacts_ref
+    )
     assert "### Integrity checks" in artifacts_ref
     assert (
         "Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail,"

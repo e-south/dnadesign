@@ -23,6 +23,7 @@ from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import (
     _style_token_for_tag,
 )
 from dnadesign.baserender.src.adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
+from dnadesign.baserender.src.adapters.snapback_visual_v1 import SnapbackVisualV1Adapter
 from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import (
     YiuHairpinTopologyV1Adapter,
 )
@@ -47,10 +48,11 @@ def test_required_source_columns_densegen_includes_optional_present_columns() ->
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
             "overlay_text": "details",
+            "video_subtitle": "subtitle",
         },
         policies={},
     )
-    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details"]
+    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details", "subtitle"]
 
 
 def test_required_source_columns_generic_features_omits_missing_optional_columns() -> None:
@@ -95,6 +97,20 @@ def test_required_source_columns_densegen_accepts_overlay_text_optional_key() ->
     assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details"]
 
 
+def test_required_source_columns_densegen_accepts_video_subtitle_optional_key() -> None:
+    cfg = AdapterCfg(
+        kind="densegen_tfbs",
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+            "video_subtitle": "subtitle",
+        },
+        policies={},
+    )
+    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "subtitle"]
+
+
 def test_generic_features_adapter_accepts_display_video_subtitle() -> None:
     cfg = AdapterCfg(
         kind="generic_features",
@@ -130,6 +146,15 @@ def test_sequence_evidence_map_adapter_requires_no_source_columns() -> None:
 
     adapter = build_adapter(cfg, alphabet="DNA")
     assert isinstance(adapter, SequenceEvidenceMapV1Adapter)
+
+
+def test_snapback_visual_adapter_requires_no_source_columns() -> None:
+    cfg = AdapterCfg(kind="snapback_visual_v1", columns={}, policies={})
+
+    assert required_source_columns(cfg) == []
+
+    adapter = build_adapter(cfg, alphabet="DNA")
+    assert isinstance(adapter, SnapbackVisualV1Adapter)
 
 
 @pytest.mark.parametrize(
@@ -465,6 +490,43 @@ def test_sequence_evidence_map_adapter_can_exclude_tags_from_legend() -> None:
     ]
 
 
+def test_sequence_evidence_map_adapter_places_hairpin_pairings_on_bottom_lane() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "snapback_foldback",
+            "topology_kind": "hairpin_folded",
+            "alphabet": "dna",
+            "primary_sequence": "TCAGCAGTCTTGACT",
+            "complement_sequence": "AGTCGTCAGAACTGA",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [
+                {
+                    "pairing_id": "pair-1",
+                    "primary_start": 5,
+                    "primary_end": 6,
+                    "complement_start": 11,
+                    "complement_end": 12,
+                    "display_label": "WC pair",
+                    "short_label": "",
+                }
+            ],
+            "display": {"title": "Foldback"},
+            "meta": {},
+        },
+        row_index=0,
+    )
+
+    assert [effect.kind for effect in record.effects] == ["span_link"]
+    assert record.effects[0].params["lane"] == "bottom"
+    assert record.effects[0].params["label"] == ""
+    assert record.effects[0].render["track"] == 0
+
+
 def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_highlights() -> None:
     adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
 
@@ -530,6 +592,54 @@ def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_hi
     boundary_effects = [effect for effect in record.effects if effect.kind == "boundary_marker"]
     assert len(boundary_effects) == 1
     assert boundary_effects[0].target == {"boundary": 9, "lane": "primary"}
+
+
+def test_snapback_visual_adapter_embeds_contract_for_snapback_renderer() -> None:
+    adapter = SnapbackVisualV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "snapback_visual_v1",
+            "state_id": "demo.post_nick_foldback",
+            "state_kind": "post_nick_foldback",
+            "alphabet": "dna",
+            "title": "Foldback",
+            "primary_sequence": "TCAGCAGTCTTGACTA",
+            "complement_sequence": "AGTCGTCAGAACTGAT",
+            "primary_row_label": "Foldback",
+            "complement_row_label": "Partner",
+            "ligation_junction_boundary": 5,
+            "released_prefix_span": {"start": 0, "end": 5},
+            "retained_stem_span": {"start": 5, "end": 9},
+            "cap_span": {"start": 9, "end": 12},
+            "foldback_revcomp_span": {"start": 12, "end": 16},
+            "loop_geometry": {
+                "kind": "hairpin_corner_triloop_v1",
+                "source_cap_span": {"start": 9, "end": 11},
+                "cap_extension_span": {"start": 11, "end": 12},
+                "display_primary_span": {"start": 5, "end": 9},
+                "display_complement_span": {"start": 12, "end": 16},
+            },
+            "pairings": [
+                {"left_index": 5, "right_index": 15},
+                {"left_index": 6, "right_index": 14},
+            ],
+            "primary_mismatch_positions": [6],
+            "complement_mismatch_positions": [14],
+            "meta": {"source_view_kind": "snapback_post_nick_foldback_v1"},
+        },
+        row_index=0,
+    )
+
+    assert record.display.overlay_text is None
+    assert record.effects == ()
+    assert record.features == ()
+    assert record.meta["contract"]["state_kind"] == "post_nick_foldback"
+    assert record.meta["contract"]["pairings"] == [
+        {"left_index": 5, "right_index": 15},
+        {"left_index": 6, "right_index": 14},
+    ]
+    assert record.meta["contract"]["loop_geometry"]["kind"] == "hairpin_corner_triloop_v1"
 
 
 def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:

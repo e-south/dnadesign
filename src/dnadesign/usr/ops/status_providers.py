@@ -56,17 +56,20 @@ def _usr_sync_audit_status(sync_audit_json: object) -> tuple[str, str, dict[str,
             {"sync_audit_json": str(resolved_audit)},
         )
     payload = json.loads(resolved_audit.read_text(encoding="utf-8"))
-    transfer_state = str(payload.get("transfer_state") or "UNKNOWN")
+    audit_data = (
+        payload.get("data") if isinstance(payload, Mapping) and isinstance(payload.get("data"), Mapping) else payload
+    )
+    transfer_state = str(audit_data.get("transfer_state") or "UNKNOWN")
     changed_flags = {
-        "primary": bool((payload.get("primary") or {}).get("changed")),
-        "meta": bool((payload.get("meta") or {}).get("changed")),
-        "_snapshots": bool((payload.get("_snapshots") or {}).get("changed")),
-        "_derived": bool((payload.get("_derived") or {}).get("changed")),
-        "_auxiliary": bool((payload.get("_auxiliary") or {}).get("changed")),
+        "primary": bool((audit_data.get("primary") or {}).get("changed")),
+        "meta": bool((audit_data.get("meta") or {}).get("changed")),
+        "_snapshots": bool((audit_data.get("_snapshots") or {}).get("changed")),
+        "_derived": bool((audit_data.get("_derived") or {}).get("changed")),
+        "_auxiliary": bool((audit_data.get("_auxiliary") or {}).get("changed")),
     }
     has_pending_drift = any(changed_flags.values())
-    is_ok = transfer_state in {"NO-OP", "TRANSFERRED"} and not has_pending_drift
-    summary = f"{payload.get('dataset', '<unknown>')}: {transfer_state}"
+    is_ok = transfer_state in {"NO-OP", "TRANSFERRED", "DIFF-ONLY"} and not has_pending_drift
+    summary = f"{audit_data.get('dataset', '<unknown>')}: {transfer_state}"
     if has_pending_drift:
         summary += " with remaining drift"
     return (
@@ -74,12 +77,12 @@ def _usr_sync_audit_status(sync_audit_json: object) -> tuple[str, str, dict[str,
         summary,
         {
             "sync_audit_json": str(resolved_audit),
-            "action": payload.get("action"),
-            "dataset": payload.get("dataset"),
+            "action": audit_data.get("action"),
+            "dataset": audit_data.get("dataset"),
             "transfer_state": transfer_state,
-            "verify": dict(payload.get("verify") or {}),
+            "verify": dict(audit_data.get("verify") or {}),
             "changed_flags": changed_flags,
-            "events_log": dict(payload.get(".events.log") or {}),
+            "events_log": dict(audit_data.get(".events.log") or {}),
         },
     )
 

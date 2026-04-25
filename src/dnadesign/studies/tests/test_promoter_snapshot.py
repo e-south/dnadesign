@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -74,7 +75,19 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
         canonical_usr_root_path=tmp_path / "usr_root",
         dataset_states=(
             {
-                "dataset": "densegen/demo_anchor",
+                "dataset": "densegen_demo_anchor",
+                "declared_status": "present",
+                "exists": True,
+                "rows": 8,
+            },
+            {
+                "dataset": "promoter/demo_anchor_set",
+                "declared_status": "present",
+                "exists": True,
+                "rows": 8,
+            },
+            {
+                "dataset": "promoter/demo_construct_contexts",
                 "declared_status": "present",
                 "exists": True,
                 "rows": 8,
@@ -114,10 +127,37 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
         next_in_progress_phase={"id": "infer_batch_preparation", "status": "in_progress"},
         next_planned_phase={"id": "infer_anchor_only_20b", "status": "planned"},
         blocked_phases=(),
-        densegen_dataset_id="densegen/demo_anchor",
+        densegen_dataset_id="densegen_demo_anchor",
         densegen_rows=8,
         densegen_row_target=10,
         densegen_row_gap=2,
+        merged_anchor_dataset_id="promoter/demo_anchor_set",
+        merged_anchor_rows=8,
+        construct_context_dataset_id="promoter/demo_construct_contexts",
+        construct_context_rows=8,
+        dataset_refresh_states=(
+            {
+                "id": "merged_anchor_from_densegen",
+                "state": "ok",
+                "summary": "Merged anchor dataset is at least as current as the DenseGen source.",
+                "upstream_dataset": "densegen_demo_anchor",
+                "upstream_rows": 8,
+                "downstream_dataset": "promoter/demo_anchor_set",
+                "downstream_rows": 8,
+                "lag_rows": 0,
+            },
+            {
+                "id": "construct_contexts_from_merged_anchor",
+                "state": "ok",
+                "summary": "Construct context dataset is at least as current as the merged anchor dataset.",
+                "upstream_dataset": "promoter/demo_anchor_set",
+                "upstream_rows": 8,
+                "downstream_dataset": "promoter/demo_construct_contexts",
+                "downstream_rows": 8,
+                "lag_rows": 0,
+            },
+        ),
+        stale_dataset_ids=(),
         evidence={"study_id": "demo_study"},
     )
 
@@ -167,6 +207,7 @@ def test_resolve_promoter_study_status_context_limits_notify_profiles_to_runtime
             phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
                 model_family and model_family in phase_id
             ),
+            inspect_semantic_completeness=lambda **kwargs: None,
         ),
     )
 
@@ -224,6 +265,7 @@ def test_build_promoter_study_status_preserves_summary_and_attention_contract(tm
             phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
                 model_family and model_family in phase_id
             ),
+            inspect_semantic_completeness=lambda **kwargs: None,
         ),
         summary_scope="repo",
     )
@@ -231,14 +273,224 @@ def test_build_promoter_study_status_preserves_summary_and_attention_contract(tm
     assert state == "attention"
     assert summary == (
         "demo_study: phase infer_batch_preparation; preferred infer evo2_20b; "
-        "densegen/demo_anchor 8/10 rows; pending promoter/demo_feature_matrix; "
+        "source gate active densegen_demo_anchor 8/10 rows (gap=2); "
+        "handoffs ready anchor=8 construct=8; "
         "next in_progress infer_batch_preparation"
     )
-    assert evidence["attention_reasons"] == [
-        "DenseGen anchor target not met",
-        "study is not complete",
-    ]
+    assert evidence["attention_reasons"] == ["DenseGen source gate is still active"]
+    assert evidence["source_growth_state"] == {
+        "state": "attention",
+        "dataset": "densegen_demo_anchor",
+        "current_rows": 8,
+        "target_rows": 10,
+        "gap_rows": 2,
+        "target_met": False,
+        "gates_current_phase": True,
+        "source_phase_id": None,
+        "source_phase_status": None,
+        "superseded_by_handoffs": False,
+        "max_handoff_rows": 8,
+        "drives_top_level_attention": True,
+        "summary": "source gate active densegen_demo_anchor 8/10 rows (gap=2)",
+    }
+    assert evidence["handoff_readiness_state"] == {
+        "state": "ok",
+        "pending_datasets": [],
+        "stale_datasets": [],
+        "drives_top_level_attention": False,
+        "summary": "handoffs ready anchor=8 construct=8",
+    }
+    assert evidence["planned_outputs_state"] == {
+        "state": "ok",
+        "pending_datasets": ["promoter/demo_feature_matrix"],
+        "drives_top_level_attention": False,
+        "include_in_summary": False,
+        "summary": "future outputs still planned promoter/demo_feature_matrix",
+    }
+    assert evidence["semantic_completeness_state"] is None
+    assert evidence["latentdna"]["state"] == "not_configured"
+    assert evidence["cluster"]["state"] == "planned"
+    assert evidence["opal"]["state"] == "not_configured"
+    assert evidence["analysis_surfaces"] == {}
     assert "local_advisories" not in evidence
+
+
+def test_build_promoter_study_status_demotes_source_gate_once_handoffs_exceed_target(tmp_path: Path) -> None:
+    base_context = _make_study_context(tmp_path)
+    study_context = replace(
+        base_context,
+        dataset_states=(
+            {
+                "dataset": "densegen_demo_anchor",
+                "declared_status": "present",
+                "exists": True,
+                "rows": 8,
+            },
+            {
+                "dataset": "promoter/demo_anchor_set",
+                "declared_status": "present",
+                "exists": True,
+                "rows": 12,
+            },
+            {
+                "dataset": "promoter/demo_construct_contexts",
+                "declared_status": "present",
+                "exists": True,
+                "rows": 12,
+            },
+            {
+                "dataset": "promoter/demo_feature_matrix",
+                "declared_status": "planned",
+                "exists": False,
+                "rows": None,
+            },
+        ),
+        phase_states=(
+            {
+                "id": "densegen_growth",
+                "status": "parallel_optional",
+                "primary_dataset": "densegen_demo_anchor",
+            },
+            {"id": "infer_batch_preparation", "status": "in_progress"},
+            {
+                "id": "infer_anchor_only_20b",
+                "status": "planned",
+                "next_surface": "runbooks/anchor_only_20b.yaml",
+            },
+        ),
+        merged_anchor_rows=12,
+        construct_context_rows=12,
+        dataset_refresh_states=(
+            {
+                "id": "merged_anchor_from_densegen",
+                "state": "ok",
+                "summary": "Merged anchor dataset is at least as current as the DenseGen source.",
+                "upstream_dataset": "densegen_demo_anchor",
+                "upstream_rows": 8,
+                "downstream_dataset": "promoter/demo_anchor_set",
+                "downstream_rows": 12,
+                "lag_rows": 0,
+            },
+            {
+                "id": "construct_contexts_from_merged_anchor",
+                "state": "ok",
+                "summary": "Construct context dataset is at least as current as the merged anchor dataset.",
+                "upstream_dataset": "promoter/demo_anchor_set",
+                "upstream_rows": 12,
+                "downstream_dataset": "promoter/demo_construct_contexts",
+                "downstream_rows": 12,
+                "lag_rows": 0,
+            },
+        ),
+    )
+    status_context = PromoterStudyStatusResolvedContext(
+        infer_runtime=PromoterStudyInferRuntimeResolvedContext(
+            preferred_model_family="evo2_20b",
+            supported_model_families=("evo2_20b", "evo2_7b"),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        ),
+    )
+
+    state, summary, evidence = build_promoter_study_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=PromoterStudyStatusDependencies(
+            infer_runtime=PromoterStudyInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: None,
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "ok"
+    assert summary == (
+        "demo_study: phase infer_batch_preparation; preferred infer evo2_20b; "
+        "handoffs ready anchor=12 construct=12; "
+        "source gate superseded by downstream handoffs densegen_demo_anchor 8/10 rows (gap=2); "
+        "next in_progress infer_batch_preparation"
+    )
+    assert "attention_reasons" not in evidence
+    assert evidence["source_growth_state"]["state"] == "ok"
+    assert evidence["source_growth_state"]["target_met"] is False
+    assert evidence["source_growth_state"]["gates_current_phase"] is False
+    assert evidence["source_growth_state"]["source_phase_id"] == "densegen_growth"
+    assert evidence["source_growth_state"]["source_phase_status"] == "parallel_optional"
+    assert evidence["source_growth_state"]["superseded_by_handoffs"] is True
+    assert evidence["source_growth_state"]["max_handoff_rows"] == 12
+
+
+def test_build_promoter_study_status_surfaces_semantic_completeness_attention(tmp_path: Path) -> None:
+    study_context = _make_study_context(tmp_path)
+    status_context = PromoterStudyStatusResolvedContext(
+        infer_runtime=PromoterStudyInferRuntimeResolvedContext(
+            preferred_model_family="evo2_20b",
+            supported_model_families=("evo2_20b", "evo2_7b"),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        ),
+    )
+
+    semantic_state = {
+        "state": "attention",
+        "drives_top_level_attention": True,
+        "summary": (
+            "source overlay needs compaction densegen_demo_anchor:densegen; "
+            "anchor DenseGen metadata incomplete promoter/demo_anchor_set 6/8"
+        ),
+    }
+
+    state, summary, evidence = build_promoter_study_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=PromoterStudyStatusDependencies(
+            infer_runtime=PromoterStudyInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: semantic_state,
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "attention"
+    assert "source overlay needs compaction" in summary
+    assert evidence["semantic_completeness_state"] == semantic_state
+    assert "shared handoff metadata is semantically incomplete" in evidence["attention_reasons"]
 
 
 def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path, monkeypatch) -> None:

@@ -45,6 +45,30 @@ def test_study_workflow_delegates_summarize_to_study_summary_module() -> None:
     assert summarize_def_idx < 0, "study_workflow should not define summarize_study_run directly."
 
 
+def test_study_workflow_delegates_state_helpers_to_study_state_module() -> None:
+    import dnadesign.cruncher.app.study_state as state_helpers
+    import dnadesign.cruncher.app.study_workflow as workflow
+
+    assert workflow._refresh_status is state_helpers._refresh_status
+    assert workflow._prepare_study_run_dir is state_helpers._prepare_study_run_dir
+    assert workflow._persist_study_state is state_helpers._persist_study_state
+    assert workflow._mark_trial_run_started is state_helpers._mark_trial_run_started
+    assert workflow._finalize_trial_run is state_helpers._finalize_trial_run
+
+
+def test_study_workflow_imports_postprocess_helpers_from_study_postprocess() -> None:
+    cruncher_root = Path(__file__).resolve().parents[2]
+    workflow_path = cruncher_root / "src" / "app" / "study_workflow.py"
+    content = workflow_path.read_text()
+
+    helper_import = "from dnadesign.cruncher.app.study_postprocess import ("
+
+    assert helper_import in content
+    assert "_run_study_replays as _run_study_replays_helper" in content
+    assert "_maybe_summarize_study as _maybe_summarize_study_helper" in content
+    assert "_finalize_study_completion as _finalize_study_completion_helper" in content
+
+
 def test_summarize_study_run_sets_cache_before_lazy_plot_imports() -> None:
     cruncher_root = Path(__file__).resolve().parents[2]
     summary_path = cruncher_root / "src" / "app" / "study_summary.py"

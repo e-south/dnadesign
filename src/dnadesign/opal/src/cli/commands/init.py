@@ -18,7 +18,7 @@ import typer
 
 from ...core.utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
 from ...storage.state import CampaignState
-from ..formatting import render_init_human
+from ..formatting import render_init_text
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
@@ -35,8 +35,8 @@ from ._common import (
 @cli_command("init", help="Initialize/validate the campaign workspace; write state.json.")
 def cmd_init(
     config: Path = typer.Option(None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"),
-    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ):
     try:
         cfg_path = resolve_config_path(config)
@@ -90,7 +90,7 @@ def cmd_init(
         if json:
             json_out(out)
         else:
-            print_stdout(render_init_human(workdir=Path(out["workdir"])))
+            print_stdout(render_init_text(workdir=Path(out["workdir"])))
             maybe_print_hints(command_name="init", cfg_path=cfg_path, no_hints=no_hints, json_output=json)
     except OpalError as e:
         opal_error("init", e)

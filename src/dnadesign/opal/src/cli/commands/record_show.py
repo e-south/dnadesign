@@ -19,7 +19,7 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.record_show import build_record_report
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
-from ..formatting import render_record_report_human
+from ..formatting import render_record_report_text
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -162,7 +162,7 @@ def cmd_record_show(
         if json:
             json_out(report)
         else:
-            print_stdout(render_record_report_human(report))
+            print_stdout(render_record_report_text(report))
     except OpalError as e:
         opal_error("record-show", e)
         raise typer.Exit(code=e.exit_code)

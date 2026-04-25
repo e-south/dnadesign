@@ -277,7 +277,7 @@ set -euo pipefail
 
 # Example: transfer-only operations
 # uv run python scripts/prefetch_models.py
-# uv run usr pull densegen/demo_hpc bu-scc -y
+# uv run usr pull densegen_demo_hpc bu-scc -y
 QSUB
 ```
 

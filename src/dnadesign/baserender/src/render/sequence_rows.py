@@ -534,7 +534,11 @@ def _span_link_label_boxes(
         if x2 <= x1:
             continue
 
-        base_fs = max(6, style.font_size_label - 2)
+        base_fs = (
+            max(6, int(round(style.display_font_size())))
+            if bool(style.uniform_display_font_size)
+            else max(6, style.font_size_label - 2)
+        )
         avail = max(4.0, x2 - x1)
         label = str(effect.params.get("label", "")).strip()
         fs = base_fs
@@ -580,7 +584,9 @@ def _compact_fixed_element_annotation_label(raw_label: str) -> str:
 
 
 def _fixed_element_annotation_font_size(style: Style) -> float:
-    return float(max(6, style.font_size_label - 2))
+    if bool(style.uniform_display_font_size):
+        return style.display_font_size()
+    return float(max(6, style.font_size_label, style.font_size_seq))
 
 
 def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, palette: Palette, style: Style) -> None:
@@ -636,7 +642,8 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
 
         tag = feature.tags[0] if feature.tags else feature.kind
         fallback = tag.split(":")[-1] if ":" in tag else tag
-        raw_label = str(labels.get(tag, fallback))
+        feature_display_label = feature.attrs.get("display_label")
+        raw_label = str(feature_display_label or labels.get(tag, fallback))
         text = _compact_fixed_element_annotation_label(raw_label)
         if not text:
             continue
@@ -870,7 +877,11 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         x = style.padding_x
         ha = "left"
     synthetic_top_pad = max(0.0, float(layout.content_top) - _actual_content_top(layout))
-    title_size = max(float(style.font_size_label), float(style.font_size_seq))
+    title_size = (
+        style.display_font_size()
+        if bool(style.uniform_display_font_size)
+        else max(float(style.font_size_label), float(style.font_size_seq))
+    )
     title_lines = max(1, len([line for line in str(text).splitlines() if line.strip()]))
     title_line_height = max((title_size / 72.0 * style.dpi) * 1.05, layout.ch * 0.5)
     title_block_height = title_line_height * title_lines
@@ -1261,7 +1272,7 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
             str(primary),
             ha="right",
             va="center",
-            fontsize=style.font_size_label,
+            fontsize=style.display_font_size() if bool(style.uniform_display_font_size) else style.font_size_label,
             family=style.font_label,
             color="#374151",
             zorder=4.0,
@@ -1274,7 +1285,7 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
             str(complement),
             ha="right",
             va="center",
-            fontsize=style.font_size_label,
+            fontsize=style.display_font_size() if bool(style.uniform_display_font_size) else style.font_size_label,
             family=style.font_label,
             color="#374151",
             zorder=4.0,
@@ -1286,7 +1297,12 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
     segment_labels = record.meta.get("segment_labels") if isinstance(record.meta, Mapping) else None
     if not isinstance(segment_labels, Sequence) or isinstance(segment_labels, (str, bytes)):
         return
-    y = layout.y_forward + layout.sequence_extent_up + max(5.0, style.font_size_label * 0.4)
+    font_size = style.display_font_size() if bool(style.uniform_display_font_size) else max(9, style.font_size_label)
+    line_height = max(10.0, (float(font_size) / 72.0) * float(style.dpi))
+    horizontal_gap = max(6.0, layout.cw * 0.25)
+    top_tiers: list[list[tuple[float, float]]] = []
+    bottom_tiers: list[list[tuple[float, float]]] = []
+    placements: list[tuple[str, str, float, int]] = []
     for raw in segment_labels:
         if not isinstance(raw, Mapping):
             continue
@@ -1300,14 +1316,41 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
             continue
         if end <= start:
             continue
+        row_id = str(raw.get("row_id", "primary")).strip().lower() or "primary"
+        if row_id not in {"primary", "complement"}:
+            row_id = "primary"
         x = layout.x_left + ((start + end) / 2.0) * layout.cw
+        text_width = _text_px_width(text, style.font_label, int(round(font_size)), style.dpi)
+        x0 = x - text_width / 2.0
+        x1 = x + text_width / 2.0
+        tiers = bottom_tiers if row_id == "complement" else top_tiers
+        tier_index = len(tiers)
+        for candidate_index, occupied in enumerate(tiers):
+            if all((x1 + horizontal_gap) <= left or (x0 - horizontal_gap) >= right for left, right in occupied):
+                tier_index = candidate_index
+                occupied.append((x0, x1))
+                break
+        else:
+            tiers.append([(x0, x1)])
+        placements.append((row_id, text, x, tier_index))
+
+    top_base_y = layout.y_forward + layout.sequence_extent_up + max(18.0, style.font_size_label * 1.4)
+    bottom_base_y = layout.y_reverse - layout.sequence_extent_down - max(16.0, style.font_size_label * 1.2)
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
+    for row_id, text, x, tier_index in placements:
+        if row_id == "complement" and show_two:
+            y = bottom_base_y - tier_index * line_height * 1.05
+            va = "top"
+        else:
+            y = top_base_y + tier_index * line_height * 1.05
+            va = "bottom"
         ax.text(
             x,
             y,
             text,
             ha="center",
-            va="bottom",
-            fontsize=max(10, style.font_size_label),
+            va=va,
+            fontsize=font_size,
             family=style.font_label,
             color="#111827",
             zorder=4.3,
@@ -1332,7 +1375,11 @@ def _draw_coordinate_ticks(ax, record: Record, layout: LayoutContext, style: Sty
             str(boundary),
             ha="center",
             va="top",
-            fontsize=max(7, style.font_size_label - 2),
+            fontsize=(
+                style.display_font_size()
+                if bool(style.uniform_display_font_size)
+                else max(7, style.font_size_label - 2)
+            ),
             family=style.font_label,
             color=style.color_ticks,
             zorder=1.3,
@@ -1362,7 +1409,7 @@ def _draw_sequence(
         left_label,
         va="center",
         ha="right",
-        fontsize=style.font_size_label,
+        fontsize=style.display_font_size() if bool(style.uniform_display_font_size) else style.font_size_label,
         family=style.font_label,
         color=style.color_sequence,
         alpha=0.9,
@@ -1373,7 +1420,7 @@ def _draw_sequence(
         right_label,
         va="center",
         ha="left",
-        fontsize=style.font_size_label,
+        fontsize=style.display_font_size() if bool(style.uniform_display_font_size) else style.font_size_label,
         family=style.font_label,
         color=style.color_sequence,
         alpha=0.9,
@@ -1572,7 +1619,18 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
     if not legend:
         return
 
-    available_width = max(0.0, float(total_width) - (2.0 * float(style.padding_x)))
+    coord_scale = max(1.0e-6, float(style.figure_scale))
+
+    def _to_layout_units(value: float) -> float:
+        return float(value) / coord_scale
+
+    # Bottom legends act as a footer; they do not need the same horizontal padding as the sequence body.
+    side_pad = (
+        max(6.0, min(12.0, float(style.padding_x) * 0.35))
+        if bool(style.uniform_display_font_size)
+        else float(style.padding_x)
+    )
+    available_width = max(0.0, float(total_width) - (2.0 * side_pad))
     if available_width <= 0.0:
         return
 
@@ -1593,36 +1651,86 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
             rows.append(current)
         return rows
 
-    base_font_size = max(6, int(style.legend_font_size))
-    min_font_size = 6
+    base_font_size = max(
+        6,
+        int(round(style.display_font_size() if bool(style.uniform_display_font_size) else style.legend_font_size)),
+    )
+    min_font_size = base_font_size if bool(style.uniform_display_font_size) else 6
+    is_uniform_footer = bool(style.uniform_display_font_size)
+    min_patch_w = max(
+        _to_layout_units(8.0),
+        _to_layout_units(float(style.legend_patch_w) if is_uniform_footer else float(style.legend_patch_w) * 0.55),
+    )
+    min_patch_h = max(
+        _to_layout_units(6.0),
+        _to_layout_units(float(style.legend_patch_h) if is_uniform_footer else float(style.legend_patch_h) * 0.55),
+    )
+    min_gap_patch_text = max(
+        _to_layout_units(2.0),
+        _to_layout_units(
+            max(12.0, float(style.legend_gap_patch_text) * 0.6)
+            if is_uniform_footer
+            else float(style.legend_gap_patch_text) * 0.5
+        ),
+    )
+    min_gap_x = max(
+        0.0,
+        _to_layout_units(max(24.0, float(style.legend_gap_x) * 0.4) if is_uniform_footer else 0.0),
+    )
     selected_layout: tuple[int, float, float, float, float, float, float, list[float], list[list[int]]] | None = None
 
+    legend_indices = list(range(len(legend)))
     for font_size in range(base_font_size, min_font_size - 1, -1):
-        scale = float(font_size) / float(base_font_size)
-        patch_w = max(8.0, float(style.legend_patch_w) * scale)
-        patch_h = max(6.0, float(style.legend_patch_h) * scale)
-        gap_patch_text = max(2.0, float(style.legend_gap_patch_text) * scale)
-        gap_x_requested = max(0.0, float(style.legend_gap_x) * scale)
-        text_widths = [_text_px_width(label, style.font_label, font_size, style.dpi) for _tag, label in legend]
-        entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
-        if any(width > available_width for width in entry_widths):
-            continue
-
-        rows = _wrap_rows(entry_widths, gap_x=gap_x_requested)
-        gap_x = gap_x_requested
-        per_row_max_gap: list[float] = []
-        for row in rows:
-            if len(row) <= 1:
+        font_scale = float(font_size) / float(base_font_size)
+        geometry_scales = (
+            (1.0,)
+            if is_uniform_footer
+            else (
+                1.0,
+                0.92,
+                0.84,
+                0.76,
+            )
+        )
+        for geometry_scale in geometry_scales:
+            patch_w = max(
+                min_patch_w,
+                _to_layout_units(float(style.legend_patch_w) * font_scale * geometry_scale),
+            )
+            patch_h = max(
+                min_patch_h,
+                _to_layout_units(float(style.legend_patch_h) * font_scale * geometry_scale),
+            )
+            gap_patch_text = max(
+                min_gap_patch_text,
+                _to_layout_units(float(style.legend_gap_patch_text) * min(font_scale, geometry_scale)),
+            )
+            text_widths = [
+                _to_layout_units(_text_px_width(label, style.font_label, font_size, style.dpi))
+                for _tag, label in legend
+            ]
+            entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
+            if any(width > available_width for width in entry_widths):
                 continue
-            row_fixed_width = sum(entry_widths[idx] for idx in row)
-            per_row_max_gap.append(max(0.0, (available_width - row_fixed_width) / float(len(row) - 1)))
-        if per_row_max_gap:
-            gap_x = min(gap_x_requested, min(per_row_max_gap))
-
-        row_height = max(patch_h, float(font_size) * 1.18)
-        row_gap_y = max(2.0, min(8.0, row_height * 0.22))
-        rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
-        if rows_height <= float(style.legend_height_px):
+            requested_gap_x = max(
+                min_gap_x,
+                _to_layout_units(float(style.legend_gap_x) * min(font_scale, geometry_scale)),
+            )
+            if len(entry_widths) <= 1:
+                gap_x = 0.0
+                row_total = sum(entry_widths)
+            else:
+                fixed_width = sum(entry_widths)
+                max_gap = max(0.0, (available_width - fixed_width) / float(len(entry_widths) - 1))
+                if max_gap < min_gap_x:
+                    continue
+                gap_x = min(requested_gap_x, max_gap)
+                row_total = fixed_width + float(len(entry_widths) - 1) * gap_x
+            if row_total > available_width:
+                continue
+            row_height = max(patch_h, _to_layout_units(float(font_size) * 1.18))
+            if row_height > float(style.legend_height_px):
+                continue
             selected_layout = (
                 font_size,
                 patch_w,
@@ -1630,24 +1738,71 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
                 gap_patch_text,
                 gap_x,
                 row_height,
-                row_gap_y,
+                0.0,
                 entry_widths,
-                rows,
+                [legend_indices],
             )
             break
+        if selected_layout is not None:
+            break
+
+    if selected_layout is None:
+        for font_size in range(base_font_size, min_font_size - 1, -1):
+            scale = float(font_size) / float(base_font_size)
+            patch_w = max(min_patch_w, _to_layout_units(float(style.legend_patch_w) * scale))
+            patch_h = max(min_patch_h, _to_layout_units(float(style.legend_patch_h) * scale))
+            gap_patch_text = max(min_gap_patch_text, _to_layout_units(float(style.legend_gap_patch_text) * scale))
+            gap_x_requested = max(0.0, _to_layout_units(float(style.legend_gap_x) * scale))
+            text_widths = [
+                _to_layout_units(_text_px_width(label, style.font_label, font_size, style.dpi))
+                for _tag, label in legend
+            ]
+            entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
+            if any(width > available_width for width in entry_widths):
+                continue
+
+            rows = _wrap_rows(entry_widths, gap_x=gap_x_requested)
+            gap_x = gap_x_requested
+            per_row_max_gap: list[float] = []
+            for row in rows:
+                if len(row) <= 1:
+                    continue
+                row_fixed_width = sum(entry_widths[idx] for idx in row)
+                per_row_max_gap.append(max(0.0, (available_width - row_fixed_width) / float(len(row) - 1)))
+            if per_row_max_gap:
+                gap_x = min(gap_x_requested, min(per_row_max_gap))
+
+            row_height = max(patch_h, _to_layout_units(float(font_size) * 1.18))
+            row_gap_y = max(_to_layout_units(2.0), min(_to_layout_units(8.0), row_height * 0.22))
+            rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
+            if rows_height <= float(style.legend_height_px):
+                selected_layout = (
+                    font_size,
+                    patch_w,
+                    patch_h,
+                    gap_patch_text,
+                    gap_x,
+                    row_height,
+                    row_gap_y,
+                    entry_widths,
+                    rows,
+                )
+                break
 
     if selected_layout is None:
         font_size = min_font_size
         scale = float(font_size) / float(base_font_size)
-        patch_w = max(8.0, float(style.legend_patch_w) * scale)
-        patch_h = max(6.0, float(style.legend_patch_h) * scale)
-        gap_patch_text = max(2.0, float(style.legend_gap_patch_text) * scale)
-        gap_x = max(0.0, float(style.legend_gap_x) * scale)
-        text_widths = [_text_px_width(label, style.font_label, font_size, style.dpi) for _tag, label in legend]
+        patch_w = max(min_patch_w, _to_layout_units(float(style.legend_patch_w) * scale))
+        patch_h = max(min_patch_h, _to_layout_units(float(style.legend_patch_h) * scale))
+        gap_patch_text = max(min_gap_patch_text, _to_layout_units(float(style.legend_gap_patch_text) * scale))
+        gap_x = max(0.0, _to_layout_units(float(style.legend_gap_x) * scale))
+        text_widths = [
+            _to_layout_units(_text_px_width(label, style.font_label, font_size, style.dpi)) for _tag, label in legend
+        ]
         entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
         rows = _wrap_rows(entry_widths, gap_x=gap_x)
-        row_height = max(patch_h, float(font_size) * 1.18)
-        row_gap_y = max(2.0, min(8.0, row_height * 0.22))
+        row_height = max(patch_h, _to_layout_units(float(font_size) * 1.18))
+        row_gap_y = max(_to_layout_units(2.0), min(_to_layout_units(8.0), row_height * 0.22))
     else:
         (
             font_size,
@@ -1662,13 +1817,13 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         ) = selected_layout
 
     total_rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
-    y = float(style.legend_pad_px) + max(0.0, (float(style.legend_height_px) - total_rows_height) / 2.0)
+    y = style.legend_origin_y(total_rows_height=total_rows_height)
     for row in rows:
         row_total = sum(entry_widths[idx] for idx in row)
         if len(row) > 1:
             row_total += float(len(row) - 1) * gap_x
-        x = (total_width - row_total) / 2.0 if style.legend_center else float(style.padding_x)
-        x = max(x, float(style.padding_x))
+        x = (total_width - row_total) / 2.0 if style.legend_center else side_pad
+        x = max(x, side_pad)
         for position, idx in enumerate(row):
             tag, label = legend[idx]
             color = palette.color_for(tag)

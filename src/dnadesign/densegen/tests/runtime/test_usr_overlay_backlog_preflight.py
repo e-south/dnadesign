@@ -31,7 +31,7 @@ def _copy_registry(usr_root: Path) -> None:
     registry_dst.write_text(registry_src.read_text(encoding="utf-8"), encoding="utf-8")
 
 
-def _densegen_cfg_stub(*, run_id: str = "demo", dataset: str = "demo_workspace"):
+def _densegen_cfg_stub(*, run_id: str = "demo", dataset: str = "densegen_demo_workspace"):
     return SimpleNamespace(
         run=SimpleNamespace(id=run_id),
         output=SimpleNamespace(
@@ -49,7 +49,7 @@ def test_resume_preflight_replays_pending_usr_overlay_backlog(tmp_path: Path, mo
     usr_root = tmp_path / "outputs" / "usr"
     _copy_registry(usr_root)
     writer = USRWriter(
-        dataset="demo_workspace",
+        dataset="densegen_demo_workspace",
         root=usr_root,
         namespace="densegen",
         chunk_size=8,
@@ -71,7 +71,7 @@ def test_resume_preflight_replays_pending_usr_overlay_backlog(tmp_path: Path, mo
     with pytest.raises(RuntimeError, match="simulated overlay write failure"):
         writer.flush()
 
-    dataset_dir = usr_root / "demo_workspace"
+    dataset_dir = usr_root / "densegen_demo_workspace"
     backlog_root = dataset_dir / "_artifacts" / "pending_overlay"
     overlay_root = dataset_dir / "_derived" / "densegen"
     assert pq.read_table(dataset_dir / "records.parquet").num_rows == 1
@@ -97,11 +97,11 @@ def test_resume_preflight_noops_without_pending_usr_overlay_backlog(tmp_path: Pa
     )
 
     assert replayed_parts == 0
-    assert not (tmp_path / "outputs" / "usr" / "demo_workspace").exists()
+    assert not (tmp_path / "outputs" / "usr" / "densegen_demo_workspace").exists()
 
 
 def test_resume_preflight_fails_when_backlog_exists_without_records(tmp_path: Path) -> None:
-    dataset_dir = tmp_path / "outputs" / "usr" / "demo_workspace"
+    dataset_dir = tmp_path / "outputs" / "usr" / "densegen_demo_workspace"
     backlog_root = dataset_dir / "_artifacts" / "pending_overlay"
     backlog_root.mkdir(parents=True, exist_ok=True)
     (backlog_root / "part-1.parquet").write_text("pending", encoding="utf-8")

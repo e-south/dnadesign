@@ -148,6 +148,7 @@ def test_get_adapter_wraps_non_infer_errors_as_model_load_error() -> None:
 
 def test_is_oom_matches_case_insensitive_phrase() -> None:
     assert is_oom(RuntimeError("CUDA Out Of Memory")) is True
+    assert is_oom(RuntimeError("Expected canUse32BitIndexMath(input) to be true")) is True
     assert is_oom(RuntimeError("other failure")) is False
 
 

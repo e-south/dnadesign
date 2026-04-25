@@ -102,7 +102,7 @@ def render_guide_markdown(report: GuidanceReport) -> str:
     return "\n".join(lines)
 
 
-def render_next_human(next_report: NextGuidance) -> str:
+def render_next_text(next_report: NextGuidance) -> str:
     lines: list[str] = []
     lines.append("Guided Next Step")
     lines.append("")

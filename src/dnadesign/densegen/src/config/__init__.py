@@ -78,7 +78,7 @@ from .inputs import (
 )
 from .logging import LoggingConfig, LoggingVisualsConfig
 from .output import OutputConfig, OutputParquetConfig, OutputSchemaConfig, OutputUSRConfig
-from .plots import PlotConfig
+from .plots import PlotConfig, StageASummaryPlotOptions
 from .postprocess import PadConfig, PadGcConfig, PostprocessConfig
 from .root import DenseGenConfig, RootConfig, load_config
 from .runtime import RuntimeConfig
@@ -148,6 +148,7 @@ __all__ = [
     "SequenceLibraryInput",
     "SideBiases",
     "SolverConfig",
+    "StageASummaryPlotOptions",
     "SUPPORTED_SCHEMA_VERSIONS",
     "USRSequencesInput",
     "expand_generation_plans",

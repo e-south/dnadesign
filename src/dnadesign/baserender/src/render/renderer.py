@@ -66,6 +66,12 @@ def _build_topology_cartoon_renderer() -> Renderer:
     return TopologyCartoonRenderer()
 
 
+def _build_snapback_map_renderer() -> Renderer:
+    from .snapback_map import SnapbackMapRenderer
+
+    return SnapbackMapRenderer()
+
+
 @dataclass(frozen=True)
 class _RendererRegistry:
     renderers: dict[str, _RegisteredRenderer]
@@ -135,6 +141,17 @@ _REGISTRY = _RendererRegistry(
                 docs_slug="topology-cartoon",
             ),
             factory=_build_topology_cartoon_renderer,
+        ),
+        "snapback_map": _RegisteredRenderer(
+            descriptor=RendererDescriptor(
+                name="snapback_map",
+                topology_kinds=("linear_dsdna", "linear_ssdna", "hairpin_folded"),
+                accepted_alphabets=("DNA", "IUPAC_DNA"),
+                required_record_features=(),
+                optional_record_features=(),
+                docs_slug="snapback-map",
+            ),
+            factory=_build_snapback_map_renderer,
         ),
     }
 )

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">latentdna banner</title>
+  <desc id="desc">latentdna title banner with latent geometry grid and downstream artifact motifs.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="320" fill="url(#bg)" rx="24" />
+  <g fill="none" stroke="#93c5fd" stroke-width="6" opacity="0.7">
+    <rect x="56" y="52" width="164" height="164" rx="18" />
+    <rect x="92" y="88" width="164" height="164" rx="18" />
+    <path d="M118 152c34-44 74-44 108 0s74 44 108 0" />
+  </g>
+  <g fill="#e0f2fe">
+    <text x="320" y="138" font-size="78" font-family="Helvetica, Arial, sans-serif" font-weight="700">latentdna</text>
+    <text x="322" y="188" font-size="28" font-family="Helvetica, Arial, sans-serif">artifact-first downstream latent analysis</text>
+    <text x="322" y="232" font-size="24" font-family="Helvetica, Arial, sans-serif" opacity="0.88">workspace-owned views, samples, projections, and plots</text>
+  </g>
+</svg>

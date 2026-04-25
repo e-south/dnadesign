@@ -54,3 +54,42 @@ def build_extract_chunk_write_back(
         )
 
     return _write_back_chunk
+
+
+def build_extract_chunk_group_write_back(
+    *,
+    source: str,
+    write_back: bool,
+    ds,
+    ids: Optional[List[str]],
+    model_id: str,
+    job_id: str,
+    overwrite: bool,
+    writer: Callable[..., None] = write_back_usr,
+) -> Optional[Callable[..., None]]:
+    if source != "usr" or not write_back:
+        return None
+    if ids is None or ds is None:
+        raise WriteBackError("USR chunk write-back requires ids and dataset handle")
+
+    def _write_back_chunk_group(
+        idx_chunk: List[int],
+        columnar: Mapping[str, List[object]],
+        *,
+        overwrite_override: bool | None = None,
+        event_args: Mapping[str, object] | None = None,
+    ) -> None:
+        if not columnar:
+            return
+        chunk_ids = [ids[row_index] for row_index in idx_chunk]
+        writer(
+            ds,
+            ids=chunk_ids,
+            model_id=model_id,
+            job_id=job_id,
+            columnar=dict(columnar),
+            overwrite=overwrite if overwrite_override is None else bool(overwrite_override),
+            event_args=event_args,
+        )
+
+    return _write_back_chunk_group

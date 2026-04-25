@@ -142,6 +142,18 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "reference/cassette_artifacts.md",
             ),
         ),
+        "snapback": (
+            "Validate and Search Single-Nick Foldbacks",
+            (
+                "guides/snapback_workflow.md",
+                "guides/snapback_released_workflow.md",
+                "reference/snapback_artifacts.md",
+                "reference/released_snapback_artifacts.md",
+                "reference/release_enzyme_catalogs.md",
+                "../workspaces/de033/README.md",
+                "../workspaces/de033/runbook.md",
+            ),
+        ),
         "yiu": (
             "Payload-Centric YIU Workflows",
             (
@@ -180,6 +192,9 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                     "reference/cassette_solve_spec.md",
                     "reference/nickase_catalog.md",
                     "reference/cassette_artifacts.md",
+                    "reference/snapback_artifacts.md",
+                    "reference/released_snapback_artifacts.md",
+                    "reference/release_enzyme_catalogs.md",
                     "reference/yiu_spec.md",
                     "reference/yiu_artifacts.md",
                     "reference/yiu_visual_system.md",

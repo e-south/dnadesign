@@ -28,7 +28,7 @@ def _required_summary_field(summary: dict, key: str) -> str:
     return val
 
 
-def render_run_summary_human(summary: dict) -> str:
+def render_run_summary_text(summary: dict) -> str:
     rid = summary.get("run_id", "")
     requested = summary.get("top_k_requested")
     effective = summary.get("top_k_effective")
@@ -65,7 +65,7 @@ def render_run_summary_human(summary: dict) -> str:
     return "\n".join(lines)
 
 
-def render_run_meta_human(row: Mapping[str, Any]) -> str:
+def render_run_meta_text(row: Mapping[str, Any]) -> str:
     y_ops = row.get("training__y_ops") or []
     y_ops_str = ", ".join([p.get("name") for p in y_ops]) if y_ops else "(none)"
     if tui_enabled():

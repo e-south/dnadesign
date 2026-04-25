@@ -1,0 +1,28 @@
+plot_id: context_robustness_summary
+question: Does added construct context preserve the anchor-level design geometry or dilute it?
+decision_role: primary
+encoding: Candidate-by-metric bar panels for anchor-vs-context self cosine and cohort-distance retention across design family, regulator composition, and Sigma-35.
+scope: A 4,096-row design-family-stratified sample of aligned anchor/context pairs for the canonical representation families, with one construct context per promoter anchor.
+guardrails:
+  - Use this panel to judge anchor-to-context geometry retention for matched promoters.
+  - Reference-promoter alignment belongs in the appendix reference panel.
+caption: Context-robustness summary across aligned anchor and construct-context representations.
+alt_text: Bar-panel summary showing self-cosine stability and cohort-geometry retention between anchor and full-context representations.
+preprocessing_md: Anchor and context vectors are each standardized by view and row-normalized before self-cosine or centroid-distance retention is computed on the persisted 4,096-row design-family-stratified sample; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
+math_md: |
+  Row-level stability uses
+  $$
+  \mathrm{self\_cos}_i = \cos\left(z_i^{\mathrm{anchor}}, z_i^{\mathrm{context}}\right).
+  $$
+  For each annotation axis \(A\), retention uses
+  $$
+  \mathrm{retention}_A =
+  \rho_{\mathrm{Pearson}}\left(
+    \mathrm{upper}(D_A^{\mathrm{anchor}}),
+    \mathrm{upper}(D_A^{\mathrm{context}})
+  \right),
+  $$
+  where each \(D_A\) is the cohort centroid-distance matrix for that view.
+rationale_md: Answers whether full-context mean pooling preserves or washes out the anchor-level design geometry.
+limitations_md: This panel reports a sample estimate rather than the full aligned population, and high agreement can still preserve nuisance structure.
+failure_modes_md: The summary fails fast if anchor and context do not retain the same non-degenerate cohort pairs for a reported annotation axis. A family can still look stable overall while context preserves nuisance structure.

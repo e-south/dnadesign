@@ -54,11 +54,21 @@ def test_status_registry_fragments_load_provider_owned_specs() -> None:
     )
     assert supported_specs["promoter-study-preflight"].owner_boundary == "usr"
     assert supported_specs["promoter-study-preflight"].observes_plane == "execution_readiness"
+    assert supported_specs["cruncher-study-preflight"].provider_ref == (
+        "dnadesign.studies.families.cruncher.ops.provider:provide_cruncher_preflight"
+    )
+    assert supported_specs["cruncher-study-preflight"].owner_boundary == "cruncher"
+    assert supported_specs["cruncher-study-preflight"].observes_plane == "execution_readiness"
     assert supported_specs["cluster-run-index"].provider_ref == (
         "dnadesign.cluster.ops.status_providers:provide_cluster_run_index_status"
     )
     assert supported_specs["cluster-run-index"].owner_boundary == "cluster"
     assert supported_specs["cluster-run-index"].observes_plane == "data"
+    assert supported_specs["latentdna-workspace-snapshot"].provider_ref == (
+        "dnadesign.latentdna.ops.status_providers:provide_latentdna_workspace_snapshot_status"
+    )
+    assert supported_specs["latentdna-workspace-snapshot"].owner_boundary == "latentdna"
+    assert supported_specs["latentdna-workspace-snapshot"].observes_plane == "data"
     assert supported_specs["opal-campaign-state"].provider_ref == (
         "dnadesign.opal.ops.status_providers:provide_opal_campaign_state_status"
     )
@@ -79,10 +89,13 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status_providers',
         'dnadesign.usr.ops.status_providers',
+        'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
+        'dnadesign.studies.families.cruncher.adapter',
+        'dnadesign.studies.families.cruncher.ops.provider',
     }
 )))
 """
@@ -151,10 +164,13 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status_providers',
         'dnadesign.usr.ops.status_providers',
+        'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
+        'dnadesign.studies.families.cruncher.adapter',
+        'dnadesign.studies.families.cruncher.ops.provider',
     }
 )))
 """
@@ -178,10 +194,13 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status_providers',
         'dnadesign.usr.ops.status_providers',
+        'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
+        'dnadesign.studies.families.cruncher.adapter',
+        'dnadesign.studies.families.cruncher.ops.provider',
     }
 )))
 """
@@ -333,6 +352,8 @@ print(json.dumps(sorted(
         'dnadesign.opal.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
+        'dnadesign.studies.families.cruncher.adapter',
+        'dnadesign.studies.families.cruncher.ops.provider',
     }
 )))
 """
@@ -363,6 +384,8 @@ print(json.dumps(sorted(
         'dnadesign.opal.ops.status_providers',
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
+        'dnadesign.studies.families.cruncher.adapter',
+        'dnadesign.studies.families.cruncher.ops.provider',
     }
 )))
 """

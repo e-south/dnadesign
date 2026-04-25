@@ -1,7 +1,7 @@
 # USR reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-23
 
 
 Reference pages define stable contracts for dataset shape, overlays, registry, events, and API usage.

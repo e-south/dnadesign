@@ -32,8 +32,8 @@ uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces
 ### Key config knobs
 
 - `densegen.output.targets`: Must include `usr` for Notify workflows.
-- `densegen.output.usr.root`: Defines dataset root under workspace outputs.
-- `densegen.output.usr.dataset`: Defines dataset id and output namespace (`workspace init --output-mode usr` rewrites this to the workspace id).
+- `densegen.output.usr.root`: Defines the USR datasets root.
+- `densegen.output.usr.dataset`: Defines the flat owner-first DenseGen dataset id (`workspace init --output-mode usr` rewrites this to `densegen_<workspace-id>`).
 - `densegen.output.usr.health_event_interval_seconds`: Controls heartbeat event cadence.
 - `densegen.run.root`: Anchors workspace-relative output paths.
 - `plots.source`: Matters when notebook/plot source selection occurs in multi-sink runs.

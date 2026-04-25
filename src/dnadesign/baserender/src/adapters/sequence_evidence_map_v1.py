@@ -357,7 +357,12 @@ class SequenceEvidenceMapV1Adapter:
                     render={},
                 )
             )
+        pairing_lane = "bottom" if contract.topology_kind == "hairpin_folded" else "top"
+        pairing_track = 0 if contract.topology_kind == "hairpin_folded" else 4
         for pairing in contract.pairings:
+            pairing_label = (
+                "" if contract.topology_kind == "hairpin_folded" else pairing.short_label or pairing.display_label or ""
+            )
             effects.append(
                 Effect(
                     kind="span_link",
@@ -369,8 +374,12 @@ class SequenceEvidenceMapV1Adapter:
                             "strand": "rev",
                         },
                     },
-                    params={"label": pairing.short_label or pairing.display_label or "", "lane": "top"},
-                    render={"track": 4},
+                    params={
+                        "label": pairing_label,
+                        "lane": pairing_lane,
+                        "inner_margin_bp": 0.0,
+                    },
+                    render={"track": pairing_track},
                 )
             )
         legend_exclude_tags_raw = meta.get("legend_exclude_tags", ())

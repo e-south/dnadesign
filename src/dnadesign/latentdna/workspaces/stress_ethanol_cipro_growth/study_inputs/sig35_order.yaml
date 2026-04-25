@@ -1,0 +1,18 @@
+source: Reverse-alphabetical Sigma-35 strength ladder from the promoter reference figure; the active study subset preserves f strongest through b weakest.
+exploratory: true
+order:
+  - variant_id: f
+    sequence: TTGACA
+    rank: 1
+  - variant_id: e
+    sequence: TAGACA
+    rank: 2
+  - variant_id: d
+    sequence: TTTACA
+    rank: 3
+  - variant_id: c
+    sequence: TTGTGA
+    rank: 4
+  - variant_id: b
+    sequence: CTGACA
+    rank: 5

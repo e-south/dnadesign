@@ -90,6 +90,14 @@ def test_tool_event_status_override_handles_infer_attach_events() -> None:
     assert tool_event_status_override("attach", event) == "running"
 
 
+def test_tool_event_status_override_handles_infer_write_overlay_part_events() -> None:
+    event = _event("write_overlay_part")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {"rows_incoming": 10, "rows_matched": 10, "rows_missing": 0}
+
+    assert tool_event_status_override("write_overlay_part", event) == "running"
+
+
 def test_tool_event_status_override_handles_infer_materialize_as_terminal() -> None:
     event = _event("materialize")
     event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
@@ -125,15 +133,176 @@ def test_tool_event_message_override_formats_infer_attach_message() -> None:
         },
     }
 
-    msg = tool_event_message_override("attach", event, run_id="infer-run-1", duration_seconds=None)
+    msg = tool_event_message_override("attach", event, run_id="infer-run-1", duration_seconds=3661.0)
 
     assert msg is not None
     assert "Infer progress | run=infer-run-1 | dataset=demo" in msg
-    assert "- Overall requested outputs: 18.0%" in msg
+    assert "- Overall requested outputs: 18.0% (72/400 units)" in msg
+    assert "- Remaining overall units: 328" in msg
+    assert "- ETA to overall complete: 4.6h" in msg
     assert "- Families: LL 50.0% | output_layer_mean 12.0% | intermediate_embedding 0.0%" in msg
     assert "- Current output: output_layer_mean__seq_mean 24.0% (24/100 rows)" in msg
     assert "incoming=12 matched=11 missing=1" in msg
     assert "- Workspace rows: 1" in msg
+    assert "- Elapsed: 01:01:01" in msg
+
+
+def test_tool_event_message_override_formats_infer_write_overlay_part_message() -> None:
+    event = _event("write_overlay_part")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {
+        "rows_incoming": 12,
+        "rows_matched": 11,
+        "rows_missing": 1,
+        "infer_output": {
+            "id": "output_layer_mean__seq_mean",
+            "family": "output_layer_mean",
+            "kind": "feature",
+            "pool_scope": "seq_mean",
+        },
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 24,
+            "output_progress_pct": 24.0,
+            "overall_target_units": 400,
+            "overall_completed_units": 72,
+            "overall_progress_pct": 18.0,
+            "family_progress_pct_map": {
+                "log_likelihood": 50.0,
+                "output_layer_mean": 12.0,
+                "intermediate_embedding": 0.0,
+            },
+        },
+    }
+
+    msg = tool_event_message_override("write_overlay_part", event, run_id="infer-run-1", duration_seconds=3661.0)
+
+    assert msg is not None
+    assert "Infer progress | run=infer-run-1 | dataset=demo" in msg
+    assert "- Current output: output_layer_mean__seq_mean 24.0% (24/100 rows)" in msg
+    assert "incoming=12 matched=11 missing=1" in msg
+
+
+def test_tool_event_message_override_explains_grouped_infer_writeback_semantics() -> None:
+    event = _event("write_overlay_part")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {
+        "rows_incoming": 256,
+        "rows_matched": 256,
+        "rows_missing": 0,
+        "infer_progress": {
+            "overall_target_units": 502760,
+            "overall_completed_units": 218112,
+            "overall_progress_pct": 43.38292624711592,
+            "family_progress_pct_map": {
+                "log_likelihood": 46.3,
+                "output_layer_mean": 46.3,
+                "intermediate_embedding": 0.0,
+            },
+        },
+    }
+
+    msg = tool_event_message_override("write_overlay_part", event, run_id="infer-run-1", duration_seconds=915.0)
+
+    assert msg is not None
+    assert "- Overall requested outputs: 43.4% (218112/502760 units)" in msg
+    assert "- Families: LL 46.3% | output_layer_mean 46.3% | intermediate_embedding 0.0%" in msg
+    assert (
+        "- Grouped writeback: family percentages reflect persisted rows still missing each family, "
+        "not per-family GPU compute"
+    ) in msg
+    assert "- Current output:" not in msg
+    assert "- ETA to overall complete: 0.3h" in msg
+    assert "incoming=256 matched=256 missing=0" in msg
+    assert "- Elapsed: 00:15:15" in msg
+
+
+def test_evaluate_tool_event_infer_attach_exposes_elapsed_duration() -> None:
+    state = ToolEventState()
+    first = _event("attach", timestamp="2026-02-06T00:00:00+00:00")
+    first["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    first["args"] = {
+        "rows_incoming": 8,
+        "rows_matched": 8,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 8,
+            "output_progress_pct": 8.0,
+            "overall_target_units": 300,
+            "overall_completed_units": 8,
+            "overall_progress_pct": 2.7,
+        },
+    }
+    second = _event("attach", timestamp="2026-02-06T00:01:10+00:00")
+    second["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    second["args"] = {
+        "rows_incoming": 8,
+        "rows_matched": 8,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 32,
+            "output_progress_pct": 32.0,
+            "overall_target_units": 100,
+            "overall_completed_units": 32,
+            "overall_progress_pct": 32.0,
+        },
+    }
+
+    first_decision = evaluate_tool_event("attach", first, run_id="infer-run-1", state=state)
+    second_decision = evaluate_tool_event("attach", second, run_id="infer-run-1", state=state)
+
+    assert first_decision.emit is True
+    assert first_decision.duration_seconds == 0.0
+    assert second_decision.emit is True
+    assert second_decision.duration_seconds == 70.0
+
+
+def test_evaluate_tool_event_infer_write_overlay_part_exposes_elapsed_duration() -> None:
+    state = ToolEventState()
+    first = _event("write_overlay_part", timestamp="2026-02-06T00:00:00+00:00")
+    first["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    first["args"] = {
+        "rows_incoming": 8,
+        "rows_matched": 8,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 8,
+            "output_progress_pct": 8.0,
+            "overall_target_units": 300,
+            "overall_completed_units": 8,
+            "overall_progress_pct": 2.7,
+        },
+    }
+    second = _event("write_overlay_part", timestamp="2026-02-06T00:01:10+00:00")
+    second["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    second["args"] = {
+        "rows_incoming": 8,
+        "rows_matched": 8,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 32,
+            "output_progress_pct": 32.0,
+            "overall_target_units": 100,
+            "overall_completed_units": 32,
+            "overall_progress_pct": 32.0,
+        },
+    }
+
+    first_decision = evaluate_tool_event("write_overlay_part", first, run_id="infer-run-1", state=state)
+    second_decision = evaluate_tool_event("write_overlay_part", second, run_id="infer-run-1", state=state)
+
+    assert first_decision.emit is True
+    assert first_decision.duration_seconds == 0.0
+    assert second_decision.emit is True
+    assert second_decision.duration_seconds == 70.0
 
 
 def test_evaluate_tool_event_infer_attach_is_throttled_by_min_seconds() -> None:

@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -28,6 +29,8 @@ _DENSEGEN_POLICY_DEFAULTS: dict[str, object] = {
     "require_non_null_cols": (),
     "on_invalid_row": "skip",
 }
+
+_IUPAC_MOTIF_SUFFIX_RE = re.compile(r"^[ACGTRYSWKMBDHVN]+$", re.IGNORECASE)
 
 
 def _find_all(haystack: str, needle: str) -> list[int]:
@@ -54,27 +57,21 @@ def _promoter_display_name(name: str) -> str:
 
 
 def _promoter_component_label(name: str, component: str) -> str:
-    display_name = _promoter_display_name(name)
     if str(component).strip().lower() == "upstream":
-        return f"{display_name} -35 site"
+        return "-35 sites"
     if str(component).strip().lower() == "downstream":
-        return f"{display_name} -10 site"
-    return display_name
-
-
-def _append_variant_suffix(label: str, variant_id: str | None) -> str:
-    variant = str(variant_id or "").strip()
-    if variant == "":
-        return label
-    return f"{label} ({variant})"
+        return "-10 sites"
+    return _promoter_display_name(name)
 
 
 def _promoter_component_display_label(name: str, component: str, variant_id: str | None) -> str:
-    label = _promoter_component_label(name, component)
-    variant = str(variant_id or "").strip()
-    if str(component).strip().lower() == "downstream" and variant.lower() == "consensus":
-        return label
-    return _append_variant_suffix(label, variant)
+    base_label = _promoter_component_label(name, component)
+    if str(component).strip().lower() in {"upstream", "downstream"} and base_label.endswith("sites"):
+        base_label = f"{base_label[:-1]}"
+    variant_text = str(variant_id or "").strip()
+    if variant_text == "":
+        return base_label
+    return f"{base_label} ({variant_text})"
 
 
 def _title_case_first(value: str) -> str:
@@ -82,6 +79,23 @@ def _title_case_first(value: str) -> str:
     if raw == "":
         return raw
     return raw[:1].upper() + raw[1:]
+
+
+def _densegen_tf_display_label(value: str) -> str:
+    raw = str(value).strip()
+    if raw == "":
+        return raw
+    head, sep, suffix = raw.partition("_")
+    if sep and len(suffix) >= 6 and _IUPAC_MOTIF_SUFFIX_RE.fullmatch(suffix):
+        raw = head
+    normalized = raw.replace("_", " ").strip()
+    compact = normalized.replace(" ", "").lower()
+    if compact in {"background", "neutralbg"}:
+        return "Neutral sites"
+    titled = _title_case_first(normalized)
+    if titled.endswith(" site") or titled.endswith(" sites"):
+        return titled
+    return f"{titled} sites"
 
 
 @dataclass(frozen=True)
@@ -94,6 +108,10 @@ class DensegenTfbsAdapter:
         merged = dict(_DENSEGEN_POLICY_DEFAULTS)
         merged.update(dict(self.policies or {}))
         object.__setattr__(self, "policies", merged)
+
+    @staticmethod
+    def _normalize_annotation_item(item: dict[str, Any]) -> dict[str, Any]:
+        return dict(item)
 
     def _parse_annotations(
         self,
@@ -131,6 +149,7 @@ class DensegenTfbsAdapter:
         for idx, item in enumerate(obj):
             if not isinstance(item, dict):
                 raise SchemaError("DenseGen annotation entries must be dicts")
+            item = self._normalize_annotation_item(item)
 
             part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
             if part_kind == "fixed_element":
@@ -310,22 +329,38 @@ class DensegenTfbsAdapter:
 
             upstream_tag = f"promoter:{name}:upstream"
             downstream_tag = f"promoter:{name}:downstream"
+            upstream_display_label = _promoter_component_display_label(name, "upstream", upstream.get("variant_id"))
+            downstream_display_label = _promoter_component_display_label(
+                name,
+                "downstream",
+                downstream.get("variant_id"),
+            )
             labels.setdefault(
                 upstream_tag,
-                _promoter_component_display_label(name, "upstream", upstream.get("variant_id")),
+                _promoter_component_label(name, "upstream"),
             )
             labels.setdefault(
                 downstream_tag,
-                _promoter_component_display_label(name, "downstream", downstream.get("variant_id")),
+                _promoter_component_label(name, "downstream"),
             )
 
             upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
             downstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:downstream"
             track = int(placement_index)
-            upstream_attrs = {"name": name, "component": "upstream", "source": "densegen_promoter"}
+            upstream_attrs = {
+                "name": name,
+                "component": "upstream",
+                "source": "densegen_promoter",
+                "display_label": upstream_display_label,
+            }
             if upstream.get("variant_id"):
                 upstream_attrs["variant_id"] = upstream.get("variant_id")
-            downstream_attrs = {"name": name, "component": "downstream", "source": "densegen_promoter"}
+            downstream_attrs = {
+                "name": name,
+                "component": "downstream",
+                "source": "densegen_promoter",
+                "display_label": downstream_display_label,
+            }
             if downstream.get("variant_id"):
                 downstream_attrs["variant_id"] = downstream.get("variant_id")
             features.append(
@@ -457,13 +492,15 @@ class DensegenTfbsAdapter:
 
             upstream_tag = f"promoter:{name}:upstream"
             downstream_tag = f"promoter:{name}:downstream"
+            upstream_display_label = _promoter_component_display_label(name, "upstream", upstream_variant_id)
+            downstream_display_label = _promoter_component_display_label(name, "downstream", downstream_variant_id)
             promoter_labels.setdefault(
                 upstream_tag,
-                _promoter_component_display_label(name, "upstream", upstream_variant_id),
+                _promoter_component_label(name, "upstream"),
             )
             promoter_labels.setdefault(
                 downstream_tag,
-                _promoter_component_display_label(name, "downstream", downstream_variant_id),
+                _promoter_component_label(name, "downstream"),
             )
             placement_track = int(placement_index)
             upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
@@ -472,6 +509,7 @@ class DensegenTfbsAdapter:
                 "name": name,
                 "component": "upstream",
                 "source": "densegen_promoter",
+                "display_label": upstream_display_label,
             }
             if upstream_variant_id:
                 upstream_attrs["variant_id"] = upstream_variant_id
@@ -479,6 +517,7 @@ class DensegenTfbsAdapter:
                 "name": name,
                 "component": "downstream",
                 "source": "densegen_promoter",
+                "display_label": downstream_display_label,
             }
             if downstream_variant_id:
                 downstream_attrs["variant_id"] = downstream_variant_id
@@ -526,6 +565,7 @@ class DensegenTfbsAdapter:
         ann_col = str(self.columns.get("annotations"))
         id_col = self.columns.get("id")
         overlay_text_col = self.columns.get("overlay_text")
+        video_subtitle_col = self.columns.get("video_subtitle")
 
         sequence_raw = row.get(sequence_col)
         if sequence_raw is None or str(sequence_raw).strip() == "":
@@ -596,8 +636,7 @@ class DensegenTfbsAdapter:
         for feat in features:
             for tag in feat.tags:
                 if tag.startswith("tf:") and tag not in tag_labels:
-                    tf_label = tag[3:]
-                    tf_label = _title_case_first(tf_label)
+                    tf_label = _densegen_tf_display_label(tag[3:])
                     tag_labels[tag] = tf_label
         tag_labels.update(promoter_labels)
         tag_labels.update(fixed_labels)
@@ -607,6 +646,11 @@ class DensegenTfbsAdapter:
             overlay_text_raw = row.get(str(overlay_text_col))
             if overlay_text_raw is not None and str(overlay_text_raw).strip() != "":
                 overlay_text = str(overlay_text_raw).strip()
+        video_subtitle = None
+        if video_subtitle_col is not None:
+            video_subtitle_raw = row.get(str(video_subtitle_col))
+            if video_subtitle_raw is not None and str(video_subtitle_raw).strip() != "":
+                video_subtitle = str(video_subtitle_raw).strip()
 
         record = Record(
             id=record_id,
@@ -614,7 +658,7 @@ class DensegenTfbsAdapter:
             sequence=sequence,
             features=tuple(features),
             effects=tuple([*promoter_effects, *fixed_effects]),
-            display=Display(overlay_text=overlay_text, tag_labels=tag_labels),
+            display=Display(overlay_text=overlay_text, video_subtitle=video_subtitle, tag_labels=tag_labels),
             meta={"row_index": row_index, "adapter": "densegen_tfbs"},
         )
         return record.validate()

@@ -30,7 +30,8 @@ Run this from an SCC login shell:
 
 ### 0) Node and GPU requirements
 
-Evo2 requirements are Linux + CUDA 12.1+, cuDNN 9.3+, Python 3.12, and Hopper-class GPUs for FP8 workflows:
+Evo2 requirements are Linux + CUDA 12.1+, cuDNN 9.3+, Python 3.12, and
+Hopper-class-or-newer GPUs for FP8 workflows:
 - Evo2 repo: <https://github.com/ArcInstitute/evo2>
 
 BU SCC GPU requests support explicit GPU count and capability constraints. Use:
@@ -71,14 +72,23 @@ rm -rf .venv
 uv cache clean
 ```
 
+Do not treat `rm -rf .venv` as the default Evo2 fix. Once `flash-attn` or
+other CUDA extensions are built from source, the environment can become
+GPU-family-specific. A `.venv` built on Blackwell can be healthy on Blackwell
+and still fail on Hopper or smaller GPUs with `no kernel image is available for
+execution on the device`. Preserve a known-good environment when possible and
+either keep submit routing pinned to that GPU family or intentionally rebuild on
+the target family and prove it with a real infer smoke there.
+
 ---
 
 ### 3) Configure environment location and caches
 
-Use one canonical environment location in the repository root and explicit cache roots.
+Use one active environment location in the repository root and explicit cache
+roots for the current GPU-family contract.
 
 ```bash
-# Keep one canonical environment in the repo root.
+# Keep one active environment in the repo root for the current GPU family.
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 
 # Keep uv cache outside the repo.
@@ -90,7 +100,7 @@ export UV_HTTP_RETRIES="${UV_HTTP_RETRIES:-10}"
 
 # Infer model-cache policy:
 # - 7B infer smoke and routine infer runs use /project.
-# - 20B Hopper runs also use /project, but with a separate cache root.
+# - 20B Hopper-class-or-newer runs also use /project, but with a separate cache root.
 # - 40B is optional and not part of the default SCC path.
 export HF_HOME_7B="${HF_HOME_7B:-/project/<your_project>/$USER/cache/huggingface/evo2_7b}"
 export HF_HOME_20B="${HF_HOME_20B:-/project/<your_project>/$USER/cache/huggingface/evo2_20b}"
@@ -157,6 +167,26 @@ Use this policy in runbooks and sessions:
 - Keep `HF_HOME` pointed to the model-specific root selected by `TARGET_MODEL_ID`.
 - Treat `evo2_40b` as optional and non-default on SCC until a dedicated multi-Hopper lane is validated.
 - Export `HF_HUB_CACHE`, `HUGGINGFACE_HUB_CACHE`, and `TRANSFORMERS_CACHE` to `HF_HOME` subpaths to override inherited SCC cache defaults.
+
+### 3c) Model fit versus environment portability
+
+Treat these as separate contracts:
+
+- Model fit: whether a checkpoint can run on a GPU class at all.
+- Environment portability: whether the current compiled CUDA extension stack in
+  `.venv` can execute on that GPU family.
+
+Those are not the same. `evo2_7b` can be a valid model choice for smaller GPUs
+while a Blackwell-built `.venv` is still unusable there because the compiled
+`flash-attn` image set only targets Blackwell.
+
+Pragmatic rule:
+
+- if you already have a working family-specific `.venv`, preserve it and pin
+  batch routing to that family
+- only rebuild when you intentionally need a different GPU family
+- before batch submit on a new GPU family, require one real `infer extract`
+  smoke there instead of trusting `infer validate config` or `infer run --dry-run`
 
 ---
 
@@ -280,6 +310,7 @@ import importlib.metadata as im
 import torch
 
 required_dist = ("torch", "transformer-engine", "flash-attn", "evo2", "vtx")
+required_modules = ("transformer_engine.pytorch", "flash_attn", "evo2", "vortex")
 missing = []
 
 print("cuda_available", torch.cuda.is_available())
@@ -289,7 +320,7 @@ for name in required_dist:
     except Exception:
         missing.append(f"missing_dist:{name}")
 
-for module_name in ("transformer_engine.pytorch", "flash_attn", "evo2"):
+for module_name in required_modules:
     try:
         importlib.import_module(module_name)
         print(module_name, "import_ok")
@@ -405,8 +436,9 @@ PY
 #### 6.3 Model support: 7B and FP8 checkpoints
 
 - 7B checkpoints (`evo2_7b`, `evo2_7b_base`, `evo2_7b_262k`) can run without Transformer Engine and fit the default L40S-style lane (`gpu_c=8.9`).
-- FP8 checkpoints (`evo2_20b`, `evo2_40b`, `evo2_40b_base`, `evo2_1b_base`) require Transformer Engine and Hopper-class GPUs.
-- On BU SCC, use `qgpus` and request `gpu_c=9.0` for `evo2_20b`; H200 is the relevant currently visible Hopper lane.
+- FP8 checkpoints (`evo2_20b`, `evo2_40b`, `evo2_40b_base`, `evo2_1b_base`) require Transformer Engine and Hopper-class-or-newer GPUs.
+- On BU SCC, `gpu_c=9.0` is the generic model-fit floor for `evo2_20b`; H200 is a common visible lane, but newer higher-capability lanes also satisfy the same floor when memory is sufficient.
+- If the current `dnadesign` Evo2 environment is family-pinned, also request an exact GPU type. On the current SCC probe surface, the visible Blackwell-family lane is `gpu_t=RTXP6000` with `gpu_c=12.0` and `96 GiB` VRAM.
 - `dnadesign` currently pins torch in the infer extra to `2.8.x`; Evo2 upstream docs recommend `2.6.x` or `2.7.x`. Always run smoke tests after sync on the target host.
 - `infer` currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id` in this stack.
 
@@ -451,7 +483,7 @@ print(snapshot_download("arcinstitute/evo2_20b"))
 PY
 ```
 
-20B preflight on a non-Hopper GPU should fail fast:
+20B preflight on a GPU below compute capability `9.0` should fail fast:
 
 ```bash
 TARGET_MODEL_ID=evo2_20b uv run infer validate config --config <path_to_evo2_20b_config.yaml>
@@ -511,7 +543,7 @@ if model_id in {"evo2_20b", "evo2_40b"} and gpu_cc_tuple < (9, 0):
         file=sys.stderr,
     )
     print(
-        "Use gpu_c=9.0 on SCC and schedule onto a Hopper lane such as H200 for evo2_20b.",
+        "Use gpu_c=9.0 as the generic evo2_20b model floor on SCC. For the current Blackwell-pinned dnadesign environment, request gpu_t=RTXP6000 and gpu_c=12.0.",
         file=sys.stderr,
     )
     raise SystemExit(2)

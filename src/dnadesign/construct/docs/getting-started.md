@@ -45,7 +45,7 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 ### Keep the model simple
 
 - Packaged demos use local semantic datasets such as `anchor_parts_demo` and `template_parts_demo`.
-- Real studies can still use semantic dataset ids such as `mg1655_promoters` or `plasmids`.
+- Real studies can still use semantic dataset ids such as `usr_mg1655_promoter_controls` or `usr_pdual10_plasmid_template`.
 - `anchor`, `template`, and `helper` are construct roles assigned inside the config, not dataset path categories.
 - One construct job uses one template plus one or more placed parts.
 - Multi-template or slot-matrix studies are represented as multiple project entries in `construct.workspace.yaml`, each with its own tracked config artifact.

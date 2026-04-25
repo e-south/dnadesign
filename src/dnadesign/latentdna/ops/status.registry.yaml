@@ -1,0 +1,37 @@
+version: 1
+provider_id: latentdna.workspace-status
+entries:
+  - status_kind: latentdna-workspace-snapshot
+    owner_boundary: latentdna
+    observes_plane: data
+    provider_ref: dnadesign.latentdna.ops.status_providers:provide_latentdna_workspace_snapshot_status
+    description: Publish the sanctioned LatentDNA workspace snapshot for one workspace.
+    surface_type: artifact_catalog
+    cost_class: cheap
+    summary_scope: workspace
+    input_schema:
+      - name: workspace
+        manifest_key: workspace
+        cli_flag: --workspace
+        placeholder: stress_ethanol_cipro_growth
+        summary: Workspace id or path passed through to `latentdna workspace snapshot`.
+        type: path
+        required: true
+        path_base: repo
+schema_version: latentdna.status_registry.v1
+owner_boundary: latentdna
+artifact_roots:
+  workspace_outputs: outputs
+  status: outputs/status
+commands:
+  workspace_snapshot:
+    command: uv run latentdna workspace snapshot --workspace {workspace_id} --json
+    output_schema: latentdna.workspace_snapshot.v1
+    output_path: outputs/status/workspace_snapshot.json
+  workspace_catalog:
+    command: uv run latentdna deliverable list --workspace {workspace_id} --json
+    output_schema: latentdna.deliverable_list.v1
+docs:
+  snapshot_contract: src/dnadesign/latentdna/docs/reference/workspace-snapshot-contract.md
+  naming_grammar: src/dnadesign/latentdna/docs/reference/artifact-naming.md
+  operations: src/dnadesign/latentdna/docs/operations/README.md

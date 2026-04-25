@@ -80,7 +80,7 @@ def ctx_show(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: Optional[str] = typer.Option("latest", "--round", "-r"),
     keys: Optional[List[str]] = typer.Option(None, "--keys", help="Filter by key prefix (repeatable)."),
-    json_out_flag: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json_out_flag: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
@@ -106,7 +106,7 @@ def ctx_show(
 def ctx_audit(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: Optional[str] = typer.Option("latest", "--round", "-r"),
-    json_out_flag: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json_out_flag: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
@@ -143,7 +143,7 @@ def ctx_diff(
     round_a: str = typer.Option(..., "--round-a", help="First round (int or 'latest')."),
     round_b: str = typer.Option(..., "--round-b", help="Second round (int or 'latest')."),
     keys: Optional[List[str]] = typer.Option(None, "--keys", help="Filter by key prefix (repeatable)."),
-    json_out_flag: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json_out_flag: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)

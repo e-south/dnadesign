@@ -8,10 +8,10 @@ densegen:
   motif_sets:
     sigma70_upstream_35:
       f: TTGACA
-      b: CTGACA
       e: TAGACA
       d: TTTACA
       c: TTGTGA
+      b: CTGACA
     sigma70_downstream_10:
       consensus: TATAAT
 
@@ -138,8 +138,9 @@ densegen:
       deduplicate: true
       chunk_size: 8192
     usr:
-      root: ../../../usr/datasets
-      dataset: densegen/study_stress_ethanol_cipro
+      root: src/dnadesign/usr/datasets
+      root_scope: git_common_repo_root
+      dataset: densegen_prom_eth_cip_source
       chunk_size: 8192
       health_event_interval_seconds: 60
 
@@ -167,7 +168,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -186,7 +187,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -210,7 +211,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -233,7 +234,7 @@ densegen:
           fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
-            upstream_variant_ids: [f, b, e, d, c]
+            upstream_variant_ids: [f, e, d, c, b]
             downstream_from_set: sigma70_downstream_10
             downstream_variant_ids: [consensus]
             pairing:
@@ -308,8 +309,29 @@ plots:
   source: usr
   out_dir: outputs/plots
   format: pdf
-  default: [stage_a_summary, placement_map, run_health, tfbs_usage]
-  # Stage-B showcase video (single all-plan MP4 by default).
+  sample_rows: 200000
+  default:
+    [
+      source_cohort_concentration,
+      stage_a_sampling_yield,
+      stage_a_pool_diversity,
+      plan_regulator_deployment_heatmap,
+      placement_occupancy_map,
+      retained_pool_coverage_by_regulator,
+      attempt_outcome_timeline,
+      solve_pressure_and_progress,
+      background_sequence_logo,
+      compression_ratio_by_plan,
+      dense_array_showcase_video,
+      retained_vs_deployed_length_mix_by_regulator,
+      retained_vs_deployed_tier_mix_by_regulator,
+      score_strata_and_deployed_length_bridge,
+      source_plan_input_heatmap,
+      stage_a_pool_score_strata,
+      tfbs_concentration_profile,
+      upstream_motif_supply_and_pwm_strength,
+    ]
+  allow_truncated: true
   video:
     enabled: true
     mode: all_plans_round_robin_single_video
@@ -321,9 +343,9 @@ plots:
       target_duration_sec: 14
       fps: 12
   options:
-    placement_map:
+    placement_occupancy_map:
       scope: auto
       max_plans: 12
-    tfbs_usage:
+    tfbs_concentration_profile:
       scope: auto
       max_plans: 12

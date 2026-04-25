@@ -94,7 +94,7 @@ policy_default_actions() {
   local policy_name="$1"
   case "$policy_name" in
     densegen) printf '%s\n' "densegen_health,densegen_flush_failed,materialize" ;;
-    infer) printf '%s\n' "attach,materialize" ;;
+    infer) printf '%s\n' "attach,write_overlay_part,materialize" ;;
     *) printf '%s\n' "" ;;
   esac
 }
@@ -366,7 +366,7 @@ case "$NOTIFY_POLICY" in
     POLICY_TOOLS="densegen"
     ;;
   infer)
-    POLICY_ACTIONS="attach,materialize"
+    POLICY_ACTIONS="attach,write_overlay_part,materialize"
     POLICY_TOOLS="infer"
     ;;
   generic|"")

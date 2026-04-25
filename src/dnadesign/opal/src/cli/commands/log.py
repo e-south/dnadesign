@@ -21,7 +21,7 @@ from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.summary import load_round_log, summarize_round_log
 from ...storage.workspace import CampaignWorkspace
-from ..formatting import render_round_log_summary_human
+from ..formatting import render_round_log_summary_text
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -37,7 +37,7 @@ from ._common import (
 def cmd_log(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: Optional[str] = typer.Option("latest", "--round", "-r"),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
@@ -53,7 +53,7 @@ def cmd_log(
             json_out(summary)
         else:
             print_config_context(cfg_path, cfg=cfg)
-            print_stdout(render_round_log_summary_human(summary))
+            print_stdout(render_round_log_summary_text(summary))
     except OpalError as e:
         opal_error("log", e)
         raise typer.Exit(code=e.exit_code)

@@ -555,7 +555,7 @@ def _parse_render(raw: Any) -> RenderCfg:
     renderer = str(data.get("renderer", "")).strip()
     require_one_of(
         renderer,
-        {"sequence_rows", "nucleotide_evidence_map", "hairpin_cartoon", "topology_cartoon"},
+        {"sequence_rows", "nucleotide_evidence_map", "hairpin_cartoon", "topology_cartoon", "snapback_map"},
         "render.renderer",
     )
 

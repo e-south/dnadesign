@@ -4,6 +4,41 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 
 ### Key paths
 - Code (CLI + library): `src/dnadesign/usr/src/`
+  - Package-root Python should stay limited to `__init__.py` and `__main__.py`; public API exports belong on the package root, but implementation modules belong under `src/`.
+  - `usr/src` root should contain package directories only plus `__init__.py`; do not reintroduce flat implementation files at that level.
+  - Coordinator packages are reserved for high-level roots such as `api/`, `cli/`, `dataset/`, `maintenance/`, `sync/`, and `version/`.
+  - Helper families should live under explicit subpackages: `cli/commands/`, `cli/support/`, `contracts/`, `datasets/`, `events/`, `legacy/`, `overlays/support/`, `overlays/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
+  - `contracts/` owns shared error classes, schema constants, response dataclasses, and sequence normalization/id rules; do not reintroduce sibling root files for those concerns.
+  - `api/` owns the internal public-library export facade that feeds `dnadesign.usr`.
+  - `events/` owns event actor normalization, redaction, fingerprinting, payload defaults, and append-only logging; keep event helper concerns out of coordinator packages.
+  - `dataset/` owns the main dataset coordinator surface and should stay as a package root over the `datasets/*` implementation families.
+  - `cli/support/` owns CLI-only helper families and should stay split into `resolution/`, `wiring/`, and `presentation/` rather than re-accumulating a flat helper bucket.
+  - `cli/support/resolution/` owns root/path resolution, dataset-target heuristics, and merge-policy lookup.
+  - `cli/support/wiring/` owns dependency assembly, command bindings, Typer surface construction, and registration glue.
+  - `cli/support/presentation/` owns output shaping, pretty formatting, rich/plain rendering, and stderr-noise suppression.
+  - `cli/` owns the Typer coordinator surface and registration glue over `cli/commands/*` and `cli/support/*`.
+  - `legacy/convert.py` owns DenseGen legacy conversion and repair entrypoints; keep legacy tool orchestration out of sibling flat roots.
+  - `maintenance/` owns the maintenance-only mutation gate/context surface, even though the implementation is small.
+  - `overlays/` owns overlay path discovery, part caching, and overlay schema/metadata helpers; `overlays/support/` remains the home for higher-level overlay digest/projection helpers that compose those primitives.
+  - `sync/remote/` owns remote endpoint config/loading plus SSH stat, diff, execution orchestration, sidecar, and transfer helpers used by `sync/`.
+  - `registry/` owns namespace registry models, YAML/cache/hash IO, and registry type/schema validation; keep registry mechanics out of `dataset/` and `cli/`.
+  - `runtime/` owns reusable runtime helpers such as DuckDB session initialization and timezone contracts; keep runtime stateful helpers out of the root coordinator layer.
+  - `storage/` owns low-level parquet IO, snapshotting, and dataset write-lock primitives; do not reintroduce sibling root files for those concerns.
+  - `sync/` owns the sync facade and runtime wiring over `sync/remote/*`.
+  - `version/` owns the version singleton so even tiny constants do not leak back into the root.
+  - When a helper family grows into a closed internal cluster, nest it again instead of re-flattening `usr/src/`; current sanctioned second-level packages are `cli/commands/datasets/`, `cli/commands/lifecycle/`, `cli/commands/maintenance/`, `cli/commands/namespace/`, `cli/commands/query/`, `cli/commands/read_views/`, `cli/commands/remotes/`, `cli/commands/sync/`, `cli/commands/tooling/`, `cli/support/presentation/`, `cli/support/resolution/`, `cli/support/wiring/`, `datasets/core/`, `datasets/demo/`, `datasets/lifecycle/`, `datasets/maintenance/`, `datasets/merge/`, `datasets/overlay/`, `datasets/query/`, `datasets/state/`, `datasets/validate/`, `datasets/views/`, `overlays/support/`, and `sync/remote/`.
+  - Tests should stay organized by family under `src/dnadesign/usr/tests/cli/`, `datasets/`, `legacy/`, `overlays/`, and `sync/`; keep root `tests/` for cross-cutting contracts only.
+  - `tests/cli/` is allowed one more owned layer when a command family becomes a closed internal cluster; the current sanctioned CLI test buckets are `tests/cli/commands/`, `tests/cli/support/`, and `tests/cli/sync/`.
+  - `tests/cli/commands/` must mirror command namespaces instead of becoming another flat bucket; current sanctioned command test buckets are `datasets/`, `lifecycle/`, `maintenance/`, `namespace/`, `query/`, `read_views/`, `remotes/`, and `tooling/`.
+  - `tests/datasets/` is allowed one more owned layer when mirroring stable source families; the current sanctioned dataset test buckets are `tests/datasets/core/`, `tests/datasets/lifecycle/`, `tests/datasets/merge/`, `tests/datasets/overlay/`, `tests/datasets/query/`, `tests/datasets/state/`, `tests/datasets/validate/`, and `tests/datasets/views/`.
+  - `tests/overlays/support/` mirrors higher-level overlay support helpers; low-level overlay primitive tests stay in `tests/overlays/`.
+  - `tests/sync/remote/` mirrors remote endpoint, diff, transfer, and sidecar helpers; `tests/sync/` stays focused on the sync facade.
+  - Shared test fixtures consumed outside USR belong under `src/dnadesign/testsupport/`, not under `dnadesign.usr.tests`.
+- Ops integration: `src/dnadesign/usr/ops/`
+  - Keep only Ops-facing provider glue, stable ops entrypoints, and status registries here; dataset/sync implementation stays under `src/`.
+  - `src/dnadesign/usr/ops/sync_audit_drill.py` owns the stable deterministic sync drill entrypoint exposed as `uv run usr-sync-audit-drill`.
+- Internal drills and harness helpers: `src/dnadesign/usr/scripts/`
+  - These scripts may import `dnadesign.usr.src.*` because they are USR-owned internal tooling, not a public cross-tool API surface.
 - Datasets root: `src/dnadesign/usr/datasets/`
   - Dataset layout (recommended):
     - `datasets/<dataset_id>/records.parquet` (canonical base table)
@@ -11,24 +46,32 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
     - `datasets/<dataset_id>/meta.md` (hand-edited notes/snippets)
     - `datasets/<dataset_id>/.events.log` (append-only; generated)
     - `datasets/<dataset_id>/_snapshots/` (generated)
-    - `datasets/_archive/<dataset_id-or-qualified-path>/...` (canonical archive location)
-  - Legacy archive roots are not operational:
-    - `datasets/archived/**` and `usr/archived/**` should be treated as historical only.
+    - `datasets/archived/<dataset_id-or-qualified-path>/...` (canonical dataset archive location)
+  - Archive handling:
+    - `datasets/archived/**` is the sanctioned dataset archive root.
+    - Archived datasets are not part of the default live dataset-id namespace under `datasets/`; target them by explicit path or by setting `--root` to `datasets/archived/` when operating inside the archive root.
+    - `datasets/archived/promoter_misc_pytorch/` is the legacy promoter-focused PyTorch archive bucket (`.pt`, summary, and progress YAML artifacts), not a `records.parquet` dataset root.
+- Demo fixtures: `src/dnadesign/usr/assets/demo_material/`
+  - Stable example inputs for notebooks, mock generation, and CLI docs.
+- Docs and media assets: `src/dnadesign/usr/assets/`
+  - Static documentation/supporting assets only.
 - Notebooks: `src/dnadesign/usr/notebooks/`
+- Archived PyTorch manager: `src/dnadesign/usr/scripts/archived_pytorch_manager.py`
+  - Inspects and updates the legacy PyTorch archive bucket under `datasets/archived/promoter_misc_pytorch/`.
 - Remote sync config: prefer `uv run usr --remotes-config <remotes.yaml> ...`; `USR_REMOTES_PATH` is the fallback for shell-scoped sessions
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync.md`
-- Repo-local BU SCC sync skill: `src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md`
+- Repo-local BU SCC sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
+  - Do not add tool-local skills under `src/dnadesign/usr/skills/`; the canonical skill root for this repo is `.agents/skills/`.
 - Checked-in study records: `docs/studies/README.md`
 - Active study registry: `docs/studies/index.yaml`
-- Historical artifacts: `src/dnadesign/usr/archived/` (treat as generated)
-- Dataset naming ontology: prefer the least-coupled semantic dataset ids, usually flat ids such as `mg1655_promoters`, `plasmids`, or `anchor_template_slot_a_window_1kb_demo`; use namespace-qualified ids only when they genuinely improve disambiguation. Keep tool provenance in overlay namespaces, not dataset ids.
+- Dataset naming ontology: active shared dataset ids must be flat owner-first ids such as `usr_mg1655_promoter_controls`, `usr_pdual10_plasmid_template`, or `densegen_prom_eth_cip_source`; use `root_kind`, `owner_tool`, overlays, and study metadata for provenance instead of nested tool-routing paths.
 - Human-readable record names belong in `usr_label__primary` / `usr_label__aliases`.
 
 ### Generated vs hand-edited
 - Hand-edited: `datasets/**/meta.md`, `remotes.yaml`, `docs/operations/sync.md`
-- Generated / run artifacts: `datasets/**/.events.log`, `datasets/**/_snapshots/**`, `datasets/**/_derived/**`, `archived/**`
+- Generated / run artifacts: `datasets/**/.events.log`, `datasets/**/_snapshots/**`, `datasets/**/_derived/**`, `datasets/archived/**`
 - Ask before committing: changed `records.parquet`, large datasets/logs, any bulk sync outputs/caches.
 
 ### Commands

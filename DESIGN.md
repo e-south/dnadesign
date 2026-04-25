@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-04-24
 
 ## At a glance
 This document defines repo-wide engineering principles, invariants, and boundary rules.
@@ -41,6 +41,9 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
   - durable dataset state belongs to USR
   - notifier delivery state belongs to notifier tooling
   - workload-domain artifacts belong to the producing tool
+- Active shared USR dataset ids are flat owner-first names. Nested paths may not
+  encode producer routing for live shared handoffs; use `root_kind`,
+  `owner_tool`, overlays, and study metadata for provenance.
 - Curated study-facing workspace and runbook examples should default USR sinks
   to an explicit shared USR root rather than an implicit workspace-local
   dataset mirror.

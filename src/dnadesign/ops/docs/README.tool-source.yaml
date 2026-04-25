@@ -1,5 +1,5 @@
 schema_version: 1
-catalog_order: 9
+catalog_order: 10
 tool: ops
 summary: Ops commands, packaged presets, and runbook lifecycle docs.
 keywords:

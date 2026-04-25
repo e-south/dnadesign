@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 import pyarrow as pa
@@ -169,6 +170,7 @@ def _ensure_registry_namespace(
 def _ensure_construct_registry(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     payload = _load_registry_payload(root)
+    original_payload = deepcopy(payload)
     namespaces = payload["namespaces"]
     _ensure_registry_namespace(
         namespace_name="usr_state",
@@ -198,7 +200,8 @@ def _ensure_construct_registry(root: Path) -> None:
         description="Human-readable labels and aliases for canonical sequence records.",
         expected_columns=_USR_LABEL_COLUMNS,
     )
-    _registry_path(root).write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    if payload != original_payload:
+        _registry_path(root).write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
 
 def _existing_output_ids(root: Path, dataset_name: str) -> set[str]:

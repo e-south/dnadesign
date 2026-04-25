@@ -292,6 +292,10 @@ src/dnadesign/usr/datasets/**
 !src/dnadesign/usr/datasets/
 !src/dnadesign/usr/datasets/README.md
 !src/dnadesign/usr/datasets/registry.yaml
+!src/dnadesign/usr/datasets/archived/
+!src/dnadesign/usr/datasets/archived/README.md
+!src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/
+!src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/README.md
 
 # Common local project dirs
 /campaigns/
@@ -322,6 +326,7 @@ meta.yaml
 
 # ADEs
 AGENTS.md
+!src/dnadesign/cruncher/AGENTS.md
 !src/dnadesign/notify/AGENTS.md
 src/dnadesign/notify/.secrets/
 

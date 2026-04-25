@@ -181,7 +181,7 @@ def cmd_demo_matrix(
     rounds: str = typer.Option("0", "--rounds", help="Comma-separated rounds to execute (example: 0 or 0,1)."),
     keep: bool = typer.Option(False, "--keep", help="Keep temp directory after completion."),
     fail_fast: bool = typer.Option(False, "--fail-fast", help="Abort immediately on first flow failure."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     created_tmp = False
     try:

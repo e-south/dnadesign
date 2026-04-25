@@ -24,11 +24,14 @@ if TYPE_CHECKING:
     import pandas as pd
 
 from ...config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, resolve_usr_root_scoped_path
+from ...core.record_metadata_recovery import recover_densegen_metadata_from_source
+from ...core.record_values import coerce_list_of_dicts
 from .base import DEFAULT_NAMESPACE
-from .parquet import validate_parquet_schema
+from .parquet import is_legacy_used_tfbs_detail_schema_compatible, validate_parquet_schema
 
 log = logging.getLogger(__name__)
 DEFAULT_RECORD_LOAD_LIMIT = 100_000
+_RECOVERABLE_METADATA_COLUMNS = {"densegen__plan", "densegen__input_name"}
 
 
 @contextlib.contextmanager
@@ -94,6 +97,146 @@ def _limit_rows(rows: Iterable[dict[str, Any]], *, max_rows: int | None) -> Iter
         yield row
 
 
+def _materialize_batches_to_dataframe(
+    batches: Iterable[Any],
+    *,
+    row_limit: int | None,
+    parse_json_in_namespaced_columns: bool,
+) -> "pd.DataFrame":
+    import numpy as np
+    import pandas as pd
+    import pyarrow as pa
+
+    limit = None if row_limit is None else max(1, int(row_limit))
+    collected: list[Any] = []
+    rows = 0
+    for batch in batches:
+        batch_rows = int(getattr(batch, "num_rows", 0) or 0)
+        if batch_rows <= 0:
+            continue
+        if limit is not None:
+            remaining = limit - rows
+            if remaining <= 0:
+                break
+            if batch_rows > remaining:
+                collected.append(batch.slice(0, remaining))
+                rows += remaining
+                break
+        collected.append(batch)
+        rows += batch_rows
+    if not collected:
+        return pd.DataFrame()
+
+    frame = pa.Table.from_batches(collected).to_pandas()
+    for name in frame.columns:
+        values = frame[name].tolist()
+        if not any(isinstance(value, np.ndarray) for value in values):
+            continue
+        frame[name] = [value.tolist() if isinstance(value, np.ndarray) else value for value in values]
+    if not parse_json_in_namespaced_columns or frame.empty:
+        return frame
+    for name in [column for column in frame.columns if "__" in str(column)]:
+        values = frame[name].tolist()
+        if not any(isinstance(value, str) for value in values):
+            continue
+        frame[name] = [_maybe_json_load(value) for value in values]
+    return frame
+
+
+def _iter_record_batches_from_config(
+    root_cfg: RootConfig,
+    cfg_path: Path,
+    columns: Iterable[str] | None = None,
+    *,
+    batch_size: int = 65536,
+) -> tuple[Iterable[Any], str, bool]:
+    if batch_size < 1:
+        raise ValueError("batch_size must be >= 1")
+    out_cfg = root_cfg.densegen.output
+    source, run_root = _resolve_source(root_cfg, cfg_path)
+    requested = list(columns) if columns else None
+
+    if source == "usr":
+        usr_cfg = out_cfg.usr
+        if usr_cfg is None:
+            raise ValueError("output.usr is required when source='usr'")
+        root = resolve_usr_root_scoped_path(
+            cfg_path,
+            usr_cfg.root,
+            label="output.usr.root",
+            scope=usr_cfg.root_scope,
+        )
+        try:
+            from dnadesign.usr import Dataset
+        except Exception as e:
+            raise RuntimeError(f"USR support is not available: {e}") from e
+
+        ds = Dataset(root, usr_cfg.dataset)
+        rp = ds.records_path
+        if not rp.exists():
+            raise FileNotFoundError(f"USR records not found at: {rp}")
+        return (
+            ds.scan(
+                columns=requested,
+                include_overlays=True,
+                include_deleted=False,
+                batch_size=int(batch_size),
+            ),
+            f"usr:{usr_cfg.dataset}",
+            True,
+        )
+
+    if source == "parquet":
+        pq_cfg = out_cfg.parquet
+        if pq_cfg is None:
+            raise ValueError("output.parquet is required when source='parquet'")
+        root = resolve_outputs_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
+        if root.exists() and root.is_dir():
+            raise ValueError(f"Parquet path must be a file, got directory: {root}")
+
+        if root.exists():
+            import pyarrow.parquet as pq
+
+            try:
+                validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
+            except RuntimeError:
+                if not is_legacy_used_tfbs_detail_schema_compatible(root, namespace=DEFAULT_NAMESPACE):
+                    raise
+                log.warning(
+                    "Loading legacy DenseGen parquet schema for compatibility: %s. "
+                    "Only densegen__used_tfbs_detail uses the legacy field layout.",
+                    root,
+                )
+            with _suppressed_pyarrow_sysctl_warnings():
+                pf = pq.ParquetFile(root)
+            if pf.metadata is not None and pf.metadata.num_rows == 0:
+                raise RuntimeError(f"Parquet output has no rows: {root}")
+            with _suppressed_pyarrow_sysctl_warnings():
+                return (
+                    pf.iter_batches(batch_size=int(batch_size), columns=requested),
+                    f"parquet:{root}",
+                    False,
+                )
+
+        parts = sorted(root.parent.glob(f"{root.stem}__part-*.parquet"))
+        if parts:
+            import pyarrow.dataset as ds
+
+            with _suppressed_pyarrow_sysctl_warnings():
+                dataset = ds.dataset([str(p) for p in parts], format="parquet")
+            with _suppressed_pyarrow_sysctl_warnings():
+                scanner = ds.Scanner.from_dataset(dataset, columns=requested, batch_size=int(batch_size))
+            return (
+                scanner.to_batches(),
+                f"parquet:{root} (parts)",
+                False,
+            )
+
+        raise FileNotFoundError(f"Parquet output not found: {root}")
+
+    raise ValueError(f"Unknown plot source: {source}")
+
+
 def _require_non_empty_rows(
     rows: Iterable[dict[str, Any]],
     *,
@@ -129,7 +272,12 @@ def scan_records_from_config(
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when source='usr'")
-        root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+        root = resolve_usr_root_scoped_path(
+            cfg_path,
+            usr_cfg.root,
+            label="output.usr.root",
+            scope=usr_cfg.root_scope,
+        )
         try:
             from dnadesign.usr import Dataset
         except Exception as e:
@@ -163,7 +311,16 @@ def scan_records_from_config(
         if root.exists():
             import pyarrow.parquet as pq
 
-            validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
+            try:
+                validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
+            except RuntimeError:
+                if not is_legacy_used_tfbs_detail_schema_compatible(root, namespace=DEFAULT_NAMESPACE):
+                    raise
+                log.warning(
+                    "Loading legacy DenseGen parquet schema for compatibility: %s. "
+                    "Only densegen__used_tfbs_detail uses the legacy field layout.",
+                    root,
+                )
             with _suppressed_pyarrow_sysctl_warnings():
                 pf = pq.ParquetFile(root)
             if pf.metadata is not None and pf.metadata.num_rows == 0:
@@ -207,37 +364,48 @@ def load_records_from_config(
     *,
     max_rows: int | None = None,
     allow_truncated: bool = False,
+    normalize_used_tfbs_detail: bool = True,
 ) -> Tuple["pd.DataFrame", str]:
     """
     Load output records based on output.targets and plots.source (when multiple sinks).
     Returns (df, source_label), where source_label is 'parquet:<path>' or 'usr:<dataset>'.
     """
-    import pandas as pd
-
     resolved_max_rows = int(max_rows) if max_rows is not None else int(DEFAULT_RECORD_LOAD_LIMIT)
     if resolved_max_rows < 1:
         raise ValueError("max_rows must be >= 1 when loading output records")
+    requested_columns = list(columns) if columns is not None else None
+    scan_columns = list(requested_columns) if requested_columns is not None else None
+    source_added_for_recovery = False
+    if (
+        scan_columns is not None
+        and "source" not in scan_columns
+        and _RECOVERABLE_METADATA_COLUMNS.intersection(scan_columns)
+    ):
+        scan_columns = [*scan_columns, "source"]
+        source_added_for_recovery = True
 
-    rows, source_label = scan_records_from_config(
+    batches, source_label, parse_json_in_namespaced_columns = _iter_record_batches_from_config(
         root_cfg,
         cfg_path,
-        columns=columns,
-        max_rows=resolved_max_rows + 1,
+        columns=scan_columns,
     )
-    materialized_rows: list[dict[str, Any]] = []
-    truncated = False
-    for row in rows:
-        if len(materialized_rows) >= resolved_max_rows:
-            truncated = True
-            break
-        materialized_rows.append(row)
-
-    if not materialized_rows:
-        raise RuntimeError("Output records could not be materialized into a dataframe.")
-
-    df = pd.DataFrame.from_records(materialized_rows)
+    df = _materialize_batches_to_dataframe(
+        batches,
+        row_limit=resolved_max_rows + 1,
+        parse_json_in_namespaced_columns=parse_json_in_namespaced_columns,
+    )
     if df.empty:
-        raise RuntimeError("Output records dataframe is empty after materialization.")
+        raise RuntimeError("Output records could not be materialized into a dataframe.")
+    truncated = len(df) > resolved_max_rows
+    if truncated:
+        df = df.iloc[:resolved_max_rows].reset_index(drop=True)
+    if normalize_used_tfbs_detail and "densegen__used_tfbs_detail" in df.columns:
+        df["densegen__used_tfbs_detail"] = [
+            coerce_list_of_dicts(value) for value in df["densegen__used_tfbs_detail"].tolist()
+        ]
+    df = recover_densegen_metadata_from_source(df)
+    if source_added_for_recovery and requested_columns is not None and "source" not in requested_columns:
+        df = df.drop(columns=["source"], errors="ignore")
 
     if truncated:
         message = (

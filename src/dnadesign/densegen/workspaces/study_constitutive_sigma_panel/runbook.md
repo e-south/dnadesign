@@ -42,12 +42,11 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     pixi run dense inspect run --events --library -c "$CONFIG"
     # Render DenseGen analysis artifacts from current run outputs.
     # `dense plot` is the analysis entry point; static plots always render.
-    # This workspace enables plots.video.enabled: true by default, emitting a sampled
-    # Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
-    # Disable by setting plots.video.enabled: false in config.
+    # The Stage-B showcase video is optional. Enable plots.video and either add
+    # dense_array_showcase_video to plots.default or render it explicitly with --only.
     pixi run dense plot -c "$CONFIG"
     # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-    # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
+    # pixi run dense plot --only dense_array_showcase_video -c "$CONFIG"
     # Generate the run-overview marimo notebook artifact.
     pixi run dense notebook generate -c "$CONFIG"
     # Validate the generated notebook before opening or sharing it.

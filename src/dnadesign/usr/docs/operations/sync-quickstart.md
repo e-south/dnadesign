@@ -101,7 +101,7 @@ Optional strict bootstrap mode:
 
 ```bash
 # Require an explicit canonical dataset id and disable local name guessing.
-uv run usr pull mg1655_promoters bu-scc -y --strict-bootstrap-id
+uv run usr pull usr_mg1655_promoter_controls bu-scc -y --strict-bootstrap-id
 ```
 
 ```bash

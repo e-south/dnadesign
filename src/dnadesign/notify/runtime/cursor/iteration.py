@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import errno
+import json
 import os
 import time
 from pathlib import Path
@@ -22,6 +23,17 @@ from ...errors import NotifyConfigError
 
 def _is_stale_handle_error(exc: OSError) -> bool:
     return exc.errno in {errno.ESTALE, errno.EBADF}
+
+
+def _tail_line_is_stable_json(line: str) -> bool:
+    text = line.strip()
+    if not text:
+        return True
+    try:
+        json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    return True
 
 
 def iter_file_lines(
@@ -70,7 +82,9 @@ def iter_file_lines(
         handle.seek(offset)
         while True:
             stale_handle_detected = False
+            line_start = 0
             try:
+                line_start = int(handle.tell())
                 line = handle.readline()
             except OSError as exc:
                 if _is_stale_handle_error(exc):
@@ -83,6 +97,20 @@ def iter_file_lines(
                     "events file handle became stale while following. Pass --on-truncate restart to resume from start."
                 )
             if line:
+                if follow and not line.endswith("\n"):
+                    handle.seek(line_start)
+                    time.sleep(poll_interval)
+                    continue
+                if follow:
+                    line_end = int(handle.tell())
+                    try:
+                        path_size = int(events_path.stat().st_size)
+                    except FileNotFoundError:
+                        path_size = line_end
+                    if line_end >= path_size and not _tail_line_is_stable_json(line):
+                        handle.seek(line_start)
+                        time.sleep(poll_interval)
+                        continue
                 last_activity = time.monotonic()
                 yield handle.tell(), line
                 continue

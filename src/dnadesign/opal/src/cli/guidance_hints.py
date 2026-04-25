@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/guidance_hints.py
 
-Shared helpers for human-readable next-step hints printed by CLI commands.
+Shared helpers for readable next-step hints printed by CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

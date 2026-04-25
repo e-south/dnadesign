@@ -48,17 +48,37 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     # Inspect run diagnostics and per-plan library progress.
     pixi run dense inspect run --events --library -c "$CONFIG"
     # Render DenseGen analysis artifacts from current run outputs.
-    # `dense plot` is the analysis entry point; static plots always render.
-    # This workspace enables plots.video.enabled: true by default, emitting a sampled
-    # Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
-    # Disable by setting plots.video.enabled: false in config.
+    # The default catalog now includes dataset-native read-only analysis plots
+    # over the selected records source plus the core local diagnostics.
     pixi run dense plot -c "$CONFIG"
-    # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-    # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
+    # Optional analysis shortcut: re-render only the Stage-B showcase video artifact.
+    # pixi run dense plot --only dense_array_showcase_video -c "$CONFIG"
     # Generate the run-overview marimo notebook artifact.
     pixi run dense notebook generate -c "$CONFIG"
     # Validate the generated notebook before opening or sharing it.
     uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+
+### Read-only local DenseGen analysis
+
+These commands read the shared `densegen_prom_eth_cip_source` dataset
+through the existing workspace config and only write local plot/notebook
+artifacts under `outputs/`. The workspace resolves `output.usr.root` against
+the git common repo root so the same commands work from a normal checkout and
+from an isolated worktree.
+
+    # Render the default read-only analysis catalog from the shared DenseGen source dataset.
+    uv run dense plot -c "$CONFIG"
+    # Generate a marimo notebook from the shared DenseGen source dataset.
+    uv run dense notebook generate --force -c "$CONFIG"
+    # Validate the generated notebook artifact.
+    uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+    # Launch the notebook in marimo app mode.
+    uv run dense notebook run -c "$CONFIG"
+
+The default plot catalog for this workspace now renders the full
+notebook-visible plot surface required for notebook launch. The happy path is
+that `dense plot` materializes every plot shown in the generated notebook,
+including the drilldown panels and the Stage-B showcase video.
 
 ### Mode B: BU SCC batch loop (generation only)
 
@@ -95,10 +115,12 @@ Queue contract:
 
 ### Optional analysis mode (existing outputs)
 
-Mode C: post-run analysis only.
+    Mode C: post-run analysis only.
 
-    # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
-    ./runbook.sh --mode analysis
+        # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+        # Records-only state is acceptable here: the shared runbook continues when
+        # finalized run metadata is absent and still refreshes recoverable diagnostics and Stage-B plots.
+        ./runbook.sh --mode analysis
 
 ### Optional notebook open
 

@@ -27,6 +27,7 @@ from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, 
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .event_log import load_events
 from .motif_labels import input_motifs, motif_display_name
+from .pipeline.attempts import _attempts_artifact_paths, _load_attempts_snapshot
 from .pipeline.plan_pools import build_plan_pools, plan_pool_label
 from .record_values import (
     coerce_list as _ensure_list,
@@ -37,6 +38,7 @@ from .reporting_transforms import (
     _dg,
     _explode_library_from_attempts,
     _explode_used,
+    _explode_used_from_composition,
     _normalized_entropy_from_counts,
     _usage_stats_from_counts,
 )
@@ -74,9 +76,15 @@ _COMPOSITION_REPORT_COLUMNS = [
     "solution_id",
     "input_name",
     "plan_name",
+    "library_index",
+    "library_hash",
     "tf",
     "tfbs",
+    "offset",
     "length",
+    "end",
+    "site_id",
+    "source",
 ]
 
 
@@ -150,7 +158,12 @@ def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root:
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when selected output source is usr")
-        usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+        usr_root = resolve_usr_root_scoped_path(
+            cfg_path,
+            usr_cfg.root,
+            label="output.usr.root",
+            scope=usr_cfg.root_scope,
+        )
         return os.path.relpath(usr_root / usr_cfg.dataset / "records.parquet", run_root)
 
     if source == "parquet":
@@ -218,18 +231,48 @@ def collect_report_data(
         output_records_path = None
 
     used_df = _explode_used(df)
-    attempts_path = tables_root / "attempts.parquet"
-    if not attempts_path.exists():
-        message = "outputs/tables/attempts.parquet is missing; library utilization summaries may be incomplete."
+    composition_path = tables_root / "composition.parquet"
+    composition = pd.DataFrame()
+    if composition_path.exists():
+        try:
+            composition = _read_composition_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
+        except Exception as exc:
+            message = f"Failed to load composition.parquet; composition summaries will be incomplete. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+            composition = pd.DataFrame()
+    if used_df.empty and not composition.empty:
+        try:
+            recovered_used_df = _explode_used_from_composition(composition)
+        except Exception as exc:
+            message = f"Failed to recover used TFBS placements from composition.parquet. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+        else:
+            if not recovered_used_df.empty:
+                used_df = recovered_used_df
+                warnings.append(
+                    "Output records did not include used TFBS detail; recovered library utilization from "
+                    "outputs/tables/composition.parquet."
+                )
+    attempt_paths = _attempts_artifact_paths(tables_root)
+    attempts_path = attempt_paths[0] if attempt_paths else tables_root / "attempts.parquet"
+    if not attempt_paths:
+        message = (
+            "outputs/tables/attempts.parquet or attempts_part-*.parquet are missing; "
+            "library utilization summaries may be incomplete."
+        )
         if strict:
             raise ValueError(message)
         warnings.append(message)
         attempts_df = pd.DataFrame()
     else:
         try:
-            attempts_df = pd.read_parquet(attempts_path, columns=_ATTEMPTS_REPORT_COLUMNS)
+            attempts_df = _load_attempts_snapshot(tables_root, columns=_ATTEMPTS_REPORT_COLUMNS)
         except Exception as exc:
-            message = f"Failed to load attempts.parquet; library utilization summaries will be incomplete. ({exc})"
+            message = f"Failed to load attempts artifacts; library utilization summaries will be incomplete. ({exc})"
             if strict:
                 raise ValueError(message) from exc
             warnings.append(message)
@@ -613,20 +656,14 @@ def collect_report_data(
         tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
         tables["tf_adjacency"] = _compute_adjacency(used_df)
 
-    composition_path = tables_root / "composition.parquet"
-    if composition_path.exists():
-        try:
-            composition = _read_composition_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
-            if not composition.empty and "tf" in composition.columns and "input_name" in composition.columns:
-                composition["tf"] = composition.apply(
-                    lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
-                    axis=1,
-                )
-            tables["composition"] = composition
-        except Exception as exc:
-            if strict:
-                raise ValueError(f"Failed to load composition.parquet for report tables. ({exc})") from exc
-            log.warning("Failed to load composition.parquet for report tables.", exc_info=True)
+    if not composition.empty:
+        composition_table = composition.copy()
+        if "tf" in composition_table.columns and "input_name" in composition_table.columns:
+            composition_table["tf"] = composition_table.apply(
+                lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+                axis=1,
+            )
+        tables["composition"] = composition_table
 
     library_hashes = used_df["library_hash"].dropna().unique().tolist() if "library_hash" in used_df.columns else []
     tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}

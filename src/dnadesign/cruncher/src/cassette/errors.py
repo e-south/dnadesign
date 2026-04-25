@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dnadesign.cruncher.nickases.errors import NickaseCatalogError as SharedNickaseCatalogError
+
 
 class CassetteError(ValueError):
     """Base error for cassette workflow failures."""
@@ -20,7 +22,7 @@ class CassetteSpecError(CassetteError):
     """Raised when a cassette spec is invalid or cannot be loaded."""
 
 
-class NickaseCatalogError(CassetteError):
+class NickaseCatalogError(SharedNickaseCatalogError, CassetteError):
     """Raised when a nickase catalog is invalid or cannot be loaded."""
 
 

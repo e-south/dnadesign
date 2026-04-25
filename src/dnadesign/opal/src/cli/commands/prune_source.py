@@ -103,7 +103,7 @@ def cmd_prune_source(
         "--backup/--no-backup",
         help="Write a copy of the original file next to records.parquet before pruning (default: on).",
     ),
-    json: bool = typer.Option(False, "--json/--human", help="Output format."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     """
     Typical use:

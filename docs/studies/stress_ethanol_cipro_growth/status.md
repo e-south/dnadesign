@@ -1,107 +1,64 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-03-24
+- Last verified: 2026-04-22
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
+- Route map: `routes.md`
 - Study execution map: `pipeline.yaml`
-- USR root: `src/dnadesign/usr/datasets`
-- Target row count: at least `100000` DenseGen anchor rows before the first shared feature-matrix realization
-- Current shared feature dataset: `n/a`
-- Current feature-dataset row count: `n/a`
-- Preferred infer model family: `evo2_20b`
-- Alternate infer model family: `evo2_7b`
+- LatentDNA binding: `latentdna_binding.yaml`
+- Snapshot posture: current
+- Preflight posture: not requested
 
-### Source datasets
+### Current datasets
 
-- DenseGen anchor shared dataset: `densegen/study_stress_ethanol_cipro` (`130864` rows, written directly to the shared USR root)
-- Wildtype or manual dataset: `mg1655_promoters` (`4` rows: `spyP_MG1655`, `sulAp`, `soxS`, `J23105`)
-- Construct template seed dataset: `plasmids` (`1` row)
-- Shared merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`130868` rows)
-- Shared Construct context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`130868` rows)
+- DenseGen anchor source: `densegen_prom_eth_cip_source` (`present`, shared source)
+- Anchor-only handoff: `usr_prom_eth_cip_anchor` (`present`, shared infer handoff)
+- Full-context handoff: `construct_prom_eth_cip_context` (`present`, shared infer handoff)
 
-### Shared downstream datasets
+### Current phase
 
-- Merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`130868` rows)
-- Construct-expanded context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`130868` rows, 1 kb realized outputs)
-- Canonical full-lane feature dataset: `promoter/stress_ethanol_cipro_feature_matrix` or `n/a`
-- Cluster results root: `n/a`
-- OPAL config: `n/a`
+- Declared phase: `infer_batch_preparation`
+- Preferred infer family: `evo2_20b`
+- Supported infer families: `evo2_20b`, `evo2_7b`
+- The study phase is `infer_batch_preparation`
+- LatentDNA browser default family: `evo2_7b` for the five-view scientist-facing review surface; 20B views remain materializable but hidden in the browser
+- Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
+- Current attention surfaces: none
+- Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
+- Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
+- Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
+- Appendix surfaces remain secondary audit material
 
-Current design note: the checked-in Infer full-lane configs keep `anchor_only`
-and `template_1kb` as separate jobs and dataset planes. The study still tracks
-`promoter/stress_ethanol_cipro_feature_matrix` as the planned shared downstream
-feature surface, but the pre-infer execution path is explicit rather than
-implicit. The study-owned Construct surface is one
-`forward_anchor_window` workspace project; the placement contract lives in the
-checked-in Construct config and workspace registry rather than being duplicated
-throughout the study note.
+### Current row counts
 
-Execution note: all checked-in Infer configs target `cuda:0`. A login-node
-`infer validate config` or `infer run --dry-run` can still pass while local
-GPU capacity is absent, so treat those commands as config-validity checks, not
-as proof that the current host can execute Infer directly.
+- DenseGen source row target: `100000`
+- DenseGen anchor target before the first full-lane infer gate closes: `100000`
+- `densegen_prom_eth_cip_source`: `157160`
+- `usr_prom_eth_cip_anchor`: `157164`
+- `construct_prom_eth_cip_context`: `157164`
+- Status JSON route: `evidence.analysis_surfaces.{densegen,latentdna,cluster}`
 
-### Infer matrix status
+### Current downstream posture
 
-- `anchor_only`: `batch-prep`
-  - preferred 20B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml`
-  - alternate 7B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml`
-  - preferred 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
-  - alternate 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml`
-  - dataset: `promoter/stress_ethanol_cipro_anchor_set`
-  - readiness note: config validation is green; notify profiles plus webhook/TLS env are still missing; direct execution still requires a GPU host
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `anchor_plus_template`: `batch-prep`
-  - preferred 20B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml`
-  - alternate 7B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml`
-  - preferred 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
-  - alternate 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml`
-  - dataset: `promoter/stress_ethanol_cipro_construct_contexts`
-  - readiness note: config validation is green; notify profiles plus webhook/TLS env are still missing; direct execution still requires a GPU host
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `full_lane_set`: `pending`
-  - config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.yaml`
-  - preferred Hopper lane: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml`
-  - alternate 7B lane: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml`
-  - datasets: `promoter/stress_ethanol_cipro_anchor_set`, `promoter/stress_ethanol_cipro_construct_contexts`
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-  - model lanes: `evo2_7b`, `evo2_20b`
-  - batch note: use the lane-specific presets above because ops auto/resume requires one USR destination per runbook.
-
-### Rollback and maintenance
-
-- Infer reset: `uv run infer prune --usr promoter/stress_ethanol_cipro_feature_matrix --usr-root src/dnadesign/usr/datasets`
-- Infer namespace archive: `uv run usr maintenance overlay-remove promoter/stress_ethanol_cipro_feature_matrix --namespace infer --mode archive`
-- DenseGen overlay compaction: `uv run usr maintenance overlay-compact densegen/study_stress_ethanol_cipro --namespace densegen`
-
-### Batch and notify
-
-- DenseGen batch route: `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml`
-- Infer Notify root: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/`
-- Infer anchor-only 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml`
-- Infer anchor-plus-template 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml`
-- Infer anchor-only 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
-- Infer anchor-plus-template 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
-- DenseGen Notify profile or config: `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/outputs/notify/densegen/profile.json`
-- Infer anchor-only 20B derived Notify profile path: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json`
-- Infer anchor-plus-template 20B derived Notify profile path: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_20b/profile.json`
-- Infer anchor-only 7B derived Notify profile path: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json`
-- Infer anchor-plus-template 7B derived Notify profile path: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json`
-- Notify secret prerequisite: export `NOTIFY_WEBHOOK_FILE=/usr4/dl523/esouth/.config/dnadesign/notify/secrets/study_stress_ethanol_cipro.webhook` or materialize the same `file://` secret ref into the lane profile before submit.
-- Infer Notify profile materialization: use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope full --json` and inspect the failing `notify.profile.*` command checks plus their `surface_id` and `command` fields, or run `notify setup slack --tool infer --config <checked-in-infer-config>` directly. The study pipeline no longer records separate Infer notify profile paths; Infer derives the lane-specific profile path from the single-lane config contract, so `--profile` should not be needed for the checked-in lane configs.
-- Infer Notify scope note: use `--config` per lane, not `--workspace study_stress_ethanol_cipro`, because the workspace default `config.yaml` is a multi-destination full-lane config and is intentionally ambiguous for a single USR events stream.
-- TLS prerequisite for `notify profile doctor` and live Slack delivery: export `SSL_CERT_FILE` or store the same CA bundle path in the materialized profile.
-- DenseGen watch command: `uv run notify usr-events watch --events src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro/.events.log --dry-run --no-advance-cursor-on-dry-run`
-- Infer anchor-only 20B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml --json`
-- Infer anchor-plus-template 20B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml --json`
-- Infer anchor-only 7B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml --json`
-- Infer anchor-plus-template 7B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml --json`
-- Infer Slack message semantics: `attach` sends `running` progress with run id, dataset, chunk rows, and workspace rows; `materialize` sends `success` with `rows_written`.
+- LatentDNA: `configured` for downstream comparison; the study-status authority remains the checked-in record plus `usr.data-plane.promoter-study-status`
+- LatentDNA gate: `representation_health_summary`
+- LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
+- LatentDNA companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
+- LatentDNA appendix support: `sigma35_centroid_distance_gallery`
+- LatentDNA notebook role: plot-first review surface for the five-view 7B-first pre-assay ladder, with appendix and debug material kept secondary
+- Cluster: `planned`
+- OPAL: `not_configured`
+- Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
+- Current appendix attention: none
+- Current appendix ok: `appendix_geometry_audit`, `appendix_umap_gallery`
+- The active comparison is `anchor_60bp` versus `full_context_anchor_mean`, with `full_context_1kb` retained as an orientation view
 
 ### Next actions
 
-- The source assembly and Construct context phases are already materialized locally. Additional DenseGen growth can continue in parallel if desired, but the checked-in study focus is now Infer batch preparation.
-- Materialize the lane-specific Infer Notify profiles for both 20B and 7B configs. Treat 20B as the preferred default and 7B as the alternate path.
-- Export `NOTIFY_WEBHOOK_FILE` and `SSL_CERT_FILE` before rerunning `notify profile doctor` or `ops runbook plan`.
-- Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` to focus on the infer-batch-preparation blockers rather than the full historical study surface.
-- Submit the preferred 20B anchor-only and anchor-plus-template presets on Hopper/H200-capable GPU infrastructure when available; use the 7B presets on other GPU-capable nodes when a non-Hopper lane is needed.
+- If you need the current record, refresh the sanctioned snapshot first:
+  `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- If you need the downstream representation-comparison surface after reading the record-plane snapshot, refresh the LatentDNA workspace snapshot:
+  `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
+- If you need blockers or next-run readiness, switch to `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+- Treat `intermediate_embedding_*` and `pooled_logits_*` as candidate `X` blocks; use `log_likelihood_per_token_*` only as scalar side channels
+- Do not use UMAP aesthetics, reference-neighbor artifacts, or geodesic pilots as the primary comparison rule

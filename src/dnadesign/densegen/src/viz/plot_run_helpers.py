@@ -13,9 +13,25 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from .plot_common import _rename_artifact_path
+
+_PLAN_BASE_LABELS = {
+    "background_only": "Background",
+    "ciprofloxacin": "Cipro",
+    "ethanol": "EtOH",
+    "ethanol_ciprofloxacin": "EtOH + Cipro",
+}
+_PLAN_VARIANT_LABELS = {
+    "sig35": "σ70",
+    "sigma70": "σ70",
+}
+_PLAN_MARKER_CYCLE = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h")
 
 
 def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
@@ -123,6 +139,176 @@ def _normalize_plan_name(value: object) -> str | None:
     if label.lower() in {"nan", "none"}:
         return None
     return label
+
+
+def _title_case_words(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    words = [word for word in text.replace("-", " ").replace("_", " ").split() if word]
+    if not words:
+        return ""
+    return " ".join(word[:1].upper() + word[1:] for word in words)
+
+
+def capitalize_first(value: object) -> str:
+    token = str(value)
+    for idx, char in enumerate(token):
+        if char.isalpha():
+            return token[:idx] + char.upper() + token[idx + 1 :]
+    return token
+
+
+def plan_markers(plan_names: list[str]) -> dict[str, str]:
+    return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
+
+
+def rename_output_paths(paths: list[Path], *, stem: str) -> list[Path]:
+    renamed: list[Path] = []
+    for path in paths:
+        target = path.with_name(f"{stem}{path.suffix}")
+        renamed.append(_rename_artifact_path(path, target))
+    return renamed
+
+
+def place_figure_legend_below_xlabel(
+    fig: plt.Figure,
+    *,
+    ax_xlabel: plt.Axes,
+    legend,
+    gap: float = 0.012,
+    min_bottom: float = 0.01,
+    max_bottom: float = 0.55,
+) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    xlabel_bbox = (
+        ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    )
+    target_top = float(xlabel_bbox.y0) - float(gap)
+    legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    if legend_bbox.y0 < float(min_bottom):
+        needed = float(min_bottom) - float(legend_bbox.y0)
+        new_bottom = min(float(max_bottom), float(fig.subplotpars.bottom) + needed + 0.005)
+        fig.subplots_adjust(bottom=new_bottom)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        xlabel_bbox = (
+            ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        target_top = float(xlabel_bbox.y0) - float(gap)
+        legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+
+
+def compact_regulator_label(value: object) -> str:
+    token = _usage_category_label(value) or str(value or "").strip()
+    if not token:
+        return ""
+    if token.lower() == "background":
+        return "Background"
+    parts = [part for part in token.replace("-", "_").split("_") if part]
+    labels: list[str] = []
+    for part in parts:
+        if part.isupper():
+            labels.append(part)
+            continue
+        labels.append(part[:1].upper() + part[1:])
+    return " ".join(labels).strip()
+
+
+_KNOWN_REGULATOR_DISPLAY_ORDER = {
+    "lexa": 0,
+    "cpxr": 1,
+    "baer": 2,
+    "background": 99,
+}
+
+
+def order_regulators_for_display(
+    regulators: list[str] | tuple[str, ...],
+    *,
+    counts_by_regulator: dict[str, int] | None = None,
+) -> list[str]:
+    ordered_unique = list(dict.fromkeys(str(regulator) for regulator in regulators if str(regulator).strip()))
+    if not ordered_unique:
+        return []
+    counts = {str(key): int(value) for key, value in (counts_by_regulator or {}).items()}
+
+    def _sort_key(regulator: str) -> tuple[int, int, str]:
+        label = compact_regulator_label(regulator)
+        token = label.lower().replace(" ", "")
+        primary = _KNOWN_REGULATOR_DISPLAY_ORDER.get(token, 40)
+        secondary = -int(counts.get(regulator, 0))
+        return primary, secondary, label.lower()
+
+    return sorted(ordered_unique, key=_sort_key)
+
+
+def compact_plan_label(plan_name: object) -> str:
+    plan_text = _normalize_plan_name(plan_name) or ""
+    if not plan_text:
+        return "Run-level"
+    if plan_text == "unscoped":
+        return "Run-level"
+    if plan_text == "stage_a":
+        return "Stage A"
+    parts = [part for part in plan_text.split("__") if str(part).strip()]
+    base_token = str(parts[0] if parts else plan_text).strip()
+    base_label = _PLAN_BASE_LABELS.get(base_token.lower(), _title_case_words(base_token) or base_token)
+    variant_tokens: list[str] = []
+    for token in parts[1:]:
+        token_text = str(token).strip()
+        if not token_text:
+            continue
+        if "=" in token_text:
+            key, value = token_text.split("=", 1)
+        elif "_" in token_text:
+            key, value = token_text.split("_", 1)
+        else:
+            key, value = token_text, ""
+        key = str(key).strip()
+        value = str(value).strip()
+        if key and value:
+            key_label = _PLAN_VARIANT_LABELS.get(key.lower(), _title_case_words(key) or key)
+            variant_tokens.append(f"{key_label} {value}")
+    if not variant_tokens:
+        return base_label
+    return f"{base_label} [{' | '.join(variant_tokens)}]"
+
+
+def compact_failure_reason_label(reason_label: object) -> str:
+    text = str(reason_label or "").strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    compact_map = {
+        "duplicate output": "Duplicate output",
+        "unknown": "Unknown",
+        "sequence validation": "Sequence validation",
+        "no solution": "No solution",
+        "required regulators": "Required TF set",
+        "min by regulator": "Per-regulator minimum",
+        "min per tf": "Per-TF minimum",
+        "min regulator groups": "Regulator-group minimum",
+        "solver failure": "Solver failure",
+    }
+    if lowered in compact_map:
+        return compact_map[lowered]
+    if lowered.startswith("forbidden kmer:"):
+        token = text.split(":", 1)[1].strip()
+        return f"Forbidden k-mer {token}".strip()
+    if lowered.startswith("forbidden kmers:"):
+        tokens = [item.strip() for item in text.split(":", 1)[1].split(",") if item.strip()]
+        if len(tokens) <= 2:
+            return f"Forbidden k-mers {', '.join(tokens)}".strip()
+        return f"Forbidden k-mers {', '.join(tokens[:2])} ({len(tokens) - 2} more)"
+    normalized = text.replace("_", " ").strip()
+    if not normalized:
+        return ""
+    return normalized[:1].upper() + normalized[1:]
 
 
 def _humanize_scope_label(value: object) -> str:

@@ -15,11 +15,12 @@ NOTEBOOK_TEMPLATE_CELLS_BASE = r"""
 @app.cell
 def _():
     from functools import lru_cache
-    import hashlib
+    from io import BytesIO
     import json
     from pathlib import Path
     import shutil
     import subprocess
+    import tempfile
     import textwrap
 
     import marimo as mo
@@ -27,9 +28,13 @@ def _():
     import yaml
     from pyarrow.parquet import ParquetFile
 
-    from dnadesign.baserender import load_records_from_parquet
+    from dnadesign.baserender import adapt_records
     from dnadesign.baserender import render_record_figure
     from dnadesign.densegen import PLOT_SPECS, densegen_notebook_render_contract
+    from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
+        densegen_baserender_title_text,
+        densegen_video_subtitle_text,
+    )
     from dnadesign.densegen.src.cli.notebook_export_paths import (
         resolve_baserender_export_destination,
         resolve_records_export_destination,
@@ -37,29 +42,174 @@ def _():
     from dnadesign.densegen.src.cli.notebook_records_projection import (
         build_records_preview_table,
     )
+    from dnadesign.densegen.src.core.record_metadata_recovery import (
+        recover_densegen_metadata_from_source,
+    )
+    from dnadesign.densegen.src.core.record_values import (
+        coerce_list_of_dicts,
+    )
+    from dnadesign.densegen.src.viz.plot_inventory import (
+        HIDDEN_VISUAL_PLOT_TYPES,
+        base_plot_id,
+        compact_plan_label,
+        describe_visual_plot_type,
+        load_current_inventory_strict,
+        notebook_visible_plot_ids,
+        plot_missing_hint,
+        plot_required_artifacts,
+        resolve_plot_availability,
+        resolve_plot_record,
+    )
 
     def require(condition: bool, message: str) -> None:
         if bool(condition):
             raise RuntimeError(message)
 
+    def consume_click(click_count: int, last_handled: int) -> tuple[bool, int]:
+        _click_count = max(0, int(click_count or 0))
+        _last_handled = max(0, int(last_handled or 0))
+        if _click_count <= _last_handled:
+            return False, _last_handled
+        return True, _click_count
+
+    def _load_usr_preview_dataframe(
+        *,
+        pd,
+        preview_limit: int,
+        required_columns: set[str],
+        usr_root: Path,
+        usr_dataset: str,
+    ) -> tuple[pd.DataFrame, int, list[str], Path]:
+        from dnadesign.usr import Dataset
+
+        ds = Dataset(usr_root, str(usr_dataset))
+        require(not ds.records_path.exists(), f"USR records not found: {ds.records_path}")
+        stats = ds.stats()
+        total_rows = int(getattr(stats, "rows", 0) or 0)
+        require(total_rows <= 0, f"`{ds.records_path.name}` is empty.")
+        window_n = min(total_rows, max(1, int(preview_limit)))
+        remaining = int(window_n)
+        batches = []
+        for batch in ds.scan(
+            columns=None,
+            include_overlays=True,
+            include_deleted=False,
+            batch_size=min(1024, max(1, int(preview_limit))),
+        ):
+            frame = batch.to_pandas()
+            if remaining < len(frame):
+                frame = frame.iloc[:remaining]
+            batches.append(frame)
+            remaining -= len(frame)
+            if remaining <= 0:
+                break
+        df_window = pd.concat(batches, ignore_index=True) if batches else pd.DataFrame()
+        missing = sorted(required_columns - set(df_window.columns))
+        return df_window, total_rows, missing, ds.records_path
+
+    def load_preview_records(
+        *,
+        ParquetFile,
+        pd,
+        preview_limit: int,
+        output_source: str,
+        records_path: Path,
+        recover_densegen_metadata_from_source,
+        required_columns: set[str],
+        usr_dataset: str | None,
+        usr_root: Path | None,
+    ) -> dict[str, object]:
+        if str(output_source or "").strip() == "usr":
+            require(
+                usr_root is None or not str(usr_dataset or "").strip(),
+                "Notebook source is USR but generation context does not include a dataset path.",
+            )
+            df_window, total_rows, missing, preview_source_path = _load_usr_preview_dataframe(
+                pd=pd,
+                preview_limit=preview_limit,
+                required_columns=required_columns,
+                usr_root=usr_root,
+                usr_dataset=str(usr_dataset),
+            )
+        else:
+            preview_source_path = records_path
+            try:
+                parquet_file = ParquetFile(preview_source_path)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to open `{preview_source_path.name}`: {exc}") from exc
+            schema_names = set(parquet_file.schema_arrow.names)
+            missing = sorted(required_columns - schema_names)
+            total_rows = int(parquet_file.metadata.num_rows or 0)
+            require(total_rows <= 0, f"`{preview_source_path.name}` is empty.")
+            window_n = min(total_rows, max(1, int(preview_limit)))
+            remaining = int(window_n)
+            batches = []
+            preview_columns = list(parquet_file.schema_arrow.names)
+            for batch in parquet_file.iter_batches(
+                columns=preview_columns,
+                batch_size=min(1024, max(1, int(preview_limit))),
+            ):
+                frame = batch.to_pandas()
+                if remaining < len(frame):
+                    frame = frame.iloc[:remaining]
+                batches.append(frame)
+                remaining -= len(frame)
+                if remaining <= 0:
+                    break
+            df_window = pd.concat(batches, ignore_index=True) if batches else pd.DataFrame(columns=preview_columns)
+        require(
+            bool(missing),
+            f"`{preview_source_path.name}` missing required columns: {missing}. "
+            "DenseGen BaseRender preview requires id, sequence, and densegen placement detail.",
+        )
+        df_window = recover_densegen_metadata_from_source(df_window)
+        if "densegen__used_tfbs_detail" in df_window.columns:
+            df_window["densegen__used_tfbs_detail"] = [
+                coerce_list_of_dicts(value) for value in df_window["densegen__used_tfbs_detail"].tolist()
+            ]
+        require(df_window.empty, "No rows available in preview window.")
+        return {
+            "preview_rows": df_window.reset_index(drop=True),
+            "preview_source_path": preview_source_path,
+            "preview_strategy": "head_window",
+            "preview_total_rows": int(total_rows),
+            "preview_window_limit": max(1, int(preview_limit)),
+        }
+
     return (
+        BytesIO,
+        HIDDEN_VISUAL_PLOT_TYPES,
         ParquetFile,
         Path,
-        lru_cache,
-        hashlib,
+        adapt_records,
+        base_plot_id,
+        compact_plan_label,
+        consume_click,
+        describe_visual_plot_type,
+        densegen_baserender_title_text,
         densegen_notebook_render_contract,
+        densegen_video_subtitle_text,
         json,
+        load_current_inventory_strict,
+        load_preview_records,
+        notebook_visible_plot_ids,
         PLOT_SPECS,
+        plot_missing_hint,
+        plot_required_artifacts,
+        resolve_plot_availability,
+        resolve_plot_record,
         resolve_baserender_export_destination,
         resolve_records_export_destination,
         build_records_preview_table,
-        load_records_from_parquet,
+        coerce_list_of_dicts,
         mo,
         pd,
         require,
+        recover_densegen_metadata_from_source,
         render_record_figure,
         shutil,
         subprocess,
+        tempfile,
         textwrap,
         yaml,
     )
@@ -87,6 +237,7 @@ def _(Path, densegen_notebook_render_contract):
             return str(resolved)
     workspace_name = str(config_path.parent.name or run_root.name)
     workspace_heading = __WORKSPACE_HEADING__
+    workspace_plan_names = __WORKSPACE_PLAN_NAMES__
     workspace_run_details_payload = __WORKSPACE_RUN_DETAILS_PAYLOAD__
     records_path = Path(__RECORDS_PATH__)
     output_source = __OUTPUT_SOURCE__
@@ -96,12 +247,12 @@ def _(Path, densegen_notebook_render_contract):
     contract = densegen_notebook_render_contract()
     record_window_limit = int(contract.record_window_limit)
     run_manifest_path = run_root / "outputs" / "meta" / "run_manifest.json"
-    plot_manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
+    plot_inventory_path = run_root / "outputs" / "plots" / "current_inventory.json"
     return (
         config_path,
         contract,
         output_source,
-        plot_manifest_path,
+        plot_inventory_path,
         record_window_limit,
         records_path,
         run_manifest_path,
@@ -109,6 +260,7 @@ def _(Path, densegen_notebook_render_contract):
         run_root,
         to_repo_relative_path,
         workspace_heading,
+        workspace_plan_names,
         workspace_run_details_payload,
         usr_dataset,
         usr_root,
@@ -185,86 +337,66 @@ def _(records_path, require):
 def _(
     ParquetFile,
     contract,
+    load_preview_records,
     output_source,
     pd,
     record_window_limit,
     records_path,
     require,
-    run_root,
     usr_dataset,
     usr_root,
 ):
     record_id_column = str(contract.adapter_columns["id"])
-    preview_records_path = records_path
-    parquet_open_error = None
-    parquet_file = None
-    try:
-        parquet_file = ParquetFile(preview_records_path)
-    except Exception as exc:
-        parquet_open_error = f"Failed to open `{preview_records_path.name}`: {exc}"
-    require(parquet_open_error is not None, parquet_open_error or "Unable to read records artifact.")
-    schema_names = set(parquet_file.schema_arrow.names)
-    required = {
+    preview_payload = load_preview_records(
+        ParquetFile=ParquetFile,
+        pd=pd,
+        preview_limit=int(record_window_limit),
+        output_source=str(output_source or "").strip(),
+        records_path=records_path,
+        recover_densegen_metadata_from_source=recover_densegen_metadata_from_source,
+        required_columns={
         contract.adapter_columns["id"],
         contract.adapter_columns["sequence"],
         contract.adapter_columns["annotations"],
-    }
-    missing = sorted(required - schema_names)
-    if missing and str(output_source or "").strip() == "usr":
-        require(
-            usr_root is None or not str(usr_dataset or "").strip(),
-            "Notebook source is USR but generation context does not include a dataset path.",
-        )
-        usr_export_path = run_root / "outputs" / "notebooks" / "records_with_overlays.parquet"
-        try:
-            from dnadesign.usr import Dataset
-
-            ds = Dataset(usr_root, str(usr_dataset))
-            require(not ds.records_path.exists(), f"USR records not found: {ds.records_path}")
-            ds.export("parquet", usr_export_path, include_deleted=False)
-            preview_records_path = usr_export_path
-            parquet_file = ParquetFile(preview_records_path)
-            schema_names = set(parquet_file.schema_arrow.names)
-            missing = sorted(required - schema_names)
-        except Exception as exc:
-            raise RuntimeError(f"Failed to build merged USR records for notebook preview: {exc}") from exc
-    require(
-        bool(missing),
-        f"`{preview_records_path.name}` missing required columns: {missing}. "
-        "DenseGen BaseRender preview requires id, sequence, and densegen placement detail.",
+        },
+        usr_dataset=usr_dataset,
+        usr_root=usr_root,
     )
-    row_count = int(parquet_file.metadata.num_rows or 0)
-    require(row_count <= 0, f"`{preview_records_path.name}` is empty.")
-
-    window_n = min(row_count, max(1, int(record_window_limit)))
-    preview_columns = list(parquet_file.schema_arrow.names)
-
-    remaining = int(window_n)
-    batches = []
-    for batch in parquet_file.iter_batches(columns=preview_columns, batch_size=min(1024, int(window_n))):
-        frame = batch.to_pandas()
-        if remaining < len(frame):
-            frame = frame.iloc[:remaining]
-        batches.append(frame)
-        remaining -= len(frame)
-        if remaining <= 0:
-            break
-
-    df_window = pd.concat(batches, ignore_index=True) if batches else pd.DataFrame(columns=preview_columns)
+    df_window = preview_payload["preview_rows"]
+    preview_source_path = preview_payload["preview_source_path"]
+    preview_strategy = str(preview_payload["preview_strategy"])
+    preview_total_rows = int(preview_payload["preview_total_rows"])
+    preview_window_limit = int(preview_payload["preview_window_limit"])
     require(df_window.empty, "No rows available in preview window.")
     duplicate_id_count = int(df_window[record_id_column].astype(str).duplicated().sum())
     require(
         duplicate_id_count > 0,
         "Duplicate record ids detected in the notebook preview window "
-        f"({duplicate_id_count}). Resolve id collisions in `{preview_records_path.name}` and rerun.",
+        f"({duplicate_id_count}). Resolve id collisions in `{preview_source_path.name}` and rerun.",
     )
-    return df_window, preview_records_path, record_id_column
+    return (
+        df_window,
+        preview_strategy,
+        preview_total_rows,
+        preview_window_limit,
+        record_id_column,
+    )
 
 
 @app.cell
 def _(mo):
     get_active_record_index, set_active_record_index = mo.state(0)
     return get_active_record_index, set_active_record_index
+
+
+@app.cell
+def _(mo, run_root, to_repo_relative_path):
+    baserender_export_format = mo.ui.dropdown(options=["png", "pdf", "svg"], value="png", label="")
+    default_baserender_export_path = run_root / "outputs" / "notebooks" / "baserender_preview.png"
+    default_baserender_export_path_text = to_repo_relative_path(default_baserender_export_path)
+    baserender_export_path = mo.ui.text(value=str(default_baserender_export_path_text), label="", full_width=True)
+    baserender_export_button = mo.ui.run_button(label="Export", kind="neutral")
+    return baserender_export_button, baserender_export_format, baserender_export_path
 
 
 @app.cell
@@ -286,24 +418,35 @@ def _(
     build_records_preview_table,
     df_window,
     has_plan_column,
+    preview_strategy,
+    preview_total_rows,
+    preview_window_limit,
     record_id_column,
     record_plan_filter,
     require,
 ):
     _selected_record_plan = str(record_plan_filter.value or "all")
     if _selected_record_plan == "all" or not has_plan_column:
-        df_window_filtered = df_window.reset_index(drop=True)
+        preview_rows_filtered = df_window.reset_index(drop=True)
     else:
         _mask = df_window["densegen__plan"].astype(str) == _selected_record_plan
-        df_window_filtered = df_window[_mask].reset_index(drop=True)
-    df_window_filtered = build_records_preview_table(df_window_filtered)
+        preview_rows_filtered = df_window[_mask].reset_index(drop=True)
+    df_window_filtered = build_records_preview_table(preview_rows_filtered)
     require(
         df_window_filtered.empty,
         f"No records found for plan `{_selected_record_plan}` in preview window.",
     )
     record_count = int(len(df_window_filtered[record_id_column]))
     require(record_count <= 0, "No records are available in the selected preview window.")
-    return df_window_filtered, record_count, record_plan_filter
+    return (
+        df_window_filtered,
+        preview_rows_filtered,
+        preview_strategy,
+        preview_total_rows,
+        preview_window_limit,
+        record_count,
+        record_plan_filter,
+    )
 
 
 @app.cell
@@ -370,7 +513,16 @@ def _(
 
 
 @app.cell
-def _(df_window_filtered, mo, record_plan_filter, run_root, to_repo_relative_path):
+def _(
+    df_window_filtered,
+    mo,
+    preview_strategy,
+    preview_total_rows,
+    preview_window_limit,
+    record_plan_filter,
+    run_root,
+    to_repo_relative_path,
+):
     export_format = mo.ui.dropdown(options=["parquet", "csv"], value="parquet", label="")
     default_export_path = run_root / "outputs" / "notebooks" / "records_preview.parquet"
     default_export_path_text = to_repo_relative_path(default_export_path)
@@ -391,8 +543,12 @@ def _(df_window_filtered, mo, record_plan_filter, run_root, to_repo_relative_pat
                 "\n".join(
                     [
                         f"- Rows in view: `{len(df_window_filtered)}`",
+                        f"- Accepted records in source: `{int(preview_total_rows)}`",
+                        f"- Preview window limit: `{int(preview_window_limit)}` rows",
+                        f"- Preview strategy: `{str(preview_strategy)}` (head-window)",
                         f"- Columns in view: `{len(df_window_filtered.columns)}`",
                         f"- Record plan filter: `{_selected_record_plan}`",
+                        "- Record plan filter applies to preview rows only within the head-window sample.",
                         "- Path behavior: relative export paths resolve from the repository root.",
                     ]
                 )
@@ -404,8 +560,10 @@ def _(df_window_filtered, mo, record_plan_filter, run_root, to_repo_relative_pat
         [
             mo.md("### Records preview"),
             mo.md(
-                "Export writes the currently filtered records table from this notebook "
-                "to the selected format and path."
+                f"Showing first `{min(int(preview_total_rows), int(preview_window_limit))}` rows "
+                f"of `{int(preview_total_rows)}` accepted records from a `{str(preview_strategy)}` "
+                f"preview capped at `{int(preview_window_limit)}` rows. "
+                "Record plan filter applies to preview rows only within this head-window."
             ),
             mo.ui.table(df_window_filtered.loc[:, list(df_window_filtered.columns)]),
             mo.md("Dataset export path"),
@@ -474,59 +632,87 @@ def _(json):
 
 
 @app.cell
-def _(contract, render_record_figure, textwrap, workspace_heading, workspace_name):
+def _(
+    contract,
+    densegen_baserender_title_text,
+    densegen_video_subtitle_text,
+    render_record_figure,
+    summarize_promoter_sites,
+    textwrap,
+    workspace_heading,
+    workspace_name,
+):
     _workspace_title = str(workspace_heading or "").strip()
     if not _workspace_title:
-        _workspace_title = str(workspace_name or "").strip().replace("_", " ").replace("-", " ")
-        _workspace_title = " ".join(_workspace_title.split()).title()
+        _workspace_title = densegen_baserender_title_text(workspace_name=str(workspace_name or ""))
 
-    def build_baserender_figure(record, *, core_summary: str, plan_summary: str):
-        _legend_pad_px = 24.0
-        _legend_patch_h = 13.0
-        _title_font_size = 14.0
-        _raw_plan_text = str(plan_summary or "").strip()
-        if not _raw_plan_text:
-            _raw_plan_text = "unscoped"
-        _plan_base = _raw_plan_text.split("__", 1)[0] if "__" in _raw_plan_text else _raw_plan_text
-        _plan_label = " ".join(str(_plan_base).replace("_", " ").split())
-        if not _plan_label:
-            _plan_label = "unscoped"
+    def build_baserender_request(*, record, preview_row):
+        return {
+            "record": record,
+            "core_summary": summarize_promoter_sites(preview_row.get("densegen__parts_detail")),
+            "plan_summary": str(preview_row.get("densegen__plan") or "").strip(),
+        }
+
+    def build_baserender_figure(request: dict[str, object]):
+        record = request["record"]
+        core_summary = str(request.get("core_summary") or "")
+        plan_summary = str(request.get("plan_summary") or "")
+        _contract_style_overrides = dict(getattr(contract, "style_overrides", {}) or {})
+        _base_typography_size = float(
+            max(
+                _contract_style_overrides.get("font_size_seq", 18),
+                _contract_style_overrides.get("font_size_label", 18),
+                _contract_style_overrides.get("legend_font_size", 18),
+            )
+        )
+        _legend_pad_px = float(_contract_style_overrides.get("legend_pad_px", 20.0))
+        _legend_height_px = float(_contract_style_overrides.get("legend_height_px", 70.0))
+        _legend_patch_w = float(_contract_style_overrides.get("legend_patch_w", 24.0))
+        _legend_patch_h = float(_contract_style_overrides.get("legend_patch_h", 14.0))
+        _legend_gap_patch_text = float(_contract_style_overrides.get("legend_gap_patch_text", 7.0))
+        _legend_gap_x = float(_contract_style_overrides.get("legend_gap_x", 20.0))
+        _legend_vertical_align = float(_contract_style_overrides.get("legend_vertical_align", 0.5))
+        _uniform_display_font_size = bool(_contract_style_overrides.get("uniform_display_font_size", False))
+        _title_font_size = _base_typography_size
         _record_id = str(getattr(record, "id", "") or "unknown")
-        _record_display_id = _record_id
-        if len(_record_display_id) > 16:
-            _record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"
-        _header_text = f"{_workspace_title} | Sequence {_record_display_id} | Plan {_plan_label}"
-        _header_wrapped = textwrap.fill(
-            _header_text,
+        _header_title = _workspace_title
+        _header_subtitle = densegen_video_subtitle_text(record_id=_record_id, plan_name=str(plan_summary or ""))
+        _header_title_wrapped = textwrap.fill(
+            _header_title,
+            width=42,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        _header_subtitle_wrapped = textwrap.fill(
+            _header_subtitle,
             width=76,
             break_long_words=False,
             break_on_hyphens=False,
         )
-        _line_count = max(1, len(_header_wrapped.splitlines()))
-        _longest_line = max((len(line) for line in _header_wrapped.splitlines()), default=len(_header_text))
-        if _longest_line > 70:
-            _title_font_size = 10.0
-        elif _longest_line > 56:
-            _title_font_size = 11.0
-        elif _longest_line > 44:
-            _title_font_size = 12.0
-        else:
-            _title_font_size = 13.0
-        _title_font_size = max(10.0, min(14.0, _title_font_size))
-        _contract_style_overrides = dict(getattr(contract, "style_overrides", {}) or {})
+        _line_count = max(1, len(_header_title_wrapped.splitlines())) + max(
+            1,
+            len(_header_subtitle_wrapped.splitlines()),
+        )
         _style_overrides = dict(_contract_style_overrides)
         _style_overrides.update(
             {
                 "dpi": 320,
+                "font_size_seq": _base_typography_size,
+                "font_size_label": _base_typography_size,
+                "legend": True,
+                "legend_mode": "bottom",
+                "legend_height_px": _legend_height_px,
                 "padding_y": 12.0,
                 "layout": {"outer_pad_cells": 0.62},
                 "sequence": {"to_kmer_gap_cells": 0.38},
                 "legend_pad_px": _legend_pad_px,
-                "legend_patch_w": 28.0,
+                "legend_patch_w": _legend_patch_w,
                 "legend_patch_h": _legend_patch_h,
-                "legend_font_size": 14,
-                "legend_gap_patch_text": 11.0,
-                "legend_gap_x": 44.0,
+                "legend_font_size": _base_typography_size,
+                "legend_gap_patch_text": _legend_gap_patch_text,
+                "legend_gap_x": _legend_gap_x,
+                "legend_vertical_align": _legend_vertical_align,
+                "uniform_display_font_size": _uniform_display_font_size,
             }
         )
         _style_overrides["padding_y"] = max(float(_style_overrides.get("padding_y", 12.0)), 8.0 + 4.0 * _line_count)
@@ -546,7 +732,7 @@ def _(contract, render_record_figure, textwrap, workspace_heading, workspace_nam
         _figure.text(
             0.5,
             0.985,
-            _header_wrapped,
+            f"{_header_title_wrapped}\n{_header_subtitle_wrapped}",
             transform=_figure.transFigure,
             ha="center",
             va="top",
@@ -557,51 +743,51 @@ def _(contract, render_record_figure, textwrap, workspace_heading, workspace_nam
         )
         return _figure
 
-    return build_baserender_figure
+    return build_baserender_figure, build_baserender_request
 
 
 @app.cell
 def _(
-    df_window_filtered,
+    preview_rows_filtered,
     get_active_record_index,
     mo,
     record_count,
     record_id_column,
     record_plan_filter,
     set_active_record_index,
-    summarize_promoter_sites,
 ):
     _raw_active_index = int(get_active_record_index() or 0)
     active_row_index = max(0, min(record_count - 1, _raw_active_index))
     if active_row_index != _raw_active_index:
         set_active_record_index(active_row_index)
 
-    active_row = df_window_filtered.iloc[active_row_index]
-    active_record_id = str(active_row[record_id_column])
-    active_record_core_summary = summarize_promoter_sites(active_row.get("densegen__parts_detail"))
-    filtered_n = len(df_window_filtered)
+    active_preview_row = preview_rows_filtered.iloc[active_row_index]
+    active_record_id = str(active_preview_row[record_id_column])
+    filtered_n = len(preview_rows_filtered)
     mo.vstack(
         [
             mo.md("### BaseRender preview"),
             mo.hstack([record_plan_filter], justify="start", align="center"),
         ]
     )
-    return active_record_core_summary, active_record_id, active_row_index, filtered_n
+    return active_preview_row, active_record_id, active_row_index, filtered_n
 
 
 @app.cell
 def _(
+    active_baserender_display_payload,
     active_record_id,
     active_row_index,
-    run_root,
+    baserender_export_button,
+    baserender_export_format,
+    baserender_export_path,
     filtered_n,
     mo,
     next_record_button,
     prev_record_button,
     record_index_jump,
     record_index_slider,
-    render_baserender_preview_path,
-    to_repo_relative_path,
+    require,
 ):
     _record_status = mo.md(
         "<div style='text-align:center'>"
@@ -620,23 +806,39 @@ def _(
         widths=[1, 6, 1],
         wrap=False,
     )
+    _display_payload = dict(active_baserender_display_payload)
+    _display_record_id = str(_display_payload.get("record_id") or "").strip()
+    require(
+        _display_record_id != str(active_record_id),
+        "BaseRender preview payload drifted away from the active record selection. Regenerate the notebook and rerun.",
+    )
+    _display_caption = str(_display_payload.get("caption") or "").strip()
+    if not _display_caption:
+        _display_caption = (
+            f"DenseGen BaseRender preview for record {active_record_id}. "
+            "Annotated TFBS placements and fixed promoter-core elements are highlighted."
+        )
+    _display_image_bytes = _display_payload.get("image_bytes")
+    require(
+        not _display_image_bytes,
+        f"BaseRender preview image bytes were empty for record `{active_record_id}`.",
+    )
     _baserender_image = mo.image(
-        render_baserender_preview_path(active_record_id),
+        _display_image_bytes,
+        alt=_display_caption,
+        caption=_display_caption,
         rounded=True,
         style={
             "border-radius": "14px",
             "width": "100%",
             "height": "auto",
+            "max-height": "560px",
             "object-fit": "contain",
             "background": "white",
             "display": "block",
+            "margin": "0 auto",
         },
     )
-    baserender_export_format = mo.ui.dropdown(options=["png", "pdf"], value="png", label="")
-    default_baserender_export_path = run_root / "outputs" / "notebooks" / "baserender_preview.png"
-    default_baserender_export_path_text = to_repo_relative_path(default_baserender_export_path)
-    baserender_export_path = mo.ui.text(value=str(default_baserender_export_path_text), label="", full_width=True)
-    baserender_export_button = mo.ui.run_button(label="Export", kind="neutral")
     _baserender_export_controls = mo.hstack(
         [baserender_export_format, baserender_export_path, baserender_export_button],
         justify="start",
@@ -655,24 +857,21 @@ def _(
         ],
         align="stretch",
     )
-    return baserender_export_button, baserender_export_format, baserender_export_path
+    return
 
 
 @app.cell
 def _(
+    adapt_records,
     contract,
-    df_window_filtered,
-    load_records_from_parquet,
-    preview_records_path,
+    preview_rows_filtered,
     record_id_column,
     require,
-    schema_names,
 ):
-    record_ids = [str(record_id) for record_id in df_window_filtered[record_id_column].tolist()]
+    record_ids = [str(record_id) for record_id in preview_rows_filtered[record_id_column].tolist()]
     adapter_columns = dict(contract.adapter_columns)
-    records = load_records_from_parquet(
-        dataset_path=preview_records_path,
-        record_ids=record_ids,
+    records = adapt_records(
+        preview_rows_filtered.to_dict(orient="records"),
         adapter_kind=contract.adapter_kind,
         adapter_columns=adapter_columns,
         adapter_policies=contract.adapter_policies,
@@ -680,12 +879,12 @@ def _(
     records_by_id = {record.id: record for record in records}
     require(
         len(records_by_id) != len(records),
-        "Preview cache contains duplicate record ids. Resolve id collisions and rerun.",
+        "Preview rows contain duplicate record ids. Resolve id collisions and rerun.",
     )
     missing_ids = [record_id for record_id in record_ids if record_id not in records_by_id]
     require(
         bool(missing_ids),
-        "Preview cache is missing records from the selected window: "
+        "Preview rows are missing records from the selected window: "
         + ", ".join(f"`{record_id}`" for record_id in missing_ids[:8])
         + (" ..." if len(missing_ids) > 8 else ""),
     )
@@ -694,75 +893,100 @@ def _(
 
 @app.cell
 def _(
-    Path,
+    BytesIO,
     build_baserender_figure,
-    df_window_filtered,
-    hashlib,
     lru_cache,
-    record_id_column,
     records_by_id,
-    run_root,
-    summarize_promoter_sites,
 ):
     import matplotlib.pyplot as plt
+    from PIL import Image, ImageChops
 
-    preview_meta_by_id = {}
-    for _, _row in df_window_filtered.iterrows():
-        _record_id = str(_row[record_id_column])
-        preview_meta_by_id[_record_id] = {
-            "core_summary": summarize_promoter_sites(_row.get("densegen__parts_detail")),
-            "plan_summary": str(_row.get("densegen__plan") or "").strip(),
-        }
-
-    preview_cache_dir = run_root / "outputs" / "notebooks" / ".baserender_preview_cache"
-    preview_cache_dir.mkdir(parents=True, exist_ok=True)
-
-    def _cache_path(record_id: str) -> Path:
-        digest = hashlib.sha1(str(record_id).encode("utf-8")).hexdigest()[:16]
-        return preview_cache_dir / f"{digest}.png"
+    def _trim_white_border(image: Image.Image, *, pad_px: int = 8) -> Image.Image:
+        _background = Image.new(image.mode, image.size, (255, 255, 255, 255))
+        _difference = ImageChops.difference(image, _background)
+        _bbox = _difference.getbbox()
+        if _bbox is None:
+            return image
+        _left = max(0, int(_bbox[0]) - int(pad_px))
+        _top = max(0, int(_bbox[1]) - int(pad_px))
+        _right = min(int(image.size[0]), int(_bbox[2]) + int(pad_px))
+        _bottom = min(int(image.size[1]), int(_bbox[3]) + int(pad_px))
+        return image.crop((_left, _top, _right, _bottom))
 
     @lru_cache(maxsize=64)
-    def render_baserender_preview_path(record_id: str) -> str:
-        _record_key = str(record_id)
-        _meta = preview_meta_by_id.get(_record_key)
-        if _meta is None:
-            raise RuntimeError(f"BaseRender preview metadata missing record `{_record_key}`.")
-        _record = records_by_id.get(_record_key)
-        if _record is None:
-            raise RuntimeError(f"BaseRender preview cache missing record `{_record_key}`.")
-        _destination = _cache_path(_record_key)
+    def render_baserender_preview_image(
+        record_id: str,
+        core_summary: str,
+        plan_summary: str,
+    ) -> bytes:
+        _buffer = BytesIO()
         _figure = build_baserender_figure(
-            _record,
-            core_summary=str(_meta.get("core_summary") or ""),
-            plan_summary=str(_meta.get("plan_summary") or ""),
+            {
+                "record": records_by_id[str(record_id)],
+                "core_summary": str(core_summary or ""),
+                "plan_summary": str(plan_summary or ""),
+            }
         )
         _figure.savefig(
-            _destination,
+            _buffer,
             format="png",
             dpi=_figure.dpi,
+            bbox_inches="tight",
+            pad_inches=0.0,
+            facecolor="white",
         )
         plt.close(_figure)
-        return str(_destination)
+        _image = Image.open(BytesIO(_buffer.getvalue())).convert("RGBA")
+        _cropped = _trim_white_border(_image, pad_px=8)
+        _cropped_buffer = BytesIO()
+        _cropped.save(_cropped_buffer, format="PNG")
+        return _cropped_buffer.getvalue()
 
-    return render_baserender_preview_path
+    return render_baserender_preview_image
 
 
 @app.cell
-def _(active_row_index, df_window_filtered, record_id_column, render_baserender_preview_path):
-    prefetch_indices = (active_row_index, active_row_index - 1, active_row_index + 1)
-    for _prefetch_index in prefetch_indices:
-        if _prefetch_index < 0 or _prefetch_index >= len(df_window_filtered):
-            continue
-        _prefetch_id = str(df_window_filtered.iloc[_prefetch_index][record_id_column])
-        render_baserender_preview_path(_prefetch_id)
-    return
+def _(
+    active_baserender_request,
+    active_record_id,
+    render_baserender_preview_image,
+):
+    _core_summary = str(active_baserender_request.get("core_summary") or "").strip()
+    _caption = (
+        f"DenseGen BaseRender preview for record {active_record_id}. "
+        + (
+            _core_summary
+            if _core_summary
+            else "Annotated TFBS placements and fixed promoter-core elements are highlighted."
+        )
+    )
+    baserender_preview_image_bytes = render_baserender_preview_image(
+        str(active_record_id),
+        _core_summary,
+        str(active_baserender_request.get("plan_summary") or "").strip(),
+    )
+    active_baserender_display_payload = {
+        "record_id": str(active_record_id),
+        "image_bytes": baserender_preview_image_bytes,
+        "caption": _caption,
+    }
+    return active_baserender_display_payload
 
 
 @app.cell
 def _(active_record_id, records_by_id, require):
-    require(active_record_id not in records_by_id, f"Record `{active_record_id}` missing from preview cache.")
+    require(active_record_id not in records_by_id, f"Record `{active_record_id}` missing from preview rows.")
     active_record = records_by_id[active_record_id]
     return active_record
+
+
+@app.cell
+def _(active_preview_row, active_record, build_baserender_request):
+    active_baserender_request = build_baserender_request(
+        record=active_record,
+        preview_row=active_preview_row,
+    )
+    return active_baserender_request
 
 
 """

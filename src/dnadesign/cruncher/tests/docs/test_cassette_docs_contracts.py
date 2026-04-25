@@ -61,7 +61,7 @@ def test_top_level_docs_route_both_workflow_families() -> None:
 
     assert "Design or search cassettes" in docs_index
     assert "Run the fixed-length optimization lane" in docs_index
-    assert "Run studies and portfolio aggregation" in docs_index
+    assert "Run Studies and Portfolio Aggregation" in docs_index
     assert "demos/demo_pairwise.md" in docs_index
     assert "demos/demo_multitf.md" in docs_index
     assert "demos/project_all_tfs.md" in docs_index

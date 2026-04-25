@@ -59,8 +59,8 @@ def resolve_baserender_export_destination(
     repo_root: Path | None = None,
 ) -> Path:
     selected = str(selected_format or "").strip().lower()
-    if selected not in {"png", "pdf"}:
-        raise ValueError(f"BaseRender export format must be png or pdf, got `{selected}`.")
+    if selected not in {"png", "pdf", "svg"}:
+        raise ValueError(f"BaseRender export format must be png, pdf, or svg, got `{selected}`.")
 
     path_text = str(raw_path or "").strip()
     if not path_text:

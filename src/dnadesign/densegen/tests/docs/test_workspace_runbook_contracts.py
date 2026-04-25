@@ -321,15 +321,37 @@ def test_shared_runbook_lib_analysis_mode_requires_existing_outputs() -> None:
             'if [[ "$run_mode" != "fresh" && "$run_mode" != "resume" && "$run_mode" != "analysis" ]]; then',
             'echo "Unsupported --mode value: $run_mode (expected fresh|resume|analysis)" >&2',
             'if [[ "$run_mode" == "analysis" ]]; then',
-            'records_table="$(dirname "$config")/outputs/tables/records.parquet"',
-            'if [[ ! -f "$records_table" ]]; then',
-            'echo "Analysis mode requires existing outputs at: $records_table" >&2',
+            'records_source_path="$(_densegen_resolve_analysis_records_path "$config" "$PWD")"',
+            'if [[ ! -f "$records_source_path" ]]; then',
+            'echo "Analysis mode requires existing outputs at: $records_source_path" >&2',
             'echo "Run ./runbook.sh --mode fresh first to generate artifacts, then rerun with --mode analysis." >&2',
             "local inspect_status=$?",
             "if [[ $inspect_status -ne 0 ]]; then",
+            (
+                'echo "Analysis mode inspection skipped: workspace lacks finalized run metadata, '
+                'but records-derived analysis can continue." >&2'
+            ),
+            'echo "Continuing with plots and notebook refresh from existing records artifacts." >&2',
             'echo "Analysis mode inspection failed. Existing artifacts may be stale or schema-incompatible." >&2',
             'echo "Run ./runbook.sh --mode fresh, then retry --mode analysis." >&2',
+            "local plot_status=$?",
+            "if [[ $plot_status -ne 0 ]]; then",
+            (
+                'echo "Analysis mode plot refresh completed with partial success; notebook will show '
+                'generated plots and explicit local-artifact gaps." >&2'
+            ),
             '"${dense_cmd[@]}" notebook generate --force -c "$config"',
         ],
         label="workspaces/_shared/workspace_runbook_flow.sh analysis-mode guardrails",
+    )
+
+
+def test_shared_runbook_lib_analysis_mode_resolves_source_from_config() -> None:
+    script = _read_shared_runbook_lib()
+    assert "_densegen_resolve_analysis_records_path()" in script
+    assert "plots.source must be set when output.targets has multiple sinks" in script
+    assert 'print(usr_root / dataset / "records.parquet")' in script
+    assert (
+        'print(resolve_outputs_scoped_path(cfg_path, workspace_dir, pq_cfg.path, label="output.parquet.path"))'
+        in script
     )

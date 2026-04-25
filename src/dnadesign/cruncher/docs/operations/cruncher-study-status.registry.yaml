@@ -1,0 +1,22 @@
+schema_version: 1
+catalog_order: 57
+registry_id: cruncher.data-plane.cruncher-study-status
+type: contract
+plane: data-plane
+owner_boundary: cruncher
+entry_artifact: one checked-in cruncher-study directory with routes and pipeline context
+exit_artifact: a read-only snapshot of the current phase, command groups, and native-agent bootstrap context
+summary: Read one checked-in cruncher-study record and report the current phase, command groups, and context refs without reconstructing the study by hand.
+execution_kind: iterative
+status_kind: cruncher-study-status
+keywords:
+  - cruncher study
+  - snapback
+  - yiu
+  - study record
+  - status
+related_tools:
+  - ops
+relations:
+  - type: handoff-to
+    target: cruncher.data-plane.cruncher-study-preflight

@@ -104,7 +104,7 @@ register_workflow_policy(
 register_workflow_policy(
     policy="infer",
     defaults={
-        "only_actions": "attach,materialize",
+        "only_actions": "attach,write_overlay_part,materialize",
         "only_tools": "infer",
         "include_args": False,
         "include_context": False,

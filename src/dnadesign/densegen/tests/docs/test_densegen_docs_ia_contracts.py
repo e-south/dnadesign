@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DOCS_ROOT = ROOT / "docs"
 WORKSPACES = ROOT / "workspaces"
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
-TERM_PATTERN = re.compile(r"\b(switchboard|agent|human|canonical)\b", flags=re.IGNORECASE)
+TERM_PATTERN = re.compile(r"\b(switchboard|agent|text|canonical)\b", flags=re.IGNORECASE)
 WORKSPACE_IDS = (
     "demo_tfbs_baseline",
     "demo_sampling_baseline",
@@ -225,6 +225,8 @@ def test_sigma70_literal_docs_include_source_citation() -> None:
 def test_outputs_reference_documents_strict_notebook_render_contract() -> None:
     content = _read(DOCS_ROOT / "reference" / "outputs.md")
     assert "Adapter policy contract: `on_invalid_row=error`" in content
+    assert "outputs/plots/current_inventory.json" in content
+    assert "outputs/plots/artifact_ledger.json" in content
     assert "Required TFBS entry keys inside `densegen__used_tfbs_detail`" in content
     for key in DENSEGEN_TFBS_REQUIRED_KEYS:
         assert f"`{key}`" in content

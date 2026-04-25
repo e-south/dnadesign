@@ -71,6 +71,9 @@ def build_scheduler_queue_checks(
         if execution.returncode != 0:
             summary = f"scheduler queue probe failed for backend {backend}"
             override_state = "attention"
+        elif queue_probe == "host_denied":
+            summary = f"current host is not a submit host for backend {backend}"
+            override_state = "attention"
         elif (
             queue_probe != "ok" or running_jobs is None or (target.max_queued_jobs is not None and queued_jobs is None)
         ):

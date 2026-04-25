@@ -12,7 +12,7 @@ This journal tracks `dnadesign.construct` design and implementation decisions, s
 `construct` is the sibling tool that realizes new DNA sequences from:
 
 - anchor sequences from USR
-- template context such as plasmids or other backbone sequences
+- template context such as usr_pdual10_plasmid_template or other backbone sequences
 - explicit placement and windowing rules
 
 The realized sequences are first-class USR records. The realization provenance is stored as `construct__*` lineage metadata.
@@ -154,9 +154,9 @@ Harden `construct` around the first real biological use case:
 
 - Control promoters and wild-type promoters are ordinary USR anchor records, not DenseGen exceptions.
 - The workspace scaffold now includes `inputs/anchor_manifest.template.yaml` as a worksheet for:
-  - `spyP_MG1655`
+  - `spyp`
   - `sulAp`
-  - `soxS`
+  - `soxSp`
   - `J23105`
   - optional `pDual-10` template reference metadata
 
@@ -223,7 +223,7 @@ Promote the first real promoter-swap flow from a file-backed placeholder into a 
 
 ### Input ontology refinement
 
-- Curated biological input datasets should use the least-coupled semantic ids possible at the USR layer, such as `mg1655_promoters` and `plasmids`, because `construct` assigns anchor/template role in config rather than by dataset path.
+- Curated biological input datasets should use the least-coupled semantic ids possible at the USR layer, such as `usr_mg1655_promoter_controls` and `usr_pdual10_plasmid_template`, because `construct` assigns anchor/template role in config rather than by dataset path.
 - Human-readable sequence names belong in a standardized `usr_label__*` overlay contract owned by `usr`, while construct-specific bootstrap provenance remains in `construct_seed__*`.
 - Realized tracer-bullet outputs should also use flat semantic USR dataset ids such as `pdual10_slot_a_window_1kb_demo`, rather than a tool-owned dataset namespace, so downstream tools see biological products instead of construct-internal routing labels.
 
@@ -292,7 +292,7 @@ The next maintainer audit pass still exposed three pragmatic gaps:
 
 ### Ontology stance
 
-- USR dataset ids remain biological collections such as `mg1655_promoters`, `plasmids`, or user-defined flat semantic ids.
+- USR dataset ids remain biological collections such as `usr_mg1655_promoter_controls`, `usr_pdual10_plasmid_template`, or user-defined flat semantic ids.
 - `anchor` and `template` stay construct-role terms in config and seed manifests, not mandatory USR path taxons.
 - Human-readable labels stay in `usr_label__*`.
 - Construct bootstrap provenance now stays in `construct_seed__*`, including `manifest_id` and `source_ref`, so imported datasets can be audited without encoding construct routing into dataset ids.

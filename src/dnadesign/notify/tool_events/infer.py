@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..errors import NotifyConfigError
+from .densegen_common import _duration_hhmmss
 from .types import ToolEventDecision, ToolEventState
 
 _INFER_PROGRESS_STEP_PCT_SMALL_TARGET = 25
@@ -24,6 +25,25 @@ _INFER_PROGRESS_STEP_PCT_LARGE_TARGET = 10
 _INFER_SMALL_TARGET_UNITS_THRESHOLD = 200
 _INFER_ATTACH_MIN_SECONDS_DEFAULT = 60.0
 _INFER_ATTACH_HEARTBEAT_SECONDS_DEFAULT = 1800.0
+
+
+def _eta_to_overall_complete_seconds(
+    *,
+    completed_units: int,
+    target_units: int,
+    elapsed_seconds: float | None,
+) -> float | None:
+    if elapsed_seconds is None:
+        return None
+    if elapsed_seconds <= 0.0 or completed_units <= 0:
+        return None
+    remaining_units = int(target_units) - int(completed_units)
+    if remaining_units <= 0:
+        return None
+    units_per_second = float(completed_units) / float(elapsed_seconds)
+    if units_per_second <= 0.0:
+        return None
+    return float(remaining_units) / units_per_second
 
 
 def _infer_actor_tool(event: dict[str, Any]) -> str:
@@ -133,6 +153,21 @@ def _ordered_family_progress_parts(progress: dict[str, Any]) -> list[str]:
     return parts
 
 
+def _grouped_family_progress_semantics_line(
+    *,
+    progress: dict[str, Any],
+    output_id: str,
+) -> str | None:
+    if output_id:
+        return None
+    if not _ordered_family_progress_parts(progress):
+        return None
+    return (
+        "- Grouped writeback: family percentages reflect persisted rows still missing each family, "
+        "not per-family GPU compute"
+    )
+
+
 def _infer_attach_signature(event: dict[str, Any], *, progress_step_pct: int) -> tuple[object, ...]:
     progress = _infer_progress(event)
     overall_progress_pct = _to_float_or_none(progress.get("overall_progress_pct")) or 0.0
@@ -182,7 +217,6 @@ def _infer_attach_message(
     run_id: str,
     duration_seconds: float | None,
 ) -> str | None:
-    del duration_seconds
     if not _is_infer_actor(event):
         return None
     if _infer_notify_suppress(event):
@@ -201,12 +235,30 @@ def _infer_attach_message(
     workspace_rows = fingerprint.get("rows")
     lines = [f"Infer progress | run={run_id} | dataset={dataset_name}"]
     overall_progress_pct = _to_float_or_none(progress.get("overall_progress_pct"))
+    overall_completed_units = _to_int_or_none(progress.get("overall_completed_units"))
+    overall_target_units = _to_int_or_none(progress.get("overall_target_units"))
     if overall_progress_pct is not None:
-        lines.append(f"- Overall requested outputs: {overall_progress_pct:.1f}%")
+        overall_line = f"- Overall requested outputs: {overall_progress_pct:.1f}%"
+        if overall_completed_units is not None and overall_target_units is not None:
+            overall_line += f" ({overall_completed_units}/{overall_target_units} units)"
+        lines.append(overall_line)
+        if overall_completed_units is not None and overall_target_units is not None:
+            remaining_units = max(0, overall_target_units - overall_completed_units)
+            lines.append(f"- Remaining overall units: {remaining_units}")
+            eta_seconds = _eta_to_overall_complete_seconds(
+                completed_units=overall_completed_units,
+                target_units=overall_target_units,
+                elapsed_seconds=duration_seconds,
+            )
+            if eta_seconds is not None:
+                lines.append(f"- ETA to overall complete: {eta_seconds / 3600.0:.1f}h")
     family_parts = _ordered_family_progress_parts(progress)
     if family_parts:
         lines.append(f"- Families: {' | '.join(family_parts)}")
     output_id = str(output.get("id") or "").strip()
+    grouped_semantics_line = _grouped_family_progress_semantics_line(progress=progress, output_id=output_id)
+    if grouped_semantics_line is not None:
+        lines.append(grouped_semantics_line)
     output_progress_pct = _to_float_or_none(progress.get("output_progress_pct"))
     completed_rows = _to_int_or_none(progress.get("completed_rows"))
     target_rows = _to_int_or_none(progress.get("target_rows"))
@@ -223,6 +275,8 @@ def _infer_attach_message(
         )
     if workspace_rows is not None:
         lines.append(f"- Workspace rows: {workspace_rows}")
+    if duration_seconds is not None:
+        lines.append(f"- Elapsed: {_duration_hhmmss(duration_seconds)}")
     return "\n".join(lines)
 
 
@@ -247,20 +301,24 @@ def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: Tool
     run_key = str(run_id)
     entry_raw = per_run.get(run_key)
     entry = entry_raw if isinstance(entry_raw, dict) else {}
+    started_at_raw = entry.get("started_at")
+    started_at = _to_float_or_none(started_at_raw)
+    if started_at is None:
+        started_at = now_seconds
     last_sent_raw = entry.get("last_sent")
     last_sent = _to_float_or_none(last_sent_raw)
     if overall_progress_pct is None:
         if last_sent is None:
-            per_run[run_key] = {"last_sent": now_seconds}
-            return ToolEventDecision(emit=True, duration_seconds=None)
+            per_run[run_key] = {"started_at": started_at, "last_sent": now_seconds}
+            return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
         elapsed = now_seconds - last_sent
         if elapsed >= heartbeat_seconds:
-            per_run[run_key] = {"last_sent": now_seconds}
-            return ToolEventDecision(emit=True, duration_seconds=None)
+            per_run[run_key] = {"started_at": started_at, "last_sent": now_seconds}
+            return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
         if elapsed < min_seconds:
             return ToolEventDecision(emit=False, duration_seconds=None)
-        per_run[run_key] = {"last_sent": now_seconds}
-        return ToolEventDecision(emit=True, duration_seconds=None)
+        per_run[run_key] = {"started_at": started_at, "last_sent": now_seconds}
+        return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
 
     progress_step_pct = _resolve_progress_step_pct(progress, notify_config)
     overall_step = int(max(0.0, min(100.0, overall_progress_pct)) // float(progress_step_pct))
@@ -277,11 +335,12 @@ def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: Tool
     if signature == entry.get("last_signature") and not heartbeat_trigger:
         return ToolEventDecision(emit=False, duration_seconds=None)
     per_run[run_key] = {
+        "started_at": started_at,
         "last_sent": now_seconds,
         "last_step": max(last_step, overall_step),
         "last_signature": signature,
     }
-    return ToolEventDecision(emit=True, duration_seconds=None)
+    return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
 
 
 def register_infer_handlers(
@@ -296,7 +355,8 @@ def register_infer_handlers(
     ],
     register_evaluator: Callable[[str, Callable[[dict[str, Any], str, ToolEventState], ToolEventDecision]], None],
 ) -> None:
-    register_status_override("attach", _infer_attach_status_override)
+    for action in ("attach", "write_overlay_part"):
+        register_status_override(action, _infer_attach_status_override)
+        register_message_override(action, _infer_attach_message)
+        register_evaluator(action, _evaluate_infer_attach_event)
     register_status_override("materialize", _infer_materialize_status_override)
-    register_message_override("attach", _infer_attach_message)
-    register_evaluator("attach", _evaluate_infer_attach_event)

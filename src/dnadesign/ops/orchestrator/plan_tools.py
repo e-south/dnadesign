@@ -75,6 +75,18 @@ def _qsub_export_names(env_vars: dict[str, str]) -> str:
     return ",".join(names)
 
 
+def _infer_scheduler_resource_parts(runbook: OrchestrationRunbookV1) -> tuple[str, ...]:
+    gpu_count = runbook.resources.gpus
+    if gpu_count is None:
+        raise ValueError("infer workflow requires resources.gpus")
+    parts: list[str] = ["-l", f"gpus={gpu_count}"]
+    if runbook.resources.gpu_capability is not None:
+        parts.extend(("-l", f"gpu_c={runbook.resources.gpu_capability}"))
+    if runbook.resources.gpu_type is not None:
+        parts.extend(("-l", f"gpu_t={runbook.resources.gpu_type}"))
+    return tuple(parts)
+
+
 def _densegen_post_run_resource_values(runbook: OrchestrationRunbookV1) -> tuple[str, str, str]:
     if runbook.densegen is None:
         raise ValueError("densegen plan adapter requires runbook.densegen")
@@ -334,10 +346,7 @@ def _infer_preflight_commands(
             f"h_rt={runbook.resources.h_rt}",
             "-l",
             f"mem_per_core={runbook.resources.mem_per_core}",
-            "-l",
-            f"gpus={runbook.resources.gpus}",
-            "-l",
-            f"gpu_c={runbook.resources.gpu_capability}",
+            *_infer_scheduler_resource_parts(runbook),
             "-v",
             _qsub_export_names(infer_env),
             infer_template,
@@ -460,10 +469,7 @@ def _infer_submit_commands(
             f"h_rt={runbook.resources.h_rt}",
             "-l",
             f"mem_per_core={runbook.resources.mem_per_core}",
-            "-l",
-            f"gpus={runbook.resources.gpus}",
-            "-l",
-            f"gpu_c={runbook.resources.gpu_capability}",
+            *_infer_scheduler_resource_parts(runbook),
             "-v",
             _qsub_export_names(infer_env),
             str(runbook.infer.qsub_template),

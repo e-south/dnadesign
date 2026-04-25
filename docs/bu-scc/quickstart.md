@@ -153,7 +153,8 @@ PY
 For extended TE/FlashAttention/Evo2 checks:
 [BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
 
-For one-sequence infer execution smoke (`evo2_7b`), Hopper `evo2_20b` validation, and 40B capacity preflight:
+For one-sequence infer execution smoke (`evo2_7b`), `evo2_20b` validation on a
+lane that meets the `gpu_c >= 9.0` contract, and 40B capacity preflight:
 [BU SCC Install bootstrap: Model support](install.md#63-model-support-7b-and-fp8-checkpoints)
 
 ### 6.5) Submission pressure gate (status-first)
@@ -234,11 +235,16 @@ qsub -P <project> \
 ```
 
 For runbook-based infer submits, set `runbook.resources.gpus`, `runbook.resources.gpu_capability`, and optionally
-`runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible multi-GPU model requests before submit.
+`runbook.resources.gpu_type` plus `runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible
+or misrouted GPU requests before submit.
 
 Use:
 - `gpu_capability: 8.9` and `gpu_memory_gib: 45.0` for `evo2_7b`
-- `gpu_capability: 9.0` and `gpu_memory_gib: 80.0` for `evo2_20b` on Hopper/H200
+- `gpu_capability: 9.0` and `gpu_memory_gib: 80.0` for `evo2_20b`; H200 is
+  the common SCC lane, but any newer higher-capability GPU lane that meets the
+  same floor also qualifies
+- for family-pinned Evo2 environments on the current SCC Blackwell lane, use
+  `gpu_capability: 12.0`, `gpu_type: RTXP6000`, and `gpu_memory_gib: 80.0`
 
 Template details and overrides:
 [BU SCC job templates](jobs/README.md)

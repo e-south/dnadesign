@@ -1,0 +1,20 @@
+plot_id: dataset_overview
+question: What shared promoter population and displayed cohort inventory anchor the downstream review?
+decision_role: primary
+encoding: Multi-panel cohort inventory chart over provenance, generation plan, and Sigma-35 variant.
+scope: Full promoter population shared by the paired anchor and construct-context datasets. The displayed panels summarize provenance, generation plan, and Sigma-35 variant over that shared denominator.
+guardrails:
+  - Inventory counts set the denominator only; they do not rank candidate representations.
+  - Treat `anchor_60bp` as the view name for the dominant synthetic cohort rather than a literal row-length guarantee.
+caption: Shared promoter inventory across provenance and trusted design annotations.
+alt_text: Multi-panel chart showing cohort fractions for the shared promoter population across provenance and promoter-design annotations.
+preprocessing_md: Uses the persisted dataset-overview scalar table without vector normalization or neighborhood construction.
+math_md: |
+  Each panel reports the cohort share
+  $$
+  p_c = \frac{n_c}{N},
+  $$
+  where \(n_c\) is the cohort count in that panel and \(N\) is the shared promoter population size.
+rationale_md: Establishes the exact denominator and the cohort partitions shown on this review surface before any representation-health or geometry claim is interpreted.
+limitations_md: Descriptive inventory only; balanced counts do not imply informative latent geometry.
+failure_modes_md: Stale study overlays or metadata derivation drift can misstate the denominator or annotation counts.

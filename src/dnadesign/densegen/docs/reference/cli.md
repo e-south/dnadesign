@@ -120,11 +120,11 @@ Notes:
 Builds Stage-A TFBS pools and pool metadata.
 
 Key options:
-- `--out TEXT` (default: `outputs/pools`)
+- `--out <path>` (default: `outputs/pools`)
 - `--n-sites INTEGER` (override Stage-A `n_sites` for PWM inputs)
 - `--batch-size INTEGER` (override Stage-A mining batch size)
 - `--max-seconds FLOAT` (override Stage-A mining max seconds)
-- `--input, -i TEXT` (repeatable)
+- `--input, -i <input-name>` (repeatable)
 - `--fresh`
 - `--show-motif-ids`
 - `--verbose`
@@ -140,10 +140,10 @@ Outputs:
 Builds Stage-B libraries from Stage-A pools.
 
 Key options:
-- `--out TEXT` (default: `outputs/libraries`)
+- `--out <path>` (default: `outputs/libraries`)
 - `--pool PATH` (default: `outputs/pools`)
-- `--input, -i TEXT` (repeatable)
-- `--plan, -p TEXT` (repeatable)
+- `--input, -i <input-name>` (repeatable)
+- `--plan, -p <plan-name>` (repeatable)
 - `--overwrite`
 - `--append`
 - `--show-motif-ids`
@@ -163,9 +163,9 @@ Outputs:
 Creates a run workspace with `config.yaml`, `inputs/`, and `outputs/` subfolders.
 
 Key options:
-- `--id, -i TEXT` (required)
+- `--id, -i <workspace-id>` (required)
 - `--root PATH`
-- `--from-workspace TEXT`
+- `--from-workspace <template-workspace>`
 - `--from-config PATH`
 - `--copy-inputs / --no-copy-inputs`
 - `--output-mode local|usr|both`
@@ -179,15 +179,15 @@ Notes:
 - Outside a source checkout, pass `--usr-root` or set `DNADESIGN_USR_ROOT`;
   the command does not guess a writable shared root from an installed package
   path.
-- `--output-mode usr|both` seeds the configured shared USR root `registry.yaml` when a seed file is available.
-- `--output-mode usr|both` sets `output.usr.dataset` to the workspace id so each initialized workspace writes to its own USR dataset path.
+- `--output-mode usr|both` leaves the shared USR root unchanged during workspace initialization; create the shared `registry.yaml` manually or let `dense run` seed it when a write path is intended.
+- `--output-mode usr|both` sets `output.usr.dataset` to a flat owner-first DenseGen id (`densegen_<workspace-id>`) so each initialized workspace writes directly under the configured USR datasets root.
 
 ### `dense workspace where`
 
 Shows effective workspace roots that `workspace init` will use.
 
 Key options:
-- `--format text|json`
+- `--format <output-format>` (`json` or the default human-readable mode)
 
 ### `dense run`
 
@@ -247,8 +247,9 @@ Key options:
 - `-c, --config PATH`
 
 Video notes:
-- `--only dense_array_video_showcase` renders only the Stage-B showcase MP4.
-- Setting `plots.video.enabled: true` appends `dense_array_video_showcase` to default plot execution.
+- `--only dense_array_showcase_video` renders only the Stage-B showcase MP4.
+- `plots.video.enabled: true` only enables the video renderer; it does not add `dense_array_showcase_video` to the default plot set automatically.
+- To render the video, either include `dense_array_showcase_video` in `plots.default` or pass `--only dense_array_showcase_video`.
 
 ### `dense ls-plots`
 
@@ -273,7 +274,7 @@ Notes:
   - if `output.targets` has both sinks, use `plots.source`
 - Source path resolution:
   - `parquet` source -> `output.parquet.path`
-  - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`, with notebook preview materialized to `outputs/notebooks/records_with_overlays.parquet` when overlay columns are required.
+  - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`
 - First notebook markdown cell renders two deterministic sections from config + `outputs/meta/run_manifest.json`:
   - `Run contract (what this run will try to do)` from validated config schema.
   - `Run outcome (what happened)` from finalized manifest counters.
@@ -290,7 +291,7 @@ Key options:
 - `--open/--no-open` (default: `--open`; run mode only)
 - `--reuse-server/--no-reuse-server` (default: `--no-reuse-server`; run mode only)
 - `--open-timeout FLOAT` (default: `30.0`; run mode with `--open` only)
-- `--host TEXT` (default: `127.0.0.1`)
+- `--host <hostname>` (default: `127.0.0.1`)
 - `--port INTEGER` (default: `2718`)
 - `--absolute`
 - `-c, --config PATH`
@@ -299,6 +300,7 @@ Notes:
 - `--mode run` launches a read-only notebook app for analysis.
 - `--mode edit` launches editable marimo cells.
 - Default launch mode is `run`; use `--mode edit` when editing notebook cells.
+- `dense notebook run` is read-only with respect to notebook artifacts: if the generated default notebook is stale, DenseGen blocks launch and asks you to rerun `dense notebook generate --force` instead of rewriting the file during startup.
 - `--headless` suppresses browser auto-open for remote/non-GUI shells when `--mode run` is used.
 - In run mode, `--no-open` maps to headless marimo launch.
 - In run mode with default `--no-reuse-server`, if `--host:--port` is already serving any notebook (including the same file), DenseGen launches a fresh server on a free port.

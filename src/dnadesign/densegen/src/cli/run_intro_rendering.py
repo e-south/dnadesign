@@ -95,14 +95,12 @@ def _build_plan_rows(contract: RunContractSummary, outcome: RunOutcomeSummary) -
 
 
 def _group_plan_rows(rows: Sequence[PlanRow]) -> tuple[PlanGroup, ...]:
-    grouped: dict[tuple[str, str, int | None, int | None], list[PlanRow]] = {}
-    order: list[tuple[str, str, int | None, int | None]] = []
+    grouped: dict[tuple[str, str], list[PlanRow]] = {}
+    order: list[tuple[str, str]] = []
     for row in rows:
         key = (
             row.base_name,
             str(row.acceptance_detail or ""),
-            int(row.quota),
-            int(row.generated) if row.generated is not None else None,
         )
         if key not in grouped:
             grouped[key] = []
@@ -111,7 +109,7 @@ def _group_plan_rows(rows: Sequence[PlanRow]) -> tuple[PlanGroup, ...]:
 
     groups: list[PlanGroup] = []
     for key in order:
-        base_name, acceptance, _, _ = key
+        base_name, acceptance = key
         label = base_name
         if acceptance:
             label = f"{base_name} ({_shorten(acceptance, max_len=72)})"
@@ -226,8 +224,9 @@ def _build_summary_lines(contract: RunContractSummary, outcome: RunOutcomeSummar
 
     if not outcome.available:
         _unavailable_message = str(outcome.message or "").strip().rstrip(".") or "manifest not found"
-        outcome_line = _summary_with_source(f"Outcome: {_unavailable_message}.", "manifest")
-        pressure_line = _summary_with_source(f"Pressure: {_unavailable_message}.", "manifest")
+        outcome_line = _summary_with_source(f"Outcome: {_unavailable_message}.", outcome.outcome_source)
+        pressure_message = str(outcome.pressure_message or "").strip().rstrip(".") or _unavailable_message
+        pressure_line = _summary_with_source(f"Pressure: {pressure_message}.", outcome.pressure_source)
     else:
         quota_total = int(outcome.quota_total or 0)
         generated_total = int(outcome.generated_total or 0)
@@ -242,20 +241,29 @@ def _build_summary_lines(contract: RunContractSummary, outcome: RunOutcomeSummar
         )
         outcome_line = _summary_with_source(
             outcome_progress,
-            "manifest",
+            outcome.outcome_source,
         )
 
-        pressure_parts: list[str] = []
-        if outcome.stall_events > 0:
-            pressure_parts.append(f"stall events={outcome.stall_events}")
-        if outcome.total_resamples > 0:
-            pressure_parts.append(f"resamples={outcome.total_resamples}")
-        if outcome.failed_solutions > 0:
-            pressure_parts.append(f"failed solves={outcome.failed_solutions}")
-        if pressure_parts:
-            pressure_line = _summary_with_source("Pressure: " + "; ".join(pressure_parts) + ".", "manifest")
+        if not outcome.pressure_available:
+            pressure_message = (
+                str(outcome.pressure_message or "").strip().rstrip(".") or "plan-local pressure is not available"
+            )
+            pressure_line = _summary_with_source(f"Pressure: {pressure_message}.", outcome.pressure_source)
         else:
-            pressure_line = _summary_with_source("Pressure: none recorded.", "manifest")
+            pressure_parts: list[str] = []
+            if outcome.stall_events > 0:
+                pressure_parts.append(f"stall events={outcome.stall_events}")
+            if outcome.total_resamples > 0:
+                pressure_parts.append(f"resamples={outcome.total_resamples}")
+            if outcome.failed_solutions > 0:
+                pressure_parts.append(f"failed solves={outcome.failed_solutions}")
+            if pressure_parts:
+                pressure_line = _summary_with_source(
+                    "Pressure: " + "; ".join(pressure_parts) + ".",
+                    outcome.pressure_source,
+                )
+            else:
+                pressure_line = _summary_with_source("Pressure: none recorded.", outcome.pressure_source)
 
     return (
         target_line,
@@ -276,10 +284,7 @@ def _render_plans_section(contract: RunContractSummary, outcome: RunOutcomeSumma
         quotas = [int(row.quota) for row in group.rows]
         generated_rows = [row for row in group.rows if row.generated is not None]
 
-        if len(set(quotas)) == 1:
-            quota_text = str(quotas[0])
-        else:
-            quota_text = f"{min(quotas)}–{max(quotas)}"
+        quota_text = str(sum(quotas))
 
         if not generated_rows:
             progress_text = "-"
@@ -449,18 +454,24 @@ def _render_outcome_section(contract: RunContractSummary, outcome: RunOutcomeSum
 
     if not outcome.available:
         _unavailable_message = str(outcome.message or "").strip().rstrip(".") or "manifest not found"
-        lines.append(f"Outcome: {_unavailable_message}. [manifest]")
-        lines.append(f"Pressure: {_unavailable_message}. [manifest]")
-        lines.append("Plan-local pressure is not recorded in this manifest.")
+        lines.append(f"Outcome: {_unavailable_message}. [{outcome.outcome_source}]")
+        pressure_message = str(outcome.pressure_message or "").strip().rstrip(".") or _unavailable_message
+        lines.append(f"Pressure: {pressure_message}. [{outcome.pressure_source}]")
+        for note in outcome.notes:
+            lines.append(f"- Note: {note}.")
+        if not outcome.pressure_available:
+            lines.append("Plan-local pressure is not available from the current workspace evidence.")
         return "\n".join(lines)
 
     quota_total = int(outcome.quota_total or 0)
     generated_total = int(outcome.generated_total or 0)
     outcome_pct = _format_percent(generated_total, quota_total)
-    lines.append(f"Outcome: {generated_total}/{quota_total} generated ({outcome_pct}). [manifest]")
+    lines.append(f"Outcome: {generated_total}/{quota_total} generated ({outcome_pct}). [{outcome.outcome_source}]")
 
     plans_at_quota = sum(1 for item in outcome.per_plan if item.quota > 0 and int(item.generated) >= int(item.quota))
-    lines.append(f"Plans at quota: {plans_at_quota}/{len(outcome.per_plan)}. [manifest]")
+    lines.append(f"Plans at quota: {plans_at_quota}/{len(outcome.per_plan)}. [{outcome.outcome_source}]")
+    for note in outcome.notes:
+        lines.append(f"- Note: {note}.")
 
     grouped: dict[str, list[PlanRow]] = {}
     order: list[str] = []
@@ -500,14 +511,24 @@ def _render_outcome_section(contract: RunContractSummary, outcome: RunOutcomeSum
         pressure_parts.append(f"failed solves={outcome.failed_solutions}")
 
     lines.append("")
-    if pressure_parts:
-        lines.append("Pressure: " + "; ".join(pressure_parts) + ". [manifest]")
+    if not outcome.pressure_available:
+        pressure_message = (
+            str(outcome.pressure_message or "").strip().rstrip(".") or "plan-local pressure is not available"
+        )
+        lines.append(f"Pressure: {pressure_message}. [{outcome.pressure_source}]")
+    elif pressure_parts:
+        lines.append("Pressure: " + "; ".join(pressure_parts) + f". [{outcome.pressure_source}]")
     else:
-        lines.append("Pressure: none recorded. [manifest]")
+        lines.append(f"Pressure: none recorded. [{outcome.pressure_source}]")
     return "\n".join(lines)
 
 
 def _render_pressure_by_plan_section(contract: RunContractSummary, outcome: RunOutcomeSummary) -> str:
+    if not outcome.pressure_available:
+        pressure_message = (
+            str(outcome.pressure_message or "").strip().rstrip(".") or "plan-local pressure is not available"
+        )
+        return f"{pressure_message}. [{outcome.pressure_source}]"
     rows = _build_plan_rows(contract, outcome)
     pressure_rows = [
         (
@@ -521,7 +542,7 @@ def _render_pressure_by_plan_section(contract: RunContractSummary, outcome: RunO
         if row.stall_events > 0 or row.total_resamples > 0 or row.failed_solutions > 0
     ]
     if not pressure_rows:
-        return "No non-zero plan-local pressure counters."
+        return f"No non-zero plan-local pressure counters. [{outcome.pressure_source}]"
     return _render_markdown_table(
         ("Plan", "Variants", "Stall events", "Resamples", "Failed solves"),
         pressure_rows,
@@ -566,6 +587,9 @@ def _render_sources_section(
     records_path = context.records_path
     manifest_path = context.manifest_path
     notebook_path = context.notebook_path
+    run_state_path = run_root / "outputs" / "meta" / "run_state.json" if run_root is not None else None
+    events_path = run_root / "outputs" / "meta" / "events.jsonl" if run_root is not None else None
+    attempts_root = run_root / "outputs" / "tables" if run_root is not None else None
 
     def _code(value: str) -> str:
         return f"`{value}`" if value else "`-`"
@@ -589,24 +613,57 @@ def _render_sources_section(
             pass
 
     records_text = str(records_path) if records_path is not None else "-"
+    records_mtime = _file_mtime(records_path)
     if run_root is not None and records_path is not None:
         try:
             records_text = str(records_path.resolve().relative_to(run_root.resolve()))
         except Exception:
             pass
+    if records_path is not None and not records_path.exists():
+        records_text += " (missing)"
+    elif outcome.outcome_source == "records" and outcome.created_at:
+        try:
+            records_text += f" (mtime={_format_timestamp(float(outcome.created_at))})"
+        except Exception:
+            if records_mtime is not None:
+                records_text += f" (mtime={_format_timestamp(records_mtime)})"
+    elif records_mtime is not None:
+        records_text += f" (mtime={_format_timestamp(records_mtime)})"
 
     manifest_text = str(manifest_path) if manifest_path is not None else "-"
-    if outcome.created_at:
+    manifest_mtime = _file_mtime(manifest_path)
+    if manifest_path is not None and not manifest_path.exists():
+        manifest_text += " (missing)"
+    elif outcome.outcome_source == "manifest" and outcome.created_at:
         manifest_text += f" (created_at={outcome.created_at})"
-    else:
-        manifest_mtime = _file_mtime(manifest_path)
-        if manifest_mtime is not None:
-            manifest_text += f" (mtime={_format_timestamp(manifest_mtime)})"
+    elif manifest_mtime is not None:
+        manifest_text += f" (mtime={_format_timestamp(manifest_mtime)})"
 
     notebook_text = str(notebook_path) if notebook_path is not None else "-"
     notebook_mtime = _file_mtime(notebook_path)
     if notebook_mtime is not None:
         notebook_text += f" (mtime={_format_timestamp(notebook_mtime)})"
+    run_state_text = str(run_state_path) if run_state_path is not None else "-"
+    run_state_mtime = _file_mtime(run_state_path)
+    if run_state_path is not None and not run_state_path.exists():
+        run_state_text += " (missing)"
+    elif outcome.outcome_source == "run_state" and outcome.created_at:
+        run_state_text += f" (created_at={outcome.created_at})"
+    elif run_state_mtime is not None:
+        run_state_text += f" (mtime={_format_timestamp(run_state_mtime)})"
+    events_text = str(events_path) if events_path is not None else "-"
+    events_mtime = _file_mtime(events_path)
+    if events_path is not None and not events_path.exists():
+        events_text += " (missing)"
+    elif events_mtime is not None:
+        events_text += f" (mtime={_format_timestamp(events_mtime)})"
+    attempts_text = str(attempts_root) if attempts_root is not None else "-"
+    if attempts_root is not None and attempts_root.exists():
+        attempts_candidates = sorted(attempts_root.glob("attempts*.parquet"))
+        if attempts_candidates:
+            attempts_text += f" ({len(attempts_candidates)} attempt parquet files)"
+    elif attempts_root is not None:
+        attempts_text += " (missing)"
 
     lines = [
         f"- Run root: {_code(run_root_text)} `[config]`",
@@ -617,23 +674,41 @@ def _render_sources_section(
         ),
         f"- Records path: {_code(records_text)} `[config]`",
         f"- Manifest: {_code(manifest_text)} `[manifest]`",
+        f"- Run state: {_code(run_state_text)} `[run_state]`",
+        f"- Attempts tables: {_code(attempts_text)} `[analysis]`",
+        f"- Events log: {_code(events_text)} `[analysis]`",
+        f"- Outcome source: `{outcome.outcome_source}`",
+        f"- Pressure source: `{outcome.pressure_source}`",
         f"- Notebook: {_code(notebook_text)} `[manifest]`",
     ]
 
     if contract.config_error is not None and str(contract.config_error).strip():
         lines.append(f"- Config validation note: {contract.config_error}. `[config]`")
 
-    manifest_mtime = _file_mtime(manifest_path)
-    if manifest_mtime is not None and notebook_mtime is not None:
-        if manifest_mtime > notebook_mtime + 2.0:
+    freshness_mtime = manifest_mtime
+    freshness_label = "manifest"
+    if outcome.outcome_source == "run_state":
+        freshness_mtime = run_state_mtime
+        freshness_label = "run_state"
+    elif outcome.outcome_source == "records":
+        freshness_mtime = records_mtime
+        freshness_label = "records"
+    if freshness_mtime is not None and notebook_mtime is not None:
+        if freshness_mtime > notebook_mtime + 2.0:
             lines.append(
-                "- Freshness: Manifest is newer than this notebook file. "
+                f"- Freshness: {freshness_label.replace('_', ' ').title()} evidence is newer than this notebook file. "
                 "Regenerate the notebook to update the narrative."
             )
         else:
-            lines.append("- Freshness: Notebook narrative matches the current manifest timestamp.")
-    elif manifest_mtime is None:
+            lines.append(
+                f"- Freshness: Notebook narrative matches the current {freshness_label.replace('_', ' ')} timestamp."
+            )
+    elif freshness_label == "manifest":
         lines.append("- Freshness: Manifest file is not available for freshness checks.")
+    elif freshness_label == "run_state":
+        lines.append("- Freshness: Run-state checkpoint is not available for freshness checks.")
+    elif freshness_label == "records":
+        lines.append("- Freshness: Records source is not available for freshness checks.")
     elif notebook_mtime is None:
         lines.append("- Freshness: Notebook file timestamp is not available for freshness checks.")
 

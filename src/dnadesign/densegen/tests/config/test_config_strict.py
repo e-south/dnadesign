@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
 from dnadesign.densegen.src.config import ConfigError, load_config
+from dnadesign.densegen.src.config.base import resolve_usr_root_scoped_path
 
 MIN_CONFIG = {
     "densegen": {
@@ -459,7 +461,7 @@ def test_usr_output_requires_root(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
-        "usr": {"dataset": "demo", "chunk_size": 10},
+        "usr": {"dataset": "densegen_demo", "chunk_size": 10},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
@@ -480,7 +482,7 @@ def test_usr_health_event_interval_requires_positive_value(tmp_path: Path) -> No
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {
-            "dataset": "demo",
+            "dataset": "densegen_demo",
             "root": "outputs/usr_datasets",
             "health_event_interval_seconds": 0,
         },
@@ -520,13 +522,28 @@ def test_usr_dataset_must_be_relative_path(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
-def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
+def test_usr_dataset_must_be_densegen_owner_first_id(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {
             "dataset": "demo",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="starting with 'densegen_'"):
+        load_config(cfg_path)
+
+
+def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "densegen_demo",
             "root": "outputs/usr_datasets",
             "chunk_size": 0,
         },
@@ -542,7 +559,7 @@ def test_usr_allow_overwrite_removed(tmp_path: Path) -> None:
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {
-            "dataset": "demo",
+            "dataset": "densegen_demo",
             "root": "outputs/usr_datasets",
             "allow_overwrite": False,
         },
@@ -678,12 +695,34 @@ def test_usr_root_can_live_outside_outputs(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "../usr_root"},
+        "usr": {"dataset": "densegen_demo", "root": "../usr_root"},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     loaded = load_config(cfg_path)
     assert loaded.root.densegen.output.usr is not None
     assert loaded.root.densegen.output.usr.root == "../usr_root"
+
+
+def test_usr_root_scope_can_resolve_from_git_common_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo_root = tmp_path / "repo"
+    shared_usr_root = repo_root / "src" / "dnadesign" / "usr" / "datasets"
+    shared_usr_root.mkdir(parents=True)
+    cfg_path = repo_root / ".worktrees" / "audit-wt" / "cfg.yaml"
+    cfg_path.parent.mkdir(parents=True)
+    cfg_path.write_text("densegen: {}\n")
+
+    def _fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=0, stdout=str(repo_root / ".git") + "\n", stderr="")
+
+    monkeypatch.setattr("dnadesign.densegen.src.config.base.subprocess.run", _fake_run)
+    resolved = resolve_usr_root_scoped_path(
+        cfg_path,
+        "src/dnadesign/usr/datasets",
+        label="output.usr.root",
+        scope="git_common_repo_root",
+    )
+
+    assert resolved == shared_usr_root.resolve()
 
 
 def test_logging_dir_must_live_under_outputs(tmp_path: Path) -> None:
@@ -951,7 +990,7 @@ def test_plots_source_required_for_multi_sink(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10},
+        "usr": {"dataset": "densegen_demo", "root": "usr_root", "chunk_size": 10},
         "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
@@ -964,12 +1003,102 @@ def test_plots_source_must_be_target(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10},
+        "usr": {"dataset": "densegen_demo", "root": "usr_root", "chunk_size": 10},
         "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg["plots"] = {"source": "csv", "out_dir": "plots"}
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_plot_scope_options_accept_concrete_plot_ids(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {
+            "placement_occupancy_map": {"scope": "auto", "max_plans": 12},
+            "tfbs_concentration_profile": {"scope": "per_group", "max_plans": 8, "drilldown_plans": 2},
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    placement_opts = dict((loaded.root.plots.options or {}).get("placement_occupancy_map") or {})
+    tfbs_opts = dict((loaded.root.plots.options or {}).get("tfbs_concentration_profile") or {})
+    assert placement_opts["scope"] == "auto"
+    assert int(placement_opts["max_plans"]) == 12
+    assert tfbs_opts["scope"] == "per_group"
+    assert int(tfbs_opts["max_plans"]) == 8
+    assert int(tfbs_opts["drilldown_plans"]) == 2
+
+
+def test_legacy_stage_a_summary_plot_option_is_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {"stage_a_summary": {"include_sampling_length_companion": True}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="stage_a_summary"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize(
+    "legacy_plot_id",
+    [
+        "stage_a_summary",
+        "placement_map",
+        "tfbs_usage",
+        "run_health",
+        "dataset_source_inventory",
+        "run_health/outcomes_over_time",
+    ],
+)
+def test_legacy_plot_ids_are_rejected_in_plots_default(tmp_path: Path, legacy_plot_id: str) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "default": [legacy_plot_id],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="no longer supported"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize(
+    "legacy_option_key",
+    [
+        "stage_a_summary",
+        "run_health",
+        "placement_map",
+        "tfbs_usage",
+    ],
+)
+def test_legacy_plot_option_blocks_are_rejected(tmp_path: Path, legacy_option_key: str) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {legacy_option_key: {}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="no longer supported"):
+        load_config(cfg_path)
+
+
+def test_unknown_plot_option_blocks_are_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {"stage_a_sampling_yield": {"scope": "auto"}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="supported plot option blocks"):
         load_config(cfg_path)
 
 

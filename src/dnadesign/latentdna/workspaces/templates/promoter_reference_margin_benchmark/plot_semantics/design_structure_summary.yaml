@@ -1,0 +1,15 @@
+plot_id: design_structure_summary
+question: Which candidate spaces preserve trusted synthetic-design structure rather than collapsing or over-indexing on nuisance variation?
+decision_role: primary
+encoding: Candidate-by-metric bar panels with bootstrap intervals for design-family, regulator-composition, Sigma-35, spacer-length, and balanced design-family separation ratios.
+scope: Stratified candidate samples over the shared promoter population, using trusted annotation axes derived from the promoter metadata contract.
+guardrails:
+  - Separation scores describe annotation-aligned geometry across known study labels.
+  - Balanced design-family scores are required because spacer-length usage can confound plan-level separation.
+caption: Annotation-aligned design-structure summary across candidate representations.
+alt_text: Bar-panel summary with confidence intervals showing annotation-separation ratios for each candidate representation.
+preprocessing_md: All centroid and cosine metrics use view-level standardization followed by row L2 normalization on the sampled candidate rows; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
+math_md: For each annotation axis A, the plot reports S_A = B_A / (W_A + eps), where B_A is mean between-centroid cosine distance and W_A is mean within-centroid cosine distance; balanced design-family scores stratify by Sigma-35 variant and spacer length.
+rationale_md: Directly tests whether a candidate X preserves trusted study annotations before assay labels exist.
+limitations_md: Strong separation can still reflect nuisance structure, and coarse cohort separation does not prove useful within-cohort ranking.
+failure_modes_md: Spacer-length dominance, label leakage through sampling imbalance, or unstable bootstrap strata can overstate representation usefulness.

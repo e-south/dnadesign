@@ -262,7 +262,7 @@ Default human-readable `show` keeps the payload handoff in the foreground:
 - payload, split-left, split-right, and assembled views with reference-vs-mismatch-present top/bottom rows in 5' to 3'
 - compact mismatch edits, PWM state, and a bounded trace summary
 
-Default `show --json` stays operator-focused and omits the machine ledger paths plus normalized payload detail unless `--verbose` is set. Human-readable `--verbose` adds provenance, bundle contract, render/integrity details, machine-facing artifact paths, and split-row debug lines; the full optimizer trace and motif context remain JSON-only.
+Default `show --json` returns the operator summary plus bundle artifact paths and integrity detail. `show --json --verbose` also includes `motif_context`, `optimization_decision`, and `split_row_debug`. Human-readable `--verbose` adds provenance, bundle contract, render/integrity details, and split-row debug lines; motif context and optimizer decision remain JSON-only.
 
 The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary now also publishes those retained left and right fragment duplexes as explicit top/bottom 5' to 3' rows for both reference and mismatch-present variants.
 The bundle summary also includes an explicit ligation posture block and a trace sampling note so operators can tell when ligation is legacy, inert, edge-blind, or active without guessing from the selected candidate alone.

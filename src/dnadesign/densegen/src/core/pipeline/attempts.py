@@ -184,12 +184,24 @@ def _load_attempts_snapshot(
             return pd.DataFrame()
         return pd.DataFrame(columns=columns)
     frames: list[pd.DataFrame] = []
+    requested_columns = [str(column).strip() for column in (columns or []) if str(column).strip()] or None
     for path in paths:
+        read_columns = requested_columns
+        include_attempt_id_for_dedupe = False
+        if requested_columns is not None and len(paths) > 1 and "attempt_id" not in requested_columns:
+            try:
+                import pyarrow.parquet as pq
+
+                include_attempt_id_for_dedupe = "attempt_id" in pq.read_schema(path).names
+            except Exception:
+                include_attempt_id_for_dedupe = False
+            if include_attempt_id_for_dedupe:
+                read_columns = [*requested_columns, "attempt_id"]
         try:
-            if columns is None:
+            if read_columns is None:
                 frame = pd.read_parquet(path)
             else:
-                frame = pd.read_parquet(path, columns=columns)
+                frame = pd.read_parquet(path, columns=read_columns)
         except Exception as exc:
             raise RuntimeError(f"Failed to read attempts artifact `{path}`: {exc}") from exc
         frames.append(frame)
@@ -198,8 +210,22 @@ def _load_attempts_snapshot(
             return pd.DataFrame()
         return pd.DataFrame(columns=columns)
     if len(frames) == 1:
-        return frames[0]
-    return pd.concat(frames, ignore_index=True)
+        frame = frames[0]
+    else:
+        frame = pd.concat(frames, ignore_index=True)
+    if "attempt_id" in frame.columns:
+        with_attempt_id = frame[frame["attempt_id"].notna()]
+        without_attempt_id = frame[frame["attempt_id"].isna()]
+        if not with_attempt_id.empty:
+            with_attempt_id = with_attempt_id.drop_duplicates(
+                subset=["attempt_id"],
+                keep="last",
+                ignore_index=True,
+            )
+        frame = pd.concat([without_attempt_id, with_attempt_id], ignore_index=True)
+    if requested_columns is not None and "attempt_id" not in requested_columns:
+        frame = frame.drop(columns=["attempt_id"], errors="ignore")
+    return frame
 
 
 def _load_failure_counts_from_attempts(

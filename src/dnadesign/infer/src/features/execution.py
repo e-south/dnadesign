@@ -20,7 +20,7 @@ import torch
 
 from ..contracts import infer_usr_column_name
 from ..errors import CapabilityError, RuntimeOOMError
-from ..runtime.resume_planner import read_usr_column_values
+from ..runtime.resume_planner import read_usr_columns
 from .context import resolve_sequence_contexts
 from .contracts import PromoterFeatureBundleConfig, SequenceContextRecord
 from .selectors import canonical_selector_for_block, resolve_intermediate_selector
@@ -90,8 +90,19 @@ def _progress_pct(*, completed: int, target: int) -> float:
     return max(0.0, min(100.0, ratio))
 
 
-def build_feature_bundle_outputs(*, bundle: PromoterFeatureBundleConfig) -> list[dict[str, object]]:
-    selector = canonical_selector_for_block(bundle.intermediate_block)
+def build_feature_bundle_outputs(
+    *,
+    bundle: PromoterFeatureBundleConfig,
+    model_id: str | None = None,
+) -> list[dict[str, object]]:
+    selector = (
+        resolve_intermediate_selector(
+            model_id=model_id,
+            intermediate_block=bundle.intermediate_block,
+        ).intermediate_selector
+        if model_id is not None
+        else canonical_selector_for_block(bundle.intermediate_block)
+    )
     outputs: list[dict[str, object]] = []
 
     if bundle.collect_log_likelihood:
@@ -198,6 +209,60 @@ def _pool_tensor_scopes(
     return seq_mean, anchor_mean
 
 
+def _feature_bundle_log_likelihoods(adapter, seq_chunk: list[str]) -> tuple[list[float], list[float]]:
+    totals = adapter.log_likelihood(
+        seq_chunk,
+        method="native",
+        reduction="sum",
+    )
+    means = adapter.log_likelihood(
+        seq_chunk,
+        method="native",
+        reduction="mean",
+    )
+    return list(totals), list(means)
+
+
+def _feature_bundle_logits_and_embedding(
+    adapter,
+    *,
+    seq_chunk: list[str],
+    selector: str,
+) -> tuple[list[object] | None, list[object] | None]:
+    fused = getattr(adapter, "logits_and_embedding", None)
+    if callable(fused):
+        logits_tensors, embedding_tensors = fused(seq_chunk, layer=selector, fmt="tensor")
+        return list(logits_tensors), list(embedding_tensors)
+    return None, None
+
+
+def _stable_feature_bundle_eval_batch_size(
+    *,
+    model_id: str,
+    bundle: PromoterFeatureBundleConfig,
+    micro_batch_size: int,
+) -> int | None:
+    if micro_batch_size <= 0:
+        return None
+    if model_id == "evo2_20b" and bundle.context.kind == "anchor_only":
+        return int(micro_batch_size)
+    return None
+
+
+def _pad_feature_bundle_eval_sequences(
+    *,
+    seq_chunk: list[str],
+    eval_batch_size: int | None,
+) -> list[str]:
+    if eval_batch_size is None or eval_batch_size <= len(seq_chunk) or not seq_chunk:
+        return list(seq_chunk)
+    padded = list(seq_chunk)
+    source_count = len(seq_chunk)
+    for offset in range(eval_batch_size - source_count):
+        padded.append(seq_chunk[offset % source_count])
+    return padded
+
+
 def _feature_request_digest(
     *,
     bundle: PromoterFeatureBundleConfig,
@@ -285,12 +350,17 @@ def _apply_digest_resume_guard(
     job_id: str,
     feature_values: Dict[str, List[object]],
     metadata_columnar: Mapping[str, List[object]],
+    existing_digests: Optional[List[object]] = None,
 ) -> List[int]:
     if ds is None or ids is None:
         return []
     digest_out_id = "metadata__feature_request_digest"
-    digest_column = infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=digest_out_id)
-    existing_digests = read_usr_column_values(ds=ds, ids=ids, column_name=digest_column)
+    if existing_digests is None:
+        digest_column = infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=digest_out_id)
+        existing_digests = read_usr_columns(ds=ds, ids=ids, column_names=[digest_column]).get(
+            digest_column,
+            [None] * len(ids),
+        )
     expected_digests = metadata_columnar[digest_out_id]
 
     stale_idx: list[int] = []
@@ -313,13 +383,14 @@ def _existing_feature_metadata_values(
 ) -> Dict[str, List[object]]:
     if ds is None or ids is None:
         return {out_id: [] for out_id in feature_metadata_output_ids()}
-    return {
-        out_id: read_usr_column_values(
-            ds=ds,
-            ids=ids,
-            column_name=infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=out_id),
-        )
+    metadata_columns = {
+        out_id: infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=out_id)
         for out_id in feature_metadata_output_ids()
+    }
+    existing_by_column = read_usr_columns(ds=ds, ids=ids, column_names=list(metadata_columns.values()))
+    return {
+        out_id: existing_by_column.get(column_name, [None] * len(ids))
+        for out_id, column_name in metadata_columns.items()
     }
 
 
@@ -354,6 +425,41 @@ def _write_chunk_subset(
     )
 
 
+def _group_columnar_by_row_indexes(
+    *,
+    columnar: Mapping[str, List[object]],
+    row_indexes_by_output: Mapping[str, set[int]],
+    idx_chunk: List[int] | None = None,
+) -> list[tuple[list[int], Dict[str, List[object]]]]:
+    groups: dict[tuple[int, ...], Dict[str, List[object]]] = {}
+    position_by_row_index = {row_index: position for position, row_index in enumerate(idx_chunk)} if idx_chunk else None
+    for out_id, values in columnar.items():
+        row_indexes = tuple(sorted(row_indexes_by_output.get(out_id, set())))
+        if not row_indexes:
+            continue
+        group_columnar = groups.setdefault(row_indexes, {})
+        if position_by_row_index is None:
+            group_columnar[out_id] = [values[row_index] for row_index in row_indexes]
+            continue
+        try:
+            group_columnar[out_id] = [values[position_by_row_index[row_index]] for row_index in row_indexes]
+        except KeyError as exc:
+            raise CapabilityError(
+                f"Grouped chunk write received row index {exc.args[0]} outside the current chunk."
+            ) from exc
+    return [(list(row_indexes), payload) for row_indexes, payload in groups.items()]
+
+
+def _group_event_args_for_columnar(
+    *,
+    grouped_columnar: Mapping[str, List[object]],
+    feature_event_args: Mapping[str, object],
+) -> dict[str, object]:
+    if any(infer_output_kind(out_id) == "feature" for out_id in grouped_columnar):
+        return dict(feature_event_args)
+    return {"infer_notify_suppress": True}
+
+
 def execute_feature_bundle(
     *,
     seqs: List[str],
@@ -374,6 +480,8 @@ def execute_feature_bundle(
     on_progress: Callable[[int], None],
     on_chunk_by_output: Mapping[str, Optional[Callable[..., None]]],
     on_chunk_by_metadata: Mapping[str, Optional[Callable[..., None]]],
+    on_chunk_output_group: Optional[Callable[..., None]] = None,
+    on_chunk_metadata_group: Optional[Callable[..., None]] = None,
 ) -> tuple[Dict[str, List[object]], list[dict[str, object]]]:
     contexts = resolve_sequence_contexts(
         seqs=seqs,
@@ -388,6 +496,12 @@ def execute_feature_bundle(
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
 
     all_vals: Dict[str, List[object]] = {key: list(value) for key, value in existing.items()}
+    metadata_existing = _existing_feature_metadata_values(
+        ds=ds if source == "usr" else None,
+        ids=ids,
+        model_id=model_id,
+        job_id=job_id,
+    )
     stale_idx = _apply_digest_resume_guard(
         ds=ds if source == "usr" else None,
         ids=ids,
@@ -395,19 +509,19 @@ def execute_feature_bundle(
         job_id=job_id,
         feature_values=all_vals,
         metadata_columnar=metadata_columnar,
+        existing_digests=metadata_existing.get("metadata__feature_request_digest"),
     )
     stale_idx_set = set(stale_idx)
     feature_resume_idx = set(need_idx) | stale_idx_set
 
-    metadata_existing = _existing_feature_metadata_values(
-        ds=ds if source == "usr" else None,
-        ids=ids,
-        model_id=model_id,
-        job_id=job_id,
-    )
     metadata_missing_by_output = _missing_rows_by_output(metadata_existing)
     metadata_missing_idx = set().union(*metadata_missing_by_output.values()) if metadata_missing_by_output else set()
     metadata_only_idx = metadata_missing_idx - feature_resume_idx
+    stable_eval_batch_size = _stable_feature_bundle_eval_batch_size(
+        model_id=model_id,
+        bundle=bundle,
+        micro_batch_size=micro_batch_size,
+    )
     feature_target_rows_by_output = {
         out_id: len({row_index for row_index, value in enumerate(values) if value is None} | stale_idx_set)
         for out_id, values in existing.items()
@@ -474,6 +588,27 @@ def execute_feature_bundle(
             }
         }
 
+    def _feature_group_progress() -> dict[str, object]:
+        overall_completed_units = sum(feature_written_units_by_family.values())
+        family_progress_pct_map = {
+            family_name: round(
+                _progress_pct(completed=completed_units, target=feature_target_units_by_family[family_name]),
+                1,
+            )
+            for family_name, completed_units in feature_written_units_by_family.items()
+        }
+        return {
+            "infer_progress": {
+                "family_progress_pct_map": family_progress_pct_map,
+                "overall_target_units": total_feature_units,
+                "overall_completed_units": overall_completed_units,
+                "overall_progress_pct": _progress_pct(
+                    completed=overall_completed_units,
+                    target=total_feature_units,
+                ),
+            }
+        }
+
     def _metadata_progress(out_id: str, *, rows_written_now: int) -> dict[str, object]:
         if rows_written_now > 0:
             target_rows = metadata_target_rows_by_output.get(out_id, 0)
@@ -495,21 +630,40 @@ def execute_feature_bundle(
             },
         }
 
-    for out_id, values in metadata_columnar.items():
-        metadata_row_indexes = sorted(metadata_missing_by_output[out_id].intersection(metadata_only_idx))
-        _write_chunk_subset(
-            writer=on_chunk_by_metadata.get(out_id),
-            idx_chunk=metadata_row_indexes,
-            values=[values[row_index] for row_index in metadata_row_indexes],
-            row_indexes=metadata_missing_by_output[out_id],
-            progress=_metadata_progress(out_id, rows_written_now=len(metadata_row_indexes)),
+    if on_chunk_metadata_group is not None:
+        metadata_only_groups = _group_columnar_by_row_indexes(
+            columnar=metadata_columnar,
+            row_indexes_by_output={
+                out_id: metadata_missing_by_output[out_id].intersection(metadata_only_idx)
+                for out_id in metadata_columnar
+            },
         )
+        for row_indexes, grouped_columnar in metadata_only_groups:
+            on_chunk_metadata_group(
+                row_indexes,
+                grouped_columnar,
+                event_args={"infer_notify_suppress": True},
+            )
+    else:
+        for out_id, values in metadata_columnar.items():
+            metadata_row_indexes = sorted(metadata_missing_by_output[out_id].intersection(metadata_only_idx))
+            _write_chunk_subset(
+                writer=on_chunk_by_metadata.get(out_id),
+                idx_chunk=metadata_row_indexes,
+                values=[values[row_index] for row_index in metadata_row_indexes],
+                row_indexes=metadata_missing_by_output[out_id],
+                progress=_metadata_progress(out_id, rows_written_now=len(metadata_row_indexes)),
+            )
 
     need_idx = sorted(feature_resume_idx)
     if len(need_idx) == 0:
         return {**all_vals, **metadata_columnar}, metadata_rows
 
-    start_bs = micro_batch_size if micro_batch_size > 0 else min(len(need_idx), default_batch_size)
+    start_bs = (
+        stable_eval_batch_size
+        if stable_eval_batch_size is not None
+        else (micro_batch_size if micro_batch_size > 0 else min(len(need_idx), default_batch_size))
+    )
     bs = start_bs
     start = 0
     while start < len(need_idx):
@@ -517,27 +671,34 @@ def execute_feature_bundle(
         idx_chunk = need_idx[start : start + take]
         seq_chunk = [seqs[row_index] for row_index in idx_chunk]
         context_chunk = [contexts[row_index] for row_index in idx_chunk]
+        eval_seq_chunk = _pad_feature_bundle_eval_sequences(
+            seq_chunk=seq_chunk,
+            eval_batch_size=stable_eval_batch_size,
+        )
 
         try:
             chunk_outputs: dict[str, list[object]] = {}
+            logits_tensors = None
+            embedding_tensors = None
 
             if bundle.collect_log_likelihood:
-                chunk_outputs[_LOG_LIKELIHOOD_TOTAL] = adapter.log_likelihood(
-                    seq_chunk,
-                    method="native",
-                    reduction="sum",
-                )
-                chunk_outputs[_LOG_LIKELIHOOD_MEAN] = adapter.log_likelihood(
-                    seq_chunk,
-                    method="native",
-                    reduction="mean",
+                totals, means = _feature_bundle_log_likelihoods(adapter, eval_seq_chunk)
+                chunk_outputs[_LOG_LIKELIHOOD_TOTAL] = totals[: len(idx_chunk)]
+                chunk_outputs[_LOG_LIKELIHOOD_MEAN] = means[: len(idx_chunk)]
+
+            if bundle.collect_output_layer_mean and bundle.collect_intermediate_embedding:
+                logits_tensors, embedding_tensors = _feature_bundle_logits_and_embedding(
+                    adapter,
+                    seq_chunk=eval_seq_chunk,
+                    selector=selector.intermediate_selector,
                 )
 
             if bundle.collect_output_layer_mean:
-                logits_tensors = adapter.logits(seq_chunk, fmt="tensor")
+                if logits_tensors is None:
+                    logits_tensors = adapter.logits(eval_seq_chunk, fmt="tensor")
                 seq_means: list[list[float]] = []
                 anchor_means: list[list[float]] = []
-                for tensor, context in zip(logits_tensors, context_chunk, strict=True):
+                for tensor, context in zip(logits_tensors[: len(idx_chunk)], context_chunk, strict=True):
                     seq_mean, anchor_mean = _pool_tensor_scopes(tensor, context=context)
                     if bundle.pooling.seq_mean:
                         seq_means.append(seq_mean)
@@ -548,14 +709,15 @@ def execute_feature_bundle(
                     chunk_outputs[_OUTPUT_LAYER_ANCHOR_MEAN] = anchor_means
 
             if bundle.collect_intermediate_embedding:
-                embedding_tensors = adapter.embedding(
-                    seq_chunk,
-                    layer=selector.intermediate_selector,
-                    fmt="tensor",
-                )
+                if embedding_tensors is None:
+                    embedding_tensors = adapter.embedding(
+                        eval_seq_chunk,
+                        layer=selector.intermediate_selector,
+                        fmt="tensor",
+                    )
                 seq_means = []
                 anchor_means = []
-                for tensor, context in zip(embedding_tensors, context_chunk, strict=True):
+                for tensor, context in zip(embedding_tensors[: len(idx_chunk)], context_chunk, strict=True):
                     seq_mean, anchor_mean = _pool_tensor_scopes(tensor, context=context)
                     if bundle.pooling.seq_mean:
                         seq_means.append(seq_mean)
@@ -568,6 +730,11 @@ def execute_feature_bundle(
                     chunk_outputs[intermediate_anchor_id] = anchor_means
 
         except RuntimeError as exc:
+            if is_oom(exc) and stable_eval_batch_size is not None:
+                raise RuntimeOOMError(
+                    "Feature bundle requires fixed evaluation batch size "
+                    f"{stable_eval_batch_size} for stable resume values; refusing to auto-derate."
+                ) from exc
             if is_oom(exc) and auto_derate and bs > 1:
                 bs = max(1, bs // 2)
                 continue
@@ -579,44 +746,139 @@ def execute_feature_bundle(
             target = all_vals[out_id]
             for value_index, row_index in enumerate(idx_chunk):
                 target[row_index] = values[value_index]
-            missing_rows = {row_index for row_index in idx_chunk if existing[out_id][row_index] is None} - stale_idx_set
-            missing_rows_in_chunk = len(missing_rows)
-            _write_chunk_subset(
-                writer=on_chunk_by_output.get(out_id),
+        if on_chunk_output_group is not None:
+            idx_chunk_set = set(idx_chunk)
+            metadata_chunk = {
+                out_id: [values[row_index] for row_index in idx_chunk] for out_id, values in metadata_columnar.items()
+            }
+            feature_missing_by_output = {}
+            for out_id in chunk_outputs:
+                missing_rows = {
+                    row_index for row_index in idx_chunk if existing[out_id][row_index] is None
+                } - stale_idx_set
+                feature_missing_by_output[out_id] = missing_rows
+                _feature_progress(out_id, rows_written_now=len(missing_rows))
+            combined_missing_groups = _group_columnar_by_row_indexes(
+                columnar={**chunk_outputs, **metadata_chunk},
+                row_indexes_by_output={
+                    **feature_missing_by_output,
+                    **{
+                        out_id: (metadata_missing_by_output[out_id] - stale_idx_set).intersection(idx_chunk_set)
+                        for out_id in metadata_columnar
+                    },
+                },
                 idx_chunk=idx_chunk,
-                values=values,
-                row_indexes=missing_rows,
-                progress=_feature_progress(out_id, rows_written_now=missing_rows_in_chunk),
             )
-            stale_rows_in_chunk = len(stale_idx_set.intersection(idx_chunk))
-            _write_chunk_subset(
-                writer=on_chunk_by_output.get(out_id),
+            feature_group_event_args = _feature_group_progress()
+            for row_indexes, grouped_columnar in combined_missing_groups:
+                on_chunk_output_group(
+                    row_indexes,
+                    grouped_columnar,
+                    event_args=_group_event_args_for_columnar(
+                        grouped_columnar=grouped_columnar,
+                        feature_event_args=feature_group_event_args,
+                    ),
+                )
+            combined_stale_groups = _group_columnar_by_row_indexes(
+                columnar={**chunk_outputs, **metadata_chunk},
+                row_indexes_by_output={
+                    **{out_id: stale_idx_set.intersection(idx_chunk_set) for out_id in chunk_outputs},
+                    **{out_id: stale_idx_set.intersection(idx_chunk_set) for out_id in metadata_columnar},
+                },
                 idx_chunk=idx_chunk,
-                values=values,
-                row_indexes=stale_idx_set,
-                overwrite_override=True,
-                progress=_feature_progress(out_id, rows_written_now=stale_rows_in_chunk),
             )
-        for out_id, values in metadata_columnar.items():
-            chunk_metadata = [values[row_index] for row_index in idx_chunk]
-            missing_rows = metadata_missing_by_output[out_id] - stale_idx_set
-            metadata_missing_rows_in_chunk = len(missing_rows.intersection(idx_chunk))
-            _write_chunk_subset(
-                writer=on_chunk_by_metadata.get(out_id),
-                idx_chunk=idx_chunk,
-                values=chunk_metadata,
-                row_indexes=missing_rows,
-                progress=_metadata_progress(out_id, rows_written_now=metadata_missing_rows_in_chunk),
-            )
-            metadata_stale_rows_in_chunk = len(stale_idx_set.intersection(idx_chunk))
-            _write_chunk_subset(
-                writer=on_chunk_by_metadata.get(out_id),
-                idx_chunk=idx_chunk,
-                values=chunk_metadata,
-                row_indexes=stale_idx_set,
-                overwrite_override=True,
-                progress=_metadata_progress(out_id, rows_written_now=metadata_stale_rows_in_chunk),
-            )
+            if combined_stale_groups:
+                for out_id in chunk_outputs:
+                    _feature_progress(out_id, rows_written_now=len(stale_idx_set.intersection(idx_chunk_set)))
+                feature_group_event_args = _feature_group_progress()
+                for row_indexes, grouped_columnar in combined_stale_groups:
+                    on_chunk_output_group(
+                        row_indexes,
+                        grouped_columnar,
+                        overwrite_override=True,
+                        event_args=_group_event_args_for_columnar(
+                            grouped_columnar=grouped_columnar,
+                            feature_event_args=feature_group_event_args,
+                        ),
+                    )
+        else:
+            for out_id, values in chunk_outputs.items():
+                missing_rows = {
+                    row_index for row_index in idx_chunk if existing[out_id][row_index] is None
+                } - stale_idx_set
+                missing_rows_in_chunk = len(missing_rows)
+                _write_chunk_subset(
+                    writer=on_chunk_by_output.get(out_id),
+                    idx_chunk=idx_chunk,
+                    values=values,
+                    row_indexes=missing_rows,
+                    progress=_feature_progress(out_id, rows_written_now=missing_rows_in_chunk),
+                )
+                stale_rows_in_chunk = len(stale_idx_set.intersection(idx_chunk))
+                _write_chunk_subset(
+                    writer=on_chunk_by_output.get(out_id),
+                    idx_chunk=idx_chunk,
+                    values=values,
+                    row_indexes=stale_idx_set,
+                    overwrite_override=True,
+                    progress=_feature_progress(out_id, rows_written_now=stale_rows_in_chunk),
+                )
+        if on_chunk_output_group is None:
+            if on_chunk_metadata_group is not None:
+                idx_chunk_set = set(idx_chunk)
+                metadata_chunk = {
+                    out_id: [values[row_index] for row_index in idx_chunk]
+                    for out_id, values in metadata_columnar.items()
+                }
+                metadata_missing_groups = _group_columnar_by_row_indexes(
+                    columnar=metadata_chunk,
+                    row_indexes_by_output={
+                        out_id: (metadata_missing_by_output[out_id] - stale_idx_set).intersection(idx_chunk_set)
+                        for out_id in metadata_columnar
+                    },
+                    idx_chunk=idx_chunk,
+                )
+                for row_indexes, grouped_columnar in metadata_missing_groups:
+                    on_chunk_metadata_group(
+                        row_indexes,
+                        grouped_columnar,
+                        event_args={"infer_notify_suppress": True},
+                    )
+                metadata_stale_groups = _group_columnar_by_row_indexes(
+                    columnar=metadata_chunk,
+                    row_indexes_by_output={
+                        out_id: stale_idx_set.intersection(idx_chunk_set) for out_id in metadata_columnar
+                    },
+                    idx_chunk=idx_chunk,
+                )
+                for row_indexes, grouped_columnar in metadata_stale_groups:
+                    on_chunk_metadata_group(
+                        row_indexes,
+                        grouped_columnar,
+                        overwrite_override=True,
+                        event_args={"infer_notify_suppress": True},
+                    )
+            else:
+                for out_id, values in metadata_columnar.items():
+                    chunk_metadata = [values[row_index] for row_index in idx_chunk]
+                    missing_rows = metadata_missing_by_output[out_id] - stale_idx_set
+                    metadata_missing_rows_in_chunk = len(missing_rows.intersection(idx_chunk))
+                    _write_chunk_subset(
+                        writer=on_chunk_by_metadata.get(out_id),
+                        idx_chunk=idx_chunk,
+                        values=chunk_metadata,
+                        row_indexes=missing_rows,
+                        progress=_metadata_progress(out_id, rows_written_now=metadata_missing_rows_in_chunk),
+                    )
+                    metadata_stale_rows_in_chunk = len(stale_idx_set.intersection(idx_chunk))
+                    _write_chunk_subset(
+                        writer=on_chunk_by_metadata.get(out_id),
+                        idx_chunk=idx_chunk,
+                        values=chunk_metadata,
+                        row_indexes=stale_idx_set,
+                        overwrite_override=True,
+                        progress=_metadata_progress(out_id, rows_written_now=metadata_stale_rows_in_chunk),
+                    )
         on_progress(len(idx_chunk))
         start += take
 

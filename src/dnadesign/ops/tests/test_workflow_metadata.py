@@ -84,6 +84,7 @@ def test_validate_workflow_contract_rejects_infer_notify_policy_densegen() -> No
             notify_policy="densegen",
             has_gpus=True,
             has_gpu_capability=True,
+            has_gpu_type=False,
             has_gpu_memory=False,
         )
     except ValueError as exc:

@@ -15,6 +15,9 @@ If you already have a workspace and a webhook secret file, jump to [Quick path](
 - Explicit one-off or local-receiver drills can also use runtime overrides such as `--url` or `--url-env`.
 - `notify ... --dry-run` can validate routing and event parsing without webhook URL resolution.
 - Notify reads USR `.events.log`; DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.
+- When starting a live watcher on an existing stream with a materialized
+  profile but no cursor file yet, seed the cursor to the current `.events.log`
+  size first unless replay is intentional.
 - Verify next with [notify profile doctor contract](../../src/dnadesign/notify/docs/reference/command-contracts.md#notify-profile-doctor).
 
 ### Choose a workflow
@@ -39,11 +42,18 @@ uv run notify usr-events watch --tool densegen --workspace <workspace> --follow 
 
 For the full quickstart (including webhook setup and dry-run checks), use [Minimal operator quickstart](usr-events.md#minimal-operator-quickstart).
 
+For live Infer study lanes, prefer one watcher per lane config and one watcher
+per destination dataset. Do not use one live watcher for a multi-destination
+Infer config when Notify and resume posture matter.
+
 ### Troubleshooting
 
 - Profile validation failures: run `notify profile doctor --profile <profile.json>` and resolve the first reported contract error.
 - Events-source mismatch after workspace changes: rerun `notify setup slack --tool <tool> --workspace <workspace> --force`.
 - HTTPS trust failures: provide `--tls-ca-bundle` or export `SSL_CERT_FILE`.
+- Quiet watcher stdout is not a failure by itself. Infer notify policies emit
+  sparse running updates; check cursor movement and spool backlog before
+  assuming delivery is broken.
 - Replay failures: run [Recover flow](usr-events.md#recover-flow).
 
 ### References

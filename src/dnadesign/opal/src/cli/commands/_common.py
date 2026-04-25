@@ -106,7 +106,7 @@ def resolve_json_path(path: Path, *, label: str, must_exist: bool) -> Path:
 
 def _format_validation_error(e, cfg_path: Path) -> str:
     """
-    Turn a Pydantic ValidationError into an actionable, human-first message,
+    Turn a Pydantic ValidationError into an actionable, text-first message,
     keeping strict validation (no fallbacks).
     """
     try:

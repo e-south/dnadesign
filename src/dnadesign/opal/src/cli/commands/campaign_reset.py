@@ -60,7 +60,7 @@ def cmd_campaign_reset(
         "--backup/--no-backup",
         help="Backup records.parquet before pruning (default: no-backup).",
     ),
-    json: bool = typer.Option(False, "--json/--human", help="Output format."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)

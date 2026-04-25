@@ -208,6 +208,7 @@ the study record routes DenseGen directly to the shared dataset.
 - When multiple targets are set, outputs must be in sync before a run; mismatches are errors.
 - `usr` (required when `targets` includes `usr`)
   - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`
+  - `dataset` must be a flat DenseGen-owned owner-first id such as `densegen_demo_sampling_baseline`; keep provenance in USR metadata and study records instead of nested dataset paths
   - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` USR events
   - `npz_fields` (optional list of metadata keys to offload into NPZ artifacts; see outputs doc)
   - `npz_root` (optional path for NPZ artifacts; defaults to `<dataset>/_artifacts/densegen_npz`)
@@ -457,7 +458,7 @@ densegen:
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `pdf`)
 - `default`: list of plot names to run when `dense plot` is invoked
-- `video` (optional; strict nested config for `dense_array_video_showcase`)
+- `video` (optional; strict nested config for `dense_array_showcase_video`)
   - `enabled` (bool; default `false`)
   - `mode`: `all_plans_round_robin_single_video | single_plan_single_video`
     - default `all_plans_round_robin_single_video` renders one MP4 across all plans in round-robin order
@@ -477,27 +478,27 @@ densegen:
   - guardrail invariant: `round(target_duration_sec * fps) <= max_total_frames`
   - the video artifact remains workspace-scoped under `outputs/plots/stage_b/...`
 - `options`: dict keyed by plot name (strict; unknown options error)
-  - `placement_map`:
+  - `placement_occupancy_map`:
     - `occupancy_alpha` (float in `(0, 1]`)
     - `occupancy_max_categories` (int > 0)
     - `scope`: `auto | per_plan | per_group`
     - `max_plans` (int > 0; used when `scope=auto`)
     - `drilldown_plans` (int >= 0; optional per-plan overlays when grouped)
-  - `tfbs_usage`:
+  - `tfbs_concentration_profile`:
     - `scope`: `auto | per_plan | per_group`
     - `max_plans` (int > 0; used when `scope=auto`)
     - `drilldown_plans` (int >= 0; optional per-plan overlays when grouped)
 - `style`: global style dict applied to every plot (can be overridden per plot). Common keys:
   - `seaborn_style` (bool; default `true`) — set to `false` if seaborn styles are unavailable.
-  - `run_health_plan_scope` (`per_plan|auto|per_group`) — scope control for `run_health.pdf` plan panels.
+  - `run_health_plan_scope` (`per_plan|auto|per_group`) — scope control for `solve_pressure_and_progress.pdf` plan panels.
   - `run_health_plan_max_labels` (int > 0) — label threshold used when `run_health_plan_scope=auto`.
-  - `run_health_outcomes_plan_scope` (`per_plan|auto|per_group`) — scope control for `outcomes_over_time.pdf`.
+  - `run_health_outcomes_plan_scope` (`per_plan|auto|per_group`) — scope control for `attempt_outcome_timeline.pdf`.
   - `run_health_outcomes_plan_max_labels` (int > 0) — label threshold used when `run_health_outcomes_plan_scope=auto`.
-  - `run_health_outcomes_attempts_per_row` (int > 0) — attempts tiled per row within each plan column in `outcomes_over_time.pdf`.
-  - `run_health_outcomes_rows_per_block` (int > 0) — guide interval (attempt-index scale) for horizontal block lines in `outcomes_over_time.pdf`.
-  - `run_health_outcomes_max_yticks` (int >= 2) — max count of y tick labels for attempt indices in `outcomes_over_time.pdf`.
-  - `tfbs_usage_breakdown_figsize` (`[width, height]`) — explicit figure size for `tfbs_usage.pdf` two-panel layout.
-  - `tfbs_usage_legend_size` (float > 0) — legend font size for `tfbs_usage.pdf`.
+  - `run_health_outcomes_attempts_per_row` (int > 0) — attempts tiled per row within each plan column in `attempt_outcome_timeline.pdf`.
+  - `run_health_outcomes_rows_per_block` (int > 0) — guide interval (attempt-index scale) for horizontal block lines in `attempt_outcome_timeline.pdf`.
+  - `run_health_outcomes_max_yticks` (int >= 2) — max count of y tick labels for attempt indices in `attempt_outcome_timeline.pdf`.
+  - `tfbs_usage_breakdown_figsize` (`[width, height]`) — explicit figure size for `tfbs_concentration_profile.pdf` two-panel layout.
+  - `tfbs_usage_legend_size` (float > 0) — legend font size for `tfbs_concentration_profile.pdf`.
 - `sample_rows`: optional cap on rows loaded for plotting (reads the first N rows for speed)
 
 ---

@@ -37,6 +37,22 @@ def _is_plot_selection_error(message: str) -> bool:
     return "unknown plot name requested" in lowered or "no plot names selected" in lowered
 
 
+def _is_truncation_error(message: str) -> bool:
+    return "output records rows were truncated" in message.lower()
+
+
+def _is_missing_local_artifact_error(message: str) -> bool:
+    lowered = message.lower()
+    tokens = (
+        "run_manifest.json",
+        "pool manifest not found",
+        "pool_manifest.json",
+        "attempts.parquet not found",
+        "composition.parquet not found",
+    )
+    return any(token in lowered for token in tokens)
+
+
 def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
     console = context.console
     make_table = context.make_table
@@ -71,6 +87,8 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
         ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     ):
+        from ..viz.plot_inventory import base_plot_id, plot_missing_hint, plot_required_artifacts
+
         cfg_path, is_default = context.resolve_config_path(ctx, config)
         loaded = context.load_config_or_exit(
             cfg_path,
@@ -105,6 +123,28 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
             if _is_plot_selection_error(message):
                 console.print(context.workspace_command("dense ls-plots", cfg_path=cfg_path, run_root=run_root))
                 raise typer.Exit(code=1) from exc
+            if _is_truncation_error(message):
+                allow_truncated_cmd = "dense plot --allow-truncated"
+                if only:
+                    allow_truncated_cmd += f" --only {only}"
+                console.print(context.workspace_command(allow_truncated_cmd, cfg_path=cfg_path, run_root=run_root))
+                raise typer.Exit(code=1) from exc
+            if _is_missing_local_artifact_error(message):
+                console.print(
+                    "[bold]Tip[/]: full DenseGen analysis needs workspace-local artifacts under "
+                    "`outputs/meta`, `outputs/pools`, and `outputs/tables`, not just shared output records."
+                )
+                selected_plot_ids = [base_plot_id(token) for token in str(only or "").split(",") if base_plot_id(token)]
+                if len(selected_plot_ids) == 1:
+                    selected_plot_id = selected_plot_ids[0]
+                    required_artifacts = plot_required_artifacts(selected_plot_id)
+                    if required_artifacts:
+                        console.print(
+                            "[bold]Required artifacts[/]: " + ", ".join(f"`{item}`" for item in required_artifacts)
+                        )
+                    missing_hint = plot_missing_hint(selected_plot_id)
+                    if missing_hint:
+                        console.print(f"[bold]Plot contract[/]: {missing_hint}")
             if _has_resumable_run_state(run_root):
                 rerun = "dense run --resume --no-plot"
             else:

@@ -22,9 +22,22 @@ def test_plot_registry_has_descriptions() -> None:
 
 def test_plot_registry_is_canonical_set() -> None:
     assert set(PLOT_SPECS.keys()) == {
-        "dense_array_video_showcase",
-        "placement_map",
-        "tfbs_usage",
-        "run_health",
-        "stage_a_summary",
+        "attempt_outcome_timeline",
+        "background_sequence_logo",
+        "compression_ratio_by_plan",
+        "dense_array_showcase_video",
+        "plan_regulator_deployment_heatmap",
+        "placement_occupancy_map",
+        "retained_pool_coverage_by_regulator",
+        "retained_vs_deployed_length_mix_by_regulator",
+        "retained_vs_deployed_tier_mix_by_regulator",
+        "score_strata_and_deployed_length_bridge",
+        "solve_pressure_and_progress",
+        "source_cohort_concentration",
+        "source_plan_input_heatmap",
+        "stage_a_pool_diversity",
+        "stage_a_pool_score_strata",
+        "stage_a_sampling_yield",
+        "tfbs_concentration_profile",
+        "upstream_motif_supply_and_pwm_strength",
     }

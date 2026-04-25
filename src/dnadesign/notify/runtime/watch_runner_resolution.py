@@ -15,8 +15,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from dnadesign.construct.contracts import resolve_construct_run_id_from_config
-
 from ..errors import NotifyConfigError
 from ..profiles.profile_paths import resolve_resolver_mode_profile_path
 
@@ -34,6 +32,8 @@ class WatchResolverMode:
 def _resolve_resolver_mode_run_id(*, tool_name: str, config_path: Path) -> str | None:
     if tool_name != "construct":
         return None
+    from dnadesign.construct.contracts import resolve_construct_run_id_from_config
+
     try:
         return resolve_construct_run_id_from_config(config_path)
     except ValueError as exc:

@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-04-24
 
 ## At a glance
 This document defines how `dnadesign` grades quality across tool domains and architectural layers.
@@ -70,6 +70,7 @@ Each score uses a `0-4` rubric:
 | Selected runbook metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Operational runbook path placement | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Transient operational artifact placement (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) | `dnadesign.devtools.docs_checks` + CI | enforced |
+| Active shared USR dataset id policy | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Cross-tool boundary terminology drift prevention | `dnadesign.devtools.docs_checks` stale-term checks + CI | enforced |
 | Tool-boundary utility placement (`src/dnadesign/utils` disallowed) | `dnadesign.devtools.docs_checks` shared-utils path check + CI | enforced |
 | Selected cross-tool runbook safety contracts | `dnadesign.ops.runbooks.schema`; orchestration contract tests | enforced |

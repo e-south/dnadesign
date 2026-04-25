@@ -17,8 +17,8 @@ from typer.testing import CliRunner
 
 from dnadesign.infer.cli import app
 from dnadesign.infer.src.writers.usr import write_back_usr
+from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
-from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 _RUNNER = CliRunner()
 

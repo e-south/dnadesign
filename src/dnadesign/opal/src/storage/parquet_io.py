@@ -112,6 +112,6 @@ def _format_type(dtype) -> str:
 
 def schema_signature(schema) -> list[tuple[str, str]]:
     """
-    Stable, human-readable schema signature for error messages/comparisons.
+    Stable, readable schema signature for error messages/comparisons.
     """
     return [(field.name, _format_type(field.type)) for field in schema]

@@ -98,17 +98,20 @@ def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
 def test_densegen_analysis_qsub_is_plot_only_without_notebook_generation() -> None:
     qsub_script = _read(BU_SCC_DOCS / "jobs" / "densegen-analysis.qsub")
     assert (
-        'DENSEGEN_ANALYSIS_PLOTS="${DENSEGEN_ANALYSIS_PLOTS:-stage_a_summary,placement_map,run_health,tfbs_usage}"'
+        'DENSEGEN_ANALYSIS_PLOTS="${DENSEGEN_ANALYSIS_PLOTS:-source_cohort_concentration,stage_a_sampling_yield,stage_a_pool_diversity,plan_regulator_deployment_heatmap,placement_occupancy_map,retained_pool_coverage_by_regulator,attempt_outcome_timeline,solve_pressure_and_progress}"'
         in qsub_script
     )
     assert 'uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"' in qsub_script
-    assert "dense_array_video_showcase requires ffmpeg executable in PATH." in qsub_script
+    assert "dense_array_showcase_video requires ffmpeg executable in PATH." in qsub_script
     assert 'ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"' in qsub_script
     assert 'COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"' in qsub_script
+    assert 'POOLS_MANIFEST="$RUN_ROOT/outputs/pools/pool_manifest.json"' in qsub_script
     assert "needs_attempts_artifact=0" in qsub_script
     assert "needs_composition_artifact=0" in qsub_script
+    assert "needs_pool_artifact=0" in qsub_script
     assert "Selected DenseGen analysis plots require attempts artifacts." in qsub_script
     assert "Selected DenseGen analysis plots require composition artifacts." in qsub_script
+    assert "Selected DenseGen analysis plots require pool artifacts." in qsub_script
     assert "resolve_run_root" in qsub_script
     assert "from dnadesign.densegen import load_config, resolve_run_root" in qsub_script
     assert "dnadesign.densegen.src.config" not in qsub_script
@@ -158,6 +161,7 @@ def test_bu_scc_docs_define_canonical_repo_venv_and_model_cache_split_policy() -
     assert "/project/<your_project>/$USER/cache/huggingface/evo2_20b" in install_doc
     assert "gpu_c=9.0" in bundle
     assert "H200" in bundle
+    assert "RTXP6000" in bundle
 
 
 def test_bu_scc_install_doc_includes_deterministic_flash_attn_source_build_controls() -> None:
@@ -239,7 +243,7 @@ def test_installation_docs_use_direct_wording_without_lane_or_agent_labels() -> 
 
     forbidden = (
         "machine lane",
-        "human lane",
+        "text lane",
         "choose your path",
         "choose by task",
         "choose no-submit and submit route",

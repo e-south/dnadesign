@@ -42,7 +42,7 @@ def cmd_ledger_compact(
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     runs: bool = typer.Option(False, "--runs", help="Compact run_meta ledger (runs.parquet)."),
     apply: bool = typer.Option(False, "--apply", help="Apply compaction without interactive confirmation."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     try:
         if not runs:

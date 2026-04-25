@@ -87,10 +87,10 @@ component_management:
       name: nmf
       paths:
         - src/dnadesign/nmf/**
-    - component_id: latdna
-      name: latdna
+    - component_id: latentdna
+      name: latentdna
       paths:
-        - src/dnadesign/latdna/**
+        - src/dnadesign/latentdna/**
     - component_id: cruncher
       name: cruncher
       paths:
@@ -115,6 +115,10 @@ component_management:
       name: permuter
       paths:
         - src/dnadesign/permuter/**
+    - component_id: testsupport
+      name: testsupport
+      paths:
+        - src/dnadesign/testsupport/**
 
 comment:
   require_changes: true

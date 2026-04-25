@@ -17,7 +17,7 @@ from ...tui import list_table, tui_enabled
 from ..core import _dim, _truncate, bullet_list
 
 
-def render_runs_list_human(rows: Sequence[Mapping[str, object]]) -> str:
+def render_runs_list_text(rows: Sequence[Mapping[str, object]]) -> str:
     if tui_enabled():
         from rich import box
         from rich.table import Table

@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -32,6 +33,11 @@ from typing import Callable, Literal, Optional
 import typer
 
 from ..config import resolve_usr_root_scoped_path
+from ..viz.plot_inventory import (
+    HIDDEN_VISUAL_PLOT_TYPES,
+    load_current_inventory_strict,
+    load_inventory_payload,
+)
 from . import notebook_runtime
 from .context import CliContext
 from .notebook_template import NotebookTemplateContext, render_notebook_template
@@ -152,6 +158,23 @@ def _notebook_server_state_path(run_root: Path) -> Path:
     return run_root / "outputs" / "notebooks" / NOTEBOOK_SERVER_STATE_FILENAME
 
 
+def _notebook_content_digest(notebook_path: Path) -> str:
+    return hashlib.sha1(notebook_path.read_bytes()).hexdigest()
+
+
+def _write_notebook_server_state(*, run_root: Path, pid: int, host: str, port: int, notebook_path: Path) -> None:
+    path = _notebook_server_state_path(run_root)
+    payload = {
+        "pid": int(pid),
+        "host": str(host),
+        "port": int(port),
+        "notebook_path": str(notebook_path.resolve()),
+        "notebook_digest": _notebook_content_digest(notebook_path),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
 def _read_notebook_server_state(*, run_root: Path) -> dict[str, object] | None:
     path = _notebook_server_state_path(run_root)
     if not path.exists():
@@ -167,18 +190,6 @@ def _read_notebook_server_state(*, run_root: Path) -> dict[str, object] | None:
     return payload
 
 
-def _write_notebook_server_state(*, run_root: Path, pid: int, host: str, port: int, notebook_path: Path) -> None:
-    path = _notebook_server_state_path(run_root)
-    payload = {
-        "pid": int(pid),
-        "host": str(host),
-        "port": int(port),
-        "notebook_path": str(notebook_path.resolve()),
-    }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-
-
 def _clear_notebook_server_state(*, run_root: Path) -> None:
     path = _notebook_server_state_path(run_root)
     try:
@@ -186,6 +197,174 @@ def _clear_notebook_server_state(*, run_root: Path) -> None:
     except FileNotFoundError:
         return
     except OSError:
+        return
+
+
+def _server_state_targets_notebook(*, state: dict[str, object], notebook_path: Path) -> bool:
+    raw_path = str(state.get("notebook_path") or "").strip()
+    if not raw_path:
+        return False
+    try:
+        return Path(raw_path).expanduser().resolve() == notebook_path.resolve()
+    except Exception:
+        return False
+
+
+def _server_state_matches_notebook_digest(
+    *,
+    state: dict[str, object] | None,
+    notebook_path: Path,
+    notebook_digest: str,
+) -> bool:
+    if state is None or not _server_state_targets_notebook(state=state, notebook_path=notebook_path):
+        return False
+    return str(state.get("notebook_digest") or "").strip() == str(notebook_digest).strip()
+
+
+def _release_tracked_notebook_server_if_stale(
+    *,
+    run_root: Path,
+    notebook_path: Path,
+    notebook_digest: str,
+) -> bool:
+    state = _read_notebook_server_state(run_root=run_root)
+    if state is None or not _server_state_targets_notebook(state=state, notebook_path=notebook_path):
+        return False
+    if _server_state_matches_notebook_digest(state=state, notebook_path=notebook_path, notebook_digest=notebook_digest):
+        return False
+    state_pid_raw = state.get("pid")
+    try:
+        state_pid = int(state_pid_raw)
+    except (TypeError, ValueError):
+        _clear_notebook_server_state(run_root=run_root)
+        return False
+    if not _process_is_running(state_pid):
+        _clear_notebook_server_state(run_root=run_root)
+        return False
+    terminated = _terminate_process_tree(state_pid)
+    if terminated:
+        _clear_notebook_server_state(run_root=run_root)
+    return bool(terminated)
+
+
+def _notebook_render_source_files() -> list[Path]:
+    repo_root = Path(__file__).resolve().parents[5]
+    explicit_files = [
+        repo_root / "src" / "dnadesign" / "densegen" / "src" / "cli" / "notebook.py",
+        repo_root / "src" / "dnadesign" / "densegen" / "src" / "cli" / "notebook_runtime.py",
+        repo_root / "src" / "dnadesign" / "densegen" / "src" / "cli" / "notebook_template.py",
+        repo_root / "src" / "dnadesign" / "densegen" / "src" / "integrations" / "baserender" / "notebook_contract.py",
+    ]
+    source_dirs = [
+        repo_root / "src" / "dnadesign" / "densegen" / "src" / "viz",
+        repo_root / "src" / "dnadesign" / "baserender" / "src",
+    ]
+    cli_dir = repo_root / "src" / "dnadesign" / "densegen" / "src" / "cli"
+    files: list[Path] = [path for path in explicit_files if path.exists()]
+    if cli_dir.exists():
+        files.extend(sorted(cli_dir.glob("notebook_cells_template*.py")))
+    for directory in source_dirs:
+        if not directory.exists():
+            continue
+        files.extend(sorted(directory.rglob("*.py")))
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for path in files:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        deduped.append(resolved)
+    return deduped
+
+
+def _plot_manifest_artifact_paths(run_root: Path) -> list[Path]:
+    def _is_notebook_plot_path(rel_path: str) -> bool:
+        parts = Path(rel_path).parts
+        if not parts:
+            return False
+        if parts[0] == "stage_a":
+            return len(parts) >= 2
+        if parts[0] == "stage_b":
+            return len(parts) >= 3
+        if parts[0] == "stage_b_summary":
+            return len(parts) >= 2
+        if parts[0] == "run_health":
+            return len(parts) >= 2
+        if parts[0] == "dataset":
+            return len(parts) >= 2
+        return False
+
+    plot_root = run_root / "outputs" / "plots"
+    payload, _inventory_source = load_inventory_payload(plot_root)
+    if not payload:
+        return []
+    artifacts: list[Path] = []
+    seen: set[Path] = set()
+    for entry in payload.get("plots", []):
+        hidden_keys = {
+            str(entry.get("name") or "").strip(),
+            str(entry.get("plot_id") or "").strip(),
+            str(entry.get("visual_plot_type") or "").strip(),
+        }
+        if any(key in HIDDEN_VISUAL_PLOT_TYPES for key in hidden_keys if key):
+            continue
+        rel_path = str(entry.get("path") or "").strip()
+        if not rel_path:
+            continue
+        if not _is_notebook_plot_path(rel_path):
+            continue
+        candidate = (plot_root / rel_path).resolve()
+        if not candidate.exists() or candidate in seen:
+            continue
+        seen.add(candidate)
+        artifacts.append(candidate)
+    return artifacts
+
+
+def _assert_plot_artifacts_are_fresh(*, run_root: Path) -> None:
+    artifact_paths = _plot_manifest_artifact_paths(run_root)
+    if not artifact_paths:
+        return
+    source_files = _notebook_render_source_files()
+    if not source_files:
+        return
+    newest_source = max(source_files, key=lambda path: path.stat().st_mtime)
+    newest_source_mtime = newest_source.stat().st_mtime
+    stale_artifacts = [path for path in artifact_paths if path.stat().st_mtime + 1.0 < newest_source_mtime]
+    if not stale_artifacts:
+        return
+    example_artifacts = ", ".join(f"`{path.name}`" for path in stale_artifacts[:3])
+    if len(stale_artifacts) > 3:
+        example_artifacts += ", ..."
+    raise RuntimeError(
+        "Plot artifacts are older than the current DenseGen/BaseRender rendering code. "
+        f"Newest render source: `{newest_source.name}`. Stale artifacts: {example_artifacts}. "
+        "Run `dense plot` before launching a fresh notebook."
+    )
+
+
+def _assert_notebook_plot_inventory_is_complete(
+    *,
+    run_root: Path,
+    config_path: Path | None = None,
+    root_cfg=None,
+) -> None:
+    plot_root = run_root / "outputs" / "plots"
+    try:
+        load_current_inventory_strict(
+            plot_root,
+            config_path=config_path,
+            root_cfg=root_cfg,
+        )
+    except ValueError as exc:
+        message = str(exc).strip() or "current_inventory.json is invalid"
+        raise RuntimeError(
+            "Notebook launch blocked: "
+            + message
+            + ". Regenerate plot and notebook artifacts with `dense plot` before launching the notebook."
+        ) from exc
+    else:
         return
 
 
@@ -263,7 +442,14 @@ def _resolve_notebook_records_path(*, loaded, run_root: Path, context: CliContex
         dataset = str(usr_cfg.dataset).strip()
         if not dataset:
             raise ValueError("output.usr.dataset must be a non-empty string")
-        usr_root = Path(resolve_usr_root_scoped_path(loaded.path, usr_cfg.root, label="output.usr.root"))
+        usr_root = Path(
+            resolve_usr_root_scoped_path(
+                loaded.path,
+                usr_cfg.root,
+                label="output.usr.root",
+                scope=usr_cfg.root_scope,
+            )
+        )
         return NotebookRecordsSource(
             source="usr",
             records_path=usr_root / dataset / "records.parquet",
@@ -304,9 +490,11 @@ def _sync_default_notebook_template(
     cfg_path: Path,
     notebook_path: Path,
     context: CliContext,
+    write: bool = True,
 ) -> bool:
     def _normalize_notebook_text(value: str) -> str:
-        return re.sub(r"(Notebook:\s+[^\n]*?)\s+\(mtime=[^)]+\)", r"\1", str(value))
+        normalized = re.sub(r"(Notebook:\s+[^\n]*?)\s+\(mtime=[^)]+\)", r"\1", str(value))
+        return re.sub(r"(`[^`\n]*outputs/notebooks/[^`\n]*?)\s+\(mtime=[^)]+\)", r"\1", normalized)
 
     records_source = _resolve_notebook_records_path(loaded=loaded, run_root=run_root, context=context)
     rendered_template = _render_notebook_template(
@@ -323,6 +511,8 @@ def _sync_default_notebook_template(
         return False
     if _normalize_notebook_text(current_text) == _normalize_notebook_text(rendered_template):
         return False
+    if not write:
+        return True
     notebook_path.parent.mkdir(parents=True, exist_ok=True)
     notebook_path.write_text(rendered_template)
     return True
@@ -429,7 +619,6 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
         )
         run_root = Path(context.run_root_for(loaded))
         notebook_path = Path(path).expanduser().resolve() if path is not None else _default_notebook_path(run_root)
-        template_refreshed = False
         if not notebook_path.exists():
             context.console.print(
                 f"[bold red]No notebook found:[/] {context.display_path(notebook_path, run_root, absolute=absolute)}"
@@ -441,20 +630,40 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
             raise typer.Exit(code=1)
         if path is None:
             try:
-                refreshed = _sync_default_notebook_template(
+                stale_template = _sync_default_notebook_template(
                     loaded=loaded,
                     run_root=run_root,
                     cfg_path=cfg_path,
                     notebook_path=notebook_path,
                     context=context,
+                    write=False,
                 )
-                template_refreshed = bool(refreshed)
             except Exception as exc:
-                context.console.print(f"[bold red]Failed to refresh notebook template:[/] {exc}")
+                context.console.print(f"[bold red]Failed to validate notebook template:[/] {exc}")
                 raise typer.Exit(code=1) from exc
-            if refreshed:
+            if stale_template:
                 notebook_label = context.display_path(notebook_path, run_root, absolute=absolute)
-                context.console.print(f"[yellow]Notebook template refreshed:[/] {notebook_label}")
+                context.console.print(
+                    "[bold red]Notebook launch blocked:[/] generated notebook is stale relative to the current "
+                    f"DenseGen notebook/template sources: {notebook_label}"
+                )
+                context.console.print("[bold]Next step[/]:")
+                context.console.print(
+                    context.workspace_command("dense notebook generate --force", cfg_path=cfg_path, run_root=run_root)
+                )
+                raise typer.Exit(code=1)
+        try:
+            _assert_notebook_plot_inventory_is_complete(
+                run_root=run_root,
+                config_path=loaded.path,
+                root_cfg=loaded.root,
+            )
+            _assert_plot_artifacts_are_fresh(run_root=run_root)
+        except RuntimeError as exc:
+            context.console.print(f"[bold red]{exc}[/]")
+            context.console.print("[bold]Next step[/]:")
+            context.console.print(context.workspace_command("dense plot", cfg_path=cfg_path, run_root=run_root))
+            raise typer.Exit(code=1) from exc
         try:
             _ensure_marimo_installed()
         except RuntimeError as exc:
@@ -500,10 +709,7 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
                         )
                     except Exception:
                         existing_notebook_matches = False
-            force_fresh_due_refresh = bool(
-                existing_server_reachable and existing_notebook_matches and template_refreshed
-            )
-            if existing_server_reachable and existing_notebook_matches and reuse_server and not force_fresh_due_refresh:
+            if existing_server_reachable and existing_notebook_matches and reuse_server:
                 context.console.print(
                     "[yellow]"
                     f"--port {port_value} is already serving this notebook "
@@ -515,81 +721,57 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
                         "[yellow]Browser did not open automatically; open the Notebook URL manually.[/]"
                     )
                 return
-            reclaimed_same_port = False
-            if (not reuse_server or force_fresh_due_refresh) and _release_workspace_notebook_port(
-                run_root=run_root,
-                host=host_value,
-                port=port_value,
-                notebook_path=notebook_path,
-            ):
-                if _port_is_available(host_value, port_value):
-                    reclaimed_same_port = True
+            if existing_server_reachable:
+                if existing_notebook_matches:
                     context.console.print(
                         "[yellow]"
-                        f"stale workspace server on --port {port_value} was stopped; restarting on the same port "
-                        "to keep notebook URLs stable.[/]"
+                        f"--port {port_value} is already serving this notebook on host {host_value}; "
+                        "launching a fresh server on a free port because --no-reuse-server is active.[/]"
                     )
                 else:
-                    context.console.print(
-                        "[yellow]"
-                        f"stale workspace server on --port {port_value} was stopped, but the port is still busy; "
-                        "launching a fresh server on a free port.[/]"
-                    )
-            if reclaimed_same_port:
-                browser_url = _format_http_url(host_value, port_value, for_browser=True)
-            else:
-                if existing_server_reachable:
-                    if force_fresh_due_refresh:
-                        context.console.print(
-                            "[yellow]"
-                            f"--port {port_value} is already serving this notebook on host {host_value}, "
-                            "but the notebook template was refreshed; launching a fresh server on a free port "
-                            "to avoid stale notebook state.[/]"
-                        )
-                    elif existing_notebook_matches:
-                        context.console.print(
-                            "[yellow]"
-                            f"--port {port_value} is already serving this notebook on host {host_value}; "
-                            "launching a fresh server on a free port because --no-reuse-server is active.[/]"
-                        )
-                    else:
-                        existing_note = ""
+                    existing_note = ""
+                    if existing_notebook_filename:
+                        existing_note = f" It currently serves `{existing_notebook_filename}`."
+                    if reuse_server:
                         if existing_notebook_filename:
-                            existing_note = f" It currently serves `{existing_notebook_filename}`."
-                        if reuse_server:
-                            if existing_notebook_filename:
-                                context.console.print(
-                                    "[yellow]"
-                                    f"--reuse-server requested but --port {port_value} serves a different notebook "
-                                    f"on host {host_value}; launching a fresh server on a free port."
-                                    f"{existing_note}[/]"
-                                )
-                            else:
-                                context.console.print(
-                                    "[yellow]"
-                                    f"--reuse-server requested but --port {port_value} notebook identity could not be "
-                                    f"verified on host {host_value}; launching a fresh server on a free port.[/]"
-                                )
+                            context.console.print(
+                                "[yellow]"
+                                f"--reuse-server requested but --port {port_value} serves a different notebook "
+                                f"on host {host_value}; launching a fresh server on a free port."
+                                f"{existing_note}[/]"
+                            )
                         else:
                             context.console.print(
                                 "[yellow]"
-                                f"--port {port_value} is already serving a notebook on host {host_value}; "
-                                "launching a fresh server on a free port. "
-                                "Use --reuse-server to attach when it is serving this notebook."
-                                f"{existing_note}[/]"
+                                f"--reuse-server requested but --port {port_value} notebook identity could not be "
+                                f"verified on host {host_value}; launching a fresh server on a free port.[/]"
                             )
-                replacement_port = _find_available_port(host_value)
-                if replacement_port is None or replacement_port <= 0:
-                    context.console.print(f"[bold red]No available port found on host {host_value}.[/]")
-                    context.console.print("[bold]Next step[/]: rerun with --port <free_port>.")
-                    raise typer.Exit(code=1)
+                    else:
+                        context.console.print(
+                            "[yellow]"
+                            f"--port {port_value} is already serving a notebook on host {host_value}; "
+                            "launching a fresh server on a free port. "
+                            "Use --reuse-server to attach when it is serving this notebook."
+                            f"{existing_note}[/]"
+                        )
+            else:
                 context.console.print(
                     "[yellow]"
                     f"--port {port_value} is already in use on host {host_value}; "
-                    f"switching to {replacement_port}.[/]"
+                    "launching a fresh server on a free port.[/]"
                 )
-                port_value = int(replacement_port)
-                browser_url = _format_http_url(host_value, port_value, for_browser=True)
+            replacement_port = _find_available_port(host_value)
+            if replacement_port is None or replacement_port <= 0:
+                context.console.print(f"[bold red]No available port found on host {host_value}.[/]")
+                context.console.print("[bold]Next step[/]: rerun with --port <free_port>.")
+                raise typer.Exit(code=1)
+            context.console.print(
+                "[yellow]"
+                f"--port {port_value} is already in use on host {host_value}; "
+                f"switching to {replacement_port}.[/]"
+            )
+            port_value = int(replacement_port)
+            browser_url = _format_http_url(host_value, port_value, for_browser=True)
         context.console.print(
             f"[bold]Launching marimo ({mode})[/]: {context.display_path(notebook_path, run_root, absolute=absolute)}"
         )
@@ -604,19 +786,6 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
         env.setdefault("MARIMO_SKIP_UPDATE_CHECK", "1")
         if mode == "run" and should_open_browser and sys.platform == "darwin":
             env.setdefault("BROWSER", "open")
-        started_pid: int | None = None
-
-        def _on_process_start(pid: int) -> None:
-            nonlocal started_pid
-            started_pid = int(pid)
-            if mode == "run":
-                _write_notebook_server_state(
-                    run_root=run_root,
-                    pid=int(pid),
-                    host=host_value,
-                    port=port_value,
-                    notebook_path=notebook_path,
-                )
 
         run_kwargs = {
             "command": command,
@@ -624,7 +793,6 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
             "browser_url": None,
             "open_timeout_seconds": open_timeout_value,
             "on_browser_open_failure": None,
-            "on_process_start": _on_process_start if mode == "run" else None,
         }
         try:
             try:
@@ -632,7 +800,6 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
             except TypeError as exc:
                 if "on_process_start" not in str(exc):
                     raise
-                run_kwargs.pop("on_process_start", None)
                 _run_marimo_command(**run_kwargs)
         except FileNotFoundError:
             context.console.print("[bold red]marimo CLI not found on PATH.[/]")
@@ -646,6 +813,3 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
                 context.console.print("[bold]Next step[/]:")
                 context.console.print(context.workspace_command(rerun_command, cfg_path=cfg_path, run_root=run_root))
             raise typer.Exit(code=1)
-        finally:
-            if mode == "run" and started_pid is not None and not _process_is_running(started_pid):
-                _clear_notebook_server_state(run_root=run_root)

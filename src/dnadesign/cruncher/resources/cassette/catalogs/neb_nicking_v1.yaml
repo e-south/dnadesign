@@ -1,7 +1,9 @@
-catalog_version: 1
+catalog_version: 3
 preset_id: neb_nicking_v1
+preset_ids:
+  - neb_nicking_v1
 generated_from: NEB public nicking enzyme resources
-generated_on: 2026-03-24
+generated_on: 2026-04-21
 normalization_policy: raw_cut_notation_is_authoritative
 
 variants:
@@ -11,8 +13,15 @@ variants:
     raw_cut_notation: GCTCTTC(1/none)
     vendor: NEB
     vendor_catalog_number: R0644
+    source_url: https://www.neb.com/en-us/products/r0644-ntbspqi
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: true
+      snapback_tier: tier1
+      commercial_confidence: primary_vendor_current
+    operational:
+      incubation_temp_c: 50
 
   - id: Nt.CviPII
     specificity_id: CviPII
@@ -20,44 +29,86 @@ variants:
     raw_cut_notation: CCD(-3/none)
     vendor: NEB
     vendor_catalog_number: R0626
+    source_url: https://www.neb.com/en-us/products/r0626-ntcvipii
     origin_class: naturally_occurring
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier3
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+        - FREQUENT_CUTTER
+    notes:
+      - Degenerate 3-base specificity is commercially real but usually too frequent for precise snapback placement.
 
   - id: Nt.BstNBI
     specificity_id: BstNBI
     motif_top_5to3: GAGTC
+    vendor_diagram_top_5to3: GAGTCNNNNN
     raw_cut_notation: GAGTC(4/none)
     vendor: NEB
     vendor_catalog_number: R0607
+    source_url: https://www.neb.com/en-us/products/r0607-ntbstnbi
     origin_class: naturally_occurring
     source_family: nicking_endonuclease
+    selection:
+      outside_site: true
+      snapback_tier: tier1
+      commercial_confidence: primary_vendor_current
 
   - id: Nb.BsrDI
     specificity_id: BsrDI
     motif_top_5to3: GCAATG
+    vendor_diagram_top_5to3: GCAATGNN
     raw_cut_notation: GCAATG(none/0)
     vendor: NEB
     vendor_catalog_number: R0648
+    source_url: https://www.neb.com/en-us/products/r0648-nbbsrdi
     origin_class: naturally_occurring
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
+    operational:
+      incubation_temp_c: 37
 
   - id: Nb.BtsI
     specificity_id: BtsI
     motif_top_5to3: GCAGTG
+    vendor_diagram_top_5to3: GCAGTGNN
     raw_cut_notation: GCAGTG(none/0)
     vendor: NEB
     vendor_catalog_number: R0707
+    source_url: https://www.neb.com/en-us/products/r0707-nbbtsi
     origin_class: naturally_occurring
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
+    operational:
+      incubation_temp_c: 37
 
   - id: Nt.AlwI
     specificity_id: AlwI
     motif_top_5to3: GGATC
+    vendor_diagram_top_5to3: GGATCNNNNN
     raw_cut_notation: GGATC(4/none)
     vendor: NEB
     vendor_catalog_number: R0627
+    source_url: https://www.neb.com/en-us/products/r0627-ntalwi
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: true
+      snapback_tier: tier1
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+        - DAM_METHYLATION_SENSITIVE
+    operational:
+      methylation_sensitivity:
+        dam: "yes"
 
   - id: Nb.BbvCI
     specificity_id: BbvCI
@@ -65,8 +116,13 @@ variants:
     raw_cut_notation: CCTCAGC(none/-2)
     vendor: NEB
     vendor_catalog_number: R0631
+    source_url: https://www.neb.com/en-us/products/r0631-nbbbvci
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
 
   - id: Nt.BbvCI
     specificity_id: BbvCI
@@ -74,8 +130,13 @@ variants:
     raw_cut_notation: CCTCAGC(-5/none)
     vendor: NEB
     vendor_catalog_number: R0632
+    source_url: https://www.neb.com/en-us/products/r0632-ntbbvci
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
 
   - id: Nb.BsmI
     specificity_id: BsmI
@@ -83,8 +144,21 @@ variants:
     raw_cut_notation: GAATGC(none/-1)
     vendor: NEB
     vendor_catalog_number: R0706
+    source_url: https://www.neb.com/en-us/products/r0706-nbbsmi
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier3
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+        - STAR_ACTIVITY_RISK
+        - DOUBLE_STRAND_CLEAVAGE_RISK
+    operational:
+      star_activity_warning: true
+      double_strand_cleavage_warning: true
+    notes:
+      - NEB warns that some buffers or long incubations can yield star activity and both-strand cleavage.
 
   - id: Nb.BssSI
     specificity_id: BssSI
@@ -92,19 +166,35 @@ variants:
     raw_cut_notation: CACGAG(none/-1)
     vendor: NEB
     vendor_catalog_number: R0681
+    source_url: https://www.neb.com/en-us/products/r0681-nbbsssi
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: false
+      snapback_tier: tier2
+      commercial_confidence: primary_vendor_current
     notes:
       - NEB notes a more robust related enzyme BssSI-v2 for the wild-type specificity, but this preset keeps the nicking variant entry as listed.
 
   - id: Nt.BsmAI
     specificity_id: BsmAI
     motif_top_5to3: GTCTC
+    vendor_diagram_top_5to3: GTCTCNN
     raw_cut_notation: GTCTC(1/none)
     vendor: NEB
     vendor_catalog_number: R0121
+    source_url: https://www.neb.com/en-us/products/r0121-ntbsmai
     origin_class: engineered
     source_family: nicking_endonuclease
+    selection:
+      outside_site: true
+      snapback_tier: tier1
+      commercial_confidence: primary_vendor_current
+      warning_codes:
+        - CPG_METHYLATION_SENSITIVE
+    operational:
+      methylation_sensitivity:
+        CpG: "yes"
 
 product_aliases:
   - alias_id: WarmStart Nt.BstNBI
@@ -115,3 +205,62 @@ product_aliases:
     notes:
       - WarmStart formulation of Nt.BstNBI, not a distinct catalytic recognition or cut rule.
       - NEB states the WarmStart formulation is inactive below 40 C due to aptamer-based inhibition.
+
+  - alias_id: Yeasen Nt.BstNBI
+    canonical_variant_id: Nt.BstNBI
+    vendor: Yeasen
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nt.BstNBI catalytic specificity.
+
+  - alias_id: Assay Biotechnology Nt.BstNBI
+    canonical_variant_id: Nt.BstNBI
+    vendor: Assay Biotechnology
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nt.BstNBI catalytic specificity.
+
+  - alias_id: ABM Nt.BstNBI
+    canonical_variant_id: Nt.BstNBI
+    vendor: ABM
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nt.BstNBI catalytic specificity.
+
+  - alias_id: SibEnzyme N.Bst9 I
+    canonical_variant_id: Nt.BstNBI
+    vendor: SibEnzyme
+    vendor_catalog_number: E401/E402
+    source_url: https://sibenzyme.com/product/n-bst9-i/
+    alias_kind: alternate_vendor
+    notes:
+      - SibEnzyme sells N.Bst9 I with the site diagram GAGTCNNNN^NN, matching the Nt.BstNBI-family outside-site top-strand nick geometry.
+      - SibEnzyme's current export price list also places N.Bst9 I in the Nickase section.
+
+  - alias_id: Assay Biotechnology Nt.BspQI
+    canonical_variant_id: Nt.BspQI
+    vendor: Assay Biotechnology
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nt.BspQI catalytic specificity.
+
+  - alias_id: Yeasen Nb.BbvCI
+    canonical_variant_id: Nb.BbvCI
+    vendor: Yeasen
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nb.BbvCI catalytic specificity.
+
+  - alias_id: NZYtech Nt.BbvCI
+    canonical_variant_id: Nt.BbvCI
+    vendor: NZYtech
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nt.BbvCI catalytic specificity.
+
+  - alias_id: Assay Biotechnology Nb.BsrDI
+    canonical_variant_id: Nb.BsrDI
+    vendor: Assay Biotechnology
+    alias_kind: alternate_vendor
+    notes:
+      - Alternate supplier for the same Nb.BsrDI catalytic specificity.

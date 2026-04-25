@@ -70,6 +70,15 @@ def test_resolve_baserender_export_destination_normalizes_format_suffix(tmp_path
     assert destination == tmp_path / "outputs" / "notebooks" / "baserender_preview.pdf"
 
 
+def test_resolve_baserender_export_destination_accepts_svg_format(tmp_path: Path) -> None:
+    destination = resolve_baserender_export_destination(
+        raw_path="outputs/notebooks/baserender_preview.png",
+        selected_format="svg",
+        run_root=tmp_path,
+    )
+    assert destination == tmp_path / "outputs" / "notebooks" / "baserender_preview.svg"
+
+
 def test_resolve_baserender_export_destination_uses_repo_root_for_relative_paths_when_provided(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     run_root = repo_root / "src" / "dnadesign" / "densegen" / "workspaces" / "demo"
@@ -92,9 +101,9 @@ def test_resolve_baserender_export_destination_rejects_empty_path(tmp_path: Path
 
 
 def test_resolve_baserender_export_destination_rejects_unknown_format(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="BaseRender export format must be png or pdf"):
+    with pytest.raises(ValueError, match="BaseRender export format must be png, pdf, or svg"):
         resolve_baserender_export_destination(
             raw_path=str(Path("/tmp") / "baserender_preview.png"),
-            selected_format="svg",
+            selected_format="eps",
             run_root=tmp_path,
         )

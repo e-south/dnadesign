@@ -15,10 +15,19 @@ For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap]
 
 ### Path policy
 
-- Keep one canonical uv environment at `<dnadesign_repo>/.venv`.
+- Keep one active uv environment at `<dnadesign_repo>/.venv` for the current
+  GPU-family contract.
 - Keep `evo2_7b` and `evo2_20b` caches on `/project`, with one explicit root per model.
 - Keep `HF_HOME` pointed at the active model-specific cache root.
 - Keep runtime transients inside infer workspace `outputs/runtime/...`.
+
+Pragmatic portability note:
+
+- A single `.venv` is fine while current work stays on one GPU family.
+- Once `flash-attn` is built from source, do not assume that environment is
+  portable across Hopper, Blackwell, and smaller GPU families.
+- Treat a working `.venv` as family-bound until a real `infer extract` smoke
+  proves otherwise on the target family.
 
 ### Lockfile preflight
 
@@ -92,7 +101,7 @@ if model_id == "evo2_20b" and gpu_cc_tuple < (9, 0):
         file=sys.stderr,
     )
     print(
-        "Use gpu_c=9.0 on SCC and schedule onto a Hopper lane such as H200 for evo2_20b.",
+        "Use gpu_c=9.0 as the generic evo2_20b model floor on SCC. For the current Blackwell-pinned dnadesign environment, request gpu_t=RTXP6000 and gpu_c=12.0.",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -138,7 +147,17 @@ PY
 
 This SCC runbook documents the promoted Evo2 lane set for `infer`: `evo2_7b` and `evo2_20b`. A 400B model is out of scope for this stack and is not a supported `model.id`.
 
-Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b` only on Hopper/H200 with `gpu_c=9.0`.
+Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b`
+only on GPU lanes that satisfy `gpu_c >= 9.0`; H200 is common on SCC, but
+newer higher-capability lanes also qualify when memory is sufficient. When the
+current `.venv` is family-pinned, add an exact selector; on the current SCC
+probe surface, the visible Blackwell lane is `gpu_t=RTXP6000` with
+`gpu_c=12.0`.
+
+Model fit and environment portability are separate. Passing the capacity gate
+does not prove that the current `.venv` can execute there. If this environment
+was built on a different GPU family, require a real `infer extract` smoke on
+the landed family before trusting batch portability.
 
 ### Setup and verification steps
 
@@ -149,7 +168,7 @@ module purge # Clear inherited module state before deterministic loads.
 module load cuda/12.8 # Load CUDA toolchain for torch/flash-attn builds.
 module load gcc/13.2.0 # Load compiler toolchain compatible with CUDA build flow.
 
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv" # Use a single canonical uv environment path.
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv" # Use the active uv environment path for the current GPU family.
 export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/workspaces/demo_usr_pressure # Pin infer workspace root.
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}" # Keep runtime artifacts workspace-scoped.
 export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}" # Default to the 7B SCC lane.
@@ -217,6 +236,7 @@ import importlib.metadata as im
 import torch
 
 required_dist = ("torch", "transformer-engine", "flash-attn", "evo2", "vtx")
+required_modules = ("transformer_engine.pytorch", "flash_attn", "evo2", "vortex")
 missing = []
 
 print("cuda_available", torch.cuda.is_available())
@@ -226,7 +246,7 @@ for name in required_dist:
     except Exception:
         missing.append(f"missing_dist:{name}")
 
-for module_name in ("transformer_engine.pytorch", "flash_attn", "evo2"):
+for module_name in required_modules:
     try:
         importlib.import_module(module_name)
         print(module_name, "import_ok")
@@ -256,14 +276,57 @@ uv run infer extract \
   --no-progress
 ```
 
+Do not replace the real extract smoke above with `infer validate config` or
+`infer run --dry-run`. Those are necessary config checks, but they do not prove
+that the compiled CUDA extension stack is portable to the current GPU family.
+
+### First real write-back gate
+
+Treat live study collection as four explicit gates:
+
+1. the checked-in study snapshot is current
+2. the study preflight is green on the current host
+3. Evo2 actually imports and loads on the live GPU host
+4. the canonical USR `infer` namespace is registered before first write-back
+
+For study-owned USR write-back lanes, run:
+
+```bash
+uv run ops progress show usr.data-plane.promoter-study-status --json # Confirm the checked-in study snapshot is current.
+NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json # Confirm the current host is execution-ready.
+uv run infer validate usr-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
+uv run usr --root src/dnadesign/usr/datasets namespace show infer # Confirm the shared USR root already knows the infer namespace.
+```
+
+If `namespace show infer` fails, use the register command emitted by
+`infer validate usr-registry` before the first real write-back.
+
+### First live signals on a GPU node
+
+For `evo2_20b`, a healthy cold start can sit for a short window in
+`fetch -> weight hydration -> GPU residency -> first attach events` before the
+target dataset shows new rows in its event stream.
+
+Before declaring the run hung, check:
+
+- `nvidia-smi` shows the infer process and rising or stable memory residency
+- the target dataset `.events.log` gains `attach` events with `completed_rows`
+- the watcher cursor advances if Notify is following the same stream
+- the watcher spool remains empty
+
+For study-owned interactive watchers on an existing event stream, seed the
+cursor to the current `.events.log` size before `notify usr-events watch
+--follow` unless replay is intentional.
+
 ### API pressure checks (forward, embeddings, generation)
 
 Use these checks to verify Evo2 usage contracts in infer:
 
 - logits/embedding pooling uses sequence dimension with `pool.dim=1`.
 - `pool.dim=0` is rejected to avoid consuming batch axis.
-- `evo2.embedding` defaults to the canonical selector `block26_mlp_out` when `params.layer` is omitted.
-- `block26_mlp_out` maps to the current provider layer path `blocks.26.mlp.l3`.
+- `evo2.embedding` defaults to a model-aware selector when `params.layer` is omitted.
+- `evo2_7b` defaults to `block26_mlp_out`, which maps to `blocks.26.mlp.l3`.
+- `evo2_20b` defaults to `block23_mlp_out`, which maps to `blocks.23.mlp.l3`.
 - `params.layer: mid` resolves to the default pooled embedding layer.
 - `params.layer: final` resolves to the last Evo2 embedding block exposed by the loaded torch module.
 - set `params.layer` to an explicit adapter-specific name only when you need a particular block.

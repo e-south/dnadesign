@@ -193,7 +193,7 @@ def test_machine_runbooks_match_supported_workflow_contract() -> None:
             )
 
 
-def test_machine_runbook_study_steps_include_human_readable_descriptions() -> None:
+def test_machine_runbook_study_steps_include_readable_descriptions() -> None:
     root = _workspace_root()
     for config_path in sorted(root.glob("*/configs/config.yaml")):
         workspace = config_path.parent.parent

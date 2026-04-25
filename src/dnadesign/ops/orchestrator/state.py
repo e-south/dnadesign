@@ -31,6 +31,10 @@ SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
 ResumeState = Literal["none", "resume_ready", "partial"]
 _OPS_IDENTITY_KEYS = ("ops_run_group_id", "ops_workspace_id", "ops_workflow_id")
 _SCHEDULER_PROBE_TIMEOUT_SECONDS = 10.0
+_SUBMIT_HOST_DENIED_TOKENS = (
+    "is no submit host",
+    "neither submit nor admin host",
+)
 
 
 def _run_probe(argv: Sequence[str]) -> tuple[int, str, str]:
@@ -74,6 +78,7 @@ def _short_digest(*parts: object, length: int = 12) -> str:
 class SchedulerProbeState(StrEnum):
     SKIPPED = "skipped"
     OK = "ok"
+    HOST_DENIED = "host_denied"
     UNAVAILABLE = "unavailable"
     UNSUPPORTED = "unsupported"
     ERROR = "error"
@@ -273,6 +278,11 @@ def _default_runtime_visibility_for_job_ids(job_ids: Sequence[str]) -> RuntimeVi
     )
 
 
+def _is_submit_host_denied_message(message: str) -> bool:
+    normalized = str(message or "").strip().lower()
+    return any(token in normalized for token in _SUBMIT_HOST_DENIED_TOKENS)
+
+
 def default_runtime_visibility() -> RuntimeVisibility:
     return _default_runtime_visibility_for_job_ids(())
 
@@ -303,12 +313,17 @@ def probe_active_jobs_for_runbook(
     return_code, stdout, stderr = _run_probe(("qstat", "-u", user))
     if return_code != 0:
         message = stderr.strip() or stdout.strip() or "qstat -u failed"
+        probe_state = (
+            SchedulerProbeState.HOST_DENIED
+            if _is_submit_host_denied_message(message)
+            else SchedulerProbeState.UNAVAILABLE
+        )
         return ActiveJobResolution(
             explicit_job_ids=(),
             discovered_job_ids=(),
             effective_job_ids=(),
             runtime_visibility=RuntimeVisibility(
-                scheduler_probe_state=SchedulerProbeState.UNAVAILABLE,
+                scheduler_probe_state=probe_state,
                 active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
                 degraded=True,
                 degraded_reasons=(message,),
@@ -409,12 +424,17 @@ def resolve_active_job_resolution(
             runtime_visibility=exc.runtime_visibility,
         )
     except RuntimeError as exc:
+        probe_state = (
+            SchedulerProbeState.HOST_DENIED
+            if _is_submit_host_denied_message(str(exc))
+            else SchedulerProbeState.UNAVAILABLE
+        )
         auto_resolution = ActiveJobResolution(
             explicit_job_ids=(),
             discovered_job_ids=(),
             effective_job_ids=(),
             runtime_visibility=RuntimeVisibility(
-                scheduler_probe_state=SchedulerProbeState.UNAVAILABLE,
+                scheduler_probe_state=probe_state,
                 active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
                 degraded=True,
                 degraded_reasons=(str(exc),),
@@ -721,7 +741,10 @@ def resolve_mode_decision(
             submit_behavior = "blocked"
             reason = f"{reason}; active_jobs_detected; submission_blocked_by_policy"
     elif selected_runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN:
-        if allow_unknown_active_jobs:
+        if selected_runtime_visibility.scheduler_probe_state == SchedulerProbeState.HOST_DENIED:
+            submit_behavior = "blocked"
+            reason = f"{reason}; current_host_not_submit_host"
+        elif allow_unknown_active_jobs:
             reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
         else:
             submit_behavior = "blocked"

@@ -46,7 +46,7 @@ def test_summarize_tool_coverage_aggregates_by_tool() -> None:
 def test_summarize_tool_coverage_handles_windows_style_paths() -> None:
     coverage_data = {
         "files": {
-            r"src\dnadesign\usr\src\io.py": {"summary": {"covered_lines": 9, "num_statements": 10}},
+            r"src\dnadesign\usr\src\storage\parquet.py": {"summary": {"covered_lines": 9, "num_statements": 10}},
         }
     }
 
@@ -69,7 +69,7 @@ def test_find_regressions_reports_only_tools_below_baseline() -> None:
 
 def test_main_exits_nonzero_on_regression(tmp_path: Path) -> None:
     coverage_json = {
-        "files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 50, "num_statements": 100}}}
+        "files": {"src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 50, "num_statements": 100}}}
     }
     baseline_json = {"usr": 80.0}
 
@@ -92,7 +92,7 @@ def test_main_exits_nonzero_on_regression(tmp_path: Path) -> None:
 
 def test_main_exits_zero_when_meeting_baseline(tmp_path: Path) -> None:
     coverage_json = {
-        "files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
+        "files": {"src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
     }
     baseline_json = {"usr": 80.0, "densegen": 0.0}
 
@@ -115,7 +115,7 @@ def test_main_exits_zero_when_meeting_baseline(tmp_path: Path) -> None:
 
 def test_main_scopes_baselines_when_only_tools_is_set(tmp_path: Path) -> None:
     coverage_json = {
-        "files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
+        "files": {"src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
     }
     baseline_json = {"usr": 80.0, "densegen": 70.0}
 
@@ -140,7 +140,7 @@ def test_main_scopes_baselines_when_only_tools_is_set(tmp_path: Path) -> None:
 
 def test_main_fails_when_only_tools_has_unknown_tool(tmp_path: Path) -> None:
     coverage_json = {
-        "files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
+        "files": {"src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
     }
     baseline_json = {"usr": 80.0}
 
@@ -183,7 +183,7 @@ def test_main_fails_for_invalid_coverage_json(tmp_path: Path) -> None:
 
 def test_main_fails_for_out_of_range_baseline_value(tmp_path: Path) -> None:
     coverage_json = {
-        "files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
+        "files": {"src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 90, "num_statements": 100}}}
     }
     coverage_path = tmp_path / "coverage.json"
     baseline_path = tmp_path / "tool-coverage-baseline.json"
@@ -224,7 +224,10 @@ def test_main_fails_for_invalid_file_summary_payload(tmp_path: Path) -> None:
     coverage_path = tmp_path / "coverage.json"
     baseline_path = tmp_path / "tool-coverage-baseline.json"
     coverage_path.write_text(
-        '{"files": {"src/dnadesign/usr/src/io.py": {"summary": {"covered_lines": "bad", "num_statements": 10}}}}',
+        (
+            '{"files": {"src/dnadesign/usr/src/storage/parquet.py": '
+            '{"summary": {"covered_lines": "bad", "num_statements": 10}}}}'
+        ),
         encoding="utf-8",
     )
     baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")

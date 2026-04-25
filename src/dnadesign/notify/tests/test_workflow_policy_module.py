@@ -55,6 +55,12 @@ def test_construct_policy_defaults_are_scoped_to_construct_events() -> None:
     assert defaults["only_tools"] == "construct"
 
 
+def test_infer_policy_defaults_include_overlay_part_progress_events() -> None:
+    defaults = policy_defaults("infer")
+    assert defaults["only_actions"] == "attach,write_overlay_part,materialize"
+    assert defaults["only_tools"] == "infer"
+
+
 def test_register_workflow_policy_supports_custom_policy_with_alias() -> None:
     register_workflow_policy(
         policy="custom_policy",

@@ -89,6 +89,52 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def _explode_used_from_composition(composition_df: pd.DataFrame) -> pd.DataFrame:
+    if composition_df is None or composition_df.empty:
+        return pd.DataFrame()
+    required = {"solution_id", "input_name", "plan_name", "tf", "tfbs", "library_hash"}
+    missing = sorted(required - set(composition_df.columns))
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns for usage fallback: {missing}")
+
+    records: list[dict[str, Any]] = []
+    for _, row in composition_df.iterrows():
+        solution_id = str(row.get("solution_id") or "").strip()
+        input_name = str(row.get("input_name") or "").strip()
+        plan_name = str(row.get("plan_name") or "").strip()
+        library_hash = str(row.get("library_hash") or "").strip()
+        regulator = str(row.get("tf") or "").strip()
+        sequence = str(row.get("tfbs") or "").strip()
+        if not solution_id or not library_hash or not regulator or not sequence:
+            continue
+        library_index_raw = row.get("library_index")
+        try:
+            library_index = int(library_index_raw) if library_index_raw is not None else 0
+        except Exception:
+            library_index = 0
+        records.append(
+            {
+                "solution_id": solution_id,
+                "library_hash": library_hash,
+                "library_index": library_index,
+                "plan": plan_name,
+                "input_name": input_name,
+                "tf": regulator,
+                "tfbs": sequence,
+                "motif_id": row.get("motif_id"),
+                "tfbs_id": row.get("tfbs_id"),
+                "orientation": row.get("orientation"),
+                "offset": row.get("offset"),
+                "length": row.get("length"),
+                "end": row.get("end"),
+                "site_id": row.get("site_id"),
+                "source": row.get("source"),
+                "required_regulators": None,
+            }
+        )
+    return pd.DataFrame(records)
+
+
 def _explode_library_from_attempts(attempts_df: pd.DataFrame) -> pd.DataFrame:
     if attempts_df is None or attempts_df.empty:
         return pd.DataFrame(

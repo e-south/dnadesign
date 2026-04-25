@@ -15,7 +15,6 @@ import importlib
 import json
 import logging
 import multiprocessing
-import shutil
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -48,6 +47,22 @@ from dnadesign.cruncher.app.study.trial_progress import (
     _trial_run_is_complete,
     _TrialWorkerProcess,
 )
+from dnadesign.cruncher.app.study_postprocess import (
+    _finalize_study_completion as _finalize_study_completion_helper,
+)
+from dnadesign.cruncher.app.study_postprocess import (
+    _maybe_summarize_study as _maybe_summarize_study_helper,
+)
+from dnadesign.cruncher.app.study_postprocess import (
+    _run_study_replays as _run_study_replays_helper,
+)
+from dnadesign.cruncher.app.study_state import (
+    _finalize_trial_run,
+    _mark_trial_run_started,
+    _persist_study_state,
+    _prepare_study_run_dir,
+    _refresh_status,
+)
 from dnadesign.cruncher.app.study_summary import summarize_study_run
 from dnadesign.cruncher.app.target_service import has_blocking_target_errors, target_statuses
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_yaml
@@ -73,10 +88,7 @@ from dnadesign.cruncher.study.manifest import (
     StudyTrialRun,
     load_study_manifest,
     load_study_status,
-    summarize_trial_statuses,
     utc_now_iso,
-    write_study_manifest,
-    write_study_status,
 )
 from dnadesign.cruncher.study.overrides import apply_dotpath_overrides
 from dnadesign.cruncher.study.schema_models import StudySpec, StudyTrial
@@ -219,38 +231,75 @@ def _merge_resume_state(expected: list[StudyTrialRun], existing: list[StudyTrial
     return merged
 
 
-def _refresh_status(
-    status: StudyStatusV1,
-    manifest: StudyManifestV1,
-    *,
-    final: bool = False,
-    failed: bool = False,
-) -> None:
-    counts = summarize_trial_statuses(manifest.trial_runs)
-    status.total_runs = int(counts["total_runs"])
-    status.pending_runs = int(counts["pending_runs"])
-    status.running_runs = int(counts["running_runs"])
-    status.success_runs = int(counts["success_runs"])
-    status.error_runs = int(counts["error_runs"])
-    status.skipped_runs = int(counts["skipped_runs"])
-    if failed:
-        status.status = "failed"
-    elif status.running_runs > 0:
-        status.status = "running"
-    elif status.error_runs > 0:
-        status.status = "completed_with_errors"
-    else:
-        status.status = "completed"
-    status.updated_at = utc_now_iso()
-    if final:
-        status.finished_at = utc_now_iso()
-
-
 def _append_log(study_run_dir: Path, message: str) -> None:
     log_path = study_log_path(study_run_dir)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(message.rstrip() + "\n")
+
+
+def _run_study_replays(
+    *,
+    bootstrap: _StudyBootstrap,
+    manifest: StudyManifestV1,
+    status: StudyStatusV1,
+    aborted: bool,
+    on_event: StudyEventCallback | None,
+) -> tuple[bool, bool]:
+    return _run_study_replays_helper(
+        bootstrap=bootstrap,
+        manifest=manifest,
+        status=status,
+        aborted=aborted,
+        on_event=on_event,
+        emit_event_fn=_emit_study_event,
+        append_log_fn=_append_log,
+        run_mmr_sweep_fn=run_mmr_sweep_for_run,
+        refresh_status_fn=_refresh_status,
+        persist_state_fn=_persist_study_state,
+        mark_pending_as_skipped_fn=_mark_pending_as_skipped,
+    )
+
+
+def _maybe_summarize_study(
+    *,
+    bootstrap: _StudyBootstrap,
+    manifest: StudyManifestV1,
+    status: StudyStatusV1,
+    on_event: StudyEventCallback | None,
+) -> None:
+    _maybe_summarize_study_helper(
+        bootstrap=bootstrap,
+        manifest=manifest,
+        status=status,
+        on_event=on_event,
+        emit_event_fn=_emit_study_event,
+        append_log_fn=_append_log,
+        summarize_study_run_fn=summarize_study_run,
+        persist_state_fn=_persist_study_state,
+    )
+
+
+def _finalize_study_completion(
+    *,
+    bootstrap: _StudyBootstrap,
+    manifest: StudyManifestV1,
+    status: StudyStatusV1,
+    aborted: bool,
+    fatal_exc: Exception | None,
+    on_event: StudyEventCallback | None,
+) -> None:
+    _finalize_study_completion_helper(
+        bootstrap=bootstrap,
+        manifest=manifest,
+        status=status,
+        aborted=aborted,
+        fatal_exc=fatal_exc,
+        on_event=on_event,
+        emit_event_fn=_emit_study_event,
+        refresh_status_fn=_refresh_status,
+        persist_state_fn=_persist_study_state,
+    )
 
 
 def _run_one_trial(
@@ -462,18 +511,6 @@ def _bootstrap_study_inputs(spec_path: Path) -> _StudyBootstrap:
     )
 
 
-def _prepare_study_run_dir(*, study_run_dir: Path, resume: bool, force_overwrite: bool) -> None:
-    if study_run_dir.exists():
-        if force_overwrite:
-            shutil.rmtree(study_run_dir)
-            return
-        if not resume:
-            raise ValueError(f"Study run directory already exists: {study_run_dir}. Use --resume or --force-overwrite.")
-        return
-    if resume:
-        raise FileNotFoundError(f"Cannot resume missing study run directory: {study_run_dir}")
-
-
 def _initialize_study_state(
     *,
     bootstrap: _StudyBootstrap,
@@ -520,17 +557,6 @@ def _initialize_study_state(
         updated_at=utc_now_iso(),
     )
     return manifest, status
-
-
-def _persist_study_state(
-    *,
-    manifest_file: Path,
-    status_file: Path,
-    manifest: StudyManifestV1,
-    status: StudyStatusV1,
-) -> None:
-    write_study_manifest(manifest_file, manifest)
-    write_study_status(status_file, status)
 
 
 def _run_study_trials(
@@ -582,17 +608,12 @@ def _run_study_trials_serial(
     for idx, trial_run in enumerate(manifest.trial_runs):
         if _trial_run_is_complete(trial_run):
             continue
-        trial_run.status = "running"
-        trial_run.error = None
-        trial_run.started_at = utc_now_iso()
-        trial_run.finished_at = None
-        manifest.trial_runs[idx] = trial_run
-        _refresh_status(status, manifest)
-        _persist_study_state(
+        trial_run = _mark_trial_run_started(
             manifest_file=bootstrap.manifest_file,
             status_file=bootstrap.status_file,
             manifest=manifest,
             status=status,
+            trial_index=idx,
         )
         _emit_study_trial_progress(
             on_event,
@@ -633,14 +654,13 @@ def _run_study_trials_serial(
             if bootstrap.spec.execution.on_trial_error == "abort":
                 aborted = True
         finally:
-            trial_run.finished_at = utc_now_iso()
-            manifest.trial_runs[idx] = trial_run
-            _refresh_status(status, manifest)
-            _persist_study_state(
+            trial_run = _finalize_trial_run(
                 manifest_file=bootstrap.manifest_file,
                 status_file=bootstrap.status_file,
                 manifest=manifest,
                 status=status,
+                trial_index=idx,
+                trial_run=trial_run,
             )
             _emit_study_trial_progress(
                 on_event,
@@ -691,18 +711,12 @@ def _spawn_parallel_trial_worker(
     ctx: multiprocessing.context.BaseContext,
     worker_target: Callable[..., None],
 ) -> _TrialWorkerProcess:
-    trial_run = manifest.trial_runs[trial_index]
-    trial_run.status = "running"
-    trial_run.error = None
-    trial_run.started_at = utc_now_iso()
-    trial_run.finished_at = None
-    manifest.trial_runs[trial_index] = trial_run
-    _refresh_status(status, manifest)
-    _persist_study_state(
+    trial_run = _mark_trial_run_started(
         manifest_file=bootstrap.manifest_file,
         status_file=bootstrap.status_file,
         manifest=manifest,
         status=status,
+        trial_index=trial_index,
     )
     _append_log(
         bootstrap.study_run_dir,
@@ -773,14 +787,13 @@ def _finalize_parallel_trial_worker(
         if bootstrap.spec.execution.on_trial_error == "abort":
             aborted = True
     finally:
-        trial_run.finished_at = utc_now_iso()
-        manifest.trial_runs[trial_index] = trial_run
-        _refresh_status(status, manifest)
-        _persist_study_state(
+        _finalize_trial_run(
             manifest_file=bootstrap.manifest_file,
             status_file=bootstrap.status_file,
             manifest=manifest,
             status=status,
+            trial_index=trial_index,
+            trial_run=trial_run,
         )
     return any_errors, aborted
 
@@ -935,123 +948,6 @@ def _run_study_trials_parallel(
     return any_errors, aborted
 
 
-def _run_study_replays(
-    *,
-    bootstrap: _StudyBootstrap,
-    manifest: StudyManifestV1,
-    status: StudyStatusV1,
-    aborted: bool,
-    on_event: StudyEventCallback | None,
-) -> tuple[bool, bool]:
-    any_errors = False
-    if not bootstrap.spec.replays.mmr_sweep.enabled or aborted:
-        return any_errors, aborted
-    replay_candidates = [item for item in manifest.trial_runs if item.status == "success" and bool(item.run_dir)]
-    total_replays = len(replay_candidates)
-    _emit_study_event(on_event, "study_replay_phase_started", total_runs=int(total_replays))
-    logger.info("Study replay phase starting: %d successful trial run(s).", total_replays)
-    _append_log(
-        bootstrap.study_run_dir,
-        f"REPLAY_START total={total_replays}",
-    )
-    completed = 0
-    for idx, trial_run in enumerate(manifest.trial_runs):
-        if trial_run.status != "success" or not trial_run.run_dir:
-            continue
-        run_dir = Path(trial_run.run_dir)
-        logger.info(
-            "Study replay run %d/%d: trial=%s seed=%d target_set=%d",
-            completed + 1,
-            total_replays,
-            trial_run.trial_id,
-            int(trial_run.seed),
-            int(trial_run.target_set_index),
-        )
-        try:
-            run_mmr_sweep_for_run(
-                run_dir,
-                pool_size_values=bootstrap.spec.replays.mmr_sweep.pool_size_values,
-                diversity_values=bootstrap.spec.replays.mmr_sweep.diversity_values,
-            )
-            completed += 1
-            _emit_study_event(
-                on_event,
-                "study_replay_progress",
-                completed_runs=int(completed),
-                total_runs=int(total_replays),
-            )
-            _append_log(
-                bootstrap.study_run_dir,
-                f"REPLAY_DONE trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}",
-            )
-        except Exception as exc:
-            any_errors = True
-            trial_run.status = "error"
-            trial_run.error = f"MMR replay failed: {exc}"
-            trial_run.finished_at = utc_now_iso()
-            manifest.trial_runs[idx] = trial_run
-            _append_log(
-                bootstrap.study_run_dir,
-                "ERROR replay "
-                f"trial={trial_run.trial_id} seed={trial_run.seed} "
-                f"target_set={trial_run.target_set_index}: {exc}",
-            )
-            _refresh_status(status, manifest)
-            _persist_study_state(
-                manifest_file=bootstrap.manifest_file,
-                status_file=bootstrap.status_file,
-                manifest=manifest,
-                status=status,
-            )
-            if bootstrap.spec.execution.on_trial_error == "abort":
-                aborted = True
-                _mark_pending_as_skipped(
-                    manifest,
-                    reason="Skipped because execution aborted after replay error.",
-                )
-                break
-    logger.info("Study replay phase complete: %d/%d replay run(s) finished.", completed, total_replays)
-    _emit_study_event(
-        on_event,
-        "study_replay_phase_completed",
-        completed_runs=int(completed),
-        total_runs=int(total_replays),
-        aborted=bool(aborted),
-    )
-    return any_errors, aborted
-
-
-def _maybe_summarize_study(
-    *,
-    bootstrap: _StudyBootstrap,
-    manifest: StudyManifestV1,
-    status: StudyStatusV1,
-    on_event: StudyEventCallback | None,
-) -> None:
-    if not bootstrap.spec.execution.summarize_after_run:
-        _emit_study_event(on_event, "study_summarize_skipped", reason="summarize_after_run=false")
-        return
-    has_non_success = any(item.status != "success" for item in manifest.trial_runs)
-    if has_non_success:
-        warning = (
-            "Summary skipped due trial errors. "
-            "Run `cruncher study summarize --allow-partial --run <study_run_dir>` to summarize successes."
-        )
-        if warning not in status.warnings:
-            status.warnings.append(warning)
-        status.updated_at = utc_now_iso()
-        write_study_status(bootstrap.status_file, status)
-        _emit_study_event(on_event, "study_summarize_skipped", reason="non_success_trial_status")
-        return
-    _emit_study_event(on_event, "study_summarize_phase_started")
-    logger.info("Study summarize phase starting.")
-    _append_log(bootstrap.study_run_dir, "SUMMARIZE_START")
-    summarize_study_run(bootstrap.study_run_dir, allow_partial=False)
-    _append_log(bootstrap.study_run_dir, "SUMMARIZE_DONE")
-    logger.info("Study summarize phase complete.")
-    _emit_study_event(on_event, "study_summarize_phase_completed")
-
-
 def run_study(
     spec_path: Path,
     *,
@@ -1108,26 +1004,13 @@ def run_study(
     except Exception as exc:
         fatal_exc = exc
     finally:
-        _refresh_status(status, manifest, final=True, failed=aborted or fatal_exc is not None)
-        _persist_study_state(
-            manifest_file=bootstrap.manifest_file,
-            status_file=bootstrap.status_file,
+        _finalize_study_completion(
+            bootstrap=bootstrap,
             manifest=manifest,
             status=status,
-        )
-        _emit_study_event(
-            on_event,
-            "study_completed",
-            study_name=manifest.study_name,
-            study_id=manifest.study_id,
-            status=status.status,
-            total_runs=int(status.total_runs),
-            success_runs=int(status.success_runs),
-            error_runs=int(status.error_runs),
-            skipped_runs=int(status.skipped_runs),
-            pending_runs=int(status.pending_runs),
-            running_runs=int(status.running_runs),
-            failed=bool(aborted or fatal_exc is not None),
+            aborted=aborted,
+            fatal_exc=fatal_exc,
+            on_event=on_event,
         )
 
     if fatal_exc is not None:

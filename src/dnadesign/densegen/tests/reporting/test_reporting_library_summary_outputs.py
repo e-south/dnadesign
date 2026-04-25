@@ -81,7 +81,7 @@ def _write_usr_config(path: Path) -> None:
               alphabet: dna_4
             usr:
               root: ../usr_root
-              dataset: densegen/demo_usr
+              dataset: densegen_demo_usr
           generation:
             sequence_length: 10
             plan:
@@ -220,13 +220,13 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(
         "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
-        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen/demo_usr"),
+        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen_demo_usr"),
     )
 
     loaded = load_config(cfg_path)
     bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
-    assert bundle.run_report["outputs_path"] == "../usr_root/densegen/demo_usr/records.parquet"
-    assert bundle.run_report["output_source"] == "usr:densegen/demo_usr"
+    assert bundle.run_report["outputs_path"] == "../usr_root/densegen_demo_usr/records.parquet"
+    assert bundle.run_report["output_source"] == "usr:densegen_demo_usr"
 
 
 def test_collect_report_data_rejects_missing_record_library_hash(tmp_path: Path, monkeypatch) -> None:
@@ -296,3 +296,112 @@ def test_collect_report_data_rejects_missing_record_library_hash(tmp_path: Path,
     loaded = load_config(cfg_path)
     with pytest.raises(ValueError, match="missing densegen__sampling_library_hash"):
         collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
+
+
+def test_collect_report_data_recovers_usage_from_composition_when_records_usage_is_empty(
+    tmp_path: Path, monkeypatch
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path)
+    (run_root / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+
+    attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
+    attempts_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "attempt_id": "a1",
+                "attempt_index": 1,
+                "run_id": "demo",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "created_at": "2026-01-14T00:00:01+00:00",
+                "status": "success",
+                "reason": "ok",
+                "detail_json": "{}",
+                "sequence": "ATGCATGCAT",
+                "sequence_hash": "hash1",
+                "solution_id": "out1",
+                "used_tf_counts_json": "{}",
+                "used_tf_list": ["TF1", "TF2"],
+                "sampling_library_index": 1,
+                "sampling_library_hash": "abc123",
+                "solver_status": "optimal",
+                "solver_objective": 0.0,
+                "solver_solve_time_s": 0.1,
+                "dense_arrays_version": None,
+                "library_tfbs": ["AAA", "CCC"],
+                "library_tfs": ["TF1", "TF2"],
+                "library_site_ids": ["s1", "s2"],
+                "library_sources": ["demo", "demo"],
+            }
+        ]
+    ).to_parquet(attempts_path, index=False)
+
+    composition_path = run_root / "outputs" / "tables" / "composition.parquet"
+    pd.DataFrame(
+        [
+            {
+                "solution_id": "out1",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "library_index": 1,
+                "library_hash": "abc123",
+                "tf": "TF1",
+                "tfbs": "AAA",
+                "offset": 0,
+                "length": 3,
+                "end": 3,
+                "site_id": "s1",
+                "source": "demo",
+            },
+            {
+                "solution_id": "out1",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "library_index": 1,
+                "library_hash": "abc123",
+                "tf": "TF2",
+                "tfbs": "CCC",
+                "offset": 5,
+                "length": 3,
+                "end": 8,
+                "site_id": "s2",
+                "source": "demo",
+            },
+        ]
+    ).to_parquet(composition_path, index=False)
+
+    records_df = pd.DataFrame(
+        [
+            {
+                "id": "out1",
+                "sequence": "ATGCATGCAT",
+                "densegen__plan": "demo_plan",
+                "densegen__input_name": PLAN_POOL_LABEL,
+                "densegen__sampling_library_hash": "abc123",
+                "densegen__sampling_library_index": 1,
+                "densegen__used_tfbs_detail": [],
+                "densegen__required_regulators": [],
+                "densegen__covers_all_tfs_in_solution": True,
+                "densegen__used_tf_counts": [],
+                "densegen__min_count_by_regulator": [],
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
+        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen_demo_usr"),
+    )
+
+    loaded = load_config(cfg_path)
+    bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
+    offered_vs_used_tf = bundle.tables["offered_vs_used_tf"]
+
+    assert int(offered_vs_used_tf["used_sequences"].sum()) == 2
+    assert any(
+        "recovered library utilization from outputs/tables/composition.parquet" in warning
+        for warning in bundle.run_report["warnings"]
+    )

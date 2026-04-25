@@ -47,7 +47,7 @@ Top opportunities (highest impact, lowest disruption):
 
 #### Tool directories under `src/dnadesign/`
 Observed tool roots:
-- `aligner`, `baserender`, `billboard`, `cluster`, `cruncher`, `densegen`, `infer`, `latdna`, `libshuffle`, `nmf`, `opal`, `permuter`, `tfkdanalysis`, `usr`
+- `aligner`, `baserender`, `billboard`, `cluster`, `cruncher`, `densegen`, `infer`, `latentdna`, `libshuffle`, `nmf`, `opal`, `permuter`, `tfkdanalysis`, `usr`
 - `archived/` and `prototypes/` are present (excluded from tests via `pytest` config)
 
 #### Nested `src/` tool layout

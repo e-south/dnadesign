@@ -22,6 +22,7 @@ import pandas as pd
 import pytest
 import yaml
 
+import dnadesign.cruncher.app.portfolio_execution as portfolio_execution
 import dnadesign.cruncher.app.portfolio_materialization as portfolio_materialization
 import dnadesign.cruncher.app.portfolio_workflow as portfolio_workflow
 from dnadesign.cruncher.analysis.layout import analysis_root, summary_path
@@ -1462,7 +1463,7 @@ def test_run_portfolio_schema_v3_prepare_mode_runs_source_runbooks(
             executed_step_ids=list(step_ids or []),
         )
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
 
     run_dir = run_portfolio(spec_path)
     assert len(calls) == 1
@@ -1566,7 +1567,7 @@ def test_run_portfolio_prepare_mode_submits_multiple_sources_before_waiting(
             executed_step_ids=list(step_ids or []),
         )
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
 
     run_dir = run_portfolio(spec_path, prepare_ready_policy="rerun")
     assert run_dir.exists()
@@ -1638,7 +1639,7 @@ def test_run_portfolio_schema_v3_fails_if_run_dir_missing_after_prepare(
             executed_step_ids=list(step_ids or []),
         )
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
 
     with pytest.raises(FileNotFoundError, match="run_dir does not exist after preparation"):
         run_portfolio(spec_path)
@@ -2212,7 +2213,7 @@ def test_run_portfolio_prepare_skip_ready_only_runs_missing_sources(
         _ = payload
         events.append(name)
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
 
     run_portfolio(spec_path, prepare_ready_policy="skip", on_event=_on_event)
     assert runbook_calls == [runbook_b.resolve()]
@@ -2282,7 +2283,7 @@ def test_run_portfolio_prepare_failure_reports_actionable_nudge(
         _ = (path, step_ids, dry_run)
         raise RuntimeError("Runbook step failed: step='analyze_summary' returncode=1")
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
 
     with pytest.raises(ValueError, match="Portfolio source preparation failed") as exc_info:
         run_portfolio(spec_path)
@@ -2471,7 +2472,7 @@ def test_run_portfolio_ensures_missing_studies_and_writes_sequence_length_table(
         )
         return resolve_deterministic_study_run_dir(path)
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
     monkeypatch.setattr(portfolio_workflow, "run_study", _fake_run_study)
 
     run_dir = run_portfolio(spec_path)
@@ -2693,7 +2694,7 @@ def test_run_portfolio_prepare_mode_materializes_before_later_prepare_failure(
             )
         raise RuntimeError("synthetic prepare failure on second source")
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
 
     with pytest.raises(ValueError, match="synthetic prepare failure on second source"):
         run_portfolio(spec_path, prepare_ready_policy="rerun")
@@ -2833,7 +2834,7 @@ def test_run_portfolio_prepare_mode_runs_prepare_before_ensured_studies(
             raise FileNotFoundError(f"Missing lockfile for study run: {lock_file}")
         return resolve_deterministic_study_run_dir(path)
 
-    monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
+    monkeypatch.setattr(portfolio_execution, "run_workspace_runbook", _fake_run_workspace_runbook)
     monkeypatch.setattr(portfolio_workflow, "run_study", _fake_run_study)
 
     def _on_event(name: str, payload: dict[str, object]) -> None:

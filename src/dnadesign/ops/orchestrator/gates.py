@@ -34,6 +34,10 @@ _DISALLOWED_NOW_DIRECTIVE = re.compile(r"^\s*#\$\s+-now\s+y(?:\s|$)")
 _SLUG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _QSTAT_PROBE_TIMEOUT_SECONDS = 10.0
 _GATES_MODULE_NAME = "dnadesign.ops.orchestrator.gates"
+_SUBMIT_HOST_DENIED_PATTERN = re.compile(
+    r"(?:is no submit host|neither submit nor admin host)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -46,7 +50,7 @@ class SessionCounts:
 @dataclass(frozen=True)
 class SessionCountsProbe:
     counts: SessionCounts | None
-    queue_probe: Literal["ok", "degraded"]
+    queue_probe: Literal["ok", "degraded", "host_denied"]
     probe_error: str | None = None
     qstat_source: Literal["live", "fixture", "degraded"] = "live"
 
@@ -329,9 +333,12 @@ def _load_session_counts_probe(*, allow_missing_qstat: bool, qstat_file: Path | 
     except RuntimeError as exc:
         if qstat_file is not None or not allow_missing_qstat:
             raise
+        queue_probe: Literal["degraded", "host_denied"] = "degraded"
+        if _SUBMIT_HOST_DENIED_PATTERN.search(str(exc)):
+            queue_probe = "host_denied"
         return SessionCountsProbe(
             counts=None,
-            queue_probe="degraded",
+            queue_probe=queue_probe,
             probe_error=str(exc),
             qstat_source="degraded",
         )
@@ -345,8 +352,15 @@ def _unknown_queue_counts() -> dict[str, str]:
     }
 
 
-def _emit_degraded_queue_probe_warning(probe: SessionCountsProbe) -> None:
-    if probe.queue_probe != "degraded" or probe.probe_error is None:
+def _emit_queue_probe_warning(probe: SessionCountsProbe) -> None:
+    if probe.queue_probe == "ok" or probe.probe_error is None:
+        return
+    if probe.queue_probe == "host_denied":
+        _emit_stderr(
+            "queue probe blocked: "
+            f"{probe.probe_error}. Current host is not submit-capable; "
+            "use a submit-capable SCC shell or OnDemand app shell."
+        )
         return
     _emit_stderr(
         f"queue probe degraded: {probe.probe_error}. Continue only for dry-run/demo use; submit readiness is unknown."
@@ -850,12 +864,25 @@ def main(argv: list[str] | None = None) -> int:
             _emit_stderr(str(exc))
             return 2
         if probe.queue_probe == "degraded":
-            _emit_degraded_queue_probe_warning(probe)
+            _emit_queue_probe_warning(probe)
             advisor = {
                 "advisor": "unknown",
                 "next_action": "queue_probe_unavailable",
                 "queue_policy": "queue_probe_unavailable",
                 "queue_probe": "degraded",
+                "qstat_source": probe.qstat_source,
+                "planned_submits": str(args.planned_submits),
+                "requires_order": "yes" if bool(args.requires_order) else "no",
+                "threshold": str(args.warn_over_running),
+                **_unknown_queue_counts(),
+            }
+        elif probe.queue_probe == "host_denied":
+            _emit_queue_probe_warning(probe)
+            advisor = {
+                "advisor": "blocked",
+                "next_action": "use_submit_host",
+                "queue_policy": "submit_host_required",
+                "queue_probe": "host_denied",
                 "qstat_source": probe.qstat_source,
                 "planned_submits": str(args.planned_submits),
                 "requires_order": "yes" if bool(args.requires_order) else "no",
@@ -886,7 +913,7 @@ def main(argv: list[str] | None = None) -> int:
             _emit_stderr(str(exc))
             return 2
         if probe.queue_probe == "degraded":
-            _emit_degraded_queue_probe_warning(probe)
+            _emit_queue_probe_warning(probe)
             brief = {
                 "submit_gate": "degraded",
                 "advisor": "unknown",
@@ -901,6 +928,22 @@ def main(argv: list[str] | None = None) -> int:
                 **_unknown_queue_counts(),
             }
             exit_code = 0
+        elif probe.queue_probe == "host_denied":
+            _emit_queue_probe_warning(probe)
+            brief = {
+                "submit_gate": "blocked",
+                "advisor": "blocked",
+                "health": "red",
+                "next_action": "use_submit_host",
+                "queue_policy": "submit_host_required",
+                "queue_probe": "host_denied",
+                "qstat_source": probe.qstat_source,
+                "planned_submits": str(args.planned_submits),
+                "requires_order": "yes" if bool(args.requires_order) else "no",
+                "threshold": str(args.warn_over_running),
+                **_unknown_queue_counts(),
+            }
+            exit_code = 2
         else:
             assert probe.counts is not None
             brief, exit_code = build_operator_brief(
@@ -970,11 +1013,23 @@ def main(argv: list[str] | None = None) -> int:
             _emit_stderr(str(exc))
             return 2
         if probe.queue_probe == "degraded":
-            _emit_degraded_queue_probe_warning(probe)
+            _emit_queue_probe_warning(probe)
             print(
                 _format_record(
                     {
                         "queue_probe": "degraded",
+                        "qstat_source": probe.qstat_source,
+                        **_unknown_queue_counts(),
+                    }
+                )
+            )
+            return 0
+        if probe.queue_probe == "host_denied":
+            _emit_queue_probe_warning(probe)
+            print(
+                _format_record(
+                    {
+                        "queue_probe": "host_denied",
                         "qstat_source": probe.qstat_source,
                         **_unknown_queue_counts(),
                     }

@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.usr.roots import resolve_usr_root_from_config
+from dnadesign.usr import resolve_usr_root_from_config
 
 from .src.config import RootConfig
 

@@ -22,10 +22,11 @@ runbook:
     smoke: dry
   resources:
     pe_omp: 4
-    h_rt: "12:00:00"
+    h_rt: "24:00:00"
     mem_per_core: 8G
     gpus: 1
-    gpu_capability: "9.0"
+    gpu_capability: "12.0"
+    gpu_type: RTXP6000
     gpu_memory_gib: 80.0
   mode_policy:
     default: auto
