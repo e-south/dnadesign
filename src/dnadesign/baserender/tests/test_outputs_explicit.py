@@ -16,7 +16,8 @@ from pathlib import Path
 import matplotlib.animation as animation
 import pytest
 
-from dnadesign.baserender.src.api import run_cruncher_showcase_job
+from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.public import run_cruncher_showcase_job
 
 from .conftest import densegen_job_payload, write_job, write_parquet
 
@@ -81,3 +82,48 @@ def test_video_output_does_not_produce_images(tmp_path: Path) -> None:
 
     images_dir = results_root / job_path.stem / "images"
     assert not images_dir.exists()
+
+
+def test_strict_skip_failure_happens_before_artifact_writes(tmp_path: Path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+                    {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
+                ],
+                "details": "row1",
+            },
+            {
+                "id": "missing_sequence",
+                "sequence": None,
+                "densegen__used_tfbs_detail": [],
+                "details": "row2",
+            },
+        ],
+    )
+    results_root = tmp_path / "results"
+    report_path = results_root / "strict_report.json"
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[{"kind": "images", "fmt": "png"}],
+        extra={
+            "run": {
+                "strict": True,
+                "fail_on_skips": True,
+                "emit_report": True,
+                "report_path": str(report_path),
+            }
+        },
+    )
+    job_path = write_job(tmp_path / "strict_skip.yaml", payload)
+
+    with pytest.raises(SchemaError, match="strict mode is enabled"):
+        run_cruncher_showcase_job(str(job_path))
+
+    assert not (results_root / job_path.stem / "images").exists()
+    assert not report_path.exists()

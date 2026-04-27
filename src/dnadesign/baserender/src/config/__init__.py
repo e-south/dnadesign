@@ -3,14 +3,22 @@
 <dnadesign project>
 src/dnadesign/baserender/src/config/__init__.py
 
-Config schema exports for Sequence Rows v3 jobs and Style v1.
+Config schema exports for BaseRender v3 jobs and Style v1.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .jobs.sequence_rows_v3 import (
+from .job_contracts import (
+    RenderContractDescriptor,
+    render_contract_descriptor,
+    render_contract_descriptors,
+    render_contract_kinds,
+    validate_render_contract_renderer,
+)
+from .jobs.base_render_v3 import (
     AdapterCfg,
+    BaseRenderJobV3,
     CruncherShowcaseJob,
     ImagesOutputCfg,
     InputCfg,
@@ -18,6 +26,7 @@ from .jobs.sequence_rows_v3 import (
     PipelineCfg,
     PluginSpec,
     RenderCfg,
+    RenderContractCfg,
     RenderJobV3,
     RunCfg,
     SampleCfg,
@@ -60,9 +69,12 @@ __all__ = [
     "list_style_presets",
     "resolve_preset_path",
     "resolve_style",
+    "BaseRenderJobV3",
     "CruncherShowcaseJob",
     "RenderJobV3",
     "SequenceRowsJobV3",
+    "RenderContractCfg",
+    "RenderContractDescriptor",
     "InputCfg",
     "AdapterCfg",
     "SampleCfg",
@@ -85,4 +97,8 @@ __all__ = [
     "validate_job",
     "resolve_job_path",
     "output_kind",
+    "render_contract_descriptor",
+    "render_contract_descriptors",
+    "render_contract_kinds",
+    "validate_render_contract_renderer",
 ]

@@ -13,6 +13,7 @@ Module Author(s): Eric J. South
 
 from ..cruncher_showcase_job import (
     AdapterCfg,
+    BaseRenderJobV3,
     CruncherShowcaseJob,
     ImagesOutputCfg,
     InputCfg,
@@ -20,6 +21,7 @@ from ..cruncher_showcase_job import (
     PipelineCfg,
     PluginSpec,
     RenderCfg,
+    RenderContractCfg,
     RenderJobV3,
     RunCfg,
     SampleCfg,
@@ -40,9 +42,11 @@ from ..cruncher_showcase_job import (
 )
 
 __all__ = [
+    "BaseRenderJobV3",
     "CruncherShowcaseJob",
     "RenderJobV3",
     "SequenceRowsJobV3",
+    "RenderContractCfg",
     "InputCfg",
     "AdapterCfg",
     "SampleCfg",

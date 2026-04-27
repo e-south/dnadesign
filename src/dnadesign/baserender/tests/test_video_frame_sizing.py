@@ -14,9 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from dnadesign.baserender.src.config import Style, VideoOutputCfg
-from dnadesign.baserender.src.core import Display, Record
+from dnadesign.baserender.src.core import Display, Record, SchemaError
 from dnadesign.baserender.src.outputs import (
     _apply_fixed_content_radius,
     _letterbox_rgba,
@@ -68,7 +69,7 @@ def test_write_video_handles_later_frames_larger_than_first(monkeypatch, tmp_pat
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _FakeFFMpegWriter)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(id="small", alphabet="DNA", sequence="ACGT"),
@@ -144,6 +145,27 @@ def test_target_frame_size_keeps_explicit_height_even_when_smaller_than_natural(
 
     assert width == 1000
     assert height == 200
+
+
+def test_target_frame_size_rejects_conflicting_explicit_size_and_aspect_ratio(tmp_path: Path) -> None:
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "conflicting-size.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=100,
+        height_px=55,
+        aspect_ratio=2.0,
+        total_duration=2.0,
+        title_text=None,
+        title_font_size=None,
+        title_align="center",
+    )
+
+    with pytest.raises(SchemaError, match="aspect"):
+        _target_frame_size(natural_w=80, natural_h=40, output=output)
 
 
 def test_trim_white_border_rgba_crops_white_edges() -> None:
@@ -252,7 +274,7 @@ def test_write_video_updates_subtitle_per_frame_from_record_display(monkeypatch,
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -359,7 +381,7 @@ def test_write_video_long_title_text_is_fitted_within_figure_bounds(monkeypatch,
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [Record(id="frame-1", alphabet="DNA", sequence="ACGT")]
     output = VideoOutputCfg(
@@ -463,7 +485,7 @@ def test_write_video_keeps_title_font_larger_than_subtitle_font(monkeypatch, tmp
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -567,7 +589,7 @@ def test_write_video_can_lock_title_and_subtitle_to_uniform_display_font_size(mo
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -671,7 +693,7 @@ def test_write_video_title_avoids_bbox_patch_to_prevent_subtitle_clip(monkeypatc
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -786,9 +808,9 @@ def test_write_video_anchors_title_block_to_content_envelope(monkeypatch, tmp_pa
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
     monkeypatch.setattr(
-        "dnadesign.baserender.src.outputs._sequence_rows_content_envelope_norms",
+        "dnadesign.baserender.src.outputs.video._sequence_rows_content_envelope_norms",
         lambda records, style: (0.68, 0.28),
     )
 
@@ -900,9 +922,9 @@ def test_write_video_anchor_respects_high_content_envelope_without_low_cap(monke
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
     monkeypatch.setattr(
-        "dnadesign.baserender.src.outputs._sequence_rows_content_envelope_norms",
+        "dnadesign.baserender.src.outputs.video._sequence_rows_content_envelope_norms",
         lambda records, style: (0.92, 0.26),
     )
 
@@ -1031,7 +1053,7 @@ def test_write_video_places_subtitle_above_rendered_content(monkeypatch, tmp_pat
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -1162,7 +1184,7 @@ def test_write_video_stacks_header_block_above_high_content_without_collision(mo
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(

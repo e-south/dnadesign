@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.baserender.src.api import run_cruncher_showcase_job
+from dnadesign.baserender.src.public import run_cruncher_showcase_job
 
 from .conftest import write_job, write_parquet
 

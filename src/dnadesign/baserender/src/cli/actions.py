@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/cli_actions.py
+src/dnadesign/baserender/src/cli/actions.py
 
 Command actions backing the CLI without depending on Typer presentation logic.
 
@@ -16,15 +16,15 @@ from typing import Any
 
 import yaml
 
-from .api import run_job as run_job_public
-from .api import validate_job as validate_job_public
-from .config import (
+from ..config import (
     RenderJobV3,
     list_style_presets,
     resolve_preset_path,
 )
-from .core import BaseRenderError
-from .workspace import Workspace, discover_workspaces, init_workspace, resolve_workspace_job_path
+from ..core import BaseRenderError
+from ..public import run_job as run_job_public
+from ..public import validate_job as validate_job_public
+from ..workspaces import Workspace, discover_workspaces, init_workspace, resolve_workspace_job_path
 
 
 def resolve_job_spec(job: str | None, workspace: str | None, workspace_root: Path | None) -> str:
@@ -67,6 +67,7 @@ def run_job_action(
 def _job_to_mapping(parsed: RenderJobV3) -> dict[str, Any]:
     return {
         "version": 3,
+        "contract": {"kind": parsed.contract.kind},
         "results_root": str(parsed.results_root),
         "input": {
             "kind": parsed.input.kind,

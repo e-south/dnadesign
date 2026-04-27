@@ -1,4 +1,6 @@
 version: 3
+contract:
+  kind: sequence_rows_render_v3
 input:
   kind: parquet
   path: data/cruncher_demo_elites.parquet

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/runner.py
+src/dnadesign/baserender/src/execution/runner.py
 
 Sequence-rows job orchestration for adapter, pipeline, selection, and output execution.
 
@@ -15,8 +15,8 @@ from itertools import islice
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from .adapters import build_adapter, required_source_columns
-from .config import (
+from ..adapters import build_adapter, required_source_columns
+from ..config import (
     ImagesOutputCfg,
     RenderJobV3,
     VideoOutputCfg,
@@ -24,11 +24,11 @@ from .config import (
     output_kind,
     resolve_style,
 )
-from .core import Record, SchemaError, SkipRecord
-from .io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
-from .pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
-from .reporting import RunReport
-from .runtime import initialize_runtime
+from ..core import Record, SchemaError, SkipRecord
+from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
+from ..pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
+from ..reporting import RunReport
+from ..runtime import initialize_runtime
 
 
 def _iter_records(job: RenderJobV3, report: RunReport) -> Iterator[Record]:
@@ -70,6 +70,21 @@ def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV3) -> 
     return records
 
 
+def _materialize_before_strict_outputs(
+    records: Iterable[Record] | list[Record],
+    job: RenderJobV3,
+    report: RunReport,
+) -> list[Record] | Iterable[Record]:
+    if not (job.run.strict or job.run.fail_on_skips):
+        return records
+
+    materialized = records if isinstance(records, list) else list(records)
+    report.yielded_records = len(materialized)
+    if report.has_skips():
+        raise SchemaError("Run completed with skipped rows/records; strict mode is enabled")
+    return materialized
+
+
 def run_sequence_rows_job(
     job_or_path: RenderJobV3 | str,
     *,
@@ -92,7 +107,7 @@ def run_sequence_rows_job(
     )
 
     style = resolve_style(preset=job.render.style_preset, overrides=job.render.style_overrides)
-    from .render import Palette
+    from ..render import Palette
 
     palette = Palette(style.palette)
 
@@ -106,11 +121,13 @@ def run_sequence_rows_job(
     else:
         records = _sample_or_limit_unselected(records, job)
 
+    records = _materialize_before_strict_outputs(records, job, report)
+
     img_output = output_kind(job, "images")
     vid_output = output_kind(job, "video")
 
     if isinstance(vid_output, VideoOutputCfg):
-        from .outputs import write_images, write_video
+        from ..outputs import write_images, write_video
 
         materialized = list(records)
         report.yielded_records = len(materialized)
@@ -134,7 +151,7 @@ def run_sequence_rows_job(
         )
         report.outputs["video_path"] = str(out_path)
     elif isinstance(img_output, ImagesOutputCfg):
-        from .outputs import write_images
+        from ..outputs import write_images
 
         if isinstance(records, list):
             materialized = records
@@ -178,10 +195,6 @@ def run_sequence_rows_job(
     if job.run.emit_report and job.run.report_path is not None:
         report.write(job.run.report_path)
         report.outputs["report_path"] = str(job.run.report_path)
-
-    if job.run.strict or job.run.fail_on_skips:
-        if report.has_skips():
-            raise SchemaError("Run completed with skipped rows/records; strict mode is enabled")
 
     return report
 

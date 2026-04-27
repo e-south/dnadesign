@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/baserender/cli.py
+<dnadesign project>
+src/dnadesign/baserender/src/styles/__init__.py
 
-Public baserender CLI entrypoint facade.
+Style helper package.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,6 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from .src.cli import app
+from .curated import cruncher_showcase_style_overrides
 
-__all__ = ["app"]
+__all__ = ["cruncher_showcase_style_overrides"]

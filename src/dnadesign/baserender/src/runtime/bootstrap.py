@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/runtime.py
+src/dnadesign/baserender/src/runtime/bootstrap.py
 
 Explicit runtime bootstrap for baserender contracts and effect drawers.
 
@@ -15,7 +15,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from .core import register_builtin_contracts
+from ..core import register_builtin_contracts
 
 
 def _ensure_mpl_config_dir() -> None:
@@ -35,7 +35,7 @@ def initialize_runtime() -> None:
     # Ensure Matplotlib can write cache artifacts in sandboxed/workspace environments.
     _ensure_mpl_config_dir()
 
-    from .render.effects import register_builtin_effect_drawers
+    from ..render.effects import register_builtin_effect_drawers
 
     register_builtin_contracts()
     register_builtin_effect_drawers()

@@ -19,7 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 import dnadesign.baserender as baserender
-from dnadesign.baserender.cli import app as baserender_app
+from dnadesign.baserender.src.cli.app import app as baserender_app
 from dnadesign.baserender.src.core import SchemaError
 
 from .conftest import write_job

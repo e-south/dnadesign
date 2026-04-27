@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/workspace.py
+src/dnadesign/baserender/src/workspaces/__init__.py
 
 Workspace discovery, scaffolding, and strict workspace job-path resolution.
 
@@ -17,9 +17,10 @@ from pathlib import Path
 
 import yaml
 
-from .core import SchemaError, ensure
+from ..core import SchemaError, ensure
 
 _WORKSPACE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+WORKSPACE_MARKER_FILENAME = ".baserender-workspace"
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,19 @@ def workspace_root(name: str, *, root: Path | None = None) -> Path:
 
 def workspace_job_path(name: str, *, root: Path | None = None) -> Path:
     ws_root = workspace_root(name, root=root)
+    if not ws_root.exists():
+        raise SchemaError(f"workspace '{name}' does not exist: {ws_root}")
+    if not ws_root.is_dir():
+        raise SchemaError(f"workspace '{name}' is not a directory: {ws_root}")
+    marker_path = ws_root / WORKSPACE_MARKER_FILENAME
+    if not marker_path.exists():
+        raise SchemaError(f"workspace '{name}' is missing {WORKSPACE_MARKER_FILENAME}: {marker_path}")
+    inputs_dir = ws_root / "inputs"
+    outputs_dir = ws_root / "outputs"
+    if not inputs_dir.is_dir():
+        raise SchemaError(f"workspace '{name}' is missing inputs/: {inputs_dir}")
+    if not outputs_dir.is_dir():
+        raise SchemaError(f"workspace '{name}' is missing outputs/: {outputs_dir}")
     job_path = ws_root / "job.yaml"
     if not job_path.exists():
         raise SchemaError(f"workspace '{name}' does not contain job.yaml: {job_path}")
@@ -84,6 +98,8 @@ def discover_workspaces(*, root: Path | None = None) -> tuple[Workspace, ...]:
         job_path = child / "job.yaml"
         if not job_path.exists():
             continue
+        if not (child / WORKSPACE_MARKER_FILENAME).exists():
+            continue
         out.append(
             Workspace(
                 name=child.name,
@@ -99,6 +115,7 @@ def discover_workspaces(*, root: Path | None = None) -> tuple[Workspace, ...]:
 def _workspace_job_template() -> dict:
     return {
         "version": 3,
+        "contract": {"kind": "sequence_rows_render_v3"},
         "results_root": "outputs",
         "input": {
             "kind": "parquet",
@@ -193,6 +210,10 @@ def init_workspace(name: str, *, root: Path | None = None) -> Workspace:
     outputs_dir.mkdir(parents=False, exist_ok=False)
 
     job_path.write_text(yaml.safe_dump(_workspace_job_template(), sort_keys=False))
+    (ws_root / WORKSPACE_MARKER_FILENAME).write_text(
+        "BaseRender workspace marker. Do not remove; it prevents accidental workspace inference.\n",
+        encoding="utf-8",
+    )
     (ws_root / "README.md").write_text(_workspace_readme_text(), encoding="utf-8")
     (inputs_dir / "README.md").write_text(_inputs_readme_text(), encoding="utf-8")
     (outputs_dir / "README.md").write_text(_outputs_readme_text(), encoding="utf-8")

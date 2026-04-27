@@ -28,6 +28,7 @@ _DENSEGEN_POLICY_DEFAULTS: dict[str, object] = {
     "min_per_record": 0,
     "require_non_null_cols": (),
     "on_invalid_row": "skip",
+    "overlay_text_template": None,
 }
 
 _IUPAC_MOTIF_SUFFIX_RE = re.compile(r"^[ACGTRYSWKMBDHVN]+$", re.IGNORECASE)
@@ -96,6 +97,18 @@ def _densegen_tf_display_label(value: str) -> str:
     if titled.endswith(" site") or titled.endswith(" sites"):
         return titled
     return f"{titled} sites"
+
+
+def _render_template(template: str, values: Mapping[str, object], *, ctx: str) -> str:
+    normalized = {str(key): "" if value is None else str(value) for key, value in values.items()}
+    try:
+        rendered = template.format_map(normalized)
+    except KeyError as exc:
+        missing = str(exc.args[0])
+        raise SchemaError(f"{ctx} references missing field: {missing}") from exc
+    except (IndexError, ValueError) as exc:
+        raise SchemaError(f"{ctx} is not a valid format template") from exc
+    return rendered.strip()
 
 
 @dataclass(frozen=True)
@@ -646,6 +659,18 @@ class DensegenTfbsAdapter:
             overlay_text_raw = row.get(str(overlay_text_col))
             if overlay_text_raw is not None and str(overlay_text_raw).strip() != "":
                 overlay_text = str(overlay_text_raw).strip()
+        overlay_text_template = self.policies.get("overlay_text_template")
+        if overlay_text_template is not None:
+            template_values: dict[str, object] = dict(row)
+            template_values["id"] = record_id
+            template_values["record_id"] = record_id
+            template_values["overlay_text"] = overlay_text or ""
+            rendered_overlay_text = _render_template(
+                str(overlay_text_template),
+                template_values,
+                ctx="densegen_tfbs policies.overlay_text_template",
+            )
+            overlay_text = rendered_overlay_text or None
         video_subtitle = None
         if video_subtitle_col is not None:
             video_subtitle_raw = row.get(str(video_subtitle_col))

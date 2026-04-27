@@ -28,7 +28,13 @@ from ..core import (
     require_mapping,
     require_one_of,
 )
-from .adapter_contracts import adapter_contract, adapter_kinds
+from ..workspaces import WORKSPACE_MARKER_FILENAME
+from .adapter_contracts import adapter_contract, normalize_adapter_config
+from .job_contracts import (
+    DEFAULT_RENDER_CONTRACT_KIND,
+    render_contract_descriptor,
+    validate_render_contract_renderer,
+)
 
 
 @dataclass(frozen=True)
@@ -84,6 +90,11 @@ class RenderCfg:
 
 
 @dataclass(frozen=True)
+class RenderContractCfg:
+    kind: str
+
+
+@dataclass(frozen=True)
 class ImagesOutputCfg:
     kind: str
     dir: Path | None
@@ -122,6 +133,7 @@ class RunCfg:
 @dataclass(frozen=True)
 class RenderJobV3:
     version: int
+    contract: RenderContractCfg
     name: str
     path: Path
     results_root: Path
@@ -135,6 +147,7 @@ class RenderJobV3:
 
 SequenceRowsJobV3 = RenderJobV3
 CruncherShowcaseJob = RenderJobV3
+BaseRenderJobV3 = RenderJobV3
 
 
 def _baserender_root() -> Path:
@@ -153,6 +166,8 @@ def _workspace_root_from_job_path(job_path: Path) -> Path | None:
         return None
     workspace_root = job_abs.parent
     if not workspace_root.is_dir():
+        return None
+    if not (workspace_root / WORKSPACE_MARKER_FILENAME).exists():
         return None
     if not (workspace_root / "inputs").is_dir():
         return None
@@ -351,6 +366,37 @@ def _parse_bool(value: Any, *, field: str, default: bool) -> bool:
     raise SchemaError(f"{field} must be bool")
 
 
+def _parse_int(value: Any, *, field: str) -> int:
+    if isinstance(value, bool):
+        raise SchemaError(f"{field} must be int")
+    try:
+        parsed = int(value)
+    except Exception as exc:
+        raise SchemaError(f"{field} must be int") from exc
+    if isinstance(value, float) and not value.is_integer():
+        raise SchemaError(f"{field} must be int")
+    return parsed
+
+
+def _parse_float(value: Any, *, field: str) -> float:
+    if isinstance(value, bool):
+        raise SchemaError(f"{field} must be float")
+    try:
+        return float(value)
+    except Exception as exc:
+        raise SchemaError(f"{field} must be float") from exc
+
+
+def _parse_contract(raw: Any) -> RenderContractCfg:
+    if raw is None:
+        return RenderContractCfg(kind=DEFAULT_RENDER_CONTRACT_KIND)
+    data = require_mapping(raw, "contract")
+    reject_unknown_keys(data, {"kind"}, "contract")
+    kind = str(data.get("kind", "")).strip()
+    ensure(kind != "", "contract.kind is required", SchemaError)
+    return RenderContractCfg(kind=render_contract_descriptor(kind).kind)
+
+
 def _parse_sample(raw: Any) -> SampleCfg:
     data = require_mapping(raw, "input.sample")
     reject_unknown_keys(data, {"mode", "n", "seed"}, "input.sample")
@@ -358,15 +404,15 @@ def _parse_sample(raw: Any) -> SampleCfg:
     mode = str(data.get("mode", "")).strip().lower()
     require_one_of(mode, {"first_n", "random_rows"}, "input.sample.mode")
 
-    n = int(data.get("n", 0))
+    n = _parse_int(data.get("n", 0), field="input.sample.n")
     ensure(n >= 1, "input.sample.n must be >= 1", SchemaError)
 
     seed_raw = data.get("seed")
     if mode == "random_rows":
         ensure(seed_raw is not None, "input.sample.seed is required when mode=random_rows", SchemaError)
-        seed = int(seed_raw)
+        seed = _parse_int(seed_raw, field="input.sample.seed")
     else:
-        seed = None if seed_raw is None else int(seed_raw)
+        seed = None if seed_raw is None else _parse_int(seed_raw, field="input.sample.seed")
 
     return SampleCfg(mode=mode, n=n, seed=seed)
 
@@ -444,33 +490,45 @@ def _parse_adapter(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...])
     data = require_mapping(raw, "input.adapter")
     reject_unknown_keys(data, {"kind", "columns", "policies"}, "input.adapter")
 
-    kind = str(data.get("kind", "")).strip()
-    require_one_of(kind, adapter_kinds(), "input.adapter.kind")
-    contract = adapter_contract(kind)
-
     columns = require_mapping(data.get("columns", {}), "input.adapter.columns")
     policies = require_mapping(data.get("policies", {}), "input.adapter.policies")
-    reject_unknown_keys(columns, set(contract.allowed_config_columns), "input.adapter.columns")
 
-    missing = sorted(set(contract.required_config_columns) - set(columns.keys()))
-    if missing:
-        raise SchemaError(f"input.adapter.columns missing required keys for {kind}: {missing}")
-
-    parsed_columns = dict(columns)
-    for key in contract.resolved_path_columns:
-        parsed_columns[key] = str(
+    def _resolve_adapter_path_column(key: str, value: Any) -> str:
+        return str(
             _resolve_path(
                 job_path,
-                str(parsed_columns[key]),
+                str(value),
                 field=f"input.adapter.columns.{key}",
                 allowed_roots=allowed_roots,
             )
         )
 
-    reject_unknown_keys(policies, set(contract.allowed_policy_keys), "input.adapter.policies")
-    parsed_policies = contract.normalize_policies(policies, "input.adapter.policies")
+    kind, parsed_columns, parsed_policies = normalize_adapter_config(
+        kind=data.get("kind", ""),
+        columns=columns,
+        policies=policies,
+        resolve_path=_resolve_adapter_path_column,
+    )
 
     return AdapterCfg(kind=kind, columns=parsed_columns, policies=parsed_policies)
+
+
+def _validate_adapter_compatibility(input_cfg: InputCfg, render_cfg: RenderCfg) -> None:
+    contract = adapter_contract(input_cfg.adapter.kind)
+    if render_cfg.renderer not in contract.supported_renderers:
+        allowed = ", ".join(sorted(contract.supported_renderers))
+        raise SchemaError(
+            "input.adapter.kind "
+            f"{input_cfg.adapter.kind!r} is not compatible with render.renderer {render_cfg.renderer!r}; "
+            f"supported render.renderer values: {allowed}"
+        )
+    if input_cfg.alphabet not in contract.supported_alphabets:
+        allowed = ", ".join(sorted(contract.supported_alphabets))
+        raise SchemaError(
+            "input.adapter.kind "
+            f"{input_cfg.adapter.kind!r} is not compatible with input.alphabet {input_cfg.alphabet!r}; "
+            f"supported input.alphabet values: {allowed}"
+        )
 
 
 def _parse_input(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> InputCfg:
@@ -493,7 +551,7 @@ def _parse_input(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -
     sample_cfg = None if sample is None else _parse_sample(sample)
 
     limit_raw = data.get("limit")
-    limit = None if limit_raw is None else int(limit_raw)
+    limit = None if limit_raw is None else _parse_int(limit_raw, field="input.limit")
     if limit is not None:
         ensure(limit >= 1, "input.limit must be >= 1 when set", SchemaError)
     if sample_cfg is not None and limit is not None:
@@ -700,10 +758,10 @@ def _parse_outputs(
         fmt = str(data.get("fmt", "mp4")).strip().lower()
         ensure(fmt == "mp4", f"outputs[{i}].fmt must be 'mp4'", SchemaError)
 
-        fps = int(data.get("fps", 2))
+        fps = _parse_int(data.get("fps", 2), field=f"outputs[{i}].fps")
         ensure(fps >= 1, f"outputs[{i}].fps must be >= 1", SchemaError)
 
-        frames_per_record = int(data.get("frames_per_record", 1))
+        frames_per_record = _parse_int(data.get("frames_per_record", 1), field=f"outputs[{i}].frames_per_record")
         ensure(frames_per_record >= 1, f"outputs[{i}].frames_per_record must be >= 1", SchemaError)
 
         pauses_raw = data.get("pauses", {})
@@ -711,24 +769,34 @@ def _parse_outputs(
             pauses_raw = {}
         if not isinstance(pauses_raw, Mapping):
             raise SchemaError(f"outputs[{i}].pauses must be a mapping")
-        pauses = {str(k): float(v) for k, v in pauses_raw.items()}
+        pauses = {str(k): _parse_float(v, field=f"outputs[{i}].pauses.{k}") for k, v in pauses_raw.items()}
 
         width_raw = data.get("width_px")
-        width_px = None if width_raw is None else int(width_raw)
+        width_px = None if width_raw is None else _parse_int(width_raw, field=f"outputs[{i}].width_px")
         if width_px is not None:
             ensure(width_px >= 1, f"outputs[{i}].width_px must be >= 1", SchemaError)
 
         height_raw = data.get("height_px")
-        height_px = None if height_raw is None else int(height_raw)
+        height_px = None if height_raw is None else _parse_int(height_raw, field=f"outputs[{i}].height_px")
         if height_px is not None:
             ensure(height_px >= 1, f"outputs[{i}].height_px must be >= 1", SchemaError)
 
         aspect_ratio = _parse_aspect(data.get("aspect"))
         if aspect_ratio is not None:
             ensure(aspect_ratio > 0, f"outputs[{i}].aspect must be > 0", SchemaError)
+        if width_px is not None and height_px is not None and aspect_ratio is not None:
+            declared_ratio = float(width_px) / float(height_px)
+            if abs(declared_ratio - float(aspect_ratio)) > 1.0e-6:
+                raise SchemaError(
+                    f"outputs[{i}].aspect conflicts with width_px/height_px ({aspect_ratio!r} != {declared_ratio:.6g})"
+                )
 
         total_duration_raw = data.get("total_duration")
-        total_duration = None if total_duration_raw is None else float(total_duration_raw)
+        total_duration = (
+            None
+            if total_duration_raw is None
+            else _parse_float(total_duration_raw, field=f"outputs[{i}].total_duration")
+        )
         if total_duration is not None:
             ensure(total_duration > 0, f"outputs[{i}].total_duration must be > 0", SchemaError)
 
@@ -738,7 +806,11 @@ def _parse_outputs(
             title_text = None
 
         title_font_size_raw = data.get("title_font_size")
-        title_font_size = None if title_font_size_raw is None else int(title_font_size_raw)
+        title_font_size = (
+            None
+            if title_font_size_raw is None
+            else _parse_int(title_font_size_raw, field=f"outputs[{i}].title_font_size")
+        )
         if title_font_size is not None:
             ensure(title_font_size >= 6, f"outputs[{i}].title_font_size must be >= 6", SchemaError)
 
@@ -784,7 +856,7 @@ def _parse_run(job_path: Path, results_root: Path, raw: Any, *, allowed_roots: t
 
     strict = _parse_bool(data.get("strict"), field="run.strict", default=False)
     fail_on_skips = _parse_bool(data.get("fail_on_skips"), field="run.fail_on_skips", default=False)
-    emit_report = _parse_bool(data.get("emit_report"), field="run.emit_report", default=True)
+    emit_report = _parse_bool(data.get("emit_report"), field="run.emit_report", default=False)
 
     raw_report_path = data.get("report_path")
     if raw_report_path is None:
@@ -825,12 +897,13 @@ def _parse_sequence_rows_job_mapping(
     data = require_mapping(raw_mapping, "top-level")
     reject_unknown_keys(
         data,
-        {"version", "results_root", "input", "selection", "pipeline", "render", "outputs", "run"},
+        {"version", "contract", "results_root", "input", "selection", "pipeline", "render", "outputs", "run"},
         "top-level",
     )
 
     version = data.get("version")
     ensure(version == 3, "Job YAML must specify version: 3", SchemaError)
+    contract_cfg = _parse_contract(data.get("contract"))
 
     results_root_raw = data.get("results_root")
     if results_root_raw is None:
@@ -861,11 +934,14 @@ def _parse_sequence_rows_job_mapping(
     )
 
     render_cfg = _parse_render(data.get("render"))
+    validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
+    _validate_adapter_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"), allowed_roots=allowed_roots)
     run_cfg = _parse_run(job_path, results_root, data.get("run"), allowed_roots=allowed_roots)
 
     return RenderJobV3(
         version=3,
+        contract=contract_cfg,
         name=job_path.stem,
         path=job_path,
         results_root=results_root,

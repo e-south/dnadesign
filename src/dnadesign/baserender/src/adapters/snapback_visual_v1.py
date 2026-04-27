@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/adapters/snapback_visual_v1.py
 
 Adapter from shared snapback visual contracts to baserender Record v1.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

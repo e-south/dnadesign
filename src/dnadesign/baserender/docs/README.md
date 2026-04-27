@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Use this index for package-local `baserender` documentation. The public surface stays small: validate or run a `RenderJobV3`, render records through the stable package API, and use integrations only when a source tool needs a contract-specific adapter.
+Use this index for package-local `baserender` documentation. The public surface stays small: validate or run a `BaseRenderJobV3` / `RenderJobV3`, render records through the stable package API, and use integrations only when a source tool needs a contract-specific adapter or render-contract descriptor.
 
 ### Start here
 

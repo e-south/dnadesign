@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/api.py
+src/dnadesign/baserender/src/public/api.py
 
 Baserender vNext public API for job execution and record rendering helpers.
 
@@ -16,27 +16,32 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from .adapters import build_adapter, list_adapter_descriptors, required_source_columns
-from .adapters import get_adapter_descriptor as _get_adapter_descriptor
-from .config import (
+from ..adapters import build_adapter, list_adapter_descriptors, required_source_columns
+from ..adapters import get_adapter_descriptor as _get_adapter_descriptor
+from ..config import (
     AdapterCfg,
     RenderJobV3,
     load_sequence_rows_job_from_mapping,
+    render_contract_descriptor,
+    render_contract_descriptors,
+    render_contract_kinds,
     resolve_style,
+    validate_render_contract_renderer,
 )
-from .config import (
+from ..config import (
     validate_render_job as _validate_render_job,
 )
-from .config import (
+from ..config import (
     validate_sequence_rows_job as _validate_sequence_rows_job,
 )
-from .core import Record, SchemaError, ensure
-from .io import iter_parquet_rows
-from .render.renderer import get_renderer_descriptor as _get_renderer_descriptor
-from .render.renderer import renderer_descriptors
-from .runner import run_sequence_rows_job as _run_sequence_rows_job
-from .runtime import initialize_runtime
-from .showcase_style import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
+from ..config.adapter_contracts import normalize_adapter_config
+from ..core import Record, SchemaError, ensure
+from ..execution import run_sequence_rows_job as _run_sequence_rows_job
+from ..io import iter_parquet_rows
+from ..render.renderer import get_renderer_descriptor as _get_renderer_descriptor
+from ..render.renderer import renderer_descriptors
+from ..runtime import initialize_runtime
+from ..styles.curated import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
 
 
 def _build_public_adapter(
@@ -46,12 +51,19 @@ def _build_public_adapter(
     adapter_policies: Mapping[str, object] | None,
     alphabet: str,
 ):
-    cfg = AdapterCfg(
-        kind=str(adapter_kind),
+    normalized_alphabet = str(alphabet).upper()
+    kind, columns, policies = normalize_adapter_config(
+        kind=adapter_kind,
         columns={} if adapter_columns is None else dict(adapter_columns),
         policies={} if adapter_policies is None else dict(adapter_policies),
+        alphabet=normalized_alphabet,
     )
-    return cfg, build_adapter(cfg, alphabet=alphabet)
+    cfg = AdapterCfg(
+        kind=kind,
+        columns=columns,
+        policies=policies,
+    )
+    return cfg, build_adapter(cfg, alphabet=normalized_alphabet)
 
 
 def _apply_public_adapter_row(
@@ -222,10 +234,10 @@ def render_record_figure(
         preset=style_preset,
         overrides={} if style_overrides is None else dict(style_overrides),
     )
-    from .render import Palette
+    from ..render import Palette
 
     palette = Palette(style.palette)
-    from .render import render_record
+    from ..render import render_record
 
     return render_record(record, renderer_name=renderer_name, style=style, palette=palette)
 
@@ -346,24 +358,29 @@ def validate_cruncher_showcase_job(
     *,
     caller_root: str | Path | None = None,
 ) -> RenderJobV3:
-    # Backward-compatible alias; sequence_rows_v3 is the canonical contract surface.
+    # Backward-compatible alias; BaseRenderJobV3 / RenderJobV3 is canonical.
     return validate_sequence_rows_job(job_or_path, caller_root=caller_root)
 
 
 def run_cruncher_showcase_job(job_or_path: RenderJobV3 | str, *, caller_root: str | Path | None = None):
-    # Backward-compatible alias; sequence_rows_v3 is the canonical contract surface.
+    # Backward-compatible alias; BaseRenderJobV3 / RenderJobV3 is canonical.
     return run_sequence_rows_job(job_or_path, caller_root=caller_root)
 
 
-def _check_job_kind(kind: str | None) -> None:
+def _check_job_kind(kind: str | None) -> str | None:
     if kind is None:
-        return
-    normalized = str(kind).strip().lower()
-    ensure(
-        normalized in {"render_job_v3", "sequence_rows_v3", "cruncher_showcase_v3"},
-        "kind must be one of: render_job_v3, sequence_rows_v3, cruncher_showcase_v3",
-        SchemaError,
-    )
+        return None
+    try:
+        return render_contract_descriptor(kind).kind
+    except SchemaError as exc:
+        allowed = ", ".join(render_contract_kinds(include_aliases=True))
+        raise SchemaError(f"kind must be one of: {allowed}") from exc
+
+
+def _validate_requested_job_kind(job: RenderJobV3, kind: str | None) -> None:
+    contract_kind = _check_job_kind(kind)
+    if contract_kind is not None:
+        validate_render_contract_renderer(contract_kind, job.render.renderer, field="kind")
 
 
 def validate_job(
@@ -372,10 +389,12 @@ def validate_job(
     kind: str | None = None,
     caller_root: str | Path | None = None,
 ) -> RenderJobV3:
-    _check_job_kind(kind)
     if isinstance(path_or_dict, Mapping):
-        return load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
-    return validate_render_job(path_or_dict, caller_root=caller_root)
+        job = load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
+    else:
+        job = validate_render_job(path_or_dict, caller_root=caller_root)
+    _validate_requested_job_kind(job, kind)
+    return job
 
 
 def run_job(
@@ -385,13 +404,13 @@ def run_job(
     strict: bool | None = None,
     caller_root: str | Path | None = None,
 ):
-    _check_job_kind(kind)
     if isinstance(path_or_dict, RenderJobV3):
         job = path_or_dict
     elif isinstance(path_or_dict, Mapping):
         job = load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
     else:
         job = validate_render_job(path_or_dict, caller_root=caller_root)
+    _validate_requested_job_kind(job, kind)
 
     if strict is not None:
         job = replace(job, run=replace(job.run, strict=bool(strict)))
@@ -412,6 +431,14 @@ def list_renderers() -> tuple[str, ...]:
 
 def get_renderer_descriptor(name: str):
     return _get_renderer_descriptor(name)
+
+
+def list_render_contracts() -> tuple[str, ...]:
+    return tuple(descriptor.kind for descriptor in render_contract_descriptors())
+
+
+def get_render_contract_descriptor(kind: str):
+    return render_contract_descriptor(kind)
 
 
 def render(

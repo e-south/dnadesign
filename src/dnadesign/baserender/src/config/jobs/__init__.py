@@ -3,14 +3,15 @@
 <dnadesign project>
 src/dnadesign/baserender/src/config/jobs/__init__.py
 
-Job schema namespace for baserender config contracts.
+Job schema namespaces for baserender config contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .sequence_rows_v3 import (
+from .base_render_v3 import (
     AdapterCfg,
+    BaseRenderJobV3,
     CruncherShowcaseJob,
     ImagesOutputCfg,
     InputCfg,
@@ -18,6 +19,7 @@ from .sequence_rows_v3 import (
     PipelineCfg,
     PluginSpec,
     RenderCfg,
+    RenderContractCfg,
     RenderJobV3,
     RunCfg,
     SampleCfg,
@@ -38,9 +40,11 @@ from .sequence_rows_v3 import (
 )
 
 __all__ = [
+    "BaseRenderJobV3",
     "CruncherShowcaseJob",
     "RenderJobV3",
     "SequenceRowsJobV3",
+    "RenderContractCfg",
     "InputCfg",
     "AdapterCfg",
     "SampleCfg",

@@ -18,8 +18,8 @@ from pathlib import Path
 import yaml
 
 from dnadesign.baserender import cruncher_showcase_style_overrides
-from dnadesign.baserender.src.api import run_cruncher_showcase_job
 from dnadesign.baserender.src.config import load_cruncher_showcase_job
+from dnadesign.baserender.src.public import run_cruncher_showcase_job
 
 
 def _pkg_root() -> Path:
@@ -44,6 +44,7 @@ def test_curated_workspace_demos_are_self_contained() -> None:
         assert job_path.exists(), f"missing job.yaml for {name}"
 
         raw = yaml.safe_load(job_path.read_text())
+        assert raw["contract"]["kind"] == "sequence_rows_render_v3", f"{name} must declare explicit contract kind"
         assert raw["render"]["style"]["overrides"], f"{name} must define style overrides"
 
         job = load_cruncher_showcase_job(job_path, caller_root=root)
@@ -104,7 +105,10 @@ def test_curated_workspace_demos_are_self_contained() -> None:
 
 def test_docs_cruncher_example_uses_local_examples_data() -> None:
     root = _pkg_root()
-    job = load_cruncher_showcase_job(root / "docs" / "examples" / "cruncher_job.yaml", caller_root=root)
+    job_path = root / "docs" / "examples" / "cruncher_job.yaml"
+    raw = yaml.safe_load(job_path.read_text())
+    assert raw["contract"]["kind"] == "sequence_rows_render_v3"
+    job = load_cruncher_showcase_job(job_path, caller_root=root)
     docs_data = root / "docs" / "examples" / "data"
 
     assert _is_under(job.input.path, docs_data)
@@ -117,7 +121,10 @@ def test_docs_cruncher_example_uses_local_examples_data() -> None:
 def test_docs_densegen_example_matches_notebook_contract() -> None:
     root = _pkg_root()
     docs_data = root / "docs" / "examples" / "data"
-    job = load_cruncher_showcase_job(root / "docs" / "examples" / "densegen_job.yaml", caller_root=root)
+    job_path = root / "docs" / "examples" / "densegen_job.yaml"
+    raw = yaml.safe_load(job_path.read_text())
+    assert raw["contract"]["kind"] == "sequence_rows_render_v3"
+    job = load_cruncher_showcase_job(job_path, caller_root=root)
 
     cols = job.input.adapter.columns
     assert job.input.adapter.kind == "densegen_tfbs"

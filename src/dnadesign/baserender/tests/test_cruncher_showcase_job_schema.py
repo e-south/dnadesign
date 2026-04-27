@@ -126,6 +126,175 @@ def test_unknown_generic_features_policy_key_raises_schema_error(tmp_path: Path)
         load_cruncher_showcase_job(job_path)
 
 
+def test_adapter_renderer_compatibility_is_enforced_at_config_boundary(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    payload["input"]["adapter"] = {
+        "kind": "sequence_evidence_map_v1",
+        "columns": {},
+        "policies": {},
+    }
+    payload["render"]["renderer"] = "sequence_rows"
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="input.adapter.kind.*render.renderer"):
+        load_cruncher_showcase_job(job_path)
+
+
+def test_adapter_alphabet_compatibility_is_enforced_at_config_boundary(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    payload["input"]["alphabet"] = "RNA"
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="input.adapter.kind.*input.alphabet"):
+        load_cruncher_showcase_job(job_path)
+
+
+def test_run_report_is_opt_in_when_run_block_is_omitted(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    del payload["run"]
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    job = load_cruncher_showcase_job(job_path)
+
+    assert job.run.emit_report is False
+    assert job.run.report_path is None
+
+
+def test_video_output_rejects_conflicting_explicit_size_and_aspect_ratio(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[
+            {
+                "kind": "video",
+                "fmt": "mp4",
+                "width_px": 100,
+                "height_px": 55,
+                "aspect": 2.0,
+            }
+        ],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="outputs\\[0\\].aspect"):
+        load_cruncher_showcase_job(job_path)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "match"),
+    [
+        (lambda payload: payload["input"].__setitem__("limit", "many"), "input.limit must be int"),
+        (
+            lambda payload: payload["input"].__setitem__("sample", {"mode": "first_n", "n": "many"}),
+            "input.sample.n must be int",
+        ),
+        (
+            lambda payload: payload["input"].__setitem__("sample", {"mode": "random_rows", "n": 2, "seed": "seed"}),
+            "input.sample.seed must be int",
+        ),
+        (lambda payload: payload["outputs"][0].__setitem__("fps", "fast"), "outputs\\[0\\].fps must be int"),
+        (
+            lambda payload: payload["outputs"][0].__setitem__("frames_per_record", "many"),
+            "outputs\\[0\\].frames_per_record must be int",
+        ),
+        (
+            lambda payload: payload["outputs"][0].__setitem__("pauses", {"r1": "slow"}),
+            "outputs\\[0\\].pauses.r1 must be float",
+        ),
+        (
+            lambda payload: payload["outputs"][0].__setitem__("width_px", "wide"),
+            "outputs\\[0\\].width_px must be int",
+        ),
+        (
+            lambda payload: payload["outputs"][0].__setitem__("height_px", "tall"),
+            "outputs\\[0\\].height_px must be int",
+        ),
+        (
+            lambda payload: payload["outputs"][0].__setitem__("total_duration", "long"),
+            "outputs\\[0\\].total_duration must be float",
+        ),
+        (
+            lambda payload: payload["outputs"][0].__setitem__("title_font_size", "large"),
+            "outputs\\[0\\].title_font_size must be int",
+        ),
+    ],
+)
+def test_scalar_coercion_errors_are_schema_errors(tmp_path: Path, mutate, match: str) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[{"kind": "video", "fmt": "mp4"}],
+    )
+    mutate(payload)
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match=match):
+        load_cruncher_showcase_job(job_path)
+
+
+def test_declared_render_contract_rejects_incompatible_renderer(tmp_path: Path) -> None:
+    json_path = tmp_path / "input.json"
+    json_path.write_text("[]")
+    payload = {
+        "version": 3,
+        "contract": {"kind": "sequence_rows_render_v3"},
+        "results_root": str(tmp_path / "results"),
+        "input": {
+            "kind": "json",
+            "path": str(json_path),
+            "adapter": {"kind": "sequence_evidence_map_v1", "columns": {}, "policies": {}},
+            "alphabet": "DNA",
+        },
+        "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
+        "outputs": [{"kind": "images", "fmt": "png"}],
+    }
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="contract.kind.*render.renderer"):
+        load_cruncher_showcase_job(job_path)
+
+
+def test_declared_render_contract_records_use_case_descriptor(tmp_path: Path) -> None:
+    json_path = tmp_path / "input.json"
+    json_path.write_text("[]")
+    payload = {
+        "version": 3,
+        "contract": {"kind": "nucleotide_evidence_map_render_v3"},
+        "results_root": str(tmp_path / "results"),
+        "input": {
+            "kind": "json",
+            "path": str(json_path),
+            "adapter": {"kind": "sequence_evidence_map_v1", "columns": {}, "policies": {}},
+            "alphabet": "DNA",
+        },
+        "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
+        "outputs": [{"kind": "images", "fmt": "png"}],
+    }
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    job = load_cruncher_showcase_job(job_path)
+
+    assert job.contract.kind == "nucleotide_evidence_map_render_v3"
+    assert job.render.renderer == "nucleotide_evidence_map"
+
+
 def test_selection_keep_order_requires_bool(tmp_path: Path) -> None:
     parquet = _make_input_parquet(tmp_path)
     selection_csv = tmp_path / "selection.csv"

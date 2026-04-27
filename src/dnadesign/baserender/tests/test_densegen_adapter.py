@@ -133,6 +133,54 @@ def test_densegen_adapter_accepts_video_subtitle_column() -> None:
     assert record.display.video_subtitle == "Sequence row1 | Plan background only"
 
 
+def test_densegen_adapter_formats_overlay_text_template_from_label_and_id() -> None:
+    row = {
+        "id": "seq123",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+        ],
+        "primary_label": "pDual-10-ES1p",
+    }
+
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+            "overlay_text": "primary_label",
+        },
+        policies={"overlay_text_template": "{overlay_text}\n{id}"},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+    assert record.display.overlay_text == "pDual-10-ES1p\nseq123"
+
+
+def test_densegen_adapter_rejects_overlay_text_template_missing_fields() -> None:
+    row = {
+        "id": "seq123",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+        ],
+    }
+
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={"overlay_text_template": "{missing_label}\n{id}"},
+        alphabet="DNA",
+    )
+
+    with pytest.raises(SchemaError, match="overlay_text_template references missing field: missing_label"):
+        adapter.apply(row, row_index=0)
+
+
 def test_densegen_adapter_treats_zero_offset_as_explicit_coordinate() -> None:
     row = {
         "id": "row1",

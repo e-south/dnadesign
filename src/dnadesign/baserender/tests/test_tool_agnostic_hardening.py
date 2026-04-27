@@ -20,7 +20,7 @@ def _read(path: Path) -> str:
 
 def test_public_api_module_avoids_tool_specific_input_assumptions() -> None:
     root = Path(__file__).resolve().parents[1]
-    api_text = _read(root / "src" / "api.py")
+    api_text = _read(root / "src" / "public" / "api.py")
     assert "densegen" not in api_text
     assert "sigma70" not in api_text
 

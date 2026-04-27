@@ -25,10 +25,11 @@ from dnadesign.contracts.visual import (
     YiuTopologyCartoonV1,
 )
 
-from ..core import SchemaError, ensure, require_one_of
+from ..core import ContractError, SchemaError, ensure, reject_unknown_keys, require_one_of
 
 PolicyNormalizer = Callable[[Mapping[str, Any], str], dict[str, Any]]
 AdapterFactory = Callable[[Any, str], Any]
+AdapterPathResolver = Callable[[str, Any], str]
 
 
 def _normalize_policies_passthrough(policies: Mapping[str, Any], _ctx: str) -> dict[str, Any]:
@@ -70,6 +71,11 @@ def _normalize_densegen_policies(policies: Mapping[str, Any], ctx: str) -> dict[
         if not isinstance(cols, (list, tuple)):
             raise SchemaError(f"{ctx}.require_non_null_cols must be a list")
         parsed["require_non_null_cols"] = [str(c) for c in cols]
+    if "overlay_text_template" in parsed:
+        template = parsed["overlay_text_template"]
+        if not isinstance(template, str) or not template.strip():
+            raise SchemaError(f"{ctx}.overlay_text_template must be a non-empty string")
+        parsed["overlay_text_template"] = template
     for key in ("zero_as_unspecified", "require_non_empty"):
         if key in parsed:
             val = parsed[key]
@@ -199,6 +205,7 @@ _DENSEGEN_POLICY_KEYS = (
     "min_per_record",
     "require_non_null_cols",
     "on_invalid_row",
+    "overlay_text_template",
 )
 
 _CRUNCHER_POLICY_KEYS = ("on_missing_hit", "on_missing_pwm")
@@ -400,3 +407,43 @@ def adapter_descriptor(kind: str) -> AdapterDescriptor:
 
 def adapter_contract(kind: str) -> AdapterContract:
     return adapter_descriptor(kind)
+
+
+def normalize_adapter_config(
+    *,
+    kind: Any,
+    columns: Mapping[str, Any],
+    policies: Mapping[str, Any],
+    alphabet: str | None = None,
+    resolve_path: AdapterPathResolver | None = None,
+) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    try:
+        parsed_kind = str(kind).strip()
+        require_one_of(parsed_kind, adapter_kinds(), "input.adapter.kind")
+        contract = adapter_contract(parsed_kind)
+
+        reject_unknown_keys(columns, set(contract.allowed_config_columns), "input.adapter.columns")
+        missing = sorted(set(contract.required_config_columns) - set(columns.keys()))
+        if missing:
+            raise SchemaError(f"input.adapter.columns missing required keys for {parsed_kind}: {missing}")
+
+        parsed_columns = dict(columns)
+        if resolve_path is not None:
+            for key in contract.resolved_path_columns:
+                if key in parsed_columns and parsed_columns[key] is not None:
+                    parsed_columns[key] = resolve_path(key, parsed_columns[key])
+
+        reject_unknown_keys(policies, set(contract.allowed_policy_keys), "input.adapter.policies")
+        parsed_policies = contract.normalize_policies(policies, "input.adapter.policies")
+
+        if alphabet is not None and alphabet not in contract.supported_alphabets:
+            allowed = ", ".join(sorted(contract.supported_alphabets))
+            raise SchemaError(
+                "input.adapter.kind "
+                f"{parsed_kind!r} is not compatible with input.alphabet {alphabet!r}; "
+                f"supported input.alphabet values: {allowed}"
+            )
+
+        return parsed_kind, parsed_columns, parsed_policies
+    except ContractError as exc:
+        raise SchemaError(str(exc)) from exc

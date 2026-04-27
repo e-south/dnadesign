@@ -13,12 +13,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
-from dnadesign.baserender.src.api import run_cruncher_showcase_job
 from dnadesign.baserender.src.cli import app
 from dnadesign.baserender.src.config import load_cruncher_showcase_job
-from dnadesign.baserender.src.workspace import discover_workspaces, init_workspace, resolve_workspace_job_path
+from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.public import run_cruncher_showcase_job
+from dnadesign.baserender.src.workspaces import discover_workspaces, init_workspace, resolve_workspace_job_path
 
 from .conftest import write_job, write_parquet
 
@@ -26,6 +28,7 @@ from .conftest import write_job, write_parquet
 def _workspace_job_payload() -> dict:
     return {
         "version": 3,
+        "contract": {"kind": "sequence_rows_render_v3"},
         "input": {
             "kind": "parquet",
             "path": "inputs/input.parquet",
@@ -53,6 +56,7 @@ def test_workspace_init_scaffolds_standard_layout(tmp_path: Path) -> None:
     assert workspace.name == "demo_workspace"
     assert workspace.root == (tmp_path / "demo_workspace").resolve()
     assert workspace.job_path == workspace.root / "job.yaml"
+    assert (workspace.root / ".baserender-workspace").exists()
     assert (workspace.root / "README.md").exists()
     assert (workspace.root / "inputs").exists()
     assert (workspace.root / "inputs" / "README.md").exists()
@@ -61,6 +65,7 @@ def test_workspace_init_scaffolds_standard_layout(tmp_path: Path) -> None:
     assert not (workspace.root / "reports").exists()
     assert "inputs/input.parquet" in (workspace.root / "README.md").read_text(encoding="utf-8")
     assert "outputs/plots/" in (workspace.root / "outputs" / "README.md").read_text(encoding="utf-8")
+    assert "contract:\n  kind: sequence_rows_render_v3" in workspace.job_path.read_text(encoding="utf-8")
 
 
 def test_workspace_job_uses_workspace_outputs_by_default(tmp_path: Path) -> None:
@@ -135,6 +140,62 @@ def test_workspace_selector_resolves_in_cli_and_validate_passes(tmp_path: Path) 
     assert "OK:" in result.output
 
 
+def test_workspace_discovery_ignores_unmarked_job_directories(tmp_path: Path) -> None:
+    candidate = tmp_path / "accidental_workspace"
+    (candidate / "inputs").mkdir(parents=True)
+    (candidate / "outputs").mkdir()
+    write_job(candidate / "job.yaml", _workspace_job_payload())
+
+    assert discover_workspaces(root=tmp_path) == ()
+
+
+def test_workspace_selector_rejects_unmarked_job_directory(tmp_path: Path) -> None:
+    candidate = tmp_path / "accidental_workspace"
+    (candidate / "inputs").mkdir(parents=True)
+    (candidate / "outputs").mkdir()
+    write_job(candidate / "job.yaml", _workspace_job_payload())
+
+    with pytest.raises(SchemaError, match=".baserender-workspace"):
+        resolve_workspace_job_path("accidental_workspace", root=tmp_path)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "job",
+            "validate",
+            "--workspace",
+            "accidental_workspace",
+            "--workspace-root",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 2
+    assert ".baserender-workspace" in result.output
+
+
+def test_unmarked_job_yaml_with_inputs_outputs_uses_job_local_results(tmp_path: Path) -> None:
+    candidate = tmp_path / "accidental_workspace"
+    (candidate / "inputs").mkdir(parents=True)
+    (candidate / "outputs").mkdir()
+    write_parquet(
+        candidate / "inputs" / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "ACGT",
+                "features": [],
+                "effects": [],
+                "display": {"overlay_text": None},
+            }
+        ],
+    )
+    write_job(candidate / "job.yaml", _workspace_job_payload())
+
+    parsed = load_cruncher_showcase_job(candidate / "job.yaml")
+
+    assert parsed.results_root == (candidate / "results").resolve()
+
+
 def test_job_validate_requires_exactly_one_job_source() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["job", "validate"])
@@ -182,4 +243,4 @@ def test_workspace_run_defaults_outputs_to_workspace_outputs_root(tmp_path: Path
 
     report = run_cruncher_showcase_job(str(workspace.job_path))
     assert Path(report.outputs["images_dir"]) == (workspace.root / "outputs" / "plots").resolve()
-    assert Path(report.outputs["report_path"]) == (workspace.root / "outputs" / "run_report.json").resolve()
+    assert "report_path" not in report.outputs

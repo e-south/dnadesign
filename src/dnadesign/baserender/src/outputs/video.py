@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/outputs.py
+src/dnadesign/baserender/src/outputs/video.py
 
-Writers for sequence-rows image and video outputs.
+Video output writer and frame-sizing helpers for BaseRender records.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import re
 import textwrap
 from dataclasses import replace
 from pathlib import Path
@@ -19,136 +18,9 @@ from typing import Iterable
 
 import numpy as np
 
-from .config import ImagesOutputCfg, Style, VideoOutputCfg
-from .core import Record, SchemaError
-from .render import Palette, render_record
-
-
-def _safe_stem(raw: str) -> str:
-    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", raw.strip())
-    stem = stem.strip("._-")
-    return stem or "record"
-
-
-def _unique_stem(base: str, used: set[str]) -> str:
-    if base not in used:
-        used.add(base)
-        return base
-    i = 2
-    while True:
-        candidate = f"{base}_{i}"
-        if candidate not in used:
-            used.add(candidate)
-            return candidate
-        i += 1
-
-
-def _figure_rgba(fig):
-    fig.canvas.draw()
-    width, height = fig.canvas.get_width_height()
-    data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-    return data.reshape((height, width, 4)).copy()
-
-
-def _render_record_grid_figure_local(
-    records: list[Record],
-    *,
-    renderer_name: str,
-    style: Style,
-    palette: Palette,
-    ncols: int,
-):
-    import matplotlib.pyplot as plt
-
-    panel_images: list[object] = []
-    for record in records:
-        panel = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
-        panel_images.append(_figure_rgba(panel))
-        plt.close(panel)
-
-    max_h = max(image.shape[0] for image in panel_images)
-    max_w = max(image.shape[1] for image in panel_images)
-    cols = min(ncols, len(panel_images))
-    rows = int((len(panel_images) + cols - 1) / cols)
-    dpi = 120
-    fig_w = (cols * max_w) / dpi
-    fig_h = (rows * max_h) / dpi
-    fig, axes = plt.subplots(rows, cols, figsize=(fig_w, fig_h), dpi=dpi, squeeze=False)
-    flat_axes = list(axes.flat)
-
-    for idx, image in enumerate(panel_images):
-        ax = flat_axes[idx]
-        ax.imshow(image)
-        ax.set_axis_off()
-
-    for ax in flat_axes[len(panel_images) :]:
-        ax.set_axis_off()
-
-    fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99, wspace=0.02, hspace=0.02)
-    return fig
-
-
-def write_images(
-    records: Iterable[Record],
-    *,
-    output: ImagesOutputCfg,
-    renderer_name: str,
-    style: Style,
-    palette: Palette,
-) -> Path:
-    import matplotlib.pyplot as plt
-
-    materialized = list(records)
-    if not materialized:
-        raise SchemaError("No records to render after adapter, transforms, and selection")
-
-    if output.path is not None:
-        out_path = output.path.resolve()
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        if len(materialized) == 1:
-            fig = render_record(materialized[0], renderer_name=renderer_name, style=style, palette=palette)
-        else:
-            fig = _render_record_grid_figure_local(
-                materialized,
-                renderer_name=renderer_name,
-                style=style,
-                palette=palette,
-                ncols=1,
-            )
-        fig.patch.set_facecolor("white")
-        fig.patch.set_alpha(1.0)
-        fig.savefig(
-            out_path,
-            format=output.fmt,
-            bbox_inches=None,
-            pad_inches=0.0,
-            facecolor="white",
-        )
-        plt.close(fig)
-        return out_path
-
-    assert output.dir is not None
-    out_dir = output.dir.resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    used: set[str] = set()
-    for index, record in enumerate(materialized):
-        stem = _safe_stem(record.id if record.id else f"record_{index}")
-        name = _unique_stem(stem, used)
-        out_path = out_dir / f"{name}.{output.fmt}"
-
-        fig = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
-        fig.patch.set_facecolor("white")
-        fig.patch.set_alpha(1.0)
-        fig.savefig(
-            out_path,
-            format=output.fmt,
-            bbox_inches=None,
-            pad_inches=0.0,
-            facecolor="white",
-        )
-        plt.close(fig)
-    return out_dir
+from ..config import Style, VideoOutputCfg
+from ..core import Record, SchemaError
+from ..render import Palette, render_record
 
 
 def _even_ceil(value: int) -> int:
@@ -164,6 +36,14 @@ def _target_frame_size(
     width = natural_w
     height = natural_h
     explicit_size = False
+
+    if output.width_px is not None and output.height_px is not None and output.aspect_ratio is not None:
+        declared_ratio = float(output.width_px) / float(output.height_px)
+        if abs(declared_ratio - float(output.aspect_ratio)) > 1.0e-6:
+            raise SchemaError(
+                "outputs.video.aspect_ratio conflicts with width_px/height_px "
+                f"({output.aspect_ratio!r} != {declared_ratio:.6g})"
+            )
 
     if output.width_px is not None:
         width = int(output.width_px)
@@ -210,8 +90,6 @@ def _scale_rgba_to_fit(arr, *, width: int, height: int):
 
 
 def _letterbox_rgba(arr, *, width: int, height: int, vertical_align: str = "center"):
-    import numpy as np
-
     h, w = arr.shape[:2]
     if width < w or height < h:
         arr = np.asarray(_scale_rgba_to_fit(arr, width=width, height=height))
@@ -232,8 +110,6 @@ def _letterbox_rgba(arr, *, width: int, height: int, vertical_align: str = "cent
 
 
 def _trim_white_border_rgba(arr, *, threshold: int = 248, pad_px: int = 2):
-    import numpy as np
-
     if arr.ndim != 3 or arr.shape[2] < 3:
         return arr
     rgb = arr[:, :, :3]
@@ -250,8 +126,6 @@ def _trim_white_border_rgba(arr, *, threshold: int = 248, pad_px: int = 2):
 
 
 def _content_bounds_rgba(arr, *, threshold: int = 252):
-    import numpy as np
-
     if arr.ndim != 3 or arr.shape[2] < 3:
         return None
     rgb = arr[:, :, :3]
@@ -403,7 +277,7 @@ def _pause_frames(record_id: str, *, output: VideoOutputCfg) -> int:
 
 
 def _sequence_rows_content_extents_px(record: Record, *, style: Style) -> tuple[float, float]:
-    from .render.layout import compute_layout
+    from ..render.layout import compute_layout
 
     layout = compute_layout(record, style)
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
@@ -439,7 +313,7 @@ def _apply_fixed_content_radius(
 
 
 def _sequence_rows_layout_context(record: Record, *, style: Style):
-    from .render.layout import compute_layout
+    from ..render.layout import compute_layout
 
     fixed_top_raw = record.meta.get("fixed_content_top_extent_px")
     fixed_bottom_raw = record.meta.get("fixed_content_bottom_extent_px")
@@ -570,7 +444,6 @@ def write_video(
 ) -> Path:
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt
-    import numpy as np
 
     materialized = list(records)
     if not materialized:
@@ -1037,3 +910,27 @@ def write_video(
         plt.close(fig)
 
     return out_path
+
+
+__all__ = [
+    "_apply_fixed_content_radius",
+    "_apply_sequence_rows_content_envelope",
+    "_apply_sequence_rows_extra_bottom_padding",
+    "_content_bounds_rgba",
+    "_even_ceil",
+    "_letterbox_rgba",
+    "_pause_frames",
+    "_rendered_content_top_norm_for_video_frame",
+    "_scale_rgba_to_fit",
+    "_scaled_dimensions_to_fit",
+    "_sequence_rows_actual_content_bounds_px",
+    "_sequence_rows_content_envelope_norms",
+    "_sequence_rows_content_extents_px",
+    "_sequence_rows_layout_context",
+    "_sequence_rows_required_extra_bottom_padding_px",
+    "_target_frame_size",
+    "_trim_white_border_rgba",
+    "_union_centered_content_bounds",
+    "render_record",
+    "write_video",
+]

@@ -1,0 +1,133 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/baserender/src/outputs/images.py
+
+Image output writer for BaseRender records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Iterable
+
+import numpy as np
+
+from ..config import ImagesOutputCfg, Style
+from ..core import Record, SchemaError
+from ..render import Palette, render_record
+from .names import _safe_stem, _unique_stem
+
+
+def _figure_rgba(fig):
+    fig.canvas.draw()
+    width, height = fig.canvas.get_width_height()
+    data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    return data.reshape((height, width, 4)).copy()
+
+
+def _render_record_grid_figure_local(
+    records: list[Record],
+    *,
+    renderer_name: str,
+    style: Style,
+    palette: Palette,
+    ncols: int,
+):
+    import matplotlib.pyplot as plt
+
+    panel_images: list[object] = []
+    for record in records:
+        panel = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
+        panel_images.append(_figure_rgba(panel))
+        plt.close(panel)
+
+    max_h = max(image.shape[0] for image in panel_images)
+    max_w = max(image.shape[1] for image in panel_images)
+    cols = min(ncols, len(panel_images))
+    rows = int((len(panel_images) + cols - 1) / cols)
+    dpi = 120
+    fig_w = (cols * max_w) / dpi
+    fig_h = (rows * max_h) / dpi
+    fig, axes = plt.subplots(rows, cols, figsize=(fig_w, fig_h), dpi=dpi, squeeze=False)
+    flat_axes = list(axes.flat)
+
+    for idx, image in enumerate(panel_images):
+        ax = flat_axes[idx]
+        ax.imshow(image)
+        ax.set_axis_off()
+
+    for ax in flat_axes[len(panel_images) :]:
+        ax.set_axis_off()
+
+    fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99, wspace=0.02, hspace=0.02)
+    return fig
+
+
+def write_images(
+    records: Iterable[Record],
+    *,
+    output: ImagesOutputCfg,
+    renderer_name: str,
+    style: Style,
+    palette: Palette,
+) -> Path:
+    import matplotlib.pyplot as plt
+
+    materialized = list(records)
+    if not materialized:
+        raise SchemaError("No records to render after adapter, transforms, and selection")
+
+    if output.path is not None:
+        out_path = output.path.resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        if len(materialized) == 1:
+            fig = render_record(materialized[0], renderer_name=renderer_name, style=style, palette=palette)
+        else:
+            fig = _render_record_grid_figure_local(
+                materialized,
+                renderer_name=renderer_name,
+                style=style,
+                palette=palette,
+                ncols=1,
+            )
+        fig.patch.set_facecolor("white")
+        fig.patch.set_alpha(1.0)
+        fig.savefig(
+            out_path,
+            format=output.fmt,
+            bbox_inches=None,
+            pad_inches=0.0,
+            facecolor="white",
+        )
+        plt.close(fig)
+        return out_path
+
+    assert output.dir is not None
+    out_dir = output.dir.resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    used: set[str] = set()
+    for index, record in enumerate(materialized):
+        stem = _safe_stem(record.id if record.id else f"record_{index}")
+        name = _unique_stem(stem, used)
+        out_path = out_dir / f"{name}.{output.fmt}"
+
+        fig = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
+        fig.patch.set_facecolor("white")
+        fig.patch.set_alpha(1.0)
+        fig.savefig(
+            out_path,
+            format=output.fmt,
+            bbox_inches=None,
+            pad_inches=0.0,
+            facecolor="white",
+        )
+        plt.close(fig)
+    return out_dir
+
+
+__all__ = ["_figure_rgba", "_render_record_grid_figure_local", "render_record", "write_images"]

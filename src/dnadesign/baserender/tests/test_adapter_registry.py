@@ -187,6 +187,7 @@ def test_adapter_descriptor_policy_normalizers_accept_supported_values() -> None
             "require_non_null_cols": ["sequence", 7],
             "zero_as_unspecified": False,
             "require_non_empty": True,
+            "overlay_text_template": "{overlay_text}\n{id}",
         },
         "input.adapter.policies",
     )
@@ -204,6 +205,7 @@ def test_adapter_descriptor_policy_normalizers_accept_supported_values() -> None
         "require_non_null_cols": ["sequence", "7"],
         "zero_as_unspecified": False,
         "require_non_empty": True,
+        "overlay_text_template": "{overlay_text}\n{id}",
     }
     assert cruncher_policies == {"on_missing_hit": "skip", "on_missing_pwm": "skip_effect"}
 
@@ -220,6 +222,14 @@ def test_densegen_policy_normalizer_rejects_non_bool_flags() -> None:
     with pytest.raises(SchemaError, match="zero_as_unspecified must be bool"):
         adapter_descriptor("densegen_tfbs").normalize_policies(
             {"zero_as_unspecified": "yes"},
+            "input.adapter.policies",
+        )
+
+
+def test_densegen_policy_normalizer_rejects_blank_overlay_template() -> None:
+    with pytest.raises(SchemaError, match="overlay_text_template must be a non-empty string"):
+        adapter_descriptor("densegen_tfbs").normalize_policies(
+            {"overlay_text_template": " "},
             "input.adapter.policies",
         )
 

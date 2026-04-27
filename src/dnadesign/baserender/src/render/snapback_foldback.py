@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/render/snapback_foldback.py
 
 Foldback-specific snapback rendering helpers for compact corner-triloop views.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,0 +1,95 @@
+version: 3
+contract:
+  kind: sequence_rows_render_v3
+input:
+  kind: parquet
+  path: inputs/input.parquet
+  adapter:
+    kind: densegen_tfbs
+    columns:
+      sequence: sequence
+      annotations: densegen__used_tfbs_detail
+      id: id
+      overlay_text: usr_label__primary
+    policies:
+      on_invalid_row: error
+      require_non_empty: true
+      min_per_record: 5
+      overlay_text_template: |-
+        {overlay_text}
+        {id}
+  alphabet: DNA
+render:
+  renderer: sequence_rows
+  style:
+    preset: presentation_default
+    overrides:
+      figure_scale: 1.6
+      padding_y: 24.0
+      overlay_align: center
+      layout:
+        outer_pad_cells: 0.62
+      sequence:
+        strand_gap_cells: 0.18
+        to_kmer_gap_cells: 0.38
+        bold_consensus_bases: true
+        non_consensus_color: "#9CA3AF"
+        tone_quantile_low: 0.10
+        tone_quantile_high: 0.90
+      palette:
+        tf:background: "#C3CAD3"
+        tf:lexA: "#5DADE2"
+        tf:lexA_CTGTATAWAWWHACA: "#5DADE2"
+        tf:cpxR: "#2D9B66"
+        tf:cpxR_MANWWHTTTAM: "#2D9B66"
+        tf:baeR: "#E58A2B"
+        tf:baeR_TTTCTSCVHNA: "#E58A2B"
+        promoter:sigma70_core:upstream: "#7D86D1"
+        promoter:sigma70_core:downstream: "#C886D1"
+      connectors: false
+      legend: true
+      legend_mode: bottom
+      legend_height_px: 136.0
+      legend_pad_px: 36.0
+      legend_patch_w: 88.0
+      legend_patch_h: 34.0
+      legend_font_size: 24
+      legend_gap_patch_text: 22.0
+      legend_gap_x: 44.0
+      legend_vertical_align: 1.0
+      font_size_seq: 24
+      font_size_label: 24
+      span_link_line_width: 3.2
+      span_link_tick_line_width: 2.8
+      uniform_display_font_size: true
+      kmer:
+        box_height_cells: 1.12
+        fill_alpha: 0.94
+        text_y_nudge_cells: 0.0
+        to_logo_gap_cells: 0.12
+      motif_logo:
+        layout: stack
+        lane_mode: follow_feature_track
+        display_mode: information
+        height_bits: 2.0
+        bits_to_cells: 1.35
+        y_pad_cells: 0.0
+        letter_x_pad_frac: 0.06
+        alpha_other: 0.80
+        alpha_observed: 1.0
+        debug_bounds: false
+        letter_coloring:
+          mode: match_window_seq
+          other_color: "#D1D5DB"
+          observed_color_source: feature_fill
+        scale_bar:
+          enabled: true
+          location: left_of_logo
+outputs:
+  - kind: images
+    dir: plots
+    fmt: png
+run:
+  strict: true
+  fail_on_skips: true
+  emit_report: true

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/cli.py
+src/dnadesign/baserender/src/cli/app.py
 
-Baserender vNext CLI for Sequence Rows v3 job configs.
+Baserender vNext CLI for BaseRender v3 render configs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,7 +17,9 @@ from pathlib import Path
 import typer
 import yaml
 
-from .cli_actions import (
+from ..core import BaseRenderError
+from ..workspaces import default_workspaces_root
+from .actions import (
     discover_workspaces_action,
     init_workspace_action,
     list_style_presets_action,
@@ -26,11 +28,9 @@ from .cli_actions import (
     show_style_action,
     validate_job_action,
 )
-from .core import BaseRenderError
-from .workspace import default_workspaces_root
 
 app = typer.Typer(help="Baserender vNext CLI")
-job_app = typer.Typer(help="Sequence Rows v3 job commands")
+job_app = typer.Typer(help="BaseRender v3 render commands")
 style_app = typer.Typer(help="Style commands")
 workspace_app = typer.Typer(help="Workspace commands")
 app.add_typer(job_app, name="job")
@@ -45,7 +45,7 @@ def _exit_cli_error(exc: Exception) -> None:
 
 @job_app.command("validate")
 def job_validate(
-    job: str | None = typer.Argument(None, help="Path to Sequence Rows v3 job YAML (or job name)."),
+    job: str | None = typer.Argument(None, help="Path to BaseRender v3 render YAML (or job name)."),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
@@ -53,7 +53,7 @@ def job_validate(
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Validate a Sequence Rows v3 job config."""
+    """Validate a BaseRender v3 render config."""
     try:
         parsed = validate_job_action(job, workspace, workspace_root)
     except BaseRenderError as exc:
@@ -63,7 +63,7 @@ def job_validate(
 
 @job_app.command("run")
 def job_run(
-    job: str | None = typer.Argument(None, help="Path to Sequence Rows v3 job YAML (or job name)."),
+    job: str | None = typer.Argument(None, help="Path to BaseRender v3 render YAML (or job name)."),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
@@ -71,7 +71,7 @@ def job_run(
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Run a Sequence Rows v3 job config."""
+    """Run a BaseRender v3 render config."""
     try:
         report = run_job_action(job, workspace, workspace_root)
     except BaseRenderError as exc:
@@ -84,7 +84,7 @@ def job_run(
 
 @job_app.command("normalize")
 def job_normalize(
-    job: str | None = typer.Argument(None, help="Path to Sequence Rows v3 job YAML (or job name)."),
+    job: str | None = typer.Argument(None, help="Path to BaseRender v3 render YAML (or job name)."),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
@@ -93,7 +93,7 @@ def job_normalize(
     ),
     out: Path = typer.Option(..., "--out", help="Output path for normalized YAML."),
 ) -> None:
-    """Normalize and rewrite a Sequence Rows v3 job config with absolute resolved paths."""
+    """Normalize and rewrite a BaseRender v3 render config with absolute resolved paths."""
     try:
         written = normalize_job_action(
             job,
