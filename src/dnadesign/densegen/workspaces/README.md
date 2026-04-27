@@ -6,6 +6,7 @@ List the packaged workspaces and their current output state with `uv run dense w
 
 ### Choose a packaged workspace
 - [`demo_tfbs_baseline`](demo_tfbs_baseline/README.md): smallest local baseline without PWM mining.
+- [`demo_dense_array_showcase`](demo_dense_array_showcase/README.md): local CBC showcase for dense TFBS packing with no, one, and two fixed-anchor regimes.
 - [`demo_sampling_baseline`](demo_sampling_baseline/README.md): PWM sampling baseline with ethanol/ciprofloxacin plans.
 - [`study_constitutive_sigma_panel`](study_constitutive_sigma_panel/README.md): constitutive σ70 panel study.
 - [`study_stress_ethanol_cipro`](study_stress_ethanol_cipro/README.md): stress-condition study with GUROBI defaults.

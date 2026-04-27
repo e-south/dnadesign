@@ -160,6 +160,27 @@ def test_workspace_init_supports_binding_sites_demo_workspace(tmp_path: Path) ->
     assert not (tmp_path / "demo_run" / "outputs" / "report").exists()
 
 
+def test_workspace_init_supports_dense_array_showcase_workspace(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "showcase_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_dense_array_showcase",
+            "--copy-inputs",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "showcase_run" / "config.yaml").exists()
+    assert (tmp_path / "showcase_run" / "inputs" / "sites.csv").exists()
+
+
 def test_workspace_init_rejects_archived_source_workspace(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(

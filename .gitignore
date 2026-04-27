@@ -237,6 +237,13 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.sh
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/*.csv
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/README.md
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/config.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.md
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.sh
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/*.csv
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/README.md
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/config.yaml

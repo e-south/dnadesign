@@ -25,6 +25,7 @@ from dnadesign.densegen.src.viz.plot_inventory import notebook_visible_plot_ids
 
 PACKAGED_WORKSPACE_IDS = (
     "demo_tfbs_baseline",
+    "demo_dense_array_showcase",
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
     "study_stress_ethanol_cipro",
@@ -32,6 +33,7 @@ PACKAGED_WORKSPACE_IDS = (
 
 WORKSPACE_TUTORIAL_PATHS = {
     "demo_tfbs_baseline": "src/dnadesign/densegen/docs/tutorials/demo_tfbs_baseline.md",
+    "demo_dense_array_showcase": "src/dnadesign/densegen/docs/tutorials/demo_dense_array_showcase.md",
     "demo_sampling_baseline": "src/dnadesign/densegen/docs/tutorials/demo_sampling_baseline.md",
     "study_constitutive_sigma_panel": "src/dnadesign/densegen/docs/tutorials/study_constitutive_sigma_panel.md",
     "study_stress_ethanol_cipro": "src/dnadesign/densegen/docs/tutorials/study_stress_ethanol_cipro.md",
@@ -262,13 +264,96 @@ def test_tfbs_baseline_demo_uses_local_output_with_padding_enabled() -> None:
     assert cfg.root.densegen.runtime.max_accepted_per_library == 10
 
 
+def test_dense_array_showcase_config_is_parquet_local_and_cbc() -> None:
+    cfg_path = _demo_config_path("demo_dense_array_showcase")
+    cfg = load_config(cfg_path)
+
+    assert cfg.root.densegen.run.id == "demo_dense_array_showcase"
+    assert cfg.root.densegen.generation.sequence_length == 100
+    assert cfg.root.densegen.generation.total_quota() == 500
+    assert cfg.root.densegen.output.targets == ["parquet"]
+    assert cfg.root.densegen.output.parquet is not None
+    assert cfg.root.densegen.output.usr is None
+    assert cfg.root.densegen.solver.backend == "CBC"
+    assert cfg.root.densegen.solver.strategy == "iterate"
+    assert cfg.root.plots is not None
+    assert cfg.root.plots.source == "parquet"
+    assert cfg.root.plots.video.enabled is True
+    assert cfg.root.plots.video.show_title is False
+    assert cfg.root.plots.video.show_subtitle is False
+    assert cfg.root.plots.video.sampling.plan_snapshots == {
+        "dense_free": 6,
+        "single_anchor__alpha=c-c": 9,
+        "single_anchor__alpha=d-d": 9,
+        "dual_anchor__alpha=c-c": 8,
+    }
+    assert cfg.root.plots.video.playback.target_duration_sec == 20
+    assert cfg.root.plots.video.playback.fps == 8
+    assert cfg.root.plots.video.presentation.legend_font_size == 30
+    assert cfg.root.plots.video.presentation.legend_height_px == 176.0
+    assert cfg.root.plots.video.presentation.palette["tf:TF_A"] == "#0072B2"
+    assert cfg.root.plots.video.presentation.palette["promoter:alpha_anchor:upstream"] == "#332288"
+
+
+def test_dense_array_showcase_sites_cover_eight_toy_regulators() -> None:
+    cfg_path = _demo_config_path("demo_dense_array_showcase")
+    cfg = load_config(cfg_path)
+    sites_input = next(inp for inp in cfg.root.densegen.inputs if inp.type == "binding_sites")
+    sites_path = resolve_path(cfg_path, sites_input.path)
+    assert sites_path.exists()
+
+    with sites_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+
+    assert len(rows) == 40
+    per_tf_counts = {f"TF_{letter}": 0 for letter in "ABCDEFGH"}
+    unique_tfbs = set()
+
+    for row in rows:
+        tf = str(row.get("tf") or "").strip()
+        tfbs = str(row.get("tfbs") or "").strip().upper()
+        assert tf in per_tf_counts
+        per_tf_counts[tf] += 1
+        assert 11 <= len(tfbs) <= 22
+        assert set(tfbs) <= {"A", "C", "G", "T"}
+        unique_tfbs.add(tfbs)
+
+    assert per_tf_counts == {f"TF_{letter}": 5 for letter in "ABCDEFGH"}
+    assert len(unique_tfbs) == 40
+
+
+def test_dense_array_showcase_plan_mix_exercises_zero_one_and_two_fixed_elements() -> None:
+    cfg = load_config(_demo_config_path("demo_dense_array_showcase"))
+    plans = list(cfg.root.densegen.generation.plan or [])
+    assert len(plans) == 4
+    assert sum(int(item.sequences) for item in plans) == 500
+
+    dense_free = [item for item in plans if item.name == "dense_free"]
+    single_anchor = [item for item in plans if item.name.startswith("single_anchor__alpha=")]
+    dual_anchor = [item for item in plans if item.name.startswith("dual_anchor__alpha=")]
+    assert len(dense_free) == 1
+    assert len(single_anchor) == 2
+    assert len(dual_anchor) == 1
+
+    assert list(dense_free[0].fixed_elements.promoter_constraints or []) == []
+    assert int(dense_free[0].sequences) == 300
+    assert {int(item.sequences) for item in single_anchor} == {90}
+    assert {int(item.sequences) for item in dual_anchor} == {20}
+    for item in single_anchor:
+        pcs = list(item.fixed_elements.promoter_constraints or [])
+        assert len(pcs) == 1
+        assert pcs[0].name == "alpha_anchor"
+        assert tuple(pcs[0].spacer_length or ()) == (16, 20)
+    for item in dual_anchor:
+        pcs = list(item.fixed_elements.promoter_constraints or [])
+        assert len(pcs) == 2
+        assert {pc.name for pc in pcs} == {"alpha_anchor", "beta_anchor"}
+        assert {tuple(pc.spacer_length or ()) for pc in pcs} == {(16, 20)}
+
+
 def test_packaged_workspace_configs_track_latest_schema_version() -> None:
-    for workspace_id in (
-        "demo_tfbs_baseline",
-        "demo_sampling_baseline",
-        "study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro",
-    ):
+    for workspace_id in PACKAGED_WORKSPACE_IDS:
         cfg = load_config(_demo_config_path(workspace_id))
         assert cfg.root.densegen.schema_version == LATEST_SCHEMA_VERSION
 
@@ -343,12 +428,7 @@ def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
         "study_constitutive_sigma_panel": "densegen_study_constitutive_sigma_panel",
         "study_stress_ethanol_cipro": "densegen_prom_eth_cip_source",
     }
-    for workspace_id in (
-        "demo_tfbs_baseline",
-        "demo_sampling_baseline",
-        "study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro",
-    ):
+    for workspace_id in PACKAGED_WORKSPACE_IDS:
         cfg_path = _demo_config_path(workspace_id)
         cfg = load_config(cfg_path)
         assert cfg.root.densegen.run.id == workspace_id
@@ -361,12 +441,7 @@ def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
 
 
 def test_packaged_workspace_configs_exclude_stale_legacy_namespaces() -> None:
-    for workspace_id in (
-        "demo_tfbs_baseline",
-        "demo_sampling_baseline",
-        "study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro",
-    ):
+    for workspace_id in PACKAGED_WORKSPACE_IDS:
         raw = _demo_config_path(workspace_id).read_text()
         assert "demo_meme_three_tfs" not in raw
         assert "neutral_bg" not in raw
@@ -418,18 +493,22 @@ def test_packaged_motif_artifact_manifests_use_active_cruncher_workspaces() -> N
 def test_gitignore_workspaces_allowlist_matches_packaged_workspace_names() -> None:
     gitignore = (Path(__file__).resolve().parents[5] / ".gitignore").read_text()
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/README.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.sh" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.sh" in gitignore
@@ -527,8 +606,22 @@ def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None
 
 def test_packaged_workspace_plot_defaults_cover_full_notebook_surface() -> None:
     expected_notebook_surface = set(notebook_visible_plot_ids())
+    dense_array_showcase_surface = {
+        "source_cohort_concentration",
+        "plan_regulator_deployment_heatmap",
+        "placement_occupancy_map",
+        "retained_pool_coverage_by_regulator",
+        "attempt_outcome_timeline",
+        "solve_pressure_and_progress",
+        "compression_ratio_by_plan",
+        "dense_array_showcase_video",
+        "retained_vs_deployed_length_mix_by_regulator",
+        "source_plan_input_heatmap",
+        "tfbs_concentration_profile",
+    }
     expected_defaults = {
         "demo_tfbs_baseline": expected_notebook_surface,
+        "demo_dense_array_showcase": dense_array_showcase_surface,
         "demo_sampling_baseline": expected_notebook_surface,
         "study_constitutive_sigma_panel": expected_notebook_surface,
         "study_stress_ethanol_cipro": expected_notebook_surface,
@@ -805,18 +898,21 @@ def test_packaged_workspace_runbook_scripts_use_shared_helper_with_workspace_pol
 
     expected_runner_by_workspace = {
         "demo_tfbs_baseline": "uv",
+        "demo_dense_array_showcase": "uv",
         "demo_sampling_baseline": "pixi",
         "study_constitutive_sigma_panel": "pixi",
         "study_stress_ethanol_cipro": "pixi",
     }
     expected_usr_registry_by_workspace = {
         "demo_tfbs_baseline": "false",
+        "demo_dense_array_showcase": "false",
         "demo_sampling_baseline": "true",
         "study_constitutive_sigma_panel": "true",
         "study_stress_ethanol_cipro": "true",
     }
     expected_fimo_by_workspace = {
         "demo_tfbs_baseline": "false",
+        "demo_dense_array_showcase": "false",
         "demo_sampling_baseline": "true",
         "study_constitutive_sigma_panel": "true",
         "study_stress_ethanol_cipro": "true",

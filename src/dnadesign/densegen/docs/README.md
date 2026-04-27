@@ -7,6 +7,7 @@
 
 #### Run a packaged workspace end to end
 - [TFBS baseline tutorial](tutorials/demo_tfbs_baseline.md): run the baseline TFBS path from config to outputs.
+- [Dense array showcase tutorial](tutorials/demo_dense_array_showcase.md): run a local CBC demo with dense TFBS packing and fixed-anchor variants.
 - [Sampling baseline tutorial](tutorials/demo_sampling_baseline.md): run the sampling-enabled path and inspect artifacts.
 - [Constitutive sigma panel tutorial](tutorials/study_constitutive_sigma_panel.md): execute a constitutive sigma study workflow.
 - [Stress ethanol and ciprofloxacin tutorial](tutorials/study_stress_ethanol_cipro.md): execute a stress-condition study and verify outputs.
