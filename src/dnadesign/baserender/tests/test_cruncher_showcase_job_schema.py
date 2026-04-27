@@ -235,6 +235,25 @@ def test_video_output_content_fit_rejects_unknown_mode(tmp_path: Path) -> None:
         load_cruncher_showcase_job(job_path)
 
 
+def test_video_output_content_fit_rejects_non_uniform_frame_fill(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[
+            {
+                "kind": "video",
+                "fmt": "mp4",
+                "content_fit": "fill_frame_per_frame",
+            }
+        ],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="outputs\\[0\\].content_fit"):
+        load_cruncher_showcase_job(job_path)
+
+
 @pytest.mark.parametrize(
     ("mutate", "match"),
     [

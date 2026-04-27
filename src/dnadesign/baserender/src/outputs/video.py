@@ -14,7 +14,7 @@ from __future__ import annotations
 import textwrap
 from dataclasses import replace
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 
@@ -142,6 +142,136 @@ def _trim_white_border_rgba(arr, *, threshold: int = 248, pad_px: int = 2):
     left = max(0, int(xs.min()) - int(pad_px))
     right = min(w - 1, int(xs.max()) + int(pad_px))
     return arr[top : bottom + 1, left : right + 1, :]
+
+
+def _video_text_px_width(text: str, family: str, size_pt: float, dpi: int) -> float:
+    if not text:
+        return 0.0
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.textpath import TextPath
+
+    prop = FontProperties(family=family, size=float(size_pt))
+    bbox = TextPath((0, 0), str(text), prop=prop).get_extents()
+    return max(0.0, float(bbox.width) / 72.0 * float(dpi))
+
+
+def _video_footer_legend_font_size_pt(style: Style) -> float:
+    # Video footer artists are drawn directly in the fixed-size output frame.
+    # Treat legend_font_size as a target final-pixel size, then convert to
+    # Matplotlib points for the figure DPI.
+    target_px = max(9.0, min(16.0, float(style.legend_font_size)))
+    return float(target_px * 72.0 / float(style.dpi))
+
+
+def _draw_video_footer_legend(
+    fig,
+    *,
+    legend: Sequence[tuple[str, str]],
+    palette: Palette,
+    style: Style,
+    frame_width_px: int,
+    frame_height_px: int,
+) -> list[object]:
+    if not legend:
+        return []
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+
+    frame_w = max(1.0, float(frame_width_px))
+    frame_h = max(1.0, float(frame_height_px))
+    font_size_pt = _video_footer_legend_font_size_pt(style)
+    font_px = font_size_pt / 72.0 * float(style.dpi)
+    side_pad = max(8.0, min(18.0, float(style.padding_x) * 0.5))
+    pad_y = max(4.0, min(10.0, float(style.legend_pad_px)))
+    patch_w = max(7.0, min(14.0, font_px * 0.9, float(style.legend_patch_w) * 0.42))
+    patch_h = max(4.0, min(8.0, font_px * 0.55, float(style.legend_patch_h) * 0.65))
+    gap_patch_text = max(4.0, min(8.0, float(style.legend_gap_patch_text)))
+    requested_gap_x = max(8.0, min(24.0, float(style.legend_gap_x)))
+    available_width = max(1.0, frame_w - (2.0 * side_pad))
+
+    text_widths = [_video_text_px_width(label, style.font_label, font_size_pt, style.dpi) for _tag, label in legend]
+    entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
+    rows: list[list[int]] = []
+    current: list[int] = []
+    current_width = 0.0
+    for idx, width in enumerate(entry_widths):
+        add_width = width if not current else requested_gap_x + width
+        if current and current_width + add_width > available_width:
+            rows.append(current)
+            current = [idx]
+            current_width = width
+            continue
+        current.append(idx)
+        current_width += add_width
+    if current:
+        rows.append(current)
+
+    row_height = max(patch_h, font_px * 1.22)
+    row_gap = max(2.0, min(6.0, row_height * 0.22))
+    rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap)
+    footer_h = min(frame_h * 0.28, rows_height + 2.0 * pad_y)
+    free_h = max(0.0, footer_h - rows_height - 2.0 * pad_y)
+    y = pad_y + free_h * float(style.legend_vertical_align)
+
+    artists: list[object] = []
+    background = Rectangle(
+        (0.0, 0.0),
+        1.0,
+        footer_h / frame_h,
+        transform=fig.transFigure,
+        facecolor="white",
+        edgecolor="none",
+        alpha=0.96,
+        zorder=200.0,
+    )
+    background.set_gid("video_footer_legend_background")
+    fig.add_artist(background)
+    artists.append(background)
+
+    for row in rows:
+        row_total = sum(entry_widths[idx] for idx in row)
+        if len(row) > 1:
+            max_gap = max(0.0, (available_width - row_total) / float(len(row) - 1))
+            gap_x = min(requested_gap_x, max_gap)
+            row_total += float(len(row) - 1) * gap_x
+        else:
+            gap_x = 0.0
+        x = (frame_w - row_total) / 2.0 if style.legend_center else side_pad
+        x = max(side_pad, x)
+        for idx in row:
+            tag, label = legend[idx]
+            color = palette.color_for(tag)
+            edge_color = tuple(channel * 0.76 for channel in color)
+            patch = FancyBboxPatch(
+                (x / frame_w, y / frame_h),
+                patch_w / frame_w,
+                patch_h / frame_h,
+                boxstyle="round,pad=0.0,rounding_size=0.004",
+                transform=fig.transFigure,
+                linewidth=0.7,
+                facecolor=color,
+                alpha=1.0,
+                edgecolor=edge_color,
+                zorder=201.0,
+            )
+            patch.set_gid(f"video_footer_legend_patch:{tag}")
+            fig.add_artist(patch)
+            artists.append(patch)
+            text = fig.text(
+                (x + patch_w + gap_patch_text) / frame_w,
+                (y + patch_h / 2.0) / frame_h,
+                label,
+                va="center",
+                ha="left",
+                fontsize=font_size_pt,
+                family=style.font_label,
+                color=style.color_sequence,
+                zorder=202.0,
+            )
+            text.set_gid(f"video_footer_legend_label:{tag}")
+            artists.append(text)
+            x += entry_widths[idx] + gap_x
+        y += row_height + row_gap
+    return artists
 
 
 def _content_bounds_rgba(arr, *, threshold: int = 252):
@@ -523,11 +653,19 @@ def write_video(
     has_title = output.title_text is not None
     has_header_block = bool(has_title or dynamic_subtitle_enabled)
     content_fit = str(getattr(output, "content_fit", "native")).strip().lower()
+    use_frame_footer_legend = (
+        renderer_name == "sequence_rows"
+        and bool(style.legend)
+        and str(style.legend_mode).lower() == "bottom"
+        and content_fit == "fill_width_per_frame"
+    )
     # Sequence-row renders already include their own footer legend geometry. When
     # the video frame pins that content block to the bottom, the legend drifts to
     # the crop edge and picks up excess white space below the annotations.
     if renderer_name == "sequence_rows":
-        frame_vertical_align = "top" if content_fit == "fill_width" and not has_header_block else "center"
+        frame_vertical_align = (
+            "top" if content_fit in {"fill_width", "fill_width_per_frame"} and not has_header_block else "center"
+        )
     else:
         frame_vertical_align = "bottom" if has_header_block else "center"
     frame_w, frame_h = _target_frame_size(natural_w=natural_w, natural_h=natural_h, output=output)
@@ -539,7 +677,11 @@ def write_video(
             reserve_scale = 0.82 if has_title and dynamic_subtitle_enabled else 0.56
             header_reserve_px = _even_ceil(int(round(float(style.dpi) * float(reserve_scale))))
             frame_h = max(int(frame_h), int(natural_h) + int(header_reserve_px))
-    rendered_content_scale = 0.96 if (renderer_name == "sequence_rows" and content_fit != "fill_width") else 1.0
+    rendered_content_scale = (
+        0.96
+        if (renderer_name == "sequence_rows" and content_fit not in {"fill_width", "fill_width_per_frame"})
+        else 1.0
+    )
     rendered_content_top_norm = _rendered_content_top_norm_for_video_frame(
         frame_shapes=frame_shapes,
         content_bounds=content_bounds,
@@ -885,6 +1027,16 @@ def write_video(
         subtitle_artist.set_text("")
         subtitle_artist.set_visible(False)
 
+    footer_legend_artists: list[object] = []
+
+    def _clear_footer_legend_artists() -> None:
+        while footer_legend_artists:
+            artist = footer_legend_artists.pop()
+            try:
+                artist.remove()
+            except ValueError:
+                pass
+
     writer = animation.FFMpegWriter(
         fps=output.fps,
         codec="libx264",
@@ -903,22 +1055,29 @@ def write_video(
     try:
         with writer.saving(fig, str(out_path), dpi=style.dpi):
             for rec in prepared:
+                _clear_footer_legend_artists()
                 arr = _render_rgba(rec)
                 if (arr.shape[1], arr.shape[0]) != (natural_canvas_w, natural_canvas_h):
                     arr = _letterbox_rgba(arr, width=natural_canvas_w, height=natural_canvas_h, vertical_align="center")
 
-                if stable_bounds is not None:
+                if stable_bounds is not None and content_fit != "fill_width_per_frame":
                     left, top, right, bottom = stable_bounds
                     arr = arr[top : bottom + 1, left : right + 1, :]
 
-                if content_fit == "fill_width" and stable_bounds is None:
+                if content_fit == "fill_width_per_frame":
+                    arr = _trim_white_border_rgba(arr, pad_px=4)
+                elif content_fit == "fill_width" and stable_bounds is None:
                     arr = _trim_white_border_rgba(arr, pad_px=24)
 
                 if rendered_content_scale < 1.0:
                     scaled_width = max(1, int(round(float(arr.shape[1]) * float(rendered_content_scale))))
                     scaled_height = max(1, int(round(float(arr.shape[0]) * float(rendered_content_scale))))
                     arr = np.asarray(_scale_rgba_to_fit(arr, width=scaled_width, height=scaled_height))
-                if content_fit == "fill_width" and arr.shape[1] < frame_w:
+                if content_fit == "fill_width_per_frame":
+                    target_width = max(1, int(frame_w) - 24)
+                    if arr.shape[1] != target_width:
+                        arr = np.asarray(_scale_rgba_to_width(arr, width=target_width))
+                elif content_fit == "fill_width" and arr.shape[1] < frame_w:
                     target_width = max(1, int(frame_w) - 48)
                     arr = np.asarray(_scale_rgba_to_width(arr, width=target_width))
 
@@ -929,11 +1088,25 @@ def write_video(
                     subtitle_text = str(rec.display.video_subtitle or "").strip()
                     subtitle_artist.set_text(subtitle_text)
                     subtitle_artist.set_visible(subtitle_text != "")
+                if use_frame_footer_legend:
+                    from ..render.legend import legend_entries_for_record
+
+                    footer_legend_artists.extend(
+                        _draw_video_footer_legend(
+                            fig,
+                            legend=legend_entries_for_record(rec),
+                            palette=palette,
+                            style=style,
+                            frame_width_px=frame_w,
+                            frame_height_px=frame_h,
+                        )
+                    )
 
                 repeats = max(1, frames_per_record + _pause_frames(rec.id, output=output))
                 for _ in range(repeats):
                     writer.grab_frame()
     finally:
+        _clear_footer_legend_artists()
         plt.close(fig)
 
     return out_path
