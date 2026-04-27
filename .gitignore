@@ -296,6 +296,14 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/inputs/README.md
 !src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/outputs/
 !src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/outputs/.gitkeep
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/.baserender-workspace
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/README.md
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/job.yaml
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/inputs/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/inputs/README.md
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/.gitkeep
 
 # LatentDNA workspaces: keep configs/templates tracked; generated analysis outputs stay local.
 src/dnadesign/latentdna/workspaces/**/outputs/

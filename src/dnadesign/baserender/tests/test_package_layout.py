@@ -116,15 +116,17 @@ def test_no_tracked_generated_baserender_artifacts() -> None:
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    offenders = [
-        path
-        for path in tracked
-        if Path(path).exists()
-        and (
-            any(part in {".mplconfig", "__pycache__"} for part in Path(path).parts)
-            or path.endswith(".DS_Store")
-            or "/results/" in path
-            or ("/outputs/" in path and not path.endswith("/.gitkeep"))
+    offenders = []
+    for path in tracked:
+        p = Path(path)
+        parts = p.parts
+        if not p.exists():
+            continue
+        is_workspace_artifact = "workspaces" in parts and (
+            "results" in parts or ("outputs" in parts and not path.endswith("/.gitkeep"))
         )
-    ]
+        if any(part in {".mplconfig", "__pycache__"} for part in parts) or path.endswith(".DS_Store"):
+            offenders.append(path)
+        elif is_workspace_artifact:
+            offenders.append(path)
     assert offenders == []
