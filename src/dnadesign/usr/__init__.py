@@ -41,6 +41,7 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "USR_LABEL_NAMESPACE": (".src.api", "USR_LABEL_NAMESPACE"),
     "SEQ_ANNOT_NAMESPACE": (".src.api", "SEQ_ANNOT_NAMESPACE"),
     "DERIVED_NAMESPACE": (".src.api", "DERIVED_NAMESPACE"),
+    "DERIVED_COLUMNS": (".src.api", "DERIVED_COLUMNS"),
     "__version__": (".src.api", "__version__"),
     "main": (".src.cli", "main"),
     "app": (".src.cli", "app"),

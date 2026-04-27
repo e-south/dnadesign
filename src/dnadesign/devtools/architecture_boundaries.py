@@ -23,7 +23,6 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "billboard",
     "cluster",
     "construct",
-    "contracts",
     "cruncher",
     "densegen",
     "infer",
@@ -38,7 +37,7 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "tfkdanalysis",
     "usr",
 }
-TOP_LEVEL_SHARED_INFRA_PACKAGES = {"devtools", "testsupport"}
+TOP_LEVEL_SHARED_INFRA_PACKAGES = {"contracts", "devtools", "testsupport"}
 TOP_LEVEL_LEGACY_DIRECTORIES = {"archived", "prototypes"}
 _IGNORED_TOP_LEVEL_DIRECTORIES = {"__pycache__"}
 _NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | TOP_LEVEL_LEGACY_DIRECTORIES | _IGNORED_TOP_LEVEL_DIRECTORIES
@@ -56,13 +55,11 @@ _SKIPPED_PATH_SEGMENTS = {
 }
 _TEST_SUPPORT_PACKAGE = "testsupport"
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
-    ("baserender", "contracts"),
     ("billboard", "aligner"),
     ("cluster", "aligner"),
     ("cluster", "ops"),
     ("cluster", "usr"),
     ("construct", "usr"),
-    ("cruncher", "contracts"),
     ("cruncher", "baserender"),
     ("densegen", "baserender"),
     ("densegen", "cruncher"),

@@ -17,8 +17,7 @@ from pathlib import Path
 import pyarrow as pa
 import yaml
 
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
-from dnadesign.usr.src.registry.models import DERIVED_COLUMNS
+from dnadesign.usr import DERIVED_COLUMNS, Dataset, ensure_sequence_contract_namespaces
 
 from .errors import ValidationError
 

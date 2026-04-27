@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 import yaml
 
 from .models import (
+    DERIVED_COLUMNS,
     DERIVED_NAMESPACE,
     REGISTRY_FILENAME,
     SEQ_ANNOT_NAMESPACE,
@@ -60,6 +61,7 @@ __all__ = [
     "USR_LABEL_NAMESPACE",
     "SEQ_ANNOT_NAMESPACE",
     "DERIVED_NAMESPACE",
+    "DERIVED_COLUMNS",
     "USR_STATE_COLUMNS",
     "USR_STATE_NAMESPACE",
     "RegistryColumn",

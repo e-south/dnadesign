@@ -150,11 +150,25 @@ def test_find_undeclared_cross_tool_imports_allows_studies_to_densegen_public_ed
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_shared_contract_package(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "baserender" / "api.py",
+        "from dnadesign.contracts.visual import SequenceEvidenceMapV1\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "contracts" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "contracts" / "visual" / "__init__.py",
+        "class SequenceEvidenceMapV1:\n    pass\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
 @pytest.mark.parametrize(
     ("owner_tool", "imported_tool"),
     (
-        ("baserender", "contracts"),
-        ("cruncher", "contracts"),
         ("notify", "construct"),
         ("notify", "densegen"),
         ("notify", "infer"),

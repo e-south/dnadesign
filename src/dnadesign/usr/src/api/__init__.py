@@ -37,6 +37,7 @@ from ..contracts import (
 from ..dataset import Dataset
 from ..events import USR_EVENT_VERSION
 from ..registry import (
+    DERIVED_COLUMNS,
     DERIVED_NAMESPACE,
     SEQ_ANNOT_NAMESPACE,
     USR_LABEL_NAMESPACE,
@@ -90,6 +91,7 @@ __all__ = [
     "USR_LABEL_NAMESPACE",
     "SEQ_ANNOT_NAMESPACE",
     "DERIVED_NAMESPACE",
+    "DERIVED_COLUMNS",
     "ProductKind",
     "Orientation",
     "ContextKind",
