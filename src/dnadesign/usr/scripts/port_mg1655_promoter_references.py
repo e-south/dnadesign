@@ -1,18 +1,20 @@
 """
 Curated projected GenBank port for promoter reference controls.
 
-This is intentionally a one-off USR migration helper. It reads archived GenBank
-records with cloning/primer flanks, projects the annotated native upstream
-promoter feature into insert-local coordinates, and writes a Construct-facing
-USR dataset whose base rows are the primer-stripped promoter inserts.
+This one-off USR migration helper builds ``usr_promoter_references`` from
+source-backed GenBank inputs. It strips cloning/primer flanks from archived
+MG1655 noncoding records, imports synthetic promoter standards as promoter
+inserts, and writes Construct-facing USR rows with source annotations, strength
+metadata, and sequence views.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -26,8 +28,10 @@ from dnadesign.usr.src.genbank.models import ParsedGenBankFeature, ParsedGenBank
 from dnadesign.usr.src.genbank.parser import BiopythonGenBankParser
 from dnadesign.usr.src.registry import (
     arrow_type_from_str,
+    ensure_registry_entries,
     ensure_sequence_contract_namespaces,
     load_registry,
+    promoter_standard_entry,
     registry_entry,
 )
 from dnadesign.usr.src.sequence_views import SequenceViewRecord, write_sequence_views
@@ -35,8 +39,11 @@ from dnadesign.usr.src.storage.parquet import now_utc
 
 DEFAULT_OUTPUT_DATASET = "usr_promoter_references"
 DEFAULT_LEGACY_DATASET = "usr_mg1655_promoter_controls"
-PORT_RUN_ID = "mg1655_promoter_reference_projected_genbank_port"
-GENBANK_ARTIFACT_SOURCE = "archived/MG1655_noncoding_set"
+PORT_RUN_ID = "promoter_reference_projected_genbank_port"
+MG1655_GENBANK_ARTIFACT_SOURCE = "archived/MG1655_noncoding_set"
+SYNTHETIC_STANDARDS_ARTIFACT_SOURCE = "archived/synthetic_promoter_standards"
+DEFAULT_EXPECTED_GENBANK_COUNT = 48
+PROMOTER_STANDARD_NAMESPACE = "promoter_standard"
 J23105_LABEL = "J23105"
 J23105_SEQUENCE = "TTTACGGCTAGCTCAGTCCTAGGTACTATGCTAGC"
 _STRICT_DNA = set("ACGT")
@@ -93,6 +100,8 @@ class PromoterReference:
     aliases: tuple[str, ...]
     sequence: str
     source_file: str
+    base_source: str
+    source_ref: str
     source_sha256: str
     record_id: str | None
     record_name: str | None
@@ -109,6 +118,13 @@ class PromoterReference:
     features_retained: tuple[dict[str, object], ...]
     features_clipped: tuple[dict[str, object], ...]
     features_lost: tuple[dict[str, object], ...]
+    derived_operation: str
+    derived_focal_rule: str
+    derived_created_by: str
+    derivation_spec_id: str
+    construct_seed_role: str
+    construct_seed_manifest_id: str
+    standard_metadata: PromoterStandardMetadata | None = None
 
     @property
     def id(self) -> str:
@@ -128,17 +144,35 @@ class LegacyReference:
 
 
 @dataclass(frozen=True)
+class PromoterStandardMetadata:
+    collection_id: str
+    promoter_id: str
+    display_name: str
+    role: str
+    strength_metric: str
+    strength_value: str
+    strength_value_numeric: float | None
+    strength_reference: str
+    source_record: str
+    notes: str
+
+
+@dataclass(frozen=True)
 class PromoterReferencePlan:
     promoters: tuple[PromoterReference, ...]
     legacy_references: tuple[LegacyReference, ...]
     archive_dir: str
+    synthetic_standards_dir: str | None
     legacy_dataset: str | None
 
     def summary(self) -> dict[str, object]:
+        synthetic_rows = [row for row in self.promoters if row.standard_metadata is not None]
         return {
             "archive_dir": self.archive_dir,
+            "synthetic_standards_dir": self.synthetic_standards_dir,
             "legacy_dataset": self.legacy_dataset,
             "genbank_records": len(self.promoters),
+            "synthetic_standard_records": len(synthetic_rows),
             "legacy_references": len(self.legacy_references),
             "total_rows": len(self.promoters) + len(self.legacy_references),
             "labels": [row.label for row in [*self.promoters, *self.legacy_references]],
@@ -156,6 +190,7 @@ class WriteResult:
     derived_overlay_rows: int
     label_overlay_rows: int
     construct_seed_overlay_rows: int
+    promoter_standard_overlay_rows: int
     sequence_views_written: int
 
 
@@ -167,8 +202,17 @@ def _default_archive_dir() -> Path:
     return _repo_root().parent / "archived" / "MG1655_noncoding_set"
 
 
+def _default_synthetic_standards_dir() -> Path:
+    return _repo_root().parent / "archived" / "synthetic_promoter_standards"
+
+
 def _default_usr_root() -> Path:
     return _repo_root() / "src" / "dnadesign" / "usr" / "datasets"
+
+
+def _ensure_promoter_reference_namespaces(root: Path) -> None:
+    ensure_sequence_contract_namespaces(root)
+    ensure_registry_entries(root, entries=(promoter_standard_entry(),))
 
 
 def _normalize_sequence(sequence: str) -> str:
@@ -239,6 +283,114 @@ def _select_upstream_feature(record: ParsedGenBankRecord, *, path: Path) -> Pars
             labels = ", ".join(str(feature.label or feature.feature_id) for feature in tied[:5])
             raise SchemaError(f"GenBank source '{path}' has ambiguous upstream features: {labels}.")
     return candidates[0]
+
+
+def _select_full_span_promoter_feature(record: ParsedGenBankRecord, *, path: Path) -> ParsedGenBankFeature:
+    candidates = [
+        feature
+        for feature in record.features
+        if feature.feature_type == "promoter"
+        and _is_precise_single_interval(feature)
+        and feature.start_0 == 0
+        and feature.end_0 == len(record.sequence)
+    ]
+    if len(candidates) != 1:
+        labels = ", ".join(str(feature.label or feature.feature_id) for feature in candidates[:5])
+        raise SchemaError(
+            f"Synthetic standard '{path}' must have exactly one full-span promoter feature; found {labels}."
+        )
+    return candidates[0]
+
+
+def _qualifier_note_map(feature: ParsedGenBankFeature) -> dict[str, str]:
+    notes: dict[str, str] = {}
+    for qualifier in feature.qualifiers:
+        if qualifier.key != "note":
+            continue
+        key, separator, value = qualifier.value.partition("=")
+        if not separator:
+            continue
+        notes[key] = value
+    return notes
+
+
+def _strength_value_numeric(value: str) -> float | None:
+    text = str(value).strip()
+    if not text or text.upper() == "NA":
+        return None
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise SchemaError(f"Promoter standard strength_value must be numeric or NA, got '{value}'.") from exc
+
+
+def _read_csv_rows(path: Path, *, required_columns: set[str]) -> list[dict[str, str]]:
+    if not path.exists():
+        raise FileNotFoundError(f"Required promoter standard table does not exist: {path}")
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        observed = set(reader.fieldnames or ())
+        missing = sorted(required_columns - observed)
+        if missing:
+            raise SchemaError(f"Promoter standard table '{path}' is missing required columns: {missing}")
+        return [{key: str(value or "").strip() for key, value in row.items()} for row in reader]
+
+
+def _synthetic_export_policy(standards_dir: Path) -> dict[tuple[str, str], bool]:
+    rows = _read_csv_rows(
+        standards_dir / "data" / "promoter_export_policy.csv",
+        required_columns={"collection_id", "promoter_id", "export_to_genbank", "exclusion_reason"},
+    )
+    policy: dict[tuple[str, str], bool] = {}
+    for row in rows:
+        key = (row["collection_id"], row["promoter_id"])
+        if key in policy:
+            raise SchemaError(f"Duplicate promoter export policy key: {key}")
+        raw = row["export_to_genbank"].casefold()
+        if raw not in {"true", "false"}:
+            raise SchemaError(f"Invalid export_to_genbank value for {key}: {row['export_to_genbank']}")
+        policy[key] = raw == "true"
+    return policy
+
+
+def _synthetic_promoter_rows(standards_dir: Path) -> list[dict[str, str]]:
+    rows = _read_csv_rows(
+        standards_dir / "data" / "promoters.csv",
+        required_columns={
+            "collection_id",
+            "promoter_id",
+            "display_name",
+            "role",
+            "sequence",
+            "strength_metric",
+            "strength_value",
+            "strength_reference",
+            "source_record",
+            "notes",
+        },
+    )
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        key = (row["collection_id"], row["promoter_id"])
+        if key in seen:
+            raise SchemaError(f"Duplicate synthetic promoter key: {key}")
+        seen.add(key)
+    return rows
+
+
+def _standard_metadata(row: dict[str, str]) -> PromoterStandardMetadata:
+    return PromoterStandardMetadata(
+        collection_id=row["collection_id"],
+        promoter_id=row["promoter_id"],
+        display_name=row["display_name"],
+        role=row["role"],
+        strength_metric=row["strength_metric"],
+        strength_value=row["strength_value"],
+        strength_value_numeric=_strength_value_numeric(row["strength_value"]),
+        strength_reference=row["strength_reference"],
+        source_record=row["source_record"],
+        notes=row["notes"],
+    )
 
 
 def _interval_dict(start_0: int, end_0: int, strand: int | None, partial: bool = False) -> dict[str, object]:
@@ -410,6 +562,8 @@ def _project_promoter(path: Path, record: ParsedGenBankRecord) -> PromoterRefere
         aliases=_dedupe_aliases((*override_aliases, source_feature.label, path.stem), primary=label),
         sequence=sequence,
         source_file=str(path),
+        base_source=f"{MG1655_GENBANK_ARTIFACT_SOURCE}:{path.name}:projected_insert",
+        source_ref=f"{MG1655_GENBANK_ARTIFACT_SOURCE}:{path.name}",
         source_sha256=record.source_sha256,
         record_id=record.record_id,
         record_name=record.record_name,
@@ -426,6 +580,84 @@ def _project_promoter(path: Path, record: ParsedGenBankRecord) -> PromoterRefere
         features_retained=retained,
         features_clipped=clipped,
         features_lost=lost,
+        derived_operation="project_genbank_upstream_feature",
+        derived_focal_rule="genbank_misc_feature_label_contains_upstream",
+        derived_created_by="usr.port_mg1655_promoter_references",
+        derivation_spec_id=f"project_genbank_upstream:{path.name}:{insert_start_0}-{insert_end_0}",
+        construct_seed_role="anchor",
+        construct_seed_manifest_id=PORT_RUN_ID,
+    )
+
+
+def _project_synthetic_standard(path: Path, record: ParsedGenBankRecord, row: dict[str, str]) -> PromoterReference:
+    source_feature = _select_full_span_promoter_feature(record, path=path)
+    note_map = _qualifier_note_map(source_feature)
+    for key in ("collection_id", "promoter_id", "source_record", "role", "strength_metric", "strength_value"):
+        if note_map.get(key) != row[key]:
+            raise SchemaError(
+                f"Synthetic standard '{path}' promoter note '{key}'={note_map.get(key)!r} "
+                f"does not match canonical table value {row[key]!r}."
+            )
+    if note_map.get("strength_reference") != row["strength_reference"]:
+        raise SchemaError(
+            f"Synthetic standard '{path}' strength_reference={note_map.get('strength_reference')!r} "
+            f"does not match canonical table value {row['strength_reference']!r}."
+        )
+    if source_feature.label != row["display_name"]:
+        raise SchemaError(
+            f"Synthetic standard '{path}' promoter label {source_feature.label!r} "
+            f"does not match display_name {row['display_name']!r}."
+        )
+    sequence = _normalize_sequence(record.sequence)
+    if sequence != _normalize_sequence(row["sequence"]):
+        raise SchemaError(f"Synthetic standard '{path}' sequence does not match promoters.csv.")
+    seq_annot_features = tuple(
+        projected
+        for feature in record.features
+        if feature.feature_type != "source"
+        for projected in [_project_feature(feature, insert_start_0=0, insert_end_0=len(record.sequence))]
+        if projected is not None
+    )
+    retained, clipped, lost = _classify_feature_retention(
+        [feature for feature in record.features if feature.feature_type != "source"],
+        insert_start_0=0,
+        insert_end_0=len(record.sequence),
+    )
+    label = row["display_name"]
+    aliases = [row["promoter_id"], f"{row['collection_id']}:{row['promoter_id']}"]
+    if row["promoter_id"] == "BBa_J23105":
+        aliases.append("Anderson_J23105")
+    source_ref = f"{SYNTHETIC_STANDARDS_ARTIFACT_SOURCE}:{row['collection_id']}:{path.name}"
+    return PromoterReference(
+        label=label,
+        aliases=_dedupe_aliases(aliases, primary=label),
+        sequence=sequence,
+        source_file=str(path),
+        base_source=f"{source_ref}:promoter_insert",
+        source_ref=source_ref,
+        source_sha256=record.source_sha256,
+        record_id=record.record_id,
+        record_name=record.record_name,
+        description=record.description,
+        topology=record.topology,
+        molecule_type=record.molecule_type,
+        source_interval_start_0=0,
+        source_interval_end_0=len(record.sequence),
+        source_intervals_0=tuple(interval.model_dump() for interval in source_feature.intervals_0),
+        source_feature_id=source_feature.feature_id,
+        source_feature_label=source_feature.label,
+        focal_confidence=source_feature.confidence,
+        seq_annot_features=seq_annot_features,
+        features_retained=retained,
+        features_clipped=clipped,
+        features_lost=lost,
+        derived_operation="import_synthetic_promoter_standard",
+        derived_focal_rule="genbank_promoter_full_span",
+        derived_created_by="usr.port_mg1655_promoter_references",
+        derivation_spec_id=f"synthetic_promoter_standard:{row['collection_id']}:{row['promoter_id']}",
+        construct_seed_role="promoter_standard",
+        construct_seed_manifest_id=PORT_RUN_ID,
+        standard_metadata=_standard_metadata(row),
     )
 
 
@@ -457,10 +689,40 @@ def _load_legacy_j23105(usr_root: Path, *, legacy_dataset: str) -> tuple[LegacyR
     return ()
 
 
+def _load_synthetic_standards(standards_dir: Path) -> tuple[PromoterReference, ...]:
+    source_dir = Path(standards_dir)
+    if not source_dir.exists():
+        raise FileNotFoundError(f"Synthetic promoter standards directory does not exist: {source_dir}")
+    policy = _synthetic_export_policy(source_dir)
+    rows = _synthetic_promoter_rows(source_dir)
+    parser = BiopythonGenBankParser()
+    promoters: list[PromoterReference] = []
+    seen_ids: dict[str, str] = {}
+    for row in rows:
+        key = (row["collection_id"], row["promoter_id"])
+        if not policy.get(key, False):
+            continue
+        path = source_dir / "genbank" / row["collection_id"] / f"{row['promoter_id']}.gb"
+        records = parser.parse_file(path, role_hint_rules=ROLE_HINT_RULES)
+        if len(records) != 1:
+            raise SchemaError(f"Synthetic standard '{path}' produced {len(records)} records; expected one.")
+        promoter = _project_synthetic_standard(path, records[0], row)
+        existing_label = seen_ids.get(promoter.id)
+        if existing_label is not None:
+            raise SchemaError(
+                f"Synthetic promoter standard '{promoter.label}' has the same sequence id as '{existing_label}'. "
+                "Update promoter_export_policy.csv before porting into usr_promoter_references."
+            )
+        seen_ids[promoter.id] = promoter.label
+        promoters.append(promoter)
+    return tuple(promoters)
+
+
 def build_promoter_reference_plan(
     *,
     archive_dir: Path,
-    legacy_usr_root: Path | None,
+    synthetic_standards_dir: Path | None = None,
+    legacy_usr_root: Path | None = None,
     legacy_dataset: str = DEFAULT_LEGACY_DATASET,
     include_legacy_j23105: bool = True,
 ) -> PromoterReferencePlan:
@@ -486,13 +748,35 @@ def build_promoter_reference_plan(
             )
         seen_ids[promoter.id] = promoter.label
         promoters.append(promoter)
+    if synthetic_standards_dir is not None:
+        for promoter in _load_synthetic_standards(Path(synthetic_standards_dir)):
+            existing_label = seen_ids.get(promoter.id)
+            if existing_label is not None:
+                raise SchemaError(
+                    f"Synthetic promoter standard '{promoter.label}' has the same sequence id as '{existing_label}'. "
+                    "Resolve the semantic duplicate before creating usr_promoter_references."
+                )
+            seen_ids[promoter.id] = promoter.label
+            promoters.append(promoter)
     legacy_references: tuple[LegacyReference, ...] = ()
     if include_legacy_j23105 and legacy_usr_root is not None:
-        legacy_references = _load_legacy_j23105(Path(legacy_usr_root), legacy_dataset=legacy_dataset)
+        retained_legacy: list[LegacyReference] = []
+        for reference in _load_legacy_j23105(Path(legacy_usr_root), legacy_dataset=legacy_dataset):
+            matched_index = next((idx for idx, promoter in enumerate(promoters) if promoter.id == reference.id), None)
+            if matched_index is None:
+                retained_legacy.append(reference)
+                continue
+            matched = promoters[matched_index]
+            promoters[matched_index] = replace(
+                matched,
+                aliases=_dedupe_aliases([*matched.aliases, *reference.aliases], primary=matched.label),
+            )
+        legacy_references = tuple(retained_legacy)
     return PromoterReferencePlan(
         promoters=tuple(sorted(promoters, key=lambda row: row.label.casefold())),
         legacy_references=legacy_references,
         archive_dir=str(source_dir),
+        synthetic_standards_dir=None if synthetic_standards_dir is None else str(Path(synthetic_standards_dir)),
         legacy_dataset=legacy_dataset if legacy_references else None,
     )
 
@@ -527,7 +811,7 @@ def _base_rows(plan: PromoterReferencePlan, *, created_at: str) -> list[dict[str
                 "bio_type": "dna",
                 "sequence": promoter.sequence.lower(),
                 "alphabet": "dna_4",
-                "source": f"{GENBANK_ARTIFACT_SOURCE}:{Path(promoter.source_file).name}:projected_insert",
+                "source": promoter.base_source,
                 "created_at": created_at,
             }
         )
@@ -573,9 +857,9 @@ def _construct_seed_rows(plan: PromoterReferencePlan) -> list[dict[str, object]]
             {
                 "id": promoter.id,
                 "construct_seed__label": promoter.label,
-                "construct_seed__manifest_id": PORT_RUN_ID,
-                "construct_seed__role": "anchor",
-                "construct_seed__source_ref": f"{GENBANK_ARTIFACT_SOURCE}:{Path(promoter.source_file).name}",
+                "construct_seed__manifest_id": promoter.construct_seed_manifest_id,
+                "construct_seed__role": promoter.construct_seed_role,
+                "construct_seed__source_ref": promoter.source_ref,
                 "construct_seed__topology": "linear",
                 "construct_seed__sha256": _sha256_sequence(promoter.sequence),
             }
@@ -633,7 +917,7 @@ def _derived_rows(plan: PromoterReferencePlan) -> list[dict[str, object]]:
                 "id": promoter.id,
                 "derived__parent_id": None,
                 "derived__parent_dataset": None,
-                "derived__operation": "project_genbank_upstream_feature",
+                "derived__operation": promoter.derived_operation,
                 "derived__product_kind": "biological_insert",
                 "derived__target_length": len(promoter.sequence),
                 "derived__source_interval_start_0": promoter.source_interval_start_0,
@@ -642,7 +926,7 @@ def _derived_rows(plan: PromoterReferencePlan) -> list[dict[str, object]]:
                 "derived__orientation": "forward",
                 "derived__template_id": None,
                 "derived__template_dataset": None,
-                "derived__focal_rule": "genbank_misc_feature_label_contains_upstream",
+                "derived__focal_rule": promoter.derived_focal_rule,
                 "derived__focal_features": [promoter.source_feature_id],
                 "derived__focal_confidence": promoter.focal_confidence,
                 "derived__analysis_only": False,
@@ -652,11 +936,32 @@ def _derived_rows(plan: PromoterReferencePlan) -> list[dict[str, object]]:
                 "derived__features_retained": list(promoter.features_retained),
                 "derived__features_clipped": list(promoter.features_clipped),
                 "derived__features_lost": list(promoter.features_lost),
-                "derived__created_by": "usr.port_mg1655_promoter_references",
-                "derived__spec_id": (
-                    f"project_genbank_upstream:{Path(promoter.source_file).name}:"
-                    f"{promoter.source_interval_start_0}-{promoter.source_interval_end_0}"
-                ),
+                "derived__created_by": promoter.derived_created_by,
+                "derived__spec_id": promoter.derivation_spec_id,
+            }
+        )
+    return rows
+
+
+def _promoter_standard_rows(plan: PromoterReferencePlan) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for promoter in plan.promoters:
+        metadata = promoter.standard_metadata
+        if metadata is None:
+            continue
+        rows.append(
+            {
+                "id": promoter.id,
+                "promoter_standard__collection_id": metadata.collection_id,
+                "promoter_standard__promoter_id": metadata.promoter_id,
+                "promoter_standard__display_name": metadata.display_name,
+                "promoter_standard__role": metadata.role,
+                "promoter_standard__strength_metric": metadata.strength_metric,
+                "promoter_standard__strength_value": metadata.strength_value,
+                "promoter_standard__strength_value_numeric": metadata.strength_value_numeric,
+                "promoter_standard__strength_reference": metadata.strength_reference,
+                "promoter_standard__source_record": metadata.source_record,
+                "promoter_standard__notes": metadata.notes,
             }
         )
     return rows
@@ -681,10 +986,7 @@ def _sequence_view_rows(
                 analysis_only=False,
                 source_dataset_id=dataset.name,
                 source_label=promoter.label,
-                derivation_spec_id=(
-                    f"project_genbank_upstream:{Path(promoter.source_file).name}:"
-                    f"{promoter.source_interval_start_0}-{promoter.source_interval_end_0}"
-                ),
+                derivation_spec_id=promoter.derivation_spec_id,
                 source_interval_start_0=0,
                 source_interval_end_0=len(promoter.sequence),
                 recommended_pooling="seq_mean",
@@ -737,7 +1039,8 @@ def _validate_plan_counts(
 ) -> None:
     if expected_genbank_count is not None and len(plan.promoters) != expected_genbank_count:
         raise SchemaError(f"Expected {expected_genbank_count} GenBank promoter rows, found {len(plan.promoters)}.")
-    if include_legacy_j23105 and not plan.legacy_references:
+    has_j23105_promoter = any(row.label == J23105_LABEL for row in plan.promoters)
+    if include_legacy_j23105 and not plan.legacy_references and not has_j23105_promoter:
         raise SchemaError("Expected legacy J23105 reference, but no J23105 row was found in the legacy dataset.")
 
 
@@ -746,7 +1049,7 @@ def write_promoter_reference_dataset(
     *,
     usr_root: Path,
     output_dataset: str = DEFAULT_OUTPUT_DATASET,
-    expected_genbank_count: int | None = 19,
+    expected_genbank_count: int | None = DEFAULT_EXPECTED_GENBANK_COUNT,
     include_legacy_j23105: bool = True,
 ) -> WriteResult:
     _validate_plan_counts(
@@ -754,7 +1057,7 @@ def write_promoter_reference_dataset(
         expected_genbank_count=expected_genbank_count,
         include_legacy_j23105=include_legacy_j23105,
     )
-    ensure_sequence_contract_namespaces(usr_root)
+    _ensure_promoter_reference_namespaces(usr_root)
     dataset = Dataset(usr_root, output_dataset)
     if dataset.dir.exists():
         raise FileExistsError(f"Output dataset already exists: {dataset.dir}")
@@ -764,21 +1067,23 @@ def write_promoter_reference_dataset(
     construct_seed_rows = _construct_seed_rows(plan)
     seq_annot_rows = _seq_annot_rows(plan, dataset=dataset)
     derived_rows = _derived_rows(plan)
+    promoter_standard_rows = _promoter_standard_rows(plan)
 
     with dataset.write_session() as session:
         session.init(
-            source=f"{GENBANK_ARTIFACT_SOURCE} projected promoter inserts",
+            source="projected promoter reference inserts",
             notes=(
-                "Primer-flank-stripped promoter references projected from archived GenBank records; "
-                "J23105 is retained as the incumbent non-MG1655 pDual reference."
+                "Primer-flank-stripped MG1655 promoter references plus source-backed synthetic "
+                "promoter standards projected from archived GenBank records."
             ),
         )
-        rows_written = session.import_rows(base_rows, source=f"{GENBANK_ARTIFACT_SOURCE}:projected_insert")
+        rows_written = session.import_rows(base_rows, source="projected_promoter_reference_insert")
 
     label_count = _write_overlay_rows(dataset, "usr_label", label_rows)
     construct_seed_count = _write_overlay_rows(dataset, "construct_seed", construct_seed_rows)
     seq_annot_count = _write_overlay_rows(dataset, "seq_annot", seq_annot_rows)
     derived_count = _write_overlay_rows(dataset, "derived", derived_rows)
+    promoter_standard_count = _write_overlay_rows(dataset, PROMOTER_STANDARD_NAMESPACE, promoter_standard_rows)
     sequence_view_count = write_sequence_views(
         dataset,
         _sequence_view_rows(plan, dataset=dataset, created_at=created_at),
@@ -791,11 +1096,13 @@ def write_promoter_reference_dataset(
         "promoter_reference_projected_genbank_port",
         args={
             "archive_dir": plan.archive_dir,
+            "synthetic_standards_dir": plan.synthetic_standards_dir,
             "legacy_dataset": plan.legacy_dataset,
             "output_dataset": dataset.name,
         },
         metrics={
             "genbank_rows": len(plan.promoters),
+            "synthetic_standard_rows": len(promoter_standard_rows),
             "legacy_rows": len(plan.legacy_references),
             "total_rows": rows_written,
         },
@@ -812,6 +1119,7 @@ def write_promoter_reference_dataset(
         derived_overlay_rows=int(derived_count),
         label_overlay_rows=int(label_count),
         construct_seed_overlay_rows=int(construct_seed_count),
+        promoter_standard_overlay_rows=int(promoter_standard_count),
         sequence_views_written=int(sequence_view_count),
     )
 
@@ -819,15 +1127,20 @@ def write_promoter_reference_dataset(
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Project archived MG1655 noncoding GenBank promoter inserts into the modern "
-            "usr_promoter_references dataset."
+            "Project archived GenBank promoter-reference inserts into the modern usr_promoter_references dataset."
         )
     )
     parser.add_argument("--archive-dir", type=Path, default=_default_archive_dir())
+    parser.add_argument("--synthetic-standards-dir", type=Path, default=_default_synthetic_standards_dir())
+    parser.add_argument(
+        "--no-synthetic-standards",
+        action="store_true",
+        help="Do not add archived synthetic promoter standards to usr_promoter_references.",
+    )
     parser.add_argument("--usr-root", type=Path, default=_default_usr_root())
     parser.add_argument("--legacy-dataset", default=DEFAULT_LEGACY_DATASET)
     parser.add_argument("--output-dataset", default=DEFAULT_OUTPUT_DATASET)
-    parser.add_argument("--expected-genbank-count", type=int, default=19)
+    parser.add_argument("--expected-genbank-count", type=int, default=DEFAULT_EXPECTED_GENBANK_COUNT)
     parser.add_argument("--no-legacy-j23105", action="store_true", help="Do not carry J23105 from the legacy dataset.")
     parser.add_argument(
         "--write", action="store_true", help="Actually create the output USR dataset. Default is dry-run."
@@ -838,8 +1151,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     include_legacy_j23105 = not bool(args.no_legacy_j23105)
+    synthetic_standards_dir = None if bool(args.no_synthetic_standards) else args.synthetic_standards_dir
     plan = build_promoter_reference_plan(
         archive_dir=args.archive_dir,
+        synthetic_standards_dir=synthetic_standards_dir,
         legacy_usr_root=args.usr_root if include_legacy_j23105 else None,
         legacy_dataset=args.legacy_dataset,
         include_legacy_j23105=include_legacy_j23105,

@@ -32,8 +32,10 @@ datasets:
     notes: >-
       Unified promoter-reference source set for the study: 19 primer-flank-stripped
       GenBank-projected promoter inserts from the archived MG1655 noncoding set plus
-      the incumbent non-MG1655 J23105 pDual reference. `seq_annot`, `derived`, and
-      `_views/sequence_views.parquet` retain source annotations and projection lineage.
+      29 source-backed synthetic promoter standards. J23105 is refreshed from the
+      synthetic GenBank source instead of being duplicated. `seq_annot`, `derived`,
+      `promoter_standard`, and `_views/sequence_views.parquet` retain source
+      annotations, strength metadata, and projection lineage.
     sync:
       enabled: false
       remote_name: n/a

@@ -27,4 +27,4 @@ The checked-in contract is intentionally small:
 - `inputs/README.md` documents that `input.parquet` is generated from USR.
 - `outputs/.gitkeep` keeps the output directory visible while rendered PNG/MP4/report artifacts remain local.
 
-Expected current projection: 19 GenBank-annotated promoter-reference rows, with one unannotated incumbent row skipped by the exporter.
+Expected current projection: 48 GenBank-annotated promoter-reference rows: 19 primer-flank-stripped MG1655 inserts plus 29 synthetic promoter standards.

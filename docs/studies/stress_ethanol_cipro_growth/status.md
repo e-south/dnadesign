@@ -63,7 +63,7 @@
 ### Reference-view branch
 
 - Present promoter-reference source dataset: `usr_promoter_references`
-- Source rows are primer-flank-stripped GenBank-projected promoter inserts plus the incumbent J23105 pDual reference; full GenBank provenance, projected annotations, derivation intervals, and sequence views are stored in dataset-local sidecars/overlays.
+- Source rows are primer-flank-stripped MG1655 GenBank-projected promoter inserts plus source-backed synthetic promoter standards. J23105 is refreshed from the synthetic GenBank source; full GenBank provenance, projected annotations, strength metadata, derivation intervals, and sequence views are stored in dataset-local sidecars/overlays.
 - Planned matched analysis-core dataset: `construct_prom_eth_cip_reference_core60`
 - Planned reference context dataset: `construct_prom_eth_cip_reference_contexts`
 - Planned reference feature dataset: `infer_prom_eth_cip_reference_views_7b`

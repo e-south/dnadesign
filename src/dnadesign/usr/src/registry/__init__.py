@@ -14,6 +14,8 @@ import yaml
 from .models import (
     DERIVED_COLUMNS,
     DERIVED_NAMESPACE,
+    PROMOTER_STANDARD_COLUMNS,
+    PROMOTER_STANDARD_NAMESPACE,
     REGISTRY_FILENAME,
     SEQ_ANNOT_NAMESPACE,
     USR_LABEL_NAMESPACE,
@@ -21,6 +23,7 @@ from .models import (
     USR_STATE_NAMESPACE,
     RegistryColumn,
     RegistryEntry,
+    promoter_standard_entry,
 )
 from .storage import (
     _REGISTRY_CACHE,
@@ -62,6 +65,8 @@ __all__ = [
     "SEQ_ANNOT_NAMESPACE",
     "DERIVED_NAMESPACE",
     "DERIVED_COLUMNS",
+    "PROMOTER_STANDARD_COLUMNS",
+    "PROMOTER_STANDARD_NAMESPACE",
     "USR_STATE_COLUMNS",
     "USR_STATE_NAMESPACE",
     "RegistryColumn",
@@ -87,6 +92,7 @@ __all__ = [
     "namespace_contract_hash_for_entries",
     "parse_columns_spec",
     "parse_type_str",
+    "promoter_standard_entry",
     "register_namespace",
     "registry_bytes",
     "registry_bytes_for_entries",

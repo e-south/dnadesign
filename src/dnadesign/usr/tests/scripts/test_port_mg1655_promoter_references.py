@@ -18,6 +18,9 @@ from dnadesign.usr.src.sequence_views import load_sequence_views
 SPYP_INSERT = "ATGC" * 15
 SOXSP_INSERT = "GCTA" * 15
 J23105 = "TTTACGGCTAGCTCAGTCCTAGGTACTATGCTAGC"
+J23103 = "CTGATAGCTAGCTCAGTCCTAGGGATTATGCTAGC"
+W9 = "TTATCAAAAAGAGTATTGACATAAAGTCTAACCTATAGGAGTATTACAGCCATCGAGAGGGACACGGCGAA"
+T7A1 = "TTATCAAAAAGAGTATTGACTTAAAGTCTAACCTATAGGATACTTACAGCCATCGAGAGGGACACGGCGAA"
 
 
 def _write_promoter_genbank(
@@ -43,6 +46,166 @@ def _write_promoter_genbank(
     ]
     with path.open("w", encoding="utf-8") as handle:
         SeqIO.write(record, handle, "genbank")
+
+
+def _write_synthetic_standard_genbank(
+    path: Path,
+    *,
+    record_id: str,
+    display_name: str,
+    collection_id: str,
+    role: str,
+    sequence: str,
+    strength_metric: str,
+    strength_value: str,
+    strength_reference: str,
+    source_record: str,
+) -> None:
+    record = SeqRecord(Seq(sequence), id=record_id, name=record_id, description=f"{display_name} synthetic standard")
+    record.annotations["molecule_type"] = "DNA"
+    record.annotations["topology"] = "linear"
+    record.features = [
+        SeqFeature(
+            FeatureLocation(0, len(sequence), strand=1),
+            type="source",
+            qualifiers={"organism": ["synthetic DNA construct"], "note": [f"source_record={source_record}"]},
+        ),
+        SeqFeature(
+            FeatureLocation(0, len(sequence), strand=1),
+            type="promoter",
+            qualifiers={
+                "label": [display_name],
+                "note": [
+                    f"collection_id={collection_id}",
+                    f"promoter_id={record_id}",
+                    f"source_record={source_record}",
+                    f"role={role}",
+                    f"strength_metric={strength_metric}",
+                    f"strength_value={strength_value}",
+                    f"strength_reference={strength_reference}",
+                    "fixture standard",
+                ],
+            },
+        ),
+        SeqFeature(
+            FeatureLocation(0, 6, strand=1),
+            type="misc_feature",
+            qualifiers={"label": ["-35"], "note": [f"feature_sequence={sequence[:6]}"]},
+        ),
+        SeqFeature(
+            FeatureLocation(23, 29, strand=1),
+            type="misc_feature",
+            qualifiers={"label": ["-10"], "note": [f"feature_sequence={sequence[23:29]}"]},
+        ),
+    ]
+    with path.open("w", encoding="utf-8") as handle:
+        SeqIO.write(record, handle, "genbank")
+
+
+def _write_synthetic_standards_fixture(root: Path) -> Path:
+    standards_dir = root / "synthetic_promoter_standards"
+    data_dir = standards_dir / "data"
+    anderson_dir = standards_dir / "genbank" / "anderson_igem"
+    t7_dir = standards_dir / "genbank" / "t7_w_collection"
+    data_dir.mkdir(parents=True)
+    anderson_dir.mkdir(parents=True)
+    t7_dir.mkdir(parents=True)
+    (data_dir / "promoters.csv").write_text(
+        "\n".join(
+            [
+                "collection_id,promoter_id,display_name,role,sequence,strength_metric,strength_value,strength_reference,source_record,notes",
+                (
+                    "anderson_igem,BBa_J23105,J23105,constitutive_promoter,"
+                    f"{J23105},relative_fluorescence_to_BBa_J23100,0.24,BBa_J23100=1.0,"
+                    "anderson_igem_promoters_catalog,fixture Anderson standard"
+                ),
+                (
+                    "anderson_igem,BBa_J23103,J23103,constitutive_promoter,"
+                    f"{J23103},relative_fluorescence_to_BBa_J23100,0.01,BBa_J23100=1.0,"
+                    "anderson_igem_promoters_catalog,retained twin sequence"
+                ),
+                (
+                    "anderson_igem,BBa_J23112,J23112,constitutive_promoter,"
+                    f"{J23103},relative_fluorescence_to_BBa_J23100,0.00,BBa_J23100=1.0,"
+                    "anderson_igem_promoters_catalog,excluded conflicting twin sequence"
+                ),
+                (
+                    "t7_w_collection,T7A1,T7A1,parent_promoter,"
+                    f"{T7A1},not_reported,NA,NA,dunlop_lab_t7_w_collection,not reported"
+                ),
+                (
+                    "t7_w_collection,W9,W9,library_member,"
+                    f"{W9},ordinal_rank_weakest_to_strongest,9,W1=weakest; W9=strongest,"
+                    "dunlop_lab_t7_w_collection,ordinal fixture standard"
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (data_dir / "promoter_export_policy.csv").write_text(
+        "\n".join(
+            [
+                "collection_id,promoter_id,export_to_genbank,exclusion_reason",
+                "anderson_igem,BBa_J23105,true,",
+                "anderson_igem,BBa_J23103,true,",
+                "anderson_igem,BBa_J23112,false,duplicate_sequence_with_BBa_J23103_conflicting_strength",
+                "t7_w_collection,T7A1,true,",
+                "t7_w_collection,W9,true,",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_synthetic_standard_genbank(
+        anderson_dir / "BBa_J23105.gb",
+        record_id="BBa_J23105",
+        display_name="J23105",
+        collection_id="anderson_igem",
+        role="constitutive_promoter",
+        sequence=J23105,
+        strength_metric="relative_fluorescence_to_BBa_J23100",
+        strength_value="0.24",
+        strength_reference="BBa_J23100=1.0",
+        source_record="anderson_igem_promoters_catalog",
+    )
+    _write_synthetic_standard_genbank(
+        anderson_dir / "BBa_J23103.gb",
+        record_id="BBa_J23103",
+        display_name="J23103",
+        collection_id="anderson_igem",
+        role="constitutive_promoter",
+        sequence=J23103,
+        strength_metric="relative_fluorescence_to_BBa_J23100",
+        strength_value="0.01",
+        strength_reference="BBa_J23100=1.0",
+        source_record="anderson_igem_promoters_catalog",
+    )
+    _write_synthetic_standard_genbank(
+        t7_dir / "T7A1.gb",
+        record_id="T7A1",
+        display_name="T7A1",
+        collection_id="t7_w_collection",
+        role="parent_promoter",
+        sequence=T7A1,
+        strength_metric="not_reported",
+        strength_value="NA",
+        strength_reference="NA",
+        source_record="dunlop_lab_t7_w_collection",
+    )
+    _write_synthetic_standard_genbank(
+        t7_dir / "W9.gb",
+        record_id="W9",
+        display_name="W9",
+        collection_id="t7_w_collection",
+        role="library_member",
+        sequence=W9,
+        strength_metric="ordinal_rank_weakest_to_strongest",
+        strength_value="9",
+        strength_reference="W1=weakest; W9=strongest",
+        source_record="dunlop_lab_t7_w_collection",
+    )
+    return standards_dir
 
 
 def _write_legacy_reference_dataset(root: Path) -> None:
@@ -90,6 +253,7 @@ def test_plan_strips_primer_flanks_and_normalizes_reference_labels(tmp_path: Pat
 
     plan = port.build_promoter_reference_plan(
         archive_dir=archive_dir,
+        synthetic_standards_dir=None,
         legacy_usr_root=None,
         include_legacy_j23105=False,
     )
@@ -124,6 +288,7 @@ def test_write_promoter_reference_dataset_uses_projected_rows_and_modern_overlay
     _write_legacy_reference_dataset(usr_root)
     plan = port.build_promoter_reference_plan(
         archive_dir=archive_dir,
+        synthetic_standards_dir=None,
         legacy_usr_root=usr_root,
         include_legacy_j23105=True,
     )
@@ -170,4 +335,76 @@ def test_write_promoter_reference_dataset_uses_projected_rows_and_modern_overlay
     assert by_view_name["spyp"].recommended_pooling == "seq_mean"
     assert "spyP" in (by_view_name["spyp"].aliases or [])
     assert by_view_name["J23105"].product_kind == "biological_insert"
+    dataset.validate(strict=True)
+
+
+def test_synthetic_standards_refresh_j23105_and_write_strength_overlay(tmp_path: Path) -> None:
+    archive_dir = tmp_path / "MG1655_noncoding_set"
+    archive_dir.mkdir()
+    _write_promoter_genbank(
+        archive_dir / "spyp-upstream-of-spy.gb",
+        record_id="SPYP",
+        insert=SPYP_INSERT,
+        broad_label="spyp (upstream of spy)",
+        regulator_label="CpxR+",
+    )
+    standards_dir = _write_synthetic_standards_fixture(tmp_path)
+    usr_root = _tmp_usr_root(tmp_path)
+    _write_legacy_reference_dataset(usr_root)
+
+    plan = port.build_promoter_reference_plan(
+        archive_dir=archive_dir,
+        synthetic_standards_dir=standards_dir,
+        legacy_usr_root=usr_root,
+        include_legacy_j23105=True,
+    )
+
+    assert plan.legacy_references == ()
+    assert sorted(row.label for row in plan.promoters) == ["J23103", "J23105", "T7A1", "W9", "spyp"]
+    assert "J23112" not in {row.label for row in plan.promoters}
+    by_label = {row.label: row for row in plan.promoters}
+    assert by_label["J23105"].sequence == J23105.lower()
+    assert by_label["J23105"].standard_metadata is not None
+    assert by_label["J23105"].standard_metadata.strength_value == "0.24"
+    assert by_label["W9"].standard_metadata is not None
+    assert by_label["W9"].standard_metadata.strength_value_numeric == 9.0
+    assert by_label["T7A1"].standard_metadata is not None
+    assert by_label["T7A1"].standard_metadata.strength_value_numeric is None
+
+    result = port.write_promoter_reference_dataset(
+        plan,
+        usr_root=usr_root,
+        output_dataset="usr_promoter_references",
+        expected_genbank_count=5,
+        include_legacy_j23105=True,
+    )
+
+    assert result.rows_written == 5
+    assert result.legacy_rows_written == 0
+    assert result.promoter_standard_overlay_rows == 4
+    dataset = Dataset(usr_root, "usr_promoter_references")
+    records = pq.read_table(dataset.records_path).to_pylist()
+    assert {row["usr_label__primary"] for row in records} == {"spyp", "J23105", "J23103", "T7A1", "W9"}
+
+    seq_annot = pq.read_table(overlay_path(dataset.dir, "seq_annot")).to_pylist()
+    assert len(seq_annot) == 5
+    j23105_annot = next(row for row in seq_annot if row["id"] == compute_id("dna", J23105.lower()))
+    j23105_labels = [feature["label"] for feature in j23105_annot["seq_annot__features"]]
+    assert j23105_labels == ["J23105", "-35", "-10"]
+
+    standard = pq.read_table(overlay_path(dataset.dir, "promoter_standard")).to_pylist()
+    by_standard_label = {row["promoter_standard__display_name"]: row for row in standard}
+    assert set(by_standard_label) == {"J23105", "J23103", "T7A1", "W9"}
+    assert by_standard_label["J23105"]["promoter_standard__strength_metric"] == ("relative_fluorescence_to_BBa_J23100")
+    assert by_standard_label["J23105"]["promoter_standard__strength_value"] == "0.24"
+    assert by_standard_label["J23105"]["promoter_standard__strength_value_numeric"] == 0.24
+    assert by_standard_label["W9"]["promoter_standard__strength_reference"] == "W1=weakest; W9=strongest"
+    assert by_standard_label["T7A1"]["promoter_standard__strength_value"] == "NA"
+    assert by_standard_label["T7A1"]["promoter_standard__strength_value_numeric"] is None
+
+    views = load_sequence_views(dataset)
+    by_view_name = {view.view_name: view for view in views}
+    assert "BBa_J23105" in (by_view_name["J23105"].aliases or [])
+    assert by_view_name["J23105"].source_interval_start_0 == 0
+    assert by_view_name["J23105"].source_interval_end_0 == len(J23105)
     dataset.validate(strict=True)

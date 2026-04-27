@@ -18,6 +18,7 @@ USR_STATE_NAMESPACE = "usr_state"
 USR_LABEL_NAMESPACE = "usr_label"
 SEQ_ANNOT_NAMESPACE = "seq_annot"
 DERIVED_NAMESPACE = "derived"
+PROMOTER_STANDARD_NAMESPACE = "promoter_standard"
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,19 @@ DERIVED_COLUMNS: list[RegistryColumn] = [
     RegistryColumn("derived__spec_id", "string"),
 ]
 
+PROMOTER_STANDARD_COLUMNS: list[RegistryColumn] = [
+    RegistryColumn("promoter_standard__collection_id", "string"),
+    RegistryColumn("promoter_standard__promoter_id", "string"),
+    RegistryColumn("promoter_standard__display_name", "string"),
+    RegistryColumn("promoter_standard__role", "string"),
+    RegistryColumn("promoter_standard__strength_metric", "string"),
+    RegistryColumn("promoter_standard__strength_value", "string"),
+    RegistryColumn("promoter_standard__strength_value_numeric", "float64"),
+    RegistryColumn("promoter_standard__strength_reference", "string"),
+    RegistryColumn("promoter_standard__source_record", "string"),
+    RegistryColumn("promoter_standard__notes", "string"),
+]
+
 
 def _clone_registry_entries(entries: dict[str, RegistryEntry]) -> dict[str, RegistryEntry]:
     return {
@@ -172,4 +186,13 @@ def derived_entry() -> RegistryEntry:
         owner="usr",
         description="Derived-product lineage, focal selection, and feature-retention overlays.",
         columns=list(DERIVED_COLUMNS),
+    )
+
+
+def promoter_standard_entry() -> RegistryEntry:
+    return RegistryEntry(
+        namespace=PROMOTER_STANDARD_NAMESPACE,
+        owner="usr",
+        description="Source-backed synthetic promoter standard strength and collection metadata.",
+        columns=list(PROMOTER_STANDARD_COLUMNS),
     )

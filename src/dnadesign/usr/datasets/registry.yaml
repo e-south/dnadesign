@@ -436,6 +436,30 @@ namespaces:
     description: OPAL demo campaign columns materialized in the packaged USR CLI example
       dataset.
     owner: opal
+  promoter_standard:
+    columns:
+    - name: promoter_standard__collection_id
+      type: string
+    - name: promoter_standard__promoter_id
+      type: string
+    - name: promoter_standard__display_name
+      type: string
+    - name: promoter_standard__role
+      type: string
+    - name: promoter_standard__strength_metric
+      type: string
+    - name: promoter_standard__strength_value
+      type: string
+    - name: promoter_standard__strength_value_numeric
+      type: float64
+    - name: promoter_standard__strength_reference
+      type: string
+    - name: promoter_standard__source_record
+      type: string
+    - name: promoter_standard__notes
+      type: string
+    description: Source-backed synthetic promoter standard strength and collection metadata.
+    owner: usr
   seq_annot:
     columns:
     - name: seq_annot__format
