@@ -52,6 +52,14 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
         compatibility_aliases=("sequence_rows_v3", "cruncher_showcase_v3"),
         docs_slug="sequence-rows-render-v3",
     ),
+    "usr_genbank_annotation_render_v1": RenderContractDescriptor(
+        kind="usr_genbank_annotation_render_v1",
+        schema_version=1,
+        display_name="USR GenBank annotation render contract",
+        purpose=("Linear sequence-row visualization for USR datasets with seq_annot GenBank feature overlays."),
+        accepted_renderers=("sequence_rows",),
+        docs_slug="usr-genbank-annotation-render-v1",
+    ),
     "nucleotide_evidence_map_render_v3": RenderContractDescriptor(
         kind="nucleotide_evidence_map_render_v3",
         schema_version=3,

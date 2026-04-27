@@ -85,7 +85,7 @@ class _IntervalAnnotationFeatureContract:
     def validate_feature(self, feature: Feature, record: Record) -> None:
         reject_unknown_keys(
             feature.attrs,
-            {"lane", "shape", "semantic", "intent", "style_token"},
+            {"lane", "shape", "semantic", "intent", "style_token", "source", "display_label"},
             "interval_annotation.attrs",
         )
         lane = str(feature.attrs.get("lane", "")).strip().lower()

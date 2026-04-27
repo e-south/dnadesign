@@ -63,7 +63,13 @@ def _normalize_densegen_policies(policies: Mapping[str, Any], ctx: str) -> dict[
             f"{ctx}.on_invalid_row",
         )
     if "min_per_record" in parsed:
-        min_per_record = int(parsed["min_per_record"])
+        value = parsed["min_per_record"]
+        if isinstance(value, bool):
+            raise SchemaError(f"{ctx}.min_per_record must be int")
+        try:
+            min_per_record = int(value)
+        except Exception as exc:
+            raise SchemaError(f"{ctx}.min_per_record must be int") from exc
         ensure(min_per_record >= 0, f"{ctx}.min_per_record must be >= 0", SchemaError)
         parsed["min_per_record"] = min_per_record
     if "require_non_null_cols" in parsed:
@@ -82,6 +88,38 @@ def _normalize_densegen_policies(policies: Mapping[str, Any], ctx: str) -> dict[
             if not isinstance(val, bool):
                 raise SchemaError(f"{ctx}.{key} must be bool")
             parsed[key] = val
+    return parsed
+
+
+def _normalize_usr_genbank_policies(policies: Mapping[str, Any], ctx: str) -> dict[str, Any]:
+    parsed = dict(policies)
+    if "on_invalid_row" in parsed:
+        require_one_of(
+            str(parsed["on_invalid_row"]).lower(),
+            {"skip", "error"},
+            f"{ctx}.on_invalid_row",
+        )
+    if "min_per_record" in parsed:
+        value = parsed["min_per_record"]
+        if isinstance(value, bool):
+            raise SchemaError(f"{ctx}.min_per_record must be int")
+        try:
+            min_per_record = int(value)
+        except Exception as exc:
+            raise SchemaError(f"{ctx}.min_per_record must be int") from exc
+        ensure(min_per_record >= 0, f"{ctx}.min_per_record must be >= 0", SchemaError)
+        parsed["min_per_record"] = min_per_record
+    for key in ("require_non_empty", "include_untyped_features"):
+        if key in parsed:
+            val = parsed[key]
+            if not isinstance(val, bool):
+                raise SchemaError(f"{ctx}.{key} must be bool")
+            parsed[key] = val
+    if "overlay_text_template" in parsed:
+        template = parsed["overlay_text_template"]
+        if not isinstance(template, str) or not template.strip():
+            raise SchemaError(f"{ctx}.overlay_text_template must be a non-empty string")
+        parsed["overlay_text_template"] = template
     return parsed
 
 
@@ -112,6 +150,12 @@ def _build_generic(cfg: Any, alphabet: str) -> Any:
     from ..adapters.generic_features import GenericFeaturesAdapter
 
     return GenericFeaturesAdapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_usr_genbank(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.usr_genbank_annotations_v1 import UsrGenbankAnnotationsV1Adapter
+
+    return UsrGenbankAnnotationsV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
 def _build_cruncher(cfg: Any, alphabet: str) -> Any:
@@ -208,6 +252,14 @@ _DENSEGEN_POLICY_KEYS = (
     "overlay_text_template",
 )
 
+_USR_GENBANK_POLICY_KEYS = (
+    "on_invalid_row",
+    "require_non_empty",
+    "min_per_record",
+    "include_untyped_features",
+    "overlay_text_template",
+)
+
 _CRUNCHER_POLICY_KEYS = ("on_missing_hit", "on_missing_pwm")
 
 
@@ -241,6 +293,30 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         required_config_columns=("sequence", "features"),
         required_source_columns=("sequence", "features"),
         optional_source_columns=("effects", "display", "id"),
+    ),
+    "usr_genbank_annotations_v1": AdapterDescriptor(
+        kind="usr_genbank_annotations_v1",
+        owner_tool="usr",
+        contract_kind="usr_genbank_annotations_v1",
+        schema_model=None,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_usr_genbank,
+        docs_slug="usr-genbank-annotations-v1",
+        allowed_config_columns=(
+            "sequence",
+            "annotations",
+            "id",
+            "overlay_text",
+            "video_subtitle",
+            "source_file",
+            "product_kind",
+        ),
+        required_config_columns=("sequence", "annotations"),
+        required_source_columns=("sequence", "annotations"),
+        optional_source_columns=("id", "overlay_text", "video_subtitle", "source_file", "product_kind"),
+        allowed_policy_keys=_USR_GENBANK_POLICY_KEYS,
+        normalize_policies=_normalize_usr_genbank_policies,
     ),
     "cruncher_best_window": AdapterDescriptor(
         kind="cruncher_best_window",

@@ -353,6 +353,7 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     contract_kinds = baserender.list_render_contracts()
     assert "base_render_job_v3" in contract_kinds
     assert "sequence_rows_render_v3" in contract_kinds
+    assert "usr_genbank_annotation_render_v1" in contract_kinds
     assert "nucleotide_evidence_map_render_v3" in contract_kinds
     sequence_contract = baserender.get_render_contract_descriptor("sequence_rows_v3")
     generic_contract = baserender.get_render_contract_descriptor("render_job_v3")

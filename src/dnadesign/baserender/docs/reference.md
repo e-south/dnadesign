@@ -84,6 +84,7 @@ Contract behavior:
 Render-contract descriptors:
 - `base_render_job_v3`: generic adapter -> renderer -> output orchestration; accepts all registered renderer families
 - `sequence_rows_render_v3`: linear sequence-row visualization; accepts `sequence_rows`
+- `usr_genbank_annotation_render_v1`: USR `seq_annot` GenBank feature-overlay visualization; accepts `sequence_rows`
 - `nucleotide_evidence_map_render_v3`: nucleotide-level ownership/evidence map visualization; accepts `nucleotide_evidence_map`
 - `hairpin_cartoon_render_v3`: hairpin topology cartoon visualization; accepts `hairpin_cartoon`
 - `topology_cartoon_render_v3`: explicit segment-topology cartoon visualization; accepts `topology_cartoon`
@@ -92,6 +93,7 @@ Render-contract descriptors:
 
 Adapters:
 - `densegen_tfbs`
+- `usr_genbank_annotations_v1`
 - `generic_features`
 - `cruncher_best_window`
 - `sequence_windows_v1`
@@ -101,6 +103,38 @@ Adapters:
 - `yiu_payload_visual_v1`
 - `yiu_hairpin_topology_v1`
 - `yiu_topology_cartoon_v1`
+
+### USR GenBank Annotations
+
+`usr_genbank_annotations_v1` is a file-contract adapter for USR rows that already
+project GenBank annotations into `seq_annot__features`. USR owns the dataset scan
+and projection step; BaseRender consumes the resulting parquet and does not inspect
+USR overlay directories.
+
+Required adapter columns:
+- `sequence`: row sequence
+- `annotations`: `seq_annot__features` list of feature mappings with `start_0` and `end_0`
+
+Optional adapter columns:
+- `id`: stable row id used in plot/report output
+- `overlay_text`: short row label rendered near the sequence
+- `video_subtitle`: subtitle text for video frames
+- `source_file`: retained as record metadata
+- `product_kind`: retained as record metadata
+
+Semantic mapping:
+- `role_hint=sigma70_minus35` or label `-35` renders as the upstream sigma-70 core site.
+- `role_hint=sigma70_minus10` or label `-10` renders as the downstream sigma-70 core site.
+- `role_hint=TFBS` or labels containing `TFBS` render as regulator binding-site features.
+- Full upstream source intervals are treated as row provenance and are not rendered as visual annotation features.
+- Promoter calls render as filled `Promoter region` interval annotations.
+- Operator labels render as filled `Operator site` interval annotations.
+- Other GenBank features render as `Additional annotation` only when `include_untyped_features: true`.
+
+Fail-fast behavior:
+- malformed annotation payloads, non-integer coordinates, zero-length intervals, and out-of-bounds intervals fail before rendering;
+- `min_per_record` enforces a minimum number of rendered features per adapted row;
+- `on_invalid_row: skip` is allowed for exploratory jobs, but production workspaces should use `error` with `run.strict: true`.
 
 Input kinds:
 - `parquet`
@@ -159,6 +193,12 @@ Images:
 - if `outputs` includes `kind: images` with no `dir`, workspace jobs default to `outputs/plots`
 - non-workspace jobs default to `<results_root>/<job_name>/images`
 - if `dir` is set, it is resolved relative to output root unless absolute
+
+Video:
+- `content_fit: native` preserves the rendered canvas scale and stable crop behavior
+- `content_fit: fill_width` trims each rendered frame, keeps a small safe gutter, and scales content to fill the video width
+- `content_fit: fill_width_per_frame` trims and scales each frame independently; use for variable-length records where per-record readability matters more than stable cross-frame crop geometry
+- BaseRender never non-uniformly stretches frames; fixed-size videos may still letterbox when records have different rendered aspect ratios.
 
 Run reports:
 - report emission is opt-in (`run.emit_report: true`)

@@ -278,6 +278,20 @@ class SequenceRowsRenderer:
                     style,
                     draw_label=True,
                 )
+            elif feature.kind == "interval_annotation":
+                _draw_interval_annotation_fill(
+                    ax,
+                    placement.x,
+                    placement.y,
+                    placement.w,
+                    placement.h,
+                    label,
+                    color,
+                    style,
+                    cw=layout.cw,
+                    ch=layout.ch,
+                    draw_label=draw_label,
+                )
             else:
                 _draw_feature_box(
                     ax,
@@ -496,6 +510,14 @@ def _darken_rgb(color: object, *, factor: float) -> tuple[float, float, float]:
     return (r * scale, g * scale, b * scale)
 
 
+def _annotation_text_color(facecolor, style: Style):
+    r, g, b = mcolors.to_rgb(facecolor)
+    luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b)
+    if luminance >= 0.58:
+        return "#374151"
+    return style.kmer.text_color
+
+
 def _capitalize_first(text: str) -> str:
     t = text.strip()
     if not t:
@@ -604,6 +626,30 @@ def _span_link_label_boxes(
     return boxes
 
 
+def _sequence_strand_occupied_boxes(layout: LayoutContext, style: Style) -> list[tuple[float, float, float, float]]:
+    pad = max(3.0, float(style.font_size_seq) / 72.0 * float(style.dpi) * 0.12)
+    x0 = float(style.padding_x)
+    x1 = float(layout.width - style.padding_x)
+    boxes = [
+        (
+            x0,
+            float(layout.y_forward) - float(layout.sequence_extent_down) - pad,
+            x1,
+            float(layout.y_forward) + float(layout.sequence_extent_up) + pad,
+        )
+    ]
+    if abs(float(layout.y_reverse) - float(layout.y_forward)) > 1.0e-6:
+        boxes.append(
+            (
+                x0,
+                float(layout.y_reverse) - float(layout.sequence_extent_down) - pad,
+                x1,
+                float(layout.y_reverse) + float(layout.sequence_extent_up) + pad,
+            )
+        )
+    return boxes
+
+
 def _compact_fixed_element_annotation_label(raw_label: str) -> str:
     text = str(raw_label).strip()
     lowered = text.lower()
@@ -618,6 +664,12 @@ def _fixed_element_annotation_font_size(style: Style) -> float:
     if bool(style.uniform_display_font_size):
         return style.display_font_size()
     return float(max(6, style.font_size_label, style.font_size_seq))
+
+
+def _interval_annotation_fill_font_size(style: Style) -> float:
+    if bool(style.uniform_display_font_size):
+        return float(max(style.display_font_size(), style.display_font_size() * 1.15))
+    return float(max(10, style.font_size_label, style.legend_font_size))
 
 
 def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, palette: Palette, style: Style) -> None:
@@ -640,6 +692,7 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
                 placement.y + placement.h / 2.0,
             )
         )
+    occupied_boxes.extend(_sequence_strand_occupied_boxes(layout, style))
     occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
 
     placed_label_boxes: list[tuple[float, float, float, float]] = []
@@ -685,11 +738,14 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
         text_w = _text_px_width(text, style.font_label, text_size, style.dpi)
         text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi))
         center_x = placement.x + placement.w / 2.0
-        top_gap = max(4.0, feature_box_pad + text_h * 0.25)
-        top_y = placement.y + placement.h / 2.0 + top_gap + text_h / 2.0
+        label_gap = max(4.0, feature_box_pad + text_h * 0.25)
+        if placement.above:
+            away_y = placement.y + placement.h / 2.0 + label_gap + text_h / 2.0
+        else:
+            away_y = placement.y - placement.h / 2.0 - label_gap - text_h / 2.0
         right_x = placement.x + placement.w + margin
         left_x = placement.x - margin
-        return text, text_size, text_w, text_h, center_x, top_y, right_x, left_x
+        return text, text_size, text_w, text_h, center_x, away_y, right_x, left_x
 
     def _candidate_fits(
         bbox: tuple[float, float, float, float],
@@ -1618,6 +1674,65 @@ def _draw_feature_box(
                 clip_on=False,
             )
         )
+
+
+def _draw_interval_annotation_fill(
+    ax,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    label: str,
+    facecolor,
+    style: Style,
+    *,
+    cw: float,
+    ch: float,
+    draw_label: bool = True,
+) -> None:
+    _draw_feature_box(
+        ax,
+        x,
+        y,
+        w,
+        h,
+        "",
+        facecolor,
+        style,
+        cw=cw,
+        ch=ch,
+        draw_label=False,
+    )
+    if not draw_label or not label:
+        return
+
+    font_size = _interval_annotation_fill_font_size(style)
+    text = str(label).strip()
+    if not text:
+        return
+    pad_x = float(style.kmer.pad_x_px)
+    x0 = float(x) - pad_x
+    x1 = float(x) + float(w) + pad_x
+    available = max(0.0, x1 - x0)
+    text_w = _text_px_width(text, style.font_label, font_size, style.dpi)
+    if text_w <= max(8.0, available - 8.0):
+        text_x = (x0 + x1) / 2.0
+        ha = "center"
+    else:
+        text_x = x0 + 4.0
+        ha = "left"
+    ax.text(
+        text_x,
+        y + float(style.kmer.text_y_nudge_cells) * ch,
+        text,
+        ha=ha,
+        va="center",
+        fontsize=font_size,
+        family=style.font_label,
+        color=_annotation_text_color(facecolor, style),
+        zorder=4.05,
+        clip_on=False,
+    )
 
 
 def _draw_interval_underline(
