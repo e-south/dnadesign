@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/tooling/cli.py
 
 Typer registration helpers for USR tooling subcommands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

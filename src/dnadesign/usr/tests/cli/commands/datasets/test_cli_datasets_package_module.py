@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/cli/commands/datasets/test_cli_datasets_package_module.p
 
 Layout contract tests for CLI dataset helper package decomposition.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

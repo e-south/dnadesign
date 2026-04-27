@@ -25,7 +25,7 @@ deliberately before treating the dataset as the cross-tool source of truth.
 
 For the live `stress_ethanol_cipro_growth` study, the real source datasets are
 not the packaged demo inputs. Merge `densegen_prom_eth_cip_source` and
-`usr_mg1655_promoter_controls` in USR first, then point Construct at that merged source
+`usr_promoter_references` in USR first, then point Construct at that merged source
 dataset while keeping `usr_pdual10_plasmid_template` as the pDual-backed template dataset.
 
 ### Boundary decisions

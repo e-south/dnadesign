@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/plot_stage_b_summary_data.py
 
 Data-normalization helpers for Stage-B summary plots.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

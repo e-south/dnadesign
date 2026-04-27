@@ -34,7 +34,7 @@ Active shared study dataset ids must be flat owner-first ids such as
 
 Choose the least-coupled semantic id that still keeps the dataset understandable.
 
-- Prefer a flat dataset id when the biological collection is already specific, such as `usr_mg1655_promoter_controls`, `usr_pdual10_plasmid_template`, or `anchor_template_slot_a_window_1kb_demo`.
+- Prefer a flat dataset id when the biological collection is already specific, such as `usr_promoter_references`, `usr_pdual10_plasmid_template`, or `anchor_template_slot_a_window_1kb_demo`.
 - Use namespace-qualified ids only when they genuinely improve disambiguation instead of encoding tool routing.
 - Do not encode active handoffs as nested owner/study folders. Use `root_kind`, `owner_tool`, overlays, and study metadata for provenance.
 - Keep tool provenance in namespaced overlay columns such as `construct__*`, `densegen__*`, or `infer__*`, not in the dataset id itself, unless the dataset is truly tool-private scratch state.
@@ -107,6 +107,12 @@ Helper packages under `src/dnadesign/usr/src/`:
 - `src/dnadesign/usr/src/events/fingerprint.py`
 - `src/dnadesign/usr/src/events/recording.py`
 - `src/dnadesign/usr/src/events/redaction.py`
+- `genbank/`
+  - GenBank parsing, source-hash fidelity, annotation import manifests, and optional feature extraction into USR overlays
+- `src/dnadesign/usr/src/genbank/__init__.py`
+- `src/dnadesign/usr/src/genbank/importer.py`
+- `src/dnadesign/usr/src/genbank/models.py`
+- `src/dnadesign/usr/src/genbank/parser.py`
 - `datasets/`
   - dataset helper packages for core ingest/activity primitives, materialization, maintenance-gated mutation operations, overlay operations, validation, and read/query flows
   - `datasets/core/` is the closed dataset core cluster for identity, ingest, activity notes, and dataset-scoped events
@@ -210,6 +216,11 @@ Helper packages under `src/dnadesign/usr/src/`:
 - `src/dnadesign/usr/src/registry/storage.py`
 - `src/dnadesign/usr/src/registry/typespec.py`
 - `src/dnadesign/usr/src/registry/validation.py`
+- `sequence_views/`
+  - semantic sequence-view identity, view-id derivation, parquet sidecar IO, and selector/store helpers
+- `src/dnadesign/usr/src/sequence_views/__init__.py`
+- `src/dnadesign/usr/src/sequence_views/models.py`
+- `src/dnadesign/usr/src/sequence_views/store.py`
 - `storage/`
   - low-level parquet IO, snapshotting, and dataset write-lock primitives
 - `sync/`

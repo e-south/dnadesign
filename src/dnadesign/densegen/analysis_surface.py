@@ -5,7 +5,7 @@ src/dnadesign/densegen/analysis_surface.py
 
 Public DenseGen analysis-surface contract.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

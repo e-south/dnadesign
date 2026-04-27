@@ -6,7 +6,7 @@ src/dnadesign/usr/src/datasets/merge/__init__.py
 Dataset merge helper package for maintenance-gated merge execution and overlay
 carry behavior.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

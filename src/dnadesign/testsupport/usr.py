@@ -5,7 +5,7 @@ src/dnadesign/testsupport/usr.py
 
 Repo-level USR fixture helpers shared across sibling package tests.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/datasets/resolution.py
 
 Dataset-id normalization and interactive selection helpers for USR CLI commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

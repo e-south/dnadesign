@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/support/wiring/registration.py
 
 CLI app registration helpers for the USR entrypoint facade.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -20,6 +20,7 @@ import typer
 
 from ....contracts import SequencesError
 from ...commands import tooling as tooling_commands
+from ...commands.genbank.cli import register_genbank_commands
 from ...commands.lifecycle import register_lifecycle_commands
 from ...commands.maintenance import register_maintenance_commands
 from ...commands.namespace.cli import register_namespace_commands
@@ -99,6 +100,11 @@ def register_cli_surface(*, apps: CliApps, root_callback: Callable[..., None], c
         cmd_overlay_project=bindings.cmd_overlay_project,
         cmd_overlay_remove=bindings.cmd_overlay_remove,
         cmd_merge_datasets=bindings.cmd_merge_datasets,
+    )
+
+    register_genbank_commands(
+        apps.genbank_app,
+        ctx_args_builder=ctx_args_builder,
     )
 
     tooling_commands.register_ops_commands(

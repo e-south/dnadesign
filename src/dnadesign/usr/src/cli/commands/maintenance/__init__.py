@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/__init__.py
 
 USR CLI maintenance command family.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

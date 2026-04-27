@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/tooling/dev.py
 
 Development-only USR tooling commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

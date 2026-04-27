@@ -21,11 +21,12 @@ uv run usr --root src/dnadesign/usr/datasets maintenance merge \
   --if-duplicate error \
   --dry-run
 
-# Merge the curated wildtype anchors without mutating their source dataset.
-# This is idempotent for the current study handoff and adds 0 rows on refresh.
+# Merge the curated promoter references without mutating their source dataset.
+# The fortified source currently adds the newly projected promoter references
+# to the existing handoff; future refreshes should become idempotent.
 uv run usr --root src/dnadesign/usr/datasets maintenance merge \
   --dest usr_prom_eth_cip_anchor \
-  --src usr_mg1655_promoter_controls \
+  --src usr_promoter_references \
   --union-columns \
   --if-duplicate error
 

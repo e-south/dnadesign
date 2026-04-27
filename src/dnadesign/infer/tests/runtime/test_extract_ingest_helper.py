@@ -17,6 +17,7 @@ import pytest
 
 from dnadesign.infer.src.config import IngestConfig
 from dnadesign.infer.src.errors import ConfigError, ValidationError
+from dnadesign.infer.src.features.contracts import PromoterFeatureBundleConfig
 from dnadesign.infer.src.runtime.ingest_loading import load_extract_ingest
 
 
@@ -109,3 +110,29 @@ def test_load_extract_ingest_unknown_source_fails_fast() -> None:
 
     with pytest.raises(ConfigError, match="Unknown ingest source"):
         load_extract_ingest(inputs=None, ingest=ingest)
+
+
+def test_load_extract_ingest_sequence_view_bundle_uses_materialized_view_records(monkeypatch) -> None:
+    ingest = IngestConfig(source="records", field="sequence")
+    bundle = PromoterFeatureBundleConfig(
+        sequence_view_inputs=[
+            {
+                "dataset": "demo_refs",
+                "root": "/tmp/usr-root",
+                "view_selector": {"product_kind": "analysis_core60"},
+                "pooling": {"operation": "core60_mean"},
+            }
+        ]
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_sequence_view_input_records",
+        lambda *, bundle: [{"id": "view-1", "sequence": "ACGT"}],
+    )
+
+    payload = load_extract_ingest(inputs=None, ingest=ingest, feature_bundle=bundle)
+
+    assert payload.source_kind == "records"
+    assert payload.seqs == ["ACGT"]
+    assert payload.ids is None
+    assert payload.records == [{"id": "view-1", "sequence": "ACGT"}]

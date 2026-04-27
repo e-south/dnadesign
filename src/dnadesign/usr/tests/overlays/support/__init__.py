@@ -5,6 +5,6 @@ src/dnadesign/usr/tests/overlays/support/__init__.py
 
 Overlay support helper tests.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

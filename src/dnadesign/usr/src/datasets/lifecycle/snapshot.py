@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/lifecycle/snapshot.py
 
 Dataset snapshot helper extracted from the Dataset coordinator.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

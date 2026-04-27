@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/tooling/__init__.py
 
 USR tooling command helper package.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

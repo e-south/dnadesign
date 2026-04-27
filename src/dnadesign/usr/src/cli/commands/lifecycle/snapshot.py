@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/lifecycle/snapshot.py
 
 USR CLI lifecycle snapshot command implementation.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

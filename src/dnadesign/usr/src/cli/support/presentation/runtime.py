@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/support/presentation/runtime.py
 
 Shared CLI runtime-format helpers for the USR entrypoint facade.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

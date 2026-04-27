@@ -1,10 +1,24 @@
 # USR maintenance patterns
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-26
 
 
 This page captures common maintenance commands that mutate or package dataset state.
+
+## GenBank-backed import and sequence-view upkeep
+
+```bash
+# Import GenBank-backed native records plus seq_annot overlays and native sequence views.
+uv run usr genbank import --manifest path/to/genbank_import.yaml
+```
+
+Operational rules:
+
+- `usr genbank import` is the owning write surface for `seq_annot` and native-record sequence views.
+- Feature extraction during GenBank import may also write `derived` overlays and child sequence views when the manifest requests it.
+- Do not hand-edit `_views/sequence_views.parquet`; rerun the owning import or realization step with the intended conflict policy.
+- Dataset-local `_views/sequence_views.parquet` sidecars are additive metadata and are not compacted via overlay maintenance commands.
 
 ## Registry and overlay maintenance
 
@@ -76,6 +90,7 @@ Merge controls:
   - only `id`-keyed overlays are supported
   - only rows that survive the merge are carried
 - if a needed namespace is not `id`-keyed or still lives in overlay parts, compact or reattach it explicitly before the merge
+- plain merge does not copy `_views/sequence_views.parquet`; downstream sequence views must be regenerated or explicitly rewritten by the owning tool because view ids, bounds, and lineage may change across derived products
 
 ## Snapshots and export
 

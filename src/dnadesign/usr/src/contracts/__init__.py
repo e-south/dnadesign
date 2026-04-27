@@ -6,7 +6,7 @@ src/dnadesign/usr/src/contracts/__init__.py
 Shared USR contract surfaces for errors, schema, API types, and sequence
 normalization rules.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

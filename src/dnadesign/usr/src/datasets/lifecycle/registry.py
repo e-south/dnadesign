@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/lifecycle/registry.py
 
 Dataset registry/lifecycle helpers extracted from the Dataset coordinator.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

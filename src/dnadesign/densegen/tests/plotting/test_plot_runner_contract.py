@@ -5,7 +5,7 @@ src/dnadesign/densegen/tests/plotting/test_plot_runner_contract.py
 
 Focused contract tests for the DenseGen plot runner.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

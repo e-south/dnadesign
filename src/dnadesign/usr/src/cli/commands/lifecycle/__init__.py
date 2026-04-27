@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/lifecycle/__init__.py
 
 USR CLI dataset lifecycle command family.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

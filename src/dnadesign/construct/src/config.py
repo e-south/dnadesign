@@ -389,6 +389,172 @@ class RealizeConfig(StrictConfigModel):
         return self
 
 
+class FeatureMatchConfig(StrictConfigModel):
+    role_hint: Optional[str] = None
+    labels: List[str] = Field(default_factory=list)
+
+    @field_validator("role_hint")
+    @classmethod
+    def _role_hint_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("feature matcher role_hint cannot be empty when provided.")
+        return text
+
+    @field_validator("labels")
+    @classmethod
+    def _labels_not_blank(cls, value: List[str]) -> List[str]:
+        normalized: list[str] = []
+        for item in value:
+            text = str(item or "").strip()
+            if not text:
+                raise ValueError("feature matcher labels cannot contain empty strings.")
+            normalized.append(text)
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_meaningful_matcher(self) -> "FeatureMatchConfig":
+        if self.role_hint is None and not self.labels:
+            raise ValueError("feature matcher requires role_hint and/or labels.")
+        return self
+
+
+class AnnotationPairMidpointSelectorConfig(StrictConfigModel):
+    kind: Literal["annotation_pair_midpoint"]
+    first: FeatureMatchConfig
+    second: FeatureMatchConfig
+    confidence: Literal["high", "medium", "low"] = "high"
+
+
+class AnnotationFeatureCenterSelectorConfig(StrictConfigModel):
+    kind: Literal["annotation_feature_center"]
+    role_hint: Optional[str] = None
+    labels: List[str] = Field(default_factory=list)
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+    @model_validator(mode="after")
+    def _validate_meaningful_matcher(self) -> "AnnotationFeatureCenterSelectorConfig":
+        if self.role_hint is None and not self.labels:
+            raise ValueError("annotation_feature_center requires role_hint and/or labels.")
+        return self
+
+
+class SequenceMidpointSelectorConfig(StrictConfigModel):
+    kind: Literal["sequence_midpoint"]
+    allowed: bool = False
+    confidence: Literal["high", "medium", "low"] = "low"
+
+
+NormalizeAnchorSelectorConfig = Annotated[
+    AnnotationPairMidpointSelectorConfig | AnnotationFeatureCenterSelectorConfig | SequenceMidpointSelectorConfig,
+    Field(discriminator="kind"),
+]
+
+
+class SelectorChainConfig(StrictConfigModel):
+    kind: Literal["chain"]
+    selectors: List[NormalizeAnchorSelectorConfig]
+
+    @model_validator(mode="after")
+    def _validate_non_empty(self) -> "SelectorChainConfig":
+        if not self.selectors:
+            raise ValueError("normalize_anchor.focal_selector.selectors must define at least one selector.")
+        return self
+
+
+class OverLengthTrimPolicyConfig(StrictConfigModel):
+    kind: Literal["trim"] = "trim"
+    target_length: int = Field(ge=1)
+    require_focal_inside: bool = True
+
+
+class NormalizeTemplateConfig(StrictConfigModel):
+    source: TemplateSourceConfig
+    circular: bool = False
+    id: Optional[str] = None
+
+    @field_validator("id")
+    @classmethod
+    def _id_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("normalize_anchor template.id cannot be empty when provided.")
+        return text
+
+
+class UnderLengthExpandFromTemplatePolicyConfig(StrictConfigModel):
+    kind: Literal["expand_from_template"]
+    target_length: int = Field(ge=1)
+    template: NormalizeTemplateConfig
+    placement_ref: str
+
+    @field_validator("placement_ref")
+    @classmethod
+    def _placement_ref_not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("normalize_anchor under_length_policy.placement_ref cannot be empty.")
+        return text
+
+
+class FeatureRetentionPolicyConfig(StrictConfigModel):
+    fail_if_loses_roles: List[str] = Field(default_factory=list)
+    warn_if_clips_roles: List[str] = Field(default_factory=list)
+
+    @field_validator("fail_if_loses_roles", "warn_if_clips_roles")
+    @classmethod
+    def _roles_not_blank(cls, value: List[str]) -> List[str]:
+        normalized: list[str] = []
+        for item in value:
+            text = str(item or "").strip()
+            if not text:
+                raise ValueError("feature retention roles cannot contain empty strings.")
+            normalized.append(text)
+        return normalized
+
+
+class FallbackPolicyConfig(StrictConfigModel):
+    allow_low_confidence: bool = False
+    mark_low_confidence_rows: bool = False
+
+
+class OutputSequenceViewConfig(StrictConfigModel):
+    create: bool = False
+    recommended_pooling: Optional[Literal["seq_mean", "anchor_mean", "core60_mean"]] = None
+
+
+class NormalizeAnchorConfig(StrictConfigModel):
+    product_kind: Literal["analysis_core60"]
+    target_length: int = Field(ge=1)
+    focal_selector: SelectorChainConfig
+    over_length_policy: OverLengthTrimPolicyConfig
+    under_length_policy: Optional[UnderLengthExpandFromTemplatePolicyConfig] = None
+    feature_retention_policy: FeatureRetentionPolicyConfig = Field(default_factory=FeatureRetentionPolicyConfig)
+    fallback_policy: FallbackPolicyConfig = Field(default_factory=FallbackPolicyConfig)
+    emit_feature_retention_report: bool = False
+    output_sequence_view: OutputSequenceViewConfig = Field(default_factory=OutputSequenceViewConfig)
+
+
+class OutputVariantConfig(StrictConfigModel):
+    product_kind: Literal["context1kb_forward", "context1kb_reverse_complement"]
+    orientation: Literal["forward", "reverse_complement"]
+    recommended_pooling: Optional[Literal["seq_mean", "anchor_mean", "core60_mean"]] = None
+
+    @model_validator(mode="after")
+    def _validate_product_kind_orientation(self) -> "OutputVariantConfig":
+        expected_kind = "context1kb_forward" if self.orientation == "forward" else "context1kb_reverse_complement"
+        if self.product_kind != expected_kind:
+            raise ValueError(
+                "output_variants product_kind must match orientation "
+                f"(expected {expected_kind!r} for orientation {self.orientation!r})."
+            )
+        return self
+
+
 class OutputConfig(StrictConfigModel):
     target: USRDatasetLocatorConfig
     record_source: Optional[str] = None
@@ -422,18 +588,39 @@ class OutputConfig(StrictConfigModel):
 
 class InnerJobConfig(StrictConfigModel):
     id: str
+    mode: Literal["realize_template", "normalize_anchor"] = "realize_template"
     input: InputConfig
-    template: TemplateConfig
-    parts: List[PartConfig]
-    realize: RealizeConfig
+    template: Optional[TemplateConfig] = None
+    parts: List[PartConfig] = Field(default_factory=list)
+    realize: Optional[RealizeConfig] = None
+    normalize_anchor: Optional[NormalizeAnchorConfig] = None
+    output_variants: List[OutputVariantConfig] = Field(default_factory=list)
     output: OutputConfig
 
     @model_validator(mode="after")
     def _validate_parts(self) -> "InnerJobConfig":
-        if not self.parts:
-            raise ValueError("job.parts must define at least one part.")
         if not str(self.input.source.root or "").strip():
             raise ValueError("job.input.source.root is required for construct jobs that read USR datasets.")
+        if self.mode == "normalize_anchor":
+            if self.normalize_anchor is None:
+                raise ValueError("job.normalize_anchor is required when job.mode='normalize_anchor'.")
+            if self.template is not None:
+                raise ValueError("job.template is only allowed when job.mode='realize_template'.")
+            if self.parts:
+                raise ValueError("job.parts is only allowed when job.mode='realize_template'.")
+            if self.realize is not None:
+                raise ValueError("job.realize is only allowed when job.mode='realize_template'.")
+            if self.output_variants:
+                raise ValueError("job.output_variants is only allowed when job.mode='realize_template'.")
+            return self
+        if self.template is None:
+            raise ValueError("job.template is required when job.mode='realize_template'.")
+        if not self.parts:
+            raise ValueError("job.parts must define at least one part.")
+        if self.realize is None:
+            raise ValueError("job.realize is required when job.mode='realize_template'.")
+        if self.normalize_anchor is not None:
+            raise ValueError("job.normalize_anchor is only allowed when job.mode='normalize_anchor'.")
         seen: set[str] = set()
         input_driven = 0
         for part in self.parts:

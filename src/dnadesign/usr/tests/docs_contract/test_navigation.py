@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/docs_contract/test_navigation.py
 
 Structural router and index contracts for USR docs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

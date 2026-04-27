@@ -5,7 +5,7 @@ src/dnadesign/usr/src/overlays/metadata.py
 
 Overlay metadata and schema inspection helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/cli.py
 
 Typer registration helpers for USR maintenance commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

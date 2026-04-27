@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/cli/commands/lifecycle/test_cli_snapshot.py
 
 CLI tests for usr snapshot lifecycle behavior.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/densegen/tests/runtime/test_records_loader_compat.py
 
 Compatibility tests for loading legacy DenseGen records artifacts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

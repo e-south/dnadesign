@@ -114,7 +114,7 @@ export FEATURE_DATASET="multi_source_construct_truth_demo" # Reuse the construct
 For the live `stress_ethanol_cipro_growth` study, keep the study-owned source
 datasets explicit:
 
-- `densegen_prom_eth_cip_source` and `usr_mg1655_promoter_controls` are separate source datasets until the USR merge step is complete
+- `densegen_prom_eth_cip_source` and `usr_promoter_references` are separate source datasets until the USR merge step is complete
 - if the study needs pDual-backed contexts, merge in USR first, then point Construct at that merged source dataset while keeping `usr_pdual10_plasmid_template` as the template dataset
 
 ### 4) Define the infer job matrix explicitly

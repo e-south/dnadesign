@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/sync/test_sync_module_layout.py
 
 Layout contract tests for the root sync facade decomposition.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

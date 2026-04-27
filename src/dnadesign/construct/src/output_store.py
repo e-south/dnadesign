@@ -17,7 +17,8 @@ from pathlib import Path
 import pyarrow as pa
 import yaml
 
-from dnadesign.usr import Dataset
+from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
+from dnadesign.usr.src.registry.models import DERIVED_COLUMNS
 
 from .errors import ValidationError
 
@@ -73,6 +74,10 @@ _CONSTRUCT_COLUMNS = [
             "realized_start:int64,realized_end:int64,length:int64>>"
         ),
     },
+    {"name": "construct__orientation", "type": "string"},
+    {"name": "construct__forward_anchor_start", "type": "int64"},
+    {"name": "construct__forward_anchor_end", "type": "int64"},
+    {"name": "construct__parent_forward_construct_id", "type": "string"},
 ]
 
 _CONSTRUCT_SEED_COLUMNS = [
@@ -202,6 +207,7 @@ def _ensure_construct_registry(root: Path) -> None:
     )
     if payload != original_payload:
         _registry_path(root).write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    ensure_sequence_contract_namespaces(root)
 
 
 def _existing_output_ids(root: Path, dataset_name: str) -> set[str]:
@@ -267,6 +273,28 @@ def _construct_metadata_table(metadata_rows: list[dict[str, object]]) -> pa.Tabl
     schema = pa.schema(
         [pa.field("id", pa.string())]
         + [pa.field(col["name"], _registry_arrow_type(col["type"])) for col in _CONSTRUCT_COLUMNS]
+    )
+    return pa.table(
+        {
+            field.name: pa.array(
+                [row.get(field.name) for row in metadata_rows],
+                type=field.type,
+            )
+            for field in schema
+        },
+        schema=schema,
+    )
+
+
+def _derived_metadata_table(metadata_rows: list[dict[str, object]]) -> pa.Table:
+    if not metadata_rows:
+        return pa.table(
+            {"id": pa.array([], type=pa.string())},
+            schema=pa.schema([pa.field("id", pa.string())]),
+        )
+    schema = pa.schema(
+        [pa.field("id", pa.string())]
+        + [pa.field(column.name, _registry_arrow_type(column.type)) for column in DERIVED_COLUMNS]
     )
     return pa.table(
         {

@@ -17,10 +17,14 @@ from pathlib import Path
 import pyarrow as pa
 import pytest
 
+from dnadesign.construct.src.annotations import AnnotationFeature, AnnotationInterval
 from dnadesign.construct.src.api import preflight_from_config, run_from_config
 from dnadesign.construct.src.errors import ValidationError
+from dnadesign.construct.src.feature_retention import classify_feature_retention
 from dnadesign.construct.src.output_store import _ensure_construct_registry
-from dnadesign.usr import Dataset
+from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces, load_sequence_views
+from dnadesign.usr.src.registry.models import SEQ_ANNOT_COLUMNS
+from dnadesign.usr.src.registry.typespec import arrow_type_from_str
 
 
 def _write_registry(root: Path) -> None:
@@ -43,6 +47,23 @@ namespaces:
         type: list<string>
 """,
         encoding="utf-8",
+    )
+
+
+def _seq_annot_table(*, row_id: str, features: list[dict[str, object]]) -> pa.Table:
+    seq_annot_type = next(column.type for column in SEQ_ANNOT_COLUMNS if column.name == "seq_annot__features")
+    schema = pa.schema(
+        [
+            pa.field("id", pa.string()),
+            pa.field("seq_annot__features", arrow_type_from_str(seq_annot_type)),
+        ]
+    )
+    return pa.table(
+        {
+            "id": pa.array([row_id], type=pa.string()),
+            "seq_annot__features": pa.array([features], type=arrow_type_from_str(seq_annot_type)),
+        },
+        schema=schema,
     )
 
 
@@ -2063,3 +2084,778 @@ job:
         match="requires exactly one forward-strand match for placement.locator.upstream_sequence",
     ):
         run_from_config(config_path)
+
+
+def test_run_construct_normalize_anchor_selects_annotation_pair_midpoint_and_writes_sequence_view(
+    tmp_path: Path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    input_ds = Dataset(usr_root, "annotated_refs")
+    input_ds.init(source="test", notes="normalize anchor test")
+    add_result = input_ds.add_sequences(["A" * 80], bio_type="dna", alphabet="dna_4", source="test")
+    input_ds.write_overlay(
+        "seq_annot",
+        _seq_annot_table(
+            row_id=add_result.ids[0],
+            features=[
+                {
+                    "feature_id": "minus35",
+                    "feature_order": 1,
+                    "feature_type": "misc_feature",
+                    "label": "-35",
+                    "role_hint": "sigma70_minus35",
+                    "location_raw": "11..16",
+                    "location_kind": "exact",
+                    "start_0": 10,
+                    "end_0": 16,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 10, "end_0": 16, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+                {
+                    "feature_id": "minus10",
+                    "feature_order": 2,
+                    "feature_type": "misc_feature",
+                    "label": "-10",
+                    "role_hint": "sigma70_minus10",
+                    "location_raw": "41..46",
+                    "location_kind": "exact",
+                    "start_0": 40,
+                    "end_0": 46,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 40, "end_0": 46, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+            ],
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    config_path = tmp_path / "normalize_anchor.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_demo
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: annotated_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_core60
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: annotation_pair_midpoint
+          first:
+            role_hint: sigma70_minus35
+            labels: ["-35"]
+          second:
+            role_hint: sigma70_minus10
+            labels: ["-10"]
+          confidence: high
+        - kind: sequence_midpoint
+          allowed: true
+    over_length_policy:
+      kind: trim
+      target_length: 60
+    feature_retention_policy:
+      fail_if_loses_roles: [sigma70_minus35, sigma70_minus10]
+    emit_feature_retention_report: true
+    output_sequence_view:
+      create: true
+      recommended_pooling: core60_mean
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    output_ds = Dataset(usr_root, "normalized_refs")
+    frame = output_ds.head(n=5)
+    assert len(frame.iloc[0]["sequence"]) == 60
+    assert frame.iloc[0]["construct__context_kind"] == "analysis_core60"
+    assert frame.iloc[0]["derived__source_interval_start_0"] == 0
+    assert frame.iloc[0]["derived__source_interval_end_0"] == 60
+    assert frame.iloc[0]["derived__focal_rule"] == "annotation_pair_midpoint"
+    assert frame.iloc[0]["derived__product_kind"] == "analysis_core60"
+    assert bool(frame.iloc[0]["derived__analysis_only"]) is True
+
+    views = load_sequence_views(output_ds)
+    assert len(views) == 1
+    assert views[0].product_kind == "analysis_core60"
+    assert views[0].recommended_pooling == "core60_mean"
+    assert views[0].parent_sequence_id == add_result.ids[0]
+
+
+def test_run_construct_normalize_anchor_fails_on_ambiguous_annotation_pair(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    input_ds = Dataset(usr_root, "annotated_refs")
+    input_ds.init(source="test", notes="normalize anchor ambiguity test")
+    add_result = input_ds.add_sequences(["A" * 80], bio_type="dna", alphabet="dna_4", source="test")
+    input_ds.write_overlay(
+        "seq_annot",
+        _seq_annot_table(
+            row_id=add_result.ids[0],
+            features=[
+                {
+                    "feature_id": "minus35a",
+                    "feature_order": 1,
+                    "feature_type": "misc_feature",
+                    "label": "-35",
+                    "role_hint": "sigma70_minus35",
+                    "location_raw": "6..11",
+                    "location_kind": "exact",
+                    "start_0": 5,
+                    "end_0": 11,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 5, "end_0": 11, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+                {
+                    "feature_id": "minus35b",
+                    "feature_order": 2,
+                    "feature_type": "misc_feature",
+                    "label": "-35",
+                    "role_hint": "sigma70_minus35",
+                    "location_raw": "13..18",
+                    "location_kind": "exact",
+                    "start_0": 12,
+                    "end_0": 18,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 12, "end_0": 18, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+                {
+                    "feature_id": "minus10",
+                    "feature_order": 3,
+                    "feature_type": "misc_feature",
+                    "label": "-10",
+                    "role_hint": "sigma70_minus10",
+                    "location_raw": "41..46",
+                    "location_kind": "exact",
+                    "start_0": 40,
+                    "end_0": 46,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 40, "end_0": 46, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+            ],
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    config_path = tmp_path / "normalize_anchor_ambiguous.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_ambiguous
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: annotated_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_core60
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: annotation_pair_midpoint
+          first:
+            role_hint: sigma70_minus35
+            labels: ["-35"]
+          second:
+            role_hint: sigma70_minus10
+            labels: ["-10"]
+    over_length_policy:
+      kind: trim
+      target_length: 60
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="matched 2 features"):
+        run_from_config(config_path)
+
+
+def test_run_construct_normalize_anchor_expands_short_sequence_from_template(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    short_anchor = "ACGT" * 8 + "ACG"
+    input_ds = Dataset(usr_root, "short_refs")
+    input_ds.init(source="test", notes="normalize anchor short test")
+    input_ds.add_sequences([short_anchor], bio_type="dna", alphabet="dna_4", source="test")
+
+    template_sequence = "A" * 15 + short_anchor + "C" * 10
+    config_path = tmp_path / "normalize_anchor_expand.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_expand
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: short_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_core60
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: sequence_midpoint
+          allowed: true
+    fallback_policy:
+      allow_low_confidence: true
+    over_length_policy:
+      kind: trim
+      target_length: 60
+    under_length_policy:
+      kind: expand_from_template
+      target_length: 60
+      template:
+        source:
+          kind: literal
+          sequence: {template_sequence}
+      placement_ref: template_fixture
+    emit_feature_retention_report: true
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    frame = Dataset(usr_root, "normalized_refs").head(n=5)
+    assert len(frame.iloc[0]["sequence"]) == 60
+    assert bool(frame.iloc[0]["derived__analysis_only"]) is True
+    assert frame.iloc[0]["derived__added_left_bp"] == 15
+    assert frame.iloc[0]["derived__added_right_bp"] == 10
+
+
+def test_run_construct_normalize_anchor_placement_ref_disambiguates_duplicate_template_match(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    short_anchor = "ACGT" * 8 + "ACG"
+    input_ds = Dataset(usr_root, "short_refs")
+    input_ds.init(source="test", notes="normalize anchor placement-ref test")
+    input_ds.add_sequences([short_anchor], bio_type="dna", alphabet="dna_4", source="test")
+
+    template_sequence = "T" * 5 + short_anchor + "G" * 5 + short_anchor + "C" * 20
+    config_path = tmp_path / "normalize_anchor_expand_offset.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_expand_offset
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: short_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_core60
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: sequence_midpoint
+          allowed: true
+    fallback_policy:
+      allow_low_confidence: true
+    over_length_policy:
+      kind: trim
+      target_length: 60
+    under_length_policy:
+      kind: expand_from_template
+      target_length: 60
+      template:
+        source:
+          kind: literal
+          sequence: {template_sequence}
+      placement_ref: offset:5
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    frame = Dataset(usr_root, "normalized_refs").head(n=5)
+    assert frame.iloc[0]["sequence"] == template_sequence[:60]
+    assert frame.iloc[0]["derived__added_left_bp"] == 5
+    assert frame.iloc[0]["derived__added_right_bp"] == 20
+
+
+def test_run_construct_normalize_anchor_circular_expansion_wraps_left_context(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    short_anchor = "AACCGGTT"
+    input_ds = Dataset(usr_root, "short_refs")
+    input_ds.init(source="test", notes="normalize anchor circular wrap test")
+    input_ds.add_sequences([short_anchor], bio_type="dna", alphabet="dna_4", source="test")
+
+    template_sequence = "GG" + short_anchor + "TTTTCCCCAAAAGG"
+    expected = template_sequence[-4:] + template_sequence[:16]
+    config_path = tmp_path / "normalize_anchor_expand_circular.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_expand_circular
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: short_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_core60
+    target_length: 20
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: sequence_midpoint
+          allowed: true
+    fallback_policy:
+      allow_low_confidence: true
+    over_length_policy:
+      kind: trim
+      target_length: 20
+    under_length_policy:
+      kind: expand_from_template
+      target_length: 20
+      template:
+        source:
+          kind: literal
+          sequence: {template_sequence}
+        circular: true
+      placement_ref: offset:2
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    frame = Dataset(usr_root, "normalized_refs").head(n=5)
+    assert frame.iloc[0]["sequence"] == expected
+    assert frame.iloc[0]["derived__added_left_bp"] == 6
+    assert frame.iloc[0]["derived__added_right_bp"] == 6
+
+
+def test_construct_feature_retention_counts_lost_compound_intervals_as_clipped_bp() -> None:
+    feature = AnnotationFeature(
+        feature_id="compound_tfbs",
+        feature_order=1,
+        feature_type="misc_feature",
+        label="compound_tfbs",
+        role_hint="TFBS",
+        start_0=5,
+        end_0=40,
+        intervals_0=(
+            AnnotationInterval(start_0=5, end_0=10, strand=1, partial=False),
+            AnnotationInterval(start_0=35, end_0=40, strand=1, partial=False),
+        ),
+        confidence="high",
+    )
+
+    retention = classify_feature_retention(
+        features=[feature],
+        source_start_0=0,
+        source_end_0=20,
+    )
+
+    assert retention.clipped[0]["clipped_bp"] == 5
+    assert retention.clipped[0]["derived_intervals_0"] == [{"start_0": 5, "end_0": 10, "strand": 1, "partial": False}]
+
+
+def test_run_construct_normalize_anchor_expansion_offsets_feature_retention_coordinates(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    short_anchor = "ACGT" * 8 + "ACG"
+    input_ds = Dataset(usr_root, "short_refs")
+    input_ds.init(source="test", notes="normalize anchor retention offset test")
+    add_result = input_ds.add_sequences([short_anchor], bio_type="dna", alphabet="dna_4", source="test")
+    input_ds.write_overlay(
+        "seq_annot",
+        _seq_annot_table(
+            row_id=add_result.ids[0],
+            features=[
+                {
+                    "feature_id": "anchor_feature",
+                    "feature_order": 1,
+                    "feature_type": "misc_feature",
+                    "label": "anchor_feature",
+                    "role_hint": "TFBS",
+                    "location_raw": "6..10",
+                    "location_kind": "exact",
+                    "start_0": 5,
+                    "end_0": 10,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 5, "end_0": 10, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                }
+            ],
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    template_sequence = "A" * 15 + short_anchor + "C" * 10
+    config_path = tmp_path / "normalize_anchor_expand_retention.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_expand_retention
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: short_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_core60
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: sequence_midpoint
+          allowed: true
+    fallback_policy:
+      allow_low_confidence: true
+    over_length_policy:
+      kind: trim
+      target_length: 60
+    under_length_policy:
+      kind: expand_from_template
+      target_length: 60
+      template:
+        source:
+          kind: literal
+          sequence: {template_sequence}
+      placement_ref: template_fixture
+    emit_feature_retention_report: true
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    frame = Dataset(usr_root, "normalized_refs").head(n=5)
+    retained = frame.iloc[0]["derived__features_retained"]
+    assert retained[0]["derived_intervals_0"] == [{"start_0": 20, "end_0": 25, "strand": 1, "partial": False}]
+
+
+def test_run_construct_output_variants_emit_forward_and_reverse_complement_views(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_variants.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: context_variants
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
+  realize:
+    mode: full_construct
+  output_variants:
+    - product_kind: context1kb_forward
+      orientation: forward
+      recommended_pooling: anchor_mean
+    - product_kind: context1kb_reverse_complement
+      orientation: reverse_complement
+      recommended_pooling: anchor_mean
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 2
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    frame = output_ds.head(n=10).sort_values("construct__orientation").reset_index(drop=True)
+    assert list(frame["construct__orientation"]) == ["forward", "reverse_complement"]
+    forward_row = frame.iloc[0]
+    rc_row = frame.iloc[1]
+    assert forward_row["sequence"] == "AAAATTTTACGTGGGG"
+    assert rc_row["sequence"] == "CCCCACGTAAAATTTT"
+    assert forward_row["construct__anchor_start"] == 8
+    assert forward_row["construct__anchor_end"] == 12
+    assert rc_row["construct__anchor_start"] == 4
+    assert rc_row["construct__anchor_end"] == 8
+    assert rc_row["construct__forward_anchor_start"] == 8
+    assert rc_row["construct__forward_anchor_end"] == 12
+
+    views = sorted(load_sequence_views(output_ds), key=lambda view: view.orientation)
+    assert [view.orientation for view in views] == ["forward", "reverse_complement"]
+    assert [view.product_kind for view in views] == ["context1kb_forward", "context1kb_reverse_complement"]
+
+
+def test_run_construct_output_variants_allow_same_sequence_with_distinct_views(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_palindromic_variants.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: context_variants
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: CCCC
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 0
+          end: 4
+        guards:
+          replaced_sequence: CCCC
+  realize:
+    mode: full_construct
+  output_variants:
+    - product_kind: context1kb_forward
+      orientation: forward
+      recommended_pooling: anchor_mean
+    - product_kind: context1kb_reverse_complement
+      orientation: reverse_complement
+      recommended_pooling: anchor_mean
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    assert result.records_total == 2
+    assert output_ds.head(n=10).shape[0] == 1
+    views = sorted(load_sequence_views(output_ds), key=lambda view: view.orientation)
+    assert [view.orientation for view in views] == ["forward", "reverse_complement"]
+    assert views[0].sequence_id == views[1].sequence_id
+
+
+def test_run_construct_output_variants_make_carried_aliases_variant_specific(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    add_result = input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+    input_ds.write_overlay(
+        "usr_label",
+        pa.table(
+            {
+                "id": pa.array([add_result.ids[0]], type=pa.string()),
+                "usr_label__primary": pa.array(["anchor_label"], type=pa.string()),
+                "usr_label__aliases": pa.array([["legacy_anchor"]], type=pa.list_(pa.string())),
+            }
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    config_path = tmp_path / "construct_labeled_variants.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: context_variants
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
+  realize:
+    mode: full_construct
+  output_variants:
+    - product_kind: context1kb_forward
+      orientation: forward
+      recommended_pooling: anchor_mean
+    - product_kind: context1kb_reverse_complement
+      orientation: reverse_complement
+      recommended_pooling: anchor_mean
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    views = sorted(load_sequence_views(output_ds), key=lambda view: view.orientation)
+    assert [view.view_name for view in views] == ["anchor_label_context1kb_forward", "anchor_label_context1kb_rc"]
+    assert [view.aliases for view in views] == [["legacy_anchor_context1kb_forward"], ["legacy_anchor_context1kb_rc"]]

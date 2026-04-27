@@ -41,6 +41,55 @@ class PromoterPoolingConfig(_StrictFeatureModel):
     anchor_mean_for_templated: bool = True
 
 
+class SequenceViewSelectorConfig(_StrictFeatureModel):
+    product_kind: Optional[
+        Literal[
+            "native_record",
+            "biological_insert",
+            "analysis_core60",
+            "context1kb_forward",
+            "context1kb_reverse_complement",
+        ]
+    ] = None
+    view_name: Optional[str] = None
+    alias: Optional[str] = None
+    orientation: Optional[Literal["forward", "reverse_complement", "unknown"]] = None
+
+    @model_validator(mode="after")
+    def _require_selector_field(self) -> "SequenceViewSelectorConfig":
+        if not any((self.product_kind, self.view_name, self.alias, self.orientation)):
+            raise ValueError(
+                "feature_bundle.sequence_view_inputs[].view_selector must set at least one selector field."
+            )
+        return self
+
+
+class SequenceViewPoolingConfig(_StrictFeatureModel):
+    operation: Literal["seq_mean", "anchor_mean", "core60_mean"]
+    bounds_from: Optional[Literal["sequence_view", "construct_overlay"]] = None
+
+    @model_validator(mode="after")
+    def _validate_bounds_source(self) -> "SequenceViewPoolingConfig":
+        if self.operation == "anchor_mean" and self.bounds_from is None:
+            raise ValueError("feature_bundle.sequence_view_inputs[].pooling.bounds_from is required for anchor_mean.")
+        if self.operation != "anchor_mean" and self.bounds_from is not None:
+            raise ValueError("feature_bundle.sequence_view_inputs[].pooling.bounds_from is only valid for anchor_mean.")
+        return self
+
+
+class SequenceViewInputConfig(_StrictFeatureModel):
+    dataset: str
+    root: Optional[str] = None
+    view_selector: SequenceViewSelectorConfig
+    pooling: SequenceViewPoolingConfig
+
+
+class FeatureDeduplicateConfig(_StrictFeatureModel):
+    by_forward_pass_key: bool = True
+    by_feature_vector_key: bool = True
+    write_alias_map: bool = True
+
+
 class PromoterDebugConfig(_StrictFeatureModel):
     persist_tokenwise: bool = False
 
@@ -60,6 +109,8 @@ class PromoterFeatureBundleConfig(_StrictFeatureModel):
     collect_intermediate_embedding: bool = True
     context: PromoterContextConfig = Field(default_factory=PromoterContextConfig)
     pooling: PromoterPoolingConfig = Field(default_factory=PromoterPoolingConfig)
+    sequence_view_inputs: list[SequenceViewInputConfig] = Field(default_factory=list)
+    deduplicate: FeatureDeduplicateConfig = Field(default_factory=FeatureDeduplicateConfig)
     debug: PromoterDebugConfig = Field(default_factory=PromoterDebugConfig)
     feature_schema_version: str = FEATURE_SCHEMA_VERSION
 
@@ -84,6 +135,11 @@ class PromoterFeatureBundleConfig(_StrictFeatureModel):
 
         if not str(self.feature_schema_version or "").strip():
             raise ValueError("feature_bundle.feature_schema_version must be non-empty.")
+        if self.sequence_view_inputs and self.pooling != PromoterPoolingConfig():
+            raise ValueError(
+                "feature_bundle.pooling is a legacy promoter-context contract and is not used with "
+                "feature_bundle.sequence_view_inputs."
+            )
         return self
 
 
@@ -108,6 +164,17 @@ class SequenceContextRecord:
     anchor_orientation: str | None
     construct_version: str | None
     is_wildtype: bool | None
+    view_id: str | None = None
+    view_name: str | None = None
+    product_kind: str | None = None
+    orientation: str | None = None
+    parent_sequence_id: str | None = None
+    derivation_id: str | None = None
+    source_dataset_id: str | None = None
+    source_dataset_root: str | None = None
+    pooling_operation: str | None = None
+    pooling_start_0: int | None = None
+    pooling_end_0: int | None = None
 
 
 @dataclass(frozen=True)

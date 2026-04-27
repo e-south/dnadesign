@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/datasets/merge/test_dataset_merge_package_module.py
 
 Layout contract tests for Dataset merge package decomposition.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

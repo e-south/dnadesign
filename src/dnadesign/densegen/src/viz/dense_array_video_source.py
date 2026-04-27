@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/dense_array_video_source.py
 
 Dense-array video source validation, ordering, and sampling helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

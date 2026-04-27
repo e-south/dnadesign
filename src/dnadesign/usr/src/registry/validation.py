@@ -5,7 +5,7 @@ src/dnadesign/usr/src/registry/validation.py
 
 Registry validation helpers for USR namespaces and overlay schemas.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

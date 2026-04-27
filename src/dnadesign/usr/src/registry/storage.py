@@ -5,7 +5,7 @@ src/dnadesign/usr/src/registry/storage.py
 
 USR registry persistence, hashing, and cache helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -25,6 +25,9 @@ from .models import (
     RegistryColumn,
     RegistryEntry,
     _clone_registry_entries,
+    derived_entry,
+    seq_annot_entry,
+    usr_label_entry,
     usr_state_entry,
 )
 from .validation import _ensure_usr_state_entry, _parse_entry, _validate_columns, registry_entry
@@ -201,6 +204,58 @@ def register_namespace(
         columns=cols,
     )
     return save_registry(root, entries)
+
+
+def ensure_registry_entries(root: Path, entries: list[RegistryEntry] | tuple[RegistryEntry, ...]) -> Path:
+    current_entries = load_registry(root, required=False)
+    if USR_STATE_NAMESPACE not in current_entries:
+        current_entries[USR_STATE_NAMESPACE] = usr_state_entry()
+    changed = False
+    for required_entry in entries:
+        existing = current_entries.get(required_entry.namespace)
+        if existing is None:
+            current_entries[required_entry.namespace] = RegistryEntry(
+                namespace=required_entry.namespace,
+                owner=required_entry.owner,
+                description=required_entry.description,
+                columns=list(required_entry.columns),
+            )
+            changed = True
+            continue
+        expected_columns = {column.name: column.type for column in required_entry.columns}
+        current_columns = {column.name: column.type for column in existing.columns}
+        for name, expected_type in expected_columns.items():
+            observed_type = current_columns.get(name)
+            if observed_type is None:
+                existing.columns.append(RegistryColumn(name=name, type=expected_type))
+                changed = True
+                continue
+            if observed_type != expected_type:
+                raise SchemaError(
+                    f"Registry namespace '{required_entry.namespace}' column '{name}' has type "
+                    f"'{observed_type}', expected '{expected_type}'."
+                )
+        if existing.owner is None and required_entry.owner is not None:
+            existing.owner = required_entry.owner
+            changed = True
+        if existing.description is None and required_entry.description is not None:
+            existing.description = required_entry.description
+            changed = True
+        _validate_columns(existing.namespace, existing.columns)
+    if not changed:
+        return registry_path(root)
+    return save_registry(root, current_entries)
+
+
+def ensure_sequence_contract_namespaces(root: Path) -> Path:
+    return ensure_registry_entries(
+        root,
+        entries=(
+            usr_label_entry(),
+            seq_annot_entry(),
+            derived_entry(),
+        ),
+    )
 
 
 def _registry_payload(entries: dict[str, RegistryEntry]) -> dict:

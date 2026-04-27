@@ -5,7 +5,8 @@
 
 ### Job shape
 
-One construct job realizes one template against one input dataset selection and writes into one output dataset.
+One construct job either realizes one template against one input dataset selection or runs one
+annotation-aware `normalize_anchor` pass, and writes into one output dataset.
 
 ```yaml
 job:
@@ -138,6 +139,45 @@ Common patterns:
 - circular templates support wraparound extraction
 - linear templates fail if the requested window would exceed boundaries
 - fixed-total windows fail if the focal part itself is longer than the requested emitted size
+
+### Normalize-anchor mode
+
+`job.mode: normalize_anchor` is the analysis-view sibling path for reference/control material.
+
+- `job.normalize_anchor.product_kind`: today this must be `analysis_core60`
+- `job.normalize_anchor.target_length`: required emitted length, for example `60`
+- `job.normalize_anchor.focal_selector`: ordered selector chain; the first successful selector wins
+- `job.normalize_anchor.over_length_policy.kind=trim`: trim a parent sequence to the target length around the focal point
+- `job.normalize_anchor.under_length_policy.kind=expand_from_template`: expand a short parent sequence only from an explicit template context
+- `job.normalize_anchor.feature_retention_policy`: fail/warn rules for retained, clipped, and lost annotated roles
+- `job.normalize_anchor.fallback_policy.allow_low_confidence`: opt-in gate for low-confidence selectors such as `sequence_midpoint`
+- `job.normalize_anchor.output_sequence_view.create`: emit a USR `_views/sequence_views.parquet` row for the derived product
+
+Supported focal selectors:
+
+- `annotation_pair_midpoint`
+- `annotation_feature_center`
+- `sequence_midpoint`
+
+Fail-fast rules for `normalize_anchor`:
+
+- ambiguous annotation matches fail before sequence emission
+- `sequence_midpoint` is low-confidence and requires `fallback_policy.allow_low_confidence: true`
+- short inputs require `under_length_policy`
+- template expansion must still emit the exact target length
+- required retained roles are enforced after trimming/expansion and before write-back
+
+### Output variants
+
+Classic template-realization jobs may add `job.output_variants` to emit explicit forward and
+whole-output reverse-complement products from one realized forward construct.
+
+- `product_kind: context1kb_forward` requires `orientation: forward`
+- `product_kind: context1kb_reverse_complement` requires `orientation: reverse_complement`
+- reverse-complement variants carry emitted-orientation anchor bounds plus
+  `construct__forward_anchor_start` / `construct__forward_anchor_end` for downstream audits
+- semantic variants may share one base sequence id; construct writes distinct sequence-view rows
+  instead of forcing duplicate base records
 
 ### Output
 

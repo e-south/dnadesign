@@ -5,7 +5,7 @@ src/dnadesign/usr/src/events/actor.py
 
 Actor normalization helpers for USR event records.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

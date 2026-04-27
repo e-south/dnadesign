@@ -5,7 +5,7 @@ src/dnadesign/usr/src/registry/typespec.py
 
 Registry type parsing and Arrow conversion helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -58,6 +58,55 @@ def parse_type_str(type_str: str) -> str:
         return f"struct<{','.join(parsed_fields)}>"
     if type_str.startswith("timestamp[") and type_str.endswith("]"):
         return type_str
+    raise SchemaError(f"Unsupported registry type '{type_str}'.")
+
+
+def arrow_type_from_str(type_str: str) -> pa.DataType:
+    canonical = parse_type_str(type_str)
+    if canonical == "string":
+        return pa.string()
+    if canonical == "int8":
+        return pa.int8()
+    if canonical == "int16":
+        return pa.int16()
+    if canonical == "int32":
+        return pa.int32()
+    if canonical == "int64":
+        return pa.int64()
+    if canonical == "uint8":
+        return pa.uint8()
+    if canonical == "uint16":
+        return pa.uint16()
+    if canonical == "uint32":
+        return pa.uint32()
+    if canonical == "uint64":
+        return pa.uint64()
+    if canonical == "float16":
+        return pa.float16()
+    if canonical == "float32":
+        return pa.float32()
+    if canonical == "float64":
+        return pa.float64()
+    if canonical == "bool":
+        return pa.bool_()
+    if canonical.startswith("timestamp[") and canonical.endswith("]"):
+        inner = canonical[len("timestamp[") : -1]
+        if "," in inner:
+            unit, tz = [piece.strip() for piece in inner.split(",", 1)]
+            return pa.timestamp(unit, tz=tz)
+        return pa.timestamp(inner.strip())
+    if canonical.startswith("fixed_size_list<"):
+        inner, size = _parse_fixed_size_list(canonical)
+        return pa.list_(arrow_type_from_str(inner), list_size=size)
+    if canonical.startswith("list<") and canonical.endswith(">"):
+        inner = canonical[len("list<") : -1].strip()
+        return pa.list_(arrow_type_from_str(inner))
+    if canonical.startswith("struct<") and canonical.endswith(">"):
+        fields = []
+        for field in _split_top_level(canonical[len("struct<") : -1]):
+            name, inner = field.split(":", 1)
+            fields.append(pa.field(name.strip(), arrow_type_from_str(inner.strip())))
+        return pa.struct(fields)
     raise SchemaError(f"Unsupported registry type '{type_str}'.")
 
 

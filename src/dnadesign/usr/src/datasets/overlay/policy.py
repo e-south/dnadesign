@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/overlay/policy.py
 
 Overlay policy and registry-coercion helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

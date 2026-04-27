@@ -5,7 +5,7 @@ src/dnadesign/densegen/tests/plotting/test_dataset_plots.py
 
 Focused tests for DenseGen dataset-native plotting.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

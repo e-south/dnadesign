@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/plot_data_loading.py
 
 Data-loading helpers for DenseGen plotting workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

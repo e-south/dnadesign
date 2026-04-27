@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/datasets/catalog.py
 
 Dataset discovery helpers for USR CLI commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

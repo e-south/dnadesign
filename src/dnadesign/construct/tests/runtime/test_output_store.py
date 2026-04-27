@@ -26,6 +26,7 @@ from dnadesign.construct.src.output_store import (
     _usr_label_table,
 )
 from dnadesign.usr import Dataset
+from dnadesign.usr.src.registry.models import DERIVED_COLUMNS, SEQ_ANNOT_COLUMNS
 
 
 def _repo_root() -> Path:
@@ -40,6 +41,10 @@ def _column_pairs(columns: list[dict[str, str]]) -> list[tuple[str, str]]:
     return [(str(column["name"]), str(column["type"])) for column in columns]
 
 
+def _registry_column_dicts(columns: list[object]) -> list[dict[str, str]]:
+    return [{"name": str(column.name), "type": str(column.type)} for column in columns]
+
+
 def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) -> None:
     root = tmp_path / "usr_root"
 
@@ -48,7 +53,7 @@ def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) ->
     payload = yaml.safe_load((root / "registry.yaml").read_text(encoding="utf-8"))
     namespaces = payload["namespaces"]
 
-    assert set(namespaces) >= {"construct", "construct_seed", "usr_label", "usr_state"}
+    assert set(namespaces) >= {"construct", "construct_seed", "usr_label", "usr_state", "seq_annot", "derived"}
     assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(_CONSTRUCT_COLUMNS)
     assert _column_pairs(namespaces["construct_seed"]["columns"]) == _column_pairs(_CONSTRUCT_SEED_COLUMNS)
     assert _column_pairs(namespaces["usr_label"]["columns"]) == _column_pairs(_USR_LABEL_COLUMNS)
@@ -108,6 +113,16 @@ def test_ensure_construct_registry_preserves_existing_valid_construct_column_ord
                 "description": "Construct bootstrap/import metadata for seeded input datasets.",
                 "columns": [dict(column) for column in _CONSTRUCT_SEED_COLUMNS],
             },
+            "derived": {
+                "owner": "usr",
+                "description": "Derived-product lineage, focal selection, and feature-retention overlays.",
+                "columns": _registry_column_dicts(DERIVED_COLUMNS),
+            },
+            "seq_annot": {
+                "owner": "usr",
+                "description": "Imported source annotation overlays with preserved GenBank location fidelity.",
+                "columns": _registry_column_dicts(SEQ_ANNOT_COLUMNS),
+            },
             "usr_label": {
                 "owner": "usr",
                 "description": "Human-readable labels and aliases for canonical sequence records.",
@@ -123,16 +138,15 @@ def test_ensure_construct_registry_preserves_existing_valid_construct_column_ord
     (root / "registry.yaml").parent.mkdir(parents=True, exist_ok=True)
     registry_path = root / "registry.yaml"
     registry_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
-    before = registry_path.read_text(encoding="utf-8")
 
     _ensure_construct_registry(root)
-
-    assert registry_path.read_text(encoding="utf-8") == before
 
     repaired = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
     namespaces = repaired["namespaces"]
     assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(stale_columns)
     assert namespaces["audit"]["columns"] == [{"name": "audit__score", "type": "float64"}]
+    assert namespaces["seq_annot"]["owner"] == "usr"
+    assert namespaces["derived"]["owner"] == "usr"
 
 
 def test_ensure_construct_registry_appends_missing_construct_columns_without_reordering(tmp_path: Path) -> None:

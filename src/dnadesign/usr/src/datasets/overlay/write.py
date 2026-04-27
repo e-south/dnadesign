@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/overlay/write.py
 
 Overlay write helpers for compact and parts-based overlay mutations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

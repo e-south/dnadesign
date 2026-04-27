@@ -15,12 +15,14 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from pyarrow import parquet as pq
 
 from dnadesign.infer import export_evo2_promoter_opal_matrix
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.contracts import infer_usr_column_name
 from dnadesign.infer.src.engine import run_extract_job
 from dnadesign.infer.src.errors import CapabilityError, RuntimeOOMError
+from dnadesign.infer.src.features.aliases import FEATURE_ALIAS_RELATIVE_PATH
 from dnadesign.infer.src.features.context import resolve_sequence_contexts
 from dnadesign.infer.src.features.execution import (
     _LOG_LIKELIHOOD_MEAN,
@@ -32,6 +34,7 @@ from dnadesign.infer.src.features.execution import (
     execute_feature_bundle,
     feature_metadata_output_ids,
 )
+from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 
 def _assert_list_close(observed: list[float], expected: list[float]) -> None:
@@ -80,6 +83,21 @@ class _CombinedFeatureAdapter(_FeatureAdapter):
         logits = [torch.arange(len(seq) * 2, dtype=torch.float32).reshape(len(seq), 2) for seq in seqs]
         embeddings = [torch.arange(len(seq) * 3, dtype=torch.float32).reshape(len(seq), 3) for seq in seqs]
         return logits, embeddings
+
+
+class _CountingFeatureAdapter(_FeatureAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.logits_call_count = 0
+        self.embedding_call_count = 0
+
+    def logits(self, seqs, *, fmt: str):
+        self.logits_call_count += 1
+        return super().logits(seqs, fmt=fmt)
+
+    def embedding(self, seqs, *, layer: str, fmt: str):
+        self.embedding_call_count += 1
+        return super().embedding(seqs, layer=layer, fmt=fmt)
 
 
 class _BatchSensitiveFeatureAdapter(_FeatureAdapter):
@@ -162,19 +180,30 @@ def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(mo
             "metadata__construct_version",
             "metadata__context_id",
             "metadata__context_kind",
+            "metadata__derivation_id",
             "metadata__feature_request_digest",
             "metadata__feature_schema_version",
+            "metadata__feature_vector_key",
+            "metadata__forward_pass_key",
             "metadata__intermediate_block",
             "metadata__intermediate_selector",
             "metadata__is_wildtype",
             "metadata__model_name",
+            "metadata__orientation",
+            "metadata__parent_sequence_id",
+            "metadata__pooling_end_0",
+            "metadata__pooling_operation",
             "metadata__pooling_modes",
+            "metadata__pooling_start_0",
+            "metadata__product_kind",
             "metadata__provider_name",
             "metadata__provider_version",
             "metadata__resolved_length",
             "metadata__sequence_id",
             "metadata__template_id",
             "metadata__timestamp",
+            "metadata__view_id",
+            "metadata__view_name",
             "output_layer_mean__seq_mean",
             "intermediate_embedding__block26_mlp_out__seq_mean",
         ]
@@ -190,6 +219,8 @@ def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(mo
     assert out["metadata__context_kind"] == ["anchor_only"]
     assert out["metadata__pooling_modes"] == [["seq_mean"]]
     assert out["metadata__intermediate_selector"] == ["block26_mlp_out"]
+    assert out["metadata__forward_pass_key"][0]
+    assert out["metadata__feature_vector_key"][0]
 
 
 def test_run_extract_job_feature_bundle_uses_fused_adapter_paths_when_available(monkeypatch) -> None:
@@ -606,6 +637,340 @@ def test_run_extract_job_feature_bundle_templated_requires_construct_metadata(mo
 
     with pytest.raises(CapabilityError, match="construct metadata columns"):
         run_extract_job(inputs=records, model=model, job=job, progress_factory=None)
+
+
+def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equivalent_core60_and_seq_mean(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer test")
+    sequence = "ACGT" * 15
+    add_result = dataset.add_sequences([sequence], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view",
+                aliases=["core60_alias"],
+                product_kind="analysis_core60",
+                context_kind="analysis_core60",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                parent_sequence_id=add_result.ids[0],
+                parent_dataset_id=dataset.name,
+                derivation_id="construct:core60",
+                derivation_spec_id="construct:core60",
+                source_interval_start_0=0,
+                source_interval_end_0=60,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                forward_anchor_start_0=0,
+                forward_anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            ),
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="native60_view",
+                aliases=["native60_alias"],
+                product_kind="native_record",
+                context_kind="native_reference",
+                orientation="forward",
+                analysis_only=False,
+                source_dataset_id=dataset.name,
+                source_interval_start_0=0,
+                source_interval_end_0=60,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                forward_anchor_start_0=0,
+                forward_anchor_end_0=60,
+                recommended_pooling="seq_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            ),
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="reference_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "analysis_core60"},
+                    "pooling": {"operation": "core60_mean"},
+                },
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"view_name": "native60_view"},
+                    "pooling": {"operation": "seq_mean"},
+                },
+            ],
+        },
+    )
+
+    out = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    assert adapter.logits_call_count == 1
+    assert adapter.embedding_call_count == 1
+    assert len(out["metadata__view_id"]) == 2
+    assert out["metadata__forward_pass_key"][0] == out["metadata__forward_pass_key"][1]
+    assert out["metadata__feature_vector_key"][0] == out["metadata__feature_vector_key"][1]
+    assert out["metadata__pooling_operation"] == ["core60_mean", "seq_mean"]
+    assert out["output_layer_mean__core60_mean"][0] is not None
+    assert out["output_layer_mean__core60_mean"][1] is None
+    assert out["output_layer_mean__seq_mean"][0] is None
+    assert out["output_layer_mean__seq_mean"][1] is not None
+    assert out["intermediate_embedding__block26_mlp_out__core60_mean"][0] is not None
+    assert out["intermediate_embedding__block26_mlp_out__seq_mean"][1] is not None
+
+    alias_table = pq.read_table(dataset.dir / FEATURE_ALIAS_RELATIVE_PATH).to_pylist()
+    assert len(alias_table) == 4
+    assert {row["representation_kind"] for row in alias_table} == {"output_layer_mean", "intermediate_embedding"}
+    assert len({row["feature_vector_key"] for row in alias_table}) == 2
+
+
+def test_run_extract_job_feature_bundle_sequence_view_deduplicate_flags_control_execution_grouping(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer deduplicate flag test")
+    sequence = "ACGT" * 15
+    add_result = dataset.add_sequences([sequence], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view_a",
+                product_kind="analysis_core60",
+                context_kind="analysis_core60",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                parent_sequence_id=add_result.ids[0],
+                parent_dataset_id=dataset.name,
+                derivation_id="construct:core60:a",
+                derivation_spec_id="construct:core60:a",
+                source_interval_start_0=0,
+                source_interval_end_0=60,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            ),
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view_b",
+                product_kind="native_record",
+                context_kind="native_reference",
+                orientation="forward",
+                analysis_only=False,
+                source_dataset_id=dataset.name,
+                source_interval_start_0=0,
+                source_interval_end_0=60,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="seq_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            ),
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _BatchSensitiveFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="reference_view_bundle_no_dedup",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"view_name": "core60_view_a"},
+                    "pooling": {"operation": "core60_mean"},
+                },
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"view_name": "core60_view_b"},
+                    "pooling": {"operation": "seq_mean"},
+                },
+            ],
+            "deduplicate": {
+                "by_forward_pass_key": False,
+                "by_feature_vector_key": False,
+                "write_alias_map": True,
+            },
+        },
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    assert adapter.logits_batch_sizes == [2]
+    assert adapter.embedding_batch_sizes == [2]
+
+
+def test_run_extract_job_feature_bundle_sequence_view_alias_map_is_idempotent(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer idempotency test")
+    sequence = "ACGT" * 15
+    add_result = dataset.add_sequences([sequence], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view",
+                product_kind="analysis_core60",
+                context_kind="analysis_core60",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                parent_sequence_id=add_result.ids[0],
+                parent_dataset_id=dataset.name,
+                derivation_id="construct:core60",
+                derivation_spec_id="construct:core60",
+                source_interval_start_0=0,
+                source_interval_end_0=60,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                forward_anchor_start_0=0,
+                forward_anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="reference_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "analysis_core60"},
+                    "pooling": {"operation": "core60_mean"},
+                }
+            ],
+        },
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+    assert adapter.logits_call_count == 1
+    assert adapter.embedding_call_count == 1
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+    assert adapter.logits_call_count == 1
+    assert adapter.embedding_call_count == 1
+
+    alias_table = pq.read_table(dataset.dir / FEATURE_ALIAS_RELATIVE_PATH).to_pylist()
+    assert len(alias_table) == 2
+
+
+def test_run_extract_job_feature_bundle_sequence_view_alias_map_tolerates_view_name_drift(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer view-name drift test")
+    sequence = "ACGT" * 15
+    add_result = dataset.add_sequences([sequence], bio_type="dna", alphabet="dna_4", source="test")
+    original_view = SequenceViewRecord(
+        sequence_id=add_result.ids[0],
+        view_name="core60_view",
+        product_kind="analysis_core60",
+        context_kind="analysis_core60",
+        orientation="forward",
+        analysis_only=True,
+        source_dataset_id=dataset.name,
+        parent_sequence_id=add_result.ids[0],
+        parent_dataset_id=dataset.name,
+        derivation_id="construct:core60",
+        derivation_spec_id="construct:core60",
+        source_interval_start_0=0,
+        source_interval_end_0=60,
+        anchor_start_0=0,
+        anchor_end_0=60,
+        forward_anchor_start_0=0,
+        forward_anchor_end_0=60,
+        recommended_pooling="core60_mean",
+        created_at="2026-04-25T00:00:00+00:00",
+        created_by="test",
+    )
+    write_sequence_views(dataset, [original_view], conflict_policy="error")
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="reference_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "analysis_core60"},
+                    "pooling": {"operation": "core60_mean"},
+                }
+            ],
+        },
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+    renamed_view = original_view.model_copy(update={"view_name": "core60_view_renamed"})
+    write_sequence_views(dataset, [renamed_view], conflict_policy="replace")
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    alias_table = pq.read_table(dataset.dir / FEATURE_ALIAS_RELATIVE_PATH).to_pylist()
+    assert len(alias_table) == 2
+    assert {row["view_name"] for row in alias_table} == {"core60_view_renamed"}
+    assert adapter.logits_call_count == 1
+    assert adapter.embedding_call_count == 1
 
 
 def test_export_evo2_promoter_opal_matrix_keeps_deterministic_feature_order() -> None:

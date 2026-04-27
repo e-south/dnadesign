@@ -5,7 +5,7 @@ src/dnadesign/usr/src/events/fingerprint.py
 
 Fingerprint helpers for USR event payloads.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

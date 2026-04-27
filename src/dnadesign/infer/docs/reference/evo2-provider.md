@@ -54,16 +54,21 @@ For promoter bundles, `infer` uses:
 
 - `seq_mean`: mean across the full resolved sequence
 - `anchor_mean`: mean across the anchor span inside a templated context
+- `core60_mean`: explicit 60 bp analysis-core pooling for sequence-view bundles
 
 Rules:
 
 - `anchor_only` contexts emit `seq_mean` only
 - templated contexts emit both `seq_mean` and `anchor_mean`
+- sequence-view bundles emit the union of the row-level pooling operations requested by `sequence_view_inputs[]`
 - tokenwise tensors are pooled in memory and discarded; tokenwise persistence is not part of the v1 repo-aligned contract
 
 When writing to USR, the persisted outputs for `output_layer_mean` and
 `intermediate_embedding` are the pooled summaries. The pooling mode is part of
 the stored semantic id, for example `seq_mean` or `anchor_mean`.
+For explicit 60 bp sequence views, `core60_mean` is semantically distinct metadata but aliases
+the same feature-vector key as `seq_mean` when the emitted row is exactly 60 bp and the pooling
+span is the full sequence.
 
 ### Context ownership
 
@@ -98,6 +103,7 @@ Promoter bundles emit stable out ids such as:
 Read these ids literally:
 
 - `output_layer_mean__seq_mean` is the mean-pooled final-layer embedding across sequence positions
+- `output_layer_mean__core60_mean` is the explicit 60 bp analysis-core mean-pooling surface for sequence-view bundles
 - `intermediate_embedding__block26_mlp_out__seq_mean` is the mean-pooled 7B block-26 representation across sequence positions
 - `intermediate_embedding__block23_mlp_out__seq_mean` is the mean-pooled 20B block-23 representation across sequence positions
 - bare names such as `output_layer_mean` or `intermediate_embedding` are bundle categories, not raw persisted tensors

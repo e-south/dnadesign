@@ -93,7 +93,7 @@ export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace
 For the live `stress_ethanol_cipro_growth` study, replace the packaged demo
 inputs with the real shared datasets explicitly:
 
-- `PRIMARY_INPUT_DATASET="usr_mg1655_promoter_controls"`
+- `PRIMARY_INPUT_DATASET="usr_promoter_references"`
 - `EXTRA_INPUT_DATASET="densegen_prom_eth_cip_source"`
 - keep `usr_pdual10_plasmid_template` as the pDual-backed template dataset when you repoint the Construct configs in step 3
 

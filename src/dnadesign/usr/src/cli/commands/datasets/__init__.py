@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/datasets/__init__.py
 
 USR CLI dataset-discovery and resolution helper package.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

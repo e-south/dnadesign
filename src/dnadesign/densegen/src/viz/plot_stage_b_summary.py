@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/plot_stage_b_summary.py
 
 Stage-B summary plots that bridge retained Stage-A pools to deployed output use.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

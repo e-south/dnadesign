@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/docs_contract/test_layout.py
 
 Structural layout and maintainer-boundary contracts for USR docs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
