@@ -28,7 +28,7 @@ def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
 
 
-def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() -> None:
+def test_live_study_browser_controls_expose_seven_geometry_inventory() -> None:
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
@@ -66,11 +66,15 @@ def test_live_study_browser_controls_expose_only_canonical_geometry_inventory() 
         "intermediate_embedding_7b_full_context_1kb",
         "pooled_logits_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
+        "intermediate_embedding_7b_anchor_plus_full_context_concat",
+        "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     ]
     geometry_roles = {row.view_id: row.role for row in controls.geometry_controls.geometries}
     assert geometry_roles["intermediate_embedding_7b_anchor_60bp"] == "primary"
-    assert geometry_roles["intermediate_embedding_7b_full_context_1kb"] == "primary"
+    assert geometry_roles["intermediate_embedding_7b_full_context_1kb"] == "appendix"
     assert geometry_roles["intermediate_embedding_7b_full_context_anchor_mean"] == "primary"
+    assert geometry_roles["intermediate_embedding_7b_anchor_plus_full_context_concat"] == "challenger"
+    assert geometry_roles["intermediate_embedding_7b_anchor_plus_anchor_mean_concat"] == "challenger"
     assert geometry_roles["pooled_logits_7b_anchor_60bp"] == "appendix"
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
@@ -105,26 +109,23 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "design_structure_summary",
         "sigma35_ordinal_audit",
         "context_robustness_summary",
+        "candidate_decision_frontier",
     ]
     decision_ladder = snapshot["decision_ladder"]
-    assert decision_ladder[: len(expected_decision_prefix)] == expected_decision_prefix
-    assert set(decision_ladder).issubset({*expected_decision_prefix, "candidate_decision_frontier"})
-    if "candidate_decision_frontier" in decision_ladder:
-        assert decision_ladder[-1] == "candidate_decision_frontier"
+    assert decision_ladder == expected_decision_prefix
     expected_browser_geometries = [
         "intermediate_embedding_7b_anchor_60bp",
         "pooled_logits_7b_anchor_60bp",
         "intermediate_embedding_7b_full_context_1kb",
         "pooled_logits_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
-    ]
-    browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
-    legacy_regenerated_geometry_ids = {
         "intermediate_embedding_7b_anchor_plus_full_context_concat",
         "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
-    }
-    assert browser_geometry_ids[: len(expected_browser_geometries)] == expected_browser_geometries
-    assert set(browser_geometry_ids).issubset({*expected_browser_geometries, *legacy_regenerated_geometry_ids})
+    ]
+    browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
+    control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    assert browser_geometry_ids == expected_browser_geometries
+    assert control_geometry_ids == expected_browser_geometries
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
@@ -205,7 +206,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert appendix_gallery.kind == "projection_grid"
     assert appendix_gallery.visibility_tier == "appendix"
     assert appendix_gallery.shape_column is None
-    assert appendix_gallery.default_hue == "design_family"
+    assert appendix_gallery.default_hue == "sig35_variant"
     assert [option.column for option in appendix_gallery.hue_options] == [
         "design_family",
         "design_regulator_composition",
@@ -302,8 +303,8 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "sample_id" not in design_margin_step.params
     assert "build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean" in pre_assay_steps
     assert "build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean" in pre_assay_steps
-    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat" not in pre_assay_steps
-    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" not in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat" in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps

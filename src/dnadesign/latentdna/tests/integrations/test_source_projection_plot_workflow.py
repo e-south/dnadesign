@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_source_projection_plot_workflow.
 
 Tracer-bullet workflow tests for latentdna source, projection, and plot flows.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

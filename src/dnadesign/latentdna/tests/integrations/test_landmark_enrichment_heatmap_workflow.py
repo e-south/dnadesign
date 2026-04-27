@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_landmark_enrichment_heatmap_work
 
 Workflow tests for neighborhood enrichment and heatmap rendering.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

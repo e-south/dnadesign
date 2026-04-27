@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/package/test_source_tree_contracts.py
 
 Source-tree contracts for the latentdna package layout.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

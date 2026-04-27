@@ -5,7 +5,7 @@ src/dnadesign/studies/families/cruncher/record_normalizer.py
 
 Thin checked-in record normalization for Cruncher study-family snapshots.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

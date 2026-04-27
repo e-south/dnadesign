@@ -5,7 +5,7 @@ src/dnadesign/studies/families/promoter/latentdna_readiness.py
 
 Read-only LatentDNA readiness inspection for promoter-study status surfaces.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

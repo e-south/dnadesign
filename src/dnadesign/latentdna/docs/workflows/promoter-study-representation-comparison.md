@@ -10,7 +10,7 @@
 **Entry artifact:** usr_prom_eth_cip_anchor and construct_prom_eth_cip_context
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 
-The promoter study binds LatentDNA to two published datasets and a 7B-first notebook candidate inventory. The live notebook surface exposes the real five-view 7B-first browser, while 20B views remain hidden in the workspace. This browser-default posture is specific to LatentDNA review and does not override the study record's current infer-runtime preference. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
+The promoter study binds LatentDNA to two published datasets and a 7B-first notebook candidate inventory. The live notebook surface exposes the real seven-geometry 7B-first browser, while 20B views remain secondary and materializable for debug-only review. This browser-default posture matches the study record's current infer-runtime preference. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
 
 ### Gate
 
@@ -87,6 +87,8 @@ Use the notes for:
 - `intermediate_embedding_7b_full_context_1kb`
 - `pooled_logits_7b_full_context_1kb`
 - `intermediate_embedding_7b_full_context_anchor_mean`
+- `intermediate_embedding_7b_anchor_plus_full_context_concat`
+- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
 
 20B views remain materializable in the workspace but are hidden from the study notebook and deliverable ladder.
 

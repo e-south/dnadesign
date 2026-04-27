@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_notebook_generation_workflow.py
 
 Workflow tests for notebook scaffolds over persisted artifacts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-04-22
+**Last verified:** 2026-04-25
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
@@ -50,7 +50,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: 7B-first browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane infer preference remains `evo2_20b` in `pipeline.yaml`
+- Current state: 7B-first browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane preferred infer family is now `evo2_7b`, with 20B retained as a secondary/debug-required lane family
 - Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
@@ -77,14 +77,15 @@ This page keeps the downstream handoff map in one place.
   - `appendix_geometry_audit`
   - `appendix_umap_gallery`
 - Snapshot attention surfaces: none
-- Snapshot ok primary surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`
+- Snapshot ok primary surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - Snapshot ok appendix surfaces: `appendix_geometry_audit`, `appendix_umap_gallery`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
-- Browser default geometries: the real five-view 7B-first surface across `intermediate_embedding` and `pooled_logits`; 20B views stay materializable in the workspace but are hidden from the study browser
+- Browser default geometries: the real seven-geometry 7B-first surface across three intermediate views, two pooled-logit diagnostics, and two concat challengers. 20B views stay materializable in the workspace but are secondary to the current study browser posture.
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors
+  - do not let reference-neighbor behavior replace synthetic internal-structure gates
   - do not treat the notebook browser as the authoritative study-status surface
 - Route note: use this route for downstream comparison outputs after checking the study record.
 

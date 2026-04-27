@@ -15,10 +15,17 @@ lifecycle:
     - merged_anchor_set
     - construct_context_expansion
     - infer_batch_preparation
-    - infer_anchor_only_20b
-    - infer_anchor_plus_template_20b
     - infer_anchor_only_7b
     - infer_anchor_plus_template_7b
+    - genbank_reference_import
+    - reference_annotation_overlay
+    - reference_core60_normalization
+    - reference_context_forward
+    - reference_context_reverse_complement
+    - infer_reference_views_7b
+    - latentdna_reference_normalization_audit
+    - infer_anchor_only_20b
+    - infer_anchor_plus_template_20b
   current_phase:
     strategy: explicit
     id: infer_batch_preparation
@@ -39,18 +46,54 @@ phases:
   - id: infer_batch_preparation
     status: in_progress
     next_surface: repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md
-  - id: infer_anchor_only_20b
-    status: planned
-    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
-  - id: infer_anchor_plus_template_20b
-    status: planned
-    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
   - id: infer_anchor_only_7b
     status: planned
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
   - id: infer_anchor_plus_template_7b
     status: planned
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+  - id: genbank_reference_import
+    status: complete
+    required_for_main_study_state: false
+    output_dataset: usr_promoter_references
+    next_surface: repo:src/dnadesign/usr/scripts/port_mg1655_promoter_references.py
+  - id: reference_annotation_overlay
+    status: complete
+    required_for_main_study_state: false
+    output_dataset: usr_promoter_references
+    next_surface: repo:src/dnadesign/usr/docs/reference/overlay-and-registry.md
+  - id: reference_core60_normalization
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: construct_prom_eth_cip_reference_core60
+    next_surface: repo:src/dnadesign/construct/docs/reference/config.md
+  - id: reference_context_forward
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: construct_prom_eth_cip_reference_contexts
+    next_surface: repo:src/dnadesign/construct/docs/reference/template-contexts.md
+  - id: reference_context_reverse_complement
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: construct_prom_eth_cip_reference_contexts
+    next_surface: repo:src/dnadesign/construct/docs/reference/template-contexts.md
+  - id: infer_reference_views_7b
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: infer_prom_eth_cip_reference_views_7b
+    next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
+  - id: latentdna_reference_normalization_audit
+    status: planned
+    required_for_main_study_state: false
+    next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+  - id: infer_anchor_only_20b
+    status: planned
+    required_for_main_study_state: false
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+  - id: infer_anchor_plus_template_20b
+    status: planned
+    required_for_main_study_state: false
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
 
 artifacts:
   densegen_anchor_source:
@@ -72,6 +115,22 @@ artifacts:
     artifact_type: dataset
     dataset_id: usr_prom_eth_cip_matrix
     ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_matrix
+  reference_native_dataset:
+    artifact_type: dataset
+    dataset_id: usr_promoter_references
+    ref: repo:src/dnadesign/usr/datasets/usr_promoter_references
+  reference_core60_dataset:
+    artifact_type: dataset
+    dataset_id: construct_prom_eth_cip_reference_core60
+    ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60
+  reference_context_dataset:
+    artifact_type: dataset
+    dataset_id: construct_prom_eth_cip_reference_contexts
+    ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts
+  reference_feature_dataset:
+    artifact_type: dataset
+    dataset_id: infer_prom_eth_cip_reference_views_7b
+    ref: repo:src/dnadesign/usr/datasets/infer_prom_eth_cip_reference_views_7b
   infer_config_anchor_only_20b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml

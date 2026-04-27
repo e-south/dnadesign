@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-22
+- Last verified: 2026-04-25
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -18,16 +18,22 @@
 ### Current phase
 
 - Declared phase: `infer_batch_preparation`
-- Preferred infer family: `evo2_20b`
-- Supported infer families: `evo2_20b`, `evo2_7b`
+- Preferred infer family: `evo2_7b`
+- Supported infer families: `evo2_7b`, `evo2_20b`
+- LatentDNA browser default family: `evo2_7b`
+- Working candidate family: `evo2_7b` full-context anchor-mean intermediate embedding
+- Conservative baseline: `evo2_7b` anchor-only intermediate embedding
+- Challenger: `evo2_7b` anchor-plus-anchor-mean concat
+- Secondary/debug-required family: `evo2_20b`
 - The study phase is `infer_batch_preparation`
-- LatentDNA browser default family: `evo2_7b` for the five-view scientist-facing review surface; 20B views remain materializable but hidden in the browser
+- This is a pre-assay representation-triage study. The current notebook/browser surface does not claim a phenotype-validated final `X`.
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
 - Current attention surfaces: none
 - Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix surfaces remain secondary audit material
+- Browser default geometries: `intermediate_embedding_7b_anchor_60bp`, `pooled_logits_7b_anchor_60bp`, `intermediate_embedding_7b_full_context_1kb`, `pooled_logits_7b_full_context_1kb`, `intermediate_embedding_7b_full_context_anchor_mean`, `intermediate_embedding_7b_anchor_plus_full_context_concat`, `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
 
 ### Current row counts
 
@@ -45,13 +51,24 @@
 - LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - LatentDNA companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
 - LatentDNA appendix support: `sigma35_centroid_distance_gallery`
-- LatentDNA notebook role: plot-first review surface for the five-view 7B-first pre-assay ladder, with appendix and debug material kept secondary
+- LatentDNA notebook role: plot-first review surface for the seven-geometry 7B-first pre-assay ladder, with appendix and debug material kept secondary
 - Cluster: `planned`
 - OPAL: `not_configured`
 - Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
 - Current appendix attention: none
 - Current appendix ok: `appendix_geometry_audit`, `appendix_umap_gallery`
-- The active comparison is `anchor_60bp` versus `full_context_anchor_mean`, with `full_context_1kb` retained as an orientation view
+- The active comparison is `anchor_60bp` versus `full_context_anchor_mean`, with `full_context_1kb` retained as an orientation/appendix view and pooled-logit surfaces treated as diagnostics rather than the default decision rule
+- Reference alignment remains diagnostic. Native references are biological controls; any future `analysis_core60` reference rows are analysis-only comparability views, not corrected native promoters.
+
+### Reference-view branch
+
+- Present promoter-reference source dataset: `usr_promoter_references`
+- Source rows are primer-flank-stripped GenBank-projected promoter inserts plus the incumbent J23105 pDual reference; full GenBank provenance, projected annotations, derivation intervals, and sequence views are stored in dataset-local sidecars/overlays.
+- Planned matched analysis-core dataset: `construct_prom_eth_cip_reference_core60`
+- Planned reference context dataset: `construct_prom_eth_cip_reference_contexts`
+- Planned reference feature dataset: `infer_prom_eth_cip_reference_views_7b`
+- Sequence-view manifests live as dataset-local `_views/sequence_views.parquet` sidecars rather than a standalone study dataset
+- The downstream core/context/infer branch remains planned and non-blocking for the main study state while the study remains in pre-assay representation triage
 
 ### Next actions
 

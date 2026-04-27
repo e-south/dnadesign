@@ -24,11 +24,22 @@ study_pipeline:
     densegen_anchor_source: densegen_prom_eth_cip_source
     merged_anchor_dataset: usr_prom_eth_cip_anchor
     construct_context_dataset: construct_prom_eth_cip_context
+    reference_native_dataset: usr_promoter_references
+    reference_core60_dataset: construct_prom_eth_cip_reference_core60
+    reference_context_dataset: construct_prom_eth_cip_reference_contexts
+    reference_feature_dataset: infer_prom_eth_cip_reference_views_7b
   infer:
-    preferred_model_family: evo2_20b
+    preferred_model_family: evo2_7b
     supported_model_families:
-      - evo2_20b
       - evo2_7b
+      - evo2_20b
+    infer_priority:
+      working_candidate_family: evo2_7b_full_context_anchor_mean_intermediate
+      conservative_baseline: evo2_7b_anchor_60bp_intermediate
+      challenger: evo2_7b_anchor_plus_anchor_mean_concat
+      full_context_seq_mean_status: appendix_orientation_surface
+      evo2_20b_status: secondary_debug_required
+      pooled_logits_status: health_gate_failed_for_general_x
     configs:
       anchor_only_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
       anchor_plus_template_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml

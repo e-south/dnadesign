@@ -28,13 +28,15 @@ mechanism.
 
 ## Current View Inventory
 
-The study-facing notebook now surfaces a five-view 7B inventory:
+The published workspace snapshot now surfaces a seven-geometry 7B-first inventory:
 
 - `intermediate_embedding_7b_anchor_60bp`
 - `pooled_logits_7b_anchor_60bp`
 - `intermediate_embedding_7b_full_context_1kb`
 - `pooled_logits_7b_full_context_1kb`
 - `intermediate_embedding_7b_full_context_anchor_mean`
+- `intermediate_embedding_7b_anchor_plus_full_context_concat`
+- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
 
 Important scope notes:
 
@@ -43,11 +45,15 @@ Important scope notes:
   logits.
 - `anchor_60bp` is a study label, not a literal invariant for every row. The
   carried controls are 35 bp, 165 bp, 200 bp, and 220 bp.
-- The primary comparison story is still the 7B intermediate family; the 7B
-  pooled-logit views stay surfaced as appendix-grade notebook candidates and as
-  a log-likelihood hue source for EDA.
-- Retired concat challengers remain a framework capability, but they are no
-  longer part of the active study-facing notebook or decision ladder.
+- The primary comparison story is still the 7B intermediate family. The current
+  working candidate is `intermediate_embedding_7b_full_context_anchor_mean`,
+  with `intermediate_embedding_7b_anchor_60bp` retained as the conservative
+  baseline.
+- The 7B pooled-logit views remain diagnostic surfaces and log-likelihood hue
+  sources. They are visible in the browser but are not the preferred
+  study-facing `X`.
+- The two concat views remain explicit challengers rather than retired
+  framework-only capabilities.
 - 20B views remain hidden from the notebook and do not participate in the
   current deliverable ladder.
 

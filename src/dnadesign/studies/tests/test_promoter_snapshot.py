@@ -21,7 +21,7 @@ from dnadesign.studies.families.promoter.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     PromoterStudyInferRuntimeResolvedContext,
 )
-from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext
+from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext, _first_phase_by_status
 from dnadesign.studies.families.promoter.snapshot import (
     PromoterStudyStatusDependencies,
     PromoterStudyStatusResolvedContext,
@@ -44,6 +44,16 @@ def _string_list_or_empty(value: object) -> list[str]:
         if text is not None:
             result.append(text)
     return result
+
+
+def test_promoter_next_planned_phase_skips_nonblocking_reference_branch() -> None:
+    phases = [
+        {"id": "genbank_reference_import", "status": "planned", "required_for_main_study_state": False},
+        {"id": "infer_anchor_only_20b", "status": "planned", "required_for_main_study_state": True},
+    ]
+
+    assert _first_phase_by_status(phases, status="planned", require_main_study_state=True) == phases[1]
+    assert _first_phase_by_status(phases, status="planned") == phases[0]
 
 
 def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:

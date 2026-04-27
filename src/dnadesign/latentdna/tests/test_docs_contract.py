@@ -78,7 +78,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "appendix_umap_gallery" in workflow
     assert "### Gate" in workflow
     assert "pre-assay representation triage" in workflow
-    assert "five-view 7B-first browser" in workflow
+    assert "seven-geometry 7B-first browser" in workflow
     assert "eight canonical 7B+20B" not in workflow
     assert "Leave geodesic pilots in study notes" in workflow
     assert 'zero_variance_policy="drop_or_zero"' in workflow
@@ -86,8 +86,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "workspace snapshot" in workflow
     assert latentdna_binding["supported_model_families"] == ["evo2_7b", "evo2_20b"]
     assert latentdna_binding["default_model_family"] == "evo2_7b"
-    assert study_pipeline["study_pipeline"]["infer"]["preferred_model_family"] == "evo2_20b"
-    assert study_pipeline["study_pipeline"]["infer"]["supported_model_families"] == ["evo2_20b", "evo2_7b"]
+    assert study_pipeline["study_pipeline"]["infer"]["preferred_model_family"] == "evo2_7b"
+    assert study_pipeline["study_pipeline"]["infer"]["supported_model_families"] == ["evo2_7b", "evo2_20b"]
 
     assert "`latentdna workspace snapshot`" in cli_contracts
     assert "`latentdna.workspace_snapshot.v1`" in cli_contracts
@@ -131,8 +131,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Plane: `downstream-analysis`" not in study_routes
     assert "Plane: `downstream-tool`" not in study_routes
     assert "7B-first browser posture" in study_routes
-    assert "five-view 7B-first surface" in study_routes
-    assert "record-plane infer preference remains `evo2_20b`" in study_routes
+    assert "seven-geometry 7B-first surface" in study_routes
+    assert "preferred infer family is now `evo2_7b`" in study_routes
     assert "eight canonical 7B+20B" not in study_routes
 
     assert "The study phase is `infer_batch_preparation`" in study_status
@@ -142,14 +142,14 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "balanced_design_family_margin_gallery" in study_status
     assert "sigma35_margin_ladder_gallery" in study_status
     assert "sigma35_stress_margin_gallery" in study_status
-    assert "Preferred infer family: `evo2_20b`" in study_status
-    assert "Supported infer families: `evo2_20b`, `evo2_7b`" in study_status
+    assert "Preferred infer family: `evo2_7b`" in study_status
+    assert "Supported infer families: `evo2_7b`, `evo2_20b`" in study_status
     assert "LatentDNA browser default family: `evo2_7b`" in study_status
     assert "LatentDNA gate:" in study_status
     assert "LatentDNA primary review path:" in study_status
     assert "LatentDNA companion visuals:" in study_status
     assert "LatentDNA appendix support:" in study_status
-    assert "five-view 7B-first pre-assay ladder" in study_status
+    assert "seven-geometry 7B-first pre-assay ladder" in study_status
     assert "eight canonical 7B+20B" not in study_status
     assert "Appendix deliverables remain secondary" in study_status
 

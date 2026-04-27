@@ -8,4 +8,5 @@ This directory holds the checked-in study snapshot for the stress / ethanol / ci
 - Companion visuals: `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix support: `sigma35_centroid_distance_gallery`
 - Appendix deliverables: `appendix_geometry_audit`, `appendix_umap_gallery`
+- Reference-view branch: `usr_promoter_references` -> `construct_prom_eth_cip_reference_core60` -> `construct_prom_eth_cip_reference_contexts` -> `infer_prom_eth_cip_reference_views_7b`
 - Study notes: [notes/README.md](/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/notes/README.md)

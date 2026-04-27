@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_snapshot_metadata_workflow.py
 
 Workflow tests for snapshot metadata companions.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

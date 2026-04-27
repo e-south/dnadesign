@@ -105,6 +105,11 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         if phase_id in seen_phase_ids:
             raise ValueError(f"ops.study.yaml phases must not duplicate id {phase_id!r}: {contract_path}")
         seen_phase_ids.add(phase_id)
+        required_for_main_study_state = item.get("required_for_main_study_state", True)
+        if not isinstance(required_for_main_study_state, bool):
+            raise ValueError(
+                f"ops.study.yaml phase {phase_id} required_for_main_study_state must be boolean: {contract_path}"
+            )
         phases.append(
             StudyPhaseContract(
                 id=phase_id,
@@ -118,6 +123,7 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
                 blocker=_string_or_none(item.get("blocker")),
                 output_dataset=_string_or_none(item.get("output_dataset")),
                 primary_dataset=_string_or_none(item.get("primary_dataset")),
+                required_for_main_study_state=required_for_main_study_state,
             )
         )
 

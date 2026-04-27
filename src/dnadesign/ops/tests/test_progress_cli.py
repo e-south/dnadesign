@@ -742,8 +742,8 @@ def _write_promoter_study_preflight_record(
                         "status": "present",
                     },
                     {
-                        "role": "wildtype_manual",
-                        "dataset": "usr_mg1655_promoter_controls",
+                        "role": "promoter_references",
+                        "dataset": "usr_promoter_references",
                         "usr_root": "usr_root",
                         "status": "present",
                     },
@@ -848,7 +848,7 @@ def _write_promoter_study_preflight_record(
     )
 
     _write_usr_dataset(repo_root / "usr_root", "densegen_demo_anchor", rows=densegen_rows)
-    _write_usr_dataset(repo_root / "usr_root", "usr_mg1655_promoter_controls")
+    _write_usr_dataset(repo_root / "usr_root", "usr_promoter_references")
     _write_usr_dataset(repo_root / "usr_root", "usr_pdual10_plasmid_template")
     _write_usr_dataset(repo_root / "usr_root", "promoter/demo_anchor_set", rows=anchor_rows)
     _write_usr_dataset(repo_root / "usr_root", "promoter/demo_construct_contexts", rows=construct_rows)

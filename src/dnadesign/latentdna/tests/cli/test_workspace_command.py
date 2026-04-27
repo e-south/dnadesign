@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/cli/test_workspace_command.py
 
 Workspace command contracts for latentdna CLI.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
