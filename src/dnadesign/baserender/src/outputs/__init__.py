@@ -34,6 +34,8 @@ from .video import (
     _target_frame_size,
     _trim_white_border_rgba,
     _union_centered_content_bounds,
+    effective_video_frames_per_record,
+    planned_video_frame_count,
     write_video,
 )
 
@@ -60,6 +62,8 @@ __all__ = [
     "_target_frame_size",
     "_trim_white_border_rgba",
     "_union_centered_content_bounds",
+    "effective_video_frames_per_record",
+    "planned_video_frame_count",
     "_unique_stem",
     "render_record",
     "write_images",

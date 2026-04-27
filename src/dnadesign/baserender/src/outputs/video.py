@@ -425,6 +425,22 @@ def _pause_frames(record_id: str, *, output: VideoOutputCfg) -> int:
     return int(round(pause_seconds * output.fps))
 
 
+def effective_video_frames_per_record(records: Sequence[Record], *, output: VideoOutputCfg) -> int:
+    if not records:
+        raise SchemaError("Cannot plan video frames with no records.")
+    frames_per_record = int(output.frames_per_record)
+    if output.total_duration is not None:
+        pause_total = sum(_pause_frames(rec.id, output=output) for rec in records)
+        frame_budget = max(1, int(round(float(output.total_duration) * output.fps)) - pause_total)
+        frames_per_record = max(1, frame_budget // len(records))
+    return int(frames_per_record)
+
+
+def planned_video_frame_count(records: Sequence[Record], *, output: VideoOutputCfg) -> int:
+    frames_per_record = effective_video_frames_per_record(records, output=output)
+    return int(sum(max(1, frames_per_record + _pause_frames(rec.id, output=output)) for rec in records))
+
+
 def _sequence_rows_content_extents_px(record: Record, *, style: Style) -> tuple[float, float]:
     from ..render.layout import compute_layout
 
@@ -718,11 +734,7 @@ def write_video(
     if rendered_content_top_norm is not None:
         content_top_norm = float(rendered_content_top_norm)
 
-    frames_per_record = int(output.frames_per_record)
-    if output.total_duration is not None:
-        pause_total = sum(_pause_frames(rec.id, output=output) for rec in prepared)
-        frame_budget = max(1, int(round(float(output.total_duration) * output.fps)) - pause_total)
-        frames_per_record = max(1, frame_budget // len(prepared))
+    frames_per_record = effective_video_frames_per_record(prepared, output=output)
     fig, ax = plt.subplots(figsize=(frame_w / style.dpi, frame_h / style.dpi), dpi=style.dpi)
     ax.set_position([0, 0, 1, 1])
     ax.set_axis_off()
@@ -1102,6 +1114,7 @@ def write_video(
                         )
                     )
 
+                fig.canvas.draw()
                 repeats = max(1, frames_per_record + _pause_frames(rec.id, output=output))
                 for _ in range(repeats):
                     writer.grab_frame()
@@ -1118,8 +1131,10 @@ __all__ = [
     "_apply_sequence_rows_extra_bottom_padding",
     "_content_bounds_rgba",
     "_even_ceil",
+    "effective_video_frames_per_record",
     "_letterbox_rgba",
     "_pause_frames",
+    "planned_video_frame_count",
     "_rendered_content_top_norm_for_video_frame",
     "_scale_rgba_to_fit",
     "_scale_rgba_to_width",

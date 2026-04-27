@@ -127,12 +127,14 @@ def run_sequence_rows_job(
     vid_output = output_kind(job, "video")
 
     if isinstance(vid_output, VideoOutputCfg):
-        from ..outputs import write_images, write_video
+        from ..outputs import effective_video_frames_per_record, planned_video_frame_count, write_images, write_video
 
         materialized = list(records)
         report.yielded_records = len(materialized)
         if not materialized:
             raise SchemaError("No records to render after adapter, transforms, and selection")
+        planned_frame_count = planned_video_frame_count(materialized, output=vid_output)
+        effective_frames_per_record = effective_video_frames_per_record(materialized, output=vid_output)
         if isinstance(img_output, ImagesOutputCfg):
             out_dir = write_images(
                 materialized,
@@ -150,6 +152,12 @@ def run_sequence_rows_job(
             palette=palette,
         )
         report.outputs["video_path"] = str(out_path)
+        report.output_metrics["video"] = {
+            "record_count": len(materialized),
+            "planned_frame_count": planned_frame_count,
+            "fps": int(vid_output.fps),
+            "frames_per_record": effective_frames_per_record,
+        }
     elif isinstance(img_output, ImagesOutputCfg):
         from ..outputs import write_images
 

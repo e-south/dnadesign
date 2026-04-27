@@ -154,6 +154,86 @@ def test_write_video_accepts_title_without_dynamic_subtitle(monkeypatch, tmp_pat
     assert out_path.exists()
 
 
+def test_write_video_draws_updated_canvas_for_each_record(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    writer_instances: list[object] = []
+
+    class _CanvasCaptureWriter:
+        class _SavingContext:
+            def __init__(self, writer: "_CanvasCaptureWriter", path: str):
+                self._writer = writer
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                self._writer.fig.canvas.draw()
+                return self._writer
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self.fig = None
+            self.frames: list[np.ndarray] = []
+            writer_instances.append(self)
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self.fig = fig
+            return self._SavingContext(self, path)
+
+        def grab_frame(self):
+            self.frames.append(np.asarray(self.fig.canvas.buffer_rgba()).copy())
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del renderer_name, style, palette
+        fig, ax = plt.subplots(figsize=(1.6, 0.8), dpi=100)
+        color = "#D94848" if record.id == "red" else "#2F6FDB"
+        ax.add_patch(plt.Rectangle((0, 0), 1, 1, color=color))
+        ax.text(0.5, 0.5, record.id, ha="center", va="center", color="white", fontsize=18)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _CanvasCaptureWriter)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "record-updates.mp4",
+        fmt="mp4",
+        fps=2,
+        frames_per_record=1,
+        pauses={},
+        width_px=200,
+        height_px=100,
+        aspect_ratio=None,
+        total_duration=None,
+    )
+
+    out_path = write_video(
+        [
+            Record(id="red", alphabet="DNA", sequence="ACGT"),
+            Record(id="blue", alphabet="DNA", sequence="TGCA"),
+        ],
+        output=output,
+        renderer_name="hairpin_cartoon",
+        style=Style(dpi=100),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+    writer = writer_instances[0]
+    assert len(writer.frames) == 2
+    assert not np.array_equal(writer.frames[0], writer.frames[1])
+
+
 def test_write_video_fill_width_without_header_top_aligns_sequence_rows(monkeypatch, tmp_path: Path) -> None:
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt
