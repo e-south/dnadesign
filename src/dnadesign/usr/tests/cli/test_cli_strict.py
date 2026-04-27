@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.testsupport.usr import ensure_registry
 from dnadesign.usr.src.cli import cmd_cell
 from dnadesign.usr.src.contracts import SequencesError
 from dnadesign.usr.src.dataset import Dataset

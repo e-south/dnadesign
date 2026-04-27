@@ -21,13 +21,13 @@ import yaml
 from typer.testing import CliRunner
 
 import dnadesign.usr as usr_pkg
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.families.promoter.ops.provider import (
     provide_promoter_preflight,
     provide_promoter_status,
 )
-from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr.src.overlays import with_overlay_metadata
 
 

@@ -17,7 +17,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.usr.src import cli as cli_module
 from dnadesign.usr.src.cli import app
 from dnadesign.usr.src.dataset import Dataset

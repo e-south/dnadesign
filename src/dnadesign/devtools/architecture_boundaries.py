@@ -37,7 +37,7 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "tfkdanalysis",
     "usr",
 }
-TOP_LEVEL_SHARED_INFRA_PACKAGES = {"contracts", "devtools", "testsupport"}
+TOP_LEVEL_SHARED_INFRA_PACKAGES = {"contracts", "devtools"}
 TOP_LEVEL_LEGACY_DIRECTORIES = {"archived", "prototypes"}
 _IGNORED_TOP_LEVEL_DIRECTORIES = {"__pycache__"}
 _NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | TOP_LEVEL_LEGACY_DIRECTORIES | _IGNORED_TOP_LEVEL_DIRECTORIES
@@ -53,7 +53,7 @@ _SKIPPED_PATH_SEGMENTS = {
     "demo_material",
     "__pycache__",
 }
-_TEST_SUPPORT_PACKAGE = "testsupport"
+_TEST_SUPPORT_IMPORT_PREFIXES = ("dnadesign.devtools.testsupport", "dnadesign.testsupport")
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("billboard", "aligner"),
     ("cluster", "aligner"),
@@ -228,8 +228,10 @@ def find_undeclared_cross_tool_imports(
             parts = target.split(".")
             if len(parts) < 2:
                 continue
-            imported_tool = parts[1]
-            if imported_tool == _TEST_SUPPORT_PACKAGE:
+            if target in _TEST_SUPPORT_IMPORT_PREFIXES or any(
+                target.startswith(f"{prefix}.") for prefix in _TEST_SUPPORT_IMPORT_PREFIXES
+            ):
+                imported_tool = "devtools.testsupport" if target.startswith("dnadesign.devtools.") else "testsupport"
                 violations.append(
                     ImportViolation(
                         owner_tool=owner_tool,
@@ -239,6 +241,7 @@ def find_undeclared_cross_tool_imports(
                     )
                 )
                 continue
+            imported_tool = parts[1]
             if imported_tool not in tool_names or imported_tool == owner_tool:
                 continue
             if target == f"dnadesign.{imported_tool}.src" or target.startswith(f"dnadesign.{imported_tool}.src."):

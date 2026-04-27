@@ -14,7 +14,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.overlays import overlay_path
 

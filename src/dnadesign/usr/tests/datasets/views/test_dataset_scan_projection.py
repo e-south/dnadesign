@@ -9,7 +9,7 @@ from pathlib import Path
 import pyarrow as pa
 import pytest
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 

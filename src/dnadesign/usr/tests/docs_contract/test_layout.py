@@ -34,7 +34,7 @@ def test_usr_layout_docs_cover_sanctioned_source_packages_and_new_support_surfac
         "cli/support/wiring/registration.py",
         "cli/support/presentation/runtime.py",
         "src/dnadesign/usr/ops/sync_audit_drill.py",
-        "src/dnadesign/testsupport/usr.py",
+        "src/dnadesign/devtools/testsupport/usr.py",
     ):
         assert token in code_map or token in introspection or token in usr_agents
 
@@ -50,8 +50,8 @@ def test_usr_agents_describe_ops_scripts_assets_and_testsupport_boundaries() -> 
     assert "src/dnadesign/usr/scripts/" in usr_agents
     assert "not a public cross-tool API surface" in usr_agents
     assert "src/dnadesign/usr/assets/demo_material/" in usr_agents
-    assert "src/dnadesign/testsupport/" in usr_agents
-    assert "Shared test fixtures consumed outside USR belong under `src/dnadesign/testsupport/`" in usr_agents
+    assert "src/dnadesign/devtools/testsupport/" in usr_agents
+    assert "Shared test fixtures consumed outside USR belong under `src/dnadesign/devtools/testsupport/`" in usr_agents
 
 
 def test_usr_archive_and_assets_docs_use_canonical_paths() -> None:

@@ -13,12 +13,12 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.latentdna.src.cli import app
 from dnadesign.latentdna.src.services.deliverable_service import deliverable_status
 from dnadesign.latentdna.src.services.freshness_service import FreshnessCache
 from dnadesign.latentdna.src.services.run_service import list_runs
 from dnadesign.latentdna.src.sources import provenance as provenance_module
-from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 

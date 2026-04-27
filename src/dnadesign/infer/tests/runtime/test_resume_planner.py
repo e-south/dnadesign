@@ -18,6 +18,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.infer.src.errors import WriteBackError
 from dnadesign.infer.src.features.contracts import (
     PromoterContextConfig,
@@ -26,7 +27,6 @@ from dnadesign.infer.src.features.contracts import (
 )
 from dnadesign.infer.src.features.execution import build_feature_bundle_outputs
 from dnadesign.infer.src.runtime.resume_planner import plan_resume_for_usr, read_usr_column_values, read_usr_columns
-from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
 
 

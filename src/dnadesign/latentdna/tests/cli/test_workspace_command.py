@@ -20,8 +20,8 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.latentdna.src.cli import app
-from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 

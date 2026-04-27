@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.datasets.overlay.policy import _overlay_table_from_registry
 from dnadesign.usr.src.registry import load_registry, registry_entry

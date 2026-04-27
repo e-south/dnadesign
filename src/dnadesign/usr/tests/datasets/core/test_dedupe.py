@@ -14,7 +14,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.testsupport.usr import ensure_registry
 from dnadesign.usr.src.contracts import SchemaError
 from dnadesign.usr.src.dataset import Dataset
 

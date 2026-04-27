@@ -1,11 +1,11 @@
 ![testsupport banner](assets/testsupport-banner.svg)
 
-`testsupport` holds shared repo-level test fixtures for cross-tool contract tests.
+`devtools.testsupport` holds shared repo-level test fixtures for cross-tool contract tests.
 
 This package exists so sibling packages can reuse test helpers without importing
 another tool's `tests/` package.
 
-See the [repository docs index](../../../docs/README.md) for workflow routes and
+See the [repository docs index](../../../../docs/README.md) for workflow routes and
 maintainer references.
 
 Current owned surfaces:
@@ -14,6 +14,6 @@ Current owned surfaces:
 
 Boundary notes:
 
-- `dnadesign.testsupport` is for test-only helpers.
+- `dnadesign.devtools.testsupport` is for test-only helpers.
 - Do not import runtime/tool implementation from here in production code.
 - Prefer moving shared fixtures here instead of exposing `dnadesign.<tool>.tests.*` across tool boundaries.

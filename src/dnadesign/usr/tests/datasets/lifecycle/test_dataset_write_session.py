@@ -17,7 +17,7 @@ from pathlib import Path
 import pyarrow as pa
 import pytest
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.testsupport.usr import ensure_registry
 from dnadesign.usr import Dataset, compute_id
 from dnadesign.usr.src.datasets.lifecycle import write_session as write_session_module
 

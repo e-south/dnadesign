@@ -256,6 +256,29 @@ def test_find_undeclared_cross_tool_imports_reports_relative_import_without_modu
 
 
 def test_find_undeclared_cross_tool_imports_rejects_testsupport_imports_from_runtime_code(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "foo" / "api.py",
+        "from dnadesign.devtools.testsupport.usr import ensure_registry\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "devtools" / "__init__.py", "")
+    _write(tmp_path / "src" / "dnadesign" / "devtools" / "testsupport" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "devtools" / "testsupport" / "usr.py",
+        "def ensure_registry():\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(
+        repo_root=tmp_path,
+        allowed_edges=set(),
+    )
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "foo"
+    assert violations[0].imported_tool == "devtools.testsupport"
+    assert violations[0].import_target == "dnadesign.devtools.testsupport.usr"
+
+
+def test_find_undeclared_cross_tool_imports_rejects_legacy_top_level_testsupport_imports(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "from dnadesign.testsupport.usr import ensure_registry\n")
     _write(tmp_path / "src" / "dnadesign" / "testsupport" / "__init__.py", "")
     _write(tmp_path / "src" / "dnadesign" / "testsupport" / "usr.py", "def ensure_registry():\n    return None\n")

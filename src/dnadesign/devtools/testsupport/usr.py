@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/testsupport/usr.py
+src/dnadesign/devtools/testsupport/usr.py
 
 Repo-level USR fixture helpers shared across sibling package tests.
 

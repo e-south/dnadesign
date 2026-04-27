@@ -17,7 +17,7 @@ from pathlib import Path
 import pyarrow as pa
 import pytest
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.usr import USR_EVENT_VERSION, Dataset
 
 

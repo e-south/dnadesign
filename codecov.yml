@@ -115,10 +115,6 @@ component_management:
       name: permuter
       paths:
         - src/dnadesign/permuter/**
-    - component_id: testsupport
-      name: testsupport
-      paths:
-        - src/dnadesign/testsupport/**
 
 comment:
   require_changes: true

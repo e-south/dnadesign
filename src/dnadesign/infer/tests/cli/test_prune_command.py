@@ -15,9 +15,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from dnadesign.devtools.testsupport.usr import register_test_namespace
 from dnadesign.infer.cli import app
 from dnadesign.infer.src.writers.usr import write_back_usr
-from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
 
 _RUNNER = CliRunner()

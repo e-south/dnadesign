@@ -581,8 +581,8 @@ def test_cli_surface_module_exports_expected_symbols() -> None:
     assert hasattr(module, "build_cli_apps")
 
 
-def test_repo_level_usr_testsupport_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.testsupport.usr")
+def test_devtools_usr_testsupport_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.devtools.testsupport.usr")
     assert hasattr(module, "ensure_registry")
     assert hasattr(module, "register_test_namespace")
 
