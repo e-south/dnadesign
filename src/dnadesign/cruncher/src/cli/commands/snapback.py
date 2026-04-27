@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/cli/commands/snapback.py
 
 CLI entrypoints for explicit v2 and co-design solve v3 snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -19,7 +19,9 @@ from dnadesign.cruncher.cli.commands.snapback_released import (
     released_solve_cmd,
     released_target_search_cmd,
 )
+from dnadesign.cruncher.cli.commands.snapback_screen import screen_cmd
 from dnadesign.cruncher.cli.commands.snapback_show import released_show_cmd, show_cmd
+from dnadesign.cruncher.cli.commands.snapback_visual import visual_cmd
 from dnadesign.cruncher.cli.commands.snapback_workspace import init_workspace_cmd
 
 app = typer.Typer(
@@ -32,6 +34,10 @@ app.command("init-workspace", help="Scaffold a snapback workspace with v2 explic
 )
 app.command("validate", help="Validate a v2 explicit snapback spec and emit a deterministic report.")(validate_cmd)
 app.command("design", help="Materialize one v2 explicit snapback design bundle.")(design_cmd)
+app.command(
+    "visual",
+    help="Render one explicit visual-only snapback example from a scoped visual spec.",
+)(visual_cmd)
 app.command(
     "solve",
     help=(
@@ -47,6 +53,13 @@ app.command(
     ),
 )(target_search_cmd)
 app.command(
+    "screen",
+    help=(
+        "Run the canonical released-product Snapback screen for logical origin-0, stem-3, cap-3 "
+        "targets with retained top and bottom product routes."
+    ),
+)(screen_cmd)
+app.command(
     "released-design",
     help="Materialize one explicit released-product snapback bundle from a two-stage precursor spec.",
 )(released_design_cmd)
@@ -61,7 +74,7 @@ app.command(
 app.command(
     "released-solve",
     help=(
-        "Search the released-product dual-enzyme catalog space, materialize the top default exposed-bottom hits, "
+        "Search the released-product dual-enzyme catalog space, materialize ranked hits, "
         "and optionally render one plot per hit."
     ),
 )(released_solve_cmd)

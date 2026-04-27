@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/docs/test_snapback_released_docs.py
 
 Docs contracts for the released-product snapback lane.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

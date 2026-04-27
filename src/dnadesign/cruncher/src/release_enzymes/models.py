@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/release_enzymes/models.py
 
 Normalized release-enzyme contracts and resolved site/cut models.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

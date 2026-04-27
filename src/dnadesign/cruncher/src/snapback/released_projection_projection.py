@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_projection_projection.py
 
 Released-product post-cut projection helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

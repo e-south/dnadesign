@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/snapback/test_solver.py
 
 Bounded solve tests for v3 co-design snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -301,13 +301,13 @@ def test_run_snapback_solve_broad_preset_catalog_respects_outside_site_feasibili
     assert report.status == "satisfied"
     assert report.metadata.catalog_presets == ["neb_nicking_v1", "thermo_nicking_v1"]
     assert report.metadata.first_satisfied_frontier is not None
-    assert report.metadata.first_satisfied_frontier.nick_boundary_from_left == 1
-    assert report.metadata.first_satisfied_frontier.paired_bp == 4
+    assert report.metadata.first_satisfied_frontier.nick_boundary_from_left == 0
+    assert report.metadata.first_satisfied_frontier.paired_bp == 5
     assert report.metadata.first_satisfied_frontier.cap_extension_nt == 0
-    assert report.hits[0].variant_id == "Nt.CviPII"
-    assert report.hits[0].nick_boundary_from_left == 1
-    assert report.hits[0].paired_bp == 4
-    assert report.hits[0].site_mutation_count == 3
+    assert report.hits[0].variant_id == "Nb.BsrDI"
+    assert report.hits[0].nick_boundary_from_left == 0
+    assert report.hits[0].paired_bp == 5
+    assert report.hits[0].site_mutation_count == 4
     assert report.hits[0].nickase.selection is not None
     assert report.hits[0].nickase.selection.outside_site is False
     assert all(hit.variant_id != "Nt.BspQI" for hit in report.hits)

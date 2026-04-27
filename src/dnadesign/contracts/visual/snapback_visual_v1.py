@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/snapback_visual_v1.py
 
 Shared snapback visual contract for nucleotide-resolution QA rendering.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

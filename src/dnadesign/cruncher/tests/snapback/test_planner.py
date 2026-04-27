@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/snapback/test_planner.py
 
 Planner tests for v2 explicit snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/release_enzymes/selection.py
 Deterministic release-enzyme priority helpers for released-product snapback
 search.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

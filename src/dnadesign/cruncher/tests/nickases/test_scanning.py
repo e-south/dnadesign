@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/nickases/test_scanning.py
 
 Tests for shared nickase scanning helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -78,3 +78,33 @@ def test_prefix_matches_plus_suffix_sensitive_scan_matches_full_scan_for_appende
     full = enumerate_site_instances(designed_sequence, coordinate_offset=0, entry=entry)
 
     assert [match.key() for match in [*prefix_matches, *suffix_matches]] == [match.key() for match in full]
+
+
+def test_vendor_diagram_bottom_nick_tracks_recognition_boundary_across_orientations() -> None:
+    entry = NickaseCatalogEntry(
+        id="Nb.BtsI",
+        specificity_id="BtsI",
+        motif_top_5to3="GCAGTG",
+        vendor_diagram_top_5to3="GCAGTGNN",
+        bottom_cut_offset=6,
+    )
+
+    forward_match = enumerate_site_instances(
+        "GCAGTGAA",
+        coordinate_offset=0,
+        entry=entry,
+        use_vendor_diagram=True,
+    )[0]
+    reverse_match = enumerate_site_instances(
+        "TTCACTGC",
+        coordinate_offset=0,
+        entry=entry,
+        use_vendor_diagram=True,
+    )[0]
+
+    assert forward_match.site.orientation == "forward"
+    assert forward_match.nick.strand == "complement"
+    assert forward_match.nick.boundary_context == 6
+    assert reverse_match.site.orientation == "reverse"
+    assert reverse_match.nick.strand == "primary"
+    assert reverse_match.nick.boundary_context == 2

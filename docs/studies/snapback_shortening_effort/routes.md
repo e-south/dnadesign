@@ -1,7 +1,7 @@
 ## Snapback Shortening Effort Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-22
+**Last verified:** 2026-04-25
 
 Use this page after the tracked study status answers `where are we?`.
 Use preflight when you need blocker or command-readiness answers.
@@ -34,7 +34,7 @@ This page keeps the study-owned handoff map in one place.
 
 ### Boundary shorthand
 
-- `released-product Snapback` means the dual-enzyme precursor lane where final geometry is evaluated on the exposed post-release bottom strand and rebased so the nick boundary is origin `0` in final-geometry space.
+- `released-product Snapback` means the BspQI-pinned dual-enzyme precursor lane where final geometry is evaluated on retained active top and bottom products and rebased so the nick boundary is origin `0` in final-geometry space.
 - `preserved-site Snapback` means the older one-enzyme lane and stays a separate contract.
 - `YIU` means mismatch-centric payload rendering over a fixed 4 nt internal window; it is not the shortening topology engine here.
 - `retron context` means biological framing from the checked-in audit notes, not scoring hooks or implicit solver relaxations.
@@ -45,9 +45,10 @@ This page keeps the study-owned handoff map in one place.
    preflight command above when the question is blocker or execution readiness.
 2. Stay on the primary route below for the read-only released-product probe in
    `de033` and inspect allowed exact-hit versus bounded near-hit posture against
-   the real release-enzyme catalog.
+   the real release-enzyme catalog with the default Type IIS release enzyme
+   pinned to `BspQI`.
 3. After the read-only probe is clean, materialize the whole-catalog released
-   solve bundle so ranked hits and per-hit plots are published under
+   solve bundle so ranked BspQI-pinned hits and per-hit plots are published under
    `outputs/released_solve`. The solve surface now collapses redundant exact or
    near hits to one representative per exposed post-nick `stem + cap` geometry.
 4. Treat `released-design` and `released-show` as validation-only for the
@@ -59,6 +60,8 @@ This page keeps the study-owned handoff map in one place.
    contract.
 5. Use the YIU contrast route below only when the task is boundary auditing or
    contrast rendering, not when the task is shortening design.
+6. Use the MSD-HOPV5 visual route only for an explicit prior-design
+   comparison. It is a visual-only sibling workspace, not a `de033` solve hit.
 
 ### Primary route: released-product Snapback
 
@@ -74,9 +77,9 @@ This is the active study lane.
 - Primary doc:
   `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md`
 - First read-only command:
-  `cd src/dnadesign/cruncher/workspaces/de033 && uv run cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --nick-boundary 0 --paired-bp 3 --cap-nt 3 --json`
+  `cd src/dnadesign/cruncher/workspaces/de033 && uv run cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --json`
 - Follow-up mutating commands:
-  `cd src/dnadesign/cruncher/workspaces/de033 && uv run cruncher snapback released-solve --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --nick-boundary 0 --paired-bp 3 --cap-nt 3 --run-dir outputs/released_solve --materialize-top-k 8 --render-format pdf --emit-renders --force-overwrite --json`
+  `cd src/dnadesign/cruncher/workspaces/de033 && uv run cruncher snapback released-solve --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --run-dir outputs/released_solve --materialize-top-k 16 --render-format pdf --emit-renders --force-overwrite --json`
 - Bundle root:
   `src/dnadesign/cruncher/workspaces/de033/outputs/released_solve`
 - Solve deliverables:
@@ -92,7 +95,29 @@ This is the active study lane.
   geometry may extend left of origin only when the omitted prefix is one
   contiguous fully degenerate `N` block in the oriented top-strand view. `de033`
   currently operates as a bounded near-hit surface rather than an exact-hit
-  bundle lane.
+  bundle lane. Near-hit ranking and plots include retained duplex left of the
+  nick in `effective_stem_bp`; boundary-`2` / paired-`3` is therefore rendered
+  and reported as a 5 bp effective stem.
+
+### Visual-only route: MSD-HOPV5 comparison
+
+Use this route when the task is to show the prior explicit `Nt.Bpu10I` MSD-HOPV5 example
+beside current solve outputs without mixing generated artifacts.
+
+- Type: `route`
+- Plane: `data-plane`
+- Surface role: `comparison-visual`
+- Owner-boundary: `cruncher`
+- Current state: `ready`
+- Workspace: `src/dnadesign/cruncher/workspaces/msd-HOPV5_snapback`
+- Follow-up mutating command:
+  `cd src/dnadesign/cruncher/workspaces/msd-HOPV5_snapback && uv run cruncher snapback visual --spec configs/snapback/msd-HOPV5.visual.snapback.yaml --force-overwrite --json`
+- Bundle root:
+  `src/dnadesign/cruncher/workspaces/msd-HOPV5_snapback/outputs/msd-HOPV5_visual`
+- Route note:
+  this route validates the explicit precursor, nick boundary, stem, cap, and
+  foldback decomposition before rendering. It does not run catalog search and
+  does not overwrite `de033`.
 
 ### Contrast route: YIU boundary check
 
@@ -127,6 +152,8 @@ reminder of what YIU does and does not model.
   `docs/studies/snapback_shortening_effort/ops.study.yaml`
 - Consolidated retron/P4 and YIU executive summary:
   `src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md`
+- Snapback phenomenology dev spec:
+  `docs/studies/snapback_shortening_effort/snapback-phenomenology-dev-spec.md`
 - Route note:
   `routes.md` is the canonical human handoff; the other notes are study
   context or machine-readable support, not replacement route maps.

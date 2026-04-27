@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/snapback_released_show.py
 
 Path-oriented integrity checks for released-product snapback bundles.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

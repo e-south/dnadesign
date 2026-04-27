@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_search_models.py
 
 Search-side contracts for released-product snapback.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
 from dnadesign.cruncher.nickases.models import NickEvent, RecognitionSiteInstance, normalize_dna
 from dnadesign.cruncher.release_enzymes.models import ReleaseCutEvent, ReleaseRecognitionSiteInstance
@@ -38,6 +38,7 @@ from dnadesign.cruncher.snapback.released_route_policy import (
     infer_released_search_final_geometry_source,
     normalize_active_strand_list,
     normalize_route_family_list,
+    normalize_variant_id_list,
     normalize_warning_code_list,
     route_family_active_strand,
     route_family_physical_nicked_strand,
@@ -56,6 +57,7 @@ class ReleasedTargetSearchConfig(StrictSnapbackModel):
     disallowed_nickase_warning_codes: list[str] = Field(
         default_factory=lambda: list(_DEFAULT_DISALLOWED_NICKASE_WARNING_CODES)
     )
+    allowed_release_variant_ids: list[str] = Field(default_factory=list)
     allowed_active_strands: list[ReleasedActiveStrand] = Field(
         default_factory=lambda: list(_DEFAULT_ALLOWED_ACTIVE_STRANDS)
     )
@@ -89,6 +91,11 @@ class ReleasedTargetSearchConfig(StrictSnapbackModel):
     @classmethod
     def _validate_search_disallowed_nickase_warning_codes(cls, value: list[str]) -> list[str]:
         return normalize_warning_code_list(value, label="search.disallowed_nickase_warning_codes")
+
+    @field_validator("allowed_release_variant_ids")
+    @classmethod
+    def _validate_allowed_release_variant_ids(cls, value: list[str]) -> list[str]:
+        return normalize_variant_id_list(value, label="search.allowed_release_variant_ids")
 
     @field_validator("allowed_active_strands")
     @classmethod
@@ -166,6 +173,16 @@ class ReleasedTargetSearchHit(StrictSnapbackModel):
             )
         return self
 
+    @computed_field
+    @property
+    def upstream_retained_duplex_bp(self) -> int:
+        return min(self.projection.retained_partner_length_nt, self.nick_boundary_from_left)
+
+    @computed_field
+    @property
+    def effective_stem_bp(self) -> int:
+        return self.upstream_retained_duplex_bp + self.final_candidate.paired_bp
+
 
 class ReleasedTargetSearchMetadata(StrictSnapbackModel):
     schema_version: int = 1
@@ -177,6 +194,7 @@ class ReleasedTargetSearchMetadata(StrictSnapbackModel):
     nick_catalog_source: str
     release_catalog_source: str
     disallowed_nickase_warning_codes: list[str] = Field(default_factory=list)
+    allowed_release_variant_ids: list[str] = Field(default_factory=list)
     allowed_active_strands: list[ReleasedActiveStrand] = Field(default_factory=list)
     allowed_route_families: list[ReleasedRouteFamily] = Field(default_factory=list)
     evaluated_pair_count: int = Field(ge=0)
@@ -190,6 +208,11 @@ class ReleasedTargetSearchMetadata(StrictSnapbackModel):
     @classmethod
     def _validate_target_search_disallowed_nickase_warning_codes(cls, value: list[str]) -> list[str]:
         return normalize_warning_code_list(value, label="metadata.disallowed_nickase_warning_codes")
+
+    @field_validator("allowed_release_variant_ids")
+    @classmethod
+    def _validate_metadata_allowed_release_variant_ids(cls, value: list[str]) -> list[str]:
+        return normalize_variant_id_list(value, label="metadata.allowed_release_variant_ids")
 
     @field_validator("allowed_active_strands")
     @classmethod

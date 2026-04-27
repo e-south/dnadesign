@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/app/snapback_publish.py
 Publish snapback QA views, renderer-facing visual contracts, and optional render
 jobs for explicit and materialized runs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

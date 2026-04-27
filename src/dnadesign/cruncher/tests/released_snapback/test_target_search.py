@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/released_snapback/test_target_search.py
 
 Target-search tests for released-product snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -277,12 +277,30 @@ def test_builtin_neb_candidates_do_not_gain_origin_slack_without_leading_degener
     assert placements["Nt.BspQI"].orientation == "forward"
     assert placements["Nt.BstNBI"].orientation == "forward"
     assert all(placement.left_of_origin_slack_nt == 0 for placement in placements.values())
-    assert placements["Nb.BsrDI"].earliest_allowed_boundary() == 6
-    assert placements["Nb.BtsI"].earliest_allowed_boundary() == 6
+    assert placements["Nb.BsrDI"].earliest_allowed_boundary() == 0
+    assert placements["Nb.BtsI"].earliest_allowed_boundary() == 0
     assert placements["Nt.BsmAI"].earliest_allowed_boundary() == 6
     assert placements["Nt.BspQI"].earliest_allowed_boundary() == 8
     assert placements["Nt.AlwI"].earliest_allowed_boundary() == 9
     assert placements["Nt.BstNBI"].earliest_allowed_boundary() == 9
+
+    vendor_placements = {
+        placement.entry.id: placement
+        for placement in released_target_search._nick_placements(
+            catalog,
+            physical_nicked_strand="top",
+            use_vendor_diagram=True,
+        )
+        if placement.entry.id in {"Nb.BsrDI", "Nb.BtsI"}
+    }
+    assert vendor_placements["Nb.BsrDI"].motif == "NNCATTGC"
+    assert vendor_placements["Nb.BtsI"].motif == "NNCACTGC"
+    assert vendor_placements["Nb.BsrDI"].site_start_at_boundary_zero == -2
+    assert vendor_placements["Nb.BtsI"].site_start_at_boundary_zero == -2
+    assert vendor_placements["Nb.BsrDI"].left_of_origin_slack_nt == 2
+    assert vendor_placements["Nb.BtsI"].left_of_origin_slack_nt == 2
+    assert vendor_placements["Nb.BsrDI"].earliest_allowed_boundary() == 0
+    assert vendor_placements["Nb.BtsI"].earliest_allowed_boundary() == 0
 
 
 def test_released_target_search_reports_exact_hits_near_hits_blockers_and_pre_post_truncation_counts(
@@ -309,7 +327,7 @@ def test_released_target_search_reports_exact_hits_near_hits_blockers_and_pre_po
     assert report.status == "exact_hits_found"
     assert report.metadata.pre_truncation_exact_hit_count == 2
     assert report.metadata.post_truncation_exact_hit_count == 1
-    assert report.metadata.pre_truncation_near_hit_count == 2
+    assert report.metadata.pre_truncation_near_hit_count == 9
     assert report.metadata.post_truncation_near_hit_count == 1
     assert report.exact_hits[0].nickase_variant_id in {"Nx.Exact7", "Nx.ExactAlt7", "Nx.Near7"}
     assert report.exact_hits[0].release_variant_id in {"Re.Exact", "Re.Overlap"}
@@ -317,6 +335,8 @@ def test_released_target_search_reports_exact_hits_near_hits_blockers_and_pre_po
     assert report.exact_hits[0].active_product_input_length_nt == 6
     assert report.near_hits[0].hit_kind == "nearest"
     assert report.near_hits[0].nick_boundary_from_left == 1
+    assert report.near_hits[0].upstream_retained_duplex_bp == 1
+    assert report.near_hits[0].effective_stem_bp == 4
     assert report.metadata.blocker_counts["RELEASE_OVERLAPS_REQUIRED_TARGET_REGION"] >= 1
 
 
@@ -422,14 +442,60 @@ def test_released_target_search_real_presets_find_expected_retained_active_route
     assert exact_hits_by_id["Nt.AlwI"].route_family == "top_active_from_bottom_nick"
     assert exact_hits_by_id["Nt.AlwI"].active_strand == "top"
     assert exact_hits_by_id["Nt.AlwI"].physical_nicked_strand == "bottom"
-    assert any(
-        base.source_constraint == "degenerate_motif_base"
-        for base in exact_hits_by_id["Nb.BsrDI"].projection.active_product_provenance
+    assert exact_hits_by_id["Nb.BsrDI"].route_family == "bottom_active_from_top_nick"
+    assert exact_hits_by_id["Nb.BsrDI"].active_strand == "bottom"
+    assert exact_hits_by_id["Nb.BsrDI"].physical_nicked_strand == "top"
+    assert exact_hits_by_id["Nb.BsrDI"].pre_nick_site.local_start == -2
+    assert exact_hits_by_id["Nb.BtsI"].route_family == "bottom_active_from_top_nick"
+    assert exact_hits_by_id["Nb.BtsI"].active_strand == "bottom"
+    assert exact_hits_by_id["Nb.BtsI"].physical_nicked_strand == "top"
+    assert exact_hits_by_id["Nb.BtsI"].pre_nick_site.local_start == -2
+
+
+def test_released_target_search_can_pin_release_variant_for_de033_bspqi_policy(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+
+    report = run_released_snapback_target_search(
+        request=SingleNickReleasedTargetSearchRequest(
+            target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
+            nick_sources=CatalogSources(preset="neb_nicking_v1", additional_presets=["thermo_nicking_v1"]),
+            release_sources=ReleaseCatalogSources(preset="type_iis_release_v1"),
+            search=ReleasedTargetSearchConfig(
+                max_results=16,
+                near_boundary_search_limit=8,
+                allow_precut_footprint_outside_active_product=True,
+                allowed_active_strands=["top", "bottom"],
+                allowed_route_families=["bottom_active_from_top_nick", "top_active_from_bottom_nick"],
+                allowed_release_variant_ids=["BspQI"],
+            ),
+        ),
+        workspace_root=workspace_root,
     )
-    assert any(
-        base.source_constraint == "degenerate_motif_base"
-        for base in exact_hits_by_id["Nb.BtsI"].projection.active_product_provenance
+
+    assert report.status == "exact_hits_found"
+    assert report.metadata.allowed_release_variant_ids == ["BspQI"]
+    assert report.exact_hits
+    assert {hit.release_variant_id for hit in report.exact_hits} == {"BspQI"}
+    assert {hit.nickase_variant_id for hit in report.exact_hits} == {
+        "Nt.BstNBI",
+        "Nt.AlwI",
+        "Nt.BsmAI",
+        "Nb.BsrDI",
+        "Nb.BtsI",
+    }
+    assert all(
+        hit.pre_nick_site.local_start is None or hit.pre_nick_site.local_start >= -2 for hit in report.exact_hits
     )
+    assert {
+        hit.nickase_variant_id: hit.pre_nick_site.local_start
+        for hit in report.exact_hits
+        if hit.nickase_variant_id in {"Nb.BsrDI", "Nb.BtsI"}
+    } == {"Nb.BsrDI": -2, "Nb.BtsI": -2}
+    assert all(hit.pre_nick_site.local_end is None or hit.pre_nick_site.local_end > 0 for hit in report.exact_hits)
+    assert "RELEASE_VARIANT_FILTERED" in report.metadata.blocker_counts
 
 
 def test_rank_hits_ignores_gc_when_other_exact_rank_inputs_match() -> None:
@@ -952,10 +1018,11 @@ def test_released_target_search_against_real_presets_evaluates_the_full_cross_pr
     expected_pairs = len(allowed_nick_placements) * len(release_placements)
     disallowed_nick_placement_count = len(nick_placements) - len(allowed_nick_placements)
 
-    assert report.status == "near_hits_only"
+    assert report.status == "exact_hits_found"
     assert report.metadata.evaluated_pair_count == expected_pairs
-    assert report.metadata.pre_truncation_exact_hit_count == 0
-    assert len(report.exact_hits) == 0
+    assert report.metadata.pre_truncation_exact_hit_count == 2
+    assert len(report.exact_hits) == 2
+    assert {hit.nickase_variant_id for hit in report.exact_hits} == {"Nb.BsrDI", "Nb.BtsI"}
     assert report.metadata.blocker_counts["DISALLOWED_NICKASE_WARNING_CODE"] == disallowed_nick_placement_count * len(
         release_placements
     )

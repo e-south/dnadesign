@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/solve_models.py
 
 Schema and report contracts for v3 co-design snapback solve workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

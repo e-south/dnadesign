@@ -11,6 +11,7 @@ variants:
     specificity_id: BspQI
     motif_top_5to3: GCTCTTC
     raw_cut_notation: GCTCTTC(1/none)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0644
     source_url: https://www.neb.com/en-us/products/r0644-ntbspqi
@@ -46,6 +47,7 @@ variants:
     motif_top_5to3: GAGTC
     vendor_diagram_top_5to3: GAGTCNNNNN
     raw_cut_notation: GAGTC(4/none)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0607
     source_url: https://www.neb.com/en-us/products/r0607-ntbstnbi
@@ -61,6 +63,7 @@ variants:
     motif_top_5to3: GCAATG
     vendor_diagram_top_5to3: GCAATGNN
     raw_cut_notation: GCAATG(none/0)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0648
     source_url: https://www.neb.com/en-us/products/r0648-nbbsrdi
@@ -78,6 +81,7 @@ variants:
     motif_top_5to3: GCAGTG
     vendor_diagram_top_5to3: GCAGTGNN
     raw_cut_notation: GCAGTG(none/0)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0707
     source_url: https://www.neb.com/en-us/products/r0707-nbbtsi
@@ -95,6 +99,7 @@ variants:
     motif_top_5to3: GGATC
     vendor_diagram_top_5to3: GGATCNNNNN
     raw_cut_notation: GGATC(4/none)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0627
     source_url: https://www.neb.com/en-us/products/r0627-ntalwi
@@ -181,6 +186,7 @@ variants:
     motif_top_5to3: GTCTC
     vendor_diagram_top_5to3: GTCTCNN
     raw_cut_notation: GTCTC(1/none)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0121
     source_url: https://www.neb.com/en-us/products/r0121-ntbsmai

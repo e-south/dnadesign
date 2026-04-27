@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/snapback/test_artifacts.py
 
 Snapback artifact layout contracts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/released_snapback/test_route_policy.py
 
 Route-policy contract tests for released-product Snapback.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

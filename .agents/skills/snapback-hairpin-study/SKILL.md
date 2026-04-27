@@ -2,7 +2,7 @@
 name: snapback-hairpin-study
 description: Recover the checked-in Snapback shortening study, its released-product Snapback execution lane, its YIU boundary role, and its study-owned command ladder. Use when the user asks about the snapback hairpin or shortening effort, wants the current phase or next route, or wants to harden the study-owned ops, docs, or native-agent bootstrap surfaces. Pair with `harness-engineering` for study-surface hardening and with `code-change-discipline` in the `pragmatic-programming-principles` lane for lane, contract, or fail-fast boundary changes. Do not use for generic Cruncher walkthroughs, unrelated Snapback design work, or bench-level retron advice.
 metadata:
-  version: 0.1.0
+  version: 0.1.1
   category: workflow-automation
   tags: [cruncher, snapback, study, shortening, routes]
 ---
@@ -38,7 +38,7 @@ Out of scope:
 - the answer comes from the checked-in study record plus the pinned ops status
   or preflight surface
 - released-product Snapback remains the active shortening lane
-- released-product Snapback means the exposed-bottom-strand geometry lane rebased so the nick boundary is origin `0` in final-geometry space for this study
+- released-product Snapback means the BspQI-pinned retained-active geometry lane rebased so the nick boundary is origin `0` in final-geometry space for this study
 - YIU remains a contrast-only boundary surface
 - the next route goes through `routes.md`; open `pipeline.yaml` only for
   machine-readable command-group or bootstrap confirmation, not hand-built
@@ -65,6 +65,10 @@ Out of scope:
   `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`.
 - Use [route-matrix.md](references/route-matrix.md) and
   [refresh-loop.md](references/refresh-loop.md) for cold-start routing.
+- If the user asks which nicking endonucleases can produce the origin-0,
+  stem-3, cap-3 outcome, open [origin-033-hits.md](references/origin-033-hits.md)
+  before answering; treat it as the concise study-owned answer and rerun the
+  listed screen/solve command only when freshness is requested.
 
 3. Pair with the right companion skill when the task widens.
 - Pair with `harness-engineering` when the change touches study status,
@@ -79,7 +83,7 @@ Out of scope:
 ## Guardrails
 
 - `released-product Snapback` is the shortening architecture under test.
-- in this study, released-product Snapback scores the exposed post-release bottom strand, not the retained top strand.
+- in this study, released-product Snapback scores retained active top and bottom products; do not collapse the screen back to exposed-bottom-only semantics.
 - outside-site type IIS nickases keep their downstream spacer geometry, but the
   released-product lane only permits left-of-origin nickase geometry when the
   omitted leading prefix is one contiguous fully degenerate `N` block in the
@@ -125,6 +129,7 @@ Should trigger:
 - "What should I open next for the shortening study?"
 - "Refresh the tracked Snapback shortening context."
 - "Harden the shortening study status, preflight, or skill routing."
+- "Which nicking endonucleases result in the 033 snapback?"
 
 Should not trigger:
 - "Run a generic Cruncher snapback search."
@@ -137,4 +142,5 @@ Should not trigger:
 - [route-matrix.md](references/route-matrix.md)
 - [refresh-loop.md](references/refresh-loop.md)
 - [study-surfaces.md](references/study-surfaces.md)
+- [origin-033-hits.md](references/origin-033-hits.md)
 - [external-sources.md](references/external-sources.md)

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/snapback/test_visual_publication.py
 
 Visual publication tests for snapback QA and public snapback visual artifacts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

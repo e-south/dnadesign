@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/snapback/test_load.py
 
 Load and schema tests for snapback explicit and solve specs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/released_snapback/test_released_show.py
 
 Focused released-product snapback readback and drift tests.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

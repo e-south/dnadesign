@@ -228,6 +228,38 @@ def print_released_target_search_report(report) -> None:
             )
 
 
+def print_snapback_screen_report(report, *, emit_mechanism_ledger: bool = True) -> None:
+    console.print("Snapback screen")
+    console.print(f"Status -> {report.status}")
+    console.print(
+        "Target topology -> "
+        f"origin={report.target_topology.logical_origin}, "
+        f"stem_bp={report.target_topology.stem_bp}, "
+        f"cap_nt={report.target_topology.cap_nt}, "
+        f"retained={','.join(report.target_topology.retained_product_strands)}"
+    )
+    console.print(f"Exact hits -> {report.exact_hit_count}")
+    console.print(f"Near hits -> {report.near_hit_count}")
+    if emit_mechanism_ledger and report.mechanism_ledger:
+        console.print("Mechanism ledger:")
+        for entry in report.mechanism_ledger:
+            provenance = ",".join(f"{key}={count}" for key, count in entry.provenance_counts.items()) or "-"
+            console.print(
+                "  - "
+                f"rank {entry.rank}: {entry.nickase_variant_id}+{entry.release_variant_id} "
+                f"kind={entry.hit_kind} "
+                f"route={entry.route_family} "
+                f"retained={entry.retained_product_strand} "
+                f"physical_nick={entry.physical_nicked_strand} "
+                f"origin={entry.logical_origin} "
+                f"stem={entry.logical_stem_bp} "
+                f"cap={entry.cap_nt} "
+                f"effective_pairing={entry.effective_foldback_pairing_bp} "
+                f"class={entry.mechanism_class} "
+                f"provenance={provenance}"
+            )
+
+
 def print_released_solve_report(report) -> None:
     console.print("Released-product snapback solve")
     console.print(f"Status -> {report.status}")
@@ -291,6 +323,7 @@ __all__ = [
     "print_released_solve_report",
     "print_released_target_search_report",
     "print_report",
+    "print_snapback_screen_report",
     "print_solve_report",
     "print_target_search_report",
 ]

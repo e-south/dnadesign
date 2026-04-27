@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/artifacts.py
 
 Artifact paths and persistence helpers for explicit and solve snapback runs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

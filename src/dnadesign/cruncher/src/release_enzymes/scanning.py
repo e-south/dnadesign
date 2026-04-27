@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/release_enzymes/scanning.py
 
 Recognition-site scanning helpers for release enzymes.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

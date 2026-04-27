@@ -52,6 +52,7 @@ def build_search_report(
             nick_catalog_source=nick_catalog_source,
             release_catalog_source=release_catalog_source,
             disallowed_nickase_warning_codes=list(request.search.disallowed_nickase_warning_codes),
+            allowed_release_variant_ids=list(request.search.allowed_release_variant_ids),
             allowed_active_strands=list(request.search.allowed_active_strands),
             allowed_route_families=list(request.search.allowed_route_families),
             evaluated_pair_count=evaluated_pair_count,

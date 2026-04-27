@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_projection_models.py
 
 Projection and final-candidate contracts for released-product snapback.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

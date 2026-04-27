@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/catalog_sources.py
 
 Shared source-label helpers for snapback catalog resolution.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

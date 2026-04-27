@@ -147,6 +147,10 @@ def _expected_released_summary_rows(report_payload: dict[str, Any]) -> list[dict
             int(projection["release_top_cut_precursor"]),
             int(projection["release_bottom_cut_precursor"]),
         )
+        upstream_retained_duplex_bp = min(
+            int(projection["retained_partner_length_nt"]),
+            int(candidate["nick_boundary_from_left"]),
+        )
         return [
             {
                 "status": str(report_payload["status"]),
@@ -160,6 +164,8 @@ def _expected_released_summary_rows(report_payload: dict[str, Any]) -> list[dict
                 "release_variant_id": str(release_event["variant_id"]),
                 "nick_boundary_from_left": str(candidate["nick_boundary_from_left"]),
                 "paired_bp": str(candidate["paired_bp"]),
+                "upstream_retained_duplex_bp": str(upstream_retained_duplex_bp),
+                "effective_stem_bp": str(upstream_retained_duplex_bp + int(candidate["paired_bp"])),
                 "cap_nt": str(candidate["cap_nt"]),
                 "active_product_input_length_nt": str(candidate["active_product_input_length_nt"]),
                 "active_product_length_nt": str(candidate["active_product_length_nt"]),

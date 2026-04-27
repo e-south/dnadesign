@@ -35,6 +35,7 @@ _ENTRY_METADATA_EXCLUDE = {
     "bottom_cut_offset",
     "source",
     "raw_cut_notation",
+    "raw_cut_offset_reference",
     "metadata",
     "recognition_sequence",
     "nicked_site_strand",
@@ -82,6 +83,17 @@ def _parse_raw_cut_notation(raw_notation: str) -> tuple[str, int | None, int | N
         raise NickaseCatalogError(f"Unsupported raw cut notation: {raw_notation!r}")
     motif, top_raw, bottom_raw = match.groups()
     return motif.upper(), _parse_cut_value(top_raw), _parse_cut_value(bottom_raw)
+
+
+def _normalize_raw_cut_offset_reference(raw_value: object) -> str | None:
+    if raw_value is None:
+        return None
+    value = str(raw_value or "").strip().lower()
+    if value not in {"motif_start", "motif_end"}:
+        raise NickaseCatalogError(
+            "CATALOG_ENTRY_NOT_NORMALIZABLE: raw_cut_offset_reference must be 'motif_start' or 'motif_end'."
+        )
+    return value
 
 
 def _normalize_metadata(entry: dict[str, Any]) -> dict[str, Any]:
@@ -216,6 +228,7 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
 
     selection = _normalize_selection(normalized)
     specificity_id = str(normalized.get("specificity_id") or normalized["id"]).strip()
+    raw_cut_offset_reference = _normalize_raw_cut_offset_reference(normalized.get("raw_cut_offset_reference"))
     top_cut_offset = normalized.get("top_cut_offset")
     bottom_cut_offset = normalized.get("bottom_cut_offset")
     if raw_cut_notation is not None:
@@ -226,7 +239,10 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
             )
         top_cut_offset = parsed_top
         bottom_cut_offset = parsed_bottom
-        if selection is not None and selection.get("outside_site") is True:
+        motif_end_reference = raw_cut_offset_reference == "motif_end" or (
+            raw_cut_offset_reference is None and selection is not None and selection.get("outside_site") is True
+        )
+        if motif_end_reference:
             motif_len = len(str(canonical_motif).strip())
             if top_cut_offset is not None and top_cut_offset >= 0:
                 top_cut_offset += motif_len
@@ -291,6 +307,7 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "selection": selection,
         "operational": operational,
         "raw_cut_notation": raw_cut_notation,
+        "raw_cut_offset_reference": raw_cut_offset_reference,
         "metadata": metadata,
     }
 

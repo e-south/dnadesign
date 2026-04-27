@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/target_models.py
 
 Contracts for target-first snapback catalog search.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

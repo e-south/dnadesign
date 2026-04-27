@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/released_snapback/test_released_solve_helpers.py
 
 Focused helper tests for released-product Snapback solve seams.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -170,5 +170,6 @@ def test_build_released_solve_report_preserves_route_policy_and_counts(tmp_path:
     assert report.metadata.selected_hit_kind == "exact"
     assert report.metadata.materialized_hit_count == 1
     assert report.metadata.available_exact_hit_count == search_report.metadata.pre_truncation_exact_hit_count
+    assert report.metadata.allowed_release_variant_ids == list(request.search.allowed_release_variant_ids)
     assert report.metadata.allowed_route_families == list(request.search.allowed_route_families)
     assert report.metadata.allowed_active_strands == list(request.search.allowed_active_strands)

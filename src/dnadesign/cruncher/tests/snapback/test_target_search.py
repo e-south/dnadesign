@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/snapback/test_target_search.py
 
 Target-first snapback catalog search tests.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -37,13 +37,14 @@ def test_run_snapback_target_search_finds_exact_origin_hit_and_later_near_hits(t
 
     assert report.status == "exact_hits_found"
     assert report.metadata.exact_hit_count >= 1
-    assert report.exact_hits[0].variant_id == "Nt.CviPII"
+    assert report.exact_hits[0].variant_id == "Nb.BsrDI"
     assert report.exact_hits[0].nick_boundary_from_left == 0
     assert report.exact_hits[0].paired_bp == 3
     assert report.exact_hits[0].cap_nt == 3
     assert report.exact_hits[0].input_length_nt == 6
     assert report.exact_hits[0].site_mutation_count == 0
-    assert report.exact_hits[0].intended_site_sequence in {"CCA", "CCG", "CCT"}
+    assert report.exact_hits[0].intended_site_sequence == "CATTGC"
+    assert {hit.variant_id for hit in report.exact_hits} == {"Nb.BsrDI", "Nb.BtsI", "Nt.CviPII"}
 
     near_boundaries = {(hit.variant_id, hit.nick_boundary_from_left) for hit in report.near_hits}
     assert ("Nt.Bpu10I", 2) in near_boundaries

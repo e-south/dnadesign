@@ -70,6 +70,16 @@ def search_released_target_hits(
             target=request.target,
             active_strand=active_strand,
         )
+        allowed_release_variant_ids = set(request.search.allowed_release_variant_ids)
+        if allowed_release_variant_ids:
+            filtered_release_placements = [
+                placement
+                for placement in route_release_placements
+                if placement.entry.variant_id in allowed_release_variant_ids
+            ]
+            for _index in range(len(route_release_placements) - len(filtered_release_placements)):
+                blocker_fn(blocker_counts, "RELEASE_VARIANT_FILTERED")
+            route_release_placements = filtered_release_placements
         for nick_placement in route_nick_placements:
             for release_placement in route_release_placements:
                 if not request.search.allow_demo_hits and (

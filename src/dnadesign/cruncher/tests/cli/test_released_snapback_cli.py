@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/cli/test_released_snapback_cli.py
 
 CLI contract tests for released-product snapback commands.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -118,6 +118,7 @@ def test_snapback_help_includes_released_product_commands() -> None:
     result = runner.invoke(app, ["snapback", "--help"], color=False)
 
     assert result.exit_code == 0
+    assert "screen" in result.output
     assert "released-design" in result.output
     assert "released-target-search" in result.output
     assert "released-solve" in result.output
@@ -207,6 +208,38 @@ def test_released_target_search_json_reports_route_policy_when_top_active_routes
         "bottom_active_from_top_nick",
         "top_active_from_bottom_nick",
     ]
+
+
+def test_snapback_screen_json_reports_study_semantics(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspaces" / "de033"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "snapback",
+            "screen",
+            "--workspace-root",
+            str(workspace),
+            "--max-results",
+            "16",
+            "--json",
+        ],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["kind"] == "snapback_screen_report_v1"
+    assert payload["status"] == "exact_hits_found"
+    assert payload["target_topology"]["logical_origin"] == 0
+    assert payload["target_topology"]["stem_bp"] == 3
+    assert payload["target_topology"]["cap_nt"] == 3
+    assert payload["target_topology"]["retained_product_strands"] == ["top", "bottom"]
+    assert payload["search_report"]["metadata"]["allowed_release_variant_ids"] == ["BspQI"]
+    ledger_ids = {entry["nickase_variant_id"] for entry in payload["mechanism_ledger"]}
+    assert ledger_ids == {"Nt.BstNBI", "Nt.AlwI", "Nt.BsmAI", "Nb.BsrDI", "Nb.BtsI"}
+    assert {entry["release_variant_id"] for entry in payload["mechanism_ledger"]} == {"BspQI"}
 
 
 def test_released_target_search_requires_explicit_sources(tmp_path: Path) -> None:

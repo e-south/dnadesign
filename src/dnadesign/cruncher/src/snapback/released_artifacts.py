@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_artifacts.py
 
 Artifact paths and persistence helpers for released-product snapback bundles.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -39,6 +39,8 @@ RELEASED_SUMMARY_FIELDNAMES = [
     "release_variant_id",
     "nick_boundary_from_left",
     "paired_bp",
+    "upstream_retained_duplex_bp",
+    "effective_stem_bp",
     "cap_nt",
     "active_product_input_length_nt",
     "active_product_length_nt",
@@ -59,6 +61,8 @@ RELEASED_SOLVE_SUMMARY_FIELDNAMES = [
     "release_variant_id",
     "nick_boundary_from_left",
     "paired_bp",
+    "upstream_retained_duplex_bp",
+    "effective_stem_bp",
     "cap_nt",
     "active_product_input_length_nt",
     "active_product_length_nt",
@@ -308,6 +312,14 @@ def write_released_summary_table(run_dir: Path, report: ReleasedSnapbackEvaluati
                 "release_variant_id": report.release_event.variant_id,
                 "nick_boundary_from_left": report.candidate.nick_boundary_from_left,
                 "paired_bp": report.candidate.paired_bp,
+                "upstream_retained_duplex_bp": min(
+                    report.projection.retained_partner_length_nt,
+                    report.candidate.nick_boundary_from_left,
+                ),
+                "effective_stem_bp": (
+                    min(report.projection.retained_partner_length_nt, report.candidate.nick_boundary_from_left)
+                    + report.candidate.paired_bp
+                ),
                 "cap_nt": report.candidate.cap_nt,
                 "active_product_input_length_nt": report.candidate.active_product_input_length_nt,
                 "active_product_length_nt": report.candidate.active_product_length_nt,
@@ -354,6 +366,8 @@ def write_released_solve_summary_table(run_dir: Path, report: ReleasedSolveRepor
                     "release_variant_id": hit.release_variant_id,
                     "nick_boundary_from_left": target_hit.nick_boundary_from_left,
                     "paired_bp": target_hit.final_candidate.paired_bp,
+                    "upstream_retained_duplex_bp": target_hit.upstream_retained_duplex_bp,
+                    "effective_stem_bp": target_hit.effective_stem_bp,
                     "cap_nt": target_hit.final_candidate.cap_nt,
                     "active_product_input_length_nt": target_hit.active_product_input_length_nt,
                     "active_product_length_nt": target_hit.active_product_length_nt,

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/snapback_target_search_workflow.py
 
 Application orchestration for target-first snapback catalog search.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
