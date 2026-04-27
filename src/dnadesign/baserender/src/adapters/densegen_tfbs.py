@@ -135,6 +135,8 @@ class DensegenTfbsAdapter:
     ) -> tuple[list[Feature], list[dict[str, Any]]]:
         if obj is None:
             return ([], [])
+        if hasattr(obj, "tolist") and not isinstance(obj, (str, bytes, bytearray)):
+            obj = obj.tolist()
         if isinstance(obj, str):
             try:
                 obj = json.loads(obj)
@@ -398,14 +400,15 @@ class DensegenTfbsAdapter:
                     render={"priority": 8, "track": track},
                 )
             )
-            effects.append(
-                Effect(
-                    kind="span_link",
-                    target={"from_feature_id": upstream_feature_id, "to_feature_id": downstream_feature_id},
-                    params={"label": f"{spacer_bp} bp", "lane": "top"},
-                    render={"priority": 8, "track": track},
+            if spacer_bp > 0:
+                effects.append(
+                    Effect(
+                        kind="span_link",
+                        target={"from_feature_id": upstream_feature_id, "to_feature_id": downstream_feature_id},
+                        params={"label": f"{spacer_bp} bp", "lane": "top"},
+                        render={"priority": 8, "track": track},
+                    )
                 )
-            )
         return features, effects, labels
 
     def _parse_promoter_detail(
@@ -556,20 +559,21 @@ class DensegenTfbsAdapter:
                     render={"priority": 8, "track": placement_track},
                 )
             )
-            promoter_effects.append(
-                Effect(
-                    kind="span_link",
-                    target={
-                        "from_feature_id": upstream_feature_id,
-                        "to_feature_id": downstream_feature_id,
-                    },
-                    params={
-                        "label": f"{spacer_bp} bp",
-                        "lane": "top",
-                    },
-                    render={"priority": 8, "track": placement_track},
+            if spacer_bp > 0:
+                promoter_effects.append(
+                    Effect(
+                        kind="span_link",
+                        target={
+                            "from_feature_id": upstream_feature_id,
+                            "to_feature_id": downstream_feature_id,
+                        },
+                        params={
+                            "label": f"{spacer_bp} bp",
+                            "lane": "top",
+                        },
+                        render={"priority": 8, "track": placement_track},
+                    )
                 )
-            )
 
         return (promoter_features, promoter_effects, promoter_labels)
 

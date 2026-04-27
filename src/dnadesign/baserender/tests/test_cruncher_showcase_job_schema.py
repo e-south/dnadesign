@@ -196,6 +196,45 @@ def test_video_output_rejects_conflicting_explicit_size_and_aspect_ratio(tmp_pat
         load_cruncher_showcase_job(job_path)
 
 
+def test_video_output_content_fit_accepts_fill_width_mode(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[
+            {
+                "kind": "video",
+                "fmt": "mp4",
+                "content_fit": "fill_width",
+            }
+        ],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    job = load_cruncher_showcase_job(job_path)
+
+    assert job.outputs[0].content_fit == "fill_width"
+
+
+def test_video_output_content_fit_rejects_unknown_mode(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[
+            {
+                "kind": "video",
+                "fmt": "mp4",
+                "content_fit": "stretch",
+            }
+        ],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="outputs\\[0\\].content_fit"):
+        load_cruncher_showcase_job(job_path)
+
+
 @pytest.mark.parametrize(
     ("mutate", "match"),
     [

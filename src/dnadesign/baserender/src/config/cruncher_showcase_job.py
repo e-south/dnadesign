@@ -114,6 +114,7 @@ class VideoOutputCfg:
     height_px: int | None
     aspect_ratio: float | None
     total_duration: float | None
+    content_fit: str = "native"
     title_text: str | None = None
     title_font_size: int | None = None
     title_align: str = "center"
@@ -749,6 +750,7 @@ def _parse_outputs(
                 "height_px",
                 "aspect",
                 "total_duration",
+                "content_fit",
                 "title_text",
                 "title_font_size",
                 "title_align",
@@ -800,6 +802,9 @@ def _parse_outputs(
         if total_duration is not None:
             ensure(total_duration > 0, f"outputs[{i}].total_duration must be > 0", SchemaError)
 
+        content_fit = str(data.get("content_fit", "native")).strip().lower()
+        require_one_of(content_fit, {"native", "fill_width"}, f"outputs[{i}].content_fit")
+
         title_text_raw = data.get("title_text")
         title_text = None if title_text_raw is None else str(title_text_raw).strip()
         if title_text == "":
@@ -838,6 +843,7 @@ def _parse_outputs(
                 height_px=height_px,
                 aspect_ratio=aspect_ratio,
                 total_duration=total_duration,
+                content_fit=content_fit,
                 title_text=title_text,
                 title_font_size=title_font_size,
                 title_align=title_align,

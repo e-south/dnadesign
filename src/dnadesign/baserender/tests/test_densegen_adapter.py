@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 from matplotlib.patches import FancyBboxPatch, PathPatch
 
@@ -602,6 +603,94 @@ def test_densegen_adapter_emits_promoter_spacer_effect_with_shared_track() -> No
     fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
     assert fig is not None
     plt.close(fig)
+
+
+def test_densegen_adapter_omits_span_link_for_zero_spacer_fixed_elements() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAACCCCGGGGTTTT",
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "fixed_element",
+                "constraint_name": "alpha_anchor",
+                "role": "upstream",
+                "sequence": "CCCC",
+                "offset_raw": 4,
+                "length": 4,
+                "spacer_length": 0,
+            },
+            {
+                "part_kind": "fixed_element",
+                "constraint_name": "alpha_anchor",
+                "role": "downstream",
+                "sequence": "GGGG",
+                "offset_raw": 8,
+                "length": 4,
+                "spacer_length": 0,
+            },
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+
+    promoter_features = [feature for feature in record.features if feature.attrs.get("source") == "densegen_promoter"]
+    assert len(promoter_features) == 2
+    assert record.effects == ()
+
+
+def test_densegen_adapter_accepts_ndarray_annotation_payloads() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAACCCCAAAAAAGGGGTTTT",
+        "densegen__used_tfbs_detail": np.array(
+            [
+                {
+                    "part_kind": "fixed_element",
+                    "constraint_name": "alpha_anchor",
+                    "role": "upstream",
+                    "sequence": "CCCC",
+                    "offset_raw": 4,
+                    "length": 4,
+                    "spacer_length": 6,
+                },
+                {
+                    "part_kind": "fixed_element",
+                    "constraint_name": "alpha_anchor",
+                    "role": "downstream",
+                    "sequence": "GGGG",
+                    "offset_raw": 14,
+                    "length": 4,
+                    "spacer_length": 6,
+                },
+            ],
+            dtype=object,
+        ),
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+
+    assert len(record.features) == 2
+    assert len(record.effects) == 1
+    assert record.effects[0].kind == "span_link"
+    assert record.effects[0].params.get("label") == "6 bp"
 
 
 def test_densegen_adapter_promoter_spacer_length_mismatch_is_fatal() -> None:

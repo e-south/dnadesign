@@ -54,6 +54,7 @@ class PlotVideoSamplingConfig(BaseModel):
     stride: int = 5
     max_source_rows: int = 20_000
     max_snapshots: int = 140
+    plan_snapshots: Dict[str, int] = Field(default_factory=dict)
 
     @field_validator("stride")
     @classmethod
@@ -75,6 +76,26 @@ class PlotVideoSamplingConfig(BaseModel):
         if not isinstance(value, int) or value < 1:
             raise ValueError("plots.video.sampling.max_snapshots must be >= 1")
         return int(value)
+
+    @field_validator("plan_snapshots")
+    @classmethod
+    def _plan_snapshots_ok(cls, value: Dict[str, int]) -> Dict[str, int]:
+        normalized: dict[str, int] = {}
+        for raw_name, raw_count in dict(value or {}).items():
+            name = str(raw_name).strip()
+            if not name:
+                raise ValueError("plots.video.sampling.plan_snapshots keys must be non-empty plan names")
+            if not isinstance(raw_count, int) or raw_count < 1:
+                raise ValueError("plots.video.sampling.plan_snapshots values must be positive integers")
+            normalized[name] = int(raw_count)
+        return normalized
+
+    @model_validator(mode="after")
+    def _plan_snapshot_budget_ok(self) -> "PlotVideoSamplingConfig":
+        requested = sum(int(value) for value in self.plan_snapshots.values())
+        if requested > int(self.max_snapshots):
+            raise ValueError("plots.video.sampling.plan_snapshots total must be <= plots.video.sampling.max_snapshots")
+        return self
 
 
 class PlotVideoPlaybackConfig(BaseModel):
@@ -123,9 +144,53 @@ class PlotVideoLimitsConfig(BaseModel):
         return seconds
 
 
+class PlotVideoPresentationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    palette: Dict[str, str] = Field(default_factory=dict)
+    legend_font_size: Optional[int] = None
+    legend_height_px: Optional[float] = None
+
+    @field_validator("palette")
+    @classmethod
+    def _palette_ok(cls, value: Dict[str, str]) -> Dict[str, str]:
+        normalized: dict[str, str] = {}
+        for raw_tag, raw_color in dict(value or {}).items():
+            tag = str(raw_tag).strip()
+            color = str(raw_color).strip()
+            if not tag:
+                raise ValueError("plots.video.presentation.palette keys must be non-empty tags")
+            if not color:
+                raise ValueError("plots.video.presentation.palette values must be non-empty color strings")
+            normalized[tag] = color
+        return normalized
+
+    @field_validator("legend_font_size")
+    @classmethod
+    def _legend_font_size_ok(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return None
+        if not isinstance(value, int) or int(value) < 8 or int(value) > 48:
+            raise ValueError("plots.video.presentation.legend_font_size must be between 8 and 48")
+        return int(value)
+
+    @field_validator("legend_height_px")
+    @classmethod
+    def _legend_height_px_ok(cls, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        if not isinstance(value, (int, float)):
+            raise ValueError("plots.video.presentation.legend_height_px must be numeric")
+        height = float(value)
+        if height < 0.0 or height > 400.0:
+            raise ValueError("plots.video.presentation.legend_height_px must be between 0 and 400")
+        return height
+
+
 class PlotVideoConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
+    show_title: bool = True
+    show_subtitle: bool = True
     mode: Literal["all_plans_round_robin_single_video", "single_plan_single_video"] = (
         "all_plans_round_robin_single_video"
     )
@@ -134,6 +199,7 @@ class PlotVideoConfig(BaseModel):
     sampling: PlotVideoSamplingConfig = Field(default_factory=PlotVideoSamplingConfig)
     playback: PlotVideoPlaybackConfig = Field(default_factory=PlotVideoPlaybackConfig)
     limits: PlotVideoLimitsConfig = Field(default_factory=PlotVideoLimitsConfig)
+    presentation: PlotVideoPresentationConfig = Field(default_factory=PlotVideoPresentationConfig)
 
     @field_validator("output_name")
     @classmethod

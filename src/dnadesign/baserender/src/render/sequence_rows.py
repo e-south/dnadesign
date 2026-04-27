@@ -34,6 +34,24 @@ from .effects.registry import draw_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
 
+_NEAR_FEATURE_ANNOTATION_SOURCES = frozenset(
+    {
+        "densegen_promoter",
+        "usr_genbank",
+        "usr_genbank_promoter",
+    }
+)
+
+
+def _feature_source(feature) -> str:
+    return str(feature.attrs.get("source", "")).strip().lower()
+
+
+def _uses_near_feature_annotation_label(feature) -> bool:
+    if _feature_source(feature) not in _NEAR_FEATURE_ANNOTATION_SOURCES:
+        return False
+    return str(feature.attrs.get("display_label", "")).strip() != ""
+
 
 @dataclass(frozen=True)
 class SequenceRowsRenderer:
@@ -209,17 +227,15 @@ class SequenceRowsRenderer:
             _draw_coordinate_ticks(ax, record, layout, style)
 
         feature_boxes = dict(layout.feature_boxes)
-        promoter_source = "densegen_promoter"
         feature_box_pad = float(style.kmer.pad_x_px)
-        promoter_feature_boxes: list[tuple[float, float, float, float]] = []
+        near_annotation_feature_boxes: list[tuple[float, float, float, float]] = []
         for placement in layout.placements:
             feature = record.features[placement.feature_index]
-            source = str(feature.attrs.get("source", "")).strip().lower()
-            if source != promoter_source:
+            if not _uses_near_feature_annotation_label(feature):
                 continue
             x0 = placement.x - feature_box_pad
             x1 = placement.x + placement.w + feature_box_pad
-            promoter_feature_boxes.append(
+            near_annotation_feature_boxes.append(
                 (
                     x0,
                     placement.y - placement.h / 2.0,
@@ -236,7 +252,6 @@ class SequenceRowsRenderer:
             label = feature.label or ""
             if not placement.above and feature.kind != "interval_annotation":
                 label = label[::-1]
-            source = str(feature.attrs.get("source", "")).strip().lower()
             placement_box = (
                 placement.x - feature_box_pad,
                 placement.y - placement.h / 2.0,
@@ -244,23 +259,39 @@ class SequenceRowsRenderer:
                 placement.y + placement.h / 2.0,
             )
             draw_label = True
-            if source != promoter_source and any(
-                _boxes_overlap(placement_box, promoter_box) for promoter_box in promoter_feature_boxes
+            if not _uses_near_feature_annotation_label(feature) and any(
+                _boxes_overlap(placement_box, annotation_box) for annotation_box in near_annotation_feature_boxes
             ):
                 draw_label = False
-            _draw_feature_box(
-                ax,
-                placement.x,
-                placement.y,
-                placement.w,
-                placement.h,
-                label,
-                color,
-                style,
-                cw=layout.cw,
-                ch=layout.ch,
-                draw_label=draw_label,
-            )
+            if (
+                feature.kind == "interval_annotation"
+                and str(feature.attrs.get("shape", "")).strip().lower() == "underline"
+            ):
+                _draw_interval_underline(
+                    ax,
+                    placement.x,
+                    placement.y,
+                    placement.w,
+                    placement.h,
+                    label,
+                    color,
+                    style,
+                    draw_label=True,
+                )
+            else:
+                _draw_feature_box(
+                    ax,
+                    placement.x,
+                    placement.y,
+                    placement.w,
+                    placement.h,
+                    label,
+                    color,
+                    style,
+                    cw=layout.cw,
+                    ch=layout.ch,
+                    draw_label=draw_label,
+                )
 
             feature_boxes[placement.feature_id] = (
                 placement.x,
@@ -634,35 +665,102 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
         y1 = float(y_anchor) + float(text_h) / 2.0
         return (x0, y0, x1, y1)
 
-    for placement in layout.placements:
-        feature = record.features[placement.feature_index]
-        source = str(feature.attrs.get("source", "")).strip().lower()
-        if source != "densegen_promoter":
-            continue
+    placement_by_id = {placement.feature_id: placement for placement in layout.placements}
+    force_baseline_label_ids: set[str] = set()
 
+    def _annotation_label_geometry(
+        placement,
+    ) -> tuple[str, float, float, float, float, float, float, float] | None:
+        feature = record.features[placement.feature_index]
+        if not _uses_near_feature_annotation_label(feature):
+            return None
         tag = feature.tags[0] if feature.tags else feature.kind
         fallback = tag.split(":")[-1] if ":" in tag else tag
         feature_display_label = feature.attrs.get("display_label")
         raw_label = str(feature_display_label or labels.get(tag, fallback))
         text = _compact_fixed_element_annotation_label(raw_label)
         if not text:
-            continue
-
+            return None
         text_size = _fixed_element_annotation_font_size(style)
         text_w = _text_px_width(text, style.font_label, text_size, style.dpi)
         text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi))
-
         center_x = placement.x + placement.w / 2.0
         top_gap = max(4.0, feature_box_pad + text_h * 0.25)
         top_y = placement.y + placement.h / 2.0 + top_gap + text_h / 2.0
         right_x = placement.x + placement.w + margin
         left_x = placement.x - margin
+        return text, text_size, text_w, text_h, center_x, top_y, right_x, left_x
 
-        candidates = (
-            (center_x, top_y, "center"),
-            (right_x, placement.y, "left"),
-            (left_x, placement.y, "right"),
-        )
+    def _candidate_fits(
+        bbox: tuple[float, float, float, float],
+        *,
+        occupied: Sequence[tuple[float, float, float, float]],
+    ) -> bool:
+        if bbox[0] < x_min or bbox[2] > x_max:
+            return False
+        if bbox[1] < 0.0 or bbox[3] > float(layout.height):
+            return False
+        return not any(_boxes_overlap(bbox, occupied_box) for occupied_box in occupied)
+
+    for effect in record.effects:
+        if effect.kind != "span_link":
+            continue
+        from_id = effect.target.get("from_feature_id")
+        to_id = effect.target.get("to_feature_id")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            continue
+        from_placement = placement_by_id.get(from_id)
+        to_placement = placement_by_id.get(to_id)
+        if from_placement is None or to_placement is None:
+            continue
+        endpoint_bboxes: list[tuple[float, float, float, float]] = []
+        can_place_both_above = True
+        for endpoint in (from_placement, to_placement):
+            geometry = _annotation_label_geometry(endpoint)
+            if geometry is None:
+                can_place_both_above = False
+                break
+            _text, _text_size, text_w, text_h, center_x, top_y, _right_x, _left_x = geometry
+            bbox = _candidate_box(
+                x_anchor=center_x,
+                y_anchor=top_y,
+                ha="center",
+                text_w=text_w,
+                text_h=text_h,
+            )
+            if not _candidate_fits(bbox, occupied=occupied_boxes):
+                can_place_both_above = False
+                break
+            if any(_boxes_overlap(bbox, existing) for existing in endpoint_bboxes):
+                can_place_both_above = False
+                break
+            endpoint_bboxes.append(bbox)
+        if not can_place_both_above:
+            force_baseline_label_ids.update({from_id, to_id})
+
+    for placement in layout.placements:
+        feature = record.features[placement.feature_index]
+        if not _uses_near_feature_annotation_label(feature):
+            continue
+
+        tag = feature.tags[0] if feature.tags else feature.kind
+        geometry = _annotation_label_geometry(placement)
+        if geometry is None:
+            continue
+        text, text_size, text_w, text_h, center_x, top_y, right_x, left_x = geometry
+
+        if placement.feature_id in force_baseline_label_ids:
+            candidates = (
+                (right_x, placement.y, "left"),
+                (left_x, placement.y, "right"),
+                (center_x, top_y, "center"),
+            )
+        else:
+            candidates = (
+                (center_x, top_y, "center"),
+                (right_x, placement.y, "left"),
+                (left_x, placement.y, "right"),
+            )
 
         selected: tuple[float, float, str, tuple[float, float, float, float]] | None = None
         for x_anchor, y_anchor, ha in candidates:
@@ -1520,6 +1618,62 @@ def _draw_feature_box(
                 clip_on=False,
             )
         )
+
+
+def _draw_interval_underline(
+    ax,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    label: str,
+    color,
+    style: Style,
+    *,
+    draw_label: bool = True,
+) -> None:
+    pad_x = float(style.kmer.pad_x_px)
+    x0 = float(x) - pad_x
+    x1 = float(x) + float(w) + pad_x
+    line_y = float(y) - max(2.0, float(h) * 0.24)
+    tick_h = max(3.0, float(h) * 0.12)
+    ax.plot(
+        [x0, x1],
+        [line_y, line_y],
+        color=color,
+        alpha=0.85,
+        lw=max(1.4, float(style.kmer.edge_width) * 2.0),
+        solid_capstyle="round",
+        zorder=3.15,
+        clip_on=False,
+    )
+    ax.plot([x0, x0], [line_y - tick_h, line_y + tick_h], color=color, alpha=0.7, lw=1.0, zorder=3.1, clip_on=False)
+    ax.plot([x1, x1], [line_y - tick_h, line_y + tick_h], color=color, alpha=0.7, lw=1.0, zorder=3.1, clip_on=False)
+
+    if not draw_label or not label:
+        return
+    font_size = max(6, min(int(style.legend_font_size), int(style.font_size_label)))
+    text = str(label).strip()
+    text_w = _text_px_width(text, style.font_label, font_size, style.dpi)
+    available = max(0.0, x1 - x0)
+    if text_w <= max(8.0, available - 8.0):
+        text_x = x0 + 4.0
+        ha = "left"
+    else:
+        text_x = (x0 + x1) / 2.0
+        ha = "center"
+    ax.text(
+        text_x,
+        line_y + max(3.0, float(h) * 0.08),
+        text,
+        ha=ha,
+        va="bottom",
+        fontsize=font_size,
+        family=style.font_label,
+        color=_darken_rgb(color, factor=0.72),
+        zorder=6.1,
+        clip_on=False,
+    )
 
 
 def _draw_motif_scale_bar(

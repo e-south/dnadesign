@@ -48,16 +48,20 @@ def _attach_video_display_metadata(
     frame: pd.DataFrame,
     *,
     workspace_name: str | None,
+    show_subtitle: bool = True,
 ) -> tuple[pd.DataFrame, str]:
     enriched = frame.copy()
-    enriched[_VIDEO_SUBTITLE_COLUMN] = [
-        densegen_video_subtitle_text(record_id=record_id, plan_name=plan_name)
-        for record_id, plan_name in zip(
-            enriched["id"].astype(str).tolist(),
-            enriched["densegen__plan"].astype(str).tolist(),
-            strict=True,
-        )
-    ]
+    if show_subtitle:
+        enriched[_VIDEO_SUBTITLE_COLUMN] = [
+            densegen_video_subtitle_text(record_id=record_id, plan_name=plan_name)
+            for record_id, plan_name in zip(
+                enriched["id"].astype(str).tolist(),
+                enriched["densegen__plan"].astype(str).tolist(),
+                strict=True,
+            )
+        ]
+    else:
+        enriched[_VIDEO_SUBTITLE_COLUMN] = ""
     workspace_title = densegen_baserender_title_text(workspace_name=str(workspace_name or "").strip())
     return enriched, workspace_title
 
@@ -114,9 +118,14 @@ def plot_dense_array_video_showcase(
         stride=int(video_cfg.sampling.stride),
         max_source_rows=int(video_cfg.sampling.max_source_rows),
         max_snapshots=snapshot_cap,
+        plan_snapshot_counts=dict(video_cfg.sampling.plan_snapshots or {}),
     )
     sampled = encode_video_source_annotations(sampled)
-    sampled, workspace_title = _attach_video_display_metadata(sampled, workspace_name=workspace_name)
+    sampled, workspace_title = _attach_video_display_metadata(
+        sampled,
+        workspace_name=workspace_name,
+        show_subtitle=bool(video_cfg.show_subtitle),
+    )
     if len(sampled) > target_total_frames:
         raise ValueError(
             "Dense-array video snapshot count exceeds playback frame budget; "
@@ -132,11 +141,21 @@ def plot_dense_array_video_showcase(
     out_file = _output_path(out_path, video_cfg=video_cfg)
     out_file.parent.mkdir(parents=True, exist_ok=True)
     contract = densegen_notebook_render_contract()
+    style_overrides = dict(contract.style_overrides)
+    presentation = video_cfg.presentation
+    if presentation.palette:
+        palette = dict(style_overrides.get("palette") or {})
+        palette.update(dict(presentation.palette))
+        style_overrides["palette"] = palette
+    if presentation.legend_font_size is not None:
+        style_overrides["legend_font_size"] = int(presentation.legend_font_size)
+    if presentation.legend_height_px is not None:
+        style_overrides["legend_height_px"] = float(presentation.legend_height_px)
     title_font_size = int(
         max(
-            contract.style_overrides.get("font_size_seq", 18),
-            contract.style_overrides.get("font_size_label", 18),
-            contract.style_overrides.get("legend_font_size", 18),
+            style_overrides.get("font_size_seq", 18),
+            style_overrides.get("font_size_label", 18),
+            style_overrides.get("legend_font_size", 18),
         )
     )
     with tempfile.TemporaryDirectory(prefix="dense-video-", dir=str(out_path.parent)) as tmpdir:
@@ -144,7 +163,12 @@ def plot_dense_array_video_showcase(
         records_path = tmp_root / "records.parquet"
         selection_path = tmp_root / "selection.csv"
         sampled.to_parquet(records_path, index=False, engine="pyarrow")
-        _write_selection_csv(selection_path, ids=[str(item) for item in sampled["id"].astype(str).tolist()])
+        if bool(video_cfg.show_subtitle):
+            _write_selection_csv(selection_path, ids=[str(item) for item in sampled["id"].astype(str).tolist()])
+
+        adapter_columns = dict(contract.adapter_columns)
+        if bool(video_cfg.show_subtitle):
+            adapter_columns["video_subtitle"] = _VIDEO_SUBTITLE_COLUMN
 
         job_mapping: dict[str, object] = {
             "version": 3,
@@ -153,26 +177,16 @@ def plot_dense_array_video_showcase(
                 "path": str(records_path),
                 "adapter": {
                     "kind": str(contract.adapter_kind),
-                    "columns": {
-                        **dict(contract.adapter_columns),
-                        "video_subtitle": _VIDEO_SUBTITLE_COLUMN,
-                    },
+                    "columns": adapter_columns,
                     "policies": dict(contract.adapter_policies),
                 },
                 "alphabet": "DNA",
-            },
-            "selection": {
-                "path": str(selection_path),
-                "match_on": "id",
-                "column": "id",
-                "keep_order": True,
-                "on_missing": "error",
             },
             "render": {
                 "renderer": "sequence_rows",
                 "style": {
                     "preset": str(contract.style_preset),
-                    "overrides": dict(contract.style_overrides),
+                    "overrides": style_overrides,
                 },
             },
             "outputs": [
@@ -183,12 +197,21 @@ def plot_dense_array_video_showcase(
                     "fps": int(video_cfg.playback.fps),
                     "frames_per_record": 1,
                     "total_duration": float(video_cfg.playback.target_duration_sec),
-                    "title_text": workspace_title,
+                    "content_fit": "fill_width" if not (video_cfg.show_title or video_cfg.show_subtitle) else "native",
+                    "title_text": workspace_title if bool(video_cfg.show_title) else None,
                     "title_font_size": title_font_size,
                 }
             ],
             "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
         }
+        if bool(video_cfg.show_subtitle):
+            job_mapping["selection"] = {
+                "path": str(selection_path),
+                "match_on": "id",
+                "column": "id",
+                "keep_order": True,
+                "on_missing": "error",
+            }
         if "densegen__promoter_detail" in sampled.columns:
             job_mapping["input"]["adapter"]["columns"]["promoter_detail"] = "densegen__promoter_detail"
         run_job(job_mapping, kind="sequence_rows_v3", caller_root=tmp_root)

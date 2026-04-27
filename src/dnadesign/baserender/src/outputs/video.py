@@ -89,6 +89,25 @@ def _scale_rgba_to_fit(arr, *, width: int, height: int):
     return resized
 
 
+def _scale_rgba_to_width(arr, *, width: int):
+    target_width = int(width)
+    if target_width <= 0:
+        raise SchemaError("Target frame width must be > 0")
+    h, w = arr.shape[:2]
+    if w <= 0 or h <= 0:
+        raise SchemaError("Rendered frame dimensions must be > 0")
+    if target_width == w:
+        return arr
+    scale = float(target_width) / float(w)
+    new_h = max(1, int(round(float(h) * scale)))
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover - pillow is required in runtime env
+        raise SchemaError("Pillow is required to scale video frames") from exc
+    image = Image.fromarray(arr, mode="RGBA")
+    return image.resize((target_width, new_h), resample=Image.Resampling.LANCZOS)
+
+
 def _letterbox_rgba(arr, *, width: int, height: int, vertical_align: str = "center"):
     h, w = arr.shape[:2]
     if width < w or height < h:
@@ -503,12 +522,14 @@ def write_video(
     dynamic_subtitle_enabled = any(subtitle_values)
     has_title = output.title_text is not None
     has_header_block = bool(has_title or dynamic_subtitle_enabled)
+    content_fit = str(getattr(output, "content_fit", "native")).strip().lower()
     # Sequence-row renders already include their own footer legend geometry. When
     # the video frame pins that content block to the bottom, the legend drifts to
     # the crop edge and picks up excess white space below the annotations.
-    frame_vertical_align = (
-        "center" if renderer_name == "sequence_rows" else ("bottom" if has_header_block else "center")
-    )
+    if renderer_name == "sequence_rows":
+        frame_vertical_align = "top" if content_fit == "fill_width" and not has_header_block else "center"
+    else:
+        frame_vertical_align = "bottom" if has_header_block else "center"
     frame_w, frame_h = _target_frame_size(natural_w=natural_w, natural_h=natural_h, output=output)
     can_expand_frame_height = output.height_px is None and output.aspect_ratio is None
     if has_header_block:
@@ -518,7 +539,7 @@ def write_video(
             reserve_scale = 0.82 if has_title and dynamic_subtitle_enabled else 0.56
             header_reserve_px = _even_ceil(int(round(float(style.dpi) * float(reserve_scale))))
             frame_h = max(int(frame_h), int(natural_h) + int(header_reserve_px))
-    rendered_content_scale = 0.96 if renderer_name == "sequence_rows" else 1.0
+    rendered_content_scale = 0.96 if (renderer_name == "sequence_rows" and content_fit != "fill_width") else 1.0
     rendered_content_top_norm = _rendered_content_top_norm_for_video_frame(
         frame_shapes=frame_shapes,
         content_bounds=content_bounds,
@@ -585,6 +606,7 @@ def write_video(
         title_size = int(output.title_font_size)
     else:
         title_size = max(12, header_font_size)
+    subtitle_size = max(8, header_font_size - 1)
 
     title_artist = None
     if output.title_text is not None:
@@ -615,7 +637,6 @@ def write_video(
         if bool(style.uniform_display_font_size):
             subtitle_size = int(title_size)
         else:
-            subtitle_size = max(8, header_font_size - 1)
             if title_artist is not None:
                 subtitle_size = min(subtitle_size, max(8, int(title_artist.get_fontsize()) - 1))
         subtitle_y = 0.985
@@ -890,10 +911,16 @@ def write_video(
                     left, top, right, bottom = stable_bounds
                     arr = arr[top : bottom + 1, left : right + 1, :]
 
+                if content_fit == "fill_width" and stable_bounds is None:
+                    arr = _trim_white_border_rgba(arr, pad_px=24)
+
                 if rendered_content_scale < 1.0:
                     scaled_width = max(1, int(round(float(arr.shape[1]) * float(rendered_content_scale))))
                     scaled_height = max(1, int(round(float(arr.shape[0]) * float(rendered_content_scale))))
                     arr = np.asarray(_scale_rgba_to_fit(arr, width=scaled_width, height=scaled_height))
+                if content_fit == "fill_width" and arr.shape[1] < frame_w:
+                    target_width = max(1, int(frame_w) - 48)
+                    arr = np.asarray(_scale_rgba_to_width(arr, width=target_width))
 
                 if (arr.shape[1], arr.shape[0]) != (frame_w, frame_h):
                     arr = _letterbox_rgba(arr, width=frame_w, height=frame_h, vertical_align=frame_vertical_align)
@@ -922,6 +949,7 @@ __all__ = [
     "_pause_frames",
     "_rendered_content_top_norm_for_video_frame",
     "_scale_rgba_to_fit",
+    "_scale_rgba_to_width",
     "_scaled_dimensions_to_fit",
     "_sequence_rows_actual_content_bounds_px",
     "_sequence_rows_content_envelope_norms",

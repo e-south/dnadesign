@@ -192,7 +192,9 @@ def _overlap(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
     return not (a_end <= b_start or b_end <= a_start)
 
 
-def _span_link_reservations_for_strand(record: Record, *, strand: str) -> tuple[tuple[int, int, int], ...]:
+def _span_link_reservations_for_strand(
+    record: Record, *, strand: str, endpoint_gap_bp: int = 0
+) -> tuple[tuple[int, int, int], ...]:
     if strand not in {"fwd", "rev"}:
         raise BoundsError(f"Unknown strand for span_link reservations: {strand!r}")
 
@@ -229,6 +231,9 @@ def _span_link_reservations_for_strand(record: Record, *, strand: str) -> tuple[
         else:
             start = int(right_feature.span.end)
             end = int(left_feature.span.start)
+        endpoint_gap = max(0, int(endpoint_gap_bp))
+        start += endpoint_gap
+        end -= endpoint_gap
         if end <= start:
             continue
         reservations.add((start, end, lane))
@@ -516,12 +521,12 @@ def compute_layout(
 
     up_tracks = assign_tracks(
         up_features,
-        reserved_intervals=_span_link_reservations_for_strand(record, strand="fwd"),
+        reserved_intervals=_span_link_reservations_for_strand(record, strand="fwd", endpoint_gap_bp=min_gap_bp),
         min_gap_bp=min_gap_bp,
     )
     dn_tracks = assign_tracks(
         dn_features,
-        reserved_intervals=_span_link_reservations_for_strand(record, strand="rev"),
+        reserved_intervals=_span_link_reservations_for_strand(record, strand="rev", endpoint_gap_bp=min_gap_bp),
         min_gap_bp=min_gap_bp,
     )
 
@@ -638,7 +643,8 @@ def compute_layout(
     content_top_extent = float(top_extent)
     content_bottom_extent = float(bottom_extent)
     if (
-        fixed_content_top_extent_px is None
+        bool(style.balance_content_radius)
+        and fixed_content_top_extent_px is None
         and fixed_content_bottom_extent_px is None
         and fixed_content_radius_px is None
     ):
@@ -669,10 +675,13 @@ def compute_layout(
     legend_space = (float(style.legend_height_px) + float(style.legend_pad_px)) if draw_bottom_legend else 0.0
     label_height = style.font_size_label / 72.0 * style.dpi
     header_margin = max(label_height * 0.9, ch * 0.55)
+    legend_content_gap = (
+        float(style.legend_content_gap_px) if style.legend_content_gap_px is not None else float(header_margin)
+    )
     extra_bottom = float(extra_bottom_padding_px)
     if not math.isfinite(extra_bottom) or extra_bottom < 0.0:
         raise BoundsError("extra_bottom_padding_px must be finite and >= 0")
-    desired_bottom = style.padding_y + outer_pad + legend_space + header_margin + extra_bottom
+    desired_bottom = style.padding_y + outer_pad + legend_space + legend_content_gap + extra_bottom
     shift = desired_bottom - content_bottom_raw
 
     shifted_placements: list[FeaturePlacement] = []
