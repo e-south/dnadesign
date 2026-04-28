@@ -510,7 +510,7 @@ def test_export_dnadesign_data_promoter_superset_records_all_sources_but_only_ba
     assert skipped["source_route"] == "regulondb_13_promoter_set"
     assert skipped["source_table"] == "PromoterSet.tsv"
     assert skipped["source_stratum"] == "local_release_pinned_curated"
-    assert skipped["promoter_id"] == "RDBECOLIPMC00002"
+    assert skipped["promoter_id"] == "PM2"
     assert skipped["promoter_name"] == "sequence_less"
     assert skipped["raw_sequence"] == "None"
     assert skipped["skip_reason"] == "missing_sequence"
