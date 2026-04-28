@@ -1682,13 +1682,11 @@ def test_promoter_study_status_reports_sequence_view_and_infer_completion_summar
                     "missing_vectors": 2,
                     "missing_products": 0,
                     "persisted_vector_reusable": 0,
-                    "legacy_digest_reusable": 1,
-                    "legacy_unclassified_vectors": 1,
                     "existing_aliases": 0,
                     "by_product_kind": {"realized_context": 4},
                     "by_orientation": {"forward": 2, "reverse_complement": 2},
                     "by_pooling_operation": {"anchor_mean": 4},
-                    "commands": {"construct_completion": [], "infer_backfill": [], "alias_backfill": []},
+                    "commands": {"construct_completion": [], "infer_backfill": []},
                 },
             )
 
@@ -1779,8 +1777,6 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
                         "missing_vectors": 2,
                         "missing_products": 0,
                         "persisted_vector_reusable": 0,
-                        "legacy_digest_reusable": 1,
-                        "legacy_unclassified_vectors": 1,
                         "existing_aliases": 0,
                         "by_product_kind": {"construct_insert": 2},
                         "by_orientation": {"forward": 2},
@@ -1788,7 +1784,6 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
                         "commands": {
                             "construct_completion": [],
                             "infer_backfill": ["uv run infer run --config config.yaml --job anchor_sequence_views_7b"],
-                            "alias_backfill": ["uv run infer aliases backfill --config config.yaml"],
                         },
                     }
                 ]
@@ -1817,8 +1812,6 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
         assert check["details"]["required_views"] == 2
         assert check["details"]["required_vectors"] == 4
         assert check["details"]["reusable_vectors"] == 1
-        assert check["details"]["legacy_digest_reusable"] == 1
-        assert check["details"]["legacy_unclassified_vectors"] == 1
         assert check["details"]["stale_vectors"] == 1
         assert check["details"]["missing_vectors"] == 2
         assert check["details"]["missing_products"] == 0

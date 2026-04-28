@@ -21,7 +21,7 @@ from typing import Sequence
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from dnadesign.usr import Dataset, overlay_parts
+from dnadesign.usr import Dataset, overlay_digest_ledger_path, overlay_parts
 
 from ..contracts import infer_usr_column_name
 from .aliases import load_feature_vector_keys
@@ -183,6 +183,7 @@ def retire_legacy_overlay_payloads(
                     delete_empty_parts=delete_empty_parts,
                 )
             )
+        _refresh_infer_overlay_ledgers(specs=specs)
         _log_retirement_events(
             specs=specs,
             candidate_columns=candidate_columns,
@@ -281,6 +282,7 @@ def prune_stale_infer_overlay_columns(
                 )
             )
         if retired_parts:
+            _refresh_or_remove_overlay_ledger(dataset=dataset, namespace=str(namespace))
             _log_stale_column_prune_event(
                 dataset=dataset,
                 namespace=str(namespace),
@@ -399,6 +401,22 @@ def _required_keys_by_dataset(specs: list[dict[str, object]]) -> dict[tuple[str,
         dataset_key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
         out.setdefault(dataset_key, set()).add(str(spec["feature_vector_key"]))
     return out
+
+
+def _refresh_infer_overlay_ledgers(*, specs: list[dict[str, object]]) -> None:
+    dataset_keys = sorted({(str(spec["dataset_root"]), str(spec["dataset_id"])) for spec in specs})
+    for dataset_root, dataset_id in dataset_keys:
+        _refresh_or_remove_overlay_ledger(dataset=Dataset(Path(dataset_root), dataset_id), namespace="infer")
+
+
+def _refresh_or_remove_overlay_ledger(*, dataset: Dataset, namespace: str) -> None:
+    overlay_dir = dataset.dir / "_derived" / namespace
+    if overlay_parts(overlay_dir):
+        dataset.write_overlay_digest_ledger(namespace)
+        return
+    ledger_path = overlay_digest_ledger_path(overlay_dir)
+    if ledger_path is not None and ledger_path.exists():
+        ledger_path.unlink()
 
 
 def _plan_legacy_payload_retirement(

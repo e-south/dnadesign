@@ -83,24 +83,38 @@ Implemented in the current working tree:
   `biological_insert -> selected_region`, and
   `context1kb_* -> realized_context` plus explicit orientation.
 - Active study `_views/view_semantics.parquet` addenda have been materialized
-  for `472029` sequence views with `source_family`, `selection_basis`,
-  `view_collections`, and `role_tags`.
+  for `629213` source, handoff, and reference sequence views with
+  `source_family`, `selection_basis`, `view_collections`, and `role_tags`.
+- All present non-archived local USR datasets now have `_views/sequence_views.parquet`
+  and `_views/view_semantics.parquet`. Source-only datasets without richer
+  product semantics use generic `source_record` views with `orientation=unknown`
+  and `recommended_pooling=seq_mean`; domain-specific handoff/context/reference
+  datasets keep their existing product-specific views.
+- A generic source-record sidecar materializer exists at
+  `src/dnadesign/usr/scripts/materialize_source_record_sequence_views.py`.
+  It skips archived datasets, leaves existing domain-specific sidecars intact,
+  and drops non-unique human aliases before writing so batch-level labels cannot
+  violate the view-alias uniqueness contract.
 
 Still open:
 
-- Full active-study feature completion remains open after the safe legacy
-  migration slice: anchor and forward-context legacy-compatible vectors have
-  been sidecar-backfilled locally and their duplicated legacy embedding payload
-  columns have been retired from the row-overlay parts. New or previously
-  uncovered rows still require Infer execution.
-- The planner can prove digest-matching legacy overlays reusable, but it does
-  not yet prove sequence/model/pooling identity when legacy digest metadata is
-  absent or drifted.
+- Full active-study feature completion remains open after the safe migration
+  slice: anchor and forward-context compatible vectors have been sidecar-backed
+  locally and the active row-overlay Infer parts have been retired. New or
+  previously uncovered rows still require Infer execution.
+- Evo2 execution is explicitly deferred in this local environment because this
+  device is not the target Infer runtime. The remaining feature work must be
+  run later in an appropriate batch environment from the modern sequence-view
+  configs.
 - Dataset-local `_views/*` and `_derived/infer/*` sidecars are current in this
   checkout, but they remain generated artifacts. Another checkout still needs
   USR sync/publish handling before assuming the migrated product names,
   recomputed `view_id` values, semantic addenda, and feature alias/vector
   sidecars are present.
+- SCC/remote parity for the newly materialized source-record sidecars still
+  needs the normal USR sync audit after this branch is committed, pushed, and
+  merged through CI. Do not SSH into SCC from this local migration pass because
+  the SCC checkout is stale.
 - Notify profile/runbook execution still needs operator environment setup
   (`NOTIFY_WEBHOOK` or `NOTIFY_WEBHOOK_FILE`, TLS certificate path, and
   file-backed secrets) before next-run preflight is submit-ready.
@@ -125,13 +139,11 @@ Latest audit delta:
   vectors, `157509` missing main 7B vectors, and `144` missing reference 7B
   vectors. The remaining main work is `115` anchor vectors, `115`
   forward-context vectors, and `157279` reverse-complement context vectors.
-- Duplicated legacy embedding payload columns have been retired after canonical
-  sidecar protection was verified. `usr_prom_eth_cip_anchor` no longer carries
-  the duplicate legacy `anchor_only_7b_features` intermediate-embedding payload
-  column, and `construct_prom_eth_cip_context` no longer carries the duplicate
-  legacy `template_1kb_7b_features` anchor-mean intermediate-embedding payload
-  column. The row-overlay parts remain only for non-retired legacy evidence and
-  metadata.
+- Active row-overlay Infer parts have been retired after canonical sidecar
+  protection was verified. `usr_prom_eth_cip_anchor` and
+  `construct_prom_eth_cip_context` now keep canonical sidecar files only:
+  `_derived/infer/feature_aliases.parquet` and
+  `_derived/infer/feature_vectors.parquet`.
 - Completion/status code now uses key-only parquet inventory for
   `_derived/infer/feature_vectors.parquet` and does not load embedding payload
   columns during normal planner or status checks. Payload reads are reserved for
@@ -387,16 +399,14 @@ Infer must distinguish four states:
 | Product missing | Required sequence view or context product is absent. | USR/Construct |
 | Feature missing | Product exists, but feature vector does not. | Infer |
 | Feature reusable | Existing vector matches sequence, model, layer, pooling, bounds, and orientation. | Infer |
-| Feature stale | Existing vector exists, but semantic identity or digest does not match. | Infer |
+| Feature stale | Canonical sidecar metadata exists, but semantic identity does not match the requested feature-vector key. | Infer |
 
 Current planner state model:
 
 | Planner field | Meaning |
 | --- | --- |
 | `persisted_vector_reusable` | Required feature-vector key already exists in `_derived/infer/feature_vectors.parquet`. |
-| `legacy_digest_reusable` | Legacy row overlay has the requested output and a matching `metadata__feature_request_digest`. |
-| `legacy_unclassified_vectors` | Legacy row overlay has a value, but lacks enough matching digest evidence to prove semantic identity. |
-| `stale_vectors` | Existing values are present but cannot be used safely without alias migration or recomputation. |
+| `stale_vectors` | Existing canonical sidecar state is present but cannot be used safely without recomputation. This is normally zero because the current sidecar key is the semantic identity. |
 | `missing_vectors` | No usable feature vector was found for the requested view/representation/pooling. |
 | `missing_products` | Required sequence products are absent. The planner emits a plan object with `missing_products`, `missing_product_selectors`, and construct-completion command hints instead of requiring operators to infer product gaps from command failure. |
 
@@ -416,16 +426,9 @@ model_family
 + emitted orientation
 ```
 
-If this identity matches, old row-based overlays may be reusable even if they lack
-new sequence-view metadata fields. In that case, the migration should write
-aliases or semantic metadata, not recompute the model by default.
-
-Naive rerun risk:
-
-- Current Infer resume logic checks `metadata__feature_request_digest`.
-- If the digest payload changed to include sequence-view fields, a rerun may
-  recompute vectors that are scientifically reusable.
-- Add a classification planner before large reruns.
+Old row-based overlays are not a runtime reuse surface after migration. They may
+be used only by explicit one-time migration utilities, then removed. The
+completion planner must not classify row-overlay payloads as reusable coverage.
 
 Required planner output:
 
@@ -442,8 +445,6 @@ missing_vectors: int
 missing_products: int
 missing_product_selectors: list
 persisted_vector_reusable: int
-legacy_digest_reusable: int
-legacy_unclassified_vectors: int
 existing_aliases: int
 by_product_kind: map
 by_orientation: map
@@ -451,7 +452,6 @@ by_pooling_operation: map
 commands:
   construct_completion: list<string>
   infer_backfill: list<string>
-  alias_backfill: list<string>
 ```
 
 Operational command:
@@ -468,9 +468,9 @@ Planner limitations:
 - Use `--max-missing-products 0 --max-stale-vectors 0` as the submit gate for
   sequence-view batch runbooks. Do not use `--max-missing-vectors 0` for a lane
   that is expected to generate missing features.
-- Digest-matching legacy overlays can be classified as reusable.
-- Drifted or missing legacy digests are not yet sequence-audited; they are
-  treated as stale/unclassified to avoid accidental overclaiming.
+- Row-overlay Infer parts are not inspected by the planner. If an older checkout
+  still has row-overlay payloads, clean or migrate them before treating the
+  dataset as modern.
 - The planner validates sequence-view selectors and pooling spans by loading
   sequence-view records, but it does not run model adapters or allocate GPU
   resources.
@@ -515,9 +515,9 @@ Minimum feature-completion checks for the active study:
 
 | Surface | Required check | Interpretation |
 | --- | --- | --- |
-| Anchor features | Sequence-view planner reports missing/stale counts for `construct_insert` `seq_mean` views | Existing DenseGen vectors may be reusable; new SFXI/reference/core rows need completion. |
-| Forward context features | Planner reports missing/stale counts for `realized_context` `anchor_mean` views with `orientation=forward` | Covered legacy forward vectors may be reusable if digest identity matches. |
-| Reverse-complement context features | Planner reports missing/stale counts for `realized_context` `anchor_mean` views with `orientation=reverse_complement` | Existing legacy forward overlays must not be treated as reverse-complement coverage. |
+| Anchor features | Sequence-view planner reports missing/stale counts for `construct_insert` `seq_mean` views | Canonical sidecar vectors are reusable; new SFXI/reference/core rows need completion. |
+| Forward context features | Planner reports missing/stale counts for `realized_context` `anchor_mean` views with `orientation=forward` | Canonical sidecar vectors are reusable; missing rows need completion. |
+| Reverse-complement context features | Planner reports missing/stale counts for `realized_context` `anchor_mean` views with `orientation=reverse_complement` | Forward vectors must not be treated as reverse-complement coverage. |
 | Reference core/context features | Planner reports reference branch separately from the main DenseGen handoff | Missing planned reference features stay non-blocking unless the study record marks them required. |
 
 Study prose must use full terms:
@@ -717,9 +717,11 @@ Tests:
 
 Status: done for sequence-view bundles, first-class missing product reporting,
 explicit completion thresholds, persisted feature-vector sidecars, and
-digest-matching legacy overlays.
+sidecar-only feature completion.
 
-Open: sequence-auditing drifted legacy overlays remains open.
+Legacy row-overlay fallback is intentionally removed from the planner. Modern
+completion is based on `_derived/infer/feature_vectors.parquet`; row overlays
+are cleanup or migration inputs, not runtime coverage.
 
 Deliverables:
 
@@ -733,14 +735,14 @@ Deliverables:
 
 Tests:
 
-- Old row-based overlay with matching identity is `reusable`.
+- Persisted sidecar vector with matching feature-vector key is `reusable`.
 - Missing reverse-complement context feature is `missing`, not `stale`.
 - Missing sequence view products are reported through `missing_products` and
   `missing_product_selectors` before model execution.
 - A zero-row required selector still returns a machine-readable plan instead of
   terminating the planner before Ops can aggregate the result.
-- Digest mismatch is reported as stale/unclassified unless a future
-  sequence/model/pooling audit can prove equivalence.
+- Row-overlay payloads are ignored by the planner; older row-overlay coverage
+  must be migrated or deleted before a dataset is considered modern.
 - Persisted feature-vector sidecars are counted as reusable without loading the
   model.
 - Thresholded CLI validation fails when `missing_products` or `stale_vectors`
@@ -748,9 +750,10 @@ Tests:
 
 #### Slice 6: Add Infer feature alias migration
 
-Status: implemented as a conservative bridge; active-study anchor and forward
-context backfill is written locally. Remaining work is true new inference plus
-generated-artifact sync/publish.
+Status: implemented as a conservative one-time bridge; active-study anchor and
+forward context backfill is written locally, and active row-overlay Infer parts
+have been removed from the local generated datasets. Remaining work is true new
+inference plus generated-artifact sync/publish.
 
 Runtime feature execution writes aliases and feature vectors for
 new sequence-view runs. The standalone migration command now audits and, when
@@ -775,8 +778,8 @@ when the expensive payload scan is required before write. Use `--write` only
 after the reusable, missing, unclassified, and orientation-blocked counts match
 expectations.
 
-After alias/vector sidecars are protected, retire duplicated legacy embedding
-payload columns with:
+After alias/vector sidecars are protected, retire duplicated legacy payload
+columns with:
 
 ```bash
 uv run infer migrate retire-legacy-payloads \
@@ -788,9 +791,9 @@ uv run infer migrate retire-legacy-payloads \
 The retirement command is dry-run by default. It scans legacy metadata and
 canonical feature-vector keys without reading embedding payload columns. With
 `--write`, it refuses to mutate if any legacy-present vector lacks canonical
-sidecar protection or if the legacy identity is unclassified. It rewrites
-Parquet parts by streaming retained columns, so normal cleanup does not
-materialize multi-GB embedding tables in memory.
+sidecar protection or if the legacy identity is unclassified. It deletes parts
+that become `id`-only and refreshes or removes stale overlay digest ledgers, so
+normal cleanup does not materialize multi-GB embedding tables in memory.
 
 Approved stale lanes that are not protected by a modern semantic sidecar use a
 different command. This is intentionally explicit: it is for payload families
@@ -807,8 +810,9 @@ uv run infer migrate prune-stale-overlay-columns \
 
 `prune-stale-overlay-columns` is dry-run by default, scans only Parquet schemas
 and column-chunk metadata, and rewrites retained columns in small batches when
-`--write` is supplied. It refuses to remove the overlay join column `id` and
-logs an `infer_stale_overlay_column_prune` event after a successful write.
+`--write` is supplied. It refuses to remove the overlay join column `id`, deletes
+parts that become `id`-only, refreshes/removes stale digest ledgers, and logs an
+`infer_stale_overlay_column_prune` event after a successful write.
 
 Deliverables:
 
@@ -839,6 +843,11 @@ Deliverables:
   `usr_prom_eth_cip_anchor` reclaimed about `2.07 GB`; `construct_prom_eth_cip_context`
   reclaimed about `4.08 GB`. Post-cleanup dry-runs report zero remaining
   `infer__evo2_20b__*` columns in both active handoffs.
+- Done: hard-cut active study Infer storage to canonical sidecars. The local
+  active handoff `_derived/infer` directories now contain only
+  `feature_aliases.parquet` and `feature_vectors.parquet`; old row-overlay
+  `part-*.parquet` files and stale digest ledgers were removed after sidecar
+  protection was verified.
 - Done: add an offline USR event-log gardening lifecycle. `uv run usr maintenance
   event-log-garden <dataset>` dry-runs by default, archives the full log on
   write, retains a bounded live tail, appends an `event_log_garden` audit event,
@@ -889,8 +898,8 @@ Deliverables:
 
 - Add a sequence-view contract check to promoter preflight. Implemented.
 - Update promoter-study status to report coverage by product kind, orientation,
-  pooling, and model/layer. Implemented as summary fields; legacy
-  sequence/model/pooling proof remains an alias-migration slice.
+  pooling, and model/layer. Implemented as summary fields over canonical
+  sidecars.
 - Add explicit "product completion" versus "feature completion" sections.
   Implemented in preflight and status summary fields.
 - Keep the reference-view branch non-blocking unless the study record marks it
@@ -906,7 +915,7 @@ Tests:
   non-blocking.
 - Status fails or warns when required reverse-complement context products are
   missing.
-- Status distinguishes reusable old vectors from missing vectors.
+- Status distinguishes canonical reusable vectors from missing vectors.
 
 #### Slice 8: Generalize without churn
 
@@ -949,13 +958,11 @@ Current desired products:
 
 Current feature completion interpretation:
 
-- Existing DenseGen anchor and covered forward context features are legacy-schema
-  features. After the local migration bridge writes aliases/vector sidecars, the
-  compatible subset is now sequence-view reusable rather than merely presumed
-  reusable.
+- Existing DenseGen anchor and covered forward context features are represented
+  by canonical sequence-view alias/vector sidecars.
 - Do not reset them globally.
 - Classify them with `infer validate sequence-view-completion` before
-  recomputation.
+  recomputation; the planner does not inspect old row overlays.
 - Product-contract health must be `ok` before interpreting feature-completion
   counts. If sequence-view sidecars fail to load or carry stale product-kind
   names, the feature planner has not reached a meaningful vector-classification
@@ -999,8 +1006,8 @@ state:
   the active main/reference sequence-view datasets.
 - [x] Sequence-view completion reports `missing_products=0` for active main and
   reference 7B configs.
-- [x] Anchor and forward legacy-compatible vectors have been sidecar-backfilled
-  from verified row-overlay lanes.
+- [x] Anchor and forward compatible vectors have been sidecar-backed and old
+  row-overlay lanes have been retired locally.
 - [x] Validation/status use key-only vector inventory and do not load embedding
   payload columns.
 - [x] Sequence-view batch runbook plans gate missing sequence products and stale
@@ -1037,12 +1044,13 @@ Allowed degraded states:
 
 - Planned reference-view Infer features may remain missing without blocking the
   main study if the study record marks the branch non-blocking.
-- Old row-based Infer overlays may remain present while alias migration is
-  incomplete, but status must label them as legacy-schema reusable or stale.
+- Old row-based Infer overlays are not an allowed active-study degraded state
+  after migration. They must be migrated into canonical sidecars or deleted.
 - `view_semantics.parquet` may be absent from generated datasets while the first
-  product-kind and pooling contracts are enforced by `_views/sequence_views.parquet`;
+  product-kind and pooling contracts are being introduced for a new dataset;
   machine selection by `view_collections` must remain disabled until the addendum
-  exists and validates.
+  exists and validates. Present non-archived local USR datasets are no longer in
+  this degraded state.
 
 Disallowed degraded states:
 
@@ -1074,6 +1082,7 @@ Focused checks after USR sequence-view semantics/QA changes:
 
 ```bash
 uv run pytest -q src/dnadesign/usr/tests/datasets/views/test_sequence_views.py
+uv run pytest -q src/dnadesign/usr/tests/scripts/test_materialize_source_record_sequence_views.py
 uv run pytest -q src/dnadesign/usr/tests/test_module_layout.py
 ```
 
@@ -1116,6 +1125,9 @@ uv run python -m dnadesign.devtools.docs_checks --repo-root .
 - [x] Generated study datasets include `view_semantics.parquet` where
   machine-readable `source_family`, `selection_basis`, or `view_collections`
   selectors are required.
+- [x] Present non-archived local USR datasets all have sequence-view and
+  view-semantics sidecars; source-only datasets use generic `source_record`
+  semantics instead of promoter-shaped product kinds.
 - [x] Sequence-view QA checks validate product-kind, orientation, pooling, exact
   product length, and emitted bounds before handoff.
 - [x] Reference core60 derivation is fail-fast around required sigma-site
@@ -1130,17 +1142,17 @@ uv run python -m dnadesign.devtools.docs_checks --repo-root .
   backfill is submitted.
 - [x] Study/Ops status reports coverage by product kind, orientation, pooling, and
   model/layer.
-- [x] Existing row-based Infer outputs can be classified before any large rerun
-  when digest evidence is present.
-- [x] Active-study anchor and forward-context legacy-compatible vectors are
-  backfilled into sequence-view feature alias/vector sidecars.
+- [x] Active-study anchor and forward-context compatible vectors are backfilled
+  into sequence-view feature alias/vector sidecars.
+- [x] Active-study row-overlay Infer parts are removed after canonical sidecar
+  protection is proven.
 - [x] Completion/status checks use key-only feature-vector sidecar inventory and
   avoid loading embedding payload columns during normal planning.
 - [x] Sequence-view runbook plans fail before submit when sequence products are
   missing or vectors are stale, while allowing missing vectors as intended
   batch work.
-- [ ] Drifted legacy row overlays can be sequence/model/pooling-audited and
-  alias-migrated without recomputation.
+- [x] Drifted legacy row overlays are not a runtime state; the active study
+  hard-cuts to canonical sidecars after migration.
 - [x] Generated USR data sync/publish posture is explicit.
 - [ ] Reverse-complement context vectors, the remaining `115` anchor vectors,
   the remaining `115` forward-context vectors, and `144` reference-branch
@@ -1174,9 +1186,10 @@ schema migration.
 
 Objection: "Are legacy Infer features invalid?"
 
-Answer: not by default. They are legacy-schema outputs. They can be reused if
-model, sequence, pooling span, bounds, and orientation match the new requested
-view identity. The planner must prove that before aliasing or rerunning.
+Answer: not by default, but they are not an active runtime surface after this
+migration. Reusable legacy outputs must first be migrated into canonical
+sequence-view sidecars. After that, row-overlay payloads are removed and the
+planner uses sidecar keys only.
 
 Objection: "Why not let `view_collections` change the `view_id`?"
 
@@ -1185,13 +1198,11 @@ part of `view_id`, the same sequence product would acquire new identities every
 time a study cohort changes. That would break feature aliasing and force
 unnecessary recomputation.
 
-Objection: "Why classify drifted legacy overlays as stale or unclassified instead
-of reusable?"
+Objection: "Why not keep drifted legacy overlays as stale evidence?"
 
-Answer: digest drift is not proof of invalid science, but absent a
-sequence/model/pooling audit it is also not proof of compatibility. The planner
-therefore uses a conservative state until an alias-migration command can prove
-equivalence explicitly.
+Answer: because it keeps two Infer storage contracts alive and invites accidental
+reuse. The safer post-migration contract is binary: canonical sidecar vectors are
+coverage; row-overlay payloads are cleanup inputs and are removed once protected.
 
 ### Next Increment
 
@@ -1220,27 +1231,24 @@ Remaining generated-data work:
   local Parquet files are still generated artifacts outside normal
   tracked-source review.
 
-The highest-leverage generated-data slice has moved from legacy migration to
-true feature completion. Local alias/vector backfill is complete for the
-legacy-compatible anchor and forward-context surfaces:
+The highest-leverage generated-data slice has moved from migration to true
+feature completion. Local alias/vector backfill is complete for the compatible
+anchor and forward-context surfaces:
 
 - `usr_prom_eth_cip_anchor`: `157164` reusable aliases/vectors written,
   `115` vectors still missing.
 - `construct_prom_eth_cip_context` forward anchor-mean: `157164` reusable
   aliases/vectors written, `115` vectors still missing.
-- `construct_prom_eth_cip_context` reverse-complement anchor-mean: `0`
-  reusable legacy vectors, `157279` vectors still missing.
+- `construct_prom_eth_cip_context` reverse-complement anchor-mean: `157279`
+  vectors still missing.
 - Reference sequence-view branch: `144` vectors still missing.
 
-The storage cleanup portion of the legacy migration is also complete locally:
+The storage cleanup portion of the migration is also complete locally:
 
-- `usr_prom_eth_cip_anchor`: duplicate legacy `anchor_only_7b_features`
-  intermediate-embedding payload column retired from `57` row-overlay parts;
-  post-cleanup dry-run reports `parts_with_payload=0`.
-- `construct_prom_eth_cip_context`: duplicate legacy
-  `template_1kb_7b_features` anchor-mean intermediate-embedding payload column
-  retired from `1012` row-overlay parts; post-cleanup dry-run reports
-  `parts_with_payload=0`.
+- `usr_prom_eth_cip_anchor`: old `anchor_only_7b_features` row-overlay parts
+  were removed after canonical sidecar protection was verified.
+- `construct_prom_eth_cip_context`: old `template_1kb_7b_features` row-overlay
+  parts were removed after canonical sidecar protection was verified.
 - Canonical modern feature-vector sidecars remain present for both protected
   surfaces, each with `157164` reusable vectors.
 - Stale `infer__evo2_20b__*` row-overlay columns have also been removed from the
@@ -1249,18 +1257,16 @@ The storage cleanup portion of the legacy migration is also complete locally:
 
 Exit criteria:
 
-- Done: a dry-run mode reports reusable, missing, unclassified, and
-  orientation-blocked legacy rows
-  without writing sidecars.
-- Done: a write mode creates feature aliases only for rows whose exact row id,
+- Done: the one-time migration mode creates feature aliases only for rows whose exact row id,
   model/layer, pooling operation, pooling bounds, and emitted orientation match
   the requested sequence-view feature identity.
 - Done: completion/status inventory reads only feature keys from large vector
   sidecars.
-- Done: a guarded payload-retirement mode removes duplicate legacy embedding
-  payload columns only after canonical sidecar protection is proven.
-- Drifted or absent legacy digests are never marked reusable without this exact
-  identity audit.
+- Done: guarded stale-overlay pruning removes old row-overlay parts only after
+  canonical sidecar protection is proven or the stale lane is explicitly
+  approved for deletion.
+- Done: drifted or absent legacy digests are never marked reusable by runtime
+  completion planning.
 - Open: reverse-complement, remaining anchor/forward, and reference feature
   execution should be run as explicit Infer batch operations, not as accidental
   status/preflight side effects.

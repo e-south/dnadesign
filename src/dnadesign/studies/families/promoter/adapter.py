@@ -693,8 +693,6 @@ _INFER_COMPLETION_SCALAR_FIELDS = (
     "missing_vectors",
     "missing_products",
     "persisted_vector_reusable",
-    "legacy_digest_reusable",
-    "legacy_unclassified_vectors",
     "existing_aliases",
 )
 

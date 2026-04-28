@@ -72,14 +72,21 @@
 - Source rows are primer-flank-stripped MG1655 GenBank-projected promoter inserts plus source-backed synthetic promoter standards. J23105 is refreshed from the synthetic GenBank source; full GenBank provenance, projected annotations, strength metadata, derivation intervals, and sequence views are stored in dataset-local sidecars/overlays.
 - Present SFXI pDual-10 source dataset: `usr_sfxi_pdual10_densegen_promoters`
 - The SFXI source rows are Reader-backed, archive-backed 60 bp pDual-10 DenseGen promoters. They are included in the main merged anchor/context handoff and remain separate from the matched native-reference core60 branch.
+- Source-only USR datasets in this checkout now expose generic `source_record`
+  sequence views plus mutable view semantics. Those views make dataset identity
+  explicit for source, demo, template, SFXI, and DenseGen datasets; they do not
+  make those source datasets canonical Infer inputs unless an Infer config
+  selects them.
 - Present matched analysis-core dataset: `construct_prom_eth_cip_reference_core60`
 - Present reference context dataset: `construct_prom_eth_cip_reference_contexts`
 - Planned reference feature dataset: `infer_prom_eth_cip_reference_views_7b`
 - Sequence-view manifests live as dataset-local `_views/sequence_views.parquet` sidecars rather than a standalone study dataset
 - Mutable view-semantics addenda live in dataset-local `_views/view_semantics.parquet` sidecars.
-  In this checkout they cover all `472029` active study sequence views and provide
-  machine-readable `source_family`, `selection_basis`, `view_collections`, and `role_tags` without
-  changing stable `view_id` identity.
+  In this checkout they cover all `629213` active-study source, handoff, and
+  reference sequence views, plus all `629753` non-archived local USR sequence
+  views. They provide machine-readable `source_family`, `selection_basis`,
+  `view_collections`, and `role_tags` without changing stable `view_id`
+  identity.
 - Native reference rows keep source lengths. Construct derives separate `analysis_window` rows by
   requiring one `sigma70_minus35` and one `sigma70_minus10` annotation, then centering the 60 bp
   analysis window on the midpoint between those sites.
@@ -103,42 +110,28 @@
 
 ### Current Infer coverage
 
-- Existing Infer overlay parts cover `157164` unique IDs in `usr_prom_eth_cip_anchor` out of `157279` current rows.
-- Existing Infer overlay parts cover `157164` unique IDs in `construct_prom_eth_cip_context` out of `314558` current rows.
-- Under the legacy row-overlay view, the current missing main-handoff feature coverage is `115` rows: `23` SFXI pDual-10 DenseGen rows,
-  `28` promoter-reference native/standard rows, `16` legacy labeled reference/control rows, and `48`
-  newly derived reference `analysis_window` rows.
-- Under the legacy row-overlay view, the current missing context feature coverage is `157394` rows: the `115` forward-context rows for
-  the missing main-handoff cohorts plus all `157279` reverse-complement contexts.
-- Under the new sequence-view feature contract, the completion planner reports
-  `missing_products=0`, `314328` reusable main 7B sequence-view feature vectors, `157509` missing
-  main 7B vectors, and `144` missing reference 7B vectors. The reusable main vectors come from local
-  alias/vector sidecar backfill for `157164` anchor construct-insert vectors and `157164`
-  forward-context anchor-mean vectors.
-- The active handoff datasets no longer carry stale `infer__evo2_20b__*` row-overlay columns. Those
-  collapsed/debug-required 20B payload and metadata columns were removed after the protected 7B
-  sequence-view sidecars were preserved. The remaining row-overlay infer parts are legacy-schema 7B
-  evidence and metadata, not a second copy of the canonical 7B intermediate embedding payloads.
+- Canonical Infer feature coverage is stored only in `_derived/infer/feature_aliases.parquet` and
+  `_derived/infer/feature_vectors.parquet`; active study row-overlay Infer parts have been retired from
+  the local generated handoff datasets.
+- The sequence-view completion planner reports `missing_products=0`, `314328` reusable main 7B
+  sequence-view feature vectors, `157509` missing main 7B vectors, and `144` missing reference 7B
+  vectors. The reusable main vectors are the canonical sidecar rows for `157164` anchor
+  construct-insert vectors and `157164` forward-context anchor-mean vectors.
+- The active handoff datasets no longer carry stale `infer__evo2_20b__*` row-overlay columns or active
+  7B row-overlay Infer parts. Historical row-overlay payloads were used only as a migration source,
+  then removed after the protected sequence-view sidecars were written.
 - The remaining main Infer work is targeted: `115` anchor rows, `115` forward-context rows, and all
   `157279` reverse-complement context rows. The reference branch remains `144` vectors missing until
-  its 7B sequence-view features are generated.
+  its 7B sequence-view features are generated. Evo2 execution is explicitly deferred in this local
+  environment because this device is not the target Infer runtime.
 - `construct_prom_eth_cip_reference_core60` has no Infer overlay yet (`48/48` rows missing), and
   `construct_prom_eth_cip_reference_contexts` has no Infer overlay yet (`96/96` rows missing).
 - Infer should consume explicit sequence views and fail fast on missing required product kinds. It
   should not synthesize missing `analysis_window` or reverse-complement products; Construct owns those
   completion steps.
 - Before submitting a new feature batch, use the sequence-view completion planner to separate
-  reusable legacy-schema vectors from stale or missing work:
+  canonical reusable vectors from missing work:
   `uv run infer validate sequence-view-completion --config <config.yaml> --format json`.
-- To preserve compatible old row-overlay vectors under the new sidecar contract, use the explicit
-  migration bridge:
-  `uv run infer migrate legacy-overlay-aliases --config <sequence-view-config.yaml> --job <sequence-view-job-id> --legacy-job-id <old-row-overlay-job-id> --format json`.
-  Dry-run smoke checks on this checkout found `100/100` reusable vectors for the first 100 merged
-  anchor `construct_insert` rows, `99/100` reusable vectors for the first 100 forward `realized_context`
-  rows, and `0/100` reusable vectors for the first 100 reverse-complement `realized_context` rows.
-  The reverse-complement result is expected: old forward row overlays are not reverse-complement
-  coverage. Full local alias/vector sidecar backfill has been written for the legacy-compatible anchor
-  and forward-context surfaces only.
 - `usr.data-plane.promoter-study-preflight` now includes `sequence_view_contract` product checks and
   non-blocking `infer_sequence_view_completion` feature-completion checks. Product checks cover the
   merged anchor, merged context, reference core60, and reference context datasets. Feature-completion

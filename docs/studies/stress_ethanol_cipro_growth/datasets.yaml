@@ -10,7 +10,12 @@ datasets:
     owner_tool: densegen
     onboard_mode: existing_both
     authority: shared
-    notes: Shared study copy written directly by DenseGen to the shared USR root and used for downstream status, construct, infer, and cluster handoff.
+    notes: >-
+      Shared study copy written directly by DenseGen to the shared USR root and
+      used for downstream status, construct, infer, and cluster handoff. The
+      local dataset now carries generic `source_record` sequence views with
+      mutable view semantics; these source views clarify provenance but are not
+      the construct-ready merged-anchor contract.
     sync:
       enabled: true
       remote_name: cluster
@@ -59,7 +64,10 @@ datasets:
       dual-promoter DenseGen dataset. These 23 rows are pDual-only, archive-backed,
       and carry modern `densegen` plus `usr_label` overlays for study anchor
       convergence. They are source rows for the merged anchor/context handoff, not
-      a replacement for the GenBank promoter-reference branch.
+      a replacement for the GenBank promoter-reference branch. The local dataset
+      now carries generic `source_record` sequence views with SFXI source-family
+      semantics; non-unique reader-experiment batch labels stay in overlays and
+      are not promoted to globally unique view aliases.
     sync:
       enabled: false
       remote_name: n/a
@@ -78,7 +86,11 @@ datasets:
     owner_tool: usr
     onboard_mode: existing_local
     authority: local
-    notes: Curated plasmid/template source set for construct-context expansion.
+    notes: >-
+      Curated plasmid/template source set for construct-context expansion. The
+      local dataset now carries a generic `source_record` sequence view with
+      template-source semantics; Construct still reads this as a template seed,
+      not as an Infer anchor product.
     sync:
       enabled: false
       remote_name: n/a
@@ -97,7 +109,7 @@ datasets:
     owner_tool: usr
     onboard_mode: existing_both
     authority: shared
-    notes: Study-owned merged anchor set materialized from densegen_prom_eth_cip_source, native usr_promoter_references, usr_sfxi_pdual10_densegen_promoters, and construct_prom_eth_cip_reference_core60. Native reference rows keep their source lengths; core60 rows are analysis-only 60 bp comparability views selected by fail-fast -35/-10 checks. The local dataset sequence-view sidecar uses one construct_insert anchor-only view per row with seq_mean recommended pooling; native or designed exact-60 rows are not duplicated or relabeled as analysis_window in this merged handoff. Record data exists locally and on the SCC cluster root; the generic sequence-view sidecar migration must be covered by the next USR sync audit before assuming remote parity.
+    notes: Study-owned merged anchor set materialized from densegen_prom_eth_cip_source, native usr_promoter_references, usr_sfxi_pdual10_densegen_promoters, and construct_prom_eth_cip_reference_core60. Native reference rows keep their source lengths; core60 rows are analysis-only 60 bp comparability views selected by fail-fast -35/-10 checks. The local dataset sequence-view sidecar uses one construct_insert anchor-only view per row with seq_mean recommended pooling; native or designed exact-60 rows are not duplicated or relabeled as analysis_window in this merged handoff. Record data exists locally and on the SCC cluster root; the local sidecar migration is current, but the next USR sync audit must verify remote parity before assuming the SCC root has the same `_views` artifacts.
     sync:
       enabled: true
       remote_name: cluster
@@ -116,7 +128,7 @@ datasets:
     owner_tool: construct
     onboard_mode: existing_both
     authority: shared
-    notes: Study-owned paired 1 kb pDual-10 forward and whole-output reverse-complement contexts materialized by Construct from the merged anchor set and usr_pdual10_plasmid_template template dataset for template-backed Infer lanes. The local context handoff now covers DenseGen, native promoter-reference, reference core60, and SFXI pDual-10 source cohorts with dataset-local realized_context sequence views for both orientations. Record data exists locally and on the SCC cluster root; the generic sequence-view sidecar migration must be covered by the next USR sync audit before assuming remote parity.
+    notes: Study-owned paired 1 kb pDual-10 forward and whole-output reverse-complement contexts materialized by Construct from the merged anchor set and usr_pdual10_plasmid_template template dataset for template-backed Infer lanes. The local context handoff now covers DenseGen, native promoter-reference, reference core60, and SFXI pDual-10 source cohorts with dataset-local realized_context sequence views for both orientations. Record data exists locally and on the SCC cluster root; the local sidecar migration is current, but the next USR sync audit must verify remote parity before assuming the SCC root has the same `_views` artifacts.
     sync:
       enabled: true
       remote_name: cluster

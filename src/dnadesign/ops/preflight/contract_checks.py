@@ -808,8 +808,6 @@ def _aggregate_infer_completion_plans(plans: Sequence[Mapping[str, object]]) -> 
         "missing_vectors",
         "missing_products",
         "persisted_vector_reusable",
-        "legacy_digest_reusable",
-        "legacy_unclassified_vectors",
         "existing_aliases",
     )
     totals = {field: 0 for field in scalar_fields}
@@ -819,7 +817,6 @@ def _aggregate_infer_completion_plans(plans: Sequence[Mapping[str, object]]) -> 
     command_lists: dict[str, list[str]] = {
         "construct_completion": [],
         "infer_backfill": [],
-        "alias_backfill": [],
     }
     datasets: list[str] = []
     bundle_ids: list[str] = []
