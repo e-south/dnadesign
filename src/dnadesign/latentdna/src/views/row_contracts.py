@@ -18,6 +18,11 @@ _PROMOTER_METADATA_INPUT_COLUMNS = (
     "usr_label__primary",
     "template_id",
     "construct__template_id",
+    "regulondb__sigma_factor_set",
+    "regulondb__regulator_composition",
+    "regulondb__box_pattern",
+    "regulondb__confidence_level_set",
+    "regulondb__metadata_completeness_class",
 )
 
 

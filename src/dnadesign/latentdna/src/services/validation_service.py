@@ -29,6 +29,11 @@ _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
     "campaign_prior": {"densegen__plan", "usr_label__primary"},
     "is_control": {"densegen__plan", "usr_label__primary"},
     "source_class": {"densegen__plan", "usr_label__primary"},
+    "regulondb__sigma_factor_set": {"regulondb__sigma_factor_set"},
+    "regulondb__regulator_composition": {"regulondb__regulator_composition"},
+    "regulondb__box_pattern": {"regulondb__box_pattern"},
+    "regulondb__confidence_level_set": {"regulondb__confidence_level_set"},
+    "regulondb__metadata_completeness_class": {"regulondb__metadata_completeness_class"},
 }
 
 

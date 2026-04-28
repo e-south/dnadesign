@@ -31,6 +31,13 @@ from .row_contracts import source_backed_view_row_contract
 _MATERIALIZE_BATCH_SIZE = 2048
 _SIG35_PATTERN = re.compile(r"__sig35[=_]([A-Za-z0-9]+)")
 _CONTROL_LABELS = {"spyp", "sulap", "soxsp", "j23105", "spy_p", "sul_ap", "sox_sp"}
+_REGULONDB_NATIVE_PROMOTER_DERIVATIONS = {
+    "regulondb__sigma_factor_set",
+    "regulondb__regulator_composition",
+    "regulondb__box_pattern",
+    "regulondb__confidence_level_set",
+    "regulondb__metadata_completeness_class",
+}
 
 
 def _reraise_missing_vector_column(
@@ -252,6 +259,10 @@ def _source_class(row: dict[str, object]) -> str:
 
 
 def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: WorkspaceContext | None = None) -> object:
+    if derive in _REGULONDB_NATIVE_PROMOTER_DERIVATIONS:
+        if derive not in row:
+            raise ContractViolationError(f"native RegulonDB promoter metadata column is missing: {derive}")
+        return row[derive]
     if derive == "design_family":
         return _design_family(row)
     if derive == "design_regulator_composition":
