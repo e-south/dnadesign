@@ -8,7 +8,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..contracts.deliverable import DeliverableEntryStatus
-from ..contracts.workspace import MatrixBundleSourceConfig, ParquetSourceConfig, USRSourceConfig
+from ..contracts.workspace import (
+    InferFeatureSidecarSourceConfig,
+    MatrixBundleSourceConfig,
+    ParquetSourceConfig,
+    USRSourceConfig,
+)
 from ..contracts.workspace_snapshot import (
     WorkspaceSnapshot,
     WorkspaceSnapshotBrowser,
@@ -36,6 +41,8 @@ def _source_snapshot(context) -> dict[str, WorkspaceSnapshotSource]:
             dataset_id = source.path
         elif isinstance(source, MatrixBundleSourceConfig):
             dataset_id = source.path
+        elif isinstance(source, InferFeatureSidecarSourceConfig):
+            dataset_id = source.dataset
         snapshots[source_id] = WorkspaceSnapshotSource(
             kind=source.kind,
             path=str(schema["path"]),

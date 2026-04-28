@@ -121,7 +121,26 @@ class MatrixBundleSourceConfig(SourceBase):
     path: str
 
 
-SourceConfig = Annotated[USRSourceConfig | ParquetSourceConfig | MatrixBundleSourceConfig, Field(discriminator="kind")]
+class InferFeatureSidecarSourceConfig(SourceBase):
+    kind: Literal["infer_feature_sidecar"]
+    root: str
+    dataset: str
+
+
+class InferFeatureScalarSidecarSourceConfig(SourceBase):
+    kind: Literal["infer_feature_scalar_sidecar"]
+    root: str
+    dataset: str
+
+
+SourceConfig = Annotated[
+    USRSourceConfig
+    | ParquetSourceConfig
+    | MatrixBundleSourceConfig
+    | InferFeatureSidecarSourceConfig
+    | InferFeatureScalarSidecarSourceConfig,
+    Field(discriminator="kind"),
+]
 
 
 class VectorColumnSpec(StrictWorkspaceModel):

@@ -12,7 +12,12 @@ import yaml
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.io.parquet_io import read_table
-from dnadesign.latentdna.src.views.materialize import _spacer_length, materialize_view_artifact
+from dnadesign.latentdna.src.views.materialize import (
+    _sig35_variant,
+    _source_class,
+    _spacer_length,
+    materialize_view_artifact,
+)
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
@@ -162,6 +167,141 @@ def test_materialize_view_rejects_synthetic_rows_without_sig35_token(tmp_path: P
 
     with pytest.raises(ContractViolationError, match="sig35_variant"):
         materialize_view_artifact(context, view_id="intermediate_embedding_20b_anchor_60bp")
+
+
+def test_sig35_variant_uses_upstream_sigma70_core_annotation_when_plan_lacks_sig35() -> None:
+    row = {
+        "usr_label__primary": "pDual-10-ES3p",
+        "densegen__plan": "ethanol_ciprofloxacin",
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "fixed_element",
+                "role": "upstream",
+                "constraint_name": "sigma70_core",
+                "variant_id": "ACCGCG",
+                "core_sequence": "ACCGCG",
+            },
+            {
+                "part_kind": "fixed_element",
+                "role": "downstream",
+                "constraint_name": "sigma70_core",
+                "variant_id": "consensus",
+                "core_sequence": "TATAAT",
+            },
+        ],
+    }
+
+    assert _sig35_variant(row) == "ACCGCG"
+
+
+def test_sig35_variant_uses_annotation_before_control_fallback_when_plan_is_missing() -> None:
+    row = {
+        "usr_label__primary": "pDual-10-archive-row",
+        "densegen__plan": None,
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "fixed_element",
+                "role": "upstream",
+                "constraint_name": "sigma70_core",
+                "variant_id": "GCAGGT",
+                "core_sequence": "GCAGGT",
+            }
+        ],
+    }
+
+    assert _sig35_variant(row) == "GCAGGT"
+
+
+def test_sig35_variant_uses_sequence_annotation_feature_when_densegen_detail_is_missing() -> None:
+    row = {
+        "usr_label__primary": "J23104",
+        "densegen__plan": None,
+        "seq_annot__features": [
+            {
+                "label": "-35",
+                "role_hint": "sigma70_minus35",
+                "qualifiers": [
+                    {"key": "label", "value": "-35"},
+                    {"key": "note", "value": "feature_sequence=TTGACA"},
+                ],
+            },
+            {
+                "label": "-10",
+                "role_hint": "sigma70_minus10",
+                "qualifiers": [{"key": "note", "value": "feature_sequence=TATTGT"}],
+            },
+        ],
+    }
+
+    assert _sig35_variant(row) == "TTGACA"
+
+
+def test_sig35_variant_does_not_slice_projected_parent_annotation_bounds_from_context_sequence() -> None:
+    row = {
+        "usr_label__primary": "J23104_context1kb_forward",
+        "densegen__plan": None,
+        "sequence": "A" * 1000,
+        "seq_annot__sequence_region_start_0": 0,
+        "seq_annot__sequence_region_end_0": 60,
+        "seq_annot__features": [
+            {
+                "label": "-35",
+                "role_hint": "sigma70_minus35",
+                "start_0": 10,
+                "end_0": 16,
+                "qualifiers": [],
+            }
+        ],
+    }
+
+    assert _sig35_variant(row) == "control"
+
+
+def test_sig35_variant_uses_derived_retained_sigma35_bounds_for_analysis_window() -> None:
+    row = {
+        "usr_label__primary": "micFp_core60",
+        "densegen__plan": None,
+        "sequence": "ttcttaagtatttgacagcactgaatgtcaaaacaaaaccttcactcgcaactagaataa",
+        "derived__target_length": 60,
+        "derived__features_retained": [
+            {
+                "label": "-35",
+                "role_hint": "sigma70_minus35",
+                "derived_intervals_0": [{"start_0": 26, "end_0": 32, "strand": 1, "partial": False}],
+            }
+        ],
+    }
+
+    assert _sig35_variant(row) == "GTCAAA"
+
+
+def test_sig35_variant_does_not_slice_projected_analysis_window_retention_from_context_sequence() -> None:
+    row = {
+        "usr_label__primary": "micFp_core60_context1kb_forward",
+        "densegen__plan": None,
+        "sequence": "A" * 1000,
+        "derived__target_length": 60,
+        "derived__features_retained": [
+            {
+                "label": "-35",
+                "role_hint": "sigma70_minus35",
+                "derived_intervals_0": [{"start_0": 26, "end_0": 32, "strand": 1, "partial": False}],
+            }
+        ],
+    }
+
+    assert _sig35_variant(row) == "control"
+
+
+def test_source_class_prefers_sequence_view_semantics_and_promoter_standard_metadata() -> None:
+    assert _source_class({"source_family": "genbank_projected_reference", "densegen__plan": None}) == (
+        "reference_control"
+    )
+    assert _source_class({"source_family": "densegen_generated", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
+    assert _source_class({"source_family": "construct_derived", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
+    assert _source_class({"promoter_standard__collection_id": "anderson", "densegen__plan": None}) == (
+        "synthetic_reference_standard"
+    )
 
 
 def test_materialize_view_canonicalizes_design_regulator_composition(tmp_path: Path) -> None:

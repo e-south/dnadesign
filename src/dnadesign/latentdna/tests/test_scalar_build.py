@@ -354,6 +354,75 @@ def test_dataset_overview_builds_dimension_panels_with_shared_denominator(tmp_pa
         assert pytest.approx(sum(float(row["fraction"]) for row in dimension_rows), rel=0, abs=1e-9) == 1.0
 
 
+def test_dataset_overview_includes_annotated_sigma35_categories_outside_named_ladder(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    archive_row = {
+        "id": "sfxi_archive_row",
+        "subject_id": "sfxi_archive_row",
+        "usr_label__primary": "pDual-10-ES3p",
+        "sequence": None,
+        "densegen__plan": "ethanol_ciprofloxacin",
+        "densegen__required_regulators": ["cpxR", "lexA"],
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "fixed_element",
+                "role": "upstream",
+                "constraint_name": "sigma70_core",
+                "variant_id": "ACCGCG",
+                "core_sequence": "ACCGCG",
+            },
+            {
+                "part_kind": "fixed_element",
+                "role": "downstream",
+                "constraint_name": "sigma70_core",
+                "variant_id": "consensus",
+                "core_sequence": "TATAAT",
+            },
+        ],
+        "seq_annot__features": None,
+        "derived__features_retained": None,
+    }
+    seq_annot_row = {
+        "id": "projected_reference_row",
+        "subject_id": "projected_reference_row",
+        "usr_label__primary": "J23104",
+        "sequence": "TTGACATATGCTAGCTAGCTAGCTAGCTAGCTAGC",
+        "densegen__plan": None,
+        "densegen__required_regulators": None,
+        "densegen__used_tfbs_detail": None,
+        "seq_annot__features": [
+            {
+                "label": "-35",
+                "role_hint": "sigma70_minus35",
+                "qualifiers": [{"key": "note", "value": "feature_sequence=TTGACA"}],
+            }
+        ],
+        "derived__features_retained": None,
+    }
+    rows = [archive_row, seq_annot_row, *_base_rows()]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_source(workspace_dir / "inputs" / "context.parquet", rows)
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="dataset_overview_counts",
+        builder_kind="dataset_overview",
+        params={"source_ids": ["anchor_60bp", "full_context_1kb"]},
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    sig35_rows = [row for row in table if row["dimension"] == "sig35_variant"]
+    counts = {row["category"]: row["count"] for row in sig35_rows}
+
+    assert artifact.stats["denominator"] == 8
+    assert counts["ACCGCG"] == 1
+    assert counts["TTGACA"] == 1
+    assert sum(int(row["count"]) for row in sig35_rows) == 8
+
+
 def test_dataset_overview_rejects_mismatched_partitions_across_sources(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -1475,6 +1544,96 @@ def test_sigma35_ordinal_audit_emits_confidence_intervals_for_spearman_summary_r
             continue
         assert row["ci_lower"] is not None
         assert row["ci_upper"] is not None
+
+
+def test_sigma35_centroid_distance_includes_annotated_unranked_variants(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "ranked_b_1",
+            "subject_id": "ranked_b_1",
+            "sig35_variant": "b",
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "ranked_b_2",
+            "subject_id": "ranked_b_2",
+            "sig35_variant": "b",
+            "embedding": [0.9, 0.1],
+        },
+        {
+            "id": "ranked_f_1",
+            "subject_id": "ranked_f_1",
+            "sig35_variant": "f",
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "ranked_f_2",
+            "subject_id": "ranked_f_2",
+            "sig35_variant": "f",
+            "embedding": [0.1, 0.9],
+        },
+        {
+            "id": "annotated_sequence_1",
+            "subject_id": "annotated_sequence_1",
+            "sig35_variant": "ACCGCG",
+            "embedding": [-1.0, 0.0],
+        },
+        {
+            "id": "annotated_sequence_2",
+            "subject_id": "annotated_sequence_2",
+            "sig35_variant": "ACCGCG",
+            "embedding": [-0.9, -0.1],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+    study_inputs_dir = workspace_dir / "study_inputs"
+    study_inputs_dir.mkdir(parents=True, exist_ok=True)
+    (study_inputs_dir / "sig35_order.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "source": "test fixture",
+                "exploratory": True,
+                "order": [
+                    {"variant_id": "f", "sequence": "TTGACA", "rank": 1},
+                    {"variant_id": "b", "sequence": "CTGACA", "rank": 2},
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="sigma35_centroid_distance_metrics",
+        builder_kind="sigma35_centroid_distance",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "sig35_order_path": "study_inputs/sig35_order.yaml",
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    labels = {row["row_variant"] for row in rows_table} | {row["column_variant"] for row in rows_table}
+
+    assert "ACCGCG (annotated, unranked)" in labels
+    assert any(
+        row["row_variant"] == "ACCGCG (annotated, unranked)"
+        and row["column_variant"] == "ACCGCG (annotated, unranked)"
+        and row["metric_value"] == pytest.approx(0.0, abs=1e-6)
+        for row in rows_table
+    )
 
 
 def test_reference_neighbor_metrics_pool_row_level_censored_ranks_across_tasks() -> None:

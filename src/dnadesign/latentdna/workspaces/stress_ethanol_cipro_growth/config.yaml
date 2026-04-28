@@ -19,6 +19,39 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: id
     subject_key: id
+  anchor_7b_seq_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_prom_eth_cip_anchor
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      orientation: forward
+  anchor_7b_seq_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_prom_eth_cip_anchor
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      orientation: forward
+  anchor_7b_seq_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_prom_eth_cip_anchor
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
   full_context_1kb:
     kind: usr
     root: ../../../usr/datasets
@@ -26,6 +59,150 @@ sources:
     record_key: id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+  full_context_7b_forward_anchor_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      orientation: forward
+  full_context_7b_forward_anchor_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      orientation: forward
+  full_context_7b_forward_anchor_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  full_context_7b_forward_seq_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      orientation: forward
+  full_context_7b_forward_seq_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      orientation: forward
+  full_context_7b_forward_seq_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  full_context_7b_reverse_complement_anchor_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      orientation: reverse_complement
+  full_context_7b_reverse_complement_anchor_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      orientation: reverse_complement
+  full_context_7b_reverse_complement_anchor_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: reverse_complement
+  full_context_7b_reverse_complement_seq_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      orientation: reverse_complement
+  full_context_7b_reverse_complement_seq_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      orientation: reverse_complement
+  full_context_7b_reverse_complement_seq_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: reverse_complement
 metadata:
   include:
     - design_family
@@ -36,13 +213,18 @@ metadata:
     - is_control
     - campaign_prior
     - construct_template_id
-    - log_likelihood_per_token_7b
-  derivations:
-    log_likelihood_per_token_7b:
-      kind: coalesce
-      sources:
-        - infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token
-        - infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token
+    - source_family
+    - selection_basis
+    - view_collections
+    - role_tags
+    - promoter_standard__collection_id
+    - promoter_standard__promoter_id
+    - promoter_standard__display_name
+    - promoter_standard__strength_metric
+    - promoter_standard__strength_value
+    - promoter_standard__strength_value_numeric
+    - promoter_standard__strength_reference
+  derivations: {}
 alignments:
   intermediate_embedding_7b_anchor_to_full_context:
     left: intermediate_embedding_7b_full_context_1kb
@@ -54,102 +236,87 @@ alignments:
     right: intermediate_embedding_7b_anchor_60bp
     left_on: [construct__anchor_id]
     right_on: [id]
-  pooled_logits_7b_anchor_to_full_context:
-    left: pooled_logits_7b_full_context_1kb
-    right: pooled_logits_7b_anchor_60bp
-    left_on: [construct__anchor_id]
-    right_on: [id]
 views:
-  intermediate_embedding_20b_anchor_60bp:
-    source: anchor_60bp
-    vector:
-      kind: column
-      name: infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
-    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
-    tags: {encoder: evo2, model: 20b, family: intermediate_embedding, scope: anchor_60bp}
-    role: hidden
-  intermediate_embedding_20b_full_context_1kb:
-    source: full_context_1kb
-    vector:
-      kind: column
-      name: infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
-    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
-    tags: {encoder: evo2, model: 20b, family: intermediate_embedding, scope: full_context_1kb}
-    role: hidden
   intermediate_embedding_7b_anchor_60bp:
-    source: anchor_60bp
+    source: anchor_7b_seq_mean_features
     vector:
       kind: column
-      name: infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+      name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: anchor_60bp}
     role: primary
-  intermediate_embedding_7b_full_context_1kb:
-    source: full_context_1kb
+  output_layer_mean_7b_anchor_60bp:
+    source: anchor_7b_seq_mean_output_layer_features
     vector:
       kind: column
-      name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: anchor_60bp}
+    role: planned
+  intermediate_embedding_7b_full_context_1kb:
+    source: full_context_7b_forward_seq_mean_features
+    vector:
+      kind: column
+      name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: full_context_1kb}
-    role: appendix
-  intermediate_embedding_7b_full_context_anchor_mean:
-    source: full_context_1kb
+    role: planned
+  output_layer_mean_7b_full_context_1kb:
+    source: full_context_7b_forward_seq_mean_output_layer_features
     vector:
       kind: column
-      name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: full_context_1kb}
+    role: planned
+  intermediate_embedding_7b_full_context_anchor_mean:
+    source: full_context_7b_forward_anchor_mean_features
+    vector:
+      kind: column
+      name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: full_context_anchor_mean}
     role: primary
-  intermediate_embedding_7b_anchor_plus_full_context_concat:
-    derive:
-      kind: concatenate
-      inputs:
-        - intermediate_embedding_7b_anchor_60bp
-        - intermediate_embedding_7b_full_context_1kb
-    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out_concat
-    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: anchor_plus_full_context_concat}
-    role: challenger
-  intermediate_embedding_7b_anchor_plus_anchor_mean_concat:
-    derive:
-      kind: concatenate
-      inputs:
-        - intermediate_embedding_7b_anchor_60bp
-        - intermediate_embedding_7b_full_context_anchor_mean
-    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out_concat
-    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: anchor_plus_anchor_mean_concat}
-    role: challenger
-  pooled_logits_20b_anchor_60bp:
-    source: anchor_60bp
+  output_layer_mean_7b_full_context_anchor_mean:
+    source: full_context_7b_forward_anchor_mean_output_layer_features
     vector:
       kind: column
-      name: infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean
-    coordinate_space_id: evo2_20b_output_layer_mean
-    tags: {encoder: evo2, model: 20b, family: pooled_logits, scope: anchor_60bp}
-    role: hidden
-  pooled_logits_20b_full_context_1kb:
-    source: full_context_1kb
-    vector:
-      kind: column
-      name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__seq_mean
-    coordinate_space_id: evo2_20b_output_layer_mean
-    tags: {encoder: evo2, model: 20b, family: pooled_logits, scope: full_context_1kb}
-    role: hidden
-  pooled_logits_7b_anchor_60bp:
-    source: anchor_60bp
-    vector:
-      kind: column
-      name: infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean
+      name: value
     coordinate_space_id: evo2_7b_output_layer_mean
-    tags: {encoder: evo2, model: 7b, family: pooled_logits, scope: anchor_60bp}
-    role: appendix
-  pooled_logits_7b_full_context_1kb:
-    source: full_context_1kb
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: full_context_anchor_mean}
+    role: planned
+  intermediate_embedding_7b_reverse_complement_context_anchor_mean:
+    source: full_context_7b_reverse_complement_anchor_mean_features
     vector:
       kind: column
-      name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reverse_complement_context_anchor_mean}
+    role: planned
+  output_layer_mean_7b_reverse_complement_context_anchor_mean:
+    source: full_context_7b_reverse_complement_anchor_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
     coordinate_space_id: evo2_7b_output_layer_mean
-    tags: {encoder: evo2, model: 7b, family: pooled_logits, scope: full_context_1kb}
-    role: appendix
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reverse_complement_context_anchor_mean}
+    role: planned
+  intermediate_embedding_7b_reverse_complement_context_1kb:
+    source: full_context_7b_reverse_complement_seq_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reverse_complement_context_1kb}
+    role: planned
+  output_layer_mean_7b_reverse_complement_context_1kb:
+    source: full_context_7b_reverse_complement_seq_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reverse_complement_context_1kb}
+    role: planned
 landmarks:
   spyp:
     source: anchor_60bp
@@ -251,11 +418,9 @@ plots:
     visibility_tier: primary
     scalars:
       - balanced_design_family_margins_intermediate_embedding_7b_anchor_60bp
-      - balanced_design_family_margins_intermediate_embedding_7b_full_context_1kb
       - balanced_design_family_margins_intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
-      - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     x_column: synthetic_margin_ethanol_vs_background
     y_column: synthetic_margin_cipro_vs_background
@@ -267,7 +432,9 @@ plots:
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
       - {column: spacer_length, label: Spacer length, type: ordinal}
-      - {column: log_likelihood_per_token_7b, label: 7B log likelihood / token, type: continuous}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: promoter_standard__collection_id, label: Reference standard collection, type: categorical}
+      - {column: promoter_standard__strength_value_numeric, label: Reference standard strength, type: continuous}
     semantics_ref: plot_semantics/balanced_design_family_margin_gallery.yaml
   sigma35_ordinal_audit:
     kind: metric_panel_grid
@@ -293,7 +460,6 @@ plots:
     visibility_tier: primary
     scalars:
       - sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp
-      - sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
       - sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
     metric_columns: [sig35_margin_f_vs_b]
     x_axis_label: Sigma-35 variant
@@ -302,7 +468,6 @@ plots:
     render_mode: violin_box
     panel_titles:
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
-      - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     semantics_ref: plot_semantics/sigma35_margin_ladder_gallery.yaml
   sigma35_stress_margin_gallery:
@@ -310,11 +475,9 @@ plots:
     visibility_tier: primary
     scalars:
       - sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp
-      - sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
       - sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
-      - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     x_column: sig35_margin_f_vs_b
     y_column: synthetic_best_stress_margin
@@ -326,18 +489,18 @@ plots:
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
       - {column: spacer_length, label: Spacer length, type: ordinal}
-      - {column: log_likelihood_per_token_7b, label: 7B log likelihood / token, type: continuous}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: promoter_standard__collection_id, label: Reference standard collection, type: categorical}
+      - {column: promoter_standard__strength_value_numeric, label: Reference standard strength, type: continuous}
     semantics_ref: plot_semantics/sigma35_stress_margin_gallery.yaml
   sigma35_centroid_distance_gallery:
     kind: heatmap_grid
     visibility_tier: appendix
     scalars:
       - sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp
-      - sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb
       - sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
-      - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     row_column: row_variant
     column_column: column_variant
@@ -387,10 +550,7 @@ plots:
     label_column: frontier_label
     label_values:
       - 60 bp anchor
-      - 1 kb seq mean
       - 1 kb anchor mean
-      - anchor + seq mean concat
-      - anchor + anchor mean concat
     semantics_ref: plot_semantics/candidate_decision_frontier.yaml
   design_centroid_margin_gallery:
     kind: xy_scatter_grid
@@ -398,15 +558,9 @@ plots:
     scalars: &design_centroid_scalars
       - design_centroid_margins_intermediate_embedding_7b_anchor_60bp
       - design_centroid_margins_intermediate_embedding_7b_full_context_anchor_mean
-      - design_centroid_margins_intermediate_embedding_7b_full_context_1kb
-      - design_centroid_margins_pooled_logits_7b_anchor_60bp
-      - design_centroid_margins_pooled_logits_7b_full_context_1kb
     panel_titles: &candidate_panel_titles
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
-      - Evo 2 7B · 1 kb construct context · Intermediate block mean
-      - Evo 2 7B · 60 bp anchor · Pooled logits
-      - Evo 2 7B · 1 kb construct context · Pooled logits
     x_column: synthetic_margin_ethanol_vs_background
     y_column: synthetic_margin_cipro_vs_background
     default_hue: design_family
@@ -415,7 +569,9 @@ plots:
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
       - {column: spacer_length, label: Spacer length, type: ordinal}
-      - {column: log_likelihood_per_token_7b, label: 7B log likelihood / token, type: continuous}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: promoter_standard__collection_id, label: Reference standard collection, type: categorical}
+      - {column: promoter_standard__strength_value_numeric, label: Reference standard strength, type: continuous}
     semantics_ref: plot_semantics/design_centroid_margin_gallery.yaml
   reference_alignment_summary:
     kind: metric_panel_grid
@@ -440,9 +596,6 @@ plots:
     reducers: &candidate_reducers
       - pca_intermediate_embedding_7b_anchor_60bp
       - pca_intermediate_embedding_7b_full_context_anchor_mean
-      - pca_intermediate_embedding_7b_full_context_1kb
-      - pca_pooled_logits_7b_anchor_60bp
-      - pca_pooled_logits_7b_full_context_1kb
     panel_titles: *candidate_panel_titles
     semantics_ref: plot_semantics/representation_scree_diagnostic.yaml
   appendix_umap_gallery:
@@ -451,9 +604,6 @@ plots:
     projections: &candidate_projections
       - umap_intermediate_embedding_7b_anchor_60bp
       - umap_intermediate_embedding_7b_full_context_anchor_mean
-      - umap_intermediate_embedding_7b_full_context_1kb
-      - umap_pooled_logits_7b_anchor_60bp
-      - umap_pooled_logits_7b_full_context_1kb
     panel_titles: *candidate_panel_titles
     default_hue: sig35_variant
     hue_options:
@@ -461,7 +611,9 @@ plots:
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
       - {column: spacer_length, label: Spacer length, type: ordinal}
-      - {column: log_likelihood_per_token_7b, label: 7B log likelihood / token, type: continuous}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: promoter_standard__collection_id, label: Reference standard collection, type: categorical}
+      - {column: promoter_standard__strength_value_numeric, label: Reference standard strength, type: continuous}
     annotation:
       reference_set: promoter_wildtype_primary
     semantics_ref: plot_semantics/appendix_umap_gallery.yaml
@@ -487,29 +639,18 @@ notebooks:
   latent_geometry_browser:
     kind: workspace
     title: Latent geometry browser
-    description: Read-only QC browser for pre-assay representation triage across the seven-geometry 7B notebook candidate inventory.
+    description: Read-only QC browser for pre-assay representation triage across available 7B sequence-view feature sidecars.
     default_deliverable: representation_health_summary
     default_surface: plots
     context_audit_scalar_ids:
       - context_delta_distribution_intermediate_embedding_7b_anchor_mean
-      - context_delta_distribution_intermediate_embedding_7b
     geometry_order: &browser_geometry_order
       - intermediate_embedding_7b_anchor_60bp
-      - pooled_logits_7b_anchor_60bp
-      - intermediate_embedding_7b_full_context_1kb
-      - pooled_logits_7b_full_context_1kb
       - intermediate_embedding_7b_full_context_anchor_mean
-      - intermediate_embedding_7b_anchor_plus_full_context_concat
-      - intermediate_embedding_7b_anchor_plus_anchor_mean_concat
     candidate_grid_views: *browser_geometry_order
     candidate_grid_panel_titles: &browser_candidate_panel_titles
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
-      - Evo 2 7B · 60 bp anchor · Pooled logits
-      - Evo 2 7B · 1 kb construct context · Intermediate block mean
-      - Evo 2 7B · 1 kb construct context · Pooled logits
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
-      - Evo 2 7B · Anchor + full-context concat · Intermediate block mean
-      - Evo 2 7B · Anchor + anchor-mean concat · Intermediate block mean
     default_compare_views:
       - intermediate_embedding_7b_anchor_60bp
       - intermediate_embedding_7b_full_context_anchor_mean
@@ -538,7 +679,7 @@ recipes:
         params:
           scalar: dataset_overview_counts
           kind: dataset_overview
-          source_ids: [anchor_60bp, full_context_1kb]
+          source_ids: [anchor_60bp]
           reference_set_id: promoter_wildtype_primary
       - &render_dataset_overview
         id: render_dataset_overview
@@ -548,29 +689,12 @@ recipes:
   pre_assay_representation_triage_recipe:
     steps:
       - &materialize_ie7_anchor {id: materialize_intermediate_embedding_7b_anchor_60bp, op: view.materialize, params: {view: intermediate_embedding_7b_anchor_60bp}}
-      - &materialize_ie7_full {id: materialize_intermediate_embedding_7b_full_context_1kb, op: view.materialize, params: {view: intermediate_embedding_7b_full_context_1kb}}
       - &materialize_ie7_anchor_mean {id: materialize_intermediate_embedding_7b_full_context_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_full_context_anchor_mean}}
-      - &materialize_ie7_anchor_plus_full {id: materialize_intermediate_embedding_7b_anchor_plus_full_context_concat, op: view.materialize, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_1kb], params: {view: intermediate_embedding_7b_anchor_plus_full_context_concat}}
-      - &materialize_ie7_anchor_plus_anchor_mean {id: materialize_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, op: view.materialize, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {view: intermediate_embedding_7b_anchor_plus_anchor_mean_concat}}
-      - &materialize_pl7_anchor {id: materialize_pooled_logits_7b_anchor_60bp, op: view.materialize, params: {view: pooled_logits_7b_anchor_60bp}}
-      - &materialize_pl7_full {id: materialize_pooled_logits_7b_full_context_1kb, op: view.materialize, params: {view: pooled_logits_7b_full_context_1kb}}
-      - &align_ie7 {id: build_alignment_intermediate_embedding_7b_anchor_to_full_context, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_1kb], params: {alignment: intermediate_embedding_7b_anchor_to_full_context}}
       - &align_ie7_anchor_mean {id: build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {alignment: intermediate_embedding_7b_anchor_to_anchor_mean}}
-      - &align_pl7 {id: build_alignment_pooled_logits_7b_anchor_to_full_context, op: alignment.build, depends_on: [materialize_pooled_logits_7b_anchor_60bp, materialize_pooled_logits_7b_full_context_1kb], params: {alignment: pooled_logits_7b_anchor_to_full_context}}
       - &score_sample_ie7_anchor {id: build_scorecard_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &score_sample_ie7_full {id: build_scorecard_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
       - &score_sample_ie7_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, view: intermediate_embedding_7b_full_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &score_sample_ie7_anchor_plus_full {id: build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_plus_full_context_concat], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat, view: intermediate_embedding_7b_anchor_plus_full_context_concat, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &score_sample_ie7_anchor_plus_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_plus_anchor_mean_concat], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, view: intermediate_embedding_7b_anchor_plus_anchor_mean_concat, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &score_sample_pl7_anchor {id: build_scorecard_sample_pooled_logits_7b_anchor_60bp, op: sample.build, depends_on: [materialize_pooled_logits_7b_anchor_60bp], params: {sample: scorecard_sample_pooled_logits_7b_anchor_60bp, view: pooled_logits_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
-      - &score_sample_pl7_full {id: build_scorecard_sample_pooled_logits_7b_full_context_1kb, op: sample.build, depends_on: [materialize_pooled_logits_7b_full_context_1kb], params: {sample: scorecard_sample_pooled_logits_7b_full_context_1kb, view: pooled_logits_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: promoter_wildtype_primary}}
       - &pca_ie7_anchor {id: reduce_pca_intermediate_embedding_7b_anchor_60bp, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_anchor_60bp], params: {view: intermediate_embedding_7b_anchor_60bp, run_id: pca_intermediate_embedding_7b_anchor_60bp, reduced_view_id: intermediate_embedding_7b_anchor_60bp_reduced, sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, dims: 16}}
-      - &pca_ie7_full {id: reduce_pca_intermediate_embedding_7b_full_context_1kb, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_full_context_1kb], params: {view: intermediate_embedding_7b_full_context_1kb, run_id: pca_intermediate_embedding_7b_full_context_1kb, reduced_view_id: intermediate_embedding_7b_full_context_1kb_reduced, sample: scorecard_sample_intermediate_embedding_7b_full_context_1kb, dims: 16}}
       - &pca_ie7_anchor_mean {id: reduce_pca_intermediate_embedding_7b_full_context_anchor_mean, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean], params: {view: intermediate_embedding_7b_full_context_anchor_mean, run_id: pca_intermediate_embedding_7b_full_context_anchor_mean, reduced_view_id: intermediate_embedding_7b_full_context_anchor_mean_reduced, sample: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, dims: 16}}
-      - &pca_ie7_anchor_plus_full {id: reduce_pca_intermediate_embedding_7b_anchor_plus_full_context_concat, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat], params: {view: intermediate_embedding_7b_anchor_plus_full_context_concat, run_id: pca_intermediate_embedding_7b_anchor_plus_full_context_concat, reduced_view_id: intermediate_embedding_7b_anchor_plus_full_context_concat_reduced, sample: scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat, dims: 16}}
-      - &pca_ie7_anchor_plus_anchor_mean {id: reduce_pca_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat], params: {view: intermediate_embedding_7b_anchor_plus_anchor_mean_concat, run_id: pca_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, reduced_view_id: intermediate_embedding_7b_anchor_plus_anchor_mean_concat_reduced, sample: scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, dims: 16}}
-      - &pca_pl7_anchor {id: reduce_pca_pooled_logits_7b_anchor_60bp, op: view.reduce, depends_on: [build_scorecard_sample_pooled_logits_7b_anchor_60bp], params: {view: pooled_logits_7b_anchor_60bp, run_id: pca_pooled_logits_7b_anchor_60bp, reduced_view_id: pooled_logits_7b_anchor_60bp_reduced, sample: scorecard_sample_pooled_logits_7b_anchor_60bp, dims: 16}}
-      - &pca_pl7_full {id: reduce_pca_pooled_logits_7b_full_context_1kb, op: view.reduce, depends_on: [build_scorecard_sample_pooled_logits_7b_full_context_1kb], params: {view: pooled_logits_7b_full_context_1kb, run_id: pca_pooled_logits_7b_full_context_1kb, reduced_view_id: pooled_logits_7b_full_context_1kb_reduced, sample: scorecard_sample_pooled_logits_7b_full_context_1kb, dims: 16}}
       - &design_margin_ie7_anchor
         id: build_design_centroid_margins_intermediate_embedding_7b_anchor_60bp
         op: scalar.build
@@ -579,20 +703,6 @@ recipes:
           scalar: design_centroid_margins_intermediate_embedding_7b_anchor_60bp
           kind: cohort_similarity_margin
           view_id: intermediate_embedding_7b_anchor_60bp
-          cohort_column: design_family
-          leave_one_out: true
-          margin_pairs:
-            - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
-            - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
-            - {target_values: [ethanol_ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_dual_vs_background}
-      - &design_margin_ie7_full
-        id: build_design_centroid_margins_intermediate_embedding_7b_full_context_1kb
-        op: scalar.build
-        depends_on: [materialize_intermediate_embedding_7b_full_context_1kb]
-        params:
-          scalar: design_centroid_margins_intermediate_embedding_7b_full_context_1kb
-          kind: cohort_similarity_margin
-          view_id: intermediate_embedding_7b_full_context_1kb
           cohort_column: design_family
           leave_one_out: true
           margin_pairs:
@@ -613,34 +723,6 @@ recipes:
             - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
             - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
             - {target_values: [ethanol_ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_dual_vs_background}
-      - &design_margin_pl7_anchor
-        id: build_design_centroid_margins_pooled_logits_7b_anchor_60bp
-        op: scalar.build
-        depends_on: [materialize_pooled_logits_7b_anchor_60bp]
-        params:
-          scalar: design_centroid_margins_pooled_logits_7b_anchor_60bp
-          kind: cohort_similarity_margin
-          view_id: pooled_logits_7b_anchor_60bp
-          cohort_column: design_family
-          leave_one_out: true
-          margin_pairs:
-            - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
-            - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
-            - {target_values: [ethanol_ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_dual_vs_background}
-      - &design_margin_pl7_full
-        id: build_design_centroid_margins_pooled_logits_7b_full_context_1kb
-        op: scalar.build
-        depends_on: [materialize_pooled_logits_7b_full_context_1kb]
-        params:
-          scalar: design_centroid_margins_pooled_logits_7b_full_context_1kb
-          kind: cohort_similarity_margin
-          view_id: pooled_logits_7b_full_context_1kb
-          cohort_column: design_family
-          leave_one_out: true
-          margin_pairs:
-            - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
-            - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
-            - {target_values: [ethanol_ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_dual_vs_background}
       - &balanced_design_margin_ie7_anchor
         id: build_balanced_design_family_margins_intermediate_embedding_7b_anchor_60bp
         op: scalar.build
@@ -648,25 +730,6 @@ recipes:
           scalar: balanced_design_family_margins_intermediate_embedding_7b_anchor_60bp
           kind: cohort_similarity_margin
           view_id: intermediate_embedding_7b_anchor_60bp
-          cohort_column: design_family
-          leave_one_out: true
-          balance_group_column: design_family
-          balance_columns: [sig35_variant, spacer_length]
-          balance_reference_only: true
-          required_group_values: [background_only, ethanol, ciprofloxacin, ethanol_ciprofloxacin]
-          exclude_group_values: [control]
-          seed: 17
-          margin_pairs:
-            - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
-            - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
-            - {target_values: [ethanol_ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_dual_vs_background}
-      - &balanced_design_margin_ie7_full
-        id: build_balanced_design_family_margins_intermediate_embedding_7b_full_context_1kb
-        op: scalar.build
-        params:
-          scalar: balanced_design_family_margins_intermediate_embedding_7b_full_context_1kb
-          kind: cohort_similarity_margin
-          view_id: intermediate_embedding_7b_full_context_1kb
           cohort_column: design_family
           leave_one_out: true
           balance_group_column: design_family
@@ -711,19 +774,6 @@ recipes:
             - {cohort_column: sig35_variant, target_values: [f], control_values: [b], output_column: sig35_margin_f_vs_b}
             - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
             - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
-      - &sigma35_stress_margins_ie7_full
-        id: build_sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
-        op: scalar.build
-        params:
-          scalar: sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
-          kind: cohort_similarity_margin
-          view_id: intermediate_embedding_7b_full_context_1kb
-          cohort_column: design_family
-          leave_one_out: true
-          margin_pairs:
-            - {cohort_column: sig35_variant, target_values: [f], control_values: [b], output_column: sig35_margin_f_vs_b}
-            - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
-            - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
       - &sigma35_stress_margins_ie7_anchor_mean
         id: build_sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
         op: scalar.build
@@ -742,12 +792,7 @@ recipes:
         op: scalar.build
         depends_on:
           - reduce_pca_intermediate_embedding_7b_anchor_60bp
-          - reduce_pca_intermediate_embedding_7b_full_context_1kb
           - reduce_pca_intermediate_embedding_7b_full_context_anchor_mean
-          - reduce_pca_intermediate_embedding_7b_anchor_plus_full_context_concat
-          - reduce_pca_intermediate_embedding_7b_anchor_plus_anchor_mean_concat
-          - reduce_pca_pooled_logits_7b_anchor_60bp
-          - reduce_pca_pooled_logits_7b_full_context_1kb
         params:
           scalar: representation_health_summary_metrics
           kind: representation_health_summary
@@ -757,23 +802,13 @@ recipes:
             pairwise_distance_iqr_min: 0.01
           candidates:
             - {view_id: intermediate_embedding_7b_anchor_60bp, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_60bp, reducer_id: pca_intermediate_embedding_7b_anchor_60bp}
-            - {view_id: pooled_logits_7b_anchor_60bp, sample_id: scorecard_sample_pooled_logits_7b_anchor_60bp, reducer_id: pca_pooled_logits_7b_anchor_60bp}
-            - {view_id: intermediate_embedding_7b_full_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_1kb, reducer_id: pca_intermediate_embedding_7b_full_context_1kb}
-            - {view_id: pooled_logits_7b_full_context_1kb, sample_id: scorecard_sample_pooled_logits_7b_full_context_1kb, reducer_id: pca_pooled_logits_7b_full_context_1kb}
             - {view_id: intermediate_embedding_7b_full_context_anchor_mean, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, reducer_id: pca_intermediate_embedding_7b_full_context_anchor_mean}
-            - {view_id: intermediate_embedding_7b_anchor_plus_full_context_concat, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat, reducer_id: pca_intermediate_embedding_7b_anchor_plus_full_context_concat}
-            - {view_id: intermediate_embedding_7b_anchor_plus_anchor_mean_concat, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat, reducer_id: pca_intermediate_embedding_7b_anchor_plus_anchor_mean_concat}
       - &build_design_structure_summary_metrics
         id: build_design_structure_summary_metrics
         op: scalar.build
         depends_on:
           - build_scorecard_sample_intermediate_embedding_7b_anchor_60bp
-          - build_scorecard_sample_intermediate_embedding_7b_full_context_1kb
           - build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean
-          - build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat
-          - build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat
-          - build_scorecard_sample_pooled_logits_7b_anchor_60bp
-          - build_scorecard_sample_pooled_logits_7b_full_context_1kb
         params:
           scalar: design_structure_summary_metrics
           kind: design_structure_summary
@@ -782,23 +817,13 @@ recipes:
           balance_columns: [sig35_variant, spacer_length]
           candidates:
             - {view_id: intermediate_embedding_7b_anchor_60bp, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_60bp}
-            - {view_id: pooled_logits_7b_anchor_60bp, sample_id: scorecard_sample_pooled_logits_7b_anchor_60bp}
-            - {view_id: intermediate_embedding_7b_full_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_1kb}
-            - {view_id: pooled_logits_7b_full_context_1kb, sample_id: scorecard_sample_pooled_logits_7b_full_context_1kb}
             - {view_id: intermediate_embedding_7b_full_context_anchor_mean, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean}
-            - {view_id: intermediate_embedding_7b_anchor_plus_full_context_concat, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat}
-            - {view_id: intermediate_embedding_7b_anchor_plus_anchor_mean_concat, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat}
       - &build_sigma35_ordinal_audit_metrics
         id: build_sigma35_ordinal_audit_metrics
         op: scalar.build
         depends_on:
           - build_scorecard_sample_intermediate_embedding_7b_anchor_60bp
-          - build_scorecard_sample_intermediate_embedding_7b_full_context_1kb
           - build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean
-          - build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat
-          - build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat
-          - build_scorecard_sample_pooled_logits_7b_anchor_60bp
-          - build_scorecard_sample_pooled_logits_7b_full_context_1kb
         params:
           scalar: sigma35_ordinal_audit_metrics
           kind: sigma35_ordinal_audit
@@ -809,12 +834,7 @@ recipes:
           balance_columns: [design_family, spacer_length]
           candidates:
             - {view_id: intermediate_embedding_7b_anchor_60bp, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_60bp}
-            - {view_id: pooled_logits_7b_anchor_60bp, sample_id: scorecard_sample_pooled_logits_7b_anchor_60bp}
-            - {view_id: intermediate_embedding_7b_full_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_1kb}
-            - {view_id: pooled_logits_7b_full_context_1kb, sample_id: scorecard_sample_pooled_logits_7b_full_context_1kb}
             - {view_id: intermediate_embedding_7b_full_context_anchor_mean, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean}
-            - {view_id: intermediate_embedding_7b_anchor_plus_full_context_concat, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat}
-            - {view_id: intermediate_embedding_7b_anchor_plus_anchor_mean_concat, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat}
       - &build_sigma35_centroid_distance_ie7_anchor
         id: build_sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp
         op: scalar.build
@@ -824,15 +844,6 @@ recipes:
           sig35_order_path: study_inputs/sig35_order.yaml
           candidates:
             - {view_id: intermediate_embedding_7b_anchor_60bp}
-      - &build_sigma35_centroid_distance_ie7_full
-        id: build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb
-        op: scalar.build
-        params:
-          scalar: sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb
-          kind: sigma35_centroid_distance
-          sig35_order_path: study_inputs/sig35_order.yaml
-          candidates:
-            - {view_id: intermediate_embedding_7b_full_context_1kb}
       - &build_sigma35_centroid_distance_ie7_anchor_mean
         id: build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean
         op: scalar.build
@@ -861,32 +872,11 @@ recipes:
           where: {column: source_class, equals: densegen}
           table_sample_only: true
           seed: 17
-      - &context_delta_ie7
-        id: build_context_delta_distribution_intermediate_embedding_7b
-        op: scalar.build
-        depends_on: [build_alignment_intermediate_embedding_7b_anchor_to_full_context]
-        params:
-          scalar: context_delta_distribution_intermediate_embedding_7b
-          kind: alignment_metrics
-          alignment_id: intermediate_embedding_7b_anchor_to_full_context
-          left_view_id: intermediate_embedding_7b_full_context_1kb
-          right_view_id: intermediate_embedding_7b_anchor_60bp
-          metadata_view_id: intermediate_embedding_7b_full_context_1kb
-          left_margin_source: null
-          right_margin_source: null
-          margin_deltas: []
-          sample_size: 512
-          sample_group_column: design_family
-          where: {column: source_class, equals: densegen}
-          table_sample_only: true
-          seed: 17
       - &build_context_robustness_summary_metrics
         id: build_context_robustness_summary_metrics
         op: scalar.build
         depends_on:
-          - build_alignment_intermediate_embedding_7b_anchor_to_full_context
           - build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean
-          - build_alignment_pooled_logits_7b_anchor_to_full_context
         params:
           scalar: context_robustness_summary_metrics
           kind: context_robustness_summary
@@ -894,22 +884,18 @@ recipes:
           sample_group_column: design_family
           seed: 17
           pairs:
-            - {pair_id: intermediate_embedding_7b_anchor_vs_context, label: "7B intermediate: anchor vs 1 kb seq mean", alignment_id: intermediate_embedding_7b_anchor_to_full_context, anchor_view_id: intermediate_embedding_7b_anchor_60bp, context_view_id: intermediate_embedding_7b_full_context_1kb}
             - {pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean, label: "7B intermediate: anchor vs context anchor mean", alignment_id: intermediate_embedding_7b_anchor_to_anchor_mean, anchor_view_id: intermediate_embedding_7b_anchor_60bp, context_view_id: intermediate_embedding_7b_full_context_anchor_mean}
-            - {pair_id: pooled_logits_7b_anchor_vs_context, label: "7B pooled logits: anchor vs 1 kb seq mean", alignment_id: pooled_logits_7b_anchor_to_full_context, anchor_view_id: pooled_logits_7b_anchor_60bp, context_view_id: pooled_logits_7b_full_context_1kb}
       - &build_reference_alignment_summary_metrics
         id: build_reference_alignment_summary_metrics
         op: scalar.build
         depends_on:
-          - build_scorecard_sample_intermediate_embedding_7b_full_context_1kb
-          - build_scorecard_sample_pooled_logits_7b_full_context_1kb
+          - build_scorecard_sample_intermediate_embedding_7b_anchor_60bp
           - build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean
         params:
           scalar: reference_alignment_summary_metrics
           kind: reference_alignment_summary
           candidates:
-            - {view_id: intermediate_embedding_7b_full_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_1kb}
-            - {view_id: pooled_logits_7b_full_context_1kb, sample_id: scorecard_sample_pooled_logits_7b_full_context_1kb}
+            - {view_id: intermediate_embedding_7b_anchor_60bp, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_60bp}
             - {view_id: intermediate_embedding_7b_full_context_anchor_mean, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean}
       - &build_candidate_decision_frontier_metrics
         id: build_candidate_decision_frontier_metrics
@@ -928,32 +914,23 @@ recipes:
           context_scalar: context_robustness_summary_metrics
           candidate_ids:
             - intermediate_embedding_7b_anchor_60bp
-            - intermediate_embedding_7b_full_context_1kb
             - intermediate_embedding_7b_full_context_anchor_mean
-            - intermediate_embedding_7b_anchor_plus_full_context_concat
-            - intermediate_embedding_7b_anchor_plus_anchor_mean_concat
           context_pairs:
             - {candidate_id: intermediate_embedding_7b_anchor_60bp, pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean}
-            - {candidate_id: intermediate_embedding_7b_full_context_1kb, pair_id: intermediate_embedding_7b_anchor_vs_context}
             - {candidate_id: intermediate_embedding_7b_full_context_anchor_mean, pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean}
           annotation_labels:
             - {candidate_id: intermediate_embedding_7b_anchor_60bp, label: "60 bp anchor"}
-            - {candidate_id: intermediate_embedding_7b_full_context_1kb, label: "1 kb seq mean"}
             - {candidate_id: intermediate_embedding_7b_full_context_anchor_mean, label: "1 kb anchor mean"}
-            - {candidate_id: intermediate_embedding_7b_anchor_plus_full_context_concat, label: "anchor + seq mean concat"}
-            - {candidate_id: intermediate_embedding_7b_anchor_plus_anchor_mean_concat, label: "anchor + anchor mean concat"}
       - &build_context_pair_summary_metrics
         id: build_context_pair_summary_metrics
         op: scalar.build
         depends_on:
           - build_context_delta_distribution_intermediate_embedding_7b_anchor_mean
-          - build_context_delta_distribution_intermediate_embedding_7b
         params:
           scalar: context_pair_summary_metrics
           kind: context_pair_summary
           comparisons:
             - {scalar_id: context_delta_distribution_intermediate_embedding_7b_anchor_mean, comparison_id: intermediate_embedding_7b_anchor_vs_anchor_mean, comparison_label: "1 kb anchor mean", comparison_role: context_anchor_mean}
-            - {scalar_id: context_delta_distribution_intermediate_embedding_7b, comparison_id: intermediate_embedding_7b_anchor_vs_context, comparison_label: "1 kb seq mean", comparison_role: whole_sequence_context}
       - &render_representation_health_summary
         id: render_representation_health_summary
         op: plot.render
@@ -969,7 +946,6 @@ recipes:
         op: plot.render
         depends_on:
           - build_balanced_design_family_margins_intermediate_embedding_7b_anchor_60bp
-          - build_balanced_design_family_margins_intermediate_embedding_7b_full_context_1kb
           - build_balanced_design_family_margins_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: balanced_design_family_margin_gallery}
       - &render_sigma35_ordinal_audit
@@ -982,7 +958,6 @@ recipes:
         op: plot.render
         depends_on:
           - build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp
-          - build_sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
           - build_sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: sigma35_margin_ladder_gallery}
       - &render_sigma35_centroid_distance_gallery
@@ -990,7 +965,6 @@ recipes:
         op: plot.render
         depends_on:
           - build_sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp
-          - build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb
           - build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: sigma35_centroid_distance_gallery}
       - &render_sigma35_stress_margin_gallery
@@ -998,7 +972,6 @@ recipes:
         op: plot.render
         depends_on:
           - build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp
-          - build_sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
           - build_sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: sigma35_stress_margin_gallery}
       - &render_context_robustness_summary
@@ -1011,9 +984,6 @@ recipes:
         op: plot.render
         depends_on:
           - build_design_centroid_margins_intermediate_embedding_7b_anchor_60bp
-          - build_design_centroid_margins_pooled_logits_7b_anchor_60bp
-          - build_design_centroid_margins_intermediate_embedding_7b_full_context_1kb
-          - build_design_centroid_margins_pooled_logits_7b_full_context_1kb
           - build_design_centroid_margins_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: design_centroid_margin_gallery}
       - &render_reference_alignment_summary
@@ -1037,9 +1007,6 @@ recipes:
         op: plot.render
         depends_on:
           - reduce_pca_intermediate_embedding_7b_anchor_60bp
-          - reduce_pca_pooled_logits_7b_anchor_60bp
-          - reduce_pca_intermediate_embedding_7b_full_context_1kb
-          - reduce_pca_pooled_logits_7b_full_context_1kb
           - reduce_pca_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: representation_scree_diagnostic}
   appendix_umap_gallery_recipe:
@@ -1047,48 +1014,24 @@ recipes:
       - *build_dataset_overview_counts
       - *render_dataset_overview
       - *materialize_ie7_anchor
-      - *materialize_ie7_full
       - *materialize_ie7_anchor_mean
-      - *materialize_ie7_anchor_plus_full
-      - *materialize_ie7_anchor_plus_anchor_mean
-      - *materialize_pl7_anchor
-      - *materialize_pl7_full
-      - *align_ie7
       - *align_ie7_anchor_mean
-      - *align_pl7
       - *score_sample_ie7_anchor
-      - *score_sample_ie7_full
       - *score_sample_ie7_anchor_mean
-      - *score_sample_ie7_anchor_plus_full
-      - *score_sample_ie7_anchor_plus_anchor_mean
-      - *score_sample_pl7_anchor
-      - *score_sample_pl7_full
       - *pca_ie7_anchor
-      - *pca_ie7_full
       - *pca_ie7_anchor_mean
-      - *pca_ie7_anchor_plus_full
-      - *pca_ie7_anchor_plus_anchor_mean
-      - *pca_pl7_anchor
-      - *pca_pl7_full
       - *design_margin_ie7_anchor
-      - *design_margin_ie7_full
       - *design_margin_ie7_anchor_mean
-      - *design_margin_pl7_anchor
-      - *design_margin_pl7_full
       - *balanced_design_margin_ie7_anchor
-      - *balanced_design_margin_ie7_full
       - *balanced_design_margin_ie7_anchor_mean
       - *sigma35_stress_margins_ie7_anchor
-      - *sigma35_stress_margins_ie7_full
       - *sigma35_stress_margins_ie7_anchor_mean
       - *build_representation_health_summary_metrics
       - *build_design_structure_summary_metrics
       - *build_sigma35_ordinal_audit_metrics
       - *build_sigma35_centroid_distance_ie7_anchor
-      - *build_sigma35_centroid_distance_ie7_full
       - *build_sigma35_centroid_distance_ie7_anchor_mean
       - *context_delta_ie7_anchor_mean
-      - *context_delta_ie7
       - *build_context_robustness_summary_metrics
       - *build_context_pair_summary_metrics
       - *build_reference_alignment_summary_metrics
@@ -1107,23 +1050,14 @@ recipes:
       - *render_reference_alignment_summary
       - *render_representation_scree_diagnostic
       - &umap_sample_ie7_anchor {id: build_umap_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: umap_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: all, seed: 17}}
-      - &umap_sample_ie7_full {id: build_umap_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: umap_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: all, seed: 17}}
       - &umap_sample_ie7_anchor_mean {id: build_umap_sample_intermediate_embedding_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {sample: umap_sample_intermediate_embedding_7b_full_context_anchor_mean, view: intermediate_embedding_7b_full_context_anchor_mean, strategy: all, seed: 17}}
-      - &umap_sample_pl7_anchor {id: build_umap_sample_pooled_logits_7b_anchor_60bp, op: sample.build, depends_on: [materialize_pooled_logits_7b_anchor_60bp], params: {sample: umap_sample_pooled_logits_7b_anchor_60bp, view: pooled_logits_7b_anchor_60bp, strategy: all, seed: 17}}
-      - &umap_sample_pl7_full {id: build_umap_sample_pooled_logits_7b_full_context_1kb, op: sample.build, depends_on: [materialize_pooled_logits_7b_full_context_1kb], params: {sample: umap_sample_pooled_logits_7b_full_context_1kb, view: pooled_logits_7b_full_context_1kb, strategy: all, seed: 17}}
       - &umap_ie7_anchor {id: fit_umap_intermediate_embedding_7b_anchor_60bp, op: projection.fit, depends_on: [build_umap_sample_intermediate_embedding_7b_anchor_60bp], params: {view: intermediate_embedding_7b_anchor_60bp, sample: umap_sample_intermediate_embedding_7b_anchor_60bp, run_id: umap_intermediate_embedding_7b_anchor_60bp, seed: 17}}
-      - &umap_ie7_full {id: fit_umap_intermediate_embedding_7b_full_context_1kb, op: projection.fit, depends_on: [build_umap_sample_intermediate_embedding_7b_full_context_1kb], params: {view: intermediate_embedding_7b_full_context_1kb, sample: umap_sample_intermediate_embedding_7b_full_context_1kb, run_id: umap_intermediate_embedding_7b_full_context_1kb, seed: 17}}
       - &umap_ie7_anchor_mean {id: fit_umap_intermediate_embedding_7b_full_context_anchor_mean, op: projection.fit, depends_on: [build_umap_sample_intermediate_embedding_7b_full_context_anchor_mean], params: {view: intermediate_embedding_7b_full_context_anchor_mean, sample: umap_sample_intermediate_embedding_7b_full_context_anchor_mean, run_id: umap_intermediate_embedding_7b_full_context_anchor_mean, seed: 17}}
-      - &umap_pl7_anchor {id: fit_umap_pooled_logits_7b_anchor_60bp, op: projection.fit, depends_on: [build_umap_sample_pooled_logits_7b_anchor_60bp], params: {view: pooled_logits_7b_anchor_60bp, sample: umap_sample_pooled_logits_7b_anchor_60bp, run_id: umap_pooled_logits_7b_anchor_60bp, seed: 17}}
-      - &umap_pl7_full {id: fit_umap_pooled_logits_7b_full_context_1kb, op: projection.fit, depends_on: [build_umap_sample_pooled_logits_7b_full_context_1kb], params: {view: pooled_logits_7b_full_context_1kb, sample: umap_sample_pooled_logits_7b_full_context_1kb, run_id: umap_pooled_logits_7b_full_context_1kb, seed: 17}}
       - &render_appendix_umap_gallery
         id: render_appendix_umap_gallery
         op: plot.render
         depends_on:
           - fit_umap_intermediate_embedding_7b_anchor_60bp
-          - fit_umap_pooled_logits_7b_anchor_60bp
-          - fit_umap_intermediate_embedding_7b_full_context_1kb
-          - fit_umap_pooled_logits_7b_full_context_1kb
           - fit_umap_intermediate_embedding_7b_full_context_anchor_mean
         params: {plot_id: appendix_umap_gallery}
       - id: generate_latent_geometry_browser
@@ -1168,12 +1102,7 @@ deliverables:
     requires:
       views: &canonical_view_ids
         - intermediate_embedding_7b_anchor_60bp
-        - intermediate_embedding_7b_full_context_1kb
         - intermediate_embedding_7b_full_context_anchor_mean
-        - intermediate_embedding_7b_anchor_plus_full_context_concat
-        - intermediate_embedding_7b_anchor_plus_anchor_mean_concat
-        - pooled_logits_7b_anchor_60bp
-        - pooled_logits_7b_full_context_1kb
     outputs:
       plots: [representation_health_summary]
     docs_refs:
@@ -1219,9 +1148,7 @@ deliverables:
     recipe: pre_assay_representation_triage_recipe
     requires:
       alignments:
-        - intermediate_embedding_7b_anchor_to_full_context
         - intermediate_embedding_7b_anchor_to_anchor_mean
-        - pooled_logits_7b_anchor_to_full_context
     outputs:
       plots:
         - context_robustness_summary
@@ -1238,9 +1165,7 @@ deliverables:
     requires:
       views: *canonical_view_ids
       alignments:
-        - intermediate_embedding_7b_anchor_to_full_context
         - intermediate_embedding_7b_anchor_to_anchor_mean
-        - pooled_logits_7b_anchor_to_full_context
     outputs:
       plots: [candidate_decision_frontier]
     docs_refs:

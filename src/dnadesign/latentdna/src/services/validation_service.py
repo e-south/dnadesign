@@ -24,7 +24,7 @@ _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
         "densegen__required_regulators",
         "usr_label__primary",
     },
-    "sig35_variant": {"densegen__plan", "usr_label__primary"},
+    "sig35_variant": {"usr_label__primary"},
     "spacer_length": {"densegen__used_tfbs_detail", "usr_label__primary"},
     "campaign_prior": {"densegen__plan", "usr_label__primary"},
     "is_control": {"densegen__plan", "usr_label__primary"},
@@ -35,6 +35,35 @@ _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
     "regulondb__confidence_level_set": {"regulondb__confidence_level_set"},
     "regulondb__metadata_completeness_class": {"regulondb__metadata_completeness_class"},
 }
+_PROMOTER_METADATA_ANY_COLUMN_GROUPS: dict[str, tuple[set[str], ...]] = {
+    "sig35_variant": (
+        {"densegen__plan"},
+        {"densegen__used_tfbs_detail"},
+        {"seq_annot__features"},
+        {"sequence", "derived__features_retained"},
+    ),
+}
+_NON_MATERIALIZABLE_VIEW_ROLES = {"planned", "retired"}
+
+
+def _materialized_view_source_contract_state(
+    view_dir: Path,
+    *,
+    source_id: str,
+    vector_column: str | None,
+) -> str:
+    manifest_path = view_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return "unknown"
+    manifest = read_json(manifest_path)
+    params = manifest.get("params", {}) if isinstance(manifest, dict) else {}
+    if not isinstance(params, dict):
+        return "unknown"
+    if params.get("source") != source_id:
+        return "stale"
+    if vector_column is not None and params.get("vector_column") != vector_column:
+        return "stale"
+    return "current"
 
 
 def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
@@ -113,6 +142,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     view_details: list[dict[str, object]] = []
     for view_id in sorted(context.config.views):
         view = context.require_view(view_id)
+        role = str(getattr(view, "role", "") or "").strip().lower()
         if isinstance(view, SourceBackedViewConfig):
             source = context.require_source(view.source)
             columns = source_columns[view.source]
@@ -123,6 +153,11 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                 "vector_kind": view.vector.kind,
                 "coordinate_space_id": view.coordinate_space_id,
             }
+            if role in _NON_MATERIALIZABLE_VIEW_ROLES:
+                view_detail["materialized"] = False
+                view_detail["validation_status"] = f"skipped_{role}"
+                view_details.append(view_detail)
+                continue
             if view.vector.kind == "column" and view.vector.name not in columns:
                 raise WorkspaceValidationError(
                     f"view {view_id} vector column is missing from source {view.source}: {view.vector.name}"
@@ -148,13 +183,23 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                     column for column in required_materialized_columns if column not in materialized_columns
                 )
                 if missing_materialized_columns:
-                    if str(getattr(view, "role", "") or "").strip().lower() != "hidden":
+                    source_contract_state = _materialized_view_source_contract_state(
+                        view_dir,
+                        source_id=view.source,
+                        vector_column=getattr(view.vector, "name", None),
+                    )
+                    if source_contract_state == "stale":
+                        view_detail["materialized_contract_status"] = "stale_source_contract"
+                        view_detail["missing_materialized_row_columns"] = missing_materialized_columns
+                        view_detail["materialized_source"] = "stale"
+                    elif str(getattr(view, "role", "") or "").strip().lower() != "hidden":
                         raise WorkspaceValidationError(
                             "materialized view rows are missing configured metadata columns: "
                             f"{view_id} ({missing_materialized_columns})"
                         )
-                    view_detail["materialized_contract_status"] = "skipped_hidden"
-                    view_detail["missing_materialized_row_columns"] = missing_materialized_columns
+                    else:
+                        view_detail["materialized_contract_status"] = "skipped_hidden"
+                        view_detail["missing_materialized_row_columns"] = missing_materialized_columns
                 else:
                     view_detail["materialized_contract_status"] = "ok"
                 view_detail["materialized"] = True
@@ -211,6 +256,13 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
         if missing:
             raise WorkspaceValidationError(
                 f"cohort {cohort_id} promoter metadata inputs are missing from source {cohort.source}: {missing}"
+            )
+        any_groups = _PROMOTER_METADATA_ANY_COLUMN_GROUPS.get(cohort.derive, ())
+        if any_groups and not any(group.issubset(source_columns[cohort.source]) for group in any_groups):
+            rendered_groups = ["{" + ", ".join(sorted(group)) + "}" for group in any_groups]
+            raise WorkspaceValidationError(
+                f"cohort {cohort_id} promoter metadata inputs require at least one of "
+                f"{rendered_groups} in source {cohort.source}"
             )
         cohort_details.append(
             {

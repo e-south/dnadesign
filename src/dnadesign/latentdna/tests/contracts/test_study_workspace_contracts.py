@@ -28,7 +28,7 @@ def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
 
 
-def test_live_study_browser_controls_expose_seven_geometry_inventory() -> None:
+def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None:
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
@@ -62,26 +62,17 @@ def test_live_study_browser_controls_expose_seven_geometry_inventory() -> None:
     ]
     assert geometry_ids == [
         "intermediate_embedding_7b_anchor_60bp",
-        "pooled_logits_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
-        "intermediate_embedding_7b_anchor_plus_full_context_concat",
-        "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     ]
     geometry_roles = {row.view_id: row.role for row in controls.geometry_controls.geometries}
     assert geometry_roles["intermediate_embedding_7b_anchor_60bp"] == "primary"
-    assert geometry_roles["intermediate_embedding_7b_full_context_1kb"] == "appendix"
     assert geometry_roles["intermediate_embedding_7b_full_context_anchor_mean"] == "primary"
-    assert geometry_roles["intermediate_embedding_7b_anchor_plus_full_context_concat"] == "challenger"
-    assert geometry_roles["intermediate_embedding_7b_anchor_plus_anchor_mean_concat"] == "challenger"
-    assert geometry_roles["pooled_logits_7b_anchor_60bp"] == "appendix"
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
     assert "spacer_length" in preferred_hues
-    assert "log_likelihood_per_token_7b" in preferred_hues
+    assert "log_likelihood_per_token_7b" not in preferred_hues
     assert "wildtype_margin_ethanol_vs_control" not in preferred_hues
     assert "wildtype_margin_cipro_vs_control" not in preferred_hues
     assert "sigma70_variant" not in preferred_hues
@@ -115,12 +106,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert decision_ladder == expected_decision_prefix
     expected_browser_geometries = [
         "intermediate_embedding_7b_anchor_60bp",
-        "pooled_logits_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
-        "intermediate_embedding_7b_anchor_plus_full_context_concat",
-        "intermediate_embedding_7b_anchor_plus_anchor_mean_concat",
     ]
     browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
     control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
@@ -129,7 +115,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
-    assert "log_likelihood_per_token_7b" in snapshot["browser"]["preferred_hues"]
+    assert "log_likelihood_per_token_7b" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_ethanol_vs_control" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_cipro_vs_control" not in snapshot["browser"]["preferred_hues"]
 
@@ -186,14 +172,19 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert "stored view matrices" in umap_semantics.preprocessing_md
     assert context.config.plots["design_centroid_margin_gallery"].kind == "xy_scatter_grid"
     assert context.config.plots["design_centroid_margin_gallery"].visibility_tier == "appendix"
-    assert [option.column for option in context.config.plots["design_centroid_margin_gallery"].hue_options] == [
+    expected_reference_hue_options = [
         "design_family",
         "design_regulator_composition",
         "sig35_variant",
         "spacer_length",
-        "log_likelihood_per_token_7b",
+        "source_family",
+        "promoter_standard__collection_id",
+        "promoter_standard__strength_value_numeric",
     ]
-    assert context.config.plots["design_centroid_margin_gallery"].hue_options[-1].type == "continuous"
+    design_hue_options = context.config.plots["design_centroid_margin_gallery"].hue_options
+    assert [option.column for option in design_hue_options] == expected_reference_hue_options
+    assert design_hue_options[3].type == "ordinal"
+    assert design_hue_options[-1].type == "continuous"
     assert context.config.plots["reference_alignment_summary"].kind == "metric_panel_grid"
     assert context.config.plots["reference_alignment_summary"].visibility_tier == "appendix"
     assert context.config.plots["representation_scree_diagnostic"].kind == "curve_grid"
@@ -207,34 +198,20 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert appendix_gallery.visibility_tier == "appendix"
     assert appendix_gallery.shape_column is None
     assert appendix_gallery.default_hue == "sig35_variant"
-    assert [option.column for option in appendix_gallery.hue_options] == [
-        "design_family",
-        "design_regulator_composition",
-        "sig35_variant",
-        "spacer_length",
-        "log_likelihood_per_token_7b",
-    ]
+    assert [option.column for option in appendix_gallery.hue_options] == expected_reference_hue_options
+    assert appendix_gallery.hue_options[3].type == "ordinal"
     assert appendix_gallery.hue_options[-1].type == "continuous"
     assert list(context.config.plots["design_centroid_margin_gallery"].scalars) == [
         "design_centroid_margins_intermediate_embedding_7b_anchor_60bp",
         "design_centroid_margins_intermediate_embedding_7b_full_context_anchor_mean",
-        "design_centroid_margins_intermediate_embedding_7b_full_context_1kb",
-        "design_centroid_margins_pooled_logits_7b_anchor_60bp",
-        "design_centroid_margins_pooled_logits_7b_full_context_1kb",
     ]
     assert list(context.config.plots["representation_scree_diagnostic"].reducers) == [
         "pca_intermediate_embedding_7b_anchor_60bp",
         "pca_intermediate_embedding_7b_full_context_anchor_mean",
-        "pca_intermediate_embedding_7b_full_context_1kb",
-        "pca_pooled_logits_7b_anchor_60bp",
-        "pca_pooled_logits_7b_full_context_1kb",
     ]
     assert list(appendix_gallery.projections) == [
         "umap_intermediate_embedding_7b_anchor_60bp",
         "umap_intermediate_embedding_7b_full_context_anchor_mean",
-        "umap_intermediate_embedding_7b_full_context_1kb",
-        "umap_pooled_logits_7b_anchor_60bp",
-        "umap_pooled_logits_7b_full_context_1kb",
     ]
     assert "reference_margin_gallery_wildtype" not in context.config.plots
     assert "reference_neighbor_evidence" not in context.config.plots
@@ -303,41 +280,31 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "sample_id" not in design_margin_step.params
     assert "build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean" in pre_assay_steps
     assert "build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean" in pre_assay_steps
-    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat" in pre_assay_steps
-    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat" not in pre_assay_steps
+    assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" not in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
     stress_margin_anchor = pre_assay_steps["build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp"]
-    stress_margin_full = pre_assay_steps["build_sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb"]
     stress_margin_anchor_mean = pre_assay_steps[
         "build_sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean"
     ]
     assert "sample_id" not in stress_margin_anchor.params
-    assert "sample_id" not in stress_margin_full.params
     assert "sample_id" not in stress_margin_anchor_mean.params
     balanced_margin_anchor = pre_assay_steps[
         "build_balanced_design_family_margins_intermediate_embedding_7b_anchor_60bp"
-    ]
-    balanced_margin_full = pre_assay_steps[
-        "build_balanced_design_family_margins_intermediate_embedding_7b_full_context_1kb"
     ]
     balanced_margin_anchor_mean = pre_assay_steps[
         "build_balanced_design_family_margins_intermediate_embedding_7b_full_context_anchor_mean"
     ]
     assert balanced_margin_anchor.params["balance_reference_only"] is True
     assert "sample_id" not in balanced_margin_anchor.params
-    assert "sample_id" not in balanced_margin_full.params
     assert "sample_id" not in balanced_margin_anchor_mean.params
     centroid_distance_anchor = pre_assay_steps["build_sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp"]
-    centroid_distance_full = pre_assay_steps[
-        "build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb"
-    ]
     centroid_distance_anchor_mean = pre_assay_steps[
         "build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean"
     ]
     assert "sample_id" not in centroid_distance_anchor.params
-    assert "sample_id" not in centroid_distance_full.params
     assert "sample_id" not in centroid_distance_anchor_mean.params
     assert (
         "build_sigma35_centroid_distance_intermediate_embedding_7b_anchor_plus_anchor_mean_concat"
@@ -377,35 +344,13 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         ]
         is True
     )
-    assert pre_assay_steps["build_context_delta_distribution_intermediate_embedding_7b"].params["where"] == {
-        "column": "source_class",
-        "equals": "densegen",
-    }
-    assert (
-        pre_assay_steps["build_context_delta_distribution_intermediate_embedding_7b"].params["table_sample_only"]
-        is True
-    )
     assert pre_assay_steps["build_context_robustness_summary_metrics"].params["pairs"] == [
-        {
-            "pair_id": "intermediate_embedding_7b_anchor_vs_context",
-            "label": "7B intermediate: anchor vs 1 kb seq mean",
-            "alignment_id": "intermediate_embedding_7b_anchor_to_full_context",
-            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
-            "context_view_id": "intermediate_embedding_7b_full_context_1kb",
-        },
         {
             "pair_id": "intermediate_embedding_7b_anchor_vs_anchor_mean",
             "label": "7B intermediate: anchor vs context anchor mean",
             "alignment_id": "intermediate_embedding_7b_anchor_to_anchor_mean",
             "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
             "context_view_id": "intermediate_embedding_7b_full_context_anchor_mean",
-        },
-        {
-            "pair_id": "pooled_logits_7b_anchor_vs_context",
-            "label": "7B pooled logits: anchor vs 1 kb seq mean",
-            "alignment_id": "pooled_logits_7b_anchor_to_full_context",
-            "anchor_view_id": "pooled_logits_7b_anchor_60bp",
-            "context_view_id": "pooled_logits_7b_full_context_1kb",
         },
     ]
     assert "render_design_centroid_margin_gallery" in pre_assay_steps
@@ -422,6 +367,8 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         appendix_steps["build_umap_sample_intermediate_embedding_7b_full_context_anchor_mean"].params["strategy"]
         == "all"
     )
+    assert "build_umap_sample_intermediate_embedding_7b_full_context_1kb" not in appendix_steps
+    assert "fit_umap_intermediate_embedding_7b_full_context_1kb" not in appendix_steps
     assert set(appendix_steps["generate_latent_geometry_browser"].depends_on) >= {
         "render_dataset_overview",
         "render_representation_health_summary",

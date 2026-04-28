@@ -78,7 +78,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "appendix_umap_gallery" in workflow
     assert "### Gate" in workflow
     assert "pre-assay representation triage" in workflow
-    assert "seven-geometry 7B-first browser" in workflow
+    assert "canonical Infer feature sidecars" in workflow
+    assert "sidecar-backed geometry is narrower than the future target set" in workflow
     assert "eight canonical 7B+20B" not in workflow
     assert "Leave geodesic pilots in study notes" in workflow
     assert 'zero_variance_policy="drop_or_zero"' in workflow
@@ -130,8 +131,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Plane: `execution-surface`" not in study_routes
     assert "Plane: `downstream-analysis`" not in study_routes
     assert "Plane: `downstream-tool`" not in study_routes
-    assert "7B-first browser posture" in study_routes
-    assert "seven-geometry 7B-first surface" in study_routes
+    assert "7B-first sidecar-backed browser posture" in study_routes
+    assert "available 7B sequence-view sidecar geometries" in study_routes
     assert "preferred infer family is now `evo2_7b`" in study_routes
     assert "eight canonical 7B+20B" not in study_routes
 
@@ -149,7 +150,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "LatentDNA primary review path:" in study_status
     assert "LatentDNA companion visuals:" in study_status
     assert "LatentDNA appendix support:" in study_status
-    assert "seven-geometry 7B-first pre-assay ladder" in study_status
+    assert "available 7B sequence-view feature sidecars" in study_status
     assert "eight canonical 7B+20B" not in study_status
     assert "Appendix deliverables remain secondary" in study_status
 

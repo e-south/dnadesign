@@ -21,9 +21,6 @@ from ..labels import humanize_candidate
 
 _DEFAULT_GEOMETRY_ORDER = [
     "intermediate_embedding_7b_anchor_60bp",
-    "pooled_logits_7b_anchor_60bp",
-    "intermediate_embedding_7b_full_context_1kb",
-    "pooled_logits_7b_full_context_1kb",
     "intermediate_embedding_7b_full_context_anchor_mean",
 ]
 
@@ -36,7 +33,6 @@ _PREFERRED_HUES = [
     "is_control",
     "synthetic_margin_ethanol_vs_background",
     "synthetic_margin_cipro_vs_background",
-    "log_likelihood_per_token_7b",
     "context_self_cosine",
     "context_shift_l2",
 ]
@@ -50,7 +46,6 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "is_control": "binary",
     "synthetic_margin_ethanol_vs_background": "continuous",
     "synthetic_margin_cipro_vs_background": "continuous",
-    "log_likelihood_per_token_7b": "continuous",
     "context_self_cosine": "continuous",
     "context_shift_l2": "continuous",
 }
@@ -66,6 +61,9 @@ _FAMILY_LABELS = {
 _SCOPE_LABELS = {
     "anchor_60bp": "60 bp anchor",
     "full_context_1kb": "1 kb construct context",
+    "full_context_anchor_mean": "1 kb context anchor mean",
+    "reverse_complement_context_anchor_mean": "1 kb reverse-complement context anchor mean",
+    "anchor_plus_anchor_mean_concat": "anchor + anchor-mean concat",
 }
 
 
@@ -172,7 +170,7 @@ def _geometry_inventory(
         model = str(tags.get("model") or "")
         family = str(tags.get("family") or "")
         scope_name = str(tags.get("scope") or "")
-        if role == "hidden":
+        if role in {"hidden", "planned", "retired"}:
             continue
         shape = _view_shape(context, view_id)
         view_dir = context.output_root / "views" / view_id

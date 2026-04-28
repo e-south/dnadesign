@@ -5,12 +5,32 @@
 **Surface role:** downstream-analysis
 **Owner-boundary:** latentdna
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-22
+**Last verified:** 2026-04-28
 **Registry-id:** latentdna.promoter-study.representation-comparison
 **Entry artifact:** usr_prom_eth_cip_anchor and construct_prom_eth_cip_context
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 
-The promoter study binds LatentDNA to two published datasets and a 7B-first notebook candidate inventory. The live notebook surface exposes the real seven-geometry 7B-first browser, while 20B views remain secondary and materializable for debug-only review. This browser-default posture matches the study record's current infer-runtime preference. The active contract is pre-assay representation triage: choose a plausible mean-pooled Evo2 feature space \(X\) for later supervised modeling.
+The promoter study now binds LatentDNA to row-level USR metadata sources plus
+canonical Infer feature sidecars. The row sources remain useful for cohort,
+landmark, and dataset-overview plots. Embedding-bearing views must come from
+`_derived/infer/feature_aliases.parquet` joined to `feature_vectors.parquet`
+and the dataset-local sequence-view sidecars; LatentDNA no longer depends on
+legacy row-overlay embedding columns for the active 7B study surfaces.
+Sigma-35 metadata is source-backed, not ladder-hardcoded: builders derive
+`sig35_variant` from DenseGen plan tokens, DenseGen fixed-element details, USR
+`seq_annot` `-35` features, or Construct retained-feature bounds. Annotated
+unranked hexamers are kept in source inventory and compatible plots; only
+ordinal-rank statistics restrict themselves to the explicit b-f order file.
+
+The active contract is still pre-assay representation triage: choose a plausible
+mean-pooled Evo2 feature space \(X\) for later supervised modeling. Available
+sidecar-backed geometry is narrower than the future target set: the current
+usable features are 7B construct-insert `seq_mean` anchors and 7B forward
+realized-context `anchor_mean` features. Forward context `seq_mean`,
+reverse-complement context features, reference `analysis_window` features,
+mean-pooled output-layer logits, and log-likelihood scalar diagnostics are not
+treated as current decision geometry until their canonical vector or scalar
+sidecars are present.
 
 ### Gate
 
@@ -83,14 +103,34 @@ Use the notes for:
 ### Surfaced Notebook Inventory
 
 - `intermediate_embedding_7b_anchor_60bp`
-- `pooled_logits_7b_anchor_60bp`
-- `intermediate_embedding_7b_full_context_1kb`
-- `pooled_logits_7b_full_context_1kb`
 - `intermediate_embedding_7b_full_context_anchor_mean`
-- `intermediate_embedding_7b_anchor_plus_full_context_concat`
-- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
 
-20B views remain materializable in the workspace but are hidden from the study notebook and deliverable ladder.
+Planned sidecar-backed surfaces are declared for forward full-context sequence
+mean, reverse-complement full-context sequence mean, and reverse-complement
+context anchor mean, but they currently select zero feature aliases. Output-layer
+mean vectors are declared as planned vector views. Log-likelihood total and
+mean-per-token values are tracked by Infer scalar sidecars and remain
+diagnostic/QC surfaces, not active LatentDNA geometry defaults. 20B and concat
+surfaces are not active in this workspace contract.
+
+### Sequence-View Plot Contract
+
+- `anchor_mean` plots use full emitted 1 kb context sequences and pool over
+  Construct-provided emitted-orientation anchor bounds. They do not truncate the
+  sequence before Infer or plotting.
+- Reverse-complement context plots require materialized reverse-complement
+  context feature aliases. LatentDNA must not reverse-complement sequences or
+  synthesize missing products.
+- Feature-backed plots include only rows with canonical Infer feature aliases.
+  If an annotated SFXI, reference, or analysis-window row is absent from an
+  embedding plot, that is missing Infer feature coverage, not a Sigma-35
+  category filter.
+- Reference-normalization plots will use explicit `analysis_window` and
+  `realized_context` sequence-view features once `infer_prom_eth_cip_reference_views_7b`
+  exists. Native exact-60 source rows are not relabeled as analysis windows.
+- Existing view artifacts built from legacy row-overlay columns are stale under
+  this contract. Deep validation reports source-contract drift; rerun view
+  materialization from sidecars before using refreshed plots as current evidence.
 
 ### Operator path
 
@@ -99,6 +139,10 @@ Use the notes for:
 uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json
 # Verify the workspace contract after config or docs changes.
 uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep
+# Inspect the canonical sidecar-backed active sources.
+uv run latentdna inspect source anchor_7b_seq_mean_features --workspace stress_ethanol_cipro_growth --json
+# Inspect the paired forward-context anchor-mean sidecar source.
+uv run latentdna inspect source full_context_7b_forward_anchor_mean_features --workspace stress_ethanol_cipro_growth --json
 # Check whether the representation-health gate is fresh enough to review.
 uv run latentdna deliverable status representation_health_summary --workspace stress_ethanol_cipro_growth
 # Check whether the context-robustness summary is fresh enough to review.
