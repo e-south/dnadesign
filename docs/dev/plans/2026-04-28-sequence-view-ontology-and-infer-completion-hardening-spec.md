@@ -1236,12 +1236,20 @@ feature completion. Local alias/vector backfill is complete for the compatible
 anchor and forward-context surfaces:
 
 - `usr_prom_eth_cip_anchor`: `157164` reusable aliases/vectors written,
-  `115` vectors still missing.
+  `157394` vectors still missing under the current two-representation plan
+  (`115` intermediate gaps plus all output-layer mean vectors).
 - `construct_prom_eth_cip_context` forward anchor-mean: `157164` reusable
-  aliases/vectors written, `115` vectors still missing.
-- `construct_prom_eth_cip_context` reverse-complement anchor-mean: `157279`
-  vectors still missing.
-- Reference sequence-view branch: `144` vectors still missing.
+  aliases/vectors written, while forward sequence-mean, output-layer mean, and
+  the remaining forward anchor-mean gaps are still missing.
+- `construct_prom_eth_cip_context` reverse-complement sequence-mean and
+  reverse-complement anchor-mean vectors are still missing for all `157279`
+  reverse-complement contexts.
+- Reference sequence-view branch: `480` vectors still missing across
+  analysis-window, forward-context, and reverse-complement-context reference
+  views.
+- Main log-likelihood scalar sidecars are declared and planner-visible, but
+  still empty locally: `1572790` main scalar specs and `480` reference scalar
+  specs remain missing until Evo2 scalar execution runs.
 
 The storage cleanup portion of the migration is also complete locally:
 
@@ -1267,9 +1275,23 @@ Exit criteria:
   approved for deletion.
 - Done: drifted or absent legacy digests are never marked reusable by runtime
   completion planning.
+- Done: LatentDNA can read canonical Infer scalar sidecars through
+  `infer_feature_scalar_sidecar` sources. The active workspace declares
+  log-likelihood mean-per-token sources for anchor, forward-context, and
+  reverse-complement-context lanes; they currently validate as zero-row planned
+  sources because local scalar sidecars have not been generated.
+- Done: LatentDNA materialized view rows retain `source_family`,
+  `selection_basis`, `view_collections`, `role_tags`, and
+  `promoter_standard__*` fields when upstream sidecars/overlays provide them.
+  `source_class` remains a broad operational class so DenseGen-filtered context
+  plots do not lose Construct-realized context rows.
 - Open: reverse-complement, remaining anchor/forward, and reference feature
   execution should be run as explicit Infer batch operations, not as accidental
   status/preflight side effects.
+- Open: the appendix UMAP plot remains intentionally unrefreshed in this local
+  pass because it runs all-row UMAP over the current 157k-row geometries. The
+  primary pre-assay recipe, dataset-overview recipe, deep validation, and
+  notebook generation all work against the refreshed partial feature state.
 
 The third highest-leverage slice, cheap status aggregation of the
 feature-completion planner output, is implemented. `usr.data-plane.promoter-study-status

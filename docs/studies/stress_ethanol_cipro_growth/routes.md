@@ -63,7 +63,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: 7B-first browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane preferred infer family is now `evo2_7b`, with 20B retained as a secondary/debug-required lane family
+- Current state: 7B-first sidecar-backed browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane preferred infer family is now `evo2_7b`, with 20B retired from the active local workspace until a debug-required lane is reintroduced deliberately
 - Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
@@ -94,7 +94,7 @@ This page keeps the downstream handoff map in one place.
 - Snapshot ok appendix surfaces: `appendix_geometry_audit`, `appendix_umap_gallery`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
-- Browser default geometries: the real seven-geometry 7B-first surface across three intermediate views, two pooled-logit diagnostics, and two concat challengers. 20B views stay materializable in the workspace but are secondary to the current study browser posture.
+- Browser default geometries: available 7B sequence-view sidecar geometries: construct-insert `seq_mean` and forward 1 kb context `anchor_mean`. Concat is retired from the current study plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, reverse-complement context anchor mean, and reference-view features are planned until Infer sidecars exist. Mean-pooled output-layer logits and log-likelihoods are collected diagnostics, not current decision geometry.
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors

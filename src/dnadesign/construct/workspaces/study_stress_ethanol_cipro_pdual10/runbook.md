@@ -88,7 +88,8 @@ uv run usr --root src/dnadesign/usr/datasets maintenance merge \
   --if-duplicate error \
   --carry-namespace construct \
   --carry-namespace derived \
-  --carry-namespace usr_label
+  --carry-namespace usr_label \
+  --carry-namespace promoter_standard
 
 # Merge the Reader-backed SFXI pDual-10 DenseGen source cohort into the same
 # shared anchor handoff. Use duplicate-error here; duplicate hits should be
@@ -155,13 +156,37 @@ uv run construct workspace run-project \
   --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 \
   --project forward_anchor_window
 
-# Project DenseGen metadata from the merged anchor onto context rows by anchor id.
-# This keeps archive-backed SFXI DenseGen annotations visible after context
-# realization while leaving promoter-reference rows with null DenseGen fields.
+# Project coordinate-free source metadata from anchors onto context rows by
+# anchor id. DenseGen metadata keeps designed-promoter provenance visible.
+# promoter_standard metadata keeps Anderson/W-collection strength fields visible
+# for reference controls and derived core60 contexts. Do not blindly project
+# seq_annot or derived interval overlays into 1 kb contexts; those coordinates
+# are parent/core-window coordinates unless Construct emits an explicit
+# coordinate transform.
 uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
   --src usr_prom_eth_cip_anchor \
   --dest construct_prom_eth_cip_context \
   --namespace densegen \
+  --src-join id \
+  --dest-join construct__anchor_id \
+  --allow-missing
+
+# Project reference-standard strength metadata through the same anchor-id join.
+uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
+  --src usr_prom_eth_cip_anchor \
+  --dest construct_prom_eth_cip_context \
+  --namespace promoter_standard \
+  --src-join id \
+  --dest-join construct__anchor_id \
+  --allow-missing
+
+# Core60 rows can be appended to the merged anchor after native references.
+# Re-project the core60 promoter_standard overlay directly from the authoritative
+# core dataset so derived reference contexts retain standard-strength metadata.
+uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
+  --src construct_prom_eth_cip_reference_core60 \
+  --dest construct_prom_eth_cip_context \
+  --namespace promoter_standard \
   --src-join id \
   --dest-join construct__anchor_id \
   --allow-missing
@@ -188,5 +213,5 @@ Hand off to:
 
 - `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/`
 - `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml`
-- `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml`
-- `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml`
+- `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml`
+- `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml`

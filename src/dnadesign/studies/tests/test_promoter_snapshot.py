@@ -542,11 +542,17 @@ def test_build_promoter_study_status_surfaces_sequence_view_and_feature_completi
     infer_feature_completion_state = {
         "state": "attention",
         "drives_top_level_attention": False,
-        "summary": "infer sequence-view feature completion reusable=1 stale=0 missing=2 missing_products=0",
+        "summary": (
+            "infer sequence-view feature completion reusable_vectors=1 stale_vectors=0 "
+            "missing_vectors=2 reusable_scalars=0 stale_scalars=0 missing_scalars=2 missing_products=0"
+        ),
         "aggregate": {
             "reusable_vectors": 1,
+            "reusable_scalars": 0,
             "stale_vectors": 0,
+            "stale_scalars": 0,
             "missing_vectors": 2,
+            "missing_scalars": 2,
             "missing_products": 0,
             "counts_by_product_kind": {"construct_insert": 2},
             "counts_by_orientation": {"forward": 2},
@@ -578,7 +584,8 @@ def test_build_promoter_study_status_surfaces_sequence_view_and_feature_completi
 
     assert state == "attention"
     assert "sequence-view product contracts 1/2 ok" in summary
-    assert "infer sequence-view feature completion reusable=1 stale=0 missing=2 missing_products=0" in summary
+    assert "infer sequence-view feature completion reusable_vectors=1 stale_vectors=0" in summary
+    assert "missing_vectors=2 reusable_scalars=0 stale_scalars=0 missing_scalars=2 missing_products=0" in summary
     assert evidence["sequence_view_contract_state"] == sequence_view_contract_state
     assert evidence["infer_feature_completion_state"] == infer_feature_completion_state
     assert "sequence-view product contracts are incomplete" in evidence["attention_reasons"]

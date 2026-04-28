@@ -475,8 +475,12 @@ def inspect_promoter_study_infer_feature_completion(
                     **aggregate,
                     "summary": (
                         f"{str(spec.get('summary') or '').rstrip('.')}. "
-                        f"reusable={aggregate['reusable_vectors']} stale={aggregate['stale_vectors']} "
-                        f"missing={aggregate['missing_vectors']} missing_products={aggregate['missing_products']}."
+                        f"reusable_vectors={aggregate['reusable_vectors']} stale_vectors={aggregate['stale_vectors']} "
+                        f"missing_vectors={aggregate['missing_vectors']} "
+                        f"reusable_scalars={aggregate['reusable_scalars']} "
+                        f"stale_scalars={aggregate['stale_scalars']} "
+                        f"missing_scalars={aggregate['missing_scalars']} "
+                        f"missing_products={aggregate['missing_products']}."
                     ),
                 }
             )
@@ -502,8 +506,10 @@ def inspect_promoter_study_infer_feature_completion(
         "summary": (
             "infer sequence-view feature completion "
             f"checks {ok_count}/{len(checks)} ok; "
-            f"reusable={aggregate['reusable_vectors']} stale={aggregate['stale_vectors']} "
-            f"missing={aggregate['missing_vectors']} missing_products={aggregate['missing_products']}; "
+            f"reusable_vectors={aggregate['reusable_vectors']} stale_vectors={aggregate['stale_vectors']} "
+            f"missing_vectors={aggregate['missing_vectors']} "
+            f"reusable_scalars={aggregate['reusable_scalars']} stale_scalars={aggregate['stale_scalars']} "
+            f"missing_scalars={aggregate['missing_scalars']} missing_products={aggregate['missing_products']}; "
             f"required_failures={required_failures} optional_failures={optional_failures}"
         ),
     }
@@ -687,13 +693,20 @@ def _aggregate_infer_completion_plans(plans: Sequence[Mapping[str, object]]) -> 
 _INFER_COMPLETION_SCALAR_FIELDS = (
     "required_views",
     "required_vectors",
+    "required_scalars",
     "existing_vectors",
+    "existing_scalars",
     "reusable_vectors",
+    "reusable_scalars",
     "stale_vectors",
+    "stale_scalars",
     "missing_vectors",
+    "missing_scalars",
     "missing_products",
     "persisted_vector_reusable",
+    "persisted_scalar_reusable",
     "existing_aliases",
+    "existing_scalar_aliases",
 )
 
 
@@ -714,7 +727,9 @@ def _infer_completion_expectation_from_payload(payload: object) -> dict[str, int
         raise ValueError("infer_sequence_view_completion expected payload must be a mapping.")
     return {
         "max_missing_vectors": _optional_int(payload.get("max_missing_vectors")) or 0,
+        "max_missing_scalars": _optional_int(payload.get("max_missing_scalars")) or 0,
         "max_stale_vectors": _optional_int(payload.get("max_stale_vectors")) or 0,
+        "max_stale_scalars": _optional_int(payload.get("max_stale_scalars")) or 0,
         "max_missing_products": _optional_int(payload.get("max_missing_products")) or 0,
     }
 
@@ -727,7 +742,9 @@ def _infer_completion_threshold_violations(
     violations: list[str] = []
     for observed_key, threshold_key in (
         ("missing_vectors", "max_missing_vectors"),
+        ("missing_scalars", "max_missing_scalars"),
         ("stale_vectors", "max_stale_vectors"),
+        ("stale_scalars", "max_stale_scalars"),
         ("missing_products", "max_missing_products"),
     ):
         observed = _required_int(aggregate.get(observed_key, 0))

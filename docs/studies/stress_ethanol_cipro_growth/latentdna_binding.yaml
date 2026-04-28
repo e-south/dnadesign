@@ -15,20 +15,30 @@ required_wildtype_references:
 default_geometry_inventory:
   default_review_geometries:
     - intermediate_embedding_7b_anchor_60bp
-    - pooled_logits_7b_anchor_60bp
-    - intermediate_embedding_7b_full_context_1kb
-    - pooled_logits_7b_full_context_1kb
     - intermediate_embedding_7b_full_context_anchor_mean
-    - intermediate_embedding_7b_anchor_plus_full_context_concat
-    - intermediate_embedding_7b_anchor_plus_anchor_mean_concat
   working_candidate: intermediate_embedding_7b_full_context_anchor_mean
   conservative_baseline: intermediate_embedding_7b_anchor_60bp
-  challengers:
-    - intermediate_embedding_7b_anchor_plus_full_context_concat
-    - intermediate_embedding_7b_anchor_plus_anchor_mean_concat
-  gate_failed_or_diagnostic:
-    - pooled_logits_7b_anchor_60bp
-    - pooled_logits_7b_full_context_1kb
+  challengers: []
+  planned_geometries:
+    - intermediate_embedding_7b_full_context_1kb
+    - intermediate_embedding_7b_reverse_complement_context_1kb
+    - intermediate_embedding_7b_reverse_complement_context_anchor_mean
+    - output_layer_mean_7b_anchor_60bp
+    - output_layer_mean_7b_full_context_1kb
+    - output_layer_mean_7b_full_context_anchor_mean
+    - output_layer_mean_7b_reverse_complement_context_1kb
+    - output_layer_mean_7b_reverse_complement_context_anchor_mean
+  planned_scalar_diagnostics:
+    - log_likelihood_total_7b_anchor_60bp
+    - log_likelihood_mean_per_token_7b_anchor_60bp
+    - log_likelihood_total_7b_full_context_1kb
+    - log_likelihood_mean_per_token_7b_full_context_1kb
+    - log_likelihood_total_7b_full_context_anchor_mean
+    - log_likelihood_mean_per_token_7b_full_context_anchor_mean
+    - log_likelihood_total_7b_reverse_complement_context_1kb
+    - log_likelihood_mean_per_token_7b_reverse_complement_context_1kb
+    - log_likelihood_total_7b_reverse_complement_context_anchor_mean
+    - log_likelihood_mean_per_token_7b_reverse_complement_context_anchor_mean
 attention_deliverables:
   - dataset_overview
   - representation_health_summary

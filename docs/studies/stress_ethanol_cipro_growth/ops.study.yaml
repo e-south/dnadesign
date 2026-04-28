@@ -16,8 +16,8 @@ lifecycle:
     - construct_context_expansion
     - infer_batch_preparation
     - infer_sequence_views_anchor_construct_insert_7b
-    - infer_sequence_views_context_forward_anchor_mean_7b
-    - infer_sequence_views_context_reverse_complement_anchor_mean_7b
+    - infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+    - infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
     - genbank_reference_import
     - reference_annotation_overlay
     - reference_core60_normalization
@@ -50,12 +50,12 @@ phases:
   - id: infer_sequence_views_anchor_construct_insert_7b
     status: planned
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml
-  - id: infer_sequence_views_context_forward_anchor_mean_7b
+  - id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
     status: planned
-    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml
-  - id: infer_sequence_views_context_reverse_complement_anchor_mean_7b
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+  - id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
     status: planned
-    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
   - id: genbank_reference_import
     status: complete
     required_for_main_study_state: false
@@ -154,12 +154,12 @@ artifacts:
   infer_config_sequence_views_anchor_construct_insert_7b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
-  infer_config_sequence_views_context_forward_anchor_mean_7b:
+  infer_config_sequence_views_context_forward_seq_and_anchor_mean_7b:
     artifact_type: file
-    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml
-  infer_config_sequence_views_context_reverse_complement_anchor_mean_7b:
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
+  infer_config_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     artifact_type: file
-    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
 
 execution_surfaces:
   construct_workspace:
@@ -180,12 +180,12 @@ execution_surfaces:
   infer_batch_sequence_views_anchor_construct_insert_7b:
     surface_type: runbook
     runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml
-  infer_batch_sequence_views_context_forward_anchor_mean_7b:
+  infer_batch_sequence_views_context_forward_seq_and_anchor_mean_7b:
     surface_type: runbook
-    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml
-  infer_batch_sequence_views_context_reverse_complement_anchor_mean_7b:
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+  infer_batch_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: runbook
-    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
   scheduler_default:
     surface_type: scheduler
     backend: sge
@@ -252,7 +252,7 @@ execution_surfaces:
       - config
       - --config
       - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
-  infer_validate_sequence_views_context_forward_anchor_mean_7b:
+  infer_validate_sequence_views_context_forward_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -261,8 +261,8 @@ execution_surfaces:
       - validate
       - config
       - --config
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml
-  infer_validate_sequence_views_context_reverse_complement_anchor_mean_7b:
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
+  infer_validate_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -271,7 +271,7 @@ execution_surfaces:
       - validate
       - config
       - --config
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
   infer_dry_run_anchor_only_20b:
     surface_type: command
     argv:
@@ -302,7 +302,7 @@ execution_surfaces:
       - --config
       - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
       - --dry-run
-  infer_dry_run_sequence_views_context_forward_anchor_mean_7b:
+  infer_dry_run_sequence_views_context_forward_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -310,9 +310,9 @@ execution_surfaces:
       - infer
       - run
       - --config
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
       - --dry-run
-  infer_dry_run_sequence_views_context_reverse_complement_anchor_mean_7b:
+  infer_dry_run_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -320,7 +320,7 @@ execution_surfaces:
       - infer
       - run
       - --config
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
       - --dry-run
   infer_completion_sequence_views_main_7b:
     surface_type: command
@@ -379,7 +379,7 @@ execution_surfaces:
       - --profile
       - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_anchor_construct_insert_7b/profile.json
       - --json
-  notify_profile_doctor_sequence_views_context_forward_anchor_mean_7b:
+  notify_profile_doctor_sequence_views_context_forward_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -388,9 +388,9 @@ execution_surfaces:
       - profile
       - doctor
       - --profile
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_context_forward_anchor_mean_7b/profile.json
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_context_forward_seq_and_anchor_mean_7b/profile.json
       - --json
-  notify_profile_doctor_sequence_views_context_reverse_complement_anchor_mean_7b:
+  notify_profile_doctor_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -399,7 +399,7 @@ execution_surfaces:
       - profile
       - doctor
       - --profile
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_context_reverse_complement_anchor_mean_7b/profile.json
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_context_reverse_complement_seq_and_anchor_mean_7b/profile.json
       - --json
   notify_resolve_events_anchor_only_20b:
     surface_type: command
@@ -440,7 +440,7 @@ execution_surfaces:
       - --config
       - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
       - --json
-  notify_resolve_events_sequence_views_context_forward_anchor_mean_7b:
+  notify_resolve_events_sequence_views_context_forward_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -451,9 +451,9 @@ execution_surfaces:
       - --tool
       - infer
       - --config
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
       - --json
-  notify_resolve_events_sequence_views_context_reverse_complement_anchor_mean_7b:
+  notify_resolve_events_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: command
     argv:
       - uv
@@ -464,7 +464,7 @@ execution_surfaces:
       - --tool
       - infer
       - --config
-      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
       - --json
 
 snapshot:
@@ -619,11 +619,13 @@ preflight:
         check_group: infer
         summary: Main sequence-view feature completion is classified before model execution.
         required: false
-        phase_id: infer_sequence_views_context_forward_anchor_mean_7b
+        phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
         surface: infer_completion_sequence_views_main_7b
         expected:
           max_missing_vectors: 0
+          max_missing_scalars: 0
           max_stale_vectors: 0
+          max_stale_scalars: 0
           max_missing_products: 0
       - kind: infer_sequence_view_completion
         check_id: infer.feature_completion.sequence_views_reference_7b
@@ -634,7 +636,9 @@ preflight:
         surface: infer_completion_sequence_views_reference_7b
         expected:
           max_missing_vectors: 0
+          max_missing_scalars: 0
           max_stale_vectors: 0
+          max_stale_scalars: 0
           max_missing_products: 0
       - kind: workspace_layout
         check_id: infer.workspace.layout
@@ -684,19 +688,19 @@ preflight:
         phase_id: infer_sequence_views_anchor_construct_insert_7b
         surface: infer_validate_sequence_views_anchor_construct_insert_7b
       - kind: command
-        check_id: infer.validate.sequence_views_context_forward_anchor_mean_7b
+        check_id: infer.validate.sequence_views_context_forward_seq_and_anchor_mean_7b
         check_group: infer
         summary: Infer config validation completed.
         required: true
-        phase_id: infer_sequence_views_context_forward_anchor_mean_7b
-        surface: infer_validate_sequence_views_context_forward_anchor_mean_7b
+        phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+        surface: infer_validate_sequence_views_context_forward_seq_and_anchor_mean_7b
       - kind: command
-        check_id: infer.validate.sequence_views_context_reverse_complement_anchor_mean_7b
+        check_id: infer.validate.sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
         check_group: infer
         summary: Infer config validation completed.
         required: true
-        phase_id: infer_sequence_views_context_reverse_complement_anchor_mean_7b
-        surface: infer_validate_sequence_views_context_reverse_complement_anchor_mean_7b
+        phase_id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+        surface: infer_validate_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
       - kind: command
         check_id: infer.dry_run.anchor_only_20b
         check_group: infer
@@ -719,19 +723,19 @@ preflight:
         phase_id: infer_sequence_views_anchor_construct_insert_7b
         surface: infer_dry_run_sequence_views_anchor_construct_insert_7b
       - kind: command
-        check_id: infer.dry_run.sequence_views_context_forward_anchor_mean_7b
+        check_id: infer.dry_run.sequence_views_context_forward_seq_and_anchor_mean_7b
         check_group: infer
         summary: Infer dry-run completed.
         required: true
-        phase_id: infer_sequence_views_context_forward_anchor_mean_7b
-        surface: infer_dry_run_sequence_views_context_forward_anchor_mean_7b
+        phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+        surface: infer_dry_run_sequence_views_context_forward_seq_and_anchor_mean_7b
       - kind: command
-        check_id: infer.dry_run.sequence_views_context_reverse_complement_anchor_mean_7b
+        check_id: infer.dry_run.sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
         check_group: infer
         summary: Infer dry-run completed.
         required: true
-        phase_id: infer_sequence_views_context_reverse_complement_anchor_mean_7b
-        surface: infer_dry_run_sequence_views_context_reverse_complement_anchor_mean_7b
+        phase_id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+        surface: infer_dry_run_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
       - kind: command
         check_id: notify.profile.anchor_only_20b
         check_group: notify
@@ -754,19 +758,19 @@ preflight:
         phase_id: infer_sequence_views_anchor_construct_insert_7b
         surface: notify_profile_doctor_sequence_views_anchor_construct_insert_7b
       - kind: command
-        check_id: notify.profile.sequence_views_context_forward_anchor_mean_7b
+        check_id: notify.profile.sequence_views_context_forward_seq_and_anchor_mean_7b
         check_group: notify
         summary: Notify profile doctor completed.
         required: true
-        phase_id: infer_sequence_views_context_forward_anchor_mean_7b
-        surface: notify_profile_doctor_sequence_views_context_forward_anchor_mean_7b
+        phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+        surface: notify_profile_doctor_sequence_views_context_forward_seq_and_anchor_mean_7b
       - kind: command
-        check_id: notify.profile.sequence_views_context_reverse_complement_anchor_mean_7b
+        check_id: notify.profile.sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
         check_group: notify
         summary: Notify profile doctor completed.
         required: true
-        phase_id: infer_sequence_views_context_reverse_complement_anchor_mean_7b
-        surface: notify_profile_doctor_sequence_views_context_reverse_complement_anchor_mean_7b
+        phase_id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+        surface: notify_profile_doctor_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
       - kind: command
         check_id: notify.resolve_events.anchor_only_20b
         check_group: notify
@@ -789,19 +793,19 @@ preflight:
         phase_id: infer_sequence_views_anchor_construct_insert_7b
         surface: notify_resolve_events_sequence_views_anchor_construct_insert_7b
       - kind: command
-        check_id: notify.resolve_events.sequence_views_context_forward_anchor_mean_7b
+        check_id: notify.resolve_events.sequence_views_context_forward_seq_and_anchor_mean_7b
         check_group: notify
         summary: Notify events path resolved.
         required: true
-        phase_id: infer_sequence_views_context_forward_anchor_mean_7b
-        surface: notify_resolve_events_sequence_views_context_forward_anchor_mean_7b
+        phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+        surface: notify_resolve_events_sequence_views_context_forward_seq_and_anchor_mean_7b
       - kind: command
-        check_id: notify.resolve_events.sequence_views_context_reverse_complement_anchor_mean_7b
+        check_id: notify.resolve_events.sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
         check_group: notify
         summary: Notify events path resolved.
         required: true
-        phase_id: infer_sequence_views_context_reverse_complement_anchor_mean_7b
-        surface: notify_resolve_events_sequence_views_context_reverse_complement_anchor_mean_7b
+        phase_id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+        surface: notify_resolve_events_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
       - kind: scheduler_queue
         check_id: infer.batch.queue
         check_group: infer_batch_plan
@@ -831,19 +835,19 @@ preflight:
         required: true
         surface: infer_batch_sequence_views_anchor_construct_insert_7b
       - kind: runbook_plan
-        check_id: infer.batch.7b.sequence_views_context_forward_anchor_mean.plan
+        check_id: infer.batch.7b.sequence_views_context_forward_seq_and_anchor_mean.plan
         check_group: infer_batch_plan
-        phase_id: infer_sequence_views_context_forward_anchor_mean_7b
-        summary: Sequence-view forward-context anchor-mean 7B infer runbook renders cleanly.
+        phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+        summary: Sequence-view forward-context sequence-mean plus anchor-mean 7B infer runbook renders cleanly.
         required: true
-        surface: infer_batch_sequence_views_context_forward_anchor_mean_7b
+        surface: infer_batch_sequence_views_context_forward_seq_and_anchor_mean_7b
       - kind: runbook_plan
-        check_id: infer.batch.7b.sequence_views_context_reverse_complement_anchor_mean.plan
+        check_id: infer.batch.7b.sequence_views_context_reverse_complement_seq_and_anchor_mean.plan
         check_group: infer_batch_plan
-        phase_id: infer_sequence_views_context_reverse_complement_anchor_mean_7b
-        summary: Sequence-view reverse-complement-context anchor-mean 7B infer runbook renders cleanly.
+        phase_id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+        summary: Sequence-view reverse-complement-context sequence-mean plus anchor-mean 7B infer runbook renders cleanly.
         required: true
-        surface: infer_batch_sequence_views_context_reverse_complement_anchor_mean_7b
+        surface: infer_batch_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
   next_scope:
     target_phase_groups:
       densegen_growth: [densegen]

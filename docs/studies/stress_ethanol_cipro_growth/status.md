@@ -20,11 +20,11 @@
 
 - Declared phase: `infer_batch_preparation`
 - Preferred infer family: `evo2_7b`
-- Supported infer families in the package: `evo2_7b`, `evo2_20b`
+- Supported infer families: `evo2_7b`, `evo2_20b` (package-supported; active feature-completion target is 7B)
 - LatentDNA browser default family: `evo2_7b`
 - Working candidate family: `evo2_7b` full-context anchor-mean intermediate embedding
 - Conservative baseline: `evo2_7b` anchor-only intermediate embedding
-- Challenger: `evo2_7b` anchor-plus-anchor-mean concat
+- Challenger: none currently active; concat is retired from the current Infer and LatentDNA plan
 - Secondary/debug-required family: `evo2_20b`
 - Active study feature-completion target: `evo2_7b`; historical `evo2_20b` row-overlay payloads were retired from the active USR handoffs because that lane is collapsed/debug-required and not part of the current sequence-view completion plan.
 - The study phase is `infer_batch_preparation`
@@ -32,10 +32,11 @@
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
 - Current attention surfaces: sequence-view feature completion and Notify setup/preflight
 - Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
-- Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the active subset: `f > e > d > c > b` (`a` is not in this study)
+- Source-level Sigma-35 inventory is annotation-backed: LatentDNA derives `sig35_variant` from DenseGen plan tokens, DenseGen fixed-element details, USR `seq_annot` `-35` features, or Construct retained-feature bounds. The current merged anchor source resolves every row to a Sigma-35 sequence or b-f ladder value; rows are not hard-omitted from source inventory merely because they are reference, SFXI, or derived core rows.
+- Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the ranked active subset: `f > e > d > c > b` (`a` is not in this study). Annotated unranked hexamers remain visible in inventory and compatible plot/scalar surfaces, but they are excluded from ordinal Spearman rank calculations until an explicit order file ranks them.
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix surfaces remain secondary audit material
-- Browser default geometries: `intermediate_embedding_7b_anchor_60bp`, `pooled_logits_7b_anchor_60bp`, `intermediate_embedding_7b_full_context_1kb`, `pooled_logits_7b_full_context_1kb`, `intermediate_embedding_7b_full_context_anchor_mean`, `intermediate_embedding_7b_anchor_plus_full_context_concat`, `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
+- Browser default geometries: `intermediate_embedding_7b_anchor_60bp`, `intermediate_embedding_7b_full_context_anchor_mean`
 
 ### Current row counts
 
@@ -57,13 +58,13 @@
 - LatentDNA primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - LatentDNA companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
 - LatentDNA appendix support: `sigma35_centroid_distance_gallery`
-- LatentDNA notebook role: plot-first review surface for the seven-geometry 7B-first pre-assay ladder, with appendix and debug material kept secondary
+- LatentDNA notebook role: plot-first review surface for available 7B sequence-view feature sidecars, with planned reverse-complement/reference and retired diagnostic surfaces kept secondary
 - Cluster: `planned`
 - OPAL: `not_configured`
 - Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
-- Current appendix attention: none
-- Current appendix ok: `appendix_geometry_audit`, `appendix_umap_gallery`
-- The active comparison is `anchor_60bp` versus `full_context_anchor_mean`, with `full_context_1kb` retained as an orientation/appendix view and pooled-logit surfaces treated as diagnostics rather than the default decision rule
+- Current appendix attention: `appendix_umap_gallery` until the all-row UMAP appendix is regenerated on a machine where that runtime cost is acceptable
+- Current appendix ok: `appendix_geometry_audit`
+- The active comparison is 7B construct-insert `seq_mean` anchors versus 7B forward 1 kb context `anchor_mean`. Concat is not part of the current Infer or LatentDNA plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, reverse-complement context anchor mean, and reference-view features remain planned until canonical Infer sidecars exist. Mean-pooled output-layer logits and log-likelihoods are collected diagnostics, not current decision geometry.
 - Reference alignment remains diagnostic. Native references are biological controls; `analysis_window` reference rows are analysis-only comparability views, not corrected native promoters.
 
 ### Reference-view branch
@@ -108,24 +109,54 @@
 - Construct details live in `src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md` and `src/dnadesign/construct/docs/reference/config.md`.
 - The downstream reference Infer branch remains planned and non-blocking for the main study state while the study remains in pre-assay representation triage
 
+### LatentDNA source contract
+
+- Active embedding-bearing LatentDNA sources now read canonical Infer feature sidecars, not legacy USR row-overlay embedding columns.
+- `anchor_7b_seq_mean_features` exposes `157164` reusable 7B anchor vectors from `usr_prom_eth_cip_anchor/_derived/infer`.
+- `full_context_7b_forward_anchor_mean_features` exposes `157164` reusable 7B forward-context anchor-mean vectors from `construct_prom_eth_cip_context/_derived/infer`.
+- LatentDNA also declares canonical Infer scalar-sidecar sources for Evo2
+  log-likelihood mean-per-token diagnostics. These sources currently expose
+  zero rows because local Infer scalar sidecars have not been generated, but the
+  schema is valid and ready for partial fills/resumes.
+- Planned sidecar sources for mean-pooled output-layer logits, forward full-context sequence mean, reverse-complement full-context sequence mean, and reverse-complement context anchor mean currently select zero aliases until Infer fills those vectors.
+- Current regenerated LatentDNA source inventory is sidecar/annotation-backed. Feature-backed embedding plots still include only rows with existing Infer feature aliases; SFXI/reference/core rows that lack vectors are missing feature coverage, not ineligible plot categories. Deep validation should be treated as the source-of-truth check for stale materialized artifacts after any source or sidecar refresh.
+- Materialized LatentDNA view rows now carry `source_family`,
+  `selection_basis`, `view_collections`, `role_tags`, and
+  `promoter_standard__*` fields when those fields are present upstream. This
+  keeps Anderson and W-collection reference-strength metadata available for plot
+  hues after their feature vectors exist.
+- `source_class` remains a broad filtering class such as `densegen` or
+  `reference_control`; fine-grained provenance is stored separately in
+  `source_family`. This prevents context rows whose sequence product is a
+  Construct realization from disappearing from DenseGen-filtered context plots.
+
 ### Current Infer coverage
 
 - Canonical Infer feature coverage is stored only in `_derived/infer/feature_aliases.parquet` and
   `_derived/infer/feature_vectors.parquet`; active study row-overlay Infer parts have been retired from
   the local generated handoff datasets.
 - The sequence-view completion planner reports `missing_products=0`, `314328` reusable main 7B
-  sequence-view feature vectors, `157509` missing main 7B vectors, and `144` missing reference 7B
-  vectors. The reusable main vectors are the canonical sidecar rows for `157164` anchor
-  construct-insert vectors and `157164` forward-context anchor-mean vectors.
+  sequence-view feature vectors, `1258462` missing main 7B vectors, `0` reusable main 7B
+  log-likelihood scalar specs, and `1572790` missing main 7B log-likelihood scalar specs under the
+  full collection plan. The reference plan has `480` missing vectors and `480` missing scalar specs.
+  Vector counts include both intermediate embeddings and mean-pooled output-layer logits.
+  Log-likelihoods are tracked separately through `_derived/infer/feature_scalar_aliases.parquet` and
+  `_derived/infer/feature_scalars.parquet`. The reusable main vectors are the canonical sidecar rows
+  for `157164` anchor construct-insert intermediate vectors and `157164` forward-context anchor-mean
+  intermediate vectors.
 - The active handoff datasets no longer carry stale `infer__evo2_20b__*` row-overlay columns or active
   7B row-overlay Infer parts. Historical row-overlay payloads were used only as a migration source,
   then removed after the protected sequence-view sidecars were written.
-- The remaining main Infer work is targeted: `115` anchor rows, `115` forward-context rows, and all
-  `157279` reverse-complement context rows. The reference branch remains `144` vectors missing until
-  its 7B sequence-view features are generated. Evo2 execution is explicitly deferred in this local
-  environment because this device is not the target Infer runtime.
-- `construct_prom_eth_cip_reference_core60` has no Infer overlay yet (`48/48` rows missing), and
-  `construct_prom_eth_cip_reference_contexts` has no Infer overlay yet (`96/96` rows missing).
+- The remaining main Infer work is targeted: `115` anchor intermediate vectors, all `157279` anchor
+  output-layer vectors, forward-context sequence-mean vectors, the remaining `115` forward-context
+  anchor-mean intermediate vectors, all forward-context output-layer vectors, all reverse-complement
+  context vectors, and all main log-likelihood scalar sidecars. The reference branch remains `480`
+  vectors and `480` scalar specs missing until its 7B sequence-view features are generated. Evo2
+  execution is explicitly deferred in this local environment because this device is not the target
+  Infer runtime.
+- `construct_prom_eth_cip_reference_core60` has no Infer sidecar vectors yet (`96` planned vectors
+  across 48 core views), and `construct_prom_eth_cip_reference_contexts` has no Infer sidecar vectors
+  yet (`384` planned vectors across 96 context views and two pooling spans).
 - Infer should consume explicit sequence views and fail fast on missing required product kinds. It
   should not synthesize missing `analysis_window` or reverse-complement products; Construct owns those
   completion steps.
@@ -137,8 +168,8 @@
   merged anchor, merged context, reference core60, and reference context datasets. Feature-completion
   checks run the main 7B sequence-view config and the reference 7B sequence-view config without
   loading Evo2; product checks are current in this checkout, while feature-completion checks still
-  report `attention` because reverse-complement, reference, and the remaining `115 + 115` main-row
-  vectors still need Infer execution.
+  report `attention` because output-layer, context sequence-mean, reverse-complement, reference, and
+  the remaining `115 + 115` reusable-intermediate gaps still need Infer execution.
 - `usr.data-plane.promoter-study-status --json` now mirrors that situation at the cheap snapshot
   layer through `sequence_view_contract_state` and `infer_feature_completion_state`. The status route
   is for record-plane situational awareness; use preflight for command-level blockers and host
@@ -159,5 +190,7 @@
 - If you need the downstream representation-comparison surface after reading the record-plane snapshot, refresh the LatentDNA workspace snapshot:
   `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - If you need blockers or next-run readiness, switch to `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
-- Treat `intermediate_embedding_*` and `pooled_logits_*` as candidate `X` blocks; use `log_likelihood_per_token_*` only as scalar side channels
+- Treat sidecar-backed 7B intermediate embeddings as the active candidate `X` blocks. Mean-pooled
+  output-layer logits and log-likelihoods are collected by Infer for diagnostics/QC, but they are not
+  active LatentDNA geometry defaults.
 - Do not use UMAP aesthetics, reference-neighbor artifacts, or geodesic pilots as the primary comparison rule
