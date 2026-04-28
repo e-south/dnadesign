@@ -32,6 +32,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     WORKSPACE_ENV_VAR,
     WORKSPACE_ROOTS_ENV_VAR,
 )
+from dnadesign.cruncher.ingest.promoters import parse_regulondb_promoter_payload
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.study.manifest import (
     StudyManifestV1,
@@ -666,6 +667,83 @@ def test_sources_summary_requires_remote_limit_when_no_iter(tmp_path, monkeypatc
     assert result.exit_code != 0
     assert "--remote-limit" in result.output
     assert "stub" in result.output
+
+
+def test_sources_promoters_json_reports_sigma_counts(tmp_path, monkeypatch) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher")},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    class StubAdapter:
+        source_id = "stub"
+
+        def capabilities(self):
+            return {"promoters:iter"}
+
+        def iter_promoters(self, query):
+            assert query.limit == 2
+            assert query.page_size == 2
+            return iter(
+                [
+                    parse_regulondb_promoter_payload(
+                        {
+                            "_id": "P1",
+                            "name": "promoter-one",
+                            "sequence": "acgt",
+                            "sigmaFactors": [{"abbreviatedName": "RpoD"}],
+                        },
+                        source_release="14.5.0",
+                        source_route="operon_tu_promoter",
+                        query={"fixture": "one"},
+                        fetched_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
+                    ),
+                    parse_regulondb_promoter_payload(
+                        {"_id": "P2", "name": "promoter-two", "sequence": "ttaa"},
+                        source_release="14.5.0",
+                        source_route="operon_tu_promoter",
+                        query={"fixture": "two"},
+                        fetched_at=datetime(2026, 4, 27, tzinfo=timezone.utc),
+                    ),
+                ]
+            )
+
+    class StubRegistry:
+        def list_sources(self):
+            return [SimpleNamespace(source_id="stub", description="stub")]
+
+        def create(self, source_id, ingest_cfg):
+            return StubAdapter()
+
+    monkeypatch.setattr(sources_module, "default_registry", lambda *args, **kwargs: StubRegistry())
+
+    result = invoke_cli(
+        [
+            "sources",
+            "promoters",
+            "stub",
+            str(config_path),
+            "--format",
+            "json",
+            "--limit",
+            "2",
+            "--page-size",
+            "2",
+        ]
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["source"] == "stub"
+    assert payload["summary"]["record_count"] == 2
+    assert payload["summary"]["missing_sigma_count"] == 1
+    assert payload["summary"]["sigma_factor_counts"] == {"RpoD": 1}
+    assert payload["source_inventory"]["sigma_present_rate"] == 0.5
 
 
 def test_lock_requires_config_with_hint() -> None:

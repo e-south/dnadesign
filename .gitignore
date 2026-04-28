@@ -171,6 +171,7 @@ src/dnadesign/cruncher/projects/**/projects/
 src/dnadesign/archived/
 src/dnadesign/prototypes/
 src/dnadesign/usr/archived/
+src/dnadesign/usr/datasets/usr_regulondb_native_promoters/
 
 # Permuter docs (local only for now)
 src/dnadesign/permuter/docs/

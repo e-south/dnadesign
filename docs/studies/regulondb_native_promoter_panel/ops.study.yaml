@@ -1,0 +1,177 @@
+version: 2
+study_id: regulondb_native_promoter_panel
+family: promoter
+title: RegulonDB native promoter panel
+
+record_sources:
+  narrative_ref: manifest:status.md
+  datasets_ref: manifest:datasets.yaml
+  pipeline_ref: manifest:pipeline.yaml
+  campaign_ref: manifest:campaign.yaml
+  routes_ref: manifest:routes.md
+
+lifecycle:
+  phase_order:
+    - regulondb_source_inventory
+    - cruncher_promoter_export
+    - usr_ingest_dry_run
+    - usr_native_promoter_import
+    - metadata_overlay_validation
+    - native_full_infer_7b
+    - core60_view_definition
+    - latentdna_native_audit
+  current_phase:
+    strategy: explicit
+    id: metadata_overlay_validation
+
+phases:
+  - id: regulondb_source_inventory
+    status: complete
+    output_dataset: usr_regulondb_native_promoters
+    next_surface: repo:src/dnadesign/cruncher/src/ingest/promoters.py
+  - id: cruncher_promoter_export
+    status: complete
+    output_dataset: usr_regulondb_native_promoters
+    next_surface: repo:src/dnadesign/cruncher/src/ingest/promoters.py
+  - id: usr_ingest_dry_run
+    status: complete
+    output_dataset: usr_regulondb_native_promoters
+    next_surface: repo:src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
+  - id: usr_native_promoter_import
+    status: complete
+    output_dataset: usr_regulondb_native_promoters
+    next_surface: repo:src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
+  - id: metadata_overlay_validation
+    status: in_progress
+    output_dataset: usr_regulondb_native_promoters
+    next_surface: repo:src/dnadesign/usr/docs/reference/overlay-and-registry.md
+  - id: native_full_infer_7b
+    status: planned
+    output_dataset: infer_regulondb_native_promoter_views_7b
+    next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
+  - id: core60_view_definition
+    status: planned
+    output_dataset: usr_regulondb_native_promoter_core60
+    next_surface: repo:src/dnadesign/usr/docs/reference/schema-contract.md
+  - id: latentdna_native_audit
+    status: planned
+    next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+
+artifacts:
+  status_note:
+    artifact_type: file
+    ref: manifest:status.md
+  routes_doc:
+    artifact_type: file
+    ref: manifest:routes.md
+  datasets_registry:
+    artifact_type: file
+    ref: manifest:datasets.yaml
+  cruncher_promoter_contract:
+    artifact_type: file
+    ref: repo:src/dnadesign/cruncher/src/ingest/promoters.py
+  usr_import_script:
+    artifact_type: file
+    ref: repo:src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
+  usr_registry:
+    artifact_type: file
+    ref: repo:src/dnadesign/usr/datasets/registry.yaml
+  native_promoter_dataset:
+    artifact_type: dataset
+    dataset_id: usr_regulondb_native_promoters
+    ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoters
+
+execution_surfaces:
+  usr_import_dry_run:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - python
+      - src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
+      - --export-dir
+      - <cruncher-promoter-export-dir>
+  usr_validate_native_dataset:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - usr
+      - validate
+      - usr_regulondb_native_promoters
+      - --strict
+
+snapshot:
+  summary_scope: repo
+
+preflight:
+  default_scope: next
+  scopes:
+    next:
+      include_phases: [current_phase]
+    full:
+      include_phases: [all]
+  group_phase_bindings:
+    study_record: regulondb_source_inventory
+    cruncher_contract: regulondb_source_inventory
+    usr_import_contract: regulondb_source_inventory
+    usr_import_runtime: usr_ingest_dry_run
+    usr_validation: metadata_overlay_validation
+  checks:
+    regulondb_source_inventory:
+      - kind: path_exists
+        check_id: study.status.present
+        check_group: study_record
+        summary: Draft study status note is present.
+        required: true
+        artifact: status_note
+      - kind: path_exists
+        check_id: study.routes.present
+        check_group: study_record
+        summary: Draft route map is present.
+        required: true
+        artifact: routes_doc
+      - kind: path_exists
+        check_id: cruncher.promoter.contract.present
+        check_group: cruncher_contract
+        summary: Cruncher promoter export contract is present.
+        required: true
+        artifact: cruncher_promoter_contract
+      - kind: path_exists
+        check_id: usr.import.script.present
+        check_group: usr_import_contract
+        summary: USR native promoter import script is present.
+        required: true
+        artifact: usr_import_script
+      - kind: path_exists
+        check_id: usr.regulondb.registry.present
+        check_group: usr_import_contract
+        summary: USR registry declares the regulondb overlay namespace.
+        required: true
+        artifact: usr_registry
+    usr_ingest_dry_run:
+      - kind: command
+        check_id: usr.import.dry_run.command.declared
+        check_group: usr_import_runtime
+        summary: Dry-run import command is declared; replace the export placeholder before execution.
+        required: false
+        surface: usr_import_dry_run
+    metadata_overlay_validation:
+      - kind: command
+        check_id: usr.native.validation.command.declared
+        check_group: usr_validation
+        summary: Native dataset validation command is declared for after committed import.
+        required: false
+        surface: usr_validate_native_dataset
+  next_scope:
+    target_phase_groups:
+      regulondb_source_inventory: [study_record, cruncher_contract, usr_import_contract]
+      cruncher_promoter_export: [study_record, cruncher_contract]
+      usr_ingest_dry_run: [study_record, usr_import_contract, usr_import_runtime]
+      usr_native_promoter_import: [study_record, usr_import_contract, usr_import_runtime]
+      metadata_overlay_validation: [study_record, usr_validation]
+      native_full_infer_7b: [study_record]
+      core60_view_definition: [study_record]
+      latentdna_native_audit: [study_record]
+    runtime_phase_groups: []
+    runtime_shared_groups: []

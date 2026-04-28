@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 from urllib.error import HTTPError, URLError
@@ -34,6 +35,13 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.models import DatasetQuery
+from dnadesign.cruncher.ingest.promoters import (
+    PromoterQuery,
+    build_promoter_descriptor_inventory,
+    build_promoter_source_inventory,
+    summarize_promoter_collection,
+    summarize_promoter_descriptors,
+)
 from dnadesign.cruncher.ingest.registry import default_registry
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 
@@ -213,6 +221,96 @@ def datasets(
             ds.reference_genome or "-",
         )
     console.print(table)
+
+
+@app.command("promoters", help="Enumerate source promoters and summarize metadata coverage.")
+def promoters(
+    args: list[str] = typer.Argument(
+        None,
+        help="Source name (optionally followed by CONFIG).",
+        metavar="ARGS",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    limit: Optional[int] = typer.Option(None, "--limit", help="Limit promoter records fetched."),
+    page_size: int = typer.Option(100, "--page-size", help="Remote page size for promoter enumeration."),
+    output_format: str = typer.Option(
+        "table",
+        "--format",
+        help="Output format: table or json.",
+    ),
+) -> None:
+    try:
+        config_path, source = parse_config_and_value(
+            args,
+            config_option,
+            value_label="SOURCE",
+            command_hint="cruncher sources promoters regulondb",
+        )
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    output_format = output_format.lower()
+    if output_format not in {"table", "json"}:
+        raise typer.BadParameter("--format must be one of: table, json.")
+    if page_size < 1:
+        raise typer.BadParameter("--page-size must be >= 1.")
+    if limit is not None and limit < 1:
+        raise typer.BadParameter("--limit must be >= 1 when provided.")
+    cfg = _load_config_or_exit(config_path)
+    registry = default_registry(
+        cfg.ingest,
+        config_path=config_path,
+        extra_parser_modules=cfg.io.parsers.extra_modules,
+    )
+    try:
+        adapter = registry.create(source, cfg.ingest)
+    except (ValueError, HTTPError, URLError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
+    supports_list = hasattr(adapter, "list_promoters")
+    supports_iter = hasattr(adapter, "iter_promoters")
+    if not supports_list and not supports_iter:
+        console.print(f"Source '{source}' does not support promoter enumeration.")
+        raise typer.Exit(code=1)
+    if hasattr(adapter, "capabilities"):
+        try:
+            caps = adapter.capabilities()
+        except (RuntimeError, HTTPError, URLError) as exc:
+            console.print(f"Error: {exc}")
+            raise typer.Exit(code=1)
+        supports_list = supports_list and "promoters:list" in caps
+        supports_iter = supports_iter and "promoters:iter" in caps
+        if not supports_list and not supports_iter:
+            console.print(f"Source '{source}' does not advertise promoter enumeration.")
+            raise typer.Exit(code=1)
+    query = PromoterQuery(limit=limit, page_size=page_size, include_relations=True)
+    try:
+        if supports_list:
+            descriptors = list(adapter.list_promoters(query))
+            inventory = build_promoter_descriptor_inventory(descriptors)
+            summary = summarize_promoter_descriptors(descriptors)
+        else:
+            records = list(adapter.iter_promoters(query))
+            inventory = build_promoter_source_inventory(records)
+            summary = summarize_promoter_collection(records)
+    except (ValueError, RuntimeError, HTTPError, URLError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
+    payload = {
+        "source": source,
+        "query": asdict(query),
+        "summary": asdict(summary),
+        "source_inventory": asdict(inventory),
+    }
+    if output_format == "json":
+        console.print(json.dumps(payload, indent=2), markup=False)
+        return
+    _render_promoter_inventory(payload)
 
 
 @app.command("summary", help="Summarize local cache and remote inventories for sources.")
@@ -568,6 +666,38 @@ def _render_regulators_table(
     console.print(table)
 
 
+def _render_promoter_inventory(payload: dict[str, object]) -> None:
+    source = str(payload["source"])
+    summary = payload["summary"]
+    inventory = payload["source_inventory"]
+    if not isinstance(summary, dict) or not isinstance(inventory, dict):
+        raise TypeError("promoter inventory payload is malformed")
+
+    overview = Table(title=f"Promoter inventory: {source}", header_style="bold")
+    overview.add_column("Metric")
+    overview.add_column("Value", justify="right")
+    overview.add_row("records", _fmt_int(summary.get("record_count")))
+    overview.add_row("unique promoters", _fmt_int(summary.get("unique_promoter_count")))
+    overview.add_row("duplicate promoter ids", _fmt_int(summary.get("duplicate_promoter_id_count")))
+    overview.add_row("missing sigma", _fmt_int(summary.get("missing_sigma_count")))
+    overview.add_row("multi-sigma", _fmt_int(summary.get("multi_sigma_count")))
+    overview.add_row("TSS present", _fmt_rate(inventory.get("tss_present_rate")))
+    overview.add_row("boxes present", _fmt_rate(inventory.get("box_annotation_rate")))
+    overview.add_row("confidence present", _fmt_rate(inventory.get("confidence_present_rate")))
+    console.print(overview)
+
+    sigma_counts = summary.get("sigma_factor_counts") or {}
+    if isinstance(sigma_counts, dict) and sigma_counts:
+        table = Table(title="Sigma factor counts", header_style="bold")
+        table.add_column("Sigma")
+        table.add_column("Promoters", justify="right")
+        for sigma, count in sorted(sigma_counts.items(), key=lambda item: (-int(item[1]), str(item[0]))):
+            table.add_row(str(sigma), _fmt_int(count))
+        console.print(table)
+    else:
+        console.print("No sigma factor annotations found.")
+
+
 def _sort_regulators(regulators: list[dict], sort_by: str) -> list[dict]:
     if sort_by == "tf":
         return sorted(regulators, key=lambda reg: reg["tf_name"].lower())
@@ -610,6 +740,12 @@ def _fmt_int(value: Optional[int]) -> str:
     if value is None:
         return "-"
     return f"{value:,}"
+
+
+def _fmt_rate(value: object) -> str:
+    if value is None:
+        return "-"
+    return f"{float(value):.1%}"
 
 
 def _fmt_sites(seq: Optional[int], total: Optional[int]) -> str:

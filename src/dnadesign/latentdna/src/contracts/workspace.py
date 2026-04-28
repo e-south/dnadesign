@@ -291,6 +291,11 @@ class PromoterMetadataCohortConfig(StrictWorkspaceModel):
         "campaign_prior",
         "is_control",
         "source_class",
+        "regulondb__sigma_factor_set",
+        "regulondb__regulator_composition",
+        "regulondb__box_pattern",
+        "regulondb__confidence_level_set",
+        "regulondb__metadata_completeness_class",
     ]
 
 

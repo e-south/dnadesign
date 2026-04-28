@@ -460,6 +460,63 @@ namespaces:
       type: string
     description: Source-backed synthetic promoter standard strength and collection metadata.
     owner: usr
+  regulondb:
+    columns:
+    - name: regulondb__release
+      type: string
+    - name: regulondb__primary_source
+      type: string
+    - name: regulondb__source_strata_set
+      type: list<string>
+    - name: regulondb__primary_promoter_id
+      type: string
+    - name: regulondb__primary_promoter_name
+      type: string
+    - name: regulondb__promoter_alias_count
+      type: int64
+    - name: regulondb__sigma_factor_set
+      type: list<string>
+    - name: regulondb__sigma_factor_count
+      type: int64
+    - name: regulondb__confidence_level_set
+      type: list<string>
+    - name: regulondb__has_minus10_box
+      type: bool
+    - name: regulondb__has_minus35_box
+      type: bool
+    - name: regulondb__box_pattern
+      type: string
+    - name: regulondb__regulator_composition
+      type: string
+    - name: regulondb__regulon_count
+      type: int64
+    - name: regulondb__has_activator
+      type: bool
+    - name: regulondb__has_repressor
+      type: bool
+    - name: regulondb__tss_available
+      type: bool
+    - name: regulondb__metadata_completeness_class
+      type: string
+    - name: regulondb__raw_sequence_case_policy
+      type: string
+    - name: regulondb__has_sequence
+      type: bool
+    - name: regulondb__has_tss
+      type: bool
+    - name: regulondb__has_sigma
+      type: bool
+    - name: regulondb__has_confidence
+      type: bool
+    - name: regulondb__has_boxes
+      type: bool
+    - name: regulondb__has_regulatory_context
+      type: bool
+    - name: regulondb__has_citations
+      type: bool
+    description: Dense native RegulonDB promoter metadata summaries; sparse biological
+      facts live in dataset relation sidecars.
+    owner: usr
   seq_annot:
     columns:
     - name: seq_annot__format

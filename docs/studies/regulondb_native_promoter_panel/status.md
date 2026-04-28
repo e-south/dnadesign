@@ -1,0 +1,132 @@
+## regulondb_native_promoter_panel
+
+- Last verified: 2026-04-28
+- Owner: Shockwing
+- Affiliated dataset registry: `datasets.yaml`
+- Route map: `routes.md`
+- Study execution map: `pipeline.yaml`
+- USR root: `src/dnadesign/usr/datasets`
+- Lifecycle posture: inactive draft, local source dataset generated and validating
+
+### Current Datasets
+
+- Native promoter source: `usr_regulondb_native_promoters` (`local validated`, untracked shared source artifact)
+- Native/full 7B features: `infer_regulondb_native_promoter_views_7b` (`planned`)
+- Core60 view: `usr_regulondb_native_promoter_core60` (`planned`)
+
+### Current Phase
+
+- Declared phase: `metadata_overlay_validation`
+- Source export status: local Cruncher superset export validated; export artifacts are not checked in
+- USR dataset status: generated locally under `src/dnadesign/usr/datasets/usr_regulondb_native_promoters`; ignored by git and not committed
+- Preferred first infer family: `evo2_7b`
+
+### Placement Boundary
+
+This study is a data intake and validation lane, not a new top-level dnadesign
+tool. Source file discovery uses the sibling `dnadesign-data` public API.
+Cruncher normalizes source rows into a fixed export. USR turns that fixed export
+into one sequence-level dataset after validation passes. Generated exports, USR
+parquet sidecars, snapshots, and downstream embeddings stay out of the
+checked-in study record. The checked-in record describes how the dataset was
+built and validated; the generated USR dataset itself is managed as a
+local/shared data artifact, not as git-tracked source.
+
+### Provenance Model
+
+`usr_regulondb_native_promoters` is the single USR dataset for the strict native
+promoter superset. It is not a live-only dataset. Its input is a fixed Cruncher
+superset export that records source, release, table or API route, row reference,
+raw checksum, parser version, and source stratum before USR import.
+
+Source strata represented by the current validated export:
+
+| Stratum | Role | Provenance rule |
+| --- | --- | --- |
+| RegulonDB 13 `PromoterSet.tsv` | Current curated release-pinned base source | Rows with strict DNA sequence and sigma annotation become base-row candidates; sequence-less rows are skipped with row-level provenance. |
+| RegulonDB 11 `PromoterSet.csv` | Historical curated base source and release comparison | Rows are preserved as versioned source records and deduplicated by canonical sequence against RegulonDB 13. |
+| Live RegulonDB 14.5 GraphQL `getAllOperon` promoter route | Modern route-completeness check and future overlay candidate | Current bounded probe showed the route is useful but incomplete, so live rows are not the present base source. |
+| RegulonDB 13 sigmulon promoter CSVs | Supplemental sigma affiliation evidence | Inventoried/deferred for reconciliation; it does not create promoter base rows by itself. |
+| RegulonDB 11 RACE and 454 promoter datasets | Experimental TSS/promoter evidence layer | Inventoried/deferred as experimental evidence, not curated base sequence truth. |
+| RegulonDB 11 `PromoterPredictionSet.csv` | Computational prediction layer | Inventoried/deferred as predicted promoter candidates; prediction rows are not curated promoters and are not activity measurements. |
+| EcoCyc 28 promoter SmartTable | Independent curation cross-check | Inventoried/deferred; EcoCyc windows can be longer than RegulonDB windows and must not replace RegulonDB sequences silently. |
+
+The single USR dataset deduplicates canonical sequence records while preserving
+source-specific promoter identities and affiliations in relation sidecars. Dense
+`regulondb__*` base overlays summarize source strata, alias counts, canonical
+sigma sets, confidence sets, and metadata completeness. Sparse or many-to-many
+facts, including citations, individual regulators, boxes, TFBSs, prediction
+scores, and source-specific raw columns, belong in relation sidecars. Sequence-
+less curated source rows cannot become USR sequence base rows, and sequence-
+bearing rows without sigma evidence are excluded from the strict base set; both
+classes remain visible in provenance sidecars with source, release, table, row
+reference, promoter identity, raw checksum, and reason.
+
+### Guardrails
+
+- Cruncher owns RegulonDB source parsing and deterministic exports.
+- USR imports only a fixed Cruncher export and defaults to dry-run.
+- Base rows are sequence records using `bio_type=dna`; promoter ids stay in aliases and relation sidecars.
+- Base-row inclusion is strict: records must have usable ACGT DNA sequence, stable promoter identity, retained provenance, and at least one sigma affiliation after sequence-level grouping.
+- No duplicate canonical sequence rows are allowed in the committed USR dataset.
+- Source promoter ids, names, sigma affiliations, predictions, and cross-release differences stay provenance-qualified instead of being flattened into sparse base columns.
+- Sigma labels are summarized with canonical labels such as `sigma70`, while raw source labels remain in relation/source-row provenance.
+- Native RegulonDB sigma metadata uses `regulondb__*` fields and never writes `sig35_variant`.
+- Prediction rows are computationally inferred promoter candidates. They must not be interpreted as measured promoter activity or curated promoter strength.
+- This study is separate from `stress_ethanol_cipro_growth`; comparisons require an explicit cross-study workspace.
+
+### Current Row Counts
+
+- `usr_regulondb_native_promoters`: 3,182 base rows (`local validated`, untracked)
+- `infer_regulondb_native_promoter_views_7b`: n/a (`planned`)
+- `usr_regulondb_native_promoter_core60`: n/a (`planned`)
+
+### Read-Only Probe Evidence
+
+Latest local source probe on 2026-04-27 produced a temporary Cruncher superset
+export outside the repo. The probe parsed the base-row-capable curated
+PromoterSet sources from sibling `dnadesign-data` and inventoried supplemental
+source strata without turning them into sequence rows:
+
+- Normalized curated source records: 7,914 from RegulonDB 13 and RegulonDB 11 PromoterSet files.
+- Skipped curated source rows with row-level provenance: 184 total, all `missing_sequence` (`92` from RegulonDB 13 and `92` from RegulonDB 11).
+- Strict USR base rows after sigma-required canonical sequence deduplication: 3,182.
+- Retained source rows: 6,629.
+- Duplicate sequence collapses among retained rows: 3,447.
+- Sequence-bearing source rows excluded for missing sigma: 1,285 source rows, representing 645 sequence groups.
+- Same-release promoter-id sequence conflicts: 0.
+- Supplemental strata recorded but deferred from base-row creation: RegulonDB 13 sigmulon, RegulonDB 11 RACE/454, RegulonDB 11 prediction rows, and EcoCyc 28 promoter windows.
+- Local write-mode validation on 2026-04-28 created the single dataset layout with `records.parquet`, dense `regulondb__*` overlays, and `_relations/*.parquet` sidecars. The generated dataset path is ignored by git.
+
+### Superset Fidelity Checks
+
+The latest dry-run validation of the temporary superset reported:
+
+- Duplicate canonical base sequences: 0.
+- Invalid non-ACGT base sequences: 0.
+- Base sequence length mismatches: 0.
+- Required retained `regulondb__*` overlay metadata null counts: none.
+- Orphan relation rows with `usr_id`: 0.
+- Duplicate relation rows after alias and sigma deduplication: 0 for retained relation sidecars.
+- Sigma labels after canonicalization: `sigma70` 3,991; `sigma24` 1,042; `sigma32` 624; `sigma38` 479; `sigma28` 290; `sigma54` 198; `sigma19` 1.
+- Missing sigma annotation in retained base rows: 0. The 645 no-sigma sequence groups are omitted from `records.parquet` and preserved in `_relations/excluded_source_rows.parquet`.
+- Fuzzy promoter-name collision candidates after strict filtering: 16. These are manual-review signals for name-based reconciliation, not automatic duplicate calls. Examples include suffix-near names such as `rsmDp1`/`rsmDp11`, `yhcAp1`/`yhcAp11`, and `sdiAp1`/`sdiAp1b`.
+
+A bounded live RegulonDB 14.5 GraphQL probe on 2026-04-27 returned 20 promoter
+records with 95% sequence coverage, 95% TSS coverage, and 55% sigma coverage.
+The live route remains a modern overlay/completeness check rather than the
+current completeness base.
+
+### Current Downstream Posture
+
+- Construct: deferred until native/full and core60 rules are validated.
+- Infer: planned for native/full Evo2 7B after this local USR artifact is accepted as the source dataset.
+- LatentDNA: planned as a separate native promoter metadata profile.
+- Cluster: not configured.
+- OPAL: not configured.
+
+### Next Actions
+
+- Review the local `usr_regulondb_native_promoters` validation output and strict omission policy.
+- Decide whether to promote the local generated dataset through the normal USR data sync path. Do not add the generated dataset root to git.
+- Keep live RegulonDB 14.5, sigmulon, HT, prediction, and EcoCyc strata as explicit future reconciliation work rather than silently widening the current base table.
