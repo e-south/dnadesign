@@ -123,6 +123,8 @@ PACKAGE_FILES = {
     ("sequence_views",): {
         "__init__.py",
         "models.py",
+        "qa.py",
+        "semantics.py",
         "store.py",
     },
     ("storage",): {

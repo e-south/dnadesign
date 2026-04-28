@@ -180,6 +180,34 @@ def _append_alias_payload(record: SequenceViewRecord) -> dict[str, object]:
     return payload
 
 
+def _alias_index_by_view_id(existing: dict[str, SequenceViewRecord]) -> dict[str, str]:
+    alias_to_view_id: dict[str, str] = {}
+    for existing_row in existing.values():
+        for alias in _casefolded_aliases(existing_row.aliases):
+            current = alias_to_view_id.get(alias)
+            if current is not None and current != existing_row.view_id:
+                raise SchemaError(
+                    "Sequence view aliases must remain unique across view_ids. "
+                    f"Alias '{alias}' is used by '{current}' and '{existing_row.view_id}'."
+                )
+            alias_to_view_id[alias] = str(existing_row.view_id)
+    return alias_to_view_id
+
+
+def _replace_alias_index(
+    alias_to_view_id: dict[str, str],
+    *,
+    old_aliases: list[str] | None,
+    new_aliases: list[str] | None,
+    view_id: str,
+) -> None:
+    for alias in _casefolded_aliases(old_aliases):
+        if alias_to_view_id.get(alias) == view_id:
+            alias_to_view_id.pop(alias, None)
+    for alias in _casefolded_aliases(new_aliases):
+        alias_to_view_id[alias] = view_id
+
+
 def load_sequence_views(dataset: Dataset) -> list[SequenceViewRecord]:
     path = sequence_views_path(dataset)
     if not path.exists():
@@ -192,6 +220,34 @@ def load_sequence_views(dataset: Dataset) -> list[SequenceViewRecord]:
     for raw in payload:
         rows.append(SequenceViewRecord.model_validate(dict(raw)))
     return rows
+
+
+def load_sequence_view_ids(dataset: Dataset) -> set[str]:
+    path = sequence_views_path(dataset)
+    if not path.exists():
+        return set()
+    table = pq.read_table(path, columns=["view_id"])
+    return {str(value) for value in table.column("view_id").to_pylist() if value is not None}
+
+
+def load_sequence_view_index(
+    dataset: Dataset,
+    *,
+    include_created: bool = False,
+) -> dict[str, dict[str, object]]:
+    path = sequence_views_path(dataset)
+    if not path.exists():
+        return {}
+    excluded = set() if include_created else {"created_at", "created_by"}
+    columns = [field.name for field in _SEQUENCE_VIEW_SCHEMA if field.name not in excluded]
+    table = pq.read_table(path, columns=columns)
+    index: dict[str, dict[str, object]] = {}
+    for row in table.to_pylist():
+        view_id = row.get("view_id")
+        if view_id is None:
+            continue
+        index[str(view_id)] = dict(row)
+    return index
 
 
 def select_sequence_views(
@@ -241,14 +297,16 @@ def write_sequence_views(
             _validate_view_bounds(dataset, row, sequence_lengths=sequence_lengths, length_cache=length_cache)
 
         existing = {row.view_id: row for row in load_sequence_views(dataset)}
+        alias_to_view_id = _alias_index_by_view_id(existing)
         for row in incoming:
             incoming_aliases = _casefolded_aliases(row.aliases)
-            same_alias_conflict = [
-                existing_row.view_id
-                for existing_row in existing.values()
-                if existing_row.view_id != row.view_id
-                and incoming_aliases.intersection(_casefolded_aliases(existing_row.aliases))
-            ]
+            same_alias_conflict = sorted(
+                {
+                    alias_to_view_id[alias]
+                    for alias in incoming_aliases
+                    if alias_to_view_id.get(alias) is not None and alias_to_view_id[alias] != row.view_id
+                }
+            )
             if same_alias_conflict:
                 preview = ", ".join(sorted(same_alias_conflict)[:3])
                 raise SchemaError(
@@ -257,6 +315,12 @@ def write_sequence_views(
             current = existing.get(row.view_id)
             if current is None:
                 existing[row.view_id] = row
+                _replace_alias_index(
+                    alias_to_view_id,
+                    old_aliases=None,
+                    new_aliases=row.aliases,
+                    view_id=str(row.view_id),
+                )
                 continue
             if current.semantic_payload() != row.semantic_payload():
                 raise SchemaError(f"Sequence view id collision with different semantic content for '{row.view_id}'.")
@@ -272,6 +336,12 @@ def write_sequence_views(
                 continue
             if conflict_policy == "replace":
                 existing[row.view_id] = row
+                _replace_alias_index(
+                    alias_to_view_id,
+                    old_aliases=current.aliases,
+                    new_aliases=row.aliases,
+                    view_id=str(row.view_id),
+                )
                 continue
             if _append_alias_payload(current) != _append_alias_payload(row):
                 raise SchemaError(
@@ -283,6 +353,12 @@ def write_sequence_views(
                 }
             )
             existing[row.view_id] = merged
+            _replace_alias_index(
+                alias_to_view_id,
+                old_aliases=current.aliases,
+                new_aliases=merged.aliases,
+                view_id=str(row.view_id),
+            )
 
         sorted_rows = [existing[key] for key in sorted(existing)]
         target_path = sequence_views_path(dataset)

@@ -123,14 +123,23 @@ Current presets include:
 
 1. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch.yaml`
 2. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml`
-3. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml`
-4. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml`
-5. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
-6. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
+3. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml`
+4. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml`
+5. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml`
+6. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
+7. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
 
-Infer auto/resume resolves exactly one USR write-back destination per runbook.
-If a study keeps `anchor_only` and `template_1kb` as separate dataset planes,
-ship one batch preset per lane instead of one multi-destination Infer preset.
+Infer auto/resume resolves exactly one USR write-back destination or one sequence-view input dataset per
+runbook. If a study has separate anchor, forward-context, and reverse-complement context datasets or
+view selectors, ship one batch preset per operational lane instead of one multi-destination Infer
+preset.
+
+Infer runbooks whose config uses `feature_bundle.sequence_view_inputs` render an
+extra preflight command before `infer run --dry-run`:
+`uv run infer validate sequence-view-completion --format json
+--max-missing-products 0 --max-stale-vectors 0`. This gate is intentionally not
+`--max-missing-vectors 0`: missing feature vectors are the batch workload, while
+missing sequence products and stale vectors are submit blockers.
 
 Keep `presets/` for reusable starters only. Do not point `ops runbook plan` or `ops runbook execute` at an installed-package preset in place. Materialize a workspace-scoped runbook with `uv run ops runbook init`, or copy the preset content into `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml` and rewrite the workspace-relative paths before use. Store run-specific variants under `<workspace-root>/outputs/logs/ops/runbooks/` with a stable runbook id.
 

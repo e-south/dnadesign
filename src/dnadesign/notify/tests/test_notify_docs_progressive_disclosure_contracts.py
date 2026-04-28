@@ -86,7 +86,8 @@ def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
     assert "NOTIFY_ACTIONS" in text
     assert "Workspace shorthand for any tool is repo-rooted" in text
     assert "DNADESIGN_REPO_ROOT=<repo-root>" in text
-    assert "Multi-destination infer configs must use explicit `--events <path>`" in text
+    assert "one sequence-view input dataset" in text
+    assert "Multi-dataset Infer configs must use explicit `--events <path>`" in text
 
 
 def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook() -> None:
@@ -174,7 +175,7 @@ def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
     )
     assert "Workspace shorthand is repo-rooted for all resolver-mode tools." in text
     assert "ingest.root" in text
-    assert "requires exactly one USR write-back destination and explicit `ingest.root`" in text
+    assert "one legacy USR write-back destination or exactly one sequence-view" in text
     assert "Multi-destination infer configs must use explicit `--events <path>`" in text
 
 

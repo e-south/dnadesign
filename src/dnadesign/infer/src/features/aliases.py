@@ -18,6 +18,8 @@ from typing import Iterable
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from dnadesign.usr import Dataset
+
 from .cache_keys import stable_sha256
 
 FEATURE_ALIAS_RELATIVE_PATH = "_derived/infer/feature_aliases.parquet"
@@ -97,6 +99,7 @@ def persist_feature_alias_rows(rows: Iterable[dict[str, object]]) -> int:
         if path.exists():
             existing_rows = pq.read_table(path).to_pylist()
         existing_by_id = {str(row["alias_id"]): row for row in existing_rows}
+        group_written = 0
         for row in payload_rows:
             alias_id = str(row["alias_id"])
             current = existing_by_id.get(alias_id)
@@ -110,6 +113,7 @@ def persist_feature_alias_rows(rows: Iterable[dict[str, object]]) -> int:
                 continue
             existing_by_id[alias_id] = row
             total_written += 1
+            group_written += 1
         table = pa.table(
             {
                 field.name: pa.array([row.get(field.name) for row in existing_by_id.values()], type=field.type)
@@ -118,7 +122,63 @@ def persist_feature_alias_rows(rows: Iterable[dict[str, object]]) -> int:
             schema=_FEATURE_ALIAS_SCHEMA,
         )
         pq.write_table(table, path)
+        if group_written:
+            Dataset(Path(dataset_root), dataset_id).log_event(
+                "infer_feature_aliases_write",
+                args={"rows_written": group_written},
+                artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
+                target_path=path,
+                actor={"tool": "infer", "run_id": "feature-alias-persistence"},
+            )
     return total_written
+
+
+def load_feature_alias_rows(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+) -> list[dict[str, object]]:
+    path = feature_alias_path(dataset_root=dataset_root, dataset_id=dataset_id)
+    if not path.exists():
+        return []
+    return pq.read_table(path).cast(_FEATURE_ALIAS_SCHEMA).to_pylist()
+
+
+def load_feature_alias_ids(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+) -> set[str]:
+    """Load only alias ids for inventory paths that must not touch vector payloads."""
+
+    path = feature_alias_path(dataset_root=dataset_root, dataset_id=dataset_id)
+    if not path.exists():
+        return set()
+    table = pq.read_table(path, columns=["alias_id"])
+    return {str(value) for value in table.column("alias_id").to_pylist() if str(value).strip()}
+
+
+def load_feature_vector_keys(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+    keys: Iterable[str],
+) -> set[str]:
+    """Return persisted feature-vector keys without reading embedding payloads.
+
+    Feature vectors can be multi-gigabyte parquet files because the `value`
+    column stores embedding arrays. Completion/status checks only need key
+    membership, so they must avoid materializing that payload column.
+    """
+
+    wanted = {str(key) for key in keys if str(key).strip()}
+    if not wanted:
+        return set()
+    path = feature_vector_path(dataset_root=dataset_root, dataset_id=dataset_id)
+    if not path.exists():
+        return set()
+    table = pq.read_table(path, columns=["feature_vector_key"])
+    return {str(key) for key in table.column("feature_vector_key").to_pylist() if str(key) in wanted}
 
 
 def load_feature_vector_rows(
@@ -157,6 +217,7 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
         if path.exists():
             existing_rows = pq.read_table(path).cast(_FEATURE_VECTOR_SCHEMA).to_pylist()
         existing_by_key = {str(row["feature_vector_key"]): row for row in existing_rows}
+        group_written = 0
         for row in payload_rows:
             key = str(row["feature_vector_key"])
             value = [float(item) for item in row["value"]]
@@ -171,6 +232,7 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
                 "created_at": str(row["created_at"]),
             }
             total_written += 1
+            group_written += 1
         table = pa.table(
             {
                 field.name: pa.array([row.get(field.name) for row in existing_by_key.values()], type=field.type)
@@ -179,4 +241,12 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
             schema=_FEATURE_VECTOR_SCHEMA,
         )
         pq.write_table(table, path)
+        if group_written:
+            Dataset(Path(dataset_root), dataset_id).log_event(
+                "infer_feature_vectors_write",
+                args={"rows_written": group_written},
+                artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
+                target_path=path,
+                actor={"tool": "infer", "run_id": "feature-vector-persistence"},
+            )
     return total_written

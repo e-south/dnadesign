@@ -44,11 +44,11 @@ class PromoterPoolingConfig(_StrictFeatureModel):
 class SequenceViewSelectorConfig(_StrictFeatureModel):
     product_kind: Optional[
         Literal[
-            "native_record",
-            "biological_insert",
-            "analysis_core60",
-            "context1kb_forward",
-            "context1kb_reverse_complement",
+            "source_record",
+            "selected_region",
+            "construct_insert",
+            "analysis_window",
+            "realized_context",
         ]
     ] = None
     view_name: Optional[str] = None

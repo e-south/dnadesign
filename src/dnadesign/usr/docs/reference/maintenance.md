@@ -20,6 +20,27 @@ Operational rules:
 - Do not hand-edit `_views/sequence_views.parquet`; rerun the owning import or realization step with the intended conflict policy.
 - Dataset-local `_views/sequence_views.parquet` sidecars are additive metadata and are not compacted via overlay maintenance commands.
 
+Merged promoter-anchor handoffs have their own sidecar materializer because
+plain merge intentionally does not copy sequence views:
+
+```bash
+# Dry-run the merged anchor sidecar plan.
+uv run python -m dnadesign.usr.scripts.materialize_promoter_anchor_sequence_views \
+  --dataset usr_prom_eth_cip_anchor
+
+# Write one construct_insert sequence view per merged anchor row.
+uv run python -m dnadesign.usr.scripts.materialize_promoter_anchor_sequence_views \
+  --dataset usr_prom_eth_cip_anchor \
+  --write
+```
+
+This helper writes `product_kind=construct_insert`, `context_kind=anchor_only`,
+`orientation=forward`, and `recommended_pooling=seq_mean` for each row in the
+merged anchor dataset. Rows sourced from
+`construct_prom_eth_cip_reference_core60` keep `analysis_only=true` and lineage
+metadata, but native or designed 60 bp rows are not duplicated or relabeled as
+`analysis_window`.
+
 ## Registry and overlay maintenance
 
 ```bash
@@ -50,6 +71,32 @@ Compaction retention contract:
 - Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
 - Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run usr state ...`.
 - `overlay-project` is the safe repair path when downstream handoff datasets must inherit authoritative overlay metadata after merge, construct, or infer without rewriting `records.parquet` or disturbing unrelated namespaces such as `infer`.
+
+## Event-log gardening
+
+USR `.events.log` files are append-only operational ledgers while a dataset is
+active. Do not truncate or hand-edit them. When a long-lived dataset has moved
+through a reviewed maintenance boundary, archive the full log and keep only an
+operational tail with the offline gardening command:
+
+```bash
+# Dry-run; reports how many lines would be archived and retained.
+uv run usr maintenance event-log-garden <dataset> --retain-last 1000
+
+# Write only after Notify watchers are stopped and cursors will be reseeded.
+uv run usr maintenance event-log-garden <dataset> \
+  --retain-last 1000 \
+  --write \
+  --acknowledge-notify-cursor-reset \
+  --reason "post-migration event-log gardening"
+```
+
+Event-log gardening contract:
+
+- The full pre-garden log is copied to `.events.archive/events-<timestamp>-<sha>.jsonl`.
+- The live `.events.log` keeps the most recent `--retain-last` records and appends an `event_log_garden` audit event.
+- Writes require `--acknowledge-notify-cursor-reset`; this is intentional because byte-offset Notify cursors become invalid after log rewriting.
+- Run this as an offline maintenance operation only. Stop active Notify watchers first, reseed cursors to the new live log tail, and coordinate USR sync/publish so local and remote event sidecars do not drift.
 
 ## De-duplication
 

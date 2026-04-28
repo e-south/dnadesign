@@ -28,8 +28,11 @@ This page is the tool-local source for Notify command invocation contracts and f
   - `infer` -> `infer`
   - `construct` -> `construct`
 - Workspace shorthand is repo-rooted for all resolver-mode tools. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
-- `infer` resolver requires exactly one USR write-back destination and explicit `ingest.root` for every `ingest.source='usr'` + `io.write_back=true` job.
-- Multi-destination infer configs must use explicit `--events <path>` instead of resolver mode.
+- `infer` resolver accepts exactly one legacy USR write-back destination or exactly one sequence-view
+  input dataset. Legacy write-back jobs still require explicit `ingest.root` for every
+  `ingest.source='usr'` + `io.write_back=true` job.
+- Multi-destination infer configs must use explicit `--events <path>` or be split into
+  single-dataset runbooks instead of resolver mode.
 - `construct --workspace` uses a workspace selector, not a raw filesystem path:
   - `<workspace>` when the workspace registry has exactly one project
   - `<workspace>:<project-id>` when selecting from `construct.workspace.yaml`

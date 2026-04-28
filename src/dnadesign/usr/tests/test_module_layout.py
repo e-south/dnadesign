@@ -40,6 +40,13 @@ def test_public_package_exports_expected_symbols() -> None:
     assert hasattr(module, "DERIVED_NAMESPACE")
     assert hasattr(module, "SequenceViewRecord")
     assert hasattr(module, "write_sequence_views")
+    assert hasattr(module, "load_sequence_view_index")
+    assert hasattr(module, "load_sequence_view_ids")
+    assert hasattr(module, "ViewSemanticsRecord")
+    assert hasattr(module, "write_view_semantics")
+    assert hasattr(module, "load_view_semantics_index")
+    assert hasattr(module, "SequenceViewContractExpectation")
+    assert hasattr(module, "validate_sequence_view_contract")
     assert hasattr(module, "RESERVED_NAMESPACES")
     assert hasattr(module, "MUTATION_RESERVED_NAMESPACES")
     assert hasattr(module, "load_overlay_catalog")
@@ -101,6 +108,8 @@ def test_api_package_exports_expected_symbols() -> None:
     assert hasattr(module, "Dataset")
     assert hasattr(module, "ensure_sequence_contract_namespaces")
     assert hasattr(module, "SequenceViewSemanticKey")
+    assert hasattr(module, "load_sequence_view_index")
+    assert hasattr(module, "load_sequence_view_ids")
     assert hasattr(module, "USR_EVENT_VERSION")
     assert hasattr(module, "__version__")
 
@@ -153,6 +162,8 @@ def test_sequence_views_module_exports_expected_symbols() -> None:
     assert hasattr(module, "SequenceViewSemanticKey")
     assert hasattr(module, "compute_sequence_view_id")
     assert hasattr(module, "write_sequence_views")
+    assert hasattr(module, "load_sequence_view_index")
+    assert hasattr(module, "load_sequence_view_ids")
 
 
 def test_overlays_module_exports_expected_symbols() -> None:

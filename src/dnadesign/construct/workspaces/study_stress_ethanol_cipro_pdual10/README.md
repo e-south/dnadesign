@@ -8,15 +8,15 @@ It is not a demo. It assumes:
 - the merged anchor dataset is `usr_prom_eth_cip_anchor`
 - the template dataset is `usr_pdual10_plasmid_template`
 - the pDual-10 template record id is `c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d`
-- the single study project writes into `construct_prom_eth_cip_context`
+- the shared context project writes paired forward and reverse-complement rows into `construct_prom_eth_cip_context`
 - the study anchor is always placed on the template forward strand at
   `3574..3666`, with upstream flank `CGCCAGCAACCGGGATCC` and downstream flank
   `GAATTCGCCAGCTGTCACCGGA`
 
 Use this workspace after the study's merged anchor dataset exists.
-The checked-in project is refresh-safe by default: rerunning it against the
-same shared context dataset skips already-present output ids and appends only
-new Construct contexts.
+The checked-in projects are refresh-safe by default: rerunning them against the
+same shared datasets skips already-present output ids, appends missing Construct
+contexts, and writes sequence-view rows for already-existing semantic variants.
 The supporting study record lives under:
 
 - `docs/studies/stress_ethanol_cipro_growth/pipeline.yaml`
@@ -47,6 +47,6 @@ tracks the expected config `job.id`, so a renamed or swapped study config fails
 in `workspace doctor` before execution.
 
 Materialize the study project only after the merged anchor dataset has been
-validated strictly. The checked-in config now sets
-`output.on_conflict=ignore`, so repeated refreshes preserve existing context
-rows instead of failing on already-materialized output ids.
+validated. The checked-in context config sets `output.on_conflict=ignore`, so
+repeated refreshes preserve existing context rows while completing missing
+forward or reverse-complement semantic views.

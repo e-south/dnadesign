@@ -12,6 +12,8 @@ from dnadesign.densegen.src.core.metadata_schema import META_FIELDS, validate_me
 from dnadesign.usr import Dataset
 from dnadesign.usr.scripts import port_reader_sfxi_densegen_archive as port
 from dnadesign.usr.src.contracts import compute_id
+from dnadesign.usr.src.overlays import overlay_metadata
+from dnadesign.usr.src.registry import registry_hash
 
 
 def _revcomp(sequence: str) -> str:
@@ -256,3 +258,66 @@ def test_write_port_dataset_uses_base_records_and_densegen_sidecar(tmp_path: Pat
     assert labels.num_rows == 2
     assert any(alias.startswith("archive_id:legacy-") for alias in labels.column("usr_label__aliases").to_pylist()[0])
     dataset.validate(strict=True)
+
+
+def test_overlap_report_flags_existing_sfxi_sequences_by_dataset(tmp_path: Path) -> None:
+    reader_root = _reader_fixture(tmp_path)
+    archive_path = _archive_fixture(tmp_path)
+    audit = port.build_port_plan(reader_root=reader_root, archive_records=archive_path)
+    usr_root = tmp_path / "usr_datasets"
+    usr_root.mkdir()
+    shutil.copy(Path("src/dnadesign/usr/datasets/registry.yaml"), usr_root / "registry.yaml")
+
+    source = Dataset(usr_root, "densegen_source")
+    with source.write_session() as session:
+        session.init(source="fixture", notes="fixture source")
+        session.import_rows(port.base_records_frame([audit.included[0]]), source="fixture")
+    anchor = Dataset(usr_root, "study_anchor")
+    with anchor.write_session() as session:
+        session.init(source="fixture", notes="fixture anchor")
+        session.import_rows(port.base_records_frame([audit.included[1]]), source="fixture")
+
+    report = port.compare_port_plan_to_datasets(
+        audit,
+        usr_root=usr_root,
+        dataset_names=("densegen_source", "study_anchor", "missing_dataset"),
+    )
+
+    assert report["included_total"] == 2
+    assert report["datasets"]["densegen_source"]["matched_count"] == 1
+    assert report["datasets"]["densegen_source"]["matched_design_ids"] == ["pDual-10-ES1p"]
+    assert report["datasets"]["study_anchor"]["matched_count"] == 1
+    assert report["datasets"]["study_anchor"]["matched_design_ids"] == ["pDual-10-ES6p"]
+    assert report["datasets"]["missing_dataset"]["exists"] is False
+
+
+def test_refresh_existing_port_dataset_overlays_uses_current_registry_metadata(tmp_path: Path) -> None:
+    reader_root = _reader_fixture(tmp_path)
+    archive_path = _archive_fixture(tmp_path)
+    audit = port.build_port_plan(reader_root=reader_root, archive_records=archive_path)
+    usr_root = tmp_path / "usr_datasets"
+    usr_root.mkdir()
+    shutil.copy(Path("src/dnadesign/usr/datasets/registry.yaml"), usr_root / "registry.yaml")
+
+    port.write_port_dataset(
+        audit,
+        usr_root=usr_root,
+        output_dataset="usr_sfxi_pdual10_densegen_promoters",
+    )
+
+    result = port.refresh_existing_port_dataset(
+        audit,
+        usr_root=usr_root,
+        output_dataset="usr_sfxi_pdual10_densegen_promoters",
+    )
+
+    dataset = Dataset(usr_root, "usr_sfxi_pdual10_densegen_promoters")
+    dataset.validate(strict=True)
+    current_hash = registry_hash(usr_root, required=True)
+    densegen_meta = overlay_metadata(dataset.dir / "_derived" / "densegen.parquet")
+    label_meta = overlay_metadata(dataset.dir / "_derived" / "usr_label.parquet")
+    assert result.rows_written == 0
+    assert result.densegen_overlay_rows == 2
+    assert result.label_overlay_rows == 2
+    assert densegen_meta["registry_hash"] == current_hash
+    assert label_meta["registry_hash"] == current_hash

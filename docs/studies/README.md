@@ -95,8 +95,8 @@ Keep four complementary artifacts for each real study:
   sources, artifacts, execution surfaces, and explicit preflight scope/check
   planning. Declare generic readiness kinds there, such as `path_exists`,
   `dataset_snapshot`, `workspace_layout`, `environment`, `gpu_availability`,
-  `command`, `scheduler_queue`, and `runbook_plan`, then bind them to explicit
-  artifact ids and execution-surface ids.
+  `command`, `scheduler_queue`, `sequence_view_contract`, and `runbook_plan`,
+  then bind them to explicit artifact ids and execution-surface ids.
 
 Keep the code boundary clear: study-family implementation code lives under
 `src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the

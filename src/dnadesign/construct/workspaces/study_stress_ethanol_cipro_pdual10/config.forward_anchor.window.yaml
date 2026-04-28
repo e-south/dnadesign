@@ -42,6 +42,13 @@ job:
       direction: symmetric
       size_bp: 1000
       offset_bp: 0
+  output_variants:
+    - product_kind: realized_context
+      orientation: forward
+      recommended_pooling: anchor_mean
+    - product_kind: realized_context
+      orientation: reverse_complement
+      recommended_pooling: anchor_mean
   output:
     on_conflict: ignore
     target:

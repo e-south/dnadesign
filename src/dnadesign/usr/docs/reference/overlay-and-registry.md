@@ -84,6 +84,16 @@ Conflict behavior is explicit-only:
 
 Sequence views are additive metadata. They do not replace sequence-derived base ids, and they are not inferred implicitly by downstream tools.
 
+Merged anchor handoffs should use product kinds conservatively. For example,
+`usr_prom_eth_cip_anchor` is a construct-ready promoter-insert handoff, so its
+dataset-local sequence-view sidecar uses one `construct_insert` view per base
+row with `context_kind=anchor_only` and `recommended_pooling=seq_mean`. Rows
+that came from `construct_prom_eth_cip_reference_core60` keep
+`analysis_only=true` and parent lineage, but the merged handoff does not
+relabel every native or designed 60 bp row as `analysis_window`. The source
+`construct_prom_eth_cip_reference_core60` dataset remains the authoritative
+surface for true derived analysis-core products.
+
 ## Design contracts
 
 - Canonical essentials are stable: `id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`.

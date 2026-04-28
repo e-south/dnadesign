@@ -16,13 +16,14 @@ from pathlib import Path
 
 import pyarrow as pa
 import pytest
+from Bio.Seq import Seq
 
 from dnadesign.construct.src.annotations import AnnotationFeature, AnnotationInterval
 from dnadesign.construct.src.api import preflight_from_config, run_from_config
 from dnadesign.construct.src.errors import ValidationError
 from dnadesign.construct.src.feature_retention import classify_feature_retention
 from dnadesign.construct.src.output_store import _ensure_construct_registry
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces, load_sequence_views
+from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces, load_sequence_views, write_sequence_views
 from dnadesign.usr.src.registry.models import SEQ_ANNOT_COLUMNS
 from dnadesign.usr.src.registry.typespec import arrow_type_from_str
 
@@ -2157,7 +2158,7 @@ job:
       root: {usr_root.as_posix()}
     field: sequence
   normalize_anchor:
-    product_kind: analysis_core60
+    product_kind: analysis_window
     target_length: 60
     focal_selector:
       kind: chain
@@ -2196,16 +2197,16 @@ job:
     output_ds = Dataset(usr_root, "normalized_refs")
     frame = output_ds.head(n=5)
     assert len(frame.iloc[0]["sequence"]) == 60
-    assert frame.iloc[0]["construct__context_kind"] == "analysis_core60"
+    assert frame.iloc[0]["construct__context_kind"] == "analysis_window"
     assert frame.iloc[0]["derived__source_interval_start_0"] == 0
     assert frame.iloc[0]["derived__source_interval_end_0"] == 60
     assert frame.iloc[0]["derived__focal_rule"] == "annotation_pair_midpoint"
-    assert frame.iloc[0]["derived__product_kind"] == "analysis_core60"
+    assert frame.iloc[0]["derived__product_kind"] == "analysis_window"
     assert bool(frame.iloc[0]["derived__analysis_only"]) is True
 
     views = load_sequence_views(output_ds)
     assert len(views) == 1
-    assert views[0].product_kind == "analysis_core60"
+    assert views[0].product_kind == "analysis_window"
     assert views[0].recommended_pooling == "core60_mean"
     assert views[0].parent_sequence_id == add_result.ids[0]
 
@@ -2297,7 +2298,7 @@ job:
       root: {usr_root.as_posix()}
     field: sequence
   normalize_anchor:
-    product_kind: analysis_core60
+    product_kind: analysis_window
     target_length: 60
     focal_selector:
       kind: chain
@@ -2350,7 +2351,7 @@ job:
       root: {usr_root.as_posix()}
     field: sequence
   normalize_anchor:
-    product_kind: analysis_core60
+    product_kind: analysis_window
     target_length: 60
     focal_selector:
       kind: chain
@@ -2414,7 +2415,7 @@ job:
       root: {usr_root.as_posix()}
     field: sequence
   normalize_anchor:
-    product_kind: analysis_core60
+    product_kind: analysis_window
     target_length: 60
     focal_selector:
       kind: chain
@@ -2451,6 +2452,122 @@ job:
     assert frame.iloc[0]["derived__added_right_bp"] == 20
 
 
+def test_run_construct_normalize_anchor_expands_short_sequence_by_replacing_template_interval(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    short_anchor = "TTGACA" + "G" * 17 + "TATAAT" + "C" * 6
+    input_ds = Dataset(usr_root, "short_refs")
+    input_ds.init(source="test", notes="normalize anchor replacement test")
+    add_result = input_ds.add_sequences([short_anchor], bio_type="dna", alphabet="dna_4", source="test")
+    input_ds.write_overlay(
+        "seq_annot",
+        _seq_annot_table(
+            row_id=add_result.ids[0],
+            features=[
+                {
+                    "feature_id": "minus35",
+                    "feature_order": 1,
+                    "feature_type": "misc_feature",
+                    "label": "-35",
+                    "role_hint": "sigma70_minus35",
+                    "location_raw": "1..6",
+                    "location_kind": "exact",
+                    "start_0": 0,
+                    "end_0": 6,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 0, "end_0": 6, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+                {
+                    "feature_id": "minus10",
+                    "feature_order": 2,
+                    "feature_type": "misc_feature",
+                    "label": "-10",
+                    "role_hint": "sigma70_minus10",
+                    "location_raw": "24..29",
+                    "location_kind": "exact",
+                    "start_0": 23,
+                    "end_0": 29,
+                    "strand": 1,
+                    "intervals_0": [{"start_0": 23, "end_0": 29, "strand": 1, "partial": False}],
+                    "is_fuzzy": False,
+                    "is_compound": False,
+                    "qualifiers": [],
+                    "confidence": "high",
+                    "source": "fixture",
+                },
+            ],
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    template_sequence = "G" * 30 + "A" * 92 + "C" * 30
+    config_path = tmp_path / "normalize_anchor_replace_interval.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_anchor_replace_interval
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: short_refs
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_window
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: annotation_pair_midpoint
+          first:
+            role_hint: sigma70_minus35
+            labels: ["-35"]
+          second:
+            role_hint: sigma70_minus10
+            labels: ["-10"]
+          confidence: high
+    over_length_policy:
+      kind: trim
+      target_length: 60
+    under_length_policy:
+      kind: expand_from_template
+      target_length: 60
+      template:
+        source:
+          kind: literal
+          sequence: {template_sequence}
+      placement_ref: replace:30-122
+    feature_retention_policy:
+      fail_if_loses_roles: [sigma70_minus35, sigma70_minus10]
+    emit_feature_retention_report: true
+  output:
+    target:
+      kind: usr
+      dataset: normalized_refs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    frame = Dataset(usr_root, "normalized_refs").head(n=5)
+    assert frame.iloc[0]["sequence"] == "G" * 16 + short_anchor + "C" * 9
+    assert frame.iloc[0]["derived__added_left_bp"] == 16
+    assert frame.iloc[0]["derived__added_right_bp"] == 9
+    assert frame.iloc[0]["derived__focal_rule"] == "annotation_pair_midpoint"
+
+
 def test_run_construct_normalize_anchor_circular_expansion_wraps_left_context(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
@@ -2477,7 +2594,7 @@ job:
       root: {usr_root.as_posix()}
     field: sequence
   normalize_anchor:
-    product_kind: analysis_core60
+    product_kind: analysis_window
     target_length: 20
     focal_selector:
       kind: chain
@@ -2594,7 +2711,7 @@ job:
       root: {usr_root.as_posix()}
     field: sequence
   normalize_anchor:
-    product_kind: analysis_core60
+    product_kind: analysis_window
     target_length: 60
     focal_selector:
       kind: chain
@@ -2638,7 +2755,7 @@ def test_run_construct_output_variants_emit_forward_and_reverse_complement_views
 
     input_ds = Dataset(usr_root, "anchors_demo")
     input_ds.init(source="test", notes="runtime test")
-    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+    input_ds.add_sequences(["AGTC"], bio_type="dna", alphabet="dna_4", source="test")
 
     config_path = tmp_path / "construct_variants.yaml"
     config_path.write_text(
@@ -2675,10 +2792,10 @@ job:
   realize:
     mode: full_construct
   output_variants:
-    - product_kind: context1kb_forward
+    - product_kind: realized_context
       orientation: forward
       recommended_pooling: anchor_mean
-    - product_kind: context1kb_reverse_complement
+    - product_kind: realized_context
       orientation: reverse_complement
       recommended_pooling: anchor_mean
   output:
@@ -2698,8 +2815,9 @@ job:
     assert list(frame["construct__orientation"]) == ["forward", "reverse_complement"]
     forward_row = frame.iloc[0]
     rc_row = frame.iloc[1]
-    assert forward_row["sequence"] == "AAAATTTTACGTGGGG"
-    assert rc_row["sequence"] == "CCCCACGTAAAATTTT"
+    assert forward_row["sequence"] == "AAAATTTTAGTCGGGG"
+    assert rc_row["sequence"] == str(Seq(forward_row["sequence"]).reverse_complement())
+    assert rc_row["sequence"] == "CCCCGACTAAAATTTT"
     assert forward_row["construct__anchor_start"] == 8
     assert forward_row["construct__anchor_end"] == 12
     assert rc_row["construct__anchor_start"] == 4
@@ -2709,7 +2827,139 @@ job:
 
     views = sorted(load_sequence_views(output_ds), key=lambda view: view.orientation)
     assert [view.orientation for view in views] == ["forward", "reverse_complement"]
-    assert [view.product_kind for view in views] == ["context1kb_forward", "context1kb_reverse_complement"]
+    assert [view.product_kind for view in views] == ["realized_context", "realized_context"]
+    assert [view.recommended_pooling for view in views] == ["anchor_mean", "anchor_mean"]
+    assert [(view.anchor_start_0, view.anchor_end_0) for view in views] == [(8, 12), (4, 8)]
+    assert [(view.forward_anchor_start_0, view.forward_anchor_end_0) for view in views] == [
+        (8, 12),
+        (8, 12),
+    ]
+
+
+def test_run_construct_output_variants_complete_views_for_existing_forward_rows(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["AGTC"], bio_type="dna", alphabet="dna_4", source="test")
+
+    legacy_config_path = tmp_path / "legacy_forward_context.yaml"
+    legacy_config_path.write_text(
+        f"""
+job:
+  id: legacy_forward_context
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+  realize:
+    mode: full_construct
+  output:
+    on_conflict: ignore
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+    run_from_config(legacy_config_path)
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    assert load_sequence_views(output_ds) == []
+
+    variant_config_path = tmp_path / "complete_context_variants.yaml"
+    variant_config_path.write_text(
+        f"""
+job:
+  id: complete_context_variants
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+  realize:
+    mode: full_construct
+  output_variants:
+    - product_kind: realized_context
+      orientation: forward
+      recommended_pooling: anchor_mean
+    - product_kind: realized_context
+      orientation: reverse_complement
+      recommended_pooling: anchor_mean
+  output:
+    on_conflict: ignore
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(variant_config_path)
+
+    assert result.records_total == 2
+    assert result.records_written == 1
+    assert result.records_skipped_existing == 1
+    views = sorted(load_sequence_views(output_ds), key=lambda view: view.orientation)
+    assert [view.orientation for view in views] == ["forward", "reverse_complement"]
+    assert [view.product_kind for view in views] == ["realized_context", "realized_context"]
+    assert [(view.anchor_start_0, view.anchor_end_0) for view in views] == [(8, 12), (4, 8)]
+
+    rerun = run_from_config(variant_config_path)
+
+    assert rerun.records_total == 2
+    assert rerun.records_written == 0
+    assert rerun.records_skipped_existing == 2
+    assert len(load_sequence_views(output_ds)) == 2
+
+    drifted_view = views[0].model_copy(update={"recommended_pooling": "seq_mean"})
+    write_sequence_views(output_ds, [drifted_view], conflict_policy="replace")
+    with pytest.raises(ValidationError, match="already exists with different metadata"):
+        run_from_config(variant_config_path)
 
 
 def test_run_construct_output_variants_allow_same_sequence_with_distinct_views(tmp_path: Path) -> None:
@@ -2756,10 +3006,10 @@ job:
   realize:
     mode: full_construct
   output_variants:
-    - product_kind: context1kb_forward
+    - product_kind: realized_context
       orientation: forward
       recommended_pooling: anchor_mean
-    - product_kind: context1kb_reverse_complement
+    - product_kind: realized_context
       orientation: reverse_complement
       recommended_pooling: anchor_mean
   output:
@@ -2838,10 +3088,10 @@ job:
   realize:
     mode: full_construct
   output_variants:
-    - product_kind: context1kb_forward
+    - product_kind: realized_context
       orientation: forward
       recommended_pooling: anchor_mean
-    - product_kind: context1kb_reverse_complement
+    - product_kind: realized_context
       orientation: reverse_complement
       recommended_pooling: anchor_mean
   output:
@@ -2857,5 +3107,11 @@ job:
 
     output_ds = Dataset(usr_root, "anchors_constructed")
     views = sorted(load_sequence_views(output_ds), key=lambda view: view.orientation)
-    assert [view.view_name for view in views] == ["anchor_label_context1kb_forward", "anchor_label_context1kb_rc"]
-    assert [view.aliases for view in views] == [["legacy_anchor_context1kb_forward"], ["legacy_anchor_context1kb_rc"]]
+    assert [view.view_name for view in views] == [
+        "anchor_label_realized_context_forward",
+        "anchor_label_realized_context_reverse_complement",
+    ]
+    assert [view.aliases for view in views] == [
+        ["legacy_anchor_realized_context_forward"],
+        ["legacy_anchor_realized_context_reverse_complement"],
+    ]

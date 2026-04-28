@@ -33,6 +33,6 @@ def test_cli_genbank_import_manifest_flow(tmp_path) -> None:
 
     dataset = Dataset(root, "usr_reference_genbank_native")
     assert result.exit_code == 0, result.stdout
-    assert "Imported 1 native record" in result.stdout
+    assert "Imported 1 source record" in result.stdout
     assert dataset.head(10).shape[0] == 1
     assert len(load_sequence_views(dataset)) == 1

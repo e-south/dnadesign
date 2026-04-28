@@ -26,6 +26,7 @@ from typing import Any
 from .contracts import (
     InferRuntimeLaneContract,
     infer_model_family_suffix,
+    plan_sequence_view_feature_completion_from_config,
     resolve_infer_runtime_lane_contracts,
     validate_infer_config_contract,
     validate_infer_dry_run_contract,
@@ -106,6 +107,7 @@ __all__ = (
     "InferRuntimeLaneContract",
     "infer_model_family_suffix",
     "inspect_local_gpu_inventory",
+    "plan_sequence_view_feature_completion_from_config",
     "resolve_infer_runtime_lane_contracts",
     "validate_infer_config_contract",
     "validate_infer_dry_run_contract",

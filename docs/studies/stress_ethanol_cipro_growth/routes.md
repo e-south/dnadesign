@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-04-25
+**Last verified:** 2026-04-27
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
@@ -43,6 +43,19 @@ This page keeps the downstream handoff map in one place.
 - Primary doc/workspace: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md`
 - First command: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
 - Route note: Infer lanes are execution configs layered on top of the current study phase; they do not replace the study lifecycle record.
+
+### Construct anchor/context refresh
+
+- Type: `route`
+- Plane: `data-plane`
+- Surface role: `consolidation`
+- Owner-boundary: `usr` plus `construct`
+- Current state: `complete`
+- Entry artifact: `densegen_prom_eth_cip_source`, `usr_promoter_references`, and `usr_sfxi_pdual10_densegen_promoters`
+- Exit artifact: `construct_prom_eth_cip_reference_core60`, `construct_prom_eth_cip_reference_contexts`, `usr_prom_eth_cip_anchor`, and `construct_prom_eth_cip_context`
+- Primary workspace: `src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10`
+- First command: `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 --project reference_core60 --dry-run --format json`
+- Route note: Construct first derives fail-fast `analysis_window` reference views from native GenBank annotations, then emits paired forward and reverse-complement reference contexts. USR then converges DenseGen 60 bp anchors, native reference inserts, SFXI pDual rows, and reference core60 rows into the shared anchor dataset. After merge, `dnadesign.usr.scripts.materialize_promoter_anchor_sequence_views` writes one `construct_insert` anchor-only sequence view per merged row; native or designed exact-60 rows are not relabeled as `analysis_window`. The shared paired forward and reverse-complement pDual context refresh follows from that anchor handoff.
 
 ### LatentDNA comparison surface
 

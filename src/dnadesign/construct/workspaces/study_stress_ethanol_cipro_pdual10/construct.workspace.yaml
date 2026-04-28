@@ -3,13 +3,43 @@ workspace:
   profile: study-owned
   description: >
     Study-owned Construct workspace for stress_ethanol_cipro_growth.
-    It reads the merged anchor set from the shared USR root and realizes
-    one 1 kb pDual-10 forward-strand anchor context into one shared downstream
-    dataset.
+    It derives reference core60 analysis views, realizes paired reference
+    forward/reverse-complement pDual-10 contexts, and refreshes the shared
+    merged-anchor paired forward/reverse-complement context handoff from the
+    shared USR root.
   roots:
     shared_usr_root: ../../../usr/datasets
     workspace_usr_root: outputs/usr_datasets
   projects:
+    - id: reference_core60
+      artifacts:
+        config:
+          path: config.reference_core60.yaml
+          job_id: construct_prom_eth_cip_reference_core60
+      contract:
+        input_dataset: usr_promoter_references
+        output_dataset: construct_prom_eth_cip_reference_core60
+      notes: >
+        60 bp analysis-only reference cores selected from explicit -35/-10
+        GenBank annotations. Missing or ambiguous sigma-70 sites fail before
+        writes; under-length references are expanded by replacing the pDual-10
+        anchor cassette interval before extracting the core.
+    - id: reference_core60_contexts
+      artifacts:
+        config:
+          path: config.reference_core60_contexts.forward_rc.yaml
+          job_id: construct_prom_eth_cip_reference_core60_contexts_forward_rc
+      contract:
+        input_dataset: construct_prom_eth_cip_reference_core60
+        template:
+          id: pdual10_forward_anchor_window
+          dataset: usr_pdual10_plasmid_template
+          record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+        output_dataset: construct_prom_eth_cip_reference_contexts
+      notes: >
+        Paired forward and whole-output reverse-complement 1 kb pDual contexts
+        for reference core60 views. Anchor bounds are emitted in the materialized
+        orientation so Infer can use anchor_mean without transforming them.
     - id: forward_anchor_window
       artifacts:
         config:
@@ -23,5 +53,7 @@ workspace:
           record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
         output_dataset: construct_prom_eth_cip_context
       notes: >
-        1 kb centered pDual-10 context around the study's single forward-strand
-        anchor cassette, guarded by incumbent, flank, and unique-kmer checks.
+        Paired 1 kb pDual-10 contexts around the study's single forward-strand
+        anchor cassette. Construct emits forward and whole-output
+        reverse-complement sequence views with anchor_mean bounds, guarded by
+        incumbent, flank, and unique-kmer checks.

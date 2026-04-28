@@ -99,6 +99,7 @@ def register_cli_surface(*, apps: CliApps, root_callback: Callable[..., None], c
         cmd_overlay_compact=bindings.cmd_overlay_compact,
         cmd_overlay_project=bindings.cmd_overlay_project,
         cmd_overlay_remove=bindings.cmd_overlay_remove,
+        cmd_event_log_garden=bindings.cmd_event_log_garden,
         cmd_merge_datasets=bindings.cmd_merge_datasets,
     )
 

@@ -503,6 +503,88 @@ def test_build_promoter_study_status_surfaces_semantic_completeness_attention(tm
     assert "shared handoff metadata is semantically incomplete" in evidence["attention_reasons"]
 
 
+def test_build_promoter_study_status_surfaces_sequence_view_and_feature_completion_sections(tmp_path: Path) -> None:
+    study_context = replace(
+        _make_study_context(tmp_path),
+        densegen_row_target=8,
+        densegen_row_gap=0,
+    )
+    status_context = PromoterStudyStatusResolvedContext(
+        infer_runtime=PromoterStudyInferRuntimeResolvedContext(
+            preferred_model_family="evo2_7b",
+            supported_model_families=("evo2_7b",),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        ),
+    )
+    sequence_view_contract_state = {
+        "state": "attention",
+        "drives_top_level_attention": True,
+        "summary": "sequence-view product contracts 1/2 ok; required_failures=1 optional_failures=0",
+        "checks": [
+            {
+                "check_id": "infer.sequence_views.context_contract",
+                "dataset": "promoter/demo_construct_contexts",
+                "state": "attention",
+                "required": True,
+            }
+        ],
+    }
+    infer_feature_completion_state = {
+        "state": "attention",
+        "drives_top_level_attention": False,
+        "summary": "infer sequence-view feature completion reusable=1 stale=0 missing=2 missing_products=0",
+        "aggregate": {
+            "reusable_vectors": 1,
+            "stale_vectors": 0,
+            "missing_vectors": 2,
+            "missing_products": 0,
+            "counts_by_product_kind": {"construct_insert": 2},
+            "counts_by_orientation": {"forward": 2},
+            "counts_by_pooling_operation": {"seq_mean": 2},
+        },
+    }
+
+    state, summary, evidence = build_promoter_study_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=PromoterStudyStatusDependencies(
+            infer_runtime=PromoterStudyInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: None,
+            inspect_sequence_view_contracts=lambda **kwargs: sequence_view_contract_state,
+            inspect_infer_feature_completion=lambda **kwargs: infer_feature_completion_state,
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "attention"
+    assert "sequence-view product contracts 1/2 ok" in summary
+    assert "infer sequence-view feature completion reusable=1 stale=0 missing=2 missing_products=0" in summary
+    assert evidence["sequence_view_contract_state"] == sequence_view_contract_state
+    assert evidence["infer_feature_completion_state"] == infer_feature_completion_state
+    assert "sequence-view product contracts are incomplete" in evidence["attention_reasons"]
+    assert "Infer feature completion is incomplete" not in evidence["attention_reasons"]
+
+
 def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path, monkeypatch) -> None:
     study_context = _make_study_context(tmp_path)
     contract = StudyOpsContract(

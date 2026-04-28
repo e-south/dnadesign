@@ -40,7 +40,7 @@ _GENBANK_ARTIFACT_DIR = "_artifacts/genbank"
 @dataclass(frozen=True)
 class GenBankImportResult:
     dataset: str
-    native_records: int
+    source_records: int
     extracted_records: int
     sequence_views_written: int
 
@@ -132,7 +132,7 @@ def import_genbank_manifest(
                 sequence_id=sequence_id,
                 view_name=record_spec.label,
                 aliases=record_spec.aliases,
-                product_kind="native_record",
+                product_kind="source_record",
                 orientation="unknown",
                 analysis_only=False,
                 source_dataset_id=dataset.name,
@@ -303,7 +303,7 @@ def import_genbank_manifest(
         "genbank_import",
         args={
             "manifest": str(Path(manifest_path)),
-            "native_records": len(native_payloads),
+            "source_records": len(native_payloads),
             "extracted_records": len(extracted_rows),
             "on_conflict": manifest.on_conflict,
         },
@@ -323,7 +323,7 @@ def import_genbank_manifest(
     )
     return GenBankImportResult(
         dataset=dataset.name,
-        native_records=len(native_payloads),
+        source_records=len(native_payloads),
         extracted_records=len(extracted_rows),
         sequence_views_written=native_views_written + len(extracted_view_rows),
     )

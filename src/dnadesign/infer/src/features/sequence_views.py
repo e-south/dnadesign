@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,34 @@ from dnadesign.usr import (
 from ..errors import CapabilityError, ValidationError
 from .context import _bool_or_none
 from .contracts import PromoterFeatureBundleConfig, SequenceContextRecord
+
+
+@dataclass(frozen=True)
+class SequenceViewMissingProduct:
+    dataset: str
+    root: str
+    product_kind: str | None
+    view_name: str | None
+    alias: str | None
+    orientation: str | None
+    pooling_operation: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "dataset": self.dataset,
+            "root": self.root,
+            "product_kind": self.product_kind,
+            "view_name": self.view_name,
+            "alias": self.alias,
+            "orientation": self.orientation,
+            "pooling_operation": self.pooling_operation,
+        }
+
+
+@dataclass(frozen=True)
+class SequenceViewInputLoadResult:
+    records: list[dict[str, object]]
+    missing_products: list[SequenceViewMissingProduct]
 
 
 def bundle_uses_sequence_views(bundle: PromoterFeatureBundleConfig) -> bool:
@@ -94,9 +123,11 @@ def _read_construct_rows(ds: Dataset, *, ids: list[str]) -> dict[str, dict[str, 
 def _context_kind_from_product_kind(product_kind: str, fallback: str | None) -> str:
     if fallback:
         return fallback
-    if product_kind == "analysis_core60":
-        return "analysis_core60"
-    if product_kind in {"context1kb_forward", "context1kb_reverse_complement"}:
+    if product_kind == "construct_insert":
+        return "anchor_only"
+    if product_kind == "analysis_window":
+        return "analysis_window"
+    if product_kind == "realized_context":
         return "template_1kb"
     return "native_reference"
 
@@ -135,9 +166,21 @@ def load_sequence_view_input_records(
     *,
     bundle: PromoterFeatureBundleConfig,
 ) -> list[dict[str, object]]:
+    result = load_sequence_view_input_records_with_status(bundle=bundle)
+    if result.missing_products:
+        first = result.missing_products[0]
+        raise ValidationError(f"Sequence-view input selector resolved zero rows for dataset '{first.dataset}'.")
+    return result.records
+
+
+def load_sequence_view_input_records_with_status(
+    *,
+    bundle: PromoterFeatureBundleConfig,
+) -> SequenceViewInputLoadResult:
     if not bundle.sequence_view_inputs:
-        return []
+        return SequenceViewInputLoadResult(records=[], missing_products=[])
     records: list[dict[str, object]] = []
+    missing_products: list[SequenceViewMissingProduct] = []
     for input_cfg in bundle.sequence_view_inputs:
         root = _resolve_usr_root(input_cfg.root)
         ds = Dataset(root, input_cfg.dataset)
@@ -150,7 +193,18 @@ def load_sequence_view_input_records(
         if input_cfg.view_selector.orientation is not None:
             selected = [row for row in selected if row.orientation == input_cfg.view_selector.orientation]
         if not selected:
-            raise ValidationError(f"Sequence-view input selector resolved zero rows for dataset '{input_cfg.dataset}'.")
+            missing_products.append(
+                SequenceViewMissingProduct(
+                    dataset=input_cfg.dataset,
+                    root=str(root),
+                    product_kind=input_cfg.view_selector.product_kind,
+                    view_name=input_cfg.view_selector.view_name,
+                    alias=input_cfg.view_selector.alias,
+                    orientation=input_cfg.view_selector.orientation,
+                    pooling_operation=input_cfg.pooling.operation,
+                )
+            )
+            continue
         sequence_by_id = _read_sequence_rows(ds, ids=sorted({row.sequence_id for row in selected}))
         construct_by_id = (
             _read_construct_rows(ds, ids=sorted({row.sequence_id for row in selected}))
@@ -215,7 +269,7 @@ def load_sequence_view_input_records(
             }
             _pooling_bounds_from_record(sequence=sequence, record=record)
             records.append(record)
-    return records
+    return SequenceViewInputLoadResult(records=records, missing_products=missing_products)
 
 
 def resolve_sequence_view_contexts(*, records: list[dict[str, Any]]) -> list[SequenceContextRecord]:

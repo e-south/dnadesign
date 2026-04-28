@@ -33,7 +33,7 @@ def _genbank_row() -> dict[str, object]:
         "sequence": "AACCGGTTGACATTTTTTTTTATAATGGCC",
         "usr_label__primary": "demoP",
         "seq_annot__source_file": "/archive/demo.gb",
-        "derived__product_kind": "biological_insert",
+        "derived__product_kind": "selected_region",
         "seq_annot__features": [
             {
                 "feature_id": "feat_promoter",
@@ -141,7 +141,7 @@ def _genbank_row_with_modern_reference_labels() -> dict[str, object]:
         "sequence": "A" * 120,
         "usr_label__primary": "cpxPp",
         "seq_annot__source_file": "/archive/cpxPp.gb",
-        "derived__product_kind": "biological_insert",
+        "derived__product_kind": "selected_region",
         "seq_annot__features": [
             {
                 "feature_id": "source_fragment",
@@ -215,7 +215,7 @@ def test_usr_genbank_adapter_maps_annotation_roles_to_sequence_rows_features() -
     assert record.display.overlay_text == "demoP\nseq1"
     assert record.meta["adapter"] == "usr_genbank_annotations_v1"
     assert record.meta["source_file"] == "/archive/demo.gb"
-    assert record.meta["product_kind"] == "biological_insert"
+    assert record.meta["product_kind"] == "selected_region"
 
     by_id = {feature.id: feature for feature in record.features}
     assert by_id["seq1:genbank:feat_m35"].label == "TTGACA"

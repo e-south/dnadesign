@@ -69,6 +69,9 @@ the stored semantic id, for example `seq_mean` or `anchor_mean`.
 For explicit 60 bp sequence views, `core60_mean` is semantically distinct metadata but aliases
 the same feature-vector key as `seq_mean` when the emitted row is exactly 60 bp and the pooling
 span is the full sequence.
+This is a feature-alias rule, not a sequence-product rule: a natively 60 bp
+`construct_insert` should stay a promoter insert in USR, while a true
+`analysis_window` row means Construct derived a 60 bp analysis-only view.
 
 ### Context ownership
 

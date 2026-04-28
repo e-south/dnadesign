@@ -80,7 +80,7 @@ class GenBankImportRecordSpec(StrictModel):
     source_file: str
     label: str
     aliases: list[str] | None = None
-    product_kind: Literal["native_record"] = "native_record"
+    product_kind: Literal["source_record"] = "source_record"
 
     @field_validator("source_file", "label")
     @classmethod

@@ -119,7 +119,7 @@ def test_load_extract_ingest_sequence_view_bundle_uses_materialized_view_records
             {
                 "dataset": "demo_refs",
                 "root": "/tmp/usr-root",
-                "view_selector": {"product_kind": "analysis_core60"},
+                "view_selector": {"product_kind": "analysis_window"},
                 "pooling": {"operation": "core60_mean"},
             }
         ]

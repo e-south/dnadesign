@@ -25,6 +25,7 @@ from dnadesign.usr import (
     SequenceViewRecord,
     compute_id,
     default_usr_root,
+    load_sequence_view_index,
     normalize_sequence,
     normalize_usr_root,
     write_sequence_views,
@@ -529,12 +530,24 @@ def _load_normalize_template(
         )
     template_root = _resolve_usr_root(base_dir, source.root, label="normalize_anchor.template.source.root")
     dataset = Dataset(template_root, source.dataset)
-    record = dataset.get(source.record_id, columns=[source.field])
-    if record is None:
+    if not dataset.records_path.exists():
+        raise ValidationError(f"Normalize-anchor template dataset not initialized: {dataset.records_path}")
+    rows = _scan_usr_rows(
+        dataset,
+        columns=["id", str(source.field)],
+        ids=[str(source.record_id)],
+    )
+    if len(rows) != 1:
         raise ValidationError(
             f"Normalize-anchor template record not found: {source.dataset}:{source.record_id} field={source.field}"
         )
-    sequence = _ensure_dna_text(str(record[source.field]), label=f"{source.dataset}:{source.record_id}:{source.field}")
+    record = rows[0]
+    raw = record.get(str(source.field))
+    if raw is None:
+        raise ValidationError(
+            f"Normalize-anchor template record '{source.record_id}' is missing field '{source.field}'."
+        )
+    sequence = _ensure_dna_text(str(raw), label=f"{source.dataset}:{source.record_id}:{source.field}")
     return _ResolvedTemplate(
         id=template_id or source.record_id,
         kind="usr",
@@ -640,18 +653,33 @@ def _expand_short_sequence_from_template(
     focal_selection: FocalSelection,
     placement_ref: str,
 ) -> tuple[str, int, int, int]:
-    anchor_start = _resolve_under_length_anchor_start(
-        sequence=sequence,
-        template=template,
-        placement_ref=placement_ref,
-    )
+    replacement_interval = _parse_replacement_placement_ref(placement_ref)
+    effective_template_sequence = template.sequence
+    if replacement_interval is None:
+        anchor_start = _resolve_under_length_anchor_start(
+            sequence=sequence,
+            template=template,
+            placement_ref=placement_ref,
+        )
+    else:
+        replacement_start, replacement_end = replacement_interval
+        _validate_replacement_interval(
+            template=template,
+            placement_ref=placement_ref,
+            replacement_start=replacement_start,
+            replacement_end=replacement_end,
+        )
+        anchor_start = replacement_start
+        effective_template_sequence = (
+            template.sequence[:replacement_start] + sequence + template.sequence[replacement_end:]
+        )
     absolute_focal = anchor_start + focal_selection.focal_point_0
     window_start = int(round(absolute_focal - (target_length / 2.0)))
     if not template.circular and window_start < 0:
         window_start = 0
     window_end = window_start + target_length
-    if not template.circular and window_end > len(template.sequence):
-        max_window_start = len(template.sequence) - target_length
+    if not template.circular and window_end > len(effective_template_sequence):
+        max_window_start = len(effective_template_sequence) - target_length
         if max_window_start < 0:
             raise ValidationError(
                 f"normalize_anchor template '{template.id}' cannot provide {target_length} bp around the focal point."
@@ -660,16 +688,19 @@ def _expand_short_sequence_from_template(
         window_end = window_start + target_length
     if template.circular:
         expanded = "".join(
-            template.sequence[(window_start + idx) % len(template.sequence)] for idx in range(target_length)
+            effective_template_sequence[(window_start + idx) % len(effective_template_sequence)]
+            for idx in range(target_length)
         )
     else:
-        expanded = template.sequence[window_start:window_end]
+        expanded = effective_template_sequence[window_start:window_end]
     if len(expanded) != target_length:
         raise ValidationError(
             f"normalize_anchor template expansion produced {len(expanded)} bp instead of {target_length}."
         )
     embedded_anchor_start = (
-        (anchor_start - window_start) % len(template.sequence) if template.circular else anchor_start - window_start
+        (anchor_start - window_start) % len(effective_template_sequence)
+        if template.circular
+        else anchor_start - window_start
     )
     if embedded_anchor_start < 0 or embedded_anchor_start + len(sequence) > target_length:
         raise ValidationError(
@@ -678,6 +709,43 @@ def _expand_short_sequence_from_template(
     added_left = embedded_anchor_start
     added_right = target_length - embedded_anchor_start - len(sequence)
     return expanded, embedded_anchor_start, added_left, added_right
+
+
+def _parse_replacement_placement_ref(placement_ref: str) -> tuple[int, int] | None:
+    text = str(placement_ref or "").strip()
+    lowered = text.casefold()
+    prefix = "replace:"
+    if not lowered.startswith(prefix):
+        return None
+    body = text[len(prefix) :].strip()
+    separator = ".." if ".." in body else "-"
+    try:
+        raw_start, raw_end = body.split(separator, maxsplit=1)
+        start = int(raw_start.strip())
+        end = int(raw_end.strip())
+    except ValueError as exc:
+        raise ValidationError(
+            f"normalize_anchor under_length_policy.placement_ref '{placement_ref}' must use "
+            "'replace:<start_0>-<end_0>'."
+        ) from exc
+    if end <= start:
+        raise ValidationError(
+            f"normalize_anchor under_length_policy.placement_ref '{placement_ref}' must use end > start."
+        )
+    return start, end
+
+
+def _validate_replacement_interval(
+    *,
+    template: _ResolvedTemplate,
+    placement_ref: str,
+    replacement_start: int,
+    replacement_end: int,
+) -> None:
+    if replacement_start < 0 or replacement_end > len(template.sequence):
+        raise ValidationError(
+            f"normalize_anchor under_length_policy.placement_ref '{placement_ref}' is outside template '{template.id}'."
+        )
 
 
 def _resolve_under_length_anchor_start(
@@ -755,7 +823,7 @@ def _build_normalize_sequence_view(
         view_name=record.label_primary,
         aliases=list(record.label_aliases),
         product_kind=str(record.derived_metadata["derived__product_kind"]),
-        context_kind="analysis_core60",
+        context_kind="analysis_window",
         orientation="forward",
         analysis_only=bool(record.derived_metadata["derived__analysis_only"]),
         source_dataset_id=output_dataset_id,
@@ -789,12 +857,11 @@ def _build_variant_sequence_view(
     recommended_pooling: str | None,
 ) -> SequenceViewRecord:
     orientation = str(record.metadata["construct__orientation"])
-    product_kind = "context1kb_forward" if orientation == "forward" else "context1kb_reverse_complement"
     return SequenceViewRecord(
         sequence_id=record.output_id,
         view_name=record.label_primary,
         aliases=list(record.label_aliases),
-        product_kind=product_kind,
+        product_kind="realized_context",
         context_kind="template_1kb",
         orientation="forward" if orientation == "forward" else "reverse_complement",
         analysis_only=False,
@@ -1678,7 +1745,9 @@ def _build_variant_record(
             "construct__parent_forward_construct_id": parent_forward_construct_id,
         }
     )
-    label_suffix = "context1kb_forward" if variant.orientation == "forward" else "context1kb_rc"
+    label_suffix = (
+        "realized_context_forward" if variant.orientation == "forward" else "realized_context_reverse_complement"
+    )
     label_primary = _append_variant_label_suffix(forward_record.label_primary, label_suffix)
     label_aliases = [
         alias
@@ -1803,8 +1872,8 @@ def _build_normalize_record(
         "id": output_id,
         "construct__job": cfg.job.id,
         "construct__spec_id": spec_id,
-        "construct__context_id": f"{cfg.job.id}:analysis_core60",
-        "construct__context_kind": "analysis_core60",
+        "construct__context_id": f"{cfg.job.id}:analysis_window",
+        "construct__context_kind": "analysis_window",
         "construct__template_id": template.id if template is not None else None,
         "construct__template_kind": template.kind if template is not None else None,
         "construct__template_source": template.source if template is not None else None,
@@ -1827,7 +1896,7 @@ def _build_normalize_record(
         "construct__forward_anchor_end": len(analysis_sequence),
         "construct__parent_forward_construct_id": "",
         "construct__mode": "normalize_anchor",
-        "construct__focal_part": "analysis_core60",
+        "construct__focal_part": "analysis_window",
         "construct__focal_part_length": len(analysis_sequence),
         "construct__window_semantics": "normalize_anchor",
         "construct__window_reference": focal_selection.focal_rule,
@@ -2153,7 +2222,7 @@ def _plan_normalize_loaded_config(
         template_length=len(template.sequence) if template is not None else 0,
         template_circular=bool(template.circular) if template is not None else False,
         realize_mode="normalize_anchor",
-        focal_part="analysis_core60",
+        focal_part="analysis_window",
         window_semantics="normalize_anchor",
         window_reference="annotation_or_sequence_focal",
         window_direction="symmetric",
@@ -2265,7 +2334,6 @@ def _construct_actor(job_id: str) -> dict[str, object]:
 
 def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_BuiltRecord]) -> None:
     actor = _construct_actor(cfg.job.id)
-    sequence_views = [record.sequence_view for record in records if record.sequence_view is not None]
     unique_records = _unique_records_by_output_id(records)
     ambiguous_overlay_ids = _ambiguous_row_overlay_ids(records)
     overlay_records = [record for record in unique_records if record.output_id not in ambiguous_overlay_ids]
@@ -2328,12 +2396,33 @@ def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_
                 note="dnadesign.construct upstream label carry-through",
                 actor=actor,
             )
-    if sequence_views:
+
+
+def _write_planned_sequence_views(output_ds: Dataset, *, cfg: JobConfig, records: List[_BuiltRecord]) -> None:
+    sequence_views = [record.sequence_view for record in records if record.sequence_view is not None]
+    if not sequence_views:
+        return
+    existing_by_id = load_sequence_view_index(output_ds)
+    missing_sequence_views: list[SequenceViewRecord] = []
+    for view in sequence_views:
+        existing = existing_by_id.get(str(view.view_id))
+        if existing is None:
+            missing_sequence_views.append(view)
+            continue
+        comparable_view = view.model_dump(mode="python")
+        comparable_view.pop("created_at", None)
+        comparable_view.pop("created_by", None)
+        if existing != comparable_view:
+            raise ValidationError(
+                f"Sequence view '{view.view_id}' already exists with different metadata; "
+                "refusing to treat the rerun as idempotent."
+            )
+    if missing_sequence_views:
         write_sequence_views(
             output_ds,
-            [view.model_dump(mode="python") for view in sequence_views],
+            [view.model_dump(mode="python") for view in missing_sequence_views],
             conflict_policy="idempotent",
-            actor=actor,
+            actor=_construct_actor(cfg.job.id),
         )
 
 
@@ -2343,6 +2432,7 @@ def _persist_construct_run(planned: _PlannedRun) -> RunResult:
     output_ds = _ensure_output_dataset(planned)
     built_to_write = _records_to_write(planned)
     _write_output_records(output_ds, cfg=cfg, records=built_to_write)
+    _write_planned_sequence_views(output_ds, cfg=cfg, records=planned.built)
     return RunResult(
         job_id=cfg.job.id,
         input_dataset=cfg.job.input.source.dataset,

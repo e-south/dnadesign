@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from Bio.Seq import Seq
 from pyarrow import parquet as pq
 
 from dnadesign.infer import export_evo2_promoter_opal_matrix
@@ -656,8 +657,8 @@ def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equiva
                 sequence_id=add_result.ids[0],
                 view_name="core60_view",
                 aliases=["core60_alias"],
-                product_kind="analysis_core60",
-                context_kind="analysis_core60",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
                 orientation="forward",
                 analysis_only=True,
                 source_dataset_id=dataset.name,
@@ -677,10 +678,10 @@ def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equiva
             ),
             SequenceViewRecord(
                 sequence_id=add_result.ids[0],
-                view_name="native60_view",
-                aliases=["native60_alias"],
-                product_kind="native_record",
-                context_kind="native_reference",
+                view_name="construct_insert60_view",
+                aliases=["construct_insert60_alias"],
+                product_kind="construct_insert",
+                context_kind="anchor_only",
                 orientation="forward",
                 analysis_only=False,
                 source_dataset_id=dataset.name,
@@ -712,13 +713,13 @@ def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equiva
                 {
                     "dataset": "reference_views",
                     "root": usr_root.as_posix(),
-                    "view_selector": {"product_kind": "analysis_core60"},
+                    "view_selector": {"product_kind": "analysis_window"},
                     "pooling": {"operation": "core60_mean"},
                 },
                 {
                     "dataset": "reference_views",
                     "root": usr_root.as_posix(),
-                    "view_selector": {"view_name": "native60_view"},
+                    "view_selector": {"view_name": "construct_insert60_view"},
                     "pooling": {"operation": "seq_mean"},
                 },
             ],
@@ -732,6 +733,8 @@ def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equiva
     assert len(out["metadata__view_id"]) == 2
     assert out["metadata__forward_pass_key"][0] == out["metadata__forward_pass_key"][1]
     assert out["metadata__feature_vector_key"][0] == out["metadata__feature_vector_key"][1]
+    assert out["metadata__context_kind"] == ["analysis_window", "anchor_only"]
+    assert out["metadata__product_kind"] == ["analysis_window", "construct_insert"]
     assert out["metadata__pooling_operation"] == ["core60_mean", "seq_mean"]
     assert out["output_layer_mean__core60_mean"][0] is not None
     assert out["output_layer_mean__core60_mean"][1] is None
@@ -762,8 +765,8 @@ def test_run_extract_job_feature_bundle_sequence_view_deduplicate_flags_control_
             SequenceViewRecord(
                 sequence_id=add_result.ids[0],
                 view_name="core60_view_a",
-                product_kind="analysis_core60",
-                context_kind="analysis_core60",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
                 orientation="forward",
                 analysis_only=True,
                 source_dataset_id=dataset.name,
@@ -782,7 +785,7 @@ def test_run_extract_job_feature_bundle_sequence_view_deduplicate_flags_control_
             SequenceViewRecord(
                 sequence_id=add_result.ids[0],
                 view_name="core60_view_b",
-                product_kind="native_record",
+                product_kind="source_record",
                 context_kind="native_reference",
                 orientation="forward",
                 analysis_only=False,
@@ -836,6 +839,105 @@ def test_run_extract_job_feature_bundle_sequence_view_deduplicate_flags_control_
     assert adapter.embedding_batch_sizes == [2]
 
 
+def test_run_extract_job_sequence_view_anchor_mean_uses_full_context_and_emitted_orientation_bounds(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "context_views")
+    dataset.init(source="test", notes="sequence-view reverse-complement pooling test")
+    forward_sequence = "AAAATTTTAGTCGGGG"
+    reverse_complement_sequence = str(Seq(forward_sequence).reverse_complement())
+    assert reverse_complement_sequence == "CCCCGACTAAAATTTT"
+    add_result = dataset.add_sequences(
+        [forward_sequence, reverse_complement_sequence],
+        bio_type="dna",
+        alphabet="dna_4",
+        source="test",
+    )
+    forward_id, reverse_complement_id = add_result.ids
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=forward_id,
+                view_name="context_forward",
+                product_kind="realized_context",
+                context_kind="template_1kb",
+                orientation="forward",
+                analysis_only=False,
+                source_dataset_id=dataset.name,
+                anchor_start_0=8,
+                anchor_end_0=12,
+                forward_anchor_start_0=8,
+                forward_anchor_end_0=12,
+                recommended_pooling="anchor_mean",
+                created_at="2026-04-27T00:00:00+00:00",
+                created_by="test",
+            ),
+            SequenceViewRecord(
+                sequence_id=reverse_complement_id,
+                view_name="context_reverse_complement",
+                product_kind="realized_context",
+                context_kind="template_1kb",
+                orientation="reverse_complement",
+                analysis_only=False,
+                source_dataset_id=dataset.name,
+                anchor_start_0=4,
+                anchor_end_0=8,
+                forward_anchor_start_0=8,
+                forward_anchor_end_0=12,
+                recommended_pooling="anchor_mean",
+                created_at="2026-04-27T00:00:00+00:00",
+                created_by="test",
+            ),
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="context_view_anchor_mean",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": True,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "context_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "realized_context", "orientation": "forward"},
+                    "pooling": {"operation": "anchor_mean", "bounds_from": "sequence_view"},
+                },
+                {
+                    "dataset": "context_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "realized_context", "orientation": "reverse_complement"},
+                    "pooling": {"operation": "anchor_mean", "bounds_from": "sequence_view"},
+                },
+            ],
+        },
+    )
+
+    out = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    assert adapter.logits_call_count == 1
+    assert adapter.embedding_call_count == 1
+    assert out["metadata__orientation"] == ["forward", "reverse_complement"]
+    assert out["metadata__resolved_length"] == [16, 16]
+    assert out["metadata__pooling_operation"] == ["anchor_mean", "anchor_mean"]
+    assert out["metadata__pooling_start_0"] == [8, 4]
+    assert out["metadata__pooling_end_0"] == [12, 8]
+    assert out["log_likelihood__total"] == [15.0, 15.0]
+    _assert_list_close(out["output_layer_mean__anchor_mean"][0], [19.0, 20.0])
+    _assert_list_close(out["output_layer_mean__anchor_mean"][1], [11.0, 12.0])
+    _assert_list_close(out["intermediate_embedding__block26_mlp_out__anchor_mean"][0], [28.5, 29.5, 30.5])
+    _assert_list_close(out["intermediate_embedding__block26_mlp_out__anchor_mean"][1], [16.5, 17.5, 18.5])
+
+
 def test_run_extract_job_feature_bundle_sequence_view_alias_map_is_idempotent(
     monkeypatch,
     tmp_path,
@@ -852,8 +954,8 @@ def test_run_extract_job_feature_bundle_sequence_view_alias_map_is_idempotent(
             SequenceViewRecord(
                 sequence_id=add_result.ids[0],
                 view_name="core60_view",
-                product_kind="analysis_core60",
-                context_kind="analysis_core60",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
                 orientation="forward",
                 analysis_only=True,
                 source_dataset_id=dataset.name,
@@ -888,7 +990,7 @@ def test_run_extract_job_feature_bundle_sequence_view_alias_map_is_idempotent(
                 {
                     "dataset": "reference_views",
                     "root": usr_root.as_posix(),
-                    "view_selector": {"product_kind": "analysis_core60"},
+                    "view_selector": {"product_kind": "analysis_window"},
                     "pooling": {"operation": "core60_mean"},
                 }
             ],
@@ -920,8 +1022,8 @@ def test_run_extract_job_feature_bundle_sequence_view_alias_map_tolerates_view_n
     original_view = SequenceViewRecord(
         sequence_id=add_result.ids[0],
         view_name="core60_view",
-        product_kind="analysis_core60",
-        context_kind="analysis_core60",
+        product_kind="analysis_window",
+        context_kind="analysis_window",
         orientation="forward",
         analysis_only=True,
         source_dataset_id=dataset.name,
@@ -954,7 +1056,7 @@ def test_run_extract_job_feature_bundle_sequence_view_alias_map_tolerates_view_n
                 {
                     "dataset": "reference_views",
                     "root": usr_root.as_posix(),
-                    "view_selector": {"product_kind": "analysis_core60"},
+                    "view_selector": {"product_kind": "analysis_window"},
                     "pooling": {"operation": "core60_mean"},
                 }
             ],

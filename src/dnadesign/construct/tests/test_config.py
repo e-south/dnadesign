@@ -231,7 +231,7 @@ def test_job_config_normalize_anchor_rejects_template_realization_fields() -> No
                         "source": {"kind": "literal", "sequence": "AAAATTTT"},
                     },
                     "normalize_anchor": {
-                        "product_kind": "analysis_core60",
+                        "product_kind": "analysis_window",
                         "target_length": 60,
                         "focal_selector": {
                             "kind": "chain",

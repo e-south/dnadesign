@@ -30,10 +30,10 @@ def _resolve_densegen_events_from_config(config_path: Path) -> Path:
 
 
 def _resolve_infer_events_from_config(config_path: Path) -> Path:
-    from dnadesign.infer.contracts import resolve_infer_usr_output_contract
+    from dnadesign.infer.contracts import resolve_infer_usr_events_contract
 
     try:
-        contract = resolve_infer_usr_output_contract(config_path)
+        contract = resolve_infer_usr_events_contract(config_path)
     except ValueError as exc:
         raise NotifyConfigError(str(exc)) from exc
     return (contract.usr_root / contract.usr_dataset / ".events.log").resolve()

@@ -41,7 +41,7 @@ def register_genbank_commands(genbank_app: typer.Typer, *, ctx_args_builder) -> 
         )
         typer.echo(
             "Imported "
-            f"{result.native_records} native record(s), "
+            f"{result.source_records} source record(s), "
             f"{result.extracted_records} extracted record(s), "
             f"and {result.sequence_views_written} sequence view row(s) into {result.dataset}."
         )

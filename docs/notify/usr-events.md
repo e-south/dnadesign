@@ -106,9 +106,13 @@ uv run notify setup resolve-events --tool construct --workspace "$CONSTRUCT_WORK
 ```
 
 Infer resolver reminder:
-- `notify setup resolve-events --tool infer --config <config>` requires exactly one USR write-back destination.
-- Infer resolver fails fast unless the config supplies `ingest.root` for every `ingest.source=usr` + `io.write_back=true` job.
-- Multi-destination infer configs must use explicit `--events <path>` selection instead of resolver mode.
+- `notify setup resolve-events --tool infer --config <config>` resolves either one legacy USR write-back
+  destination or one sequence-view input dataset.
+- Sequence-view Infer configs should be split into one operational dataset per watcher. This keeps
+  Notify, resume state, and feature-sidecar writes aligned with a single USR `.events.log`.
+- Multi-dataset Infer configs must use explicit `--events <path>` selection or be split into
+  single-dataset runbooks; resolver mode fails fast rather than guessing which event stream owns the
+  watcher.
 
 ### Run flow
 
@@ -137,6 +141,15 @@ uv run notify usr-events watch --profile "$PROFILE" --follow --idle-timeout 900
 ```
 
 Do not preseed the cursor when replay is the goal.
+
+Event-log gardening:
+
+USR maintenance can archive an old `.events.log` and rewrite the live file to a
+short operational tail. Treat that as an offline maintenance operation, not a
+live Notify action. Stop watchers before gardening, run
+`uv run usr maintenance event-log-garden <dataset> --write --acknowledge-notify-cursor-reset`,
+then seed each Notify cursor to the new live `.events.log` size before
+restarting follow mode. A cursor from the pre-garden file must not be reused.
 
 Healthy watcher signals:
 

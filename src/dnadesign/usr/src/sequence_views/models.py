@@ -20,18 +20,23 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 VIEW_ID_SCHEMA_VERSION = 1
 SEQUENCE_VIEW_SIDECAR_RELATIVE_PATH = "_views/sequence_views.parquet"
+VIEW_SEMANTICS_SIDECAR_RELATIVE_PATH = "_views/view_semantics.parquet"
 
+# Product kind describes generic sequence-product lineage, not domain role,
+# cohort membership, orientation, length, or pooling. Study-specific terms live
+# in view-semantics addenda or context/pooling fields.
 ProductKind = Literal[
-    "native_record",
-    "biological_insert",
-    "analysis_core60",
-    "context1kb_forward",
-    "context1kb_reverse_complement",
+    "source_record",
+    "selected_region",
+    "construct_insert",
+    "analysis_window",
+    "realized_context",
 ]
 Orientation = Literal["forward", "reverse_complement", "unknown"]
-ContextKind = Literal["anchor_only", "template_1kb", "template_custom", "native_reference", "analysis_core60"]
+ContextKind = Literal["anchor_only", "template_1kb", "template_custom", "native_reference", "analysis_window"]
 PoolingOperation = Literal["seq_mean", "anchor_mean", "core60_mean"]
 SequenceViewConflictPolicy = Literal["error", "idempotent", "replace", "append_alias"]
+ViewSemanticsConflictPolicy = Literal["error", "idempotent", "replace"]
 
 
 def _none_if_blank(value: object) -> str | None:
@@ -218,8 +223,8 @@ class SequenceViewRecord(StrictSequenceViewModel):
             raise ValueError("forward_anchor_end_0 requires forward_anchor_start_0.")
         if self.forward_anchor_start_0 is not None and self.forward_anchor_end_0 is None:
             raise ValueError("forward_anchor_start_0 requires forward_anchor_end_0.")
-        if self.orientation == "unknown" and self.product_kind != "native_record":
-            raise ValueError("orientation='unknown' is only valid for native_record sequence views.")
+        if self.orientation == "unknown" and self.product_kind != "source_record":
+            raise ValueError("orientation='unknown' is only valid for source_record sequence views.")
         return self
 
     def semantic_key(self) -> SequenceViewSemanticKey:
@@ -268,3 +273,40 @@ class SequenceViewSelector(StrictSequenceViewModel):
     @classmethod
     def _normalize_selector_string(cls, value: str | None) -> str | None:
         return _none_if_blank(value)
+
+
+class ViewSemanticsRecord(StrictSequenceViewModel):
+    """Mutable study/provenance semantics that must not affect stable view ids."""
+
+    view_id: str
+    sequence_id: str
+    source_family: str | None = None
+    selection_basis: str | None = None
+    view_collections: list[str] | None = None
+    role_tags: list[str] | None = None
+    study_id: str | None = None
+    created_at: str
+    created_by: str | None = None
+
+    @field_validator(
+        "view_id",
+        "sequence_id",
+        "source_family",
+        "selection_basis",
+        "study_id",
+        "created_at",
+        "created_by",
+    )
+    @classmethod
+    def _normalize_strings(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            raise ValueError("View-semantics string fields must be non-empty when provided.")
+        return text
+
+    @field_validator("view_collections", "role_tags")
+    @classmethod
+    def _normalize_lists(cls, value: list[str] | None) -> list[str] | None:
+        return _stable_aliases(value)

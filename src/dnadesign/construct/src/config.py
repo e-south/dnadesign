@@ -528,7 +528,7 @@ class OutputSequenceViewConfig(StrictConfigModel):
 
 
 class NormalizeAnchorConfig(StrictConfigModel):
-    product_kind: Literal["analysis_core60"]
+    product_kind: Literal["analysis_window"]
     target_length: int = Field(ge=1)
     focal_selector: SelectorChainConfig
     over_length_policy: OverLengthTrimPolicyConfig
@@ -540,18 +540,14 @@ class NormalizeAnchorConfig(StrictConfigModel):
 
 
 class OutputVariantConfig(StrictConfigModel):
-    product_kind: Literal["context1kb_forward", "context1kb_reverse_complement"]
+    product_kind: Literal["realized_context"]
     orientation: Literal["forward", "reverse_complement"]
     recommended_pooling: Optional[Literal["seq_mean", "anchor_mean", "core60_mean"]] = None
 
     @model_validator(mode="after")
     def _validate_product_kind_orientation(self) -> "OutputVariantConfig":
-        expected_kind = "context1kb_forward" if self.orientation == "forward" else "context1kb_reverse_complement"
-        if self.product_kind != expected_kind:
-            raise ValueError(
-                "output_variants product_kind must match orientation "
-                f"(expected {expected_kind!r} for orientation {self.orientation!r})."
-            )
+        if self.product_kind != "realized_context":
+            raise ValueError("output_variants product_kind must be 'realized_context'.")
         return self
 
 

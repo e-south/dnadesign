@@ -319,7 +319,7 @@ def test_write_promoter_reference_dataset_uses_projected_rows_and_modern_overlay
     assert projected_labels == ["spyp (upstream of spy)", "spyp", "-35", "-10", "CpxR+"]
 
     derived = pq.read_table(overlay_path(dataset.dir, "derived")).to_pylist()
-    assert derived[0]["derived__product_kind"] == "biological_insert"
+    assert derived[0]["derived__product_kind"] == "selected_region"
     assert derived[0]["derived__operation"] == "project_genbank_upstream_feature"
     assert derived[0]["derived__source_interval_start_0"] == 12
     assert derived[0]["derived__source_interval_end_0"] == 72
@@ -331,10 +331,10 @@ def test_write_promoter_reference_dataset_uses_projected_rows_and_modern_overlay
 
     views = load_sequence_views(dataset)
     by_view_name = {view.view_name: view for view in views}
-    assert by_view_name["spyp"].product_kind == "biological_insert"
+    assert by_view_name["spyp"].product_kind == "selected_region"
     assert by_view_name["spyp"].recommended_pooling == "seq_mean"
     assert "spyP" in (by_view_name["spyp"].aliases or [])
-    assert by_view_name["J23105"].product_kind == "biological_insert"
+    assert by_view_name["J23105"].product_kind == "selected_region"
     dataset.validate(strict=True)
 
 

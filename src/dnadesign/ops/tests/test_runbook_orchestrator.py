@@ -1898,6 +1898,55 @@ def test_infer_preflight_uses_run_dry_run_contract(tmp_path: Path) -> None:
     assert "uv run infer validate config --config" not in preflight_block
 
 
+def test_sequence_view_infer_runbook_preflight_gates_missing_products_not_missing_vectors(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.sequence_views.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: context_reverse_complement_anchor_mean_7b
+    operation: extract
+    ingest:
+      source: records
+      field: sequence
+    feature_bundle:
+      collect_log_likelihood: false
+      collect_output_layer_mean: false
+      collect_intermediate_embedding: true
+      sequence_view_inputs:
+        - dataset: construct_prom_eth_cip_context
+          root: ../../../usr/datasets
+          view_selector:
+            product_kind: realized_context
+            orientation: reverse_complement
+          pooling:
+            operation: anchor_mean
+            bounds_from: sequence_view
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_sequence_view_preflight")
+    payload["runbook"]["infer"]["config"] = str(config_path)
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode="fresh", requested_smoke=None, active_job_ids=())
+    preflight_block = _render_block(plan.preflight_commands)
+
+    assert "uv run infer validate sequence-view-completion --config" in preflight_block
+    assert "--max-missing-products 0" in preflight_block
+    assert "--max-stale-vectors 0" in preflight_block
+    assert "--max-missing-vectors" not in preflight_block
+    assert "uv run infer run --config" in preflight_block
+    assert "--dry-run" in preflight_block
+
+
 def test_infer_runbook_plan_emits_exact_gpu_type_when_declared(tmp_path: Path) -> None:
     workspace_root = tmp_path / "infer_workspace"
     payload = _infer_runbook_payload(workspace_root, runbook_id="infer_blackwell_pin")
@@ -4016,8 +4065,9 @@ def test_stress_ethanol_cipro_infer_presets_are_blackwell_pinned() -> None:
     for preset_name in (
         "infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml",
         "infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml",
     ):
         payload = yaml.safe_load((preset_dir / preset_name).read_text(encoding="utf-8"))
         resources = payload["runbook"]["resources"]
@@ -4034,8 +4084,9 @@ def test_stress_ethanol_cipro_infer_configs_match_pressure_test_matrix() -> None
             break
     config_dir = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "study_stress_ethanol_cipro"
     expected = {
-        "config.anchor_only.evo2_7b.yaml": 1024,
-        "config.anchor_plus_template.evo2_7b.yaml": 128,
+        "config.sequence_views.anchor_construct_insert.evo2_7b.yaml": 128,
+        "config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml": 128,
+        "config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml": 128,
         "config.anchor_only.evo2_20b.yaml": 256,
         "config.anchor_plus_template.evo2_20b.yaml": 48,
     }

@@ -143,11 +143,13 @@ Common patterns:
 ### Normalize-anchor mode
 
 `job.mode: normalize_anchor` is the analysis-view sibling path for reference/control material.
+It derives a separate analysis product from a biological input row; it does not rewrite the
+native/reference sequence.
 
-- `job.normalize_anchor.product_kind`: today this must be `analysis_core60`
+- `job.normalize_anchor.product_kind`: today this must be `analysis_window`
 - `job.normalize_anchor.target_length`: required emitted length, for example `60`
 - `job.normalize_anchor.focal_selector`: ordered selector chain; the first successful selector wins
-- `job.normalize_anchor.over_length_policy.kind=trim`: trim a parent sequence to the target length around the focal point
+- `job.normalize_anchor.over_length_policy.kind=trim`: emit an exact-length window from the parent sequence around the focal point
 - `job.normalize_anchor.under_length_policy.kind=expand_from_template`: expand a short parent sequence only from an explicit template context
 - `job.normalize_anchor.feature_retention_policy`: fail/warn rules for retained, clipped, and lost annotated roles
 - `job.normalize_anchor.fallback_policy.allow_low_confidence`: opt-in gate for low-confidence selectors such as `sequence_midpoint`
@@ -155,9 +157,28 @@ Common patterns:
 
 Supported focal selectors:
 
-- `annotation_pair_midpoint`
+- `annotation_pair_midpoint`: require one first feature and one second feature, then use the midpoint
+  between their feature centers
 - `annotation_feature_center`
 - `sequence_midpoint`
+
+For the promoter-reference core60 lane, the intended high-confidence selector is
+`annotation_pair_midpoint` over `sigma70_minus35` and `sigma70_minus10`. A config that only
+declares this selector has no midpoint fallback: missing or ambiguous sigma-site annotations fail
+before write-back.
+
+Over-length inputs use the annotation-pair focal point to choose an exact 60 bp analysis window.
+Construct evaluates candidate windows that contain the focal point, prefers retention of the
+selected sigma-site features, records clipped/lost annotations in the `derived` overlay, and writes
+`derived__source_interval_start_0` / `derived__source_interval_end_0` as 0-based half-open parent
+coordinates. The emitted row is `analysis_only=true` and `derived__product_kind=analysis_window`.
+
+Under-length inputs are never padded with arbitrary bases. They require
+`under_length_policy.kind=expand_from_template`. The study reference lane uses
+`placement_ref: replace:<start_0>-<end_0>`: Construct replaces that template interval with the short
+input sequence, extracts the exact target-length window around the sigma-site focal point, and records
+`derived__added_left_bp`, `derived__added_right_bp`, and template provenance. This is a pDual-context
+analysis view, not a new native promoter.
 
 Fail-fast rules for `normalize_anchor`:
 
@@ -172,12 +193,23 @@ Fail-fast rules for `normalize_anchor`:
 Classic template-realization jobs may add `job.output_variants` to emit explicit forward and
 whole-output reverse-complement products from one realized forward construct.
 
-- `product_kind: context1kb_forward` requires `orientation: forward`
-- `product_kind: context1kb_reverse_complement` requires `orientation: reverse_complement`
+- `product_kind: realized_context` with `orientation: forward` emits the forward context product
+- `product_kind: realized_context` with `orientation: reverse_complement` emits the whole-output
+  reverse-complement context product
 - reverse-complement variants carry emitted-orientation anchor bounds plus
   `construct__forward_anchor_start` / `construct__forward_anchor_end` for downstream audits
+- reverse-complement variants are the reverse complement of the full emitted context sequence, not
+  the reverse complement of a truncated anchor-only sequence
+- Infer `anchor_mean` consumers should use the emitted-orientation `construct__anchor_start` /
+  `construct__anchor_end` or matching sequence-view bounds directly; reverse-complement bounds are
+  already transformed by Construct using `L-b, L-a`
+- `anchor_mean` is an Infer pooling instruction over those coordinates. Construct still emits the
+  full context sequence, and Infer should pass that full sequence through the model before pooling
+  the anchor span.
 - semantic variants may share one base sequence id; construct writes distinct sequence-view rows
   instead of forcing duplicate base records
+- with `output.on_conflict=ignore`, already-present base rows are skipped, but planned sequence-view
+  rows are still written idempotently so reruns can complete missing semantic views
 
 ### Output
 

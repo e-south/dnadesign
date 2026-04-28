@@ -1,7 +1,7 @@
 # USR schema contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-26
+**Last verified:** 2026-04-27
 
 
 ## Core schema
@@ -54,7 +54,7 @@ Additive shared namespaces used by the current sequence-product contract:
 
 `seq_annot__features` preserves imported feature order, raw location text, normalized 0-based half-open intervals where available, qualifier multiplicity, and confidence for fuzzy or unsupported source locations.
 
-`derived__features_retained`, `derived__features_clipped`, and `derived__features_lost` summarize how parent annotations survive derived sequence products such as `analysis_core60` windows or template-expanded contexts.
+`derived__features_retained`, `derived__features_clipped`, and `derived__features_lost` summarize how parent annotations survive derived sequence products such as `analysis_window` windows or template-expanded contexts.
 
 Dataset id naming convention:
 
@@ -87,12 +87,35 @@ Parquet key/value metadata for derived overlays:
 USR keeps the base `records.parquet` schema stable and stores richer semantic view identity in additive sidecars.
 
 - Dataset-local sequence views live at `_views/sequence_views.parquet`.
+- Optional mutable view semantics live at `_views/view_semantics.parquet`.
 - `view_id` identifies a semantic sequence product/view, not a base sequence row.
 - Multiple `view_id` values may point to the same `id` in `records.parquet`.
 - Sequence views carry product kind, orientation, parent lineage, optional source intervals, optional emitted anchor bounds, and recommended pooling metadata.
 - Human labels and aliases are mutable metadata on the view row; they are not part of the stable semantic hash.
+- The view-semantics addendum is keyed by `view_id` and can carry `source_family`,
+  `selection_basis`, `view_collections`, and `role_tags` without changing stable
+  view identity. It is the right place for study cohort membership; do not
+  encode cohort membership by inventing misleading `product_kind` values.
 
 This separation allows provenance-faithful native records, analysis-only cores, and forward or reverse-complement construct contexts to alias the same base sequence when the literal sequence string collides.
+
+Current product-kind vocabulary:
+
+- `source_record`: source-faithful imported record.
+- `selected_region`: explicitly selected biological insert from a source record.
+- `construct_insert`: construct-ready promoter/anchor row in a merged handoff dataset.
+- `analysis_window`: Construct-derived 60 bp analysis-only comparability view.
+- `realized_context`: Construct-realized emitted context; `orientation` and
+  length distinguish forward 1 kb pDual contexts from reverse-complement
+  contexts.
+
+Product kind describes the sequence product's lineage and semantics, not every
+downstream analysis cohort. A natively 60 bp promoter insert remains a
+`construct_insert`; it must not be duplicated or relabeled as `analysis_window`
+solely because it is 60 bp. `analysis_window` is reserved for rows Construct
+derived by trimming/windowing or template-expanding around an explicit focal
+rule. Exact 60 bp `seq_mean` and `core60_mean` equivalence belongs to Infer's
+feature-alias layer, not to USR base rows.
 
 ## Next steps
 

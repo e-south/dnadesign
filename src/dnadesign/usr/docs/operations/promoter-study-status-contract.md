@@ -25,6 +25,7 @@ Use this page for the cheap snapshot.
 | Need | Surface | Why |
 | --- | --- | --- |
 | Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of study phase, datasets, row counts, and downstream posture. |
+| Are sequence products and feature-completion lanes visible at a glance? | `usr.data-plane.promoter-study-status --json` and read `evidence.sequence_view_contract_state` plus `evidence.infer_feature_completion_state` | Summarized product-kind/orientation/pooling contract health, generated sidecar freshness, and Infer reusable/stale/missing counts without replacing preflight. |
 | What blocks execution on this host? | [Promoter Study Preflight](promoter-study-preflight.md) | Command-level readiness for the next actionable phase. |
 | Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
 | Which plots, notebooks, deliverables, or artifact roots are available? | `uv run ops progress show usr.data-plane.promoter-study-status --json` and read `evidence.analysis_surfaces` | One snapshot now exposes DenseGen contract-governed current inventory and freshness, LatentDNA deliverable ids plus artifact roots, and Cluster artifact-layout templates without guessing. |

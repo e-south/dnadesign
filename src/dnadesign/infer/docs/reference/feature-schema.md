@@ -49,13 +49,14 @@ feature_bundle:
     - dataset: construct_prom_eth_cip_reference_core60
       root: src/dnadesign/usr/datasets
       view_selector:
-        product_kind: analysis_core60
+        product_kind: analysis_window
       pooling:
         operation: core60_mean
     - dataset: construct_prom_eth_cip_reference_contexts
       root: src/dnadesign/usr/datasets
       view_selector:
-        product_kind: context1kb_reverse_complement
+        product_kind: realized_context
+        orientation: reverse_complement
       pooling:
         operation: anchor_mean
         bounds_from: sequence_view
@@ -64,9 +65,45 @@ feature_bundle:
 Sequence-view rules:
 
 - each resolved row is one explicit semantic view id, not one implicit promoter lane
+- `construct_insert` views map to `context_kind=anchor_only`; they are the
+  merged construct-ready promoter/anchor handoff rows, not derived core60 rows
 - `seq_mean`, `anchor_mean`, and `core60_mean` are row-level pooling operations
+- `anchor_mean` does not shorten the model input. Infer sends the full emitted sequence to the
+  provider, then mean-pools token features over the explicit emitted-orientation
+  `pooling_start_0:pooling_end_0` span.
+- reverse-complement context rows must already contain reverse-complement sequences and
+  reverse-complement-orientation pooling bounds; Infer must not apply a second `L-b, L-a`
+  transform.
 - `core60_mean` aliases `seq_mean` only when the emitted sequence is exactly 60 bp and the pooling span is the full row
+- a native or designed exact-60 `construct_insert` can feature-alias with a true
+  `analysis_window` row when the sequence, model, layer, and pooling span are
+  identical; USR should not duplicate the native row as `analysis_window` just
+  to make that alias possible
 - view-aware bundles persist feature aliases under `_derived/infer/feature_aliases.parquet`
+- view-aware bundles persist reusable feature vectors under `_derived/infer/feature_vectors.parquet`
+- `infer` consumes sequence views; it does not manufacture missing
+  `analysis_window` or `realized_context` rows
+- missing required product kinds are a Construct/USR completion problem; the
+  completion planner reports them as `missing_products` before model execution
+- Before large backfills, run `uv run infer validate sequence-view-completion
+  --config <config.yaml> --format json` to classify vectors as reusable, stale,
+  missing, or product-missing without loading the model. Sequence-view `root`
+  values resolve relative to the config file directory. Legacy row-based overlays
+  are reusable only when the planner can match the requested feature identity;
+  otherwise they remain stale or unclassified instead of being silently trusted.
+- Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0` to
+  fail before submit when required sequence products are absent or existing
+  vectors are stale. Do not set `--max-missing-vectors 0` for a lane whose
+  purpose is to generate missing feature vectors.
+- To preserve compatible old row-overlay vectors under the newer sidecar
+  contract, run `uv run infer migrate legacy-overlay-aliases --config
+  <sequence-view-config.yaml> --job <sequence-view-job-id> --legacy-job-id
+  <old-row-overlay-job-id> --format json` first as a dry run. The command only
+  writes `feature_aliases.parquet` and `feature_vectors.parquet` with `--write`,
+  and it refuses to treat old forward overlays as reverse-complement coverage.
+  Dry-run mode is metadata-only by default so full-study planning does not read
+  large embedding payload columns; add `--verify-payloads` when an expensive
+  exact payload scan is intentionally required. `--write` always reads payloads.
 
 ### Default output ids
 
@@ -145,7 +182,7 @@ Example exported feature names:
 - `infer.evo2.evo2_7b.anchor_only.log_likelihood.total`
 - `infer.evo2.evo2_7b.anchor_only.output_layer_mean.seq_mean[0]`
 - `infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[17]`
-- `infer.evo2.evo2_7b.analysis_core60.intermediate_embedding.block26_mlp_out.core60_mean[17]`
+- `infer.evo2.evo2_7b.analysis_window.intermediate_embedding.block26_mlp_out.core60_mean[17]`
 - `infer.evo2.evo2_20b.template_1kb.intermediate_embedding.block23_mlp_out.anchor_mean[17]`
 
 ### Fail-fast rules
@@ -154,5 +191,6 @@ Example exported feature names:
 - at least one feature group must be enabled
 - `pool.dim < 1` is rejected during config parsing
 - templated contexts without required `construct__*` metadata fail before model execution
+- sequence-view bundles with missing required views, missing anchor bounds, or invalid pooling spans fail before model execution
 - unsupported model ids for this bundle fail before adapter execution
 - tokenwise persistence is intentionally unsupported in the repo-aligned v1 bundle

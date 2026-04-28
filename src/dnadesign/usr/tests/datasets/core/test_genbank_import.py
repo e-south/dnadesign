@@ -111,7 +111,7 @@ def _write_manifest(
                 "source_file": source_file.name,
                 "label": "sulAp_native",
                 "aliases": ["sulAp", "solA_cipro_control"],
-                "product_kind": "native_record",
+                "product_kind": "source_record",
             }
         ],
         "extract_features": extract_features or [],
@@ -133,7 +133,7 @@ def test_genbank_import_preserves_annotation_overlay_and_native_view(tmp_path: P
     overlay_row = overlay_table.to_pylist()[0]
     views = load_sequence_views(dataset)
 
-    assert result.native_records == 1
+    assert result.source_records == 1
     assert overlay_row["seq_annot__format"] == "genbank"
     assert overlay_row["seq_annot__source_sha256"]
     assert overlay_row["seq_annot__topology"] == "linear"
@@ -143,7 +143,7 @@ def test_genbank_import_preserves_annotation_overlay_and_native_view(tmp_path: P
     assert overlay_row["seq_annot__features"][1]["role_hint"] == "sigma70_minus35"
     assert overlay_row["seq_annot__features"][2]["role_hint"] == "sigma70_minus10"
     assert overlay_row["seq_annot__features"][3]["role_hint"] == "TFBS"
-    assert views[0].product_kind == "native_record"
+    assert views[0].product_kind == "source_record"
     assert views[0].orientation == "unknown"
 
 
@@ -201,7 +201,7 @@ def test_genbank_import_validates_feature_extractions_before_writing_dataset(tmp
             {
                 "source_label": "sulAp_native",
                 "selector": {"kind": "label", "label": "missing_feature"},
-                "product_kind": "biological_insert",
+                "product_kind": "selected_region",
                 "view_name": "missing_insert",
                 "on_ambiguous": "error",
             }
@@ -249,8 +249,8 @@ def test_genbank_import_feature_extraction_is_idempotent_when_requested(tmp_path
             {
                 "source_label": "sulAp_native",
                 "selector": {"kind": "label", "label": "pred. sulAp"},
-                "product_kind": "biological_insert",
-                "view_name": "sulAp_biological_insert",
+                "product_kind": "selected_region",
+                "view_name": "sulAp_selected_region",
                 "aliases": ["sulAp_insert"],
                 "on_ambiguous": "error",
             }
@@ -269,7 +269,7 @@ def test_genbank_import_feature_extraction_is_idempotent_when_requested(tmp_path
 
     assert dataset.head(10).shape[0] == 2
     assert derived_table.num_rows == 1
-    assert {view.product_kind for view in views} == {"native_record", "biological_insert"}
+    assert {view.product_kind for view in views} == {"source_record", "selected_region"}
 
 
 def test_genbank_import_extracts_feature_with_parent_derivation(tmp_path: Path) -> None:
@@ -285,8 +285,8 @@ def test_genbank_import_extracts_feature_with_parent_derivation(tmp_path: Path) 
             {
                 "source_label": "sulAp_native",
                 "selector": {"kind": "label", "label": "pred. sulAp"},
-                "product_kind": "biological_insert",
-                "view_name": "sulAp_biological_insert",
+                "product_kind": "selected_region",
+                "view_name": "sulAp_selected_region",
                 "aliases": ["sulAp_insert"],
                 "on_ambiguous": "error",
             }
@@ -301,11 +301,11 @@ def test_genbank_import_extracts_feature_with_parent_derivation(tmp_path: Path) 
 
     assert dataset.head(10).shape[0] == 2
     assert derived_row["derived__operation"] == "extract_feature"
-    assert derived_row["derived__product_kind"] == "biological_insert"
+    assert derived_row["derived__product_kind"] == "selected_region"
     assert derived_row["derived__parent_dataset"] == dataset.name
     assert derived_row["derived__source_interval_start_0"] == 12
     assert derived_row["derived__source_interval_end_0"] == 52
-    assert {view.product_kind for view in views} == {"native_record", "biological_insert"}
+    assert {view.product_kind for view in views} == {"source_record", "selected_region"}
 
 
 def test_genbank_import_extracts_negative_strand_features_as_reverse_complement_views(tmp_path: Path) -> None:
@@ -321,7 +321,7 @@ def test_genbank_import_extracts_negative_strand_features_as_reverse_complement_
             {
                 "source_label": "sulAp_native",
                 "selector": {"kind": "label", "label": "neg_feature"},
-                "product_kind": "biological_insert",
+                "product_kind": "selected_region",
                 "view_name": "neg_feature_insert",
                 "on_ambiguous": "error",
             }
@@ -333,7 +333,7 @@ def test_genbank_import_extracts_negative_strand_features_as_reverse_complement_
     frame = dataset.head(10)
     extracted = frame[frame["sequence"] == "AACTTTGGGCAT"]
     derived_row = pq.read_table(overlay_path(dataset.dir, "derived")).to_pylist()[0]
-    view = next(view for view in load_sequence_views(dataset) if view.product_kind == "biological_insert")
+    view = next(view for view in load_sequence_views(dataset) if view.product_kind == "selected_region")
 
     assert extracted.shape[0] == 1
     assert derived_row["derived__orientation"] == "reverse_complement"

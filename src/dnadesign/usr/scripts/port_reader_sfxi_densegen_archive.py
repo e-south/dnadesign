@@ -189,6 +189,103 @@ class WriteResult:
     label_overlay_rows: int
 
 
+def _build_port_tables(plan: PortPlan, *, usr_root: Path) -> tuple[pd.DataFrame, pa.Table, pa.Table]:
+    base_rows = base_records_frame(plan.included)
+    densegen_frame = modern_densegen_overlay_frame(plan.included)
+    labels_frame = usr_label_overlay_frame(plan.included)
+    densegen_schema = _overlay_schema_from_registry(usr_root, "densegen", densegen_frame.columns)
+    label_schema = _overlay_schema_from_registry(usr_root, "usr_label", labels_frame.columns)
+    densegen_table = _table_from_frame(densegen_frame, densegen_schema)
+    label_table = _table_from_frame(labels_frame, label_schema)
+    return base_rows, densegen_table, label_table
+
+
+def _validate_existing_port_base(dataset: Dataset, expected_base_rows: pd.DataFrame) -> None:
+    if not dataset.records_path.exists():
+        raise FileNotFoundError(f"Existing output dataset has no records.parquet: {dataset.records_path}")
+    expected = expected_base_rows.set_index("id", drop=False)
+    actual = pq.read_table(dataset.records_path, columns=["id", "sequence"]).to_pandas().set_index("id", drop=False)
+    expected_ids = set(str(value) for value in expected.index.tolist())
+    actual_ids = set(str(value) for value in actual.index.tolist())
+    missing = sorted(expected_ids - actual_ids)
+    extra = sorted(actual_ids - expected_ids)
+    if missing or extra:
+        details = {
+            "missing_expected_ids": missing[:10],
+            "extra_existing_ids": extra[:10],
+            "missing_expected_count": len(missing),
+            "extra_existing_count": len(extra),
+        }
+        raise ValueError(f"Existing output dataset base rows do not match the SFXI port plan: {details}")
+    mismatched_sequences = [
+        str(record_id)
+        for record_id in sorted(expected_ids)
+        if str(actual.loc[record_id, "sequence"]) != str(expected.loc[record_id, "sequence"])
+    ]
+    if mismatched_sequences:
+        raise ValueError(
+            "Existing output dataset has sequence drift for port ids: " + ", ".join(mismatched_sequences[:10])
+        )
+
+
+def compare_port_plan_to_datasets(
+    plan: PortPlan,
+    *,
+    usr_root: Path,
+    dataset_names: Iterable[str],
+) -> dict[str, Any]:
+    included_by_id = {row.id: row for row in plan.included}
+    included_sequence_to_ids: dict[str, list[str]] = {}
+    for row in plan.included:
+        included_sequence_to_ids.setdefault(row.sequence.upper(), []).append(row.id)
+    datasets: dict[str, Any] = {}
+    for dataset_name in dataset_names:
+        dataset = Dataset(usr_root, dataset_name)
+        if not dataset.records_path.exists():
+            datasets[dataset_name] = {
+                "exists": False,
+                "rows": 0,
+                "matched_count": 0,
+                "missing_count": len(plan.included),
+                "matched_design_ids": [],
+                "missing_design_ids": [row.design_id for row in plan.included],
+                "matched_ids": [],
+                "duplicate_id_count": 0,
+                "sequence_only_match_count": 0,
+                "sequence_only_match_design_ids": [],
+            }
+            continue
+        frame = pq.read_table(dataset.records_path, columns=["id", "sequence"]).to_pandas()
+        dataset_ids = {str(value) for value in frame["id"].tolist()}
+        duplicate_id_count = int(frame["id"].duplicated().sum())
+        matched_ids = sorted(dataset_ids & set(included_by_id))
+        matched_design_ids = [included_by_id[record_id].design_id for record_id in matched_ids]
+        missing_rows = [row for row in plan.included if row.id not in dataset_ids]
+        sequence_matches: list[str] = []
+        for sequence in {str(value).upper() for value in frame["sequence"].tolist()}:
+            for record_id in included_sequence_to_ids.get(sequence, []):
+                if record_id not in dataset_ids:
+                    sequence_matches.append(record_id)
+        sequence_matches = sorted(set(sequence_matches))
+        datasets[dataset_name] = {
+            "exists": True,
+            "rows": int(frame.shape[0]),
+            "matched_count": len(matched_ids),
+            "missing_count": len(missing_rows),
+            "matched_design_ids": matched_design_ids,
+            "missing_design_ids": [row.design_id for row in missing_rows],
+            "matched_ids": matched_ids,
+            "duplicate_id_count": duplicate_id_count,
+            "sequence_only_match_count": len(sequence_matches),
+            "sequence_only_match_design_ids": [included_by_id[record_id].design_id for record_id in sequence_matches],
+        }
+    return {
+        "included_total": len(plan.included),
+        "included_design_ids": [row.design_id for row in plan.included],
+        "datasets": datasets,
+    }
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -942,13 +1039,7 @@ def write_port_dataset(
     if dataset.dir.exists():
         raise FileExistsError(f"Output dataset already exists: {dataset.dir}")
 
-    base_rows = base_records_frame(plan.included)
-    densegen_frame = modern_densegen_overlay_frame(plan.included)
-    labels_frame = usr_label_overlay_frame(plan.included)
-    densegen_schema = _overlay_schema_from_registry(usr_root, "densegen", densegen_frame.columns)
-    label_schema = _overlay_schema_from_registry(usr_root, "usr_label", labels_frame.columns)
-    densegen_table = _table_from_frame(densegen_frame, densegen_schema)
-    label_table = _table_from_frame(labels_frame, label_schema)
+    base_rows, densegen_table, label_table = _build_port_tables(plan, usr_root=usr_root)
 
     with dataset.write_session() as session:
         session.init(
@@ -973,6 +1064,32 @@ def write_port_dataset(
         dataset=dataset.name,
         dataset_dir=str(dataset.dir),
         rows_written=int(rows_written),
+        densegen_overlay_rows=int(densegen_rows),
+        label_overlay_rows=int(label_rows),
+    )
+
+
+def refresh_existing_port_dataset(
+    plan: PortPlan,
+    *,
+    usr_root: Path,
+    output_dataset: str = DEFAULT_OUTPUT_DATASET,
+    expected_count: int | None = None,
+) -> WriteResult:
+    _validate_included_count(plan, expected_count)
+    dataset = Dataset(usr_root, output_dataset)
+    if not dataset.dir.exists():
+        raise FileNotFoundError(f"Output dataset does not exist: {dataset.dir}")
+    base_rows, densegen_table, label_table = _build_port_tables(plan, usr_root=usr_root)
+    _validate_existing_port_base(dataset, base_rows)
+    with dataset.maintenance(reason="refresh_reader_sfxi_densegen_archive_overlays"):
+        densegen_rows = dataset.write_overlay("densegen", densegen_table, key="id", overwrite=True)
+        label_rows = dataset.write_overlay("usr_label", label_table, key="id", overwrite=True)
+    dataset.validate(strict=True)
+    return WriteResult(
+        dataset=dataset.name,
+        dataset_dir=str(dataset.dir),
+        rows_written=0,
         densegen_overlay_rows=int(densegen_rows),
         label_overlay_rows=int(label_rows),
     )
@@ -1008,7 +1125,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--expected-count", type=int, default=23)
     parser.add_argument("--report-dir", type=Path, default=None)
     parser.add_argument(
+        "--compare-dataset",
+        action="append",
+        default=[],
+        help="USR dataset id to compare against the included SFXI candidates. May be repeated.",
+    )
+    parser.add_argument(
         "--write", action="store_true", help="Actually create the output USR dataset. Default is dry-run."
+    )
+    parser.add_argument(
+        "--refresh-existing-overlays",
+        action="store_true",
+        help="Rewrite existing output dataset overlays through current USR registry metadata after base-row checks.",
     )
     return parser.parse_args(argv)
 
@@ -1020,8 +1148,24 @@ def main(argv: list[str] | None = None) -> int:
     _validate_included_count(plan, args.expected_count)
     if args.report_dir is not None:
         _write_report(plan, args.report_dir)
-    payload: dict[str, Any] = {"plan": plan.summary(), "write": bool(args.write)}
-    if args.write:
+    if args.write and args.refresh_existing_overlays:
+        raise ValueError("--write and --refresh-existing-overlays are mutually exclusive.")
+    payload: dict[str, Any] = {"plan": plan.summary(), "write": bool(args.write or args.refresh_existing_overlays)}
+    if args.compare_dataset:
+        payload["comparisons"] = compare_port_plan_to_datasets(
+            plan,
+            usr_root=args.usr_root,
+            dataset_names=tuple(args.compare_dataset),
+        )
+    if args.refresh_existing_overlays:
+        result = refresh_existing_port_dataset(
+            plan,
+            usr_root=args.usr_root,
+            output_dataset=args.output_dataset,
+            expected_count=args.expected_count,
+        )
+        payload["result"] = result.__dict__
+    elif args.write:
         result = write_port_dataset(
             plan,
             usr_root=args.usr_root,

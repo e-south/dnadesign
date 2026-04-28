@@ -25,7 +25,7 @@ def test_project_genbank_baserender_rows_keeps_only_annotation_backed_rows() -> 
             "usr_label__primary": "demoP",
             "seq_annot__source_file": "demo.gb",
             "seq_annot__features": [{"feature_id": "f1", "start_0": 0, "end_0": 4}],
-            "derived__product_kind": "biological_insert",
+            "derived__product_kind": "selected_region",
             "unrelated": "drop-me",
         },
         {
@@ -48,7 +48,7 @@ def test_project_genbank_baserender_rows_keeps_only_annotation_backed_rows() -> 
             "usr_label__primary": "demoP",
             "seq_annot__source_file": "demo.gb",
             "seq_annot__features": [{"feature_id": "f1", "start_0": 0, "end_0": 4}],
-            "derived__product_kind": "biological_insert",
+            "derived__product_kind": "selected_region",
         }
     ]
 
@@ -61,7 +61,7 @@ def test_project_genbank_baserender_rows_rejects_malformed_annotation_payloads()
             "usr_label__primary": "demoP",
             "seq_annot__source_file": "demo.gb",
             "seq_annot__features": "not-a-feature-list",
-            "derived__product_kind": "biological_insert",
+            "derived__product_kind": "selected_region",
         }
     ]
 

@@ -91,6 +91,8 @@ uv run python -m dnadesign.devtools.pytest_gate --junit-xml external-integration
 1. Proposal lifecycle and promotion rules: [PLANS](../../PLANS.md)
 2. Execution plan indexes: [active plans](../exec-plans/active/README.md), [completed plans](../exec-plans/completed/README.md)
 3. Decision records: [architecture decisions](../architecture/decisions/README.md)
+4. Sequence-view, reference-product, reverse-complement context, and Infer-completion hardening proposal:
+   [2026-04-28 sequence-view ontology and Infer completion spec](plans/2026-04-28-sequence-view-ontology-and-infer-completion-hardening-spec.md)
 
 ### Naming and file layout
 

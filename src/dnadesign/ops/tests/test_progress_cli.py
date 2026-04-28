@@ -28,6 +28,7 @@ from dnadesign.studies.families.promoter.ops.provider import (
     provide_promoter_preflight,
     provide_promoter_status,
 )
+from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 from dnadesign.usr.src.overlays import with_overlay_metadata
 
 
@@ -175,6 +176,45 @@ def _write_usr_dataset(root: Path, dataset: str, *, rows: int = 2) -> None:
         )
         pq.write_table(densegen_overlay, derived_dir / "densegen.parquet")
     (dataset_dir / ".events.log").write_text("{}\n{}\n", encoding="utf-8")
+
+
+def _write_sequence_view_sidecar(
+    root: Path,
+    dataset: str,
+    *,
+    product_kind: str,
+    context_kind: str,
+    recommended_pooling: str,
+    orientations: tuple[str, ...],
+) -> None:
+    ensure_sequence_contract_namespaces(root)
+    ds = Dataset(root, dataset)
+    table = pq.read_table(ds.records_path, columns=["id", "length"])
+    ids = [str(value) for value in table.column("id").to_pylist()]
+    lengths = [int(value) for value in table.column("length").to_pylist()]
+    if len(ids) != len(orientations):
+        raise AssertionError(f"test setup orientation count mismatch for {dataset}")
+    rows = []
+    for row_id, length, orientation in zip(ids, lengths, orientations, strict=True):
+        rows.append(
+            SequenceViewRecord(
+                sequence_id=row_id,
+                view_name=f"{row_id}_{product_kind}_{orientation}",
+                product_kind=product_kind,
+                context_kind=context_kind,
+                orientation=orientation,  # type: ignore[arg-type]
+                analysis_only=product_kind == "analysis_window",
+                source_dataset_id=dataset,
+                anchor_start_0=0 if recommended_pooling == "anchor_mean" else None,
+                anchor_end_0=length if recommended_pooling == "anchor_mean" else None,
+                forward_anchor_start_0=0 if recommended_pooling == "anchor_mean" else None,
+                forward_anchor_end_0=length if recommended_pooling == "anchor_mean" else None,
+                recommended_pooling=recommended_pooling,  # type: ignore[arg-type]
+                created_at="2026-04-28T00:00:00+00:00",
+                created_by="test",
+            )
+        )
+    write_sequence_views(ds, rows, conflict_policy="error")
 
 
 def _write_promoter_ops_contract(
@@ -1458,7 +1498,336 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
         assert evidence["counts"]["ok"] >= 1
         assert evidence["counts"]["attention"] >= 1
         assert evidence["counts"]["missing"] == 0
+
+
+def test_promoter_study_preflight_reports_sequence_view_contract_health(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        _write_study_index(repo_root / "docs" / "studies" / "index.yaml")
+        _write_promoter_study_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
+        usr_root = repo_root / "usr_root"
+        _write_sequence_view_sidecar(
+            usr_root,
+            "promoter/demo_anchor_set",
+            product_kind="construct_insert",
+            context_kind="anchor_only",
+            recommended_pooling="seq_mean",
+            orientations=("forward", "forward"),
+        )
+        _write_sequence_view_sidecar(
+            usr_root,
+            "promoter/demo_construct_contexts",
+            product_kind="realized_context",
+            context_kind="template_1kb",
+            recommended_pooling="anchor_mean",
+            orientations=("forward", "forward", "reverse_complement", "reverse_complement"),
+        )
+        ops_path = study_dir / "ops.study.yaml"
+        ops_payload = yaml.safe_load(ops_path.read_text(encoding="utf-8"))
+        ops_payload["preflight"]["checks"]["infer_batch_preparation"].insert(
+            1,
+            {
+                "kind": "sequence_view_contract",
+                "check_id": "infer.sequence_views.context_contract",
+                "check_group": "infer",
+                "summary": "Construct context sequence views satisfy product and pooling contract.",
+                "required": True,
+                "artifact": "construct_context_dataset",
+                "expected": {
+                    "total_records": 4,
+                    "total_views": 4,
+                    "counts_by_product_kind": {"realized_context": 4},
+                    "counts_by_orientation": {"forward": 2, "reverse_complement": 2},
+                    "counts_by_context_kind": {"template_1kb": 4},
+                    "counts_by_recommended_pooling": {"anchor_mean": 4},
+                },
+            },
+        )
+        ops_path.write_text(yaml.safe_dump(ops_payload, sort_keys=False), encoding="utf-8")
+
+        monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.run_preflight_command",
+            lambda argv, *, cwd, timeout_seconds=180: CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False),
+        )
+        monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
+        )
+        monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 1, "devices": [], "probe_error": None},
+        )
+
+        _state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+
+        checks = {check["id"]: check for check in evidence["checks"]}
+        check = checks["infer.sequence_views.context_contract"]
+        assert check["kind"] == "sequence_view_contract"
+        assert check["state"] == "ok"
+        assert check["details"]["counts_by_product_kind"] == {"realized_context": 4}
+        assert check["details"]["counts_by_orientation"] == {"forward": 2, "reverse_complement": 2}
+        assert check["details"]["invalid_bounds"] == 0
         assert evidence["scope"] == "full"
+
+
+def test_promoter_study_status_reports_sequence_view_and_infer_completion_summary(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        _write_study_index(repo_root / "docs" / "studies" / "index.yaml")
+        _write_promoter_study_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
+        datasets_path = study_dir / "datasets.yaml"
+        datasets_payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8"))
+        for entry in datasets_payload["datasets"]:
+            if entry["dataset"] in {
+                "promoter/demo_anchor_set",
+                "promoter/demo_construct_contexts",
+            }:
+                entry["status"] = "present"
+        datasets_path.write_text(yaml.safe_dump(datasets_payload, sort_keys=False), encoding="utf-8")
+
+        usr_root = repo_root / "usr_root"
+        _write_sequence_view_sidecar(
+            usr_root,
+            "promoter/demo_construct_contexts",
+            product_kind="realized_context",
+            context_kind="template_1kb",
+            recommended_pooling="anchor_mean",
+            orientations=("forward", "forward", "reverse_complement", "reverse_complement"),
+        )
+        infer_config = repo_root / "workspace" / "infer" / "config.sequence_views.evo2_7b.yaml"
+        infer_config.write_text(
+            yaml.safe_dump(
+                {
+                    "model": {"id": "evo2_7b", "device": "cuda:0", "precision": "bf16", "alphabet": "dna"},
+                    "jobs": [],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        ops_path = study_dir / "ops.study.yaml"
+        ops_payload = yaml.safe_load(ops_path.read_text(encoding="utf-8"))
+        ops_payload["execution_surfaces"]["infer_completion_context_7b"] = {
+            "surface_type": "command",
+            "cwd_ref": "repo:workspace/infer",
+            "argv": [
+                "uv",
+                "run",
+                "infer",
+                "validate",
+                "sequence-view-completion",
+                "--config",
+                "config.sequence_views.evo2_7b.yaml",
+                "--format",
+                "json",
+            ],
+        }
+        ops_payload["preflight"]["checks"]["infer_batch_preparation"].insert(
+            1,
+            {
+                "kind": "sequence_view_contract",
+                "check_id": "infer.sequence_views.context_contract",
+                "check_group": "infer",
+                "summary": "Construct context sequence views satisfy product and pooling contract.",
+                "required": True,
+                "artifact": "construct_context_dataset",
+                "expected": {
+                    "total_records": 4,
+                    "total_views": 4,
+                    "counts_by_product_kind": {"realized_context": 4},
+                    "counts_by_orientation": {"forward": 2, "reverse_complement": 2},
+                    "counts_by_context_kind": {"template_1kb": 4},
+                    "counts_by_recommended_pooling": {"anchor_mean": 4},
+                },
+            },
+        )
+        ops_payload["preflight"]["checks"]["infer_batch_preparation"].insert(
+            2,
+            {
+                "kind": "infer_sequence_view_completion",
+                "check_id": "infer.feature_completion.context_7b",
+                "check_group": "infer",
+                "summary": "Context sequence-view feature completion is classified.",
+                "required": False,
+                "phase_id": "infer_anchor_plus_template_7b",
+                "surface": "infer_completion_context_7b",
+                "expected": {
+                    "max_missing_vectors": 0,
+                    "max_stale_vectors": 0,
+                    "max_missing_products": 0,
+                },
+            },
+        )
+        ops_path.write_text(yaml.safe_dump(ops_payload, sort_keys=False), encoding="utf-8")
+
+        def _fake_plan(config_path: Path, job: str | None = None):
+            assert config_path == infer_config.resolve()
+            assert job is None
+            return (
+                {
+                    "dataset": "promoter/demo_construct_contexts",
+                    "bundle_id": "context_sequence_views_7b",
+                    "model_family": "evo2_7b",
+                    "required_views": 4,
+                    "required_vectors": 4,
+                    "existing_vectors": 2,
+                    "reusable_vectors": 1,
+                    "stale_vectors": 1,
+                    "missing_vectors": 2,
+                    "missing_products": 0,
+                    "persisted_vector_reusable": 0,
+                    "legacy_digest_reusable": 1,
+                    "legacy_unclassified_vectors": 1,
+                    "existing_aliases": 0,
+                    "by_product_kind": {"realized_context": 4},
+                    "by_orientation": {"forward": 2, "reverse_complement": 2},
+                    "by_pooling_operation": {"anchor_mean": 4},
+                    "commands": {"construct_completion": [], "infer_backfill": [], "alias_backfill": []},
+                },
+            )
+
+        monkeypatch.setattr(
+            "dnadesign.infer.plan_sequence_view_feature_completion_from_config",
+            _fake_plan,
+            raising=False,
+        )
+
+        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
+
+        assert state == "ok"
+        assert "sequence-view product contracts 1/1 ok" in summary
+        assert "infer sequence-view feature completion checks 0/1 ok" in summary
+        assert "reusable=1 stale=1 missing=2 missing_products=0" in summary
+        assert evidence["sequence_view_contract_state"]["state"] == "ok"
+        assert evidence["sequence_view_contract_state"]["checks"][0]["counts_by_orientation"] == {
+            "forward": 2,
+            "reverse_complement": 2,
+        }
+        assert evidence["infer_feature_completion_state"]["state"] == "attention"
+        assert evidence["infer_feature_completion_state"]["drives_top_level_attention"] is False
+        assert evidence["infer_feature_completion_state"]["aggregate"]["counts_by_product_kind"] == {
+            "realized_context": 4
+        }
+        assert evidence["infer_feature_completion_state"]["aggregate"]["counts_by_orientation"] == {
+            "forward": 2,
+            "reverse_complement": 2,
+        }
+
+
+def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        _write_study_index(repo_root / "docs" / "studies" / "index.yaml")
+        _write_promoter_study_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
+        ops_path = study_dir / "ops.study.yaml"
+        ops_payload = yaml.safe_load(ops_path.read_text(encoding="utf-8"))
+        ops_payload["execution_surfaces"]["infer_completion_anchor_7b"] = {
+            "surface_type": "command",
+            "argv": [
+                "uv",
+                "run",
+                "infer",
+                "validate",
+                "sequence-view-completion",
+                "--config",
+                "workspace/infer/config.anchor_sequence_views.evo2_7b.yaml",
+                "--format",
+                "json",
+            ],
+        }
+        ops_payload["preflight"]["checks"]["infer_batch_preparation"].insert(
+            1,
+            {
+                "kind": "infer_sequence_view_completion",
+                "check_id": "infer.feature_completion.anchor_7b",
+                "check_group": "infer",
+                "summary": "Anchor sequence-view feature completion is classified.",
+                "required": False,
+                "phase_id": "infer_anchor_only_7b",
+                "surface": "infer_completion_anchor_7b",
+                "expected": {
+                    "max_missing_vectors": 0,
+                    "max_stale_vectors": 0,
+                    "max_missing_products": 0,
+                },
+            },
+        )
+        ops_path.write_text(yaml.safe_dump(ops_payload, sort_keys=False), encoding="utf-8")
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "infer validate sequence-view-completion" in command:
+                payload = [
+                    {
+                        "dataset": "promoter/demo_anchor_set",
+                        "bundle_id": "anchor_sequence_views_7b",
+                        "model_family": "evo2_7b",
+                        "required_views": 2,
+                        "required_vectors": 4,
+                        "existing_vectors": 2,
+                        "reusable_vectors": 1,
+                        "stale_vectors": 1,
+                        "missing_vectors": 2,
+                        "missing_products": 0,
+                        "persisted_vector_reusable": 0,
+                        "legacy_digest_reusable": 1,
+                        "legacy_unclassified_vectors": 1,
+                        "existing_aliases": 0,
+                        "by_product_kind": {"construct_insert": 2},
+                        "by_orientation": {"forward": 2},
+                        "by_pooling_operation": {"seq_mean": 2},
+                        "commands": {
+                            "construct_completion": [],
+                            "infer_backfill": ["uv run infer run --config config.yaml --job anchor_sequence_views_7b"],
+                            "alias_backfill": ["uv run infer aliases backfill --config config.yaml"],
+                        },
+                    }
+                ]
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            return CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False)
+
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
+        )
+        monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 1, "devices": [], "probe_error": None},
+        )
+
+        _state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+
+        checks = {check["id"]: check for check in evidence["checks"]}
+        check = checks["infer.feature_completion.anchor_7b"]
+        assert check["kind"] == "infer_sequence_view_completion"
+        assert check["state"] == "attention"
+        assert check["summary"] == (
+            "Anchor sequence-view feature completion is classified. reusable=1 stale=1 missing=2 missing_products=0."
+        )
+        assert check["details"]["required_views"] == 2
+        assert check["details"]["required_vectors"] == 4
+        assert check["details"]["reusable_vectors"] == 1
+        assert check["details"]["legacy_digest_reusable"] == 1
+        assert check["details"]["legacy_unclassified_vectors"] == 1
+        assert check["details"]["stale_vectors"] == 1
+        assert check["details"]["missing_vectors"] == 2
+        assert check["details"]["missing_products"] == 0
+        assert check["details"]["counts_by_product_kind"] == {"construct_insert": 2}
+        assert check["details"]["counts_by_orientation"] == {"forward": 2}
+        assert check["details"]["counts_by_pooling_operation"] == {"seq_mean": 2}
+        assert check["details"]["commands"]["infer_backfill"] == [
+            "uv run infer run --config config.yaml --job anchor_sequence_views_7b"
+        ]
 
 
 def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(monkeypatch) -> None:

@@ -32,6 +32,14 @@ class InferUSROutputContract:
 
 
 @dataclass(frozen=True)
+class InferUSREventsContract:
+    config_path: Path
+    usr_root: Path
+    usr_dataset: str
+    source_kind: str
+
+
+@dataclass(frozen=True)
 class InferConfigValidationContract:
     config_path: Path
     model_id: str
@@ -241,6 +249,81 @@ def resolve_infer_usr_output_contract(config_path: Path) -> InferUSROutputContra
     )
 
 
+def resolve_infer_usr_events_contract(config_path: Path) -> InferUSREventsContract:
+    resolved_config_path, root = _load_infer_root_config(config_path)
+
+    try:
+        output = resolve_infer_usr_output_contract(resolved_config_path)
+    except ValueError as exc:
+        output_error = str(exc)
+    else:
+        return InferUSREventsContract(
+            config_path=output.config_path,
+            usr_root=output.usr_root,
+            usr_dataset=output.usr_dataset,
+            source_kind="usr_writeback",
+        )
+
+    destinations = _sequence_view_event_destinations(root, config_path=resolved_config_path)
+    if not destinations:
+        raise ValueError(
+            "infer resolver requires at least one job with ingest.source='usr' and io.write_back=true "
+            f"or exactly one feature_bundle.sequence_view_inputs dataset; write-back resolver error: {output_error}"
+        )
+    if len(destinations) > 1:
+        rendered = ", ".join(sorted(f"{root_path}/{dataset}" for root_path, dataset in destinations))
+        raise ValueError(
+            f"infer resolver found multiple sequence-view event sources in config: {rendered}. "
+            "Split the batch into single-dataset sequence-view runbooks or pass --events explicitly."
+        )
+    usr_root, dataset = next(iter(destinations))
+    return InferUSREventsContract(
+        config_path=resolved_config_path,
+        usr_root=usr_root,
+        usr_dataset=dataset,
+        source_kind="sequence_view_input",
+    )
+
+
+def _sequence_view_event_destinations(
+    root: Mapping[str, object],
+    *,
+    config_path: Path,
+) -> set[tuple[Path, str]]:
+    jobs = root.get("jobs")
+    if not isinstance(jobs, list):
+        raise ValueError(f"infer config must include a jobs list: {config_path}")
+    destinations: set[tuple[Path, str]] = set()
+    for job in jobs:
+        if not isinstance(job, Mapping):
+            continue
+        feature_bundle = job.get("feature_bundle")
+        if not isinstance(feature_bundle, Mapping):
+            continue
+        inputs = feature_bundle.get("sequence_view_inputs")
+        if not isinstance(inputs, list):
+            continue
+        for input_payload in inputs:
+            if not isinstance(input_payload, Mapping):
+                continue
+            dataset = _normalize_relative_dataset_path(
+                input_payload.get("dataset"),
+                label="infer resolver requires sequence_view_inputs.dataset",
+            )
+            root_value = input_payload.get("root")
+            if root_value is None:
+                raise ValueError("infer resolver requires sequence_view_inputs.root for sequence-view jobs")
+            usr_root = resolve_usr_root_from_config(
+                root_value,
+                config_path=config_path,
+                label="infer resolver sequence_view_inputs.root",
+            )
+            if usr_root is None:
+                raise ValueError("infer resolver requires sequence_view_inputs.root for sequence-view jobs")
+            destinations.add((usr_root, dataset))
+    return destinations
+
+
 def validate_infer_config_contract(config_path: Path) -> InferConfigValidationContract:
     from .src.runtime.adapter_runtime import validate_adapter_runtime_contract
 
@@ -273,6 +356,41 @@ def validate_infer_dry_run_contract(config_path: Path) -> InferConfigValidationC
     return _build_infer_config_validation_contract(config_path=resolved_config_path, root=root)
 
 
+def plan_sequence_view_feature_completion_from_config(
+    config_path: Path,
+    *,
+    job: str | None = None,
+) -> tuple[dict[str, object], ...]:
+    from .src.cli.config_inputs import resolve_config_sequence_view_roots
+    from .src.features.completion_planner import plan_sequence_view_feature_completion
+    from .src.features.sequence_views import bundle_uses_sequence_views
+
+    resolved_config_path, root = _load_validated_infer_config(config_path)
+    selected_jobs = [selected_job for selected_job in root.jobs if job in {None, str(selected_job.id)}]
+    if not selected_jobs:
+        raise ValueError("No jobs selected. Check the job id or the config file.")
+
+    plans: list[dict[str, object]] = []
+    for selected_job in selected_jobs:
+        if selected_job.feature_bundle is None or not bundle_uses_sequence_views(selected_job.feature_bundle):
+            continue
+        resolve_config_sequence_view_roots(job=selected_job, config_dir=resolved_config_path.parent)
+        command = f"uv run infer run --config {resolved_config_path} --job {selected_job.id}"
+        plans.append(
+            plan_sequence_view_feature_completion(
+                bundle=selected_job.feature_bundle,
+                model_id=root.model.id,
+                job_id=selected_job.id,
+                bundle_id=selected_job.id,
+                infer_command=command,
+            ).to_dict()
+        )
+
+    if not plans:
+        raise ValueError("No selected jobs use feature_bundle.sequence_view_inputs.")
+    return tuple(plans)
+
+
 def resolve_infer_notify_profile_path(config_path: Path) -> Path:
     resolved_config_path, _root = _load_infer_root_config(config_path)
     workspace_root = resolved_config_path.parent
@@ -285,10 +403,13 @@ def resolve_infer_notify_profile_path(config_path: Path) -> Path:
 __all__ = [
     "InferConfigValidationContract",
     "InferRuntimeLaneContract",
+    "InferUSREventsContract",
     "InferUSROutputContract",
     "infer_model_family_suffix",
+    "plan_sequence_view_feature_completion_from_config",
     "resolve_infer_notify_profile_path",
     "resolve_infer_runtime_lane_contracts",
+    "resolve_infer_usr_events_contract",
     "resolve_infer_usr_output_contract",
     "validate_infer_config_contract",
     "validate_infer_dry_run_contract",

@@ -562,7 +562,7 @@ def _validated_preflight_checks(
                     f"{phase_id} entry {check_id} must use boolean required: {contract_path}"
                 )
 
-            if kind in {"path_exists", "dataset_snapshot"}:
+            if kind in {"path_exists", "dataset_snapshot", "sequence_view_contract"}:
                 artifact = _string_or_none(spec.get("artifact"))
                 if artifact is None:
                     raise ValueError(
@@ -574,6 +574,13 @@ def _validated_preflight_checks(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} references unknown artifact "
                         f"{artifact!r}: {contract_path}"
                     )
+            if kind == "sequence_view_contract":
+                expected = spec.get("expected")
+                if expected is not None and not isinstance(expected, dict):
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} expected must be a mapping when defined: {contract_path}"
+                    )
             if kind == "dataset_snapshot":
                 target_rows = spec.get("target_rows")
                 if not isinstance(target_rows, int) or target_rows <= 0:
@@ -581,7 +588,13 @@ def _validated_preflight_checks(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
                         f"target_rows: {contract_path}"
                     )
-            if kind in {"runbook_plan", "workspace_layout", "command", "scheduler_queue"}:
+            if kind in {
+                "runbook_plan",
+                "workspace_layout",
+                "command",
+                "scheduler_queue",
+                "infer_sequence_view_completion",
+            }:
                 surface = _string_or_none(spec.get("surface"))
                 if surface is None:
                     raise ValueError(
@@ -599,12 +612,20 @@ def _validated_preflight_checks(
                     "workspace_layout": "workspace",
                     "command": "command",
                     "scheduler_queue": "scheduler",
+                    "infer_sequence_view_completion": "command",
                 }[kind]
                 if surface_type != expected_surface_type:
                     raise ValueError(
                         "ops.study.yaml preflight.checks."
                         f"{phase_id} entry {check_id} requires surface {surface!r} to use "
                         f"surface_type {expected_surface_type!r}: {contract_path}"
+                    )
+            if kind == "infer_sequence_view_completion":
+                expected = spec.get("expected")
+                if expected is not None and not isinstance(expected, dict):
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} expected must be a mapping when defined: {contract_path}"
                     )
             if kind == "environment":
                 vars_payload = spec.get("vars")

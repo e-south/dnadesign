@@ -116,6 +116,97 @@ def test_resolve_tool_events_path_infer_from_single_usr_writeback_job(tmp_path: 
     assert policy == "infer"
 
 
+def test_resolve_tool_events_path_infer_from_single_sequence_view_dataset(tmp_path: Path) -> None:
+    config = tmp_path / "infer_sequence_views.yaml"
+    usr_root = tmp_path / "usr_root"
+    config.write_text(
+        "\n".join(
+            [
+                "model:",
+                "  id: evo2_7b",
+                "  device: cpu",
+                "  precision: fp32",
+                "  alphabet: dna",
+                "jobs:",
+                "  - id: anchor_sequence_views_7b",
+                "    operation: extract",
+                "    ingest:",
+                "      source: records",
+                "      field: sequence",
+                "    feature_bundle:",
+                "      intermediate_block: 26",
+                "      collect_log_likelihood: false",
+                "      collect_output_layer_mean: false",
+                "      collect_intermediate_embedding: true",
+                "      sequence_view_inputs:",
+                "        - dataset: usr_prom_eth_cip_anchor",
+                f"          root: {usr_root}",
+                "          view_selector:",
+                "            product_kind: construct_insert",
+                "          pooling:",
+                "            operation: seq_mean",
+                "    io:",
+                "      write_back: false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    events_path, policy = resolve_tool_events_path(tool="infer", config=config)
+
+    assert events_path == (usr_root / "usr_prom_eth_cip_anchor" / ".events.log").resolve()
+    assert policy == "infer"
+
+
+def test_resolve_tool_events_path_infer_rejects_multi_dataset_sequence_view_config(tmp_path: Path) -> None:
+    config = tmp_path / "infer_sequence_views.yaml"
+    usr_root = tmp_path / "usr_root"
+    config.write_text(
+        "\n".join(
+            [
+                "model:",
+                "  id: evo2_7b",
+                "  device: cpu",
+                "  precision: fp32",
+                "  alphabet: dna",
+                "jobs:",
+                "  - id: main_sequence_views_7b",
+                "    operation: extract",
+                "    ingest:",
+                "      source: records",
+                "      field: sequence",
+                "    feature_bundle:",
+                "      intermediate_block: 26",
+                "      collect_log_likelihood: false",
+                "      collect_output_layer_mean: false",
+                "      collect_intermediate_embedding: true",
+                "      sequence_view_inputs:",
+                "        - dataset: usr_prom_eth_cip_anchor",
+                f"          root: {usr_root}",
+                "          view_selector:",
+                "            product_kind: construct_insert",
+                "          pooling:",
+                "            operation: seq_mean",
+                "        - dataset: construct_prom_eth_cip_context",
+                f"          root: {usr_root}",
+                "          view_selector:",
+                "            product_kind: realized_context",
+                "          pooling:",
+                "            operation: anchor_mean",
+                "            bounds_from: sequence_view",
+                "    io:",
+                "      write_back: false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(NotifyConfigError, match="multiple sequence-view event sources"):
+        resolve_tool_events_path(tool="infer", config=config)
+
+
 def test_resolve_tool_events_path_infer_requires_explicit_root_even_with_env(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "infer.yaml"
     usr_root = tmp_path / "env_usr_root"

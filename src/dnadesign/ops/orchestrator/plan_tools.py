@@ -13,9 +13,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Literal
+
+import yaml
 
 from dnadesign.infer import validate_runbook_gpu_resources
 
@@ -329,31 +332,78 @@ def _infer_preflight_commands(
     infer_env["CUDA_MODULE"] = runbook.infer.cuda_module
     infer_env["GCC_MODULE"] = runbook.infer.gcc_module
 
-    return (
+    commands = [
         _tool_ops_gate(*infer_overlay_guard_parts),
-        _tool_argv("uv", "run", "infer", "run", "--config", config, "--dry-run"),
-        _tool_argv(
-            "qsub",
-            "-verify",
-            "-P",
-            runbook.project,
-            "-o",
-            stdout_file,
-            "-pe",
-            "omp",
-            str(runbook.resources.pe_omp),
-            "-l",
-            f"h_rt={runbook.resources.h_rt}",
-            "-l",
-            f"mem_per_core={runbook.resources.mem_per_core}",
-            *_infer_scheduler_resource_parts(runbook),
-            "-v",
-            _qsub_export_names(infer_env),
-            infer_template,
-            env=infer_env,
-        ),
-        _tool_ops_gate("qa-submit-preflight", "--template", infer_template),
+    ]
+    if _infer_config_uses_sequence_view_inputs(Path(runbook.infer.config)):
+        commands.append(
+            _tool_argv(
+                "uv",
+                "run",
+                "infer",
+                "validate",
+                "sequence-view-completion",
+                "--config",
+                config,
+                "--format",
+                "json",
+                "--max-missing-products",
+                "0",
+                "--max-stale-vectors",
+                "0",
+            )
+        )
+    commands.extend(
+        (
+            _tool_argv("uv", "run", "infer", "run", "--config", config, "--dry-run"),
+            _tool_argv(
+                "qsub",
+                "-verify",
+                "-P",
+                runbook.project,
+                "-o",
+                stdout_file,
+                "-pe",
+                "omp",
+                str(runbook.resources.pe_omp),
+                "-l",
+                f"h_rt={runbook.resources.h_rt}",
+                "-l",
+                f"mem_per_core={runbook.resources.mem_per_core}",
+                *_infer_scheduler_resource_parts(runbook),
+                "-v",
+                _qsub_export_names(infer_env),
+                infer_template,
+                env=infer_env,
+            ),
+            _tool_ops_gate("qa-submit-preflight", "--template", infer_template),
+        )
     )
+    return tuple(commands)
+
+
+def _infer_config_uses_sequence_view_inputs(config_path: Path) -> bool:
+    try:
+        payload = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"infer config is not readable: {config_path}") from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(f"infer config is not valid yaml: {config_path}") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"infer config root must be a mapping: {config_path}")
+    jobs = payload.get("jobs") or ()
+    if not isinstance(jobs, list):
+        return False
+    for job in jobs:
+        if not isinstance(job, Mapping):
+            continue
+        feature_bundle = job.get("feature_bundle")
+        if not isinstance(feature_bundle, Mapping):
+            continue
+        sequence_view_inputs = feature_bundle.get("sequence_view_inputs")
+        if isinstance(sequence_view_inputs, list) and sequence_view_inputs:
+            return True
+    return False
 
 
 def _densegen_submit_commands(
