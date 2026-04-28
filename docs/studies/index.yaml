@@ -8,6 +8,10 @@ studies:
     family: promoter
     title: Stress / ethanol / ciprofloxacin growth study
     record_root: docs/studies/stress_ethanol_cipro_growth
+  - study_id: regulondb_native_promoter_panel
+    family: promoter
+    title: RegulonDB native promoter panel
+    record_root: docs/studies/regulondb_native_promoter_panel
   # Named Cruncher study. Pin `--study-dir docs/studies/snapback_shortening_effort`
   # for snapback questions instead of assuming the repo-wide active study matches.
   - study_id: snapback_shortening_effort

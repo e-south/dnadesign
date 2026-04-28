@@ -1,0 +1,47 @@
+version: 1
+study_id: regulondb_native_promoter_panel
+
+intent:
+  primary_goal: Build one provenance-qualified native RegulonDB promoter USR dataset with one canonical sequence row per deduplicated promoter sequence and relation sidecars for source-specific metadata.
+  primary_lane: native_regulondb_promoter_source
+  operator_question: Does the fixed promoter superset pass local generated-dataset validation for sequence uniqueness, strict DNA content, retained metadata completeness, sigma annotation, skipped/excluded-row provenance, and fuzzy name-review signals?
+  non_goals:
+    - production live sync
+    - pDual context construction before native/full and core60 validation
+    - changes to stress_ethanol_cipro_growth
+    - sparse source-specific columns on USR base records
+    - treating computational prediction rows as curated promoter truth
+  context_refs:
+    - docs/studies/regulondb_native_promoter_panel/status.md
+  decision_refs:
+    - docs/studies/regulondb_native_promoter_panel/routes.md
+
+command_groups:
+  - id: usr_dry_run
+    purpose: Validate a fixed Cruncher promoter export without writing a USR dataset.
+    workspace_ref: src/dnadesign/usr
+    validation_role: read_only_probe
+    commands:
+      - uv run python src/dnadesign/usr/scripts/create_regulondb_native_promoters.py --export-dir <cruncher-promoter-export-dir>
+  - id: usr_committed_import
+    purpose: Create local usr_regulondb_native_promoters after the dry-run report passes; keep the generated dataset root out of git.
+    workspace_ref: src/dnadesign/usr
+    validation_role: mutating_import
+    commands:
+      - uv run python src/dnadesign/usr/scripts/create_regulondb_native_promoters.py --export-dir <cruncher-promoter-export-dir> --write
+      - uv run usr validate usr_regulondb_native_promoters --strict
+
+native_agent_bootstrap:
+  open_first:
+    - manifest:status.md
+    - manifest:routes.md
+    - manifest:pipeline.yaml
+  pair_with:
+    - code-change-discipline
+  must_preserve:
+    - Cruncher exports normalized source records only.
+    - USR imports from a fixed export and defaults to dry-run.
+    - Native RegulonDB imports never write sig35_variant.
+    - usr_regulondb_native_promoters remains the single USR dataset for the strict deduplicated native promoter superset.
+    - Generated USR parquet artifacts remain untracked; study docs record provenance and validation evidence.
+    - Source provenance remains visible for RegulonDB 13, live RegulonDB 14.5, RegulonDB 13 sigmulon, RegulonDB 11 curated/HT/prediction, and EcoCyc 28 rows.

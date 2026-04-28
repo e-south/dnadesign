@@ -1,0 +1,60 @@
+study_id: regulondb_native_promoter_panel
+usr_remotes_path: n/a
+datasets:
+  - role: native_promoter_source
+    dataset: usr_regulondb_native_promoters
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: local_validated_untracked
+    lifecycle: source
+    owner_tool: usr
+    onboard_mode: create_new
+    authority: shared
+    notes: Local generated native reference dataset created from a deterministic Cruncher promoter superset export. The dataset id is intentionally stable, but the source scope is a strict deduplicated native promoter panel, not a live-only RegulonDB route dump. The current base rows are drawn from release-pinned RegulonDB 13 PromoterSet.tsv and historical RegulonDB 11 PromoterSet.csv source rows that have strict ACGT sequence and sigma evidence after sequence-level grouping. Live RegulonDB 14.5 GraphQL promoter route rows are documented as a modern overlay/source-completeness check, while RegulonDB 13 sigmulon, RegulonDB 11 RACE/454, RegulonDB 11 prediction rows, and EcoCyc 28 promoter SmartTable rows remain inventoried/deferred strata. The dataset keeps one canonical sequence row per deduplicated retained sequence and places source identities, skipped rows, excluded no-sigma rows, sigma affiliations, coordinates, predictions, evidence, citations, boxes, and other many-to-many metadata in relation sidecars. The generated dataset root is intentionally ignored by git and should be moved through USR data sync rather than committed.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: native_full_features_7b
+    dataset: infer_regulondb_native_promoter_views_7b
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: infer
+    onboard_mode: create_new
+    authority: shared
+    notes: Planned Evo2 7B native/full promoter feature surface. This remains blocked on validated USR import.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: native_core60_view
+    dataset: usr_regulondb_native_promoter_core60
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: usr
+    onboard_mode: create_new
+    authority: shared
+    notes: Planned derived TSS/core view. The derivation rule is deliberately deferred until source TSS and strand coverage are validated.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
