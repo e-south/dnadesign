@@ -20,6 +20,12 @@ from dnadesign.cruncher.ingest.models import (
     SiteInstance,
     SiteQuery,
 )
+from dnadesign.cruncher.ingest.promoters import (
+    PromoterDescriptor,
+    PromoterExportManifest,
+    PromoterQuery,
+    PromoterRecord,
+)
 
 
 class SourceAdapter(Protocol):
@@ -38,3 +44,17 @@ class SourceAdapter(Protocol):
     def get_sites_for_motif(self, motif_id: str, query: SiteQuery) -> Iterable[SiteInstance]: ...
 
     def list_datasets(self, query: DatasetQuery) -> list[DatasetDescriptor]: ...
+
+
+class PromoterSourceAdapter(Protocol):
+    source_id: str
+
+    def capabilities(self) -> Set[str]: ...
+
+    def list_promoters(self, query: PromoterQuery) -> Iterable[PromoterDescriptor]: ...
+
+    def iter_promoters(self, query: PromoterQuery) -> Iterable[PromoterRecord]: ...
+
+    def get_promoter(self, query: PromoterQuery) -> PromoterRecord: ...
+
+    def export_promoters(self, query: PromoterQuery, destination) -> PromoterExportManifest: ...
