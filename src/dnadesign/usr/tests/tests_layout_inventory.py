@@ -203,6 +203,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_layout.py",
         "test_dedupe.py",
         "test_duckdb_session_contract.py",
+        "test_event_log_gardening.py",
         "test_events_schema.py",
         "test_genbank_import.py",
         "test_import_strict.py",
