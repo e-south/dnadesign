@@ -81,20 +81,26 @@ Sequence-view rules:
   to make that alias possible
 - view-aware bundles persist feature aliases under `_derived/infer/feature_aliases.parquet`
 - view-aware bundles persist reusable feature vectors under `_derived/infer/feature_vectors.parquet`
+- view-aware bundles persist log-likelihood scalar aliases under
+  `_derived/infer/feature_scalar_aliases.parquet`
+- view-aware bundles persist reusable log-likelihood scalar values under
+  `_derived/infer/feature_scalars.parquet`
 - `infer` consumes sequence views; it does not manufacture missing
   `analysis_window` or `realized_context` rows
 - missing required product kinds are a Construct/USR completion problem; the
   completion planner reports them as `missing_products` before model execution
 - Before large backfills, run `uv run infer validate sequence-view-completion
-  --config <config.yaml> --format json` to classify vectors as reusable, stale,
-  missing, or product-missing without loading the model. Sequence-view `root`
-  values resolve relative to the config file directory. Legacy row-based overlays
-  are reusable only when the planner can match the requested feature identity;
-  otherwise they remain stale or unclassified instead of being silently trusted.
-- Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0` to
-  fail before submit when required sequence products are absent or existing
-  vectors are stale. Do not set `--max-missing-vectors 0` for a lane whose
-  purpose is to generate missing feature vectors.
+  --config <config.yaml> --format json` to classify vectors and scalars as
+  reusable, stale, missing, or product-missing without loading the model.
+  Sequence-view `root` values resolve relative to the config file directory.
+  Legacy row-based overlays are reusable only when the planner can match the
+  requested feature identity; otherwise they remain stale or unclassified
+  instead of being silently trusted.
+- Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0
+  --max-stale-scalars 0` to fail before submit when required sequence products
+  are absent or existing vector/scalar sidecars are stale. Do not set
+  `--max-missing-vectors 0` or `--max-missing-scalars 0` for a lane whose
+  purpose is to generate missing features.
 - To preserve compatible old row-overlay vectors under the newer sidecar
   contract, run `uv run infer migrate legacy-overlay-aliases --config
   <sequence-view-config.yaml> --job <sequence-view-job-id> --legacy-job-id

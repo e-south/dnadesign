@@ -13,8 +13,8 @@ jobs:
       field: sequence
     feature_bundle:
       intermediate_block: 26
-      collect_log_likelihood: false
-      collect_output_layer_mean: false
+      collect_log_likelihood: true
+      collect_output_layer_mean: true
       collect_intermediate_embedding: true
       sequence_view_inputs:
         - dataset: construct_prom_eth_cip_reference_core60
@@ -28,17 +28,24 @@ jobs:
       write_back: false
       overwrite: false
 
-  - id: reference_context_forward_anchor_mean_7b
+  - id: reference_context_forward_seq_and_anchor_mean_7b
     operation: extract
     ingest:
       source: records
       field: sequence
     feature_bundle:
       intermediate_block: 26
-      collect_log_likelihood: false
-      collect_output_layer_mean: false
+      collect_log_likelihood: true
+      collect_output_layer_mean: true
       collect_intermediate_embedding: true
       sequence_view_inputs:
+        - dataset: construct_prom_eth_cip_reference_contexts
+          root: ../../../usr/datasets
+          view_selector:
+            product_kind: realized_context
+            orientation: forward
+          pooling:
+            operation: seq_mean
         - dataset: construct_prom_eth_cip_reference_contexts
           root: ../../../usr/datasets
           view_selector:
@@ -51,17 +58,24 @@ jobs:
       write_back: false
       overwrite: false
 
-  - id: reference_context_reverse_complement_anchor_mean_7b
+  - id: reference_context_reverse_complement_seq_and_anchor_mean_7b
     operation: extract
     ingest:
       source: records
       field: sequence
     feature_bundle:
       intermediate_block: 26
-      collect_log_likelihood: false
-      collect_output_layer_mean: false
+      collect_log_likelihood: true
+      collect_output_layer_mean: true
       collect_intermediate_embedding: true
       sequence_view_inputs:
+        - dataset: construct_prom_eth_cip_reference_contexts
+          root: ../../../usr/datasets
+          view_selector:
+            product_kind: realized_context
+            orientation: reverse_complement
+          pooling:
+            operation: seq_mean
         - dataset: construct_prom_eth_cip_reference_contexts
           root: ../../../usr/datasets
           view_selector:

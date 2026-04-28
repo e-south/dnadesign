@@ -14,9 +14,15 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 
-from .aliases import load_feature_alias_ids, load_feature_vector_keys
+from .aliases import (
+    load_feature_alias_ids,
+    load_feature_scalar_alias_ids,
+    load_feature_scalar_keys,
+    load_feature_vector_keys,
+)
 from .contracts import PromoterFeatureBundleConfig
 from .execution import (
+    _sequence_view_feature_scalar_specs,
     _sequence_view_feature_vector_specs,
     build_feature_metadata_rows,
 )
@@ -37,13 +43,20 @@ class FeatureCompletionPlan:
     model_family: str
     required_views: int
     required_vectors: int
+    required_scalars: int
     existing_vectors: int
+    existing_scalars: int
     reusable_vectors: int
+    reusable_scalars: int
     stale_vectors: int
+    stale_scalars: int
     missing_vectors: int
+    missing_scalars: int
     missing_products: int
     persisted_vector_reusable: int
+    persisted_scalar_reusable: int
     existing_aliases: int
+    existing_scalar_aliases: int
     by_product_kind: dict[str, int]
     by_orientation: dict[str, int]
     by_pooling_operation: dict[str, int]
@@ -87,6 +100,14 @@ def _group_required_keys_by_dataset(specs: list[dict[str, object]]) -> dict[tupl
     return keys_by_dataset
 
 
+def _group_required_scalar_keys_by_dataset(specs: list[dict[str, object]]) -> dict[tuple[str, str], set[str]]:
+    keys_by_dataset: dict[tuple[str, str], set[str]] = {}
+    for spec in specs:
+        dataset_key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        keys_by_dataset.setdefault(dataset_key, set()).add(str(spec["feature_scalar_key"]))
+    return keys_by_dataset
+
+
 def _persisted_feature_vector_keys(specs: list[dict[str, object]]) -> set[str]:
     existing: set[str] = set()
     for (dataset_root, dataset_id), keys in _group_required_keys_by_dataset(specs).items():
@@ -95,10 +116,25 @@ def _persisted_feature_vector_keys(specs: list[dict[str, object]]) -> set[str]:
     return existing
 
 
+def _persisted_feature_scalar_keys(specs: list[dict[str, object]]) -> set[str]:
+    existing: set[str] = set()
+    for (dataset_root, dataset_id), keys in _group_required_scalar_keys_by_dataset(specs).items():
+        loaded = load_feature_scalar_keys(dataset_root=dataset_root, dataset_id=dataset_id, keys=keys)
+        existing.update(loaded)
+    return existing
+
+
 def _existing_alias_ids(specs: list[dict[str, object]]) -> set[str]:
     alias_ids: set[str] = set()
     for dataset_root, dataset_id in _group_required_keys_by_dataset(specs):
         alias_ids.update(load_feature_alias_ids(dataset_root=dataset_root, dataset_id=dataset_id))
+    return alias_ids
+
+
+def _existing_scalar_alias_ids(specs: list[dict[str, object]]) -> set[str]:
+    alias_ids: set[str] = set()
+    for dataset_root, dataset_id in _group_required_scalar_keys_by_dataset(specs):
+        alias_ids.update(load_feature_scalar_alias_ids(dataset_root=dataset_root, dataset_id=dataset_id))
     return alias_ids
 
 
@@ -122,6 +158,11 @@ def plan_sequence_view_feature_completion(
         bundle=bundle,
         selector=selector.intermediate_selector,
     )
+    scalar_specs = _sequence_view_feature_scalar_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+    )
 
     persisted_keys = _persisted_feature_vector_keys(specs)
     persisted_reusable = 0
@@ -133,6 +174,16 @@ def plan_sequence_view_feature_completion(
             continue
         missing += 1
 
+    persisted_scalar_keys = _persisted_feature_scalar_keys(scalar_specs)
+    persisted_scalar_reusable = 0
+    missing_scalars = 0
+    for spec in scalar_specs:
+        key = str(spec["feature_scalar_key"])
+        if key in persisted_scalar_keys:
+            persisted_scalar_reusable += 1
+            continue
+        missing_scalars += 1
+
     product_counts = Counter(str(context.product_kind) for context in contexts if context.product_kind is not None)
     orientation_counts = Counter(
         str(context.orientation or context.anchor_orientation or "forward") for context in contexts
@@ -143,7 +194,7 @@ def plan_sequence_view_feature_completion(
     ]
     commands = FeatureCompletionCommands(
         construct_completion=construct_completion,
-        infer_backfill=[infer_command] if infer_command and missing else [],
+        infer_backfill=[infer_command] if infer_command and (missing or missing_scalars) else [],
     )
     return FeatureCompletionPlan(
         dataset=_dataset_label(records, missing_product_selectors=missing_product_selectors),
@@ -151,13 +202,20 @@ def plan_sequence_view_feature_completion(
         model_family=model_id,
         required_views=len(contexts),
         required_vectors=len(specs),
+        required_scalars=len(scalar_specs),
         existing_vectors=persisted_reusable,
+        existing_scalars=persisted_scalar_reusable,
         reusable_vectors=persisted_reusable,
+        reusable_scalars=persisted_scalar_reusable,
         stale_vectors=0,
+        stale_scalars=0,
         missing_vectors=missing,
+        missing_scalars=missing_scalars,
         missing_products=len(missing_product_selectors),
         persisted_vector_reusable=persisted_reusable,
+        persisted_scalar_reusable=persisted_scalar_reusable,
         existing_aliases=len(_existing_alias_ids(specs)),
+        existing_scalar_aliases=len(_existing_scalar_alias_ids(scalar_specs)),
         by_product_kind=dict(sorted(product_counts.items())),
         by_orientation=dict(sorted(orientation_counts.items())),
         by_pooling_operation=dict(sorted(pooling_counts.items())),

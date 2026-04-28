@@ -1676,13 +1676,20 @@ def test_promoter_study_status_reports_sequence_view_and_infer_completion_summar
                     "model_family": "evo2_7b",
                     "required_views": 4,
                     "required_vectors": 4,
+                    "required_scalars": 4,
                     "existing_vectors": 2,
+                    "existing_scalars": 0,
                     "reusable_vectors": 1,
+                    "reusable_scalars": 0,
                     "stale_vectors": 1,
+                    "stale_scalars": 0,
                     "missing_vectors": 2,
+                    "missing_scalars": 4,
                     "missing_products": 0,
                     "persisted_vector_reusable": 0,
+                    "persisted_scalar_reusable": 0,
                     "existing_aliases": 0,
+                    "existing_scalar_aliases": 0,
                     "by_product_kind": {"realized_context": 4},
                     "by_orientation": {"forward": 2, "reverse_complement": 2},
                     "by_pooling_operation": {"anchor_mean": 4},
@@ -1701,7 +1708,8 @@ def test_promoter_study_status_reports_sequence_view_and_infer_completion_summar
         assert state == "ok"
         assert "sequence-view product contracts 1/1 ok" in summary
         assert "infer sequence-view feature completion checks 0/1 ok" in summary
-        assert "reusable=1 stale=1 missing=2 missing_products=0" in summary
+        assert "reusable_vectors=1 stale_vectors=1 missing_vectors=2" in summary
+        assert "reusable_scalars=0 stale_scalars=0 missing_scalars=4 missing_products=0" in summary
         assert evidence["sequence_view_contract_state"]["state"] == "ok"
         assert evidence["sequence_view_contract_state"]["checks"][0]["counts_by_orientation"] == {
             "forward": 2,
@@ -1771,13 +1779,20 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
                         "model_family": "evo2_7b",
                         "required_views": 2,
                         "required_vectors": 4,
+                        "required_scalars": 4,
                         "existing_vectors": 2,
+                        "existing_scalars": 0,
                         "reusable_vectors": 1,
+                        "reusable_scalars": 0,
                         "stale_vectors": 1,
+                        "stale_scalars": 0,
                         "missing_vectors": 2,
+                        "missing_scalars": 4,
                         "missing_products": 0,
                         "persisted_vector_reusable": 0,
+                        "persisted_scalar_reusable": 0,
                         "existing_aliases": 0,
+                        "existing_scalar_aliases": 0,
                         "by_product_kind": {"construct_insert": 2},
                         "by_orientation": {"forward": 2},
                         "by_pooling_operation": {"seq_mean": 2},
@@ -1807,13 +1822,18 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
         assert check["kind"] == "infer_sequence_view_completion"
         assert check["state"] == "attention"
         assert check["summary"] == (
-            "Anchor sequence-view feature completion is classified. reusable=1 stale=1 missing=2 missing_products=0."
+            "Anchor sequence-view feature completion is classified. reusable_vectors=1 stale_vectors=1 "
+            "missing_vectors=2 reusable_scalars=0 stale_scalars=0 missing_scalars=4 missing_products=0."
         )
         assert check["details"]["required_views"] == 2
         assert check["details"]["required_vectors"] == 4
+        assert check["details"]["required_scalars"] == 4
         assert check["details"]["reusable_vectors"] == 1
+        assert check["details"]["reusable_scalars"] == 0
         assert check["details"]["stale_vectors"] == 1
+        assert check["details"]["stale_scalars"] == 0
         assert check["details"]["missing_vectors"] == 2
+        assert check["details"]["missing_scalars"] == 4
         assert check["details"]["missing_products"] == 0
         assert check["details"]["counts_by_product_kind"] == {"construct_insert": 2}
         assert check["details"]["counts_by_orientation"] == {"forward": 2}

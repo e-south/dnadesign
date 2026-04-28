@@ -21,8 +21,8 @@ Configs:
 - `config.sequence_views.main.evo2_7b.yaml`
 - `config.sequence_views.reference.evo2_7b.yaml`
 - `config.sequence_views.anchor_construct_insert.evo2_7b.yaml`
-- `config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml`
-- `config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml`
+- `config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml`
+- `config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml`
 - `config.yaml` points at the default 7B full-lane set
 
 Operational unit:
@@ -30,11 +30,15 @@ Operational unit:
 - treat one sequence-view config as one operational unit for real study work:
   one sequence-view dataset, one watcher, one feature-sidecar write surface
 - use `config.sequence_views.anchor_construct_insert.evo2_7b.yaml`,
-  `config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml`, and
-  `config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml`
+  `config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml`, and
+  `config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml`
   for cold-start, notify, and resumable batch work
 - keep the multi-job sequence-view config for completion planning; it is not
   the live Notify default because it spans multiple USR event streams
+- every 7B sequence-view lane collects intermediate embeddings, mean-pooled
+  output-layer logits, and log-likelihoods. Context lanes select both full
+  sequence `seq_mean` and bounded `anchor_mean` pooling in the same job so one
+  Evo2 forward pass can serve both vector spans. Concat is not an Infer target.
 
 Portable preflight:
 
@@ -43,10 +47,10 @@ uv run infer validate config \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
 
 uv run infer validate config \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
 
 uv run infer validate config \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
 
 uv run infer validate config \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
@@ -56,10 +60,11 @@ uv run infer validate sequence-view-completion \
   --format json
 
 uv run infer validate sequence-view-completion \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml \
   --format json \
   --max-missing-products 0 \
-  --max-stale-vectors 0
+  --max-stale-vectors 0 \
+  --max-stale-scalars 0
 
 uv run notify setup resolve-events \
   --tool infer \
@@ -84,7 +89,7 @@ uv run infer migrate legacy-overlay-aliases \
 
 uv run infer migrate legacy-overlay-aliases \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml \
-  --job context_forward_anchor_mean_7b \
+  --job context_forward_seq_and_anchor_mean_7b \
   --legacy-job-id template_1kb_7b_features \
   --max-views 100 \
   --format json
@@ -94,16 +99,20 @@ Omit `--max-views` for a full metadata-only dry-run. Add `--verify-payloads` if
 the dry-run must read embedding payloads before write. Add `--write` only for a
 deliberate generated-data backfill run after the reusable, missing, and
 orientation-blocked counts match expectations.
+The historical 7B forward-context row overlay only backfills the forward
+`anchor_mean` intermediate vectors. It is not evidence for full-context
+`seq_mean`, output-layer mean, log-likelihood, or reverse-complement coverage.
 
 The multi-job sequence-view completion configs are planning surfaces, not live
 Notify units. They classify reusable, stale, missing, and product-missing work
 for `construct_insert`, forward `realized_context`, reverse-complement
 `realized_context`, and reference `analysis_window` views without loading Evo2.
 The lane-specific sequence-view runbooks also render this completion planner as
-a pre-submit gate with `--max-missing-products 0 --max-stale-vectors 0`. Missing
-feature vectors are allowed there because they are the work the batch is meant
-to compute; missing sequence products or stale vectors are not allowed to slip
-through as a submit-ready plan.
+a pre-submit gate with `--max-missing-products 0 --max-stale-vectors 0
+--max-stale-scalars 0`. Missing feature vectors and log-likelihood scalars are
+allowed there because they are the work the batch is meant to compute; missing
+sequence products, stale vectors, or stale scalar sidecars are not allowed to
+slip through as a submit-ready plan.
 The local generated `_views/sequence_views.parquet` sidecars now use the generic
 product-kind vocabulary. Completion checks will still report attention until
 compatible old row-overlay vectors are migrated into feature alias/vector
@@ -119,11 +128,11 @@ uv run ops runbook plan \
   --repo-root <repo-root>
 
 uv run ops runbook plan \
-  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml \
+  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml \
   --repo-root <repo-root>
 
 uv run ops runbook plan \
-  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml \
+  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml \
   --repo-root <repo-root>
 ```
 
@@ -166,13 +175,13 @@ uv run notify setup slack \
 
 uv run notify setup slack \
   --tool infer \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml \
   --secret-source file \
   --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
 
 uv run notify setup slack \
   --tool infer \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml \
   --secret-source file \
   --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
 

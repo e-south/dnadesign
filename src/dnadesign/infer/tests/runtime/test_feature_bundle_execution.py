@@ -23,7 +23,11 @@ from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.contracts import infer_usr_column_name
 from dnadesign.infer.src.engine import run_extract_job
 from dnadesign.infer.src.errors import CapabilityError, RuntimeOOMError
-from dnadesign.infer.src.features.aliases import FEATURE_ALIAS_RELATIVE_PATH
+from dnadesign.infer.src.features.aliases import (
+    FEATURE_ALIAS_RELATIVE_PATH,
+    FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
+    FEATURE_SCALAR_RELATIVE_PATH,
+)
 from dnadesign.infer.src.features.context import resolve_sequence_contexts
 from dnadesign.infer.src.features.execution import (
     _LOG_LIKELIHOOD_MEAN,
@@ -936,6 +940,15 @@ def test_run_extract_job_sequence_view_anchor_mean_uses_full_context_and_emitted
     _assert_list_close(out["output_layer_mean__anchor_mean"][1], [11.0, 12.0])
     _assert_list_close(out["intermediate_embedding__block26_mlp_out__anchor_mean"][0], [28.5, 29.5, 30.5])
     _assert_list_close(out["intermediate_embedding__block26_mlp_out__anchor_mean"][1], [16.5, 17.5, 18.5])
+
+    scalar_alias_table = pq.read_table(dataset.dir / FEATURE_SCALAR_ALIAS_RELATIVE_PATH).to_pylist()
+    scalar_table = pq.read_table(dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).to_pylist()
+    assert len(scalar_alias_table) == 4
+    assert len(scalar_table) == 4
+    assert {row["scalar_kind"] for row in scalar_alias_table} == {
+        "log_likelihood__total",
+        "log_likelihood__mean_per_token",
+    }
 
 
 def test_run_extract_job_feature_bundle_sequence_view_alias_map_is_idempotent(

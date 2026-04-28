@@ -13,8 +13,8 @@ jobs:
       field: sequence
     feature_bundle:
       intermediate_block: 26
-      collect_log_likelihood: false
-      collect_output_layer_mean: false
+      collect_log_likelihood: true
+      collect_output_layer_mean: true
       collect_intermediate_embedding: true
       sequence_view_inputs:
         - dataset: usr_prom_eth_cip_anchor

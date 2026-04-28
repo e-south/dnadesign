@@ -114,10 +114,20 @@ def register(app: typer.Typer) -> None:
             "--max-missing-vectors",
             help="Fail if missing feature-vector count exceeds this threshold.",
         ),
+        max_missing_scalars: Optional[int] = typer.Option(
+            None,
+            "--max-missing-scalars",
+            help="Fail if missing feature-scalar count exceeds this threshold.",
+        ),
         max_stale_vectors: Optional[int] = typer.Option(
             None,
             "--max-stale-vectors",
             help="Fail if stale or unclassified feature-vector count exceeds this threshold.",
+        ),
+        max_stale_scalars: Optional[int] = typer.Option(
+            None,
+            "--max-stale-scalars",
+            help="Fail if stale or unclassified feature-scalar count exceeds this threshold.",
         ),
         max_missing_products: Optional[int] = typer.Option(
             None,
@@ -131,7 +141,9 @@ def register(app: typer.Typer) -> None:
             violations = _sequence_view_completion_threshold_violations(
                 plans=plans,
                 max_missing_vectors=max_missing_vectors,
+                max_missing_scalars=max_missing_scalars,
                 max_stale_vectors=max_stale_vectors,
+                max_stale_scalars=max_stale_scalars,
                 max_missing_products=max_missing_products,
             )
             if violations:
@@ -147,7 +159,9 @@ def register(app: typer.Typer) -> None:
                     "sequence-view-completion "
                     f"job={plan['bundle_id']} dataset={plan['dataset']} required_views={plan['required_views']} "
                     f"required_vectors={plan['required_vectors']} reusable={plan['reusable_vectors']} "
-                    f"stale={plan['stale_vectors']} missing={plan['missing_vectors']}"
+                    f"missing={plan['missing_vectors']} required_scalars={plan['required_scalars']} "
+                    f"reusable_scalars={plan['reusable_scalars']} missing_scalars={plan['missing_scalars']} "
+                    f"stale_vectors={plan['stale_vectors']} stale_scalars={plan['stale_scalars']}"
                 )
         except Exception as error:
             raise_cli_error(error)
@@ -157,12 +171,16 @@ def _sequence_view_completion_threshold_violations(
     *,
     plans: Sequence[Mapping[str, object]],
     max_missing_vectors: int | None,
+    max_missing_scalars: int | None,
     max_stale_vectors: int | None,
+    max_stale_scalars: int | None,
     max_missing_products: int | None,
 ) -> list[str]:
     thresholds = (
         ("missing_vectors", max_missing_vectors),
+        ("missing_scalars", max_missing_scalars),
         ("stale_vectors", max_stale_vectors),
+        ("stale_scalars", max_stale_scalars),
         ("missing_products", max_missing_products),
     )
     violations: list[str] = []

@@ -16,10 +16,14 @@ from pathlib import Path
 import pytest
 
 from dnadesign.infer.src.features import completion_planner
-from dnadesign.infer.src.features.aliases import persist_feature_vector_rows
+from dnadesign.infer.src.features.aliases import persist_feature_scalar_rows, persist_feature_vector_rows
 from dnadesign.infer.src.features.completion_planner import plan_sequence_view_feature_completion
 from dnadesign.infer.src.features.contracts import PromoterFeatureBundleConfig
-from dnadesign.infer.src.features.execution import _sequence_view_feature_vector_specs, build_feature_metadata_rows
+from dnadesign.infer.src.features.execution import (
+    _sequence_view_feature_scalar_specs,
+    _sequence_view_feature_vector_specs,
+    build_feature_metadata_rows,
+)
 from dnadesign.infer.src.features.selectors import resolve_intermediate_selector
 from dnadesign.infer.src.features.sequence_views import load_sequence_view_input_records, resolve_sequence_view_contexts
 from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
@@ -80,6 +84,30 @@ def test_sequence_view_completion_planner_reports_missing_vectors(tmp_path: Path
     assert plan.missing_vectors == 2
     assert plan.by_product_kind == {"analysis_window": 1}
     assert plan.by_pooling_operation == {"core60_mean": 1}
+
+
+def test_sequence_view_completion_planner_reports_missing_scalars(tmp_path: Path) -> None:
+    usr_root, dataset = _dataset_with_sequence_view(tmp_path)
+    bundle = PromoterFeatureBundleConfig(
+        collect_log_likelihood=True,
+        collect_output_layer_mean=False,
+        collect_intermediate_embedding=False,
+        sequence_view_inputs=[
+            {
+                "dataset": dataset,
+                "root": usr_root.as_posix(),
+                "view_selector": {"product_kind": "analysis_window"},
+                "pooling": {"operation": "core60_mean"},
+            }
+        ],
+    )
+
+    plan = plan_sequence_view_feature_completion(bundle=bundle, model_id="evo2_7b", job_id="reference_views")
+
+    assert plan.required_vectors == 0
+    assert plan.required_scalars == 2
+    assert plan.reusable_scalars == 0
+    assert plan.missing_scalars == 2
 
 
 def test_sequence_view_completion_planner_reports_missing_products(tmp_path: Path) -> None:
@@ -153,6 +181,50 @@ def test_sequence_view_completion_planner_reuses_persisted_feature_vectors(tmp_p
     assert plan.reusable_vectors == 2
     assert plan.persisted_vector_reusable == 2
     assert plan.missing_vectors == 0
+
+
+def test_sequence_view_completion_planner_reuses_persisted_feature_scalars(tmp_path: Path) -> None:
+    usr_root, dataset = _dataset_with_sequence_view(tmp_path)
+    bundle = PromoterFeatureBundleConfig(
+        collect_log_likelihood=True,
+        collect_output_layer_mean=False,
+        collect_intermediate_embedding=False,
+        sequence_view_inputs=[
+            {
+                "dataset": dataset,
+                "root": usr_root.as_posix(),
+                "view_selector": {"product_kind": "analysis_window"},
+                "pooling": {"operation": "core60_mean"},
+            }
+        ],
+    )
+    records = load_sequence_view_input_records(bundle=bundle)
+    contexts = resolve_sequence_view_contexts(records=records)
+    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id="evo2_7b")
+    specs = _sequence_view_feature_scalar_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+    )
+    persist_feature_scalar_rows(
+        [
+            {
+                "_dataset_root": spec["dataset_root"],
+                "_dataset_id": spec["dataset_id"],
+                "feature_scalar_key": spec["feature_scalar_key"],
+                "value": 1.25,
+                "created_at": metadata_rows[int(spec["row_index"])]["timestamp"],
+            }
+            for spec in specs
+        ]
+    )
+
+    plan = plan_sequence_view_feature_completion(bundle=bundle, model_id="evo2_7b", job_id="reference_views")
+
+    assert plan.required_scalars == 2
+    assert plan.reusable_scalars == 2
+    assert plan.persisted_scalar_reusable == 2
+    assert plan.missing_scalars == 0
 
 
 def test_sequence_view_completion_planner_uses_key_only_vector_inventory(

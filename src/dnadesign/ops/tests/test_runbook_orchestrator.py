@@ -1942,7 +1942,9 @@ jobs:
     assert "uv run infer validate sequence-view-completion --config" in preflight_block
     assert "--max-missing-products 0" in preflight_block
     assert "--max-stale-vectors 0" in preflight_block
+    assert "--max-stale-scalars 0" in preflight_block
     assert "--max-missing-vectors" not in preflight_block
+    assert "--max-missing-scalars" not in preflight_block
     assert "uv run infer run --config" in preflight_block
     assert "--dry-run" in preflight_block
 
@@ -4066,8 +4068,11 @@ def test_stress_ethanol_cipro_infer_presets_are_blackwell_pinned() -> None:
         "infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml",
         "infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml",
         "infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_sequence_views_context_forward_anchor_mean_7b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_anchor_mean_7b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml",
+        (
+            "infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b"
+            "_batch_with_notify.yaml"
+        ),
     ):
         payload = yaml.safe_load((preset_dir / preset_name).read_text(encoding="utf-8"))
         resources = payload["runbook"]["resources"]
@@ -4085,8 +4090,8 @@ def test_stress_ethanol_cipro_infer_configs_match_pressure_test_matrix() -> None
     config_dir = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "study_stress_ethanol_cipro"
     expected = {
         "config.sequence_views.anchor_construct_insert.evo2_7b.yaml": 128,
-        "config.sequence_views.context_forward_anchor_mean.evo2_7b.yaml": 128,
-        "config.sequence_views.context_reverse_complement_anchor_mean.evo2_7b.yaml": 128,
+        "config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml": 128,
+        "config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml": 128,
         "config.anchor_only.evo2_20b.yaml": 256,
         "config.anchor_plus_template.evo2_20b.yaml": 48,
     }

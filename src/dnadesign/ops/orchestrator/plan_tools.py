@@ -351,6 +351,8 @@ def _infer_preflight_commands(
                 "0",
                 "--max-stale-vectors",
                 "0",
+                "--max-stale-scalars",
+                "0",
             )
         )
     commands.extend(

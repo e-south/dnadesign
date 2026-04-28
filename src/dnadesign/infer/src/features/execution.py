@@ -23,8 +23,13 @@ from ..errors import CapabilityError, RuntimeOOMError
 from ..runtime.resume_planner import read_usr_columns
 from .aliases import (
     compute_feature_alias_id,
+    compute_feature_scalar_alias_id,
+    compute_feature_scalar_key,
+    load_feature_scalar_rows,
     load_feature_vector_rows,
     persist_feature_alias_rows,
+    persist_feature_scalar_alias_rows,
+    persist_feature_scalar_rows,
     persist_feature_vector_rows,
 )
 from .cache_keys import compute_feature_vector_key, compute_forward_pass_key
@@ -694,6 +699,62 @@ def _sequence_view_feature_alias_rows(
     return alias_rows
 
 
+def _feature_scalar_key_for_context(
+    *,
+    metadata: Mapping[str, object],
+    scalar_kind: str,
+) -> str:
+    return compute_feature_scalar_key(
+        forward_pass_key=str(metadata["forward_pass_key"]),
+        scalar_kind=scalar_kind,
+        dtype_or_storage_format="float64",
+    )
+
+
+def _sequence_view_feature_scalar_alias_rows(
+    *,
+    contexts: List[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    bundle: PromoterFeatureBundleConfig,
+    model_id: str,
+) -> list[dict[str, object]]:
+    if not bundle.deduplicate.write_alias_map or not bundle.collect_log_likelihood:
+        return []
+    alias_rows: list[dict[str, object]] = []
+    for context, metadata in zip(contexts, metadata_rows, strict=True):
+        if context.view_id is None or context.source_dataset_id is None or context.source_dataset_root is None:
+            continue
+        created_at = str(metadata["timestamp"])
+        for scalar_kind in (_LOG_LIKELIHOOD_TOTAL, _LOG_LIKELIHOOD_MEAN):
+            feature_scalar_key = _feature_scalar_key_for_context(metadata=metadata, scalar_kind=scalar_kind)
+            alias_rows.append(
+                {
+                    "_dataset_root": context.source_dataset_root,
+                    "_dataset_id": context.source_dataset_id,
+                    "alias_id": compute_feature_scalar_alias_id(
+                        view_id=context.view_id,
+                        sequence_id=context.sequence_id,
+                        feature_scalar_key=feature_scalar_key,
+                        scalar_kind=scalar_kind,
+                    ),
+                    "view_id": context.view_id,
+                    "view_name": context.view_name,
+                    "sequence_id": context.sequence_id,
+                    "feature_scalar_key": feature_scalar_key,
+                    "forward_pass_key": str(metadata["forward_pass_key"]),
+                    "provider": "evo2",
+                    "model_name": model_id,
+                    "model_revision": None,
+                    "scalar_kind": scalar_kind,
+                    "orientation": context.orientation or context.anchor_orientation or "forward",
+                    "source_dataset_id": context.source_dataset_id,
+                    "feature_request_digest": str(metadata["feature_request_digest"]),
+                    "created_at": created_at,
+                }
+            )
+    return alias_rows
+
+
 def _sequence_view_feature_vector_specs(
     *,
     contexts: List[SequenceContextRecord],
@@ -740,6 +801,31 @@ def _sequence_view_feature_vector_specs(
     return specs
 
 
+def _sequence_view_feature_scalar_specs(
+    *,
+    contexts: List[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    bundle: PromoterFeatureBundleConfig,
+) -> list[dict[str, object]]:
+    if not bundle.collect_log_likelihood:
+        return []
+    specs: list[dict[str, object]] = []
+    for row_index, (context, metadata) in enumerate(zip(contexts, metadata_rows, strict=True)):
+        if context.source_dataset_id is None or context.source_dataset_root is None:
+            continue
+        for out_id in (_LOG_LIKELIHOOD_TOTAL, _LOG_LIKELIHOOD_MEAN):
+            specs.append(
+                {
+                    "row_index": row_index,
+                    "out_id": out_id,
+                    "feature_scalar_key": _feature_scalar_key_for_context(metadata=metadata, scalar_kind=out_id),
+                    "dataset_root": context.source_dataset_root,
+                    "dataset_id": context.source_dataset_id,
+                }
+            )
+    return specs
+
+
 def _apply_persisted_sequence_view_vectors(
     *,
     all_vals: Dict[str, List[object]],
@@ -766,6 +852,32 @@ def _apply_persisted_sequence_view_vectors(
         all_vals[str(spec["out_id"])][int(spec["row_index"])] = value
 
 
+def _apply_persisted_sequence_view_scalars(
+    *,
+    all_vals: Dict[str, List[object]],
+    specs: list[dict[str, object]],
+) -> None:
+    keys_by_dataset: dict[tuple[str, str], set[str]] = {}
+    for spec in specs:
+        dataset_key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        keys_by_dataset.setdefault(dataset_key, set()).add(str(spec["feature_scalar_key"]))
+
+    loaded_by_dataset: dict[tuple[str, str], dict[str, float]] = {}
+    for (dataset_root, dataset_id), keys in keys_by_dataset.items():
+        loaded_by_dataset[(dataset_root, dataset_id)] = load_feature_scalar_rows(
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            keys=keys,
+        )
+
+    for spec in specs:
+        dataset_key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        value = loaded_by_dataset.get(dataset_key, {}).get(str(spec["feature_scalar_key"]))
+        if value is None:
+            continue
+        all_vals[str(spec["out_id"])][int(spec["row_index"])] = float(value)
+
+
 def _persist_sequence_view_feature_vectors(
     *,
     all_vals: Dict[str, List[object]],
@@ -789,6 +901,31 @@ def _persist_sequence_view_feature_vectors(
         )
     if rows:
         persist_feature_vector_rows(rows)
+
+
+def _persist_sequence_view_feature_scalars(
+    *,
+    all_vals: Dict[str, List[object]],
+    specs: list[dict[str, object]],
+    metadata_rows: list[dict[str, object]],
+) -> None:
+    rows: list[dict[str, object]] = []
+    for spec in specs:
+        row_index = int(spec["row_index"])
+        value = all_vals[str(spec["out_id"])][row_index]
+        if value is None:
+            continue
+        rows.append(
+            {
+                "_dataset_root": spec["dataset_root"],
+                "_dataset_id": spec["dataset_id"],
+                "feature_scalar_key": spec["feature_scalar_key"],
+                "value": float(value),
+                "created_at": str(metadata_rows[row_index]["timestamp"]),
+            }
+        )
+    if rows:
+        persist_feature_scalar_rows(rows)
 
 
 def _execute_sequence_view_feature_bundle(
@@ -822,13 +959,25 @@ def _execute_sequence_view_feature_bundle(
         bundle=bundle,
         selector=selector.intermediate_selector,
     )
+    scalar_specs = _sequence_view_feature_scalar_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+    )
     for spec in vector_specs:
+        all_vals.setdefault(str(spec["out_id"]), [None] * len(seqs))
+    for spec in scalar_specs:
         all_vals.setdefault(str(spec["out_id"]), [None] * len(seqs))
     if bundle.deduplicate.by_feature_vector_key:
         _apply_persisted_sequence_view_vectors(all_vals=all_vals, specs=vector_specs)
+    _apply_persisted_sequence_view_scalars(all_vals=all_vals, specs=scalar_specs)
     missing_feature_rows = {
         int(spec["row_index"]) for spec in vector_specs if all_vals[str(spec["out_id"])][int(spec["row_index"])] is None
     }
+    missing_scalar_rows = {
+        int(spec["row_index"]) for spec in scalar_specs if all_vals[str(spec["out_id"])][int(spec["row_index"])] is None
+    }
+    missing_feature_rows.update(missing_scalar_rows)
     if need_idx:
         need_idx = sorted(set(need_idx).intersection(missing_feature_rows))
     else:
@@ -844,8 +993,17 @@ def _execute_sequence_view_feature_bundle(
         )
         if alias_rows:
             persist_feature_alias_rows(alias_rows)
+        scalar_alias_rows = _sequence_view_feature_scalar_alias_rows(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            model_id=model_id,
+        )
+        if scalar_alias_rows:
+            persist_feature_scalar_alias_rows(scalar_alias_rows)
         if bundle.deduplicate.by_feature_vector_key:
             _persist_sequence_view_feature_vectors(all_vals=all_vals, specs=vector_specs, metadata_rows=metadata_rows)
+        _persist_sequence_view_feature_scalars(all_vals=all_vals, specs=scalar_specs, metadata_rows=metadata_rows)
         return {**all_vals, **metadata_columnar}, metadata_rows
 
     stable_eval_batch_size = None
@@ -964,8 +1122,17 @@ def _execute_sequence_view_feature_bundle(
     )
     if alias_rows:
         persist_feature_alias_rows(alias_rows)
+    scalar_alias_rows = _sequence_view_feature_scalar_alias_rows(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        model_id=model_id,
+    )
+    if scalar_alias_rows:
+        persist_feature_scalar_alias_rows(scalar_alias_rows)
     if bundle.deduplicate.by_feature_vector_key:
         _persist_sequence_view_feature_vectors(all_vals=all_vals, specs=vector_specs, metadata_rows=metadata_rows)
+    _persist_sequence_view_feature_scalars(all_vals=all_vals, specs=scalar_specs, metadata_rows=metadata_rows)
     return {**all_vals, **metadata_columnar}, metadata_rows
 
 
