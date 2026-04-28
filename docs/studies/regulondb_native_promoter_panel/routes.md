@@ -53,9 +53,14 @@ source stratum.
 - Write command: `uv run python src/dnadesign/usr/scripts/create_regulondb_native_promoters.py --export-dir <cruncher-promoter-export-dir> --write`
 - Route note: Dry-run is the default. Write mode refuses to overwrite an existing dataset. The generated dataset must have no duplicate canonical sequence rows, no duplicate source-alias rows, no non-ACGT sequence content, no orphan `usr_id` relation rows, and no sparse source-specific base columns.
 
-The USR import may create dense `regulondb__*` overlay summaries on
-`records.parquet`, but full provenance and high-cardinality facts remain in
+The USR import creates dense `regulondb__*` overlay summaries on
+`records.parquet`, source-record sequence views in
+`_views/sequence_views.parquet`, mutable provenance/cohort semantics in
+`_views/view_semantics.parquet`, and high-cardinality provenance facts in
 relation sidecars inside the same dataset root.
+Each retained native promoter sequence is exposed as
+`product_kind=source_record`, not as an `analysis_window`; downstream core60 or
+context views require an explicit derivation step.
 Rows from curated source tables that lack usable DNA sequence are preserved in
 `_relations/skipped_source_rows.parquet` rather than promoted to sequence base
 rows.

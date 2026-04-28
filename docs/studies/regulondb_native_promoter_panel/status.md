@@ -19,6 +19,7 @@
 - Declared phase: `metadata_overlay_validation`
 - Source export status: local Cruncher superset export validated; export artifacts are not checked in
 - USR dataset status: generated locally under `src/dnadesign/usr/datasets/usr_regulondb_native_promoters`; ignored by git and not committed
+- Sequence-view status: write mode now emits one `source_record` sequence view per retained native promoter sequence, plus mutable view semantics for `source_family`, `selection_basis`, `view_collections`, and `role_tags`
 - Preferred first infer family: `evo2_7b`
 
 ### Placement Boundary
@@ -62,6 +63,16 @@ bearing rows without sigma evidence are excluded from the strict base set; both
 classes remain visible in provenance sidecars with source, release, table, row
 reference, promoter identity, raw checksum, and reason.
 
+Sequence-view identity is intentionally generic. Retained native RegulonDB rows
+are exposed as `product_kind=source_record`, `context_kind=native_reference`,
+`orientation=unknown`, and `recommended_pooling=seq_mean`. The mutable
+`_views/view_semantics.parquet` addendum carries
+`source_family=regulondb_native_promoter`,
+`selection_basis=regulondb_curated_promoter_sequence_with_sigma`, and the
+`regulondb_native_promoter_panel` collection tag. These rows are not
+`analysis_window` products; core60 or context products must be derived later by
+an explicit Construct/USR derivation step.
+
 ### Guardrails
 
 - Cruncher owns RegulonDB source parsing and deterministic exports.
@@ -78,6 +89,8 @@ reference, promoter identity, raw checksum, and reason.
 ### Current Row Counts
 
 - `usr_regulondb_native_promoters`: 3,182 base rows (`local validated`, untracked)
+- `usr_regulondb_native_promoters/_views/sequence_views.parquet`: 3,182 `source_record` views expected after write-mode regeneration
+- `usr_regulondb_native_promoters/_views/view_semantics.parquet`: 3,182 mutable semantics rows expected after write-mode regeneration
 - `infer_regulondb_native_promoter_views_7b`: n/a (`planned`)
 - `usr_regulondb_native_promoter_core60`: n/a (`planned`)
 
@@ -96,7 +109,7 @@ source strata without turning them into sequence rows:
 - Sequence-bearing source rows excluded for missing sigma: 1,285 source rows, representing 645 sequence groups.
 - Same-release promoter-id sequence conflicts: 0.
 - Supplemental strata recorded but deferred from base-row creation: RegulonDB 13 sigmulon, RegulonDB 11 RACE/454, RegulonDB 11 prediction rows, and EcoCyc 28 promoter windows.
-- Local write-mode validation on 2026-04-28 created the single dataset layout with `records.parquet`, dense `regulondb__*` overlays, and `_relations/*.parquet` sidecars. The generated dataset path is ignored by git.
+- Local write-mode validation on 2026-04-28 created the single dataset layout with `records.parquet`, dense `regulondb__*` overlays, `_relations/*.parquet` provenance sidecars, and source-record sequence-view sidecars. The generated dataset path is ignored by git.
 
 ### Superset Fidelity Checks
 

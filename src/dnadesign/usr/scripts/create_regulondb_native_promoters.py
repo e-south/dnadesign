@@ -32,9 +32,17 @@ from dnadesign.cruncher.ingest.promoters import (
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.contracts import SchemaError, compute_id
 from dnadesign.usr.src.registry import arrow_type_from_str, load_registry, registry_entry
+from dnadesign.usr.src.sequence_views import (
+    SequenceViewRecord,
+    ViewSemanticsRecord,
+    write_sequence_views,
+    write_view_semantics,
+)
 from dnadesign.usr.src.storage.parquet import now_utc
 
 DEFAULT_OUTPUT_DATASET = "usr_regulondb_native_promoters"
+DEFAULT_STUDY_ID = "regulondb_native_promoter_panel"
+CREATED_BY = "dnadesign.usr.create_regulondb_native_promoters"
 REGULONDB_NAMESPACE = "regulondb"
 RELATIONS_DIRNAME = "_relations"
 _STRICT_DNA = set("ACGT")
@@ -258,6 +266,8 @@ class WriteResult:
     dataset_dir: str
     rows_written: int
     regulondb_overlay_rows: int
+    sequence_view_rows: int
+    view_semantics_rows: int
     relation_sidecars: dict[str, int]
 
 
@@ -1229,6 +1239,79 @@ def _write_relation_sidecars(dataset_dir: Path, relation_rows: Mapping[str, list
     return counts
 
 
+def _promoter_alias_ids_by_usr(relation_rows: Mapping[str, list[dict[str, object]]]) -> dict[str, list[str]]:
+    aliases_by_usr: dict[str, list[str]] = {}
+    seen_by_usr: dict[str, set[str]] = {}
+    for row in relation_rows.get("promoter_aliases", []):
+        usr_id = str(row.get("usr_id") or "").strip()
+        promoter_id = str(row.get("promoter_id") or "").strip()
+        if not usr_id or not promoter_id:
+            continue
+        seen = seen_by_usr.setdefault(usr_id, set())
+        key = promoter_id.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        aliases_by_usr.setdefault(usr_id, []).append(promoter_id)
+    return {usr_id: sorted(values) for usr_id, values in aliases_by_usr.items()}
+
+
+def _regulondb_source_record_views(
+    plan: NativePromoterImportPlan,
+    *,
+    created_at: str,
+) -> list[SequenceViewRecord]:
+    aliases_by_usr = _promoter_alias_ids_by_usr(plan.relation_rows)
+    rows: list[SequenceViewRecord] = []
+    for row in plan.base_rows:
+        sequence_id = str(row["id"])
+        aliases = aliases_by_usr.get(sequence_id) or None
+        if aliases and len(aliases) == 1:
+            view_name = f"{aliases[0]}_source_record"
+        else:
+            view_name = f"regulondb_source_record_{sequence_id[:12]}"
+        rows.append(
+            SequenceViewRecord(
+                sequence_id=sequence_id,
+                view_name=view_name,
+                aliases=aliases,
+                product_kind="source_record",
+                context_kind="native_reference",
+                orientation="unknown",
+                analysis_only=False,
+                source_dataset_id=plan.dataset,
+                source_label="regulondb_native_promoter",
+                source_interval_start_0=0,
+                source_interval_end_0=int(row["length"]),
+                recommended_pooling="seq_mean",
+                created_at=created_at,
+                created_by=CREATED_BY,
+            )
+        )
+    return rows
+
+
+def _regulondb_source_record_view_semantics(
+    views: Iterable[SequenceViewRecord],
+    *,
+    created_at: str,
+) -> list[ViewSemanticsRecord]:
+    return [
+        ViewSemanticsRecord(
+            view_id=str(view.view_id),
+            sequence_id=view.sequence_id,
+            source_family="regulondb_native_promoter",
+            selection_basis="regulondb_curated_promoter_sequence_with_sigma",
+            view_collections=["regulondb_native_promoter_panel", "native_promoter_source_records"],
+            role_tags=["native_promoter_source", "reference_source"],
+            study_id=DEFAULT_STUDY_ID,
+            created_at=created_at,
+            created_by=CREATED_BY,
+        )
+        for view in views
+    ]
+
+
 def write_import_plan(plan: NativePromoterImportPlan, *, usr_root: Path) -> WriteResult:
     _validate_relation_sidecar_integrity(plan.base_rows, plan.relation_rows)
     dataset = Dataset(usr_root, plan.dataset)
@@ -1241,6 +1324,12 @@ def write_import_plan(plan: NativePromoterImportPlan, *, usr_root: Path) -> Writ
         )
         rows_written = session.import_rows(plan.base_rows, source="regulondb_native_promoter_import")
     overlay_count = _write_regulondb_overlay(dataset, plan.regulondb_overlay_rows)
+    created_at = now_utc()
+    source_record_views = _regulondb_source_record_views(plan, created_at=created_at)
+    source_record_semantics = _regulondb_source_record_view_semantics(source_record_views, created_at=created_at)
+    actor = {"tool": CREATED_BY, "run_id": "regulondb_native_promoter_import", "dataset": plan.dataset}
+    sequence_view_count = write_sequence_views(dataset, source_record_views, conflict_policy="error", actor=actor)
+    view_semantics_count = write_view_semantics(dataset, source_record_semantics, conflict_policy="error", actor=actor)
     relation_counts = _write_relation_sidecars(dataset.dir, plan.relation_rows)
     with dataset.maintenance("materialize_regulondb_native_promoter_overlay"):
         dataset.materialize(namespaces=[REGULONDB_NAMESPACE], keep_overlays=True)
@@ -1250,9 +1339,15 @@ def write_import_plan(plan: NativePromoterImportPlan, *, usr_root: Path) -> Writ
         metrics={
             "base_rows": len(plan.base_rows),
             "regulondb_overlay_rows": len(plan.regulondb_overlay_rows),
+            "sequence_view_rows": int(sequence_view_count),
+            "view_semantics_rows": int(view_semantics_count),
             "relation_rows": sum(relation_counts.values()),
         },
-        artifacts={"relation_sidecars": sorted(relation_counts)},
+        artifacts={
+            "relation_sidecars": sorted(relation_counts),
+            "sequence_views": "_views/sequence_views.parquet",
+            "view_semantics": "_views/view_semantics.parquet",
+        },
     )
     dataset.validate(strict=True)
     return WriteResult(
@@ -1260,6 +1355,8 @@ def write_import_plan(plan: NativePromoterImportPlan, *, usr_root: Path) -> Writ
         dataset_dir=str(dataset.dir),
         rows_written=int(rows_written),
         regulondb_overlay_rows=int(overlay_count),
+        sequence_view_rows=int(sequence_view_count),
+        view_semantics_rows=int(view_semantics_count),
         relation_sidecars=relation_counts,
     )
 

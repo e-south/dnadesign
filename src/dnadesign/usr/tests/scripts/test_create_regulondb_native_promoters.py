@@ -333,14 +333,29 @@ def test_write_mode_creates_dataset_relations_and_event_log(tmp_path: Path) -> N
     dataset_dir = usr_root / "usr_regulondb_native_promoters"
     assert payload["write"] is True
     assert (dataset_dir / "records.parquet").exists()
+    assert (dataset_dir / "_views" / "sequence_views.parquet").exists()
+    assert (dataset_dir / "_views" / "view_semantics.parquet").exists()
     assert (dataset_dir / "_relations" / "promoter_aliases.parquet").exists()
     assert (dataset_dir / "_relations" / "excluded_source_rows.parquet").exists()
     assert (dataset_dir / "_relations" / "skipped_source_rows.parquet").exists()
     assert (dataset_dir / ".events.log").exists()
     records = pq.read_table(dataset_dir / "records.parquet").to_pylist()
+    views = pq.read_table(dataset_dir / "_views" / "sequence_views.parquet").to_pylist()
+    semantics = pq.read_table(dataset_dir / "_views" / "view_semantics.parquet").to_pylist()
     skipped_rows = pq.read_table(dataset_dir / "_relations" / "skipped_source_rows.parquet").to_pylist()
     assert "sig35_variant" not in records[0]
     assert records[0]["regulondb__primary_promoter_id"] == "PM0001"
+    assert payload["result"]["sequence_view_rows"] == 1
+    assert payload["result"]["view_semantics_rows"] == 1
+    assert views[0]["sequence_id"] == records[0]["id"]
+    assert views[0]["product_kind"] == "source_record"
+    assert views[0]["context_kind"] == "native_reference"
+    assert views[0]["orientation"] == "unknown"
+    assert views[0]["recommended_pooling"] == "seq_mean"
+    assert semantics[0]["view_id"] == views[0]["view_id"]
+    assert semantics[0]["source_family"] == "regulondb_native_promoter"
+    assert semantics[0]["selection_basis"] == "regulondb_curated_promoter_sequence_with_sigma"
+    assert "regulondb_native_promoter_panel" in semantics[0]["view_collections"]
     assert pq.read_table(dataset_dir / "_relations" / "excluded_source_rows.parquet").num_rows == 0
     assert skipped_rows[0]["promoter_id"] == "PM_MISSING_SEQUENCE"
     assert skipped_rows[0]["skip_reason"] == "missing_sequence"

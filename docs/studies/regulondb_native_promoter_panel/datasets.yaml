@@ -10,7 +10,27 @@ datasets:
     owner_tool: usr
     onboard_mode: create_new
     authority: shared
-    notes: Local generated native reference dataset created from a deterministic Cruncher promoter superset export. The dataset id is intentionally stable, but the source scope is a strict deduplicated native promoter panel, not a live-only RegulonDB route dump. The current base rows are drawn from release-pinned RegulonDB 13 PromoterSet.tsv and historical RegulonDB 11 PromoterSet.csv source rows that have strict ACGT sequence and sigma evidence after sequence-level grouping. Live RegulonDB 14.5 GraphQL promoter route rows are documented as a modern overlay/source-completeness check, while RegulonDB 13 sigmulon, RegulonDB 11 RACE/454, RegulonDB 11 prediction rows, and EcoCyc 28 promoter SmartTable rows remain inventoried/deferred strata. The dataset keeps one canonical sequence row per deduplicated retained sequence and places source identities, skipped rows, excluded no-sigma rows, sigma affiliations, coordinates, predictions, evidence, citations, boxes, and other many-to-many metadata in relation sidecars. The generated dataset root is intentionally ignored by git and should be moved through USR data sync rather than committed.
+    notes: >-
+      Local generated native reference dataset created from a deterministic
+      Cruncher promoter superset export. The dataset id is intentionally stable,
+      but the source scope is a strict deduplicated native promoter panel, not a
+      live-only RegulonDB route dump. The current base rows are drawn from
+      release-pinned RegulonDB 13 PromoterSet.tsv and historical RegulonDB 11
+      PromoterSet.csv source rows that have strict ACGT sequence and sigma
+      evidence after sequence-level grouping. Live RegulonDB 14.5 GraphQL
+      promoter route rows are documented as a modern overlay/source-completeness
+      check, while RegulonDB 13 sigmulon, RegulonDB 11 RACE/454, RegulonDB 11
+      prediction rows, and EcoCyc 28 promoter SmartTable rows remain
+      inventoried/deferred strata. The dataset keeps one canonical sequence row
+      per deduplicated retained sequence and places source identities, skipped
+      rows, excluded no-sigma rows, sigma affiliations, coordinates,
+      predictions, evidence, citations, boxes, and other many-to-many metadata
+      in relation sidecars. Write mode also emits dataset-local sequence-view
+      sidecars: each retained native row is a generic source_record view, with
+      RegulonDB-specific source family, strict selection basis, study collection,
+      and role tags stored in view_semantics rather than product_kind. The
+      generated dataset root is intentionally ignored by git and should be moved
+      through USR data sync rather than committed.
     sync:
       enabled: false
       remote_name: n/a
