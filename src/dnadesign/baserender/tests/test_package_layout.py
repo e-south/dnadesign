@@ -106,7 +106,7 @@ def test_src_nested_ia_packages_exist() -> None:
 def test_console_script_targets_src_cli_app() -> None:
     with Path("pyproject.toml").open("rb") as handle:
         pyproject = tomllib.load(handle)
-    assert pyproject["project"]["scripts"]["baserender"] == "dnadesign.baserender.src.cli.app:app"
+    assert pyproject["project"]["scripts"]["baserender"] == "dnadesign.baserender:app"
 
 
 def test_no_tracked_generated_baserender_artifacts() -> None:

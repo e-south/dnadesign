@@ -16,6 +16,7 @@ from typing import Any
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
+    "app": ("dnadesign.baserender.src.cli", "app"),
     "adapt_record": ("dnadesign.baserender.src.public", "adapt_record"),
     "adapt_records": ("dnadesign.baserender.src.public", "adapt_records"),
     "BaseRenderJobV3": ("dnadesign.baserender.src.config", "BaseRenderJobV3"),
