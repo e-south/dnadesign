@@ -1,6 +1,6 @@
 ## Source Evidence
 
-Retrieved: 2026-03-12
+Retrieved: 2026-04-28
 
 Update this table whenever external policy claims are added or changed.
 

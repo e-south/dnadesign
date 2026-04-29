@@ -20,8 +20,12 @@ DENSEGEN_TRACE_FILTER_AWK='
 }
 { print }
 '
-exec > >(awk "$DENSEGEN_TRACE_FILTER_AWK" | tee -a "$DENSEGEN_TRACE_FILE")
-exec 2> >(awk "$DENSEGEN_TRACE_FILTER_AWK" | tee -a "$DENSEGEN_TRACE_FILE" >&2)
+if ( : > >(cat >/dev/null) ) 2>/dev/null; then
+  exec > >(awk "$DENSEGEN_TRACE_FILTER_AWK" | tee -a "$DENSEGEN_TRACE_FILE")
+  exec 2> >(awk "$DENSEGEN_TRACE_FILTER_AWK" | tee -a "$DENSEGEN_TRACE_FILE" >&2)
+else
+  echo "DenseGen trace tee unavailable; continuing without trace file mirroring." >&2
+fi
 echo "DenseGen runtime trace: $DENSEGEN_TRACE_FILE"
 
 DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
