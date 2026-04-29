@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 from dnadesign.studies.families.promoter.analysis_surfaces import inspect_promoter_exploratory_analysis
+from dnadesign.studies.families.promoter.latentdna_contract import _validate_binding, _validate_workspace_snapshot
 from dnadesign.studies.families.promoter.latentdna_readiness import inspect_promoter_latentdna_readiness
 from dnadesign.studies.tests.test_promoter_snapshot import _make_study_context
 
@@ -236,6 +237,86 @@ def test_inspect_promoter_latentdna_readiness_uses_binding_and_snapshot_contract
         "pooled_logits_20b_full_context_1kb",
         "pooled_logits_7b_anchor_60bp",
         "pooled_logits_7b_full_context_1kb",
+    ]
+
+
+def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> None:
+    binding = _validate_binding(
+        {
+            "workspace_id": "regulondb_native_promoter_panel",
+            "workspace_ref": "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel",
+            "snapshot_ref": (
+                "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/outputs/status/"
+                "workspace_snapshot.json"
+            ),
+            "source_datasets": {
+                "native_source_records": "usr_regulondb_native_promoters",
+                "native_source_record_features_7b": "usr_regulondb_native_promoters/_derived/infer",
+                "core60_tss_upstream": "usr_regulondb_native_promoter_core60",
+            },
+            "supported_model_families": ["evo2_7b"],
+            "default_model_family": "evo2_7b",
+            "required_wildtype_references": [],
+            "decision_deliverables": ["dataset_overview"],
+        }
+    )
+
+    snapshot = _validate_workspace_snapshot(
+        binding=binding,
+        snapshot={
+            "schema_version": "latentdna.workspace_snapshot.v1",
+            "workspace_id": "regulondb_native_promoter_panel",
+            "output_root": "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/outputs",
+            "sources": {
+                "native_source_records": {
+                    "kind": "usr",
+                    "path": "src/dnadesign/usr/datasets/usr_regulondb_native_promoters/records.parquet",
+                    "row_count": 3182,
+                },
+                "native_source_record_features_7b": {
+                    "kind": "infer_feature_sidecar",
+                    "path": "src/dnadesign/usr/datasets/usr_regulondb_native_promoters/_derived/infer",
+                    "row_count": 0,
+                },
+                "core60_tss_upstream": {
+                    "kind": "usr",
+                    "path": "src/dnadesign/usr/datasets/usr_regulondb_native_promoter_core60/records.parquet",
+                    "row_count": 3182,
+                },
+            },
+            "model_families": ["evo2_7b"],
+            "canonical_views": ["intermediate_embedding_7b_native_source_record_seq_mean"],
+            "deliverables": {
+                "dataset_overview": {
+                    "title": "Dataset overview",
+                    "status": "planned",
+                    "freshness": "planned",
+                    "acceptance_checks": [],
+                    "artifact_paths": [],
+                    "docs_refs": [],
+                    "warnings": ["pending infer batch"],
+                }
+            },
+            "exports": {},
+            "browser": {
+                "default_geometry_ids": [],
+                "preferred_hues": ["regulondb__sigma_factor_set"],
+            },
+            "decision_ladder": ["dataset_overview"],
+            "last_updated_at": "2026-04-29T00:00:00+00:00",
+        },
+    )
+
+    assert binding["source_datasets"] == {
+        "core60_tss_upstream": "usr_regulondb_native_promoter_core60",
+        "native_source_record_features_7b": "usr_regulondb_native_promoters/_derived/infer",
+        "native_source_records": "usr_regulondb_native_promoters",
+    }
+    assert binding["required_wildtype_references"] == []
+    assert sorted(snapshot["sources"]) == [
+        "core60_tss_upstream",
+        "native_source_record_features_7b",
+        "native_source_records",
     ]
 
 
