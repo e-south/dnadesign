@@ -38,6 +38,16 @@ command_groups:
       - uv run construct workspace doctor --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
       - uv run construct workspace validate-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60
       - uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --dry-run
+      - uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --format json
+      - uv run usr validate usr_regulondb_native_promoter_core60 --strict
+  - id: infer_fill_remaining_7b
+    purpose: Inspect all checked-in Infer runbooks for this study, skip completed lanes, block lanes with missing sequence products or stale sidecars, and plan or execute only lanes with missing sequence-view vectors/scalars.
+    workspace_ref: src/dnadesign/ops
+    validation_role: control_plane_fill_remaining
+    commands:
+      - uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel
+      - uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel --execute
+      - uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel --submit
   - id: infer_native_full_7b
     purpose: Extract Evo2 7B intermediate embeddings, output-layer means, and log-likelihood scalars for native source-record sequence views; run only in a suitable GPU batch environment.
     workspace_ref: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel

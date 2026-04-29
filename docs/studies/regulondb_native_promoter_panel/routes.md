@@ -5,8 +5,8 @@
 Use this page after the checked-in study status establishes the current phase.
 This study remains inactive for production execution, but downstream
 Construct/Infer/Notify/LatentDNA contracts are now checked in. The native USR
-dataset is materialized locally and validated; generated data artifacts remain
-untracked.
+dataset and the Construct-derived TSS-upstream core60 dataset are materialized
+locally and validated; generated data artifacts remain untracked.
 
 - Status: `uv run ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json`
 - Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json`
@@ -100,14 +100,17 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `data-plane`
 - Surface role: `derivation`
 - Owner-boundary: `construct`
-- Current state: `configured_dry_run_validated`
+- Current state: `local_validated`
 - Entry artifact: `usr_regulondb_native_promoters`
 - Exit artifact: `usr_regulondb_native_promoter_core60`
 - Workspace: `src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel`
 - Route note: Native `source_record` rows remain source views. The checked-in
   core60 route emits a new `analysis_window` dataset by taking `[0,60)` from
   the native 81 bp source window, using the declared TSS offset `60`. This is
-  not -10/-35 box centering.
+  not -10/-35 box centering. The 2026-04-29 materialization wrote 3,182
+  sequence-view rows and 3,181 canonical 60 bp sequence rows; the row-count
+  difference is expected USR sequence deduplication for duplicate derived
+  windows.
 
 ### Infer Core60 TSS-Upstream 7B
 
@@ -115,15 +118,33 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `configured_waiting_for_construct_output`
+- Current state: `configured_preflight_ready`
 - Entry artifact: `usr_regulondb_native_promoter_core60`
 - Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoter_core60`
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml`
 - Runbook: `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml`
 - Route note: This lane extracts derived `analysis_window` views with
-  `core60_mean` pooling after Construct materializes the core60 dataset. It
+  `core60_mean` pooling from the materialized core60 dataset. It
   requests the same intermediate block mean, output-layer mean, mean-per-token
   log likelihood, and total log likelihood sidecars as the native/full lane.
+
+### Fill Remaining Infer
+
+- Type: `route`
+- Plane: `control-plane`
+- Surface role: `batch-ergonomics`
+- Owner-boundary: `ops`
+- Current state: `plan_ready`
+- Entry artifact: checked-in study `execution_surfaces` or explicit Infer runbook paths
+- Exit artifact: one fill plan plus one workspace-scoped audit JSON per executed runnable lane
+- Command: `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel`
+- Submit command: `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel --submit`
+- Route note: Ops discovers the study's Infer runbooks, runs the sequence-view
+  completion inventory, skips complete lanes, blocks lanes with missing
+  sequence products or stale sidecars, and plans only lanes with missing
+  vectors/scalars. The primitive is study-record based and can also accept
+  repeated `--runbook` paths, so it is not tied to RegulonDB or promoter
+  semantics.
 
 ### LatentDNA Native Audit
 

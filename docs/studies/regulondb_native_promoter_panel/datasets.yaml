@@ -73,18 +73,21 @@ datasets:
     dataset: usr_regulondb_native_promoter_core60
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
-    status: planned
+    status: local_validated_untracked
     lifecycle: shared_handoff
-    owner_tool: usr
+    owner_tool: construct
     onboard_mode: create_new
     authority: shared
     notes: >-
-      Planned derived TSS-upstream core60 view. The local native source dataset
-      has no populated -10/-35 box annotations, but its RegulonDB source-window
-      contract places TSS at sequence offset 60. Construct therefore emits the
-      half-open upstream interval `[0,60)` as an `analysis_window` with
-      `core60_mean` pooling metadata. A local dry-run planned 3,182 output
-      records without writing generated artifacts.
+      Local generated TSS-upstream core60 view materialized by Construct on
+      2026-04-29. The local native source dataset has no populated -10/-35 box
+      annotations, but its RegulonDB source-window contract places TSS at
+      sequence offset 60. Construct therefore emits the half-open upstream
+      interval `[0,60)` as an `analysis_window` with `core60_mean` pooling
+      metadata. The dataset validates strictly and contains 3,181 canonical
+      60 bp sequence rows plus 3,182 sequence-view rows; the one-row difference
+      is expected USR sequence deduplication for duplicate derived windows, not
+      a lost source view.
     sync:
       enabled: false
       remote_name: n/a
