@@ -68,6 +68,60 @@ sources:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
       orientation: unknown
+  core60_tss_upstream:
+    kind: usr
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoter_core60
+    record_key: id
+    subject_key: id
+    role: planned
+  core60_tss_upstream_7b_core60_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoter_core60
+    record_key: alias_id
+    subject_key: id
+    role: planned
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: core60_mean
+      orientation: forward
+  core60_tss_upstream_7b_core60_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoter_core60
+    record_key: alias_id
+    subject_key: id
+    role: planned
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: core60_mean
+      orientation: forward
+  core60_tss_upstream_7b_core60_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoter_core60
+    record_key: alias_id
+    subject_key: id
+    role: planned
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  core60_tss_upstream_7b_core60_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoter_core60
+    record_key: alias_id
+    subject_key: id
+    role: planned
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: forward
 metadata:
   include:
     - regulondb__sigma_factor_set
@@ -106,6 +160,30 @@ views:
       family: output_layer_mean
       scope: native_source_record
       pooling: seq_mean
+  intermediate_embedding_7b_core60_tss_upstream:
+    source: core60_tss_upstream_7b_core60_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_core60_tss_upstream_core60_mean
+    role: planned
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: core60_tss_upstream
+      pooling: core60_mean
+  output_layer_mean_7b_core60_tss_upstream:
+    source: core60_tss_upstream_7b_core60_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_core60_tss_upstream_core60_mean
+    role: planned
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: core60_tss_upstream
+      pooling: core60_mean
 cohorts:
   regulondb__sigma_factor_set:
     kind: promoter_metadata

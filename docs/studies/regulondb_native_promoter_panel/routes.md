@@ -89,9 +89,10 @@ must not be used as automatic sequence deduplication rules.
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml`
 - Runbook: `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml`
 - Route note: This lane extracts native `source_record` views with
-  `seq_mean` pooling. Local preflight validates the config, resolves the Notify
-  event path, and reports all vectors/scalars missing as expected before Evo2
-  batch execution.
+  `seq_mean` pooling and requests the intermediate block mean, output-layer
+  mean, mean-per-token log likelihood, and total log likelihood sidecars.
+  Local preflight validates the config, resolves the Notify event path, and
+  reports all vectors/scalars missing as expected before Evo2 batch execution.
 
 ### Construct Native/Core60/Context
 
@@ -120,7 +121,9 @@ must not be used as automatic sequence deduplication rules.
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml`
 - Runbook: `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml`
 - Route note: This lane extracts derived `analysis_window` views with
-  `core60_mean` pooling after Construct materializes the core60 dataset.
+  `core60_mean` pooling after Construct materializes the core60 dataset. It
+  requests the same intermediate block mean, output-layer mean, mean-per-token
+  log likelihood, and total log likelihood sidecars as the native/full lane.
 
 ### LatentDNA Native Audit
 
@@ -129,10 +132,14 @@ must not be used as automatic sequence deduplication rules.
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
 - Current state: `configured_planned_features`
-- Entry artifact: native/full and later core60 7B feature surfaces
+- Entry artifact: native/full and later core60 7B vector and scalar feature surfaces
 - Workspace: `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel`
 - Binding: `docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml`
 - Route note: Native cohorts use `regulondb__*` fields. They must not derive
   DenseGen metadata or alias native sigma factors into `sig35_variant`.
-  Current feature views are declared as planned so workspace validation can run
-  before Evo2 sidecars exist.
+  Current feature views are declared as planned so workspace validation and the
+  partial workspace snapshot can run before Evo2 sidecars exist. The native/full
+  and core60 contracts both name intermediate embeddings, output-layer means,
+  and log-likelihood scalar diagnostics. The partial snapshot is metadata-valid
+  but should report core60 sources and decision deliverables as pending until
+  Construct and Infer outputs exist.

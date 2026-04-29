@@ -56,9 +56,10 @@ datasets:
       Planned Evo2 7B native/full promoter feature surface. The checked-in Infer
       config consumes `source_record` sequence views from
       `usr_regulondb_native_promoters` with `seq_mean` pooling and writes
-      canonical vector/scalar sidecars under the source dataset's
-      `_derived/infer` directory. The local completion inventory currently
-      reports all vectors/scalars missing because no Evo2 batch has run.
+      canonical intermediate-embedding, output-layer-mean, and log-likelihood
+      scalar sidecars under the source dataset's `_derived/infer` directory.
+      The local completion inventory currently reports all vectors/scalars
+      missing because no Evo2 batch has run.
     sync:
       enabled: false
       remote_name: n/a
@@ -84,6 +85,31 @@ datasets:
       half-open upstream interval `[0,60)` as an `analysis_window` with
       `core60_mean` pooling metadata. A local dry-run planned 3,182 output
       records without writing generated artifacts.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: native_core60_features_7b
+    dataset: infer_regulondb_native_promoter_core60_views_7b
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: infer
+    onboard_mode: create_new
+    authority: shared
+    notes: >-
+      Planned Evo2 7B feature surface for the Construct-derived TSS-upstream
+      core60 dataset. The checked-in Infer config consumes `analysis_window`
+      sequence views from `usr_regulondb_native_promoter_core60` with
+      `core60_mean` pooling and writes the same intermediate-embedding,
+      output-layer-mean, and log-likelihood scalar sidecars as the native/full
+      lane under that dataset's `_derived/infer` directory.
     sync:
       enabled: false
       remote_name: n/a

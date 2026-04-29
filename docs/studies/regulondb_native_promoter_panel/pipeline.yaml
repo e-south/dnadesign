@@ -39,19 +39,28 @@ command_groups:
       - uv run construct workspace validate-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60
       - uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --dry-run
   - id: infer_native_full_7b
-    purpose: Extract Evo2 7B feature sidecars for native source-record sequence views; run only in a suitable GPU batch environment.
+    purpose: Extract Evo2 7B intermediate embeddings, output-layer means, and log-likelihood scalars for native source-record sequence views; run only in a suitable GPU batch environment.
     workspace_ref: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
     validation_role: preflight_then_batch
     commands:
       - uv run infer validate config --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
       - uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --format json --mode inventory
       - uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --json
+  - id: infer_core60_tss_upstream_7b
+    purpose: Extract the same Evo2 7B vector and scalar sidecars for Construct-derived core60 TSS-upstream sequence views after the core60 dataset exists.
+    workspace_ref: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
+    validation_role: post_construct_preflight_then_batch
+    commands:
+      - uv run infer validate config --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+      - uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml --format json --mode inventory
+      - uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml --json
   - id: latentdna_native_workspace
-    purpose: Validate the downstream RegulonDB LatentDNA workspace and planned feature-source contract.
+    purpose: Validate the downstream RegulonDB LatentDNA workspace and planned native plus core60 feature-source contract.
     workspace_ref: src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel
     validation_role: planned_feature_consumer
     commands:
       - MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json
+      - MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json
 
 native_agent_bootstrap:
   open_first:

@@ -19,6 +19,7 @@ lifecycle:
     - metadata_overlay_validation
     - native_full_infer_7b
     - core60_view_definition
+    - core60_infer_7b
     - latentdna_native_audit
   current_phase:
     strategy: explicit
@@ -53,6 +54,10 @@ phases:
     status: planned
     output_dataset: usr_regulondb_native_promoter_core60
     next_surface: repo:src/dnadesign/usr/docs/reference/schema-contract.md
+  - id: core60_infer_7b
+    status: planned
+    output_dataset: infer_regulondb_native_promoter_core60_views_7b
+    next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
   - id: latentdna_native_audit
     status: planned
     next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
@@ -106,12 +111,19 @@ artifacts:
     artifact_type: dataset
     dataset_id: infer_regulondb_native_promoter_views_7b
     ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoters/_derived/infer
+  infer_core60_dataset_7b:
+    artifact_type: dataset
+    dataset_id: infer_regulondb_native_promoter_core60_views_7b
+    ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoter_core60/_derived/infer
   infer_workspace_root:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
   notify_native_full_profile_7b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/native_full_7b/profile.json
+  notify_core60_profile_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/core60_tss_upstream_7b/profile.json
   latentdna_binding:
     artifact_type: file
     ref: manifest:latentdna_binding.yaml
@@ -200,6 +212,20 @@ execution_surfaces:
       - json
       - --mode
       - inventory
+  infer_completion_core60_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - sequence-view-completion
+      - --config
+      - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+      - --format
+      - json
+      - --mode
+      - inventory
   notify_resolve_events_native_full_7b:
     surface_type: command
     argv:
@@ -212,6 +238,19 @@ execution_surfaces:
       - infer
       - --config
       - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+      - --json
+  notify_resolve_events_core60_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - setup
+      - resolve-events
+      - --tool
+      - infer
+      - --config
+      - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
       - --json
   latentdna_validate_workspace:
     surface_type: command
@@ -309,6 +348,25 @@ preflight:
         summary: Native/full 7B Infer batch runbook is present.
         required: true
         artifact: infer_native_full_runbook_7b
+      - kind: command
+        check_id: infer.config.native_full_7b.validates
+        check_group: infer
+        summary: Native/full 7B Infer config validates without loading Evo2.
+        required: true
+        surface: infer_validate_native_full_7b
+      - kind: command
+        check_id: infer.native_full_7b.completion.inventory
+        check_group: infer
+        summary: Native/full 7B sequence-view completion inventory is inspectable and resumable.
+        required: true
+        surface: infer_completion_native_full_7b
+      - kind: command
+        check_id: notify.events.native_full_7b.resolve
+        check_group: notify
+        summary: Notify can resolve the native/full 7B Infer event path from the config.
+        required: true
+        surface: notify_resolve_events_native_full_7b
+    core60_infer_7b:
       - kind: path_exists
         check_id: infer.config.core60_7b.present
         check_group: infer
@@ -322,29 +380,23 @@ preflight:
         required: true
         artifact: infer_core60_runbook_7b
       - kind: command
-        check_id: infer.config.native_full_7b.validates
-        check_group: infer
-        summary: Native/full 7B Infer config validates without loading Evo2.
-        required: true
-        surface: infer_validate_native_full_7b
-      - kind: command
         check_id: infer.config.core60_7b.validates
         check_group: infer
         summary: Core60 TSS-upstream 7B Infer config validates without loading Evo2.
         required: true
         surface: infer_validate_core60_7b
       - kind: command
-        check_id: infer.native_full_7b.completion.inventory
+        check_id: infer.core60_7b.completion.inventory
         check_group: infer
-        summary: Native/full 7B sequence-view completion inventory is inspectable and resumable.
-        required: true
-        surface: infer_completion_native_full_7b
+        summary: Core60 TSS-upstream 7B sequence-view completion inventory is inspectable after Construct materializes the dataset.
+        required: false
+        surface: infer_completion_core60_7b
       - kind: command
-        check_id: notify.events.native_full_7b.resolve
+        check_id: notify.events.core60_7b.resolve
         check_group: notify
-        summary: Notify can resolve the native/full 7B Infer event path from the config.
-        required: true
-        surface: notify_resolve_events_native_full_7b
+        summary: Notify can resolve the core60 7B Infer event path after the core60 dataset exists.
+        required: false
+        surface: notify_resolve_events_core60_7b
     core60_view_definition:
       - kind: path_exists
         check_id: construct.workspace.layout
@@ -395,6 +447,12 @@ preflight:
         summary: Native/full 7B Infer sidecar features are present for LatentDNA after batch execution.
         required: false
         artifact: infer_native_full_dataset_7b
+      - kind: path_exists
+        check_id: latentdna.input.core60_7b.present
+        check_group: latentdna
+        summary: Core60 7B Infer sidecar features are present for LatentDNA after Construct and batch execution.
+        required: false
+        artifact: infer_core60_dataset_7b
       - kind: command
         check_id: latentdna.workspace.deep.validates
         check_group: latentdna
@@ -410,6 +468,7 @@ preflight:
       metadata_overlay_validation: [study_record, usr_validation]
       native_full_infer_7b: [study_record, infer, notify]
       core60_view_definition: [study_record, construct]
+      core60_infer_7b: [study_record, infer, notify]
       latentdna_native_audit: [study_record, latentdna]
     runtime_phase_groups: []
     runtime_shared_groups: []

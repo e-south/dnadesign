@@ -11,8 +11,9 @@
 ### Current Datasets
 
 - Native promoter source: `usr_regulondb_native_promoters` (`local validated`, generated/untracked)
-- Native/full 7B features: `infer_regulondb_native_promoter_views_7b` (`planned`)
+- Native/full 7B vector/scalar sidecars: `infer_regulondb_native_promoter_views_7b` (`planned`)
 - Core60 view: `usr_regulondb_native_promoter_core60` (`planned`)
+- Core60 7B vector/scalar sidecars: `infer_regulondb_native_promoter_core60_views_7b` (`planned`)
 
 ### Current Phase
 
@@ -147,13 +148,18 @@ current completeness base.
 - Construct: configured for `native_tss_upstream_core60`. Local dry-run on
   2026-04-29 planned 3,182 records and wrote no generated artifacts.
 - Infer: configured for native source-record `seq_mean` and derived core60
-  `core60_mean` Evo2 7B lanes. No Evo2 batch has been executed in this checkout.
+  `core60_mean` Evo2 7B lanes. Both lanes request intermediate block means,
+  output-layer means, mean-per-token log likelihoods, and total log
+  likelihoods. No Evo2 batch has been executed in this checkout.
 - Notify: native Infer event-path resolution succeeds against
   `usr_regulondb_native_promoters/.events.log`; webhook/profile materialization
   remains an operator step in the batch environment.
 - LatentDNA: configured with a workspace and study binding. The workspace
   validates with native feature sources empty/planned and RegulonDB metadata
-  cohorts available from USR.
+  cohorts available from USR. A local snapshot exists and reports the native
+  record plus native 7B vector/scalar source declarations, with the core60
+  source family and decision deliverables still pending until Construct and
+  Infer sidecars exist.
 - Cluster: not configured.
 - OPAL: not configured.
 
@@ -167,7 +173,7 @@ the generated core60 dataset.
 
 Record-backed evidence from 2026-04-29:
 
-- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` reports `is_active_study=false`, current phase `metadata_overlay_validation`, and `configured=false` for LatentDNA.
+- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` reports `is_active_study=false`, current phase `metadata_overlay_validation`, and LatentDNA `state=attention` with pending decision deliverables plus missing planned core60 sources.
 - The same status surface reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and `exists=false` for generated Infer/core60 artifacts that have not been run.
 - `uv run usr validate usr_regulondb_native_promoters --strict` passes locally.
 - `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --dry-run --format json` returns `records_total=3182`.
@@ -175,6 +181,7 @@ Record-backed evidence from 2026-04-29:
 - `uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --format json --mode inventory` reports 3,182 required views and missing vectors/scalars as expected before batch execution.
 - `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --json` resolves the native USR `.events.log`.
 - `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json` returns `status=ok`.
+- `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json` writes the local partial snapshot contract. It is valid for native metadata review, but does not claim feature plots before native/full or core60 Infer sidecars exist.
 
 To reach the active promoter-study standard, this study needs these gates in
 order:
@@ -185,8 +192,9 @@ order:
 2. Materialize `usr_regulondb_native_promoter_core60` from the checked-in
    TSS-upstream Construct workspace when a generated-artifact lane is intended.
 3. Run the native source-record Evo2 7B batch, then the core60 Evo2 7B batch
-   after Construct output exists. Outputs use canonical `_derived/infer`
-   vector/scalar sidecars.
+   after Construct output exists. Both batches must emit intermediate
+   embeddings, output-layer means, and log-likelihood scalar sidecars under the
+   canonical `_derived/infer` contract.
 4. Materialize Notify profiles in the target batch environment and start one
    watcher per Infer lane.
 5. Refresh LatentDNA snapshots and plots after feature sidecars exist; native
