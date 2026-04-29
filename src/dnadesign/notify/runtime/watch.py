@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ..errors import NotifyDeliveryError
+from ..core.errors import NotifyDeliveryError
 from ..tool_events import ToolEventState
 from .cursor import acquire_cursor_lock as _acquire_cursor_lock
 from .cursor import iter_file_lines as _iter_file_lines

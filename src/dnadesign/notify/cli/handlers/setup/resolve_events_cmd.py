@@ -17,7 +17,7 @@ from typing import Callable
 
 import typer
 
-from ....errors import NotifyConfigError, NotifyError
+from ....core.errors import NotifyConfigError, NotifyError
 
 
 def run_setup_resolve_events_command(

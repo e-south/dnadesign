@@ -17,7 +17,7 @@ import stat
 import time
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 
 def ensure_private_directory(path: Path, *, label: str) -> None:

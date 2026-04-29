@@ -16,7 +16,7 @@ from typing import Callable
 
 import typer
 
-from ....errors import NotifyError
+from ....core.errors import NotifyError
 
 
 def run_setup_webhook_command(

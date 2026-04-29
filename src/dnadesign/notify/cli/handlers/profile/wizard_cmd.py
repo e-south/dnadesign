@@ -18,7 +18,7 @@ from typing import Any, Callable
 import click
 import typer
 
-from ....errors import NotifyError
+from ....core.errors import NotifyError
 
 
 def run_profile_wizard_command(

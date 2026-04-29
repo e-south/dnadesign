@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from .policy import default_profile_path_for_tool
 
 

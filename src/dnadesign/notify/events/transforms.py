@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 
 def event_meta(

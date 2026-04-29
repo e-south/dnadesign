@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.notify.contracts import resolve_tls_ca_bundle_path
+from dnadesign.notify.core.contracts import resolve_tls_ca_bundle_path
 
 
 def test_resolve_tls_ca_bundle_path_prefers_explicit_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

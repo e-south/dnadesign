@@ -27,4 +27,4 @@ operator runbooks listed below.
 - `profile_version` must be `2`.
 
 ### Tests
-- `uv run pytest -q src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+- `uv run pytest -q src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`

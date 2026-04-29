@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ..errors import NotifyValidationError
+from ..core.errors import NotifyValidationError
 from .discord import format_discord
 from .generic import format_generic
 from .slack import format_slack

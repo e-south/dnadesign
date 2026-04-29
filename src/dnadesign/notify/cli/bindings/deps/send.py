@@ -16,9 +16,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ....core.errors import NotifyError
 from ....delivery.http import post_json
 from ....delivery.payload import build_payload
-from ....errors import NotifyError
 from ...handlers import run_send_command
 from .. import helpers
 

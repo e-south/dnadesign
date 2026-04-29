@@ -16,7 +16,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from .densegen_common import _duration_hhmmss
 from .types import ToolEventDecision, ToolEventState
 

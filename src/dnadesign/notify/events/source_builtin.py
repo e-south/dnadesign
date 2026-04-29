@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 ToolEventsSourceRegister = Callable[..., None]
 

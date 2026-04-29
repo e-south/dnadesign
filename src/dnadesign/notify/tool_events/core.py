@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from .packs_builtin import register_builtin_tool_event_packs
 from .types import ToolEventDecision, ToolEventState
 

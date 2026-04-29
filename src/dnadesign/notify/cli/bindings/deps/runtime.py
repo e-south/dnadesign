@@ -20,9 +20,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from ....core.errors import NotifyConfigError, NotifyDeliveryError
 from ....delivery.http import post_json
 from ....delivery.validation import resolve_tls_ca_bundle, resolve_webhook_url, validate_provider_webhook_url
-from ....errors import NotifyConfigError, NotifyDeliveryError
 from ....events.source import normalize_tool_name as _normalize_setup_tool_name
 from ....events.source import resolve_tool_events_path as _resolve_tool_events_path
 from ....events.transforms import event_message as _event_message

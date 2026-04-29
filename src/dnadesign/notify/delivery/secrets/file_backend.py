@@ -15,7 +15,7 @@ import os
 import stat
 from pathlib import Path
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 
 
 def ensure_private_secret_parent(path: Path) -> None:

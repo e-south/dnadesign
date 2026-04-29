@@ -15,8 +15,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from ..contracts import resolve_tls_ca_bundle_path
-from ..errors import NotifyConfigError
+from ..core.contracts import resolve_tls_ca_bundle_path
+from ..core.errors import NotifyConfigError
 from .secrets import resolve_secret_ref
 
 _SLACK_WEBHOOK_HOSTS = {"hooks.slack.com", "hooks.slack-gov.com"}

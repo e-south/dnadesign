@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 from ..policy import normalize_policy_name, supported_workflow_policies
 from .contract import (
     PROFILE_ALLOWED_KEYS,

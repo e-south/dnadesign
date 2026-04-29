@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from ..profiles.profile_paths import resolve_resolver_mode_profile_path
 
 
