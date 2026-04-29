@@ -21,7 +21,7 @@ from ..io.parquet_io import read_table, write_table
 from ..labels import humanize_label
 from ..metrics.definitions import resolve_metric_definition, validate_metric_registry
 from ..sources.resolver import inspect_source_schema, read_records_table, resolve_source
-from ..views.materialize import _promoter_metadata_value
+from ..views.promoter_metadata import _promoter_metadata_value
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
 from .common import (

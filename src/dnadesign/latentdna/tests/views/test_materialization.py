@@ -12,11 +12,11 @@ import yaml
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.io.parquet_io import read_table
-from dnadesign.latentdna.src.views.materialize import (
+from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
+from dnadesign.latentdna.src.views.promoter_metadata import (
     _sig35_variant,
     _source_class,
     _spacer_length,
-    materialize_view_artifact,
 )
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
