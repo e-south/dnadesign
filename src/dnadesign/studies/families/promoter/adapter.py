@@ -478,11 +478,11 @@ def inspect_promoter_study_infer_feature_completion(
                 surface_payload=contract.execution_surfaces.get(surface_id) or {},
                 repo_root=study_context.study_repo_root,
             )
-            from dnadesign.infer import plan_sequence_view_feature_completion_from_config
+            from dnadesign.infer import plan_sequence_view_feature_inventory_completion_from_config
 
             plans = [
                 dict(plan)
-                for plan in plan_sequence_view_feature_completion_from_config(
+                for plan in plan_sequence_view_feature_inventory_completion_from_config(
                     config_path,
                     job=job,
                 )

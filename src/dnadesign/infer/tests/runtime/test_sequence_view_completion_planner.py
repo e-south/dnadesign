@@ -16,10 +16,18 @@ from pathlib import Path
 import pytest
 
 from dnadesign.infer.src.features import completion_planner
-from dnadesign.infer.src.features.aliases import persist_feature_scalar_rows, persist_feature_vector_rows
-from dnadesign.infer.src.features.completion_planner import plan_sequence_view_feature_completion
+from dnadesign.infer.src.features.aliases import (
+    persist_feature_alias_rows,
+    persist_feature_scalar_rows,
+    persist_feature_vector_rows,
+)
+from dnadesign.infer.src.features.completion_planner import (
+    plan_sequence_view_feature_completion,
+    plan_sequence_view_feature_inventory_completion,
+)
 from dnadesign.infer.src.features.contracts import SequenceFeatureBundleConfig
 from dnadesign.infer.src.features.execution import (
+    _sequence_view_feature_alias_rows,
     _sequence_view_feature_scalar_specs,
     _sequence_view_feature_vector_specs,
     build_feature_metadata_rows,
@@ -343,3 +351,52 @@ def test_sequence_view_completion_planner_uses_key_only_vector_inventory(
     assert key_only_calls == 1
     assert plan.persisted_vector_reusable == 2
     assert plan.missing_vectors == 0
+
+
+def test_sequence_view_inventory_completion_reuses_aliases_and_reports_stale_payloads(tmp_path: Path) -> None:
+    usr_root, dataset = _dataset_with_sequence_view(tmp_path)
+    bundle = _bundle(usr_root, dataset)
+    records = load_sequence_view_input_records(bundle=bundle)
+    contexts = resolve_sequence_view_contexts(records=records)
+    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id="evo2_7b")
+    selector = resolve_intermediate_selector(model_id="evo2_7b", intermediate_block=bundle.intermediate_block)
+    specs = _sequence_view_feature_vector_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        selector=selector.intermediate_selector,
+    )
+    persist_feature_alias_rows(
+        _sequence_view_feature_alias_rows(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            selector=selector.intermediate_selector,
+            model_id="evo2_7b",
+        )
+    )
+    persist_feature_vector_rows(
+        [
+            {
+                "_dataset_root": specs[0]["dataset_root"],
+                "_dataset_id": specs[0]["dataset_id"],
+                "feature_vector_key": specs[0]["feature_vector_key"],
+                "value": [1.0, 2.0],
+                "created_at": metadata_rows[int(specs[0]["row_index"])]["timestamp"],
+            }
+        ]
+    )
+
+    plan = plan_sequence_view_feature_inventory_completion(
+        bundle=bundle,
+        model_id="evo2_7b",
+        job_id="reference_views",
+    )
+
+    assert plan.required_views == 1
+    assert plan.required_vectors == 2
+    assert plan.reusable_vectors == 1
+    assert plan.stale_vectors == 1
+    assert plan.missing_vectors == 0
+    assert plan.existing_aliases == 2
+    assert plan.by_pooling_operation == {"core60_mean": 1}

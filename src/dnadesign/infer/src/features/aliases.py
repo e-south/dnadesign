@@ -294,6 +294,17 @@ def load_feature_scalar_alias_ids(
     return {str(value) for value in table.column("alias_id").to_pylist() if str(value).strip()}
 
 
+def load_feature_scalar_alias_rows(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+) -> list[dict[str, object]]:
+    path = feature_scalar_alias_path(dataset_root=dataset_root, dataset_id=dataset_id)
+    if not path.exists():
+        return []
+    return pq.read_table(path).cast(_FEATURE_SCALAR_ALIAS_SCHEMA).to_pylist()
+
+
 def load_feature_vector_keys(
     *,
     dataset_root: str | Path,

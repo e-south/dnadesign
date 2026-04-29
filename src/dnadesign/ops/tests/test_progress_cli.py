@@ -1698,7 +1698,7 @@ def test_promoter_study_status_reports_sequence_view_and_infer_completion_summar
             )
 
         monkeypatch.setattr(
-            "dnadesign.infer.plan_sequence_view_feature_completion_from_config",
+            "dnadesign.infer.plan_sequence_view_feature_inventory_completion_from_config",
             _fake_plan,
             raising=False,
         )
