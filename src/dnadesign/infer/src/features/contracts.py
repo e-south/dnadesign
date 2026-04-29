@@ -137,7 +137,7 @@ class SequenceFeatureBundleConfig(_StrictFeatureModel):
             raise ValueError("feature_bundle.feature_schema_version must be non-empty.")
         if self.sequence_view_inputs and self.pooling != SequenceFeaturePoolingConfig():
             raise ValueError(
-                "feature_bundle.pooling is a legacy context contract and is not used with "
+                "feature_bundle.pooling is a context-scoped contract and is not used with "
                 "feature_bundle.sequence_view_inputs."
             )
         return self

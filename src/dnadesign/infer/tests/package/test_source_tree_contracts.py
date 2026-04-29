@@ -152,6 +152,9 @@ def test_infer_feature_contracts_are_grouped_under_features_package() -> None:
     assert (features_dir / "context.py").is_file()
     assert (features_dir / "execution.py").is_file()
     assert (features_dir / "export.py").is_file()
+    assert (features_dir / "overlay_pruning.py").is_file()
+    assert not (features_dir / "legacy_alias_migration.py").exists()
+    assert not (features_dir / "legacy_payload_retirement.py").exists()
 
 
 def test_infer_root_does_not_track_runtime_log_artifacts() -> None:

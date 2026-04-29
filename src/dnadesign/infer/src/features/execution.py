@@ -265,13 +265,9 @@ def _pool_tensor_for_context(
     return tensor[start_0:end_0].mean(dim=0).detach().cpu().tolist()
 
 
-def _canonical_pooling_identity(context: SequenceContextRecord) -> tuple[str, int | None, int | None]:
+def _feature_pooling_identity(context: SequenceContextRecord) -> tuple[str, int | None, int | None]:
     operation = str(context.pooling_operation or "seq_mean")
-    start_0 = context.pooling_start_0
-    end_0 = context.pooling_end_0
-    if operation == "core60_mean" and start_0 == 0 and end_0 == int(context.resolved_length) == 60:
-        return "seq_mean", None, None
-    return operation, start_0, end_0
+    return operation, context.pooling_start_0, context.pooling_end_0
 
 
 def _feature_bundle_log_likelihoods(adapter, seq_chunk: list[str]) -> tuple[list[float], list[float]]:
@@ -326,6 +322,34 @@ def _pad_feature_bundle_eval_sequences(
     for offset in range(eval_batch_size - source_count):
         padded.append(seq_chunk[offset % source_count])
     return padded
+
+
+def _sequence_view_group_output_needs(
+    *,
+    all_vals: Dict[str, List[object]],
+    contexts: List[SequenceContextRecord],
+    row_indexes: list[int],
+    bundle: SequenceFeatureBundleConfig,
+    selector: str,
+) -> tuple[bool, bool, bool]:
+    needs_scalars = False
+    needs_logits = False
+    needs_embedding = False
+    for row_index in row_indexes:
+        context = contexts[row_index]
+        pool_scope = str(context.pooling_operation or "seq_mean")
+        if bundle.collect_log_likelihood and (
+            all_vals[_LOG_LIKELIHOOD_TOTAL][row_index] is None or all_vals[_LOG_LIKELIHOOD_MEAN][row_index] is None
+        ):
+            needs_scalars = True
+        if bundle.collect_output_layer_mean and all_vals[_output_layer_out_id(pool_scope)][row_index] is None:
+            needs_logits = True
+        if (
+            bundle.collect_intermediate_embedding
+            and all_vals[_intermediate_out_id(selector, pool_scope)][row_index] is None
+        ):
+            needs_embedding = True
+    return needs_scalars, needs_logits, needs_embedding
 
 
 def _feature_request_digest(
@@ -391,7 +415,7 @@ def _primary_feature_vector_key_for_context(
     bundle: SequenceFeatureBundleConfig,
     forward_pass_key: str,
 ) -> str | None:
-    pooling_operation, pooling_start_0, pooling_end_0 = _canonical_pooling_identity(context)
+    pooling_operation, pooling_start_0, pooling_end_0 = _feature_pooling_identity(context)
     if pooling_operation is None:
         return None
     if bundle.collect_intermediate_embedding:
@@ -424,7 +448,7 @@ def _feature_vector_key_for_representation(
     representation_kind: str,
     selector: str,
 ) -> str:
-    pooling_operation, pooling_start_0, pooling_end_0 = _canonical_pooling_identity(context)
+    pooling_operation, pooling_start_0, pooling_end_0 = _feature_pooling_identity(context)
     return compute_feature_vector_key(
         forward_pass_key=forward_pass_key,
         representation_kind=representation_kind,
@@ -657,7 +681,7 @@ def _sequence_view_feature_alias_rows(
                 continue
             if context.pooling_operation is None:
                 continue
-            pooling_operation, pooling_start_0, pooling_end_0 = _canonical_pooling_identity(context)
+            pooling_operation, pooling_start_0, pooling_end_0 = _feature_pooling_identity(context)
             feature_vector_key = compute_feature_vector_key(
                 forward_pass_key=forward_pass_key,
                 representation_kind=representation_kind,
@@ -1034,29 +1058,72 @@ def _execute_sequence_view_feature_bundle(
         forward_key_chunk = representative_forward_keys[start : start + take]
         eval_seq_chunk = [context.resolved_sequence for context in context_chunk]
         try:
-            logits_tensors = None
-            embedding_tensors = None
-            if bundle.collect_log_likelihood:
-                totals, means = _feature_bundle_log_likelihoods(adapter, eval_seq_chunk)
-                for position, group_key in enumerate(group_key_chunk):
-                    for row_index in forward_groups[group_key]:
-                        if bundle.collect_log_likelihood:
-                            all_vals[_LOG_LIKELIHOOD_TOTAL][row_index] = totals[position]
-                            all_vals[_LOG_LIKELIHOOD_MEAN][row_index] = means[position]
-            if bundle.collect_output_layer_mean and bundle.collect_intermediate_embedding:
-                logits_tensors, embedding_tensors = _feature_bundle_logits_and_embedding(
-                    adapter,
-                    seq_chunk=eval_seq_chunk,
+            scalar_by_position: dict[int, tuple[float, float]] = {}
+            logits_by_position: dict[int, object] = {}
+            embedding_by_position: dict[int, object] = {}
+            scalar_positions: list[int] = []
+            logits_positions: list[int] = []
+            embedding_positions: list[int] = []
+            for position, group_key in enumerate(group_key_chunk):
+                needs_scalars, needs_logits, needs_embedding = _sequence_view_group_output_needs(
+                    all_vals=all_vals,
+                    contexts=contexts,
+                    row_indexes=forward_groups[group_key],
+                    bundle=bundle,
                     selector=selector.intermediate_selector,
                 )
-            if bundle.collect_output_layer_mean and logits_tensors is None:
-                logits_tensors = adapter.logits(eval_seq_chunk, fmt="tensor")
-            if bundle.collect_intermediate_embedding and embedding_tensors is None:
+                if needs_scalars:
+                    scalar_positions.append(position)
+                if needs_logits:
+                    logits_positions.append(position)
+                if needs_embedding:
+                    embedding_positions.append(position)
+
+            if scalar_positions:
+                totals, means = _feature_bundle_log_likelihoods(
+                    adapter,
+                    seq_chunk=[eval_seq_chunk[position] for position in scalar_positions],
+                )
+                for local_index, position in enumerate(scalar_positions):
+                    scalar_by_position[position] = (totals[local_index], means[local_index])
+
+            logits_position_set = set(logits_positions)
+            embedding_position_set = set(embedding_positions)
+            fused_positions = sorted(logits_position_set.intersection(embedding_position_set))
+            if fused_positions:
+                logits_tensors, embedding_tensors = _feature_bundle_logits_and_embedding(
+                    adapter,
+                    seq_chunk=[eval_seq_chunk[position] for position in fused_positions],
+                    selector=selector.intermediate_selector,
+                )
+                if logits_tensors is not None and embedding_tensors is not None:
+                    for local_index, position in enumerate(fused_positions):
+                        logits_by_position[position] = logits_tensors[local_index]
+                        embedding_by_position[position] = embedding_tensors[local_index]
+                else:
+                    logits_positions = sorted(logits_position_set)
+                    embedding_positions = sorted(embedding_position_set)
+
+            missing_logits_positions = [position for position in logits_positions if position not in logits_by_position]
+            if missing_logits_positions:
+                logits_tensors = adapter.logits(
+                    [eval_seq_chunk[position] for position in missing_logits_positions],
+                    fmt="tensor",
+                )
+                for local_index, position in enumerate(missing_logits_positions):
+                    logits_by_position[position] = logits_tensors[local_index]
+
+            missing_embedding_positions = [
+                position for position in embedding_positions if position not in embedding_by_position
+            ]
+            if missing_embedding_positions:
                 embedding_tensors = adapter.embedding(
-                    eval_seq_chunk,
+                    [eval_seq_chunk[position] for position in missing_embedding_positions],
                     layer=selector.intermediate_selector,
                     fmt="tensor",
                 )
+                for local_index, position in enumerate(missing_embedding_positions):
+                    embedding_by_position[position] = embedding_tensors[local_index]
         except RuntimeError as exc:
             if is_oom(exc) and stable_eval_batch_size is not None:
                 raise RuntimeOOMError(
@@ -1073,13 +1140,24 @@ def _execute_sequence_view_feature_bundle(
             forward_pass_key = forward_key_chunk[position]
             row_indexes = forward_groups[group_key]
             completed_rows += len(row_indexes)
-            logits_tensor = logits_tensors[position] if logits_tensors is not None else None
-            embedding_tensor = embedding_tensors[position] if embedding_tensors is not None else None
+            scalar_pair = scalar_by_position.get(position)
+            if scalar_pair is not None:
+                total, mean = scalar_pair
+                for row_index in row_indexes:
+                    if all_vals[_LOG_LIKELIHOOD_TOTAL][row_index] is None:
+                        all_vals[_LOG_LIKELIHOOD_TOTAL][row_index] = total
+                    if all_vals[_LOG_LIKELIHOOD_MEAN][row_index] is None:
+                        all_vals[_LOG_LIKELIHOOD_MEAN][row_index] = mean
+            logits_tensor = logits_by_position.get(position)
+            embedding_tensor = embedding_by_position.get(position)
             pooled_cache: dict[tuple[object, ...], list[float]] = {}
             for row_index in row_indexes:
                 context = contexts[row_index]
                 pool_scope = str(context.pooling_operation or "seq_mean")
                 if bundle.collect_output_layer_mean:
+                    output_out_id = _output_layer_out_id(pool_scope)
+                    if all_vals[output_out_id][row_index] is not None:
+                        continue
                     assert logits_tensor is not None
                     pooling_key = (
                         "output_layer_mean",
@@ -1093,8 +1171,11 @@ def _execute_sequence_view_feature_bundle(
                     cache_key = pooling_key if bundle.deduplicate.by_feature_vector_key else (*pooling_key, row_index)
                     if cache_key not in pooled_cache:
                         pooled_cache[cache_key] = _pool_tensor_for_context(logits_tensor, context=context)
-                    all_vals[_output_layer_out_id(pool_scope)][row_index] = pooled_cache[cache_key]
+                    all_vals[output_out_id][row_index] = pooled_cache[cache_key]
                 if bundle.collect_intermediate_embedding:
+                    intermediate_out_id = _intermediate_out_id(selector.intermediate_selector, pool_scope)
+                    if all_vals[intermediate_out_id][row_index] is not None:
+                        continue
                     assert embedding_tensor is not None
                     pooling_key = (
                         "intermediate_embedding",
@@ -1108,7 +1189,6 @@ def _execute_sequence_view_feature_bundle(
                     cache_key = pooling_key if bundle.deduplicate.by_feature_vector_key else (*pooling_key, row_index)
                     if cache_key not in pooled_cache:
                         pooled_cache[cache_key] = _pool_tensor_for_context(embedding_tensor, context=context)
-                    intermediate_out_id = _intermediate_out_id(selector.intermediate_selector, pool_scope)
                     all_vals[intermediate_out_id][row_index] = pooled_cache[cache_key]
         on_progress(completed_rows)
         start += take

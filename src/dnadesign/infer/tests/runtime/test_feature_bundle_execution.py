@@ -644,7 +644,7 @@ def test_run_extract_job_feature_bundle_templated_requires_construct_metadata(mo
         run_extract_job(inputs=records, model=model, job=job, progress_factory=None)
 
 
-def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equivalent_core60_and_seq_mean(
+def test_run_extract_job_feature_bundle_sequence_views_share_forward_pass_for_distinct_pooling_semantics(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -736,7 +736,7 @@ def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equiva
     assert adapter.embedding_call_count == 1
     assert len(out["metadata__view_id"]) == 2
     assert out["metadata__forward_pass_key"][0] == out["metadata__forward_pass_key"][1]
-    assert out["metadata__feature_vector_key"][0] == out["metadata__feature_vector_key"][1]
+    assert out["metadata__feature_vector_key"][0] != out["metadata__feature_vector_key"][1]
     assert out["metadata__context_kind"] == ["analysis_window", "anchor_only"]
     assert out["metadata__product_kind"] == ["analysis_window", "construct_insert"]
     assert out["metadata__pooling_operation"] == ["core60_mean", "seq_mean"]
@@ -750,7 +750,85 @@ def test_run_extract_job_feature_bundle_sequence_views_deduplicates_alias_equiva
     alias_table = pq.read_table(dataset.dir / FEATURE_ALIAS_RELATIVE_PATH).to_pylist()
     assert len(alias_table) == 4
     assert {row["representation_kind"] for row in alias_table} == {"output_layer_mean", "intermediate_embedding"}
-    assert len({row["feature_vector_key"] for row in alias_table}) == 2
+    assert len({row["feature_vector_key"] for row in alias_table}) == 4
+    assert {row["pooling_operation"] for row in alias_table} == {"core60_mean", "seq_mean"}
+
+
+def test_run_extract_job_feature_bundle_sequence_view_resume_skips_completed_vector_families(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer partial resume test")
+    add_result = dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="construct_insert60_view",
+                product_kind="construct_insert",
+                context_kind="anchor_only",
+                orientation="forward",
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="seq_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    vector_job = JobConfig(
+        id="reference_view_vectors",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "construct_insert"},
+                    "pooling": {"operation": "seq_mean"},
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _CountingFeatureAdapter())
+    run_extract_job(inputs=None, model=model, job=vector_job, progress_factory=None)
+
+    resume_adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: resume_adapter)
+    scalar_resume_job = JobConfig(
+        id="reference_view_scalars",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": True,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "construct_insert"},
+                    "pooling": {"operation": "seq_mean"},
+                }
+            ],
+        },
+    )
+
+    run_extract_job(inputs=None, model=model, job=scalar_resume_job, progress_factory=None)
+
+    assert resume_adapter.log_likelihood_reductions == ["sum", "mean"]
+    assert resume_adapter.logits_call_count == 0
+    assert resume_adapter.embedding_call_count == 0
+    assert (dataset.dir / FEATURE_SCALAR_ALIAS_RELATIVE_PATH).exists()
+    assert (dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).exists()
 
 
 def test_run_extract_job_feature_bundle_sequence_view_deduplicate_flags_control_execution_grouping(
