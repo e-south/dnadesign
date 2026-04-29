@@ -12,7 +12,7 @@ requires-python = ">=3.12,<3.13"
 
 dependencies = [
   "arviz>=0.23.0",
-  "biopython",
+  "biopython>=1.87",
   "igraph",
   "leidenalg",
   "logomaker",
@@ -23,7 +23,7 @@ dependencies = [
   "pandas",
   "pyarrow>=16",
   "pydantic",
-  "pygments",
+  "pygments>=2.20.0",
   "pymc",
   "python-levenshtein",
   "pyyaml",
@@ -46,7 +46,7 @@ dependencies = [
   "certifi>=2025.11.12",
   "keyring>=25.6.0",
   "fastparquet>=2025.12.0",
-  "marimo",
+  "marimo>=0.23.0",
   "openai>=2.14.0",
 ]
 
@@ -73,7 +73,7 @@ infer-evo2 = [
   "torchvision>=0.23,<0.24; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "torchaudio>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
-  "pip; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "pip>=26.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "wheel>=0.46.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -89,7 +89,7 @@ infer-evo2 = [
 ]
 
 [dependency-groups]
-test = ["pytest>=8.2", "pytest-cov", "hypothesis>=6.100"]
+test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
 
@@ -188,6 +188,11 @@ default-groups = []
 environments = [
   "sys_platform == 'darwin'",
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+constraint-dependencies = [
+  "cryptography>=46.0.7",
+  "onnx>=1.21.0",
+  "pillow>=12.2.0",
 ]
 
 # flash-attn + TE-torch must build against the same torch as the runtime env
