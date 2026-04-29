@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.infer.src.features.aliases import (
     compute_feature_alias_id,
     compute_feature_scalar_alias_id,

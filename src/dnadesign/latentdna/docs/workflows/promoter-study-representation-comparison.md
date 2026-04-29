@@ -137,11 +137,15 @@ workspace contract.
 
 ### Operator path
 
+Set `MPLCONFIGDIR=/tmp/dnadesign_mpl` on hosts where Matplotlib cannot write
+its default cache directory. Regenerate deliverables only when the status or
+snapshot command reports stale artifacts.
+
 ```bash
 # Publish the study-facing snapshot.
-uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json
+MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json
 # Verify the workspace contract after config or docs changes.
-uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep
+MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep
 # Inspect the canonical sidecar-backed active sources.
 uv run latentdna inspect source anchor_7b_seq_mean_features --workspace stress_ethanol_cipro_growth --json
 # Inspect the paired forward-context anchor-mean sidecar source.
@@ -149,13 +153,13 @@ uv run latentdna inspect source full_context_7b_forward_anchor_mean_features --w
 # Inspect the planned reference core60 sidecar source without requiring completed vectors.
 uv run latentdna inspect source reference_core60_7b_core60_mean_features --workspace stress_ethanol_cipro_growth --json
 # Check whether the representation-health gate is fresh enough to review.
-uv run latentdna deliverable status representation_health_summary --workspace stress_ethanol_cipro_growth
+MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna deliverable status representation_health_summary --workspace stress_ethanol_cipro_growth
 # Check whether the context-robustness summary is fresh enough to review.
-uv run latentdna deliverable status context_robustness_summary --workspace stress_ethanol_cipro_growth
+MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna deliverable status context_robustness_summary --workspace stress_ethanol_cipro_growth
 # Refresh the default review deliverable if freshness drift is reported.
-uv run latentdna deliverable run representation_health_summary --workspace stress_ethanol_cipro_growth
+MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna deliverable run representation_health_summary --workspace stress_ethanol_cipro_growth
 # Rebuild the `latent_geometry_browser` notebook after persisted artifacts refresh.
-uv run latentdna notebook generate latent_geometry_browser --workspace stress_ethanol_cipro_growth
+MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna notebook generate latent_geometry_browser --workspace stress_ethanol_cipro_growth
 ```
 
 ### Guardrails

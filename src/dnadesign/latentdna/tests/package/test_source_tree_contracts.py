@@ -31,6 +31,8 @@ def test_latentdna_root_keeps_progressive_disclosure_directories() -> None:
     assert (latentdna_root / "docs" / "dev").is_dir()
     assert (latentdna_root / "src").is_dir()
     assert (latentdna_root / "tests").is_dir()
+    assert (latentdna_root / "tests" / "sources").is_dir()
+    assert (latentdna_root / "tests" / "views").is_dir()
     assert (latentdna_root / "tests" / "perf").is_dir()
     assert (latentdna_root / "workspaces").is_dir()
 
