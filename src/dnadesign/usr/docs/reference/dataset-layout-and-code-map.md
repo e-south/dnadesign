@@ -241,7 +241,7 @@ Internal archive tooling:
 
 Shared repo-level test support:
 
-- `src/dnadesign/devtools/testsupport/usr.py`
+- `src/dnadesign/devtools/tests/support/usr.py`
   - shared USR registry fixture helpers for sibling package tests; cross-tool tests should not import `dnadesign.usr.tests.*`.
 
 ## Next steps

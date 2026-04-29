@@ -15,7 +15,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.devtools.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr.src.contracts import SequencesError
 from dnadesign.usr.src.dataset import Dataset
 

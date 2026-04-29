@@ -35,7 +35,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
   - `tests/datasets/` is allowed one more owned layer when mirroring stable source families; the current sanctioned dataset test buckets are `tests/datasets/core/`, `tests/datasets/lifecycle/`, `tests/datasets/merge/`, `tests/datasets/overlay/`, `tests/datasets/query/`, `tests/datasets/state/`, `tests/datasets/validate/`, and `tests/datasets/views/`.
   - `tests/overlays/support/` mirrors higher-level overlay support helpers; low-level overlay primitive tests stay in `tests/overlays/`.
   - `tests/sync/remote/` mirrors remote endpoint, diff, transfer, and sidecar helpers; `tests/sync/` stays focused on the sync facade.
-  - Shared test fixtures consumed outside USR belong under `src/dnadesign/devtools/testsupport/`, not under `dnadesign.usr.tests`.
+  - Shared test fixtures consumed outside USR belong under `src/dnadesign/devtools/tests/support/`, not under `dnadesign.usr.tests`.
 - Ops integration: `src/dnadesign/usr/ops/`
   - Keep only Ops-facing provider glue, stable ops entrypoints, and status registries here; dataset/sync implementation stays under `src/`.
   - `src/dnadesign/usr/ops/sync_audit_drill.py` owns the stable deterministic sync drill entrypoint exposed as `uv run usr-sync-audit-drill`.

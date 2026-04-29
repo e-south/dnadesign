@@ -17,7 +17,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr.src.cli import app
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.overlays import overlay_dir_path, overlay_path

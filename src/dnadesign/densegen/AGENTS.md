@@ -36,5 +36,5 @@ uv run dense inspect run --root src/dnadesign/densegen/workspaces
 ```bash
 uv run pytest -q src/dnadesign/densegen/tests/docs/test_densegen_docs_ia_contracts.py
 uv run pytest -q src/dnadesign/densegen/tests/docs/test_workspace_runbook_contracts.py
-uv run python -m dnadesign.devtools.docs_checks
+uv run python -m dnadesign.devtools.docs.checks
 ```

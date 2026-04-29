@@ -18,7 +18,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset, NamespaceError, SchemaError
 from dnadesign.usr.src.datasets.overlay import write as dataset_overlay_write_module
 from dnadesign.usr.src.datasets.query import create_overlay_view

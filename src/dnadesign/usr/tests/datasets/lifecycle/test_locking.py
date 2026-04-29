@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from pathlib import Path
 
-from dnadesign.devtools.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import dataset as dataset_module
 from dnadesign.usr.src.storage.locking import LOCK_FILENAME, dataset_write_lock

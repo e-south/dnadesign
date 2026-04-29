@@ -32,7 +32,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
   - `uv run ruff check .`
   - `uv run ruff format --check .`
   - `uv run pytest -q`
-  - `uv run python -m dnadesign.devtools.docs_checks`
+  - `uv run python -m dnadesign.devtools.docs.checks`
 - Discover CLIs:
   - check `[project.scripts]` in `pyproject.toml`
   - run `uv run <script> --help`

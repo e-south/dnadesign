@@ -14,7 +14,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import dnadesign.usr.src.cli as cli_module
-from dnadesign.devtools.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr import Dataset
 
 

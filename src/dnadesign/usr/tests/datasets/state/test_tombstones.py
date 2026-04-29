@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.devtools.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.overlays import overlay_metadata, overlay_path
 

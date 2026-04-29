@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pyarrow as pa
 
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr.src.dataset import Dataset
 
 

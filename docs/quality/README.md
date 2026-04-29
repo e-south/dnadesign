@@ -17,7 +17,7 @@ This index tracks quality expectations for tests, CI signal, coverage gates, and
 - [Codecov component status defaults](../../codecov.yml): `component_management.default_rules.statuses` enforces strict project-status semantics for every component.
 - [CI upload wiring](../../.github/workflows/ci.yaml): core/external integration lane uploads use `codecov/codecov-action@v5` with GitHub OIDC authentication (`use_oidc: true`).
 - [Coverage baselines](../../.github/tool-coverage-baseline.json): required per-tool floors.
-- [Coverage summary generator](../../src/dnadesign/devtools/coverage_summary.py): builds `quality-score-coverage-summary.json` from coverage + baseline contracts.
-- [Quality score input generator](../../src/dnadesign/devtools/quality_score.py): composes lane outcomes + coverage summary into `quality-score-inputs.json`.
+- [Coverage summary generator](../../src/dnadesign/devtools/quality/coverage_summary.py): builds `quality-score-coverage-summary.json` from coverage + baseline contracts.
+- [Quality score input generator](../../src/dnadesign/devtools/quality/score.py): composes lane outcomes + coverage summary into `quality-score-inputs.json`.
 - [Quality entropy report artifact](../../.github/workflows/ci.yaml): scheduled report for stale SOR metadata and broken evidence links.
 - [Developer docs](../dev/README.md): maintainer-level test and CI conventions.

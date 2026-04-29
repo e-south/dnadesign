@@ -29,7 +29,7 @@ Why:
 Validation:
 - `uv run pytest -q src/dnadesign/opal/tests/selection/test_expected_improvement_edge_cases.py`
 - `uv run pytest -q src/dnadesign/opal/tests/objectives/test_objective_contract_v2.py src/dnadesign/opal/tests/runtime/test_run_round_integrity.py::test_run_round_uses_selection_score_for_tie_expansion`
-- `uv run python -m dnadesign.devtools.docs_checks`
+- `uv run python -m dnadesign.devtools.docs.checks`
 
 ### 2026-02-20 SFXI uncertainty canon alignment plan
 
@@ -67,7 +67,7 @@ Validation:
 - `uv run ruff check src/dnadesign/opal/src/objectives/sfxi_v1.py src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py`
 - `uv run pytest -q src/dnadesign/opal/tests`
 - `uv run opal demo-matrix --rounds 0 --json`
-- `uv run python -m dnadesign.devtools.docs_checks`
+- `uv run python -m dnadesign.devtools.docs.checks`
 
 ### 2026-02-16 Guided demo workflows (CLI + docs)
 
@@ -1680,7 +1680,7 @@ Validation:
   - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
 - Lint/docs checks:
   - `uv run ruff check src/dnadesign/opal/src/config/loader.py src/dnadesign/opal/src/cli/commands/_common.py src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_config_objectives_v2.py` -> PASS
-  - `uv run python -m dnadesign.devtools.docs_checks` -> PASS
+  - `uv run python -m dnadesign.devtools.docs.checks` -> PASS
 - End-to-end CLI pressure checks:
   - `uv run opal demo-matrix --rounds 0,1 --json` -> PASS
   - `uv run opal demo-matrix --rounds 0 --json` -> PASS
@@ -1751,6 +1751,6 @@ Validation:
 - Full OPAL:
   - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
 - Docs checks:
-  - `uv run python -m dnadesign.devtools.docs_checks` -> PASS
+  - `uv run python -m dnadesign.devtools.docs.checks` -> PASS
 - Workflow smoke:
   - `uv run opal demo-matrix --rounds 0 --json` -> PASS

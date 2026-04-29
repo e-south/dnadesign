@@ -20,7 +20,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.devtools.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.contracts import REQUIRED_COLUMNS, VerificationError

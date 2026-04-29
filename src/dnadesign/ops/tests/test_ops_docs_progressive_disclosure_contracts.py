@@ -374,7 +374,7 @@ def test_dev_docs_index_is_action_oriented() -> None:
         label="docs/dev/README.md",
     )
     assert "journal.md" in text
-    assert "uv run python -m dnadesign.devtools.docs_checks --repo-root ." in text
+    assert "uv run python -m dnadesign.devtools.docs.checks --repo-root ." in text
     assert "for agents" not in text.lower()
     assert "for humans" not in text.lower()
 

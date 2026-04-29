@@ -21,7 +21,7 @@ import yaml
 from typer.testing import CliRunner
 
 import dnadesign.usr as usr_pkg
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.families.promoter.ops.provider import (
