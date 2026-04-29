@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from dnadesign.latentdna.src.services.workspace_snapshot_service import _decision_ladder
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from dnadesign.latentdna.src.services.workspace_snapshot_service import _decision_ladder, workspace_snapshot
 
 
 def _deliverable(
@@ -46,3 +49,69 @@ def test_decision_ladder_excludes_appendix_only_deliverables() -> None:
         "dataset_overview",
         "workspace_snapshot_export",
     ]
+
+
+def test_workspace_snapshot_omits_missing_planned_sources(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["row_01"],
+                "embedding": pa.array([[0.0, 1.0]], type=pa.list_(pa.float32())),
+            }
+        ),
+        inputs_dir / "native.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: snapshot_planned_source_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg]
+  neighbor_backend: auto
+sources:
+  native:
+    kind: parquet
+    path: ./inputs/native.parquet
+    record_key: id
+    subject_key: id
+  future_core60_features:
+    kind: parquet
+    path: ./inputs/not_yet_materialized.parquet
+    record_key: id
+    subject_key: id
+    role: planned
+views:
+  native_geometry:
+    source: native
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+    tags: {model: demo}
+    role: planned
+  future_core60_geometry:
+    source: future_core60_features
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+    tags: {model: demo}
+    role: planned
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    snapshot = workspace_snapshot(workspace_dir)
+
+    assert "native" in snapshot["sources"]
+    assert "future_core60_features" not in snapshot["sources"]

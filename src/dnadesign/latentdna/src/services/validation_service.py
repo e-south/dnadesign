@@ -6,7 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..contracts.errors import WorkspaceValidationError
+from dnadesign.usr import SequencesError
+
+from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
 from ..io.json_io import read_json
@@ -44,6 +46,21 @@ _PROMOTER_METADATA_ANY_COLUMN_GROUPS: dict[str, tuple[set[str], ...]] = {
     ),
 }
 _NON_MATERIALIZABLE_VIEW_ROLES = {"planned", "retired"}
+_OPTIONAL_SOURCE_ROLES = {"planned", "retired"}
+_MISSING_SOURCE_MARKERS = ("not found", "not initialized")
+
+
+def _normalized_role(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _is_optional_missing_source_error(exc: Exception) -> bool:
+    if isinstance(exc, FileNotFoundError):
+        return True
+    if not isinstance(exc, SourceResolutionError | SequencesError):
+        return False
+    message = str(exc).lower()
+    return any(marker in message for marker in _MISSING_SOURCE_MARKERS)
 
 
 def _materialized_view_source_contract_state(
@@ -118,11 +135,30 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     for source_id in sorted(context.config.sources):
         source = context.require_source(source_id)
         resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
-        schema_info = inspect_source_schema(resolved)
-        columns = set(schema_info["columns"])
         required_columns = [source.record_key, source.subject_key]
         if source.context_key is not None:
             required_columns.append(source.context_key)
+        try:
+            schema_info = inspect_source_schema(resolved)
+        except Exception as exc:
+            source_role = _normalized_role(getattr(source, "role", None))
+            if source_role not in _OPTIONAL_SOURCE_ROLES or not _is_optional_missing_source_error(exc):
+                raise
+            source_columns[source_id] = set()
+            source_details.append(
+                {
+                    "source_id": source_id,
+                    "kind": source.kind,
+                    "path": resolved.records_path.as_posix() if resolved.records_path is not None else None,
+                    "row_count": 0,
+                    "required_columns": required_columns,
+                    "vector_columns": [],
+                    "validation_status": f"skipped_{source_role}",
+                    "missing_reason": str(exc),
+                }
+            )
+            continue
+        columns = set(schema_info["columns"])
         missing_columns = [name for name in required_columns if name not in columns]
         if missing_columns:
             missing_rendered = ", ".join(missing_columns)

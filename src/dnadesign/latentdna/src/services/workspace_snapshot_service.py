@@ -7,7 +7,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dnadesign.usr import SequencesError
+
 from ..contracts.deliverable import DeliverableEntryStatus
+from ..contracts.errors import SourceResolutionError
 from ..contracts.workspace import (
     InferFeatureScalarSidecarSourceConfig,
     InferFeatureSidecarSourceConfig,
@@ -29,12 +32,35 @@ from ..services.notebook_geometry_controls import build_workspace_geometry_contr
 from ..sources.resolver import inspect_source_schema, resolve_source
 from ..workspaces.loader import load_workspace_config
 
+_OPTIONAL_SOURCE_ROLES = {"planned", "retired"}
+_MISSING_SOURCE_MARKERS = ("not found", "not initialized")
+
+
+def _normalized_role(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _is_optional_missing_source_error(exc: Exception) -> bool:
+    if isinstance(exc, FileNotFoundError):
+        return True
+    if not isinstance(exc, SourceResolutionError | SequencesError):
+        return False
+    message = str(exc).lower()
+    return any(marker in message for marker in _MISSING_SOURCE_MARKERS)
+
 
 def _source_snapshot(context) -> dict[str, WorkspaceSnapshotSource]:
     snapshots: dict[str, WorkspaceSnapshotSource] = {}
     for source_id, source in context.config.sources.items():
         resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
-        schema = inspect_source_schema(resolved)
+        try:
+            schema = inspect_source_schema(resolved)
+        except Exception as exc:
+            if _normalized_role(getattr(source, "role", None)) in _OPTIONAL_SOURCE_ROLES and (
+                _is_optional_missing_source_error(exc)
+            ):
+                continue
+            raise
         dataset_id: str | None = None
         if isinstance(source, USRSourceConfig):
             dataset_id = source.dataset

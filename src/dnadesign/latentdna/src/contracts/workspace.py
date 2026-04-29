@@ -100,6 +100,7 @@ class SourceBase(StrictWorkspaceModel):
     record_key: str
     subject_key: str
     context_key: str | None = None
+    role: str | None = None
     where: dict[str, Any] | None = None
     metadata_include: list[str] | None = None
     vector_cache_policy: str | None = None

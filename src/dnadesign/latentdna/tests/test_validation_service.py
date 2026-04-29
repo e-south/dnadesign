@@ -114,6 +114,98 @@ def test_deep_validate_workspace_marks_old_materialized_view_source_contract_sta
     assert detail["missing_materialized_row_columns"] == ["demo_metric"]
 
 
+def test_deep_validate_workspace_allows_missing_planned_source(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: validation_planned_source_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg]
+  neighbor_backend: auto
+sources:
+  future_core60_features:
+    kind: parquet
+    path: ./inputs/not_yet_materialized.parquet
+    record_key: id
+    subject_key: id
+    role: planned
+views:
+  future_core60_geometry:
+    source: future_core60_features
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+    tags: {model: demo}
+    role: planned
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = validate_workspace(workspace_dir, deep=True)
+
+    assert payload["status"] == "ok"
+    source_detail = next(item for item in payload["source_details"] if item["source_id"] == "future_core60_features")
+    assert source_detail["validation_status"] == "skipped_planned"
+    view_detail = next(item for item in payload["view_details"] if item["view_id"] == "future_core60_geometry")
+    assert view_detail["validation_status"] == "skipped_planned"
+
+
+def test_deep_validate_workspace_fails_for_malformed_planned_source(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(pa.table({"wrong_id": ["row_01"]}), inputs_dir / "malformed.parquet")
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: validation_malformed_planned_source_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg]
+  neighbor_backend: auto
+sources:
+  malformed_planned:
+    kind: parquet
+    path: ./inputs/malformed.parquet
+    record_key: id
+    subject_key: id
+    role: planned
+views:
+  malformed_geometry:
+    source: malformed_planned
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo_space
+    tags: {model: demo}
+    role: planned
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        validate_workspace(workspace_dir, deep=True)
+    except WorkspaceValidationError as exc:
+        assert "source malformed_planned is missing required columns" in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError("expected malformed planned source to fail")
+
+
 def test_deep_validate_accepts_sig35_cohort_from_sequence_annotation(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
