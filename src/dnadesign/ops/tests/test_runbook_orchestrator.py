@@ -4073,6 +4073,15 @@ def test_stress_ethanol_cipro_infer_presets_are_blackwell_pinned() -> None:
             "infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b"
             "_batch_with_notify.yaml"
         ),
+        ("infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml"),
+        (
+            "infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b"
+            "_batch_with_notify.yaml"
+        ),
+        (
+            "infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b"
+            "_batch_with_notify.yaml"
+        ),
     ):
         payload = yaml.safe_load((preset_dir / preset_name).read_text(encoding="utf-8"))
         resources = payload["runbook"]["resources"]
@@ -4092,6 +4101,9 @@ def test_stress_ethanol_cipro_infer_configs_match_pressure_test_matrix() -> None
         "config.sequence_views.anchor_construct_insert.evo2_7b.yaml": 128,
         "config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml": 128,
         "config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml": 128,
+        "config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml": 128,
+        "config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml": 128,
+        "config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml": 128,
         "config.anchor_only.evo2_20b.yaml": 256,
         "config.anchor_plus_template.evo2_20b.yaml": 48,
     }

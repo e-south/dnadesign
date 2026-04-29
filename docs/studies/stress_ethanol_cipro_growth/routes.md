@@ -38,11 +38,16 @@ This page keeps the downstream handoff map in one place.
 - Surface role: `operator`
 - Owner-boundary: `infer`
 - Current state: `infer_batch_preparation`
-- Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
+- Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`,
+  `construct_prom_eth_cip_reference_core60`, and
+  `construct_prom_eth_cip_reference_contexts`
 - Exit artifact: checked-in infer lane configs plus the next batch preset declared in `pipeline.yaml`
 - Primary doc/workspace: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md`
 - First command: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
-- Route note: Infer lanes are execution configs layered on top of the current study phase; they do not replace the study lifecycle record.
+- Route note: Infer lanes are execution configs layered on top of the current
+  study phase; they do not replace the study lifecycle record. Notify runbooks
+  are one USR event stream per lane, including the split reference core60,
+  reference-context-forward, and reference-context-reverse lanes.
 
 ### Construct anchor/context refresh
 

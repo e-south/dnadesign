@@ -18,6 +18,9 @@ study_pipeline:
       sequence_views_anchor_construct_insert: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml
       sequence_views_context_forward_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
       sequence_views_context_reverse_complement_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
+      sequence_views_reference_analysis_window_core60: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml
+      sequence_views_reference_context_forward_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+      sequence_views_reference_context_reverse_complement_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
     infer_batch_20b_with_notify:
       anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
       anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
@@ -48,6 +51,9 @@ study_pipeline:
       sequence_views_anchor_construct_insert_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
       sequence_views_context_forward_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
       sequence_views_context_reverse_complement_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
+      sequence_views_reference_analysis_window_core60_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml
+      sequence_views_reference_context_forward_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml
+      sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
       anchor_only_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
       anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
       full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml

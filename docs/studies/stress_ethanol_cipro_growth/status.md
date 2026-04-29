@@ -81,6 +81,10 @@
 - Present matched analysis-core dataset: `construct_prom_eth_cip_reference_core60`
 - Present reference context dataset: `construct_prom_eth_cip_reference_contexts`
 - Planned reference feature dataset: `infer_prom_eth_cip_reference_views_7b`
+- Reference Infer is now split into one Notify-compatible lane per USR event
+  stream: reference `analysis_window` core60, reference context forward, and
+  reference context reverse-complement. The combined reference config remains a
+  completion-planning surface only.
 - Sequence-view manifests live as dataset-local `_views/sequence_views.parquet` sidecars rather than a standalone study dataset
 - Mutable view-semantics addenda live in dataset-local `_views/view_semantics.parquet` sidecars.
   In this checkout they cover all `629213` active-study source, handoff, and
@@ -178,8 +182,9 @@
 - `usr.data-plane.promoter-study-preflight` now includes `sequence_view_contract` product checks and
   non-blocking `infer_sequence_view_completion` feature-completion checks. Product checks cover the
   merged anchor, merged context, reference core60, and reference context datasets. Feature-completion
-  checks run the main 7B sequence-view config and the reference 7B sequence-view config without
-  loading Evo2; product checks are current in this checkout, while feature-completion checks still
+  checks run the main 7B sequence-view config and the combined reference 7B planning config without
+  loading Evo2; the live reference Notify runbooks use the three split reference lane configs.
+  Product checks are current in this checkout, while feature-completion checks still
   report `attention` because output-layer, context sequence-mean, reverse-complement, reference, and
   the remaining `115 + 115` reusable-intermediate gaps still need Infer execution.
 - `usr.data-plane.promoter-study-status --json` now mirrors that situation at the cheap snapshot

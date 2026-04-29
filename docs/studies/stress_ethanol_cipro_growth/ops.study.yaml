@@ -23,6 +23,9 @@ lifecycle:
     - reference_core60_normalization
     - reference_context_forward
     - reference_context_reverse_complement
+    - infer_reference_analysis_window_core60_7b
+    - infer_reference_context_forward_seq_and_anchor_mean_7b
+    - infer_reference_context_reverse_complement_seq_and_anchor_mean_7b
     - infer_reference_views_7b
     - latentdna_reference_normalization_audit
     - infer_anchor_only_20b
@@ -81,6 +84,21 @@ phases:
     required_for_main_study_state: false
     output_dataset: construct_prom_eth_cip_reference_contexts
     next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/config.reference_core60_contexts.forward_rc.yaml
+  - id: infer_reference_analysis_window_core60_7b
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: infer_prom_eth_cip_reference_views_7b
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml
+  - id: infer_reference_context_forward_seq_and_anchor_mean_7b
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: infer_prom_eth_cip_reference_views_7b
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+  - id: infer_reference_context_reverse_complement_seq_and_anchor_mean_7b
+    status: planned
+    required_for_main_study_state: false
+    output_dataset: infer_prom_eth_cip_reference_views_7b
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
   - id: infer_reference_views_7b
     status: planned
     required_for_main_study_state: false
@@ -151,6 +169,15 @@ artifacts:
   infer_config_sequence_views_reference_7b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference.evo2_7b.yaml
+  infer_config_sequence_views_reference_analysis_window_core60_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml
+  infer_config_sequence_views_reference_context_forward_seq_and_anchor_mean_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml
+  infer_config_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
   infer_config_sequence_views_anchor_construct_insert_7b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
@@ -186,6 +213,15 @@ execution_surfaces:
   infer_batch_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: runbook
     runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
+  infer_batch_sequence_views_reference_analysis_window_core60_7b:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml
+  infer_batch_sequence_views_reference_context_forward_seq_and_anchor_mean_7b:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+  infer_batch_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
   scheduler_default:
     surface_type: scheduler
     backend: sge

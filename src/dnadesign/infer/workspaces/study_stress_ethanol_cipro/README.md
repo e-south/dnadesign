@@ -23,6 +23,9 @@ Configs:
 - `config.sequence_views.anchor_construct_insert.evo2_7b.yaml`
 - `config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml`
 - `config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml`
+- `config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml`
+- `config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml`
+- `config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml`
 - `config.yaml` points at the default 7B full-lane set
 
 Operational unit:
@@ -32,7 +35,10 @@ Operational unit:
 - use `config.sequence_views.anchor_construct_insert.evo2_7b.yaml`,
   `config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml`, and
   `config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml`
-  for cold-start, notify, and resumable batch work
+  for main-study cold-start, notify, and resumable batch work
+- use the three `config.sequence_views.reference_*` configs for reference
+  core60 and reference-context Notify lanes; the combined reference config is a
+  planning surface because it spans two USR event streams
 - keep the multi-job sequence-view config for completion planning; it is not
   the live Notify default because it spans multiple USR event streams
 - every 7B sequence-view lane collects intermediate embeddings, mean-pooled
@@ -51,6 +57,15 @@ uv run infer validate config \
 
 uv run infer validate config \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
+
+uv run infer validate config \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml
+
+uv run infer validate config \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml
+
+uv run infer validate config \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
 
 uv run infer validate config \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
@@ -108,6 +123,18 @@ uv run ops runbook plan \
 uv run ops runbook plan \
   --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml \
   --repo-root <repo-root>
+
+uv run ops runbook plan \
+  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml \
+  --repo-root <repo-root>
+
+uv run ops runbook plan \
+  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml \
+  --repo-root <repo-root>
+
+uv run ops runbook plan \
+  --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml \
+  --repo-root <repo-root>
 ```
 
 Planning those presets on this node requires the same webhook secret-file
@@ -156,6 +183,24 @@ uv run notify setup slack \
 uv run notify setup slack \
   --tool infer \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml \
+  --secret-source file \
+  --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
+
+uv run notify setup slack \
+  --tool infer \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml \
+  --secret-source file \
+  --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
+
+uv run notify setup slack \
+  --tool infer \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml \
+  --secret-source file \
+  --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
+
+uv run notify setup slack \
+  --tool infer \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml \
   --secret-source file \
   --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
 
