@@ -199,8 +199,12 @@ def _validate_workspace_snapshot(
     sources = snapshot.get("sources")
     if not isinstance(sources, Mapping):
         raise ValueError("latentdna snapshot 'sources' must be a mapping")
+    missing_binding_sources: list[str] = []
     for source_name in _snapshot_source_dataset_keys(binding):
         source_payload = sources.get(source_name)
+        if source_payload is None:
+            missing_binding_sources.append(source_name)
+            continue
         if not isinstance(source_payload, Mapping):
             raise ValueError(f"latentdna snapshot source {source_name!r} must be a mapping")
         for field in ("kind", "path", "row_count"):
@@ -217,8 +221,12 @@ def _validate_workspace_snapshot(
     deliverables = snapshot.get("deliverables")
     if not isinstance(deliverables, Mapping):
         raise ValueError("latentdna snapshot 'deliverables' must be a mapping")
+    missing_decision_deliverables: list[str] = []
     for deliverable_id in _string_list((binding or {}).get("decision_deliverables")):
         deliverable_payload = deliverables.get(deliverable_id)
+        if deliverable_payload is None:
+            missing_decision_deliverables.append(deliverable_id)
+            continue
         if not isinstance(deliverable_payload, Mapping):
             raise ValueError(f"latentdna snapshot deliverable {deliverable_id!r} must be a mapping")
         for field in ("title", "status", "freshness", "acceptance_checks", "artifact_paths", "docs_refs", "warnings"):
@@ -234,7 +242,11 @@ def _validate_workspace_snapshot(
         for field in ("status", "artifact_path", "manifest_path"):
             if field not in export_payload:
                 raise ValueError(f"latentdna snapshot export {export_id!r} missing required field {field!r}")
-    return dict(snapshot)
+    return {
+        **dict(snapshot),
+        "missing_binding_sources": missing_binding_sources,
+        "missing_decision_deliverables": missing_decision_deliverables,
+    }
 
 
 def load_latentdna_snapshot(

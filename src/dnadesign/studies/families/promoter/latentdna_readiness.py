@@ -99,6 +99,12 @@ def inspect_promoter_latentdna_readiness(
     deliverables_payload = snapshot.get("deliverables") if isinstance(snapshot, Mapping) else {}
     exports_payload = snapshot.get("exports") if isinstance(snapshot, Mapping) else {}
     browser_payload = snapshot.get("browser") if isinstance(snapshot, Mapping) else {}
+    missing_binding_sources = (
+        list(snapshot.get("missing_binding_sources") or []) if isinstance(snapshot, Mapping) else []
+    )
+    missing_decision_deliverables = (
+        list(snapshot.get("missing_decision_deliverables") or []) if isinstance(snapshot, Mapping) else []
+    )
 
     ok_deliverables = [
         deliverable_id
@@ -130,7 +136,7 @@ def inspect_promoter_latentdna_readiness(
         state = "missing"
     elif any(status == "error" for status in [*deliverable_statuses, *export_statuses]):
         state = "error"
-    elif pending_deliverables or any(status != "ok" for status in export_statuses):
+    elif missing_binding_sources or pending_deliverables or any(status != "ok" for status in export_statuses):
         state = "attention"
     else:
         state = "ok"
@@ -147,6 +153,8 @@ def inspect_promoter_latentdna_readiness(
         "decision_deliverables": decision_deliverables,
         "ok_deliverables": ok_deliverables,
         "pending_deliverables": pending_deliverables,
+        "missing_source_datasets": missing_binding_sources,
+        "missing_decision_deliverables": missing_decision_deliverables,
         "export_ids": export_ids,
         "exports_ok": all(status == "ok" for status in export_statuses) if export_statuses else True,
         "browser_default_geometry_ids": list((browser_payload or {}).get("default_geometry_ids") or []),

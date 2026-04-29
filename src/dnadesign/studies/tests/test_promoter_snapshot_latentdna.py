@@ -222,6 +222,7 @@ def test_inspect_promoter_latentdna_readiness_uses_binding_and_snapshot_contract
         "reference_core60": "promoter/demo_reference_core60",
         "reference_contexts": "promoter/demo_reference_contexts",
     }
+    assert readiness["missing_source_datasets"] == ["reference_contexts", "reference_core60"]
     assert readiness["ok_deliverables"] == [
         "dataset_overview",
         "representation_health_summary",
@@ -253,6 +254,16 @@ def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> Non
                 "native_source_records": "usr_regulondb_native_promoters",
                 "native_source_record_features_7b": "usr_regulondb_native_promoters/_derived/infer",
                 "core60_tss_upstream": "usr_regulondb_native_promoter_core60",
+                "core60_tss_upstream_7b_core60_mean_features": ("usr_regulondb_native_promoter_core60/_derived/infer"),
+                "core60_tss_upstream_7b_core60_mean_output_layer_features": (
+                    "usr_regulondb_native_promoter_core60/_derived/infer"
+                ),
+                "core60_tss_upstream_7b_core60_mean_log_likelihood_mean": (
+                    "usr_regulondb_native_promoter_core60/_derived/infer"
+                ),
+                "core60_tss_upstream_7b_core60_mean_log_likelihood_total": (
+                    "usr_regulondb_native_promoter_core60/_derived/infer"
+                ),
             },
             "supported_model_families": ["evo2_7b"],
             "default_model_family": "evo2_7b",
@@ -309,6 +320,16 @@ def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> Non
 
     assert binding["source_datasets"] == {
         "core60_tss_upstream": "usr_regulondb_native_promoter_core60",
+        "core60_tss_upstream_7b_core60_mean_features": "usr_regulondb_native_promoter_core60/_derived/infer",
+        "core60_tss_upstream_7b_core60_mean_log_likelihood_mean": (
+            "usr_regulondb_native_promoter_core60/_derived/infer"
+        ),
+        "core60_tss_upstream_7b_core60_mean_log_likelihood_total": (
+            "usr_regulondb_native_promoter_core60/_derived/infer"
+        ),
+        "core60_tss_upstream_7b_core60_mean_output_layer_features": (
+            "usr_regulondb_native_promoter_core60/_derived/infer"
+        ),
         "native_source_record_features_7b": "usr_regulondb_native_promoters/_derived/infer",
         "native_source_records": "usr_regulondb_native_promoters",
     }
@@ -318,6 +339,13 @@ def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> Non
         "native_source_record_features_7b",
         "native_source_records",
     ]
+    assert snapshot["missing_binding_sources"] == [
+        "core60_tss_upstream_7b_core60_mean_features",
+        "core60_tss_upstream_7b_core60_mean_log_likelihood_mean",
+        "core60_tss_upstream_7b_core60_mean_log_likelihood_total",
+        "core60_tss_upstream_7b_core60_mean_output_layer_features",
+    ]
+    assert snapshot["missing_decision_deliverables"] == []
 
 
 def test_inspect_promoter_latentdna_readiness_rejects_snapshot_schema_mismatch(tmp_path: Path) -> None:
