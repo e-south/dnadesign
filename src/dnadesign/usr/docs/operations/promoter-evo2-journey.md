@@ -27,7 +27,7 @@ The study record is the right place for current phase, dataset posture, and down
    Anchor-only routes can stay in the merged USR dataset.
    Template-backed routes should go through [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md) plus the Construct-owned [template/context contract](../../../construct/docs/reference/template-contexts.md).
 4. Run infer-owned Evo2 feature extraction.
-   Use [Evo2 promoter-study feature runbook](../../../infer/docs/operations/evo2-promoter-features.md) for validate, dry-run, run, and study-bound anchor/full-context feature extraction.
+   Use [Evo2 sequence-feature runbook](../../../infer/docs/operations/evo2-sequence-features.md) for validate, dry-run, run, and study-bound anchor/full-context feature extraction.
    Use [Evo2 provider reference](../../../infer/docs/reference/evo2-provider.md) for `evo2_7b`, `evo2_20b`, the model-aware intermediate default, pooling, and stored output names.
 5. Validate the optional Notify side branch only when watcher behavior matters.
    Use [Notify operations route](../../../../../docs/notify/README.md) or the operator manual [Notify: consuming Universal Sequence Record events](../../../../../docs/notify/usr-events.md).
@@ -51,7 +51,7 @@ The study record is the right place for current phase, dataset posture, and down
 - If you need the study-bound LatentDNA comparison workspace and workflow next, use [Promoter-study representation comparison](../../../latentdna/docs/workflows/promoter-study-representation-comparison.md).
 - If you need template-backed contexts such as `template_1kb` before feature extraction, use [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md).
 - If DenseGen, manual, and wildtype sources still need explicit merge/carry setup, use [Multi-source shared dataset assembly](multi-source-shared-dataset-assembly.md).
-- If the data-plane handoff is already clear and you only need the infer-owned Evo2 contract, use [Evo2 promoter-study feature runbook](../../../infer/docs/operations/evo2-promoter-features.md).
+- If the data-plane handoff is already clear and you only need the infer-owned Evo2 contract, use [Evo2 sequence-feature runbook](../../../infer/docs/operations/evo2-sequence-features.md).
 
 ### Related docs
 

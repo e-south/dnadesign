@@ -12,22 +12,22 @@ Module Author(s): Eric J. South
 from .contracts import (
     FEATURE_SCHEMA_VERSION,
     OpalMatrixExport,
-    PromoterContextConfig,
-    PromoterDebugConfig,
-    PromoterFeatureBundleConfig,
-    PromoterPoolingConfig,
     SelectorResolution,
     SequenceContextRecord,
+    SequenceFeatureBundleConfig,
+    SequenceFeatureContextConfig,
+    SequenceFeatureDebugConfig,
+    SequenceFeaturePoolingConfig,
 )
 from .selectors import canonical_selector_for_block, provider_layer_for_block, resolve_intermediate_selector
 
 __all__ = [
     "FEATURE_SCHEMA_VERSION",
     "OpalMatrixExport",
-    "PromoterContextConfig",
-    "PromoterDebugConfig",
-    "PromoterFeatureBundleConfig",
-    "PromoterPoolingConfig",
+    "SequenceFeatureContextConfig",
+    "SequenceFeatureDebugConfig",
+    "SequenceFeatureBundleConfig",
+    "SequenceFeaturePoolingConfig",
     "SelectorResolution",
     "SequenceContextRecord",
     "canonical_selector_for_block",

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/features/context.py
 
-Sequence-context resolution for Evo2 promoter feature extraction.
+Sequence-context resolution for Evo2 feature extraction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from ..errors import CapabilityError
-from .contracts import PromoterFeatureBundleConfig, SequenceContextRecord
+from .contracts import SequenceContextRecord, SequenceFeatureBundleConfig
 
 _CONSTRUCT_REQUIRED_COLUMNS = (
     "construct__context_id",
@@ -115,7 +115,7 @@ def _build_anchor_only_contexts(
     seqs: List[str],
     ids: Optional[List[str]],
     records: Optional[List[Dict[str, Any]]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> List[SequenceContextRecord]:
     contexts: list[SequenceContextRecord] = []
     for index, sequence in enumerate(seqs):
@@ -144,7 +144,7 @@ def _build_templated_contexts(
     *,
     seqs: List[str],
     rows: List[Dict[str, Any]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> List[SequenceContextRecord]:
     contexts: list[SequenceContextRecord] = []
     for index, sequence in enumerate(seqs):
@@ -199,7 +199,7 @@ def resolve_sequence_contexts(
     ids: Optional[List[str]],
     records: Optional[List[Dict[str, Any]]],
     ds,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> List[SequenceContextRecord]:
     if bundle.context.kind == "anchor_only":
         return _build_anchor_only_contexts(seqs=seqs, ids=ids, records=records, bundle=bundle)

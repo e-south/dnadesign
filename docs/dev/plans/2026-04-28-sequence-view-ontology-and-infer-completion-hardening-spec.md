@@ -561,7 +561,7 @@ Assertions:
 Evidence:
 
 - `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
+- `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 - focused docs/source diff review.
 
 #### `architecture-invariants`
@@ -589,7 +589,7 @@ Evidence:
 - Construct core60/context tests.
 - Infer sequence-view and alias tests.
 - Study/Ops status tests.
-- `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
+- `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
   when cross-tool imports change.
 
 #### `drift-gc`
@@ -626,7 +626,7 @@ Deliverables:
 
 Validation:
 
-- `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
+- `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 
 #### Slice 2: Add sequence-view semantic addendum support
 
@@ -919,24 +919,24 @@ Tests:
 
 #### Slice 8: Generalize without churn
 
-Status: partially implemented.
+Status: implemented for product kinds and Infer sequence-feature bundle naming.
 
 Done: product kinds are hard-cut to the generic vocabulary in code, configs,
 tests, docs, and local active-study sequence-view sidecars.
 
-Open: promoter-specific class names and some context-kind values remain as
-compatibility surfaces for existing configs.
+Open: context-kind values such as `anchor_only` and `template_1kb` remain
+generic sequence-context terms used by current configs.
 
 Deliverables:
 
 - Introduce generic docs language for sequence products, selected regions,
   analysis windows, and realized contexts. Implemented for product-kind terms.
-- Keep promoter-specific values as compatibility terms. Superseded for
-  product-kind values; generated active-study sidecars have been migrated
-  locally, but sync/publish handling remains required for other roots.
-- Do not rename `PromoterFeatureBundleConfig` until a generic
-  `SequenceFeatureBundleConfig` adapter exists and legacy configs are covered by
-  tests.
+- Keep promoter-specific values out of Infer-owned bundle contracts. Superseded
+  for product-kind values and sequence-feature config names; generated
+  active-study sidecars have been migrated locally, but sync/publish handling
+  remains required for other roots.
+- Use `SequenceFeatureBundleConfig` and `evo2_sequence_feature_v1` for the
+  Infer-owned bundle contract.
 
 Tests:
 
@@ -1067,7 +1067,7 @@ Disallowed degraded states:
 Focused checks after documentation-only changes:
 
 ```bash
-uv run python -m dnadesign.devtools.docs_checks --repo-root .
+uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
 
 Focused checks after USR sequence-view changes:
@@ -1114,7 +1114,7 @@ Repo-level checks before merging:
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest -q
-uv run python -m dnadesign.devtools.docs_checks --repo-root .
+uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
 
 ### Acceptance Checklist

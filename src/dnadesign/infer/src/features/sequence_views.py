@@ -27,7 +27,7 @@ from dnadesign.usr import (
 
 from ..errors import CapabilityError, ValidationError
 from .context import _bool_or_none
-from .contracts import PromoterFeatureBundleConfig, SequenceContextRecord
+from .contracts import SequenceContextRecord, SequenceFeatureBundleConfig
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ class SequenceViewInputLoadResult:
     missing_products: list[SequenceViewMissingProduct]
 
 
-def bundle_uses_sequence_views(bundle: PromoterFeatureBundleConfig) -> bool:
+def bundle_uses_sequence_views(bundle: SequenceFeatureBundleConfig) -> bool:
     return bool(bundle.sequence_view_inputs)
 
 
@@ -164,7 +164,7 @@ def _pooling_bounds_from_record(
 
 def load_sequence_view_input_records(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> list[dict[str, object]]:
     result = load_sequence_view_input_records_with_status(bundle=bundle)
     if result.missing_products:
@@ -175,7 +175,7 @@ def load_sequence_view_input_records(
 
 def load_sequence_view_input_records_with_status(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> SequenceViewInputLoadResult:
     if not bundle.sequence_view_inputs:
         return SequenceViewInputLoadResult(records=[], missing_products=[])

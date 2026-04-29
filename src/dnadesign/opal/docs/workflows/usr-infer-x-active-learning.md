@@ -17,7 +17,7 @@ Use this workflow when a USR dataset already contains one or more infer-derived 
 
 This workflow starts after infer write-back is already complete.
 
-For the Evo2 promoter feature bundle, `infer` may write several coordinated `infer__...` columns per job. In that case, use `dnadesign.infer.export_evo2_promoter_opal_matrix(...)` to flatten the chosen bundle into one deterministic `X` matrix before entering the OPAL round loop.
+For Evo2 sequence-feature bundles, `infer` may write several coordinated `infer__...` columns per job. In that case, use `dnadesign.infer.export_evo2_sequence_opal_matrix(...)` to flatten the chosen bundle into one deterministic `X` matrix before entering the OPAL round loop.
 
 ### Boundary decisions
 
@@ -30,7 +30,7 @@ For the Evo2 promoter feature bundle, `infer` may write several coordinated `inf
 
 - one USR dataset already exists at a known root
 - that dataset already has the chosen infer-derived `X` column such as `infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean`
-- or the Evo2 promoter bundle has already been exported into one deterministic `X` matrix outside OPAL
+- or the Evo2 sequence bundle has already been exported into one deterministic `X` matrix outside OPAL
 - labels will be ingested incrementally through OPAL rounds rather than attached silently during infer
 
 For the upstream shared-dataset and infer matrix assembly, use:

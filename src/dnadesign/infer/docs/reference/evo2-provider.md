@@ -1,11 +1,11 @@
 ## Evo2 Provider Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-04-28
 
-Use this page for the repo-aligned Evo2 promoter feature contract inside `infer`.
+Use this page for the repo-aligned Evo2 sequence-feature contract inside `infer`.
 
-### Supported promoter lane set
+### Supported Evo2 lanes
 
 - `evo2_7b`
 - `evo2_20b`
@@ -14,7 +14,7 @@ Use this page for the repo-aligned Evo2 promoter feature contract inside `infer`
 
 ### Project default intermediate selector
 
-`infer` uses a model-aware project default for promoter feature extraction.
+`infer` uses a model-aware project default for sequence-feature extraction.
 
 - this is a repo default, not a universal scientific claim
 - `evo2_7b` uses block `26` because public Evo 2 interpretability work examined layer 26 and reported biologically meaningful features there; see [Interpreting Evo 2](https://www.goodfire.ai/research/interpreting-evo-2)
@@ -34,7 +34,7 @@ The bundle resolves that to a model-aware canonical selector:
 
 ### Feature groups
 
-Default promoter bundles collect all three groups:
+Default feature bundles collect all three groups:
 
 - `log_likelihood`
 - `output_layer_mean`
@@ -50,7 +50,7 @@ Interpret these names as feature families, not persisted tensor shapes:
 
 ### Pooling modes
 
-For promoter bundles, `infer` uses:
+For feature bundles, `infer` uses:
 
 - `seq_mean`: mean across the full resolved sequence
 - `anchor_mean`: mean across the anchor span inside a templated context
@@ -70,7 +70,7 @@ For explicit 60 bp sequence views, `core60_mean` is semantically distinct metada
 the same feature-vector key as `seq_mean` when the emitted row is exactly 60 bp and the pooling
 span is the full sequence.
 This is a feature-alias rule, not a sequence-product rule: a natively 60 bp
-`construct_insert` should stay a promoter insert in USR, while a true
+`construct_insert` should stay an anchor insert in USR, while a true
 `analysis_window` row means Construct derived a 60 bp analysis-only view.
 
 ### Context ownership
@@ -79,7 +79,7 @@ This is a feature-alias rule, not a sequence-product rule: a natively 60 bp
 - `infer` reads that metadata and computes feature pooling
 - `infer` does not build templates internally
 
-Templated promoter bundles require these construct columns alongside the resolved sequence:
+Templated context bundles require these construct columns alongside the resolved sequence:
 
 - `construct__context_id`
 - `construct__template_id`
@@ -92,7 +92,7 @@ The generic USR persistence contract remains:
 
 - `infer__<model_id>__<job_id>__<out_id>`
 
-Promoter bundles emit stable out ids such as:
+Feature bundles emit stable out ids such as:
 
 - `log_likelihood__total`
 - `log_likelihood__mean_per_token`

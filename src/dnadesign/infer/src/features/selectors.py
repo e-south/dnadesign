@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/features/selectors.py
 
-Canonical selector resolution for Evo2 promoter feature extraction.
+Canonical selector resolution for Evo2 feature extraction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -55,15 +55,13 @@ def default_intermediate_block_for_model(model_id: str) -> int:
         return int(_MODEL_DEFAULT_INTERMEDIATE_BLOCK[model_id])
     except KeyError as e:
         rendered = ", ".join(sorted(_SUPPORTED_MODELS))
-        raise ConfigError(
-            f"Evo2 promoter feature bundle supports model.id values: {rendered}. Received '{model_id}'."
-        ) from e
+        raise ConfigError(f"Evo2 feature bundle supports model.id values: {rendered}. Received '{model_id}'.") from e
 
 
 def resolve_intermediate_selector(*, model_id: str, intermediate_block: int) -> SelectorResolution:
     if model_id not in _SUPPORTED_MODELS:
         rendered = ", ".join(sorted(_SUPPORTED_MODELS))
-        raise ConfigError(f"Evo2 promoter feature bundle supports model.id values: {rendered}. Received '{model_id}'.")
+        raise ConfigError(f"Evo2 feature bundle supports model.id values: {rendered}. Received '{model_id}'.")
     requested_block = int(intermediate_block)
     max_block = int(_MODEL_MAX_INTERMEDIATE_BLOCK[model_id])
     if requested_block > max_block:

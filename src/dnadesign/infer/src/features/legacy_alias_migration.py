@@ -21,7 +21,7 @@ from dnadesign.usr import Dataset
 from ..contracts import infer_usr_column_name
 from ..runtime.resume_planner import read_usr_columns
 from .aliases import compute_feature_alias_id, persist_feature_alias_rows, persist_feature_vector_rows
-from .contracts import PromoterFeatureBundleConfig, SequenceContextRecord
+from .contracts import SequenceContextRecord, SequenceFeatureBundleConfig
 from .execution import (
     _sequence_view_feature_vector_specs,
     build_feature_metadata_rows,
@@ -53,7 +53,7 @@ class LegacyAliasMigrationResult:
 
 def migrate_legacy_overlay_aliases(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str,
     legacy_job_id: str,
     write: bool = False,

@@ -24,11 +24,13 @@ from dnadesign.infer.cli import main as infer_cli_main
 
 def test_infer_public_api_exports_callable_wrappers() -> None:
     assert callable(infer.run_extract)
-    assert callable(infer.run_evo2_promoter_features)
+    assert callable(infer.run_evo2_sequence_features)
     assert callable(infer.run_generate)
     assert callable(infer.run_job)
-    assert callable(infer.export_evo2_promoter_opal_matrix)
+    assert callable(infer.export_evo2_sequence_opal_matrix)
     assert callable(infer.resolve_infer_runtime_lane_contracts)
+    assert not hasattr(infer, "run_evo2_promoter_features")
+    assert not hasattr(infer, "export_evo2_promoter_opal_matrix")
 
 
 def test_infer_cli_wrapper_exposes_main_callable() -> None:

@@ -25,7 +25,7 @@ from dnadesign.usr import Dataset, overlay_digest_ledger_path, overlay_parts
 
 from ..contracts import infer_usr_column_name
 from .aliases import load_feature_vector_keys
-from .contracts import PromoterFeatureBundleConfig
+from .contracts import SequenceFeatureBundleConfig
 from .execution import _sequence_view_feature_vector_specs, build_feature_metadata_rows
 from .legacy_alias_migration import (
     _has_legacy_metadata,
@@ -105,7 +105,7 @@ class StaleInferOverlayColumnPruneResult:
 
 def retire_legacy_overlay_payloads(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str,
     legacy_job_id: str,
     write: bool = False,

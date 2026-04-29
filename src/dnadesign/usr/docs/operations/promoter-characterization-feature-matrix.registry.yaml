@@ -32,7 +32,7 @@ related_tool_routes:
   - tool: infer
     route: evo2-provider
   - tool: infer
-    route: evo2-promoter-features
+    route: evo2-sequence-features
   - tool: cluster
     route: exploratory-clustering
   - tool: opal

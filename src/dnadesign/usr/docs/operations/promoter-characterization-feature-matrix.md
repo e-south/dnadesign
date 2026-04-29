@@ -121,7 +121,7 @@ datasets explicit:
 
 Use one infer config per model lane. Inside that config, keep the job ids explicit so downstream tools can choose feature columns without ambiguity.
 
-For the Evo2 promoter slice, prefer the infer-owned `feature_bundle` surface over hand-assembled output lists. That keeps the selector, pooling, metadata, and digest contract in one place.
+For the Evo2 sequence-feature slice, prefer the infer-owned `feature_bundle` surface over hand-assembled output lists. That keeps the selector, pooling, metadata, and digest contract in one place.
 
 Recommended job-id pattern:
 
@@ -152,7 +152,7 @@ model: # Configure one explicit Evo2 model lane per infer config.
   batch_size: 2 # Keep the first smoke batch small and reversible.
 
 jobs: # Keep context choice explicit as job ids inside the model lane.
-  - id: anchor_only_7b_features # Anchor-only promoter feature bundle.
+  - id: anchor_only_7b_features # Anchor-only Evo2 sequence-feature bundle.
     operation: extract # Run the feature extraction surface.
     ingest: # Read directly from the anchor-only USR dataset.
       source: usr # Use the USR ingest surface.
@@ -164,7 +164,7 @@ jobs: # Keep context choice explicit as job ids inside the model lane.
       context:
         kind: anchor_only # Anchor-only lane.
 
-  - id: template_1kb_7b_features # Construct-expanded promoter feature bundle.
+  - id: template_1kb_7b_features # Construct-expanded Evo2 sequence-feature bundle.
     operation: extract # Reuse the extract surface for the templated lane.
     ingest: # Read from the larger construct-backed context dataset.
       source: usr # Use the USR ingest surface.
@@ -241,7 +241,7 @@ Use OPAL only after the feature dataset already contains the chosen `infer__...`
 
 That workflow starts after the feature dataset already has the chosen `infer__...` column and OPAL is configured with `data.location.kind: usr`.
 
-When the promoter bundle should be consumed as one flattened `X` matrix instead of one raw infer column, export it explicitly with `dnadesign.infer.export_evo2_promoter_opal_matrix(...)` before switching to the downstream OPAL-owned procedure.
+When the sequence-feature bundle should be consumed as one flattened `X` matrix instead of one raw infer column, export it explicitly with `dnadesign.infer.export_evo2_sequence_opal_matrix(...)` before switching to the downstream OPAL-owned procedure.
 
 Continue with the OPAL-owned workflow for the full label-ingest and round-loop procedure:
 

@@ -30,7 +30,7 @@ related_tool_routes:
   - tool: construct
     route: template-contexts
   - tool: infer
-    route: evo2-promoter-features
+    route: evo2-sequence-features
   - tool: latentdna
     route: promoter-study-representation-comparison
   - tool: cluster

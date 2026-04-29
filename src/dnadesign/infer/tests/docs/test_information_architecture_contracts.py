@@ -49,7 +49,7 @@ def test_infer_top_readme_is_lightweight_router() -> None:
     assert "docs/index.md" in readme
     assert "docs/getting-started/cli-quickstart.md" in readme
     assert "workspaces/README.md" in readme
-    assert "docs/operations/evo2-promoter-features.md" in readme
+    assert "docs/operations/evo2-sequence-features.md" in readme
     assert "docs/operations/pressure-test-agnostic-models.md" in readme
     assert "docs/reference/README.md" in readme
     assert "../../../docs/README.md" in readme
@@ -76,7 +76,7 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "getting-started/cli-quickstart.md" in docs_readme
     assert "operations/README.md" in docs_readme
     assert "../workspaces/README.md" in docs_readme
-    assert "operations/evo2-promoter-features.md" in docs_readme
+    assert "operations/evo2-sequence-features.md" in docs_readme
     assert "operations/pressure-test-agnostic-models.md" in docs_readme
     assert "reference/evo2-provider.md" in docs_readme
     assert "reference/feature-schema.md" in docs_readme
@@ -130,14 +130,14 @@ def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
     assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_index
     assert "cluster exploratory workflow" in docs_index
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_index
-    assert "operations/evo2-promoter-features.md" in docs_index
+    assert "operations/evo2-sequence-features.md" in docs_index
     assert "reference/evo2-provider.md" in docs_index
     assert "reference/feature-schema.md" in docs_index
 
 
 def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
     ops_index = _read("src/dnadesign/infer/docs/operations/README.md")
-    assert "evo2-promoter-features.md" in ops_index
+    assert "evo2-sequence-features.md" in ops_index
     assert "pressure-test-agnostic-models.md" in ops_index
     assert "../tutorials/demo_pressure_test_usr_ops_notify.md" in ops_index
     assert "scc-evo2-gpu-uv-runbook.md" in ops_index

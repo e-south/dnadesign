@@ -14,6 +14,6 @@ routes:
   - id: evo2-provider
     path: reference/evo2-provider.md
     summary: Evo2 lane set, block-26 default, output naming, pooling, and persistence contract.
-  - id: evo2-promoter-features
-    path: operations/evo2-promoter-features.md
-    summary: Infer-owned promoter-study Evo2 feature runbook with validate, dry-run, run, and OPAL export handoff.
+  - id: evo2-sequence-features
+    path: operations/evo2-sequence-features.md
+    summary: Infer-owned Evo2 sequence-feature runbook with validate, dry-run, run, and OPAL export handoff.

@@ -1,9 +1,12 @@
-## Evo2 Promoter-Study Feature Runbook
+## Evo2 Sequence-Feature Runbook
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-18
 
-Use this runbook when you want the infer-owned part of a promoter-study feature flow without duplicating the USR-owned cross-tool workflow.
+Use this runbook when you want the infer-owned part of an Evo2 sequence-feature flow.
+The examples use anchor-only and template-context DNA records because those are
+the current promoter-study dogfood surfaces, but the contract is not
+promoter-specific.
 
 This page owns:
 
@@ -14,11 +17,12 @@ This page owns:
 
 This page does not own:
 
-- multi-source promoter-study dataset assembly
+- multi-source study dataset assembly
 - template realization with `construct`
 - downstream OPAL round logic
 
-Use the shared cross-tool promoter-study workflow here:
+Use the current cross-tool promoter-study workflow only when the task is about
+that specific checked-in study:
 
 - [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
 
@@ -99,9 +103,9 @@ The persisted USR columns still follow the generic infer contract:
 When the downstream branch wants one flattened `X` matrix, do not explode vectors in storage. Export them explicitly:
 
 ```python
-from dnadesign.infer import export_evo2_promoter_opal_matrix
+from dnadesign.infer import export_evo2_sequence_opal_matrix
 
-payload = export_evo2_promoter_opal_matrix(
+payload = export_evo2_sequence_opal_matrix(
     row_ids=row_ids,
     columnar=columnar,
     model_id="evo2_7b",

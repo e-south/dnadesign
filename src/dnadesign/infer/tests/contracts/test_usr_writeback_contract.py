@@ -19,7 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.engine import _plan_resume_for_usr, run_extract_job
 from dnadesign.infer.src.errors import RuntimeOOMError, WriteBackError

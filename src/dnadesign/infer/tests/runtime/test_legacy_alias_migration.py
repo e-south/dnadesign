@@ -17,10 +17,10 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from dnadesign.devtools.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.infer.src.contracts import infer_usr_column_name
 from dnadesign.infer.src.features.aliases import FEATURE_ALIAS_RELATIVE_PATH, FEATURE_VECTOR_RELATIVE_PATH
-from dnadesign.infer.src.features.contracts import PromoterFeatureBundleConfig
+from dnadesign.infer.src.features.contracts import SequenceFeatureBundleConfig
 from dnadesign.infer.src.features.legacy_alias_migration import migrate_legacy_overlay_aliases
 from dnadesign.infer.src.features.legacy_payload_retirement import (
     prune_stale_infer_overlay_columns,
@@ -60,8 +60,8 @@ def _dataset_with_forward_construct_insert(tmp_path: Path) -> tuple[Path, Datase
     return usr_root, dataset, sequence_id
 
 
-def _sequence_view_bundle(usr_root: Path, dataset: str, *, orientation: str = "forward") -> PromoterFeatureBundleConfig:
-    return PromoterFeatureBundleConfig(
+def _sequence_view_bundle(usr_root: Path, dataset: str, *, orientation: str = "forward") -> SequenceFeatureBundleConfig:
+    return SequenceFeatureBundleConfig(
         collect_log_likelihood=False,
         collect_output_layer_mean=False,
         sequence_view_inputs=[

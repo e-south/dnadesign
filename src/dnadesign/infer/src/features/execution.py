@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/features/execution.py
 
-Execution helpers for Evo2 promoter-feature bundles.
+Execution helpers for Evo2 feature bundles.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ from .aliases import (
 )
 from .cache_keys import compute_feature_vector_key, compute_forward_pass_key
 from .context import resolve_sequence_contexts
-from .contracts import PromoterFeatureBundleConfig, SequenceContextRecord
+from .contracts import SequenceContextRecord, SequenceFeatureBundleConfig
 from .selectors import canonical_selector_for_block, resolve_intermediate_selector
 from .sequence_views import bundle_uses_sequence_views, resolve_sequence_view_contexts
 
@@ -77,11 +77,11 @@ _METADATA_OUTPUT_FIELDS = (
 )
 
 
-def _templated_anchor_mean_enabled(bundle: PromoterFeatureBundleConfig) -> bool:
+def _templated_anchor_mean_enabled(bundle: SequenceFeatureBundleConfig) -> bool:
     return bundle.context.kind != "anchor_only" and bool(bundle.pooling.anchor_mean_for_templated)
 
 
-def _sequence_view_pooling_modes(bundle: PromoterFeatureBundleConfig) -> list[str]:
+def _sequence_view_pooling_modes(bundle: SequenceFeatureBundleConfig) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
     for input_cfg in bundle.sequence_view_inputs:
@@ -93,7 +93,7 @@ def _sequence_view_pooling_modes(bundle: PromoterFeatureBundleConfig) -> list[st
     return ordered
 
 
-def _pooling_modes(bundle: PromoterFeatureBundleConfig) -> list[str]:
+def _pooling_modes(bundle: SequenceFeatureBundleConfig) -> list[str]:
     if bundle_uses_sequence_views(bundle):
         return _sequence_view_pooling_modes(bundle)
     modes: list[str] = []
@@ -145,7 +145,7 @@ def _progress_pct(*, completed: int, target: int) -> float:
 
 def build_feature_bundle_outputs(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str | None = None,
 ) -> list[dict[str, object]]:
     selector = (
@@ -304,7 +304,7 @@ def _feature_bundle_logits_and_embedding(
 def _stable_feature_bundle_eval_batch_size(
     *,
     model_id: str,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     micro_batch_size: int,
 ) -> int | None:
     if micro_batch_size <= 0:
@@ -330,7 +330,7 @@ def _pad_feature_bundle_eval_sequences(
 
 def _feature_request_digest(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     context: SequenceContextRecord,
     model_id: str,
     selector: str,
@@ -368,7 +368,7 @@ def _forward_pass_key_for_context(
     context: SequenceContextRecord,
     model_id: str,
     selector: str,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> str:
     requested_layers = [selector] if bundle.collect_intermediate_embedding else []
     return compute_forward_pass_key(
@@ -388,7 +388,7 @@ def _primary_feature_vector_key_for_context(
     context: SequenceContextRecord,
     model_id: str,
     selector: str,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     forward_pass_key: str,
 ) -> str | None:
     pooling_operation, pooling_start_0, pooling_end_0 = _canonical_pooling_identity(context)
@@ -439,7 +439,7 @@ def _feature_vector_key_for_representation(
 def build_feature_metadata_rows(
     *,
     contexts: List[SequenceContextRecord],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str,
 ) -> list[dict[str, object]]:
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
@@ -635,7 +635,7 @@ def _sequence_view_feature_alias_rows(
     *,
     contexts: List[SequenceContextRecord],
     metadata_rows: list[dict[str, object]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     selector: str,
     model_id: str,
 ) -> list[dict[str, object]]:
@@ -715,7 +715,7 @@ def _sequence_view_feature_scalar_alias_rows(
     *,
     contexts: List[SequenceContextRecord],
     metadata_rows: list[dict[str, object]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str,
 ) -> list[dict[str, object]]:
     if not bundle.deduplicate.write_alias_map or not bundle.collect_log_likelihood:
@@ -759,7 +759,7 @@ def _sequence_view_feature_vector_specs(
     *,
     contexts: List[SequenceContextRecord],
     metadata_rows: list[dict[str, object]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     selector: str,
 ) -> list[dict[str, object]]:
     specs: list[dict[str, object]] = []
@@ -805,7 +805,7 @@ def _sequence_view_feature_scalar_specs(
     *,
     contexts: List[SequenceContextRecord],
     metadata_rows: list[dict[str, object]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
 ) -> list[dict[str, object]]:
     if not bundle.collect_log_likelihood:
         return []
@@ -933,7 +933,7 @@ def _execute_sequence_view_feature_bundle(
     seqs: List[str],
     records,
     model_id: str,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     existing: Mapping[str, List[object]],
     need_idx: List[int],
     adapter,
@@ -1145,7 +1145,7 @@ def execute_feature_bundle(
     ds,
     model_id: str,
     job_id: str,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     existing: Mapping[str, List[object]],
     need_idx: List[int],
     adapter,

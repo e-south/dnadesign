@@ -20,7 +20,7 @@ from .aliases import (
     load_feature_scalar_keys,
     load_feature_vector_keys,
 )
-from .contracts import PromoterFeatureBundleConfig
+from .contracts import SequenceFeatureBundleConfig
 from .execution import (
     _sequence_view_feature_scalar_specs,
     _sequence_view_feature_vector_specs,
@@ -140,7 +140,7 @@ def _existing_scalar_alias_ids(specs: list[dict[str, object]]) -> set[str]:
 
 def plan_sequence_view_feature_completion(
     *,
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str,
     job_id: str,
     bundle_id: str | None = None,

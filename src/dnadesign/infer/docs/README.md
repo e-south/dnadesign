@@ -20,8 +20,8 @@
 - [CLI quickstart](getting-started/cli-quickstart.md): run `validate`, ad-hoc `extract`, and ad-hoc `generate`.
 - [Reference index](reference/README.md): command and contract lookups before automation.
 
-#### Run a study-specific Evo2 feature bundle
-- [Evo2 promoter-study feature runbook](operations/evo2-promoter-features.md): repo-aligned feature-bundle flow with explicit anchor-only and templated contexts for promoter datasets.
+#### Run an Evo2 sequence-feature bundle
+- [Evo2 sequence-feature runbook](operations/evo2-sequence-features.md): repo-aligned feature-bundle flow with explicit anchor-only, templated-context, and sequence-view examples.
 - [Evo2 provider reference](reference/evo2-provider.md): supported checkpoints, default block 26 selector, and storage/debug defaults.
 - [Feature schema and selector contract](reference/feature-schema.md): output ids, metadata out ids, digests, and OPAL export ordering.
 - [evo2_feature_bundle_smoke workspace](../workspaces/evo2_feature_bundle_smoke/README.md): packaged feature-bundle smoke path with generic anchor and templated records.

@@ -1,13 +1,18 @@
-## Evo2 Promoter Feature Schema
+## Evo2 Sequence-View Feature Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-04-28
 
-Use this page when you need the stable bundle contract for promoter feature extraction.
+Use this page when you need the stable bundle contract for Evo2 feature extraction from explicit sequence views.
 The repository now supports two sibling surfaces:
 
-- legacy promoter-context bundles driven by `context.kind` plus bundle-level pooling flags
+- legacy context bundles driven by `context.kind` plus bundle-level pooling flags
 - explicit sequence-view bundles driven by `sequence_view_inputs[]`
+
+The v1 schema literal is `evo2_sequence_feature_v1`. It describes the generic
+Evo2 sequence-feature contract used by both row-context and explicit
+sequence-view bundles; promoter studies are inputs to that contract, not a
+separate Infer primitive.
 
 ### Row contract
 
@@ -21,7 +26,7 @@ The semantic bundle is one resolved context per row:
 
 ```yaml
 feature_bundle:
-  kind: evo2_promoter_v1
+  kind: evo2_sequence_feature_v1
   intermediate_block: 26  # legacy config default; evo2_20b resolves it to block 23
   collect_log_likelihood: true
   collect_output_layer_mean: true
@@ -43,7 +48,7 @@ Sequence-view bundles add an explicit view-selection surface:
 
 ```yaml
 feature_bundle:
-  kind: evo2_promoter_v1
+  kind: evo2_sequence_feature_v1
   collect_log_likelihood: false
   sequence_view_inputs:
     - dataset: construct_prom_eth_cip_reference_core60
@@ -64,9 +69,9 @@ feature_bundle:
 
 Sequence-view rules:
 
-- each resolved row is one explicit semantic view id, not one implicit promoter lane
+- each resolved row is one explicit semantic view id, not one implicit study lane
 - `construct_insert` views map to `context_kind=anchor_only`; they are the
-  merged construct-ready promoter/anchor handoff rows, not derived core60 rows
+  merged construct-ready anchor handoff rows, not derived core60 rows
 - `seq_mean`, `anchor_mean`, and `core60_mean` are row-level pooling operations
 - `anchor_mean` does not shorten the model input. Infer sends the full emitted sequence to the
   provider, then mean-pools token features over the explicit emitted-orientation
@@ -175,7 +180,9 @@ The canonical selector is the stable contract. Provider-layer strings are adapte
 
 ### Export contract for OPAL
 
-Use `dnadesign.infer.export_evo2_promoter_opal_matrix(...)` when OPAL needs a deterministic flattened matrix.
+Use `dnadesign.infer.export_evo2_sequence_opal_matrix(...)` when OPAL needs a deterministic flattened matrix.
+The helper name is legacy; the exported rows are keyed by feature metadata, not
+by a promoter-only primitive.
 
 Export guarantees:
 

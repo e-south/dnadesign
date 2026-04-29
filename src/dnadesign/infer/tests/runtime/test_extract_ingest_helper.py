@@ -17,7 +17,7 @@ import pytest
 
 from dnadesign.infer.src.config import IngestConfig
 from dnadesign.infer.src.errors import ConfigError, ValidationError
-from dnadesign.infer.src.features.contracts import PromoterFeatureBundleConfig
+from dnadesign.infer.src.features.contracts import SequenceFeatureBundleConfig
 from dnadesign.infer.src.runtime.ingest_loading import load_extract_ingest
 
 
@@ -114,7 +114,7 @@ def test_load_extract_ingest_unknown_source_fails_fast() -> None:
 
 def test_load_extract_ingest_sequence_view_bundle_uses_materialized_view_records(monkeypatch) -> None:
     ingest = IngestConfig(source="records", field="sequence")
-    bundle = PromoterFeatureBundleConfig(
+    bundle = SequenceFeatureBundleConfig(
         sequence_view_inputs=[
             {
                 "dataset": "demo_refs",

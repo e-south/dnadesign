@@ -16,7 +16,7 @@ from .bootstrap import initialize_registry
 from .config import JobConfig, ModelConfig, OutputSpec
 from .engine import run_extract_job, run_generate_job
 from .errors import ConfigError
-from .features.contracts import PromoterFeatureBundleConfig
+from .features.contracts import SequenceFeatureBundleConfig
 from .features.export import export_opal_matrix
 
 ProgressFactory = Optional[Callable[[str, int], Any]]  # returns handle with .update(n), .close()
@@ -100,11 +100,11 @@ def run_job(
         raise ConfigError(f"Unknown operation: {job_cfg.operation}")
 
 
-def run_evo2_promoter_features(
+def run_evo2_sequence_features(
     seqs: List[str],
     *,
     model_id: str,
-    bundle: Dict[str, Any] | PromoterFeatureBundleConfig,
+    bundle: Dict[str, Any] | SequenceFeatureBundleConfig,
     device: str | None = None,
     precision: str | None = None,
     alphabet: str | None = None,
@@ -114,7 +114,7 @@ def run_evo2_promoter_features(
     initialize_registry()
     if not isinstance(seqs, list) or not all(isinstance(x, str) for x in seqs):
         raise ConfigError("seqs must be list[str]")
-    bundle_cfg = bundle if isinstance(bundle, PromoterFeatureBundleConfig) else PromoterFeatureBundleConfig(**bundle)
+    bundle_cfg = bundle if isinstance(bundle, SequenceFeatureBundleConfig) else SequenceFeatureBundleConfig(**bundle)
     model = ModelConfig(
         id=model_id,
         device=device or "cpu",
@@ -123,7 +123,7 @@ def run_evo2_promoter_features(
         batch_size=batch_size,
     )
     job = JobConfig(
-        id=f"{bundle_cfg.context.kind}_promoter_features",
+        id=f"{bundle_cfg.context.kind}_sequence_features",
         operation="extract",
         ingest={"source": "sequences"},
         feature_bundle=bundle_cfg,
@@ -131,15 +131,15 @@ def run_evo2_promoter_features(
     return run_extract_job(seqs, model=model, job=job, progress_factory=progress_factory)
 
 
-def export_evo2_promoter_opal_matrix(
+def export_evo2_sequence_opal_matrix(
     *,
     row_ids: List[str],
     columnar: Dict[str, List[object]],
     model_id: str,
-    bundle: Dict[str, Any] | PromoterFeatureBundleConfig,
+    bundle: Dict[str, Any] | SequenceFeatureBundleConfig,
 ) -> Dict[str, object]:
     initialize_registry()
-    bundle_cfg = bundle if isinstance(bundle, PromoterFeatureBundleConfig) else PromoterFeatureBundleConfig(**bundle)
+    bundle_cfg = bundle if isinstance(bundle, SequenceFeatureBundleConfig) else SequenceFeatureBundleConfig(**bundle)
     export = export_opal_matrix(
         row_ids=row_ids,
         columnar=columnar,

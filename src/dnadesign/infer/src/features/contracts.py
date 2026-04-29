@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/features/contracts.py
 
-Semantic contracts for Evo2 promoter-feature extraction.
+Semantic contracts for Evo2 sequence-view feature extraction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,19 +16,19 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-FEATURE_SCHEMA_VERSION = "evo2_promoter_v1"
+FEATURE_SCHEMA_VERSION = "evo2_sequence_feature_v1"
 
 
 class _StrictFeatureModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class PromoterContextConfig(_StrictFeatureModel):
+class SequenceFeatureContextConfig(_StrictFeatureModel):
     kind: Literal["anchor_only", "template_1kb", "template_custom"] = "anchor_only"
     template_id: Optional[str] = None
 
     @model_validator(mode="after")
-    def _validate_context(self) -> "PromoterContextConfig":
+    def _validate_context(self) -> "SequenceFeatureContextConfig":
         if self.kind == "anchor_only" and self.template_id is not None:
             raise ValueError("feature_bundle.context.template_id is not allowed for kind='anchor_only'.")
         if self.kind == "template_custom" and not str(self.template_id or "").strip():
@@ -36,7 +36,7 @@ class PromoterContextConfig(_StrictFeatureModel):
         return self
 
 
-class PromoterPoolingConfig(_StrictFeatureModel):
+class SequenceFeaturePoolingConfig(_StrictFeatureModel):
     seq_mean: bool = True
     anchor_mean_for_templated: bool = True
 
@@ -90,32 +90,32 @@ class FeatureDeduplicateConfig(_StrictFeatureModel):
     write_alias_map: bool = True
 
 
-class PromoterDebugConfig(_StrictFeatureModel):
+class SequenceFeatureDebugConfig(_StrictFeatureModel):
     persist_tokenwise: bool = False
 
     @model_validator(mode="after")
-    def _reject_unimplemented_debug_mode(self) -> "PromoterDebugConfig":
+    def _reject_unimplemented_debug_mode(self) -> "SequenceFeatureDebugConfig":
         if self.persist_tokenwise:
             raise ValueError("feature_bundle.debug.persist_tokenwise is not supported in the repo-aligned v1 contract.")
         return self
 
 
-class PromoterFeatureBundleConfig(_StrictFeatureModel):
-    kind: Literal["evo2_promoter_v1"] = "evo2_promoter_v1"
+class SequenceFeatureBundleConfig(_StrictFeatureModel):
+    kind: Literal["evo2_sequence_feature_v1"] = "evo2_sequence_feature_v1"
     intermediate_block: int = Field(default=26, ge=0)
     collect_log_likelihood: bool = True
     collect_output_layer_mean: bool = True
     collect_output_embedding: Optional[bool] = None
     collect_intermediate_embedding: bool = True
-    context: PromoterContextConfig = Field(default_factory=PromoterContextConfig)
-    pooling: PromoterPoolingConfig = Field(default_factory=PromoterPoolingConfig)
+    context: SequenceFeatureContextConfig = Field(default_factory=SequenceFeatureContextConfig)
+    pooling: SequenceFeaturePoolingConfig = Field(default_factory=SequenceFeaturePoolingConfig)
     sequence_view_inputs: list[SequenceViewInputConfig] = Field(default_factory=list)
     deduplicate: FeatureDeduplicateConfig = Field(default_factory=FeatureDeduplicateConfig)
-    debug: PromoterDebugConfig = Field(default_factory=PromoterDebugConfig)
+    debug: SequenceFeatureDebugConfig = Field(default_factory=SequenceFeatureDebugConfig)
     feature_schema_version: str = FEATURE_SCHEMA_VERSION
 
     @model_validator(mode="after")
-    def _normalize_aliases_and_contract(self) -> "PromoterFeatureBundleConfig":
+    def _normalize_aliases_and_contract(self) -> "SequenceFeatureBundleConfig":
         if self.collect_output_embedding is not None:
             if self.collect_output_layer_mean not in {self.collect_output_embedding, True}:
                 raise ValueError(
@@ -135,9 +135,9 @@ class PromoterFeatureBundleConfig(_StrictFeatureModel):
 
         if not str(self.feature_schema_version or "").strip():
             raise ValueError("feature_bundle.feature_schema_version must be non-empty.")
-        if self.sequence_view_inputs and self.pooling != PromoterPoolingConfig():
+        if self.sequence_view_inputs and self.pooling != SequenceFeaturePoolingConfig():
             raise ValueError(
-                "feature_bundle.pooling is a legacy promoter-context contract and is not used with "
+                "feature_bundle.pooling is a legacy context contract and is not used with "
                 "feature_bundle.sequence_view_inputs."
             )
         return self

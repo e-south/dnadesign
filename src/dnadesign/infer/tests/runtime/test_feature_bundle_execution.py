@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/runtime/test_feature_bundle_execution.py
 
-Runtime contract tests for Evo2 promoter feature bundles.
+Runtime contract tests for Evo2 sequence-feature bundles.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import torch
 from Bio.Seq import Seq
 from pyarrow import parquet as pq
 
-from dnadesign.infer import export_evo2_promoter_opal_matrix
+from dnadesign.infer import export_evo2_sequence_opal_matrix
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.contracts import infer_usr_column_name
 from dnadesign.infer.src.engine import run_extract_job
@@ -1088,8 +1088,8 @@ def test_run_extract_job_feature_bundle_sequence_view_alias_map_tolerates_view_n
     assert adapter.embedding_call_count == 1
 
 
-def test_export_evo2_promoter_opal_matrix_keeps_deterministic_feature_order() -> None:
-    payload = export_evo2_promoter_opal_matrix(
+def test_export_evo2_sequence_opal_matrix_keeps_deterministic_feature_order() -> None:
+    payload = export_evo2_sequence_opal_matrix(
         row_ids=["row-1"],
         model_id="evo2_7b",
         bundle={"context": {"kind": "template_1kb"}},
@@ -1121,8 +1121,8 @@ def test_export_evo2_promoter_opal_matrix_keeps_deterministic_feature_order() ->
     assert payload["x"] == [[1.5, 0.5, 10.0, 11.0, 12.0, 13.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0]]
 
 
-def test_export_evo2_promoter_opal_matrix_skips_seq_mean_when_disabled() -> None:
-    payload = export_evo2_promoter_opal_matrix(
+def test_export_evo2_sequence_opal_matrix_skips_seq_mean_when_disabled() -> None:
+    payload = export_evo2_sequence_opal_matrix(
         row_ids=["row-1"],
         model_id="evo2_7b",
         bundle={
