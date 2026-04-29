@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-28
+- Last verified: 2026-04-29
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -172,6 +172,9 @@
 - Before submitting a new feature batch, use the sequence-view completion planner to separate
   canonical reusable vectors from missing work:
   `uv run infer validate sequence-view-completion --config <config.yaml> --format json`.
+  For host preflight and status loops over large partial datasets, add
+  `--mode inventory` so the check counts sidecar aliases and payload-key
+  inventory without deriving every missing feature key.
 - `usr.data-plane.promoter-study-preflight` now includes `sequence_view_contract` product checks and
   non-blocking `infer_sequence_view_completion` feature-completion checks. Product checks cover the
   merged anchor, merged context, reference core60, and reference context datasets. Feature-completion

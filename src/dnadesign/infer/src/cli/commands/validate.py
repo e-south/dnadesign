@@ -19,7 +19,10 @@ from typing import Optional
 import typer
 import yaml
 
-from dnadesign.infer import plan_sequence_view_feature_completion_from_config
+from dnadesign.infer import (
+    plan_sequence_view_feature_completion_from_config,
+    plan_sequence_view_feature_inventory_completion_from_config,
+)
 
 from ...config import RootConfig
 from ...ingest.sources import load_usr_input
@@ -134,10 +137,21 @@ def register(app: typer.Typer) -> None:
             "--max-missing-products",
             help="Fail if missing sequence-product selector count exceeds this threshold.",
         ),
+        mode: str = typer.Option(
+            "exact",
+            "--mode",
+            help="Completion planning mode: exact or inventory.",
+        ),
     ) -> None:
         try:
             cfg_path = discovery_config(config)
-            plans = list(plan_sequence_view_feature_completion_from_config(cfg_path, job=job))
+            normalized_mode = mode.strip().casefold()
+            if normalized_mode == "exact":
+                plans = list(plan_sequence_view_feature_completion_from_config(cfg_path, job=job))
+            elif normalized_mode == "inventory":
+                plans = list(plan_sequence_view_feature_inventory_completion_from_config(cfg_path, job=job))
+            else:
+                raise ValueError("mode must be one of: exact, inventory.")
             violations = _sequence_view_completion_threshold_violations(
                 plans=plans,
                 max_missing_vectors=max_missing_vectors,

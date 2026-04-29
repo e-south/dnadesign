@@ -223,6 +223,25 @@ jobs:
     assert '"missing_vectors":2' in (result.stdout or "")
     assert '"missing_scalars":0' in (result.stdout or "")
 
+    inventory_result = _RUNNER.invoke(
+        app,
+        [
+            "validate",
+            "sequence-view-completion",
+            "--config",
+            config.as_posix(),
+            "--format",
+            "json",
+            "--mode",
+            "inventory",
+        ],
+    )
+
+    assert inventory_result.exit_code == 0, inventory_result.stdout
+    assert '"required_views":1' in (inventory_result.stdout or "")
+    assert '"missing_vectors":2' in (inventory_result.stdout or "")
+    assert '"stale_vectors":0' in (inventory_result.stdout or "")
+
 
 def test_validate_sequence_view_completion_thresholds_fail_before_batch_submission(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"

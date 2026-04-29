@@ -96,6 +96,11 @@ Sequence-view rules:
 - Before large backfills, run `uv run infer validate sequence-view-completion
   --config <config.yaml> --format json` to classify vectors and scalars as
   reusable, stale, missing, or product-missing without loading the model.
+  Use `--mode inventory` for host preflight/status loops that must stay bounded:
+  it counts expected sequence-view products plus alias/payload sidecar
+  inventory, catches stale alias-to-payload references, and avoids deriving
+  every missing feature key for very large partial datasets. Keep the default
+  exact mode for deeper batch planning when the runtime cost is acceptable.
   Sequence-view `root` values resolve relative to the config file directory.
   USR row-overlay payload columns are not counted as sequence-view feature
   coverage.
