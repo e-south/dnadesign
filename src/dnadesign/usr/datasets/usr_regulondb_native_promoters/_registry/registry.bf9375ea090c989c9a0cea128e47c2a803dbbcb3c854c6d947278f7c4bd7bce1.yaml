@@ -1,0 +1,575 @@
+namespaces:
+  audit:
+    columns:
+    - name: audit__X_value
+      type: list<float64>
+    description: Audit overlay for demo dataset examples.
+    owner: usr
+  construct:
+    columns:
+    - name: construct__job
+      type: string
+    - name: construct__spec_id
+      type: string
+    - name: construct__context_id
+      type: string
+    - name: construct__context_kind
+      type: string
+    - name: construct__template_id
+      type: string
+    - name: construct__template_kind
+      type: string
+    - name: construct__template_source
+      type: string
+    - name: construct__template_dataset
+      type: string
+    - name: construct__template_field
+      type: string
+    - name: construct__template_record_id
+      type: string
+    - name: construct__template_sha256
+      type: string
+    - name: construct__template_length
+      type: int64
+    - name: construct__template_circular
+      type: bool
+    - name: construct__input_dataset
+      type: string
+    - name: construct__input_fields
+      type: list<string>
+    - name: construct__input_id
+      type: string
+    - name: construct__input_length
+      type: int64
+    - name: construct__anchor_id
+      type: string
+    - name: construct__anchor_orientation
+      type: string
+    - name: construct__anchor_start
+      type: int64
+    - name: construct__anchor_end
+      type: int64
+    - name: construct__mode
+      type: string
+    - name: construct__focal_part
+      type: string
+    - name: construct__focal_part_length
+      type: int64
+    - name: construct__window_semantics
+      type: string
+    - name: construct__window_reference
+      type: string
+    - name: construct__window_direction
+      type: string
+    - name: construct__window_size_bp
+      type: int64
+    - name: construct__window_upstream_bp
+      type: int64
+    - name: construct__window_downstream_bp
+      type: int64
+    - name: construct__window_offset_bp
+      type: int64
+    - name: construct__window_start
+      type: int64
+    - name: construct__window_end
+      type: int64
+    - name: construct__resolved_length
+      type: int64
+    - name: construct__full_construct_length
+      type: int64
+    - name: construct__parts
+      type: list<struct<name:string,role:string,sequence_source:string,sequence_field:string,placement_kind:string,orientation:string,template_start:int64,template_end:int64,realized_start:int64,realized_end:int64,length:int64>>
+    - name: construct__orientation
+      type: string
+    - name: construct__forward_anchor_start
+      type: int64
+    - name: construct__forward_anchor_end
+      type: int64
+    - name: construct__parent_forward_construct_id
+      type: string
+    description: Construct lineage overlays for realized DNA sequences.
+    owner: construct
+  construct_seed:
+    columns:
+    - name: construct_seed__label
+      type: string
+    - name: construct_seed__manifest_id
+      type: string
+    - name: construct_seed__role
+      type: string
+    - name: construct_seed__source_ref
+      type: string
+    - name: construct_seed__topology
+      type: string
+    - name: construct_seed__sha256
+      type: string
+    description: Construct bootstrap/import metadata for seeded input datasets.
+    owner: construct
+  densegen:
+    columns:
+    - name: densegen__schema_version
+      type: string
+    - name: densegen__created_at
+      type: string
+    - name: densegen__run_id
+      type: string
+    - name: densegen__length
+      type: int64
+    - name: densegen__plan
+      type: string
+    - name: densegen__input_name
+      type: string
+    - name: densegen__input_mode
+      type: string
+    - name: densegen__input_pwm_ids
+      type: list<string>
+    - name: densegen__used_tfbs
+      type: list<string>
+    - name: densegen__used_tfbs_detail
+      type: list<struct<part_kind:string,role:string,constraint_name:string,sequence:string,core_sequence:string,variant_id:string,spacer_length:int64,placement_index:int64,part_index:int64,regulator:string,motif_id:string,tfbs_id:string,orientation:string,offset:int64,offset_raw:int64,length:int64,end:int64,pad_left:int64,site_id:string,source:string,score_best_hit_raw:float64,score_theoretical_max:float64,score_relative_to_theoretical_max:float64,rank_among_mined_positive:int64,rank_among_selected:int64,tier:int64,selection_policy:string,nearest_selected_similarity:float64,nearest_selected_distance:float64,nearest_selected_distance_norm:float64,matched_start:int64,matched_stop:int64,matched_strand:string>>
+    - name: densegen__used_tf_counts
+      type: list<struct<tf:string,count:int64>>
+    - name: densegen__library_unique_tf_count
+      type: int64
+    - name: densegen__library_unique_tfbs_count
+      type: int64
+    - name: densegen__covers_all_tfs_in_solution
+      type: bool
+    - name: densegen__required_regulators
+      type: list<string>
+    - name: densegen__min_count_by_regulator
+      type: list<struct<tf:string,min_count:int64>>
+    - name: densegen__compression_ratio
+      type: float64
+    - name: densegen__sampling_library_hash
+      type: string
+    - name: densegen__sampling_library_index
+      type: int64
+    - name: densegen__sequence_validation
+      type: struct<validation_passed:bool,violations:list<struct<constraint:string,pattern:string,strand:string,position:int64,matched_seq:string,context_window:string>>>
+    - name: densegen__pad_used
+      type: bool
+    - name: densegen__pad_bases
+      type: int64
+    - name: densegen__pad_end
+      type: string
+    - name: densegen__pad_literal
+      type: string
+    - name: densegen__gc_total
+      type: float64
+    - name: densegen__gc_core
+      type: float64
+    - name: densegen__npz_ref
+      type: string
+    - name: densegen__npz_sha256
+      type: string
+    - name: densegen__npz_bytes
+      type: int64
+    - name: densegen__npz_fields
+      type: list<string>
+    description: DenseGen derived outputs.
+    owner: densegen
+  derived:
+    columns:
+    - name: derived__parent_id
+      type: string
+    - name: derived__parent_dataset
+      type: string
+    - name: derived__operation
+      type: string
+    - name: derived__product_kind
+      type: string
+    - name: derived__target_length
+      type: int64
+    - name: derived__source_interval_start_0
+      type: int64
+    - name: derived__source_interval_end_0
+      type: int64
+    - name: derived__source_intervals_0
+      type: list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>
+    - name: derived__orientation
+      type: string
+    - name: derived__template_id
+      type: string
+    - name: derived__template_dataset
+      type: string
+    - name: derived__focal_rule
+      type: string
+    - name: derived__focal_features
+      type: list<string>
+    - name: derived__focal_confidence
+      type: string
+    - name: derived__analysis_only
+      type: bool
+    - name: derived__added_left_bp
+      type: int64
+    - name: derived__added_right_bp
+      type: int64
+    - name: derived__added_sequence_source
+      type: string
+    - name: derived__features_retained
+      type: list<struct<feature_id:string,label:string,role_hint:string,feature_type:string,status:string,original_intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,derived_intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,clipped_bp:int64,reason:string>>
+    - name: derived__features_clipped
+      type: list<struct<feature_id:string,label:string,role_hint:string,feature_type:string,status:string,original_intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,derived_intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,clipped_bp:int64,reason:string>>
+    - name: derived__features_lost
+      type: list<struct<feature_id:string,label:string,role_hint:string,feature_type:string,status:string,original_intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,derived_intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,clipped_bp:int64,reason:string>>
+    - name: derived__created_by
+      type: string
+    - name: derived__spec_id
+      type: string
+    description: Derived-product lineage, focal selection, and feature-retention overlays.
+    owner: usr
+  infer:
+    columns:
+    - name: infer__evo2_20b__anchor_only_20b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__feature_request_digest
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__feature_request_digest
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__feature_request_digest
+      type: string
+    description: null
+    owner: null
+  mock:
+    columns:
+    - name: mock__X_value
+      type: list<float64>
+    - name: mock__some_other_value
+      type: float64
+    - name: mock__y_label
+      type: list<float64>
+    description: Mock attachment columns used in README examples.
+    owner: usr
+  opal:
+    columns:
+    - name: opal__demo__label_hist
+      type: list<struct<r:int64,src:string,ts:string,y:list<float64>>>
+    - name: opal__demo__latest_as_of_round
+      type: int64
+    - name: opal__demo__latest_pred_scalar
+      type: float64
+    description: OPAL demo campaign columns materialized in the packaged USR CLI example
+      dataset.
+    owner: opal
+  promoter_standard:
+    columns:
+    - name: promoter_standard__collection_id
+      type: string
+    - name: promoter_standard__promoter_id
+      type: string
+    - name: promoter_standard__display_name
+      type: string
+    - name: promoter_standard__role
+      type: string
+    - name: promoter_standard__strength_metric
+      type: string
+    - name: promoter_standard__strength_value
+      type: string
+    - name: promoter_standard__strength_value_numeric
+      type: float64
+    - name: promoter_standard__strength_reference
+      type: string
+    - name: promoter_standard__source_record
+      type: string
+    - name: promoter_standard__notes
+      type: string
+    description: Source-backed synthetic promoter standard strength and collection
+      metadata.
+    owner: usr
+  regulondb:
+    columns:
+    - name: regulondb__release
+      type: string
+    - name: regulondb__primary_source
+      type: string
+    - name: regulondb__source_strata_set
+      type: list<string>
+    - name: regulondb__primary_promoter_id
+      type: string
+    - name: regulondb__primary_promoter_name
+      type: string
+    - name: regulondb__promoter_alias_count
+      type: int64
+    - name: regulondb__sigma_factor_set
+      type: list<string>
+    - name: regulondb__sigma_factor_count
+      type: int64
+    - name: regulondb__confidence_level_set
+      type: list<string>
+    - name: regulondb__has_minus10_box
+      type: bool
+    - name: regulondb__has_minus35_box
+      type: bool
+    - name: regulondb__box_pattern
+      type: string
+    - name: regulondb__regulator_composition
+      type: string
+    - name: regulondb__regulon_count
+      type: int64
+    - name: regulondb__has_activator
+      type: bool
+    - name: regulondb__has_repressor
+      type: bool
+    - name: regulondb__tss_available
+      type: bool
+    - name: regulondb__metadata_completeness_class
+      type: string
+    - name: regulondb__raw_sequence_case_policy
+      type: string
+    - name: regulondb__has_sequence
+      type: bool
+    - name: regulondb__has_tss
+      type: bool
+    - name: regulondb__has_sigma
+      type: bool
+    - name: regulondb__has_confidence
+      type: bool
+    - name: regulondb__has_boxes
+      type: bool
+    - name: regulondb__has_regulatory_context
+      type: bool
+    - name: regulondb__has_citations
+      type: bool
+    description: Dense native RegulonDB promoter metadata summaries; sparse biological
+      facts live in dataset relation sidecars.
+    owner: usr
+  seq_annot:
+    columns:
+    - name: seq_annot__format
+      type: string
+    - name: seq_annot__source_file
+      type: string
+    - name: seq_annot__source_sha256
+      type: string
+    - name: seq_annot__source_artifact_uri
+      type: string
+    - name: seq_annot__parser
+      type: string
+    - name: seq_annot__parser_version
+      type: string
+    - name: seq_annot__record_id
+      type: string
+    - name: seq_annot__record_name
+      type: string
+    - name: seq_annot__description
+      type: string
+    - name: seq_annot__topology
+      type: string
+    - name: seq_annot__molecule_type
+      type: string
+    - name: seq_annot__sequence_region_start_0
+      type: int64
+    - name: seq_annot__sequence_region_end_0
+      type: int64
+    - name: seq_annot__features
+      type: list<struct<feature_id:string,feature_order:int64,feature_type:string,label:string,role_hint:string,location_raw:string,location_kind:string,start_0:int64,end_0:int64,strand:int64,intervals_0:list<struct<start_0:int64,end_0:int64,strand:int64,partial:bool>>,is_fuzzy:bool,is_compound:bool,qualifiers:list<struct<key:string,value:string>>,confidence:string,source:string>>
+    description: Imported source annotation overlays with preserved GenBank location
+      fidelity.
+    owner: usr
+  usr_label:
+    columns:
+    - name: usr_label__primary
+      type: string
+    - name: usr_label__aliases
+      type: list<string>
+    description: Human-readable labels and aliases for canonical sequence records.
+    owner: usr
+  usr_state:
+    columns:
+    - name: usr_state__masked
+      type: bool
+    - name: usr_state__qc_status
+      type: string
+    - name: usr_state__split
+      type: string
+    - name: usr_state__supersedes
+      type: string
+    - name: usr_state__lineage
+      type: list<string>
+    description: Reserved record-state overlay (masked/qc/split/lineage).
+    owner: usr
