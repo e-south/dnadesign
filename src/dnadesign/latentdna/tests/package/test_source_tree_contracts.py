@@ -38,7 +38,9 @@ def test_latentdna_root_keeps_progressive_disclosure_directories() -> None:
 def test_latentdna_root_keeps_minimal_top_level_surface() -> None:
     latentdna_root = _latentdna_root()
     observed = {
-        path.name for path in latentdna_root.iterdir() if path.name != "__pycache__" and not path.name.startswith(".")
+        path.name
+        for path in latentdna_root.iterdir()
+        if path.name != "__pycache__" and not path.name.startswith(".") and path.name != "AGENTS.md"
     }
     assert observed == {
         "README.md",

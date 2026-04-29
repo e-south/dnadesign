@@ -366,7 +366,9 @@ meta.yaml
 # ADEs
 AGENTS.md
 !src/dnadesign/baserender/AGENTS.md
+!src/dnadesign/construct/AGENTS.md
 !src/dnadesign/cruncher/AGENTS.md
+!src/dnadesign/latentdna/AGENTS.md
 !src/dnadesign/notify/AGENTS.md
 src/dnadesign/notify/.secrets/
 
