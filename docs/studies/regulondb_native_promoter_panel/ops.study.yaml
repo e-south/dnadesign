@@ -80,17 +80,40 @@ artifacts:
     artifact_type: dataset
     dataset_id: usr_regulondb_native_promoters
     ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoters
+  construct_workspace_root:
+    artifact_type: file
+    ref: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
+  construct_core60_config:
+    artifact_type: file
+    ref: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel/config.core60.yaml
+  construct_core60_dataset:
+    artifact_type: dataset
+    dataset_id: usr_regulondb_native_promoter_core60
+    ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoter_core60
+  infer_native_full_config_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+  infer_native_full_runbook_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
+  infer_native_full_dataset_7b:
+    artifact_type: dataset
+    dataset_id: infer_regulondb_native_promoter_views_7b
+    ref: repo:src/dnadesign/usr/datasets/infer_regulondb_native_promoter_views_7b
+  infer_workspace_root:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
+  notify_native_full_profile_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/native_full_7b/profile.json
+  latentdna_binding:
+    artifact_type: file
+    ref: manifest:latentdna_binding.yaml
+  latentdna_workspace_root:
+    artifact_type: file
+    ref: repo:src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel
 
 execution_surfaces:
-  usr_import_dry_run:
-    surface_type: command
-    argv:
-      - uv
-      - run
-      - python
-      - src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
-      - --export-dir
-      - <cruncher-promoter-export-dir>
   usr_validate_native_dataset:
     surface_type: command
     argv:
@@ -115,8 +138,11 @@ preflight:
     study_record: regulondb_source_inventory
     cruncher_contract: regulondb_source_inventory
     usr_import_contract: regulondb_source_inventory
-    usr_import_runtime: usr_ingest_dry_run
     usr_validation: metadata_overlay_validation
+    construct: core60_view_definition
+    infer: native_full_infer_7b
+    notify: native_full_infer_7b
+    latentdna: latentdna_native_audit
   checks:
     regulondb_source_inventory:
       - kind: path_exists
@@ -149,29 +175,91 @@ preflight:
         summary: USR registry declares the regulondb overlay namespace.
         required: true
         artifact: usr_registry
-    usr_ingest_dry_run:
-      - kind: command
-        check_id: usr.import.dry_run.command.declared
-        check_group: usr_import_runtime
-        summary: Dry-run import command is declared; replace the export placeholder before execution.
-        required: false
-        surface: usr_import_dry_run
     metadata_overlay_validation:
+      - kind: path_exists
+        check_id: usr.native.dataset.present
+        check_group: usr_validation
+        summary: Native RegulonDB promoter USR dataset is present in the canonical USR root.
+        required: true
+        artifact: native_promoter_dataset
       - kind: command
         check_id: usr.native.validation.command.declared
         check_group: usr_validation
         summary: Native dataset validation command is declared for after committed import.
-        required: false
+        required: true
         surface: usr_validate_native_dataset
+    native_full_infer_7b:
+      - kind: path_exists
+        check_id: infer.workspace.layout
+        check_group: infer
+        summary: RegulonDB Infer workspace root is present.
+        required: true
+        artifact: infer_workspace_root
+      - kind: path_exists
+        check_id: infer.config.native_full_7b.present
+        check_group: infer
+        summary: Native/full 7B Infer sequence-view config is present.
+        required: true
+        artifact: infer_native_full_config_7b
+      - kind: path_exists
+        check_id: infer.runbook.native_full_7b.present
+        check_group: infer
+        summary: Native/full 7B Infer batch runbook is present.
+        required: true
+        artifact: infer_native_full_runbook_7b
+      - kind: path_exists
+        check_id: notify.profile.native_full_7b.present
+        check_group: notify
+        summary: Native/full 7B Notify profile is present.
+        required: true
+        artifact: notify_native_full_profile_7b
+    core60_view_definition:
+      - kind: path_exists
+        check_id: construct.workspace.layout
+        check_group: construct
+        summary: RegulonDB Construct workspace root is present.
+        required: true
+        artifact: construct_workspace_root
+      - kind: path_exists
+        check_id: construct.core60.config.present
+        check_group: construct
+        summary: Native promoter core60 Construct config is present.
+        required: true
+        artifact: construct_core60_config
+      - kind: path_exists
+        check_id: construct.core60.dataset.present
+        check_group: construct
+        summary: Native promoter core60 derived dataset is present.
+        required: true
+        artifact: construct_core60_dataset
+    latentdna_native_audit:
+      - kind: path_exists
+        check_id: latentdna.binding.present
+        check_group: latentdna
+        summary: RegulonDB LatentDNA study binding is present.
+        required: true
+        artifact: latentdna_binding
+      - kind: path_exists
+        check_id: latentdna.workspace.layout
+        check_group: latentdna
+        summary: RegulonDB LatentDNA workspace root is present.
+        required: true
+        artifact: latentdna_workspace_root
+      - kind: path_exists
+        check_id: latentdna.input.native_full_7b.present
+        check_group: latentdna
+        summary: Native/full 7B feature dataset is present for LatentDNA.
+        required: true
+        artifact: infer_native_full_dataset_7b
   next_scope:
     target_phase_groups:
       regulondb_source_inventory: [study_record, cruncher_contract, usr_import_contract]
       cruncher_promoter_export: [study_record, cruncher_contract]
-      usr_ingest_dry_run: [study_record, usr_import_contract, usr_import_runtime]
-      usr_native_promoter_import: [study_record, usr_import_contract, usr_import_runtime]
+      usr_ingest_dry_run: [study_record, usr_import_contract]
+      usr_native_promoter_import: [study_record, usr_import_contract]
       metadata_overlay_validation: [study_record, usr_validation]
-      native_full_infer_7b: [study_record]
-      core60_view_definition: [study_record]
-      latentdna_native_audit: [study_record]
+      native_full_infer_7b: [study_record, infer, notify]
+      core60_view_definition: [study_record, construct]
+      latentdna_native_audit: [study_record, latentdna]
     runtime_phase_groups: []
     runtime_shared_groups: []

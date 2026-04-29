@@ -1,14 +1,14 @@
 ## regulondb_native_promoter_panel Routes
 
-**Last verified:** 2026-04-28
+**Last verified:** 2026-04-29
 
 Use this page after the checked-in study status establishes the current phase.
-This study remains inactive/draft for downstream work, but the source dataset
-has been generated locally for validation. The generated USR dataset root is not
-git-tracked.
+This study remains inactive/source-intake-only for downstream work. The native
+USR dataset is materialized locally and validated, but it is a generated data
+artifact and is not git-tracked.
 
 - Status: `uv run ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json`
-- Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --json`
+- Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json`
 
 ### Source Intake
 
@@ -52,6 +52,10 @@ source stratum.
 - First command: `uv run python src/dnadesign/usr/scripts/create_regulondb_native_promoters.py --export-dir <cruncher-promoter-export-dir>`
 - Write command: `uv run python src/dnadesign/usr/scripts/create_regulondb_native_promoters.py --export-dir <cruncher-promoter-export-dir> --write`
 - Route note: Dry-run is the default. Write mode refuses to overwrite an existing dataset. The generated dataset must have no duplicate canonical sequence rows, no duplicate source-alias rows, no non-ACGT sequence content, no orphan `usr_id` relation rows, and no sparse source-specific base columns.
+- Readiness note: this route is complete in the current checkout when
+  `src/dnadesign/usr/datasets/usr_regulondb_native_promoters/records.parquet`
+  exists and `uv run usr validate usr_regulondb_native_promoters --strict`
+  passes. Both checks passed locally on 2026-04-29.
 
 The USR import creates dense `regulondb__*` overlay summaries on
 `records.parquet`, source-record sequence views in
@@ -78,10 +82,24 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `planned`
+- Current state: `not_configured`
 - Entry artifact: `usr_regulondb_native_promoters`
 - Exit artifact: `infer_regulondb_native_promoter_views_7b`
-- Route note: This route remains blocked until USR validation passes.
+- Route note: This route remains blocked until USR validation passes and a
+  checked-in Infer sequence-view config plus notify-backed runbook exists.
+
+### Construct Native/Core60/Context
+
+- Type: `route`
+- Plane: `data-plane`
+- Surface role: `derivation`
+- Owner-boundary: `construct`
+- Current state: `not_configured`
+- Entry artifact: `usr_regulondb_native_promoters`
+- Exit artifact: explicit derived core60 and context USR datasets once rules are accepted
+- Route note: Native `source_record` rows are the source view. Core60 or context
+  views must be new explicit derivations with sequence-view contracts, not
+  reinterpretations of the native source rows.
 
 ### LatentDNA Native Audit
 
@@ -89,6 +107,6 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `planned`
+- Current state: `not_configured`
 - Entry artifact: native/full and later core60 7B feature surfaces
-- Route note: Native cohorts use `regulondb__*` fields. They must not derive DenseGen metadata or alias native sigma factors into `sig35_variant`.
+- Route note: Native cohorts use `regulondb__*` fields. They must not derive DenseGen metadata or alias native sigma factors into `sig35_variant`. This route needs a checked-in `latentdna_binding.yaml`, workspace config, snapshot, deliverables, and browser hue plan before it can be treated as an executable downstream surface.
