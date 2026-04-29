@@ -22,6 +22,7 @@ from dnadesign.studies.core.models import (
     StudyPreflightContract,
     StudyPreflightNextScopeContract,
 )
+from dnadesign.studies.families.promoter import adapter as promoter_adapter
 from dnadesign.studies.families.promoter.infer_runtime import PromoterStudyInferRuntimeDependencies
 from dnadesign.studies.families.promoter.preflight import (
     PromoterPreflightContextDependencies,
@@ -58,6 +59,27 @@ def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str
         stderr=stderr,
         timed_out=False,
     )
+
+
+def test_promoter_preflight_command_runner_applies_operator_timeout(tmp_path: Path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _run_progress_command(argv, *, cwd, timeout_seconds=180):
+        captured["argv"] = tuple(argv)
+        captured["cwd"] = cwd
+        captured["timeout_seconds"] = timeout_seconds
+        return _execution(tuple(argv), cwd, returncode=0, stdout="ok")
+
+    monkeypatch.setattr(promoter_adapter, "run_preflight_command", _run_progress_command)
+
+    runner = promoter_adapter._build_preflight_command_runner(7)
+    runner(("uv", "--version"), cwd=tmp_path, timeout_seconds=180)
+
+    assert captured == {
+        "argv": ("uv", "--version"),
+        "cwd": tmp_path,
+        "timeout_seconds": 7,
+    }
 
 
 def test_resolve_promoter_preflight_context_uses_contract_scope_groups_and_runtime_lane_order(tmp_path: Path) -> None:

@@ -70,7 +70,7 @@ Snapshot answers record-backed questions:
 
 Escalate to preflight when the question is about blockers or readiness:
 
-- `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+- `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
 
 Preflight answers readiness questions:
 

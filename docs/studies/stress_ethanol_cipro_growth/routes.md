@@ -1,13 +1,13 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-04-27
+**Last verified:** 2026-04-29
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
 This page keeps the downstream handoff map in one place.
 
 - Status: `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+- Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
 - LatentDNA downstream snapshot: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - Snapshot route inventory: `evidence.analysis_surfaces.{densegen,latentdna,cluster}`
 
@@ -41,7 +41,7 @@ This page keeps the downstream handoff map in one place.
 - Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
 - Exit artifact: checked-in infer lane configs plus the next batch preset declared in `pipeline.yaml`
 - Primary doc/workspace: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md`
-- First command: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+- First command: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
 - Route note: Infer lanes are execution configs layered on top of the current study phase; they do not replace the study lifecycle record.
 
 ### Construct anchor/context refresh
@@ -95,6 +95,7 @@ This page keeps the downstream handoff map in one place.
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
 - Browser default geometry layout: candidate grid over the available 7B sequence-view sidecar geometries: construct-insert `seq_mean` and forward 1 kb context `anchor_mean`. Concat is retired from the current study plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, reverse-complement context anchor mean, and reference-view features are planned until Infer sidecars exist. Mean-pooled output-layer logits and log-likelihoods are collected diagnostics, not current decision geometry.
+- Browser hue controls are workspace-configured, not promoter hardcoded. The current browser promotes study metadata carried on materialized view rows, including `source_family`, `selection_basis`, `promoter_standard__collection_id`, and continuous `promoter_standard__strength_value_numeric` when those columns are present.
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors

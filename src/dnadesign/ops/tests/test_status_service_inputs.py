@@ -58,7 +58,7 @@ def test_build_status_inputs_applies_declared_default_scope() -> None:
 
     resolved = build_status_inputs(spec=spec, raw_inputs={}, repo_root=Path("/tmp/repo"))
 
-    assert resolved == {"scope": "next"}
+    assert resolved == {"scope": "next", "command_timeout_seconds": 180}
 
 
 def test_build_status_inputs_coerces_latentdna_workspace_repo_path() -> None:

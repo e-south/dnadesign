@@ -145,10 +145,14 @@ class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
         context: StudyStatusContext,
         *,
         scope: str | None,
+        command_timeout_seconds: object | None = None,
     ) -> tuple[str, str, dict[str, object]]:
         study_context = _study_family_context(context).study_context
         evidence = dict(study_context.evidence)
         evidence["ops_study_contract"] = dict(context.contract.raw_payload)
+        resolved_command_timeout_seconds = _resolve_preflight_command_timeout_seconds(command_timeout_seconds)
+        if resolved_command_timeout_seconds is not None:
+            evidence["command_timeout_seconds"] = resolved_command_timeout_seconds
         missing_result = _missing_promoter_study_result(context=study_context, evidence=evidence)
         if missing_result is not None:
             return missing_result
@@ -168,7 +172,7 @@ class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
             context=resolved_context,
             evidence=evidence,
             dependencies=PromoterPreflightCoordinatorDependencies(
-                run_preflight_command=run_preflight_command,
+                run_preflight_command=_build_preflight_command_runner(resolved_command_timeout_seconds),
                 execute_runbook_plan=execute_runbook_plan,
                 safe_json_loads=safe_json_loads,
                 choose_command_summary=choose_command_summary,
@@ -179,6 +183,31 @@ class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
 
 
 STUDY_FAMILY_ADAPTER = PromoterStudyFamilyAdapter()
+
+
+def _resolve_preflight_command_timeout_seconds(value: object | None) -> int | None:
+    resolved = optional_positive_int(value)
+    if resolved is None:
+        return None
+    if resolved <= 0:
+        raise ValueError("promoter-study-preflight command_timeout_seconds must be greater than zero")
+    return resolved
+
+
+def _build_preflight_command_runner(command_timeout_seconds: int | None):
+    def _run_preflight_command(
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        timeout_seconds: int | float = 180,
+    ):
+        return run_preflight_command(
+            argv,
+            cwd=cwd,
+            timeout_seconds=command_timeout_seconds if command_timeout_seconds is not None else timeout_seconds,
+        )
+
+    return _run_preflight_command
 
 
 def discover_active_study_dir(

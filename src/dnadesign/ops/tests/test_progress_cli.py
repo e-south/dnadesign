@@ -3369,6 +3369,10 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
                 "phase and defers later-lane blockers."
             ),
         },
+        {
+            "cli_flag": "--command-timeout-seconds",
+            "summary": "Per-command timeout for command-backed preflight checks on this host.",
+        },
     ]
     assert kinds["cruncher-study-preflight"]["observes_plane"] == "execution_readiness"
     assert kinds["cruncher-study-preflight"]["surface_type"] == "study_preflight"
@@ -3439,6 +3443,7 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_preflight_
     assert result.exit_code == 0
     assert "--study-dir" in result.output
     assert "--scope" in result.output
+    assert "--command-timeout-seconds" in result.output
     assert "Preflight scope for promoter-study-preflight" in result.output
 
 

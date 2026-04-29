@@ -41,6 +41,7 @@ def provide_promoter_preflight(
     return STUDY_FAMILY_ADAPTER.build_preflight(
         context,
         scope=inputs.get("scope"),
+        command_timeout_seconds=inputs.get("command_timeout_seconds"),
     )
 
 

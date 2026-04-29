@@ -196,7 +196,7 @@
   `uv run ops progress show usr.data-plane.promoter-study-status --json`
 - If you need the downstream representation-comparison surface after reading the record-plane snapshot, refresh the LatentDNA workspace snapshot:
   `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
-- If you need blockers or next-run readiness, switch to `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+- If you need blockers or next-run readiness, switch to `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
 - Treat sidecar-backed 7B intermediate embeddings as the active candidate `X` blocks. Mean-pooled
   output-layer logits and log-likelihoods are collected by Infer for diagnostics/QC, but they are not
   active LatentDNA geometry defaults.

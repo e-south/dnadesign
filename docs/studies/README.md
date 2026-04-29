@@ -1,7 +1,7 @@
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-13
+**Last verified:** 2026-04-29
 
 Use this index for `where is the real study right now?`, not for generic
 workflow routing.
@@ -33,7 +33,7 @@ Use these surfaces in order:
 | Need | Surface | Why |
 | --- | --- | --- |
 | Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of the active study record. |
-| What blocks the next execution step here? | `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` | Command-level readiness for the next actionable phase on this host. |
+| What blocks the next execution step here? | `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json` | Command-level readiness for the next actionable phase on this host. |
 | Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
 
 ### Family shortcuts
@@ -61,7 +61,7 @@ visible:
 3. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`
    only when the question is about the repo-wide active promoter study.
 4. Run
-   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
    only when the question is blocker or next-run readiness for that same active
    promoter study.
 5. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
@@ -241,7 +241,7 @@ for the first pull rather than relying on local name guessing.
 - Status summary:
   `uv run ops progress show usr.data-plane.promoter-study-status --json`
 - Command preflight:
-  `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+  `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
 - To pin a non-active study or run from outside the repo checkout, add:
   `--repo-root <repo-root> --study-dir docs/studies/<study-id>`
 - The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.
@@ -265,7 +265,7 @@ for the first pull rather than relying on local name guessing.
   generic workspace docs.
 - Use `ops progress show usr.data-plane.promoter-study-status` for the cheap
   record-plane snapshot, then escalate to
-  `ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+  `ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
   when the question is "what should run next?" or "which execution-readiness
   blockers remain right now?" Use the returned ontology fields such as
   `observes_plane`, `summary_scope`, `scope`, `phase_id`, `group_id`, `kind`,
