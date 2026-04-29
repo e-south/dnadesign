@@ -17,6 +17,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from typing import get_args
 
 import pytest
@@ -27,6 +28,7 @@ import dnadesign.ops.orchestrator.state as orchestrator_state
 import dnadesign.ops.runbooks.schema as runbook_schema
 from dnadesign.ops.cli import app
 from dnadesign.ops.orchestrator.execute import execute_batch_plan
+from dnadesign.ops.orchestrator.infer_fill import build_infer_fill_plan, execute_infer_fill_plan
 from dnadesign.ops.orchestrator.mode_tools import resolve_mode_tool_adapter_for_workflow_id
 from dnadesign.ops.orchestrator.plan import (
     BatchPlan,
@@ -251,6 +253,42 @@ jobs:
             },
         }
     }
+
+
+def _write_sequence_view_infer_config(config_path: Path) -> None:
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: sequence_view_job
+    operation: extract
+    ingest:
+      source: records
+      field: sequence
+    feature_bundle:
+      intermediate_block: 26
+      collect_log_likelihood: true
+      collect_output_layer_mean: true
+      collect_intermediate_embedding: true
+      sequence_view_inputs:
+        - dataset: demo_sequence_views
+          root: ../../usr/datasets
+          view_selector:
+            product_kind: source_record
+          pooling:
+            operation: seq_mean
+    io:
+      write_back: false
+      overwrite: false
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -967,6 +1005,192 @@ def test_build_batch_plan_forwards_allow_fresh_reset(tmp_path: Path, monkeypatch
     assert captured["active_job_ids"] == ()
     assert captured["allow_fresh_reset"] is True
     assert plan.selected_mode == "fresh"
+
+
+def test_infer_sequence_view_auto_mode_does_not_force_overwrite(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_sequence_view")
+    runbook_path = tmp_path / "runbook.yaml"
+    runbook_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    runbook = load_orchestration_runbook(runbook_path)
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode=None, active_job_ids=())
+
+    assert decision.selected_mode == "fresh"
+    assert decision.run_args == ""
+
+
+def test_infer_sequence_view_plan_uses_sidecar_guard_not_overlay_guard(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_sequence_view")
+    runbook = load_orchestration_runbook(tmp_path / "runbook.yaml", raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+    preflight_block = _render_block(plan.preflight_commands)
+    submit_block = _render_block(plan.submit_commands)
+
+    assert "infer validate sequence-view-completion" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates usr-overlay-guard" not in preflight_block
+    assert "INFER_RUN_ARGS" not in preflight_block
+    assert "INFER_RUN_ARGS" not in submit_block
+
+
+def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dnadesign.ops.orchestrator.infer_fill as infer_fill
+
+    repo_root = tmp_path
+    study_dir = repo_root / "docs" / "studies" / "demo"
+    study_dir.mkdir(parents=True)
+    workspace_root = repo_root / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    runbook_path = repo_root / "runbooks" / "infer.yaml"
+    runbook_path.parent.mkdir(parents=True)
+    runbook_path.write_text(
+        yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_sequence_view")),
+        encoding="utf-8",
+    )
+    (study_dir / "ops.study.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "execution_surfaces": {
+                    "infer_sequence_views": {
+                        "surface_type": "runbook",
+                        "runbook_ref": "repo:runbooks/infer.yaml",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        infer_fill,
+        "plan_sequence_view_feature_inventory_completion_from_config",
+        lambda _config: (
+            {
+                "required_views": 2,
+                "required_vectors": 4,
+                "required_scalars": 4,
+                "missing_products": 0,
+                "missing_vectors": 3,
+                "missing_scalars": 2,
+                "stale_vectors": 0,
+                "stale_scalars": 0,
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "resolve_active_job_resolution",
+        lambda **_kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.SKIPPED,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.NO_MATCH,
+                degraded=False,
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "build_batch_plan",
+        lambda **_kwargs: SimpleNamespace(submit_commands=("notify", "infer"), as_dict=lambda: {"fake": True}),
+    )
+
+    fill_plan = build_infer_fill_plan(repo_root=repo_root, study_dir=study_dir)
+
+    assert fill_plan.aggregate_submit_commands == 2
+    assert len(fill_plan.lanes) == 1
+    lane = fill_plan.lanes[0]
+    assert lane.action == "run"
+    assert lane.missing_vectors == 3
+    assert lane.missing_scalars == 2
+    assert lane.audit_json_path == workspace_root / "outputs" / "logs" / "ops" / "audit" / (
+        "infer_sequence_view.fill-infer.json"
+    )
+
+
+def test_infer_fill_blocks_missing_sequence_products_before_batch_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dnadesign.ops.orchestrator.infer_fill as infer_fill
+
+    workspace_root = tmp_path / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    runbook_path = tmp_path / "infer.yaml"
+    runbook_path.write_text(
+        yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_missing_products")),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "plan_sequence_view_feature_inventory_completion_from_config",
+        lambda _config: (
+            {
+                "required_views": 2,
+                "required_vectors": 4,
+                "required_scalars": 4,
+                "missing_products": 1,
+                "missing_vectors": 3,
+                "missing_scalars": 2,
+                "stale_vectors": 0,
+                "stale_scalars": 0,
+            },
+        ),
+    )
+
+    def _unexpected_batch_plan(**_kwargs):
+        raise AssertionError("missing sequence products must block before batch planning")
+
+    monkeypatch.setattr(infer_fill, "build_batch_plan", _unexpected_batch_plan)
+
+    fill_plan = build_infer_fill_plan(repo_root=tmp_path, runbook_paths=(runbook_path,))
+
+    assert fill_plan.aggregate_submit_commands == 0
+    assert fill_plan.lanes[0].action == "blocked"
+    assert "missing sequence products block submit" in fill_plan.lanes[0].reasons
+
+    executed = execute_infer_fill_plan(fill_plan=fill_plan, submit=True)
+
+    assert executed.ok is False
+    assert executed.executed is False
+    assert "infer_missing_products: lane blocked: missing sequence products block submit" in executed.errors
+
+
+def test_infer_fill_skips_infer_runbooks_without_sequence_view_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dnadesign.ops.orchestrator.infer_fill as infer_fill
+
+    workspace_root = tmp_path / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    runbook_path = tmp_path / "infer.yaml"
+    runbook_path.write_text(
+        yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_legacy_features")),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "plan_sequence_view_feature_inventory_completion_from_config",
+        lambda _config: (_ for _ in ()).throw(ValueError("No selected jobs use feature_bundle.sequence_view_inputs.")),
+    )
+
+    def _unexpected_batch_plan(**_kwargs):
+        raise AssertionError("unsupported Infer runbooks should not reach batch planning")
+
+    monkeypatch.setattr(infer_fill, "build_batch_plan", _unexpected_batch_plan)
+
+    fill_plan = build_infer_fill_plan(repo_root=tmp_path, runbook_paths=(runbook_path,))
+
+    assert fill_plan.aggregate_submit_commands == 0
+    assert fill_plan.lanes[0].action == "skip_unsupported"
+    assert fill_plan.lanes[0].reasons == ("legacy/non-sequence-view Infer config skipped before SGE plan rendering",)
 
 
 def test_discover_active_job_ids_matches_explicit_identity_tags(

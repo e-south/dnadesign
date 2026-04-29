@@ -303,39 +303,15 @@ def _infer_preflight_commands(
         raise ValueError("infer plan adapter requires runbook.infer")
     config = str(runbook.infer.config)
     infer_template = str(runbook.infer.qsub_template)
-    infer_overlay_guard = runbook.infer.overlay_guard
-    infer_overlay_guard_parts: list[str] = [
-        "usr-overlay-guard",
-        "--tool",
-        "infer",
-        "--config",
-        config,
-        "--workspace-root",
-        str(runbook.workspace_root),
-        "--mode",
-        mode_decision.selected_mode,
-        "--run-args",
-        mode_decision.run_args,
-        "--max-projected-overlay-parts",
-        str(infer_overlay_guard.max_projected_overlay_parts),
-        "--max-existing-overlay-parts",
-        str(infer_overlay_guard.max_existing_overlay_parts),
-        "--overlay-namespace",
-        infer_overlay_guard.overlay_namespace,
-        "--json",
-    ]
-    if infer_overlay_guard.auto_compact_existing_overlay_parts:
-        infer_overlay_guard_parts.append("--auto-compact-existing-overlay-parts")
+    uses_sequence_views = _infer_config_uses_sequence_view_inputs(Path(runbook.infer.config))
     infer_env: dict[str, str] = {"INFER_CONFIG": config}
     if mode_decision.run_args:
         infer_env["INFER_RUN_ARGS"] = mode_decision.run_args
     infer_env["CUDA_MODULE"] = runbook.infer.cuda_module
     infer_env["GCC_MODULE"] = runbook.infer.gcc_module
 
-    commands = [
-        _tool_ops_gate(*infer_overlay_guard_parts),
-    ]
-    if _infer_config_uses_sequence_view_inputs(Path(runbook.infer.config)):
+    commands: list[ToolCommandSpec] = []
+    if uses_sequence_views:
         commands.append(
             _tool_argv(
                 "uv",
@@ -355,6 +331,31 @@ def _infer_preflight_commands(
                 "0",
             )
         )
+    else:
+        infer_overlay_guard = runbook.infer.overlay_guard
+        infer_overlay_guard_parts: list[str] = [
+            "usr-overlay-guard",
+            "--tool",
+            "infer",
+            "--config",
+            config,
+            "--workspace-root",
+            str(runbook.workspace_root),
+            "--mode",
+            mode_decision.selected_mode,
+            "--run-args",
+            mode_decision.run_args,
+            "--max-projected-overlay-parts",
+            str(infer_overlay_guard.max_projected_overlay_parts),
+            "--max-existing-overlay-parts",
+            str(infer_overlay_guard.max_existing_overlay_parts),
+            "--overlay-namespace",
+            infer_overlay_guard.overlay_namespace,
+            "--json",
+        ]
+        if infer_overlay_guard.auto_compact_existing_overlay_parts:
+            infer_overlay_guard_parts.append("--auto-compact-existing-overlay-parts")
+        commands.append(_tool_ops_gate(*infer_overlay_guard_parts))
     commands.extend(
         (
             _tool_argv("uv", "run", "infer", "run", "--config", config, "--dry-run"),

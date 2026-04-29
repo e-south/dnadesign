@@ -11,9 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
+
+import yaml
 
 from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
 from dnadesign.ops.contracts import resolve_usr_producer_contract
@@ -138,7 +141,33 @@ def _run_args_for_densegen(runbook: OrchestrationRunbookV1, mode: ResolvedMode) 
     return runbook.densegen.run_args.resume
 
 
-def _run_args_for_infer(_runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> str:
+def _infer_config_uses_sequence_view_inputs(config_path: Path) -> bool:
+    try:
+        payload = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
+    except OSError as exc:
+        raise ValueError(f"infer config is not readable: {config_path}") from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(f"infer config is not valid yaml: {config_path}") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"infer config root must be a mapping: {config_path}")
+    jobs = payload.get("jobs") or ()
+    if not isinstance(jobs, list):
+        return False
+    for job in jobs:
+        if not isinstance(job, Mapping):
+            continue
+        feature_bundle = job.get("feature_bundle")
+        if not isinstance(feature_bundle, Mapping):
+            continue
+        sequence_view_inputs = feature_bundle.get("sequence_view_inputs")
+        if isinstance(sequence_view_inputs, list) and sequence_view_inputs:
+            return True
+    return False
+
+
+def _run_args_for_infer(runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> str:
+    if runbook.infer is not None and _infer_config_uses_sequence_view_inputs(runbook.infer.config):
+        return ""
     if mode == "fresh":
         return "--overwrite"
     return ""

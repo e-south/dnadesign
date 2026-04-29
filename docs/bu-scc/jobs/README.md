@@ -121,7 +121,8 @@ Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the s
 - preflight: `uv run infer validate config --config "$INFER_CONFIG"`
 - run: `uv run infer run --config "$INFER_CONFIG" ${INFER_RUN_ARGS:-}`
 - actor tags: `USR_ACTOR_TOOL=infer`, `USR_ACTOR_RUN_ID=${OPS_JOB_NAME_SLUG:-$JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
-- optional reset contract: set `INFER_RUN_ARGS=--overwrite` when an orchestration layer intentionally wants infer to recompute the requested write-back outputs in place
+- sequence-view sidecar jobs should be submitted through Ops runbooks or `ops runbook fill-infer`; those plans add `infer validate sequence-view-completion` before submit and do not pass `INFER_RUN_ARGS=--overwrite`
+- optional legacy reset contract: set `INFER_RUN_ARGS=--overwrite` only when a direct row-writeback Infer run intentionally needs to recompute requested write-back outputs in place
 
 Before first submit on a host, run deterministic environment bootstrap:
 - [BU SCC install GPU setup and verification runbook](../install.md#gpu-setup-and-verification-runbook)

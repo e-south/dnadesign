@@ -170,6 +170,32 @@ Result expectations:
 9. DenseGen preflight runs a records-part guard that projects `records__part-*.parquet` growth and applies age/count maintenance before submit.
 10. DenseGen preflight runs an archived-overlay retention guard that enforces `_derived/_archived` count/size thresholds before submit.
 
+### Fill remaining Infer lanes
+
+Use the fill command when a checked-in study has multiple Infer runbooks and the
+operator question is "run whatever sequence-view inference is still missing":
+
+```bash
+uv run ops runbook fill-infer --study-dir docs/studies/<study-id>
+uv run ops runbook fill-infer --study-dir docs/studies/<study-id> --execute
+uv run ops runbook fill-infer --study-dir docs/studies/<study-id> --submit
+```
+
+The command is a control-plane wrapper around ordinary Infer runbooks. It reads
+study `execution_surfaces` or repeated `--runbook <path>` inputs, runs the
+Infer sequence-view completion inventory for each lane, skips complete lanes,
+blocks lanes with missing sequence products or stale feature sidecars, and
+plans or executes only lanes with missing vectors/scalars. It does not merge
+runbooks or event streams: Notify remains one watcher per lane, and each
+executed lane writes its audit JSON under
+`<workspace-root>/outputs/logs/ops/audit/<runbook-id>.fill-infer.json`.
+
+For workstation planning without a scheduler, add
+`--no-discover-active-jobs --allow-unknown-active-jobs --allow-missing-qstat`.
+Do not combine `--allow-missing-qstat` with `--submit`; real submission still
+requires a submit-capable HPC shell, scheduler visibility, and Notify webhook
+materialization.
+
 ### Orchestration workflow ids
 
 Workflow ids are transport-neutral. Notify transport and delivery wiring live in `runbook.notify`, not in `workflow_id`.
@@ -375,10 +401,10 @@ uv run ops runbook execute \
 30. When `notify.orchestration_events=true`, execute emits direct notify lifecycle events for submit orchestration (`started`, then `success` or `failure`) in addition to watcher event notifications, using file-backed `--secret-ref`.
 31. Notify DenseGen progress semantics use workspace-session counters (`rows_written_session`, `run_quota`, and `fingerprint.rows`) and default heartbeat cadence is 1800 seconds (`progress_heartbeat_seconds`) unless explicitly overridden.
 32. Notify workflows resolve a TLS CA bundle from `SSL_CERT_FILE` or known system CA paths and pass it explicitly to notify setup/orchestration commands; when no readable CA bundle is resolvable, planning fails fast before submit.
-33. Preflight runs `usr-overlay-guard` using tool-specific adapters (`--tool densegen` for DenseGen, `--tool infer` for infer) with explicit thresholds from each workflow’s overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance. Today infer does not emit overlay parts, so the infer adapter returns explicit `guard_status=skipped` evidence rather than enforcing those thresholds.
-34. When existing overlay parts exceed `<tool>.overlay_guard.max_existing_overlay_parts`, preflight compacts the configured overlay namespace when `auto_compact_existing_overlay_parts=true`; otherwise planning fails fast with an explicit compaction command.
+33. DenseGen preflight runs `usr-overlay-guard` with explicit thresholds from its overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance.
+34. Sequence-view Infer preflight does not render `usr-overlay-guard`: those jobs write sidecar features under `_derived/infer/`, not row-overlay parts. It renders `infer validate sequence-view-completion` instead and blocks missing source products or stale feature sidecars before SGE submit.
 35. `densegen.overlay_guard.overlay_namespace` must match `^[a-z][a-z0-9_]*$` so runbook contracts remain compatible with USR overlay namespace rules.
-36. `infer.overlay_guard.overlay_namespace` is fixed to `infer`; customizing it is rejected because infer write-back and prune use the canonical infer namespace.
+36. Legacy row-writeback Infer runbooks remain explicit direct-runbook surfaces. The study-level `fill-infer` primitive skips non-sequence-view Infer runbooks before SGE plan rendering, so old USR/write-back shapes do not enter the intelligent fill queue.
 37. `usr-overlay-guard` and `usr-records-part-guard` are explicit about degraded mode: tools that do not emit overlay parts or records-part files return `guard_status=skipped` with a reason (no silent fallback).
 38. DenseGen preflight runs `usr-records-part-guard` with explicit thresholds from `densegen.records_part_guard`; when projected records parts exceed `max_projected_records_parts`, planning fails fast with tuning guidance (`runtime.max_accepted_per_library`, `output.parquet.chunk_size`).
 39. When existing records parts exceed `densegen.records_part_guard.max_existing_records_parts` or oldest part age exceeds `max_existing_records_part_age_days`, preflight compacts `records__part-*.parquet` into `records.parquet` when `auto_compact_existing_records_parts=true`; otherwise planning fails fast with explicit maintenance guidance.
@@ -390,9 +416,9 @@ uv run ops runbook execute \
 
 Infer resume note:
 
-- Infer `--mode auto` treats an existing `infer` overlay in the target dataset as a resume artifact, including overlays that arrived through explicit USR merge carry.
-- For infer, Ops `selected_mode=fresh` now passes `--overwrite` to `infer run`, which forces recomputation of the requested infer outputs without implicitly pruning the namespace.
-- If merge carry preserved stale `infer` values that should be removed rather than recomputed in place, prune the overlay first; use `--mode fresh --allow-fresh-reset` only when recomputing the current requested outputs is intentional.
+- Sequence-view Infer jobs resume from sidecar aliases/vectors/scalars under `_derived/infer/`; Ops does not pass `INFER_RUN_ARGS=--overwrite` for these jobs.
+- Legacy row-writeback Infer jobs may still use `INFER_RUN_ARGS=--overwrite` when an operator directly plans that runbook and intentionally wants to recompute requested write-back outputs in place without implicitly pruning the namespace.
+- If merge carry preserved stale legacy `infer` values that should be removed rather than recomputed in place, prune the overlay first; use `--mode fresh --allow-fresh-reset` only when recomputing the current requested outputs is intentional.
 
 ### Related docs
 

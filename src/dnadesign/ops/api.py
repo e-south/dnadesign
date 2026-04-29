@@ -20,6 +20,14 @@ from .catalog import (
     load_runbook_catalog,
 )
 from .orchestrator.execute import BatchExecutionResult, execute_batch_plan
+from .orchestrator.infer_fill import (
+    InferFillLane,
+    InferFillPlan,
+    build_infer_fill_plan,
+    discover_infer_runbook_paths_for_study,
+    execute_infer_fill_plan,
+    resolve_active_study_dir,
+)
 from .orchestrator.plan import BatchPlan, build_batch_plan
 from .orchestrator.state import (
     ActiveJobProbeError,
@@ -49,6 +57,8 @@ __all__ = [
     "ActiveJobProbeError",
     "ActiveJobResolution",
     "ActiveJobResolutionState",
+    "InferFillLane",
+    "InferFillPlan",
     "OpsJobIdentity",
     "OrchestrationRunbookV1",
     "ProcedureStatus",
@@ -57,11 +67,14 @@ __all__ = [
     "SchedulerProbeState",
     "StatusKindSpec",
     "build_batch_plan",
+    "build_infer_fill_plan",
     "build_campaign_scaffold",
     "build_procedure_status",
     "build_status_inputs",
     "discover_active_job_ids_for_runbook",
+    "discover_infer_runbook_paths_for_study",
     "execute_batch_plan",
+    "execute_infer_fill_plan",
     "execute_runbook_plan",
     "filter_runbook_catalog",
     "list_status_kind_specs",
@@ -73,6 +86,7 @@ __all__ = [
     "load_status_kind_spec",
     "probe_active_jobs_for_runbook",
     "resolve_active_job_resolution",
+    "resolve_active_study_dir",
     "resolve_ops_job_identity",
     "run_status_kind",
 ]

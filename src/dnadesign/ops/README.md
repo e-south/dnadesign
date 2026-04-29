@@ -49,6 +49,7 @@ Use this README for package scope, the shared command entrypoints below, and lin
 - `uv run ops catalog list --simple`: start with a quick inventory from the shell.
 - `uv run ops catalog show <registry-id>`: inspect one registered route, its owner docs, and related procedures.
 - `uv run ops progress explain <registry-id>`: print the required flags before you use a status surface.
+- `uv run ops runbook fill-infer --study-dir docs/studies/<study-id>`: inspect a study's Infer runbooks and plan only incomplete sequence-view lanes.
 - Use [How to use Ops](docs/how-to-use-ops.md) for the expanded command ladder and [Ops orchestration index](../../../docs/operations/README.md) once you are in the runbook lifecycle.
 
 ## Python API
