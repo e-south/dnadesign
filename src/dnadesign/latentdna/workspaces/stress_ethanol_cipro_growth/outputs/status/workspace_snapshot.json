@@ -5923,7 +5923,11 @@
       "synthetic_margin_ethanol_vs_background",
       "synthetic_margin_cipro_vs_background",
       "context_self_cosine",
-      "context_shift_l2"
+      "context_shift_l2",
+      "source_family",
+      "selection_basis",
+      "promoter_standard__collection_id",
+      "promoter_standard__strength_value_numeric"
     ]
   },
   "decision_ladder": [
@@ -5933,5 +5937,5 @@
     "context_robustness_summary",
     "candidate_decision_frontier"
   ],
-  "last_updated_at": "2026-04-29T13:03:41.519887+00:00"
+  "last_updated_at": "2026-04-29T14:35:17.190722+00:00"
 }

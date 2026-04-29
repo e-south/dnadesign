@@ -73,6 +73,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
     assert "spacer_length" in preferred_hues
+    assert "promoter_standard__strength_value_numeric" in preferred_hues
     assert "log_likelihood_per_token_7b" not in preferred_hues
     assert "wildtype_margin_ethanol_vs_control" not in preferred_hues
     assert "wildtype_margin_cipro_vs_control" not in preferred_hues
@@ -83,6 +84,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         assert controls.geometry_controls.hue_kinds["design_family"] == "categorical"
         assert controls.geometry_controls.hue_kinds["is_control"] == "binary"
         assert controls.geometry_controls.hue_kinds["spacer_length"] == "ordinal"
+        assert controls.geometry_controls.hue_kinds["promoter_standard__strength_value_numeric"] == "continuous"
     else:
         assert controls.geometry_controls.joinable_tables == []
     assert controls.geometry_controls.reference_labels == ["spyp", "sulap", "j23105"]
@@ -149,6 +151,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert controls.geometry_controls.default_layout == "candidate_grid"
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
+    assert "promoter_standard__strength_value_numeric" in snapshot["browser"]["preferred_hues"]
     assert "log_likelihood_per_token_7b" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_ethanol_vs_control" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_cipro_vs_control" not in snapshot["browser"]["preferred_hues"]

@@ -133,6 +133,7 @@ def test_runtime_hue_columns_ignore_unbound_legacy_joinable_tables() -> None:
             }
         ],
         preferred_hues=["design_family", "context_shift_l2"],
+        row_metadata_hues=[],
         configured_hue_kinds={
             "design_family": "categorical",
             "context_shift_l2": "continuous",
@@ -142,6 +143,25 @@ def test_runtime_hue_columns_ignore_unbound_legacy_joinable_tables() -> None:
 
     assert global_hues == []
     assert hue_kinds == {}
+
+
+def test_runtime_hue_columns_accept_control_plane_view_row_metadata() -> None:
+    global_hues, hue_kinds = _runtime_hue_columns(
+        joinable_tables=[],
+        preferred_hues=["source_family", "promoter_standard__strength_value_numeric"],
+        row_metadata_hues=["source_family", "promoter_standard__strength_value_numeric"],
+        configured_hue_kinds={
+            "source_family": "categorical",
+            "promoter_standard__strength_value_numeric": "continuous",
+        },
+        joinable_artifact_suffixes=set(),
+    )
+
+    assert global_hues == ["source_family", "promoter_standard__strength_value_numeric"]
+    assert hue_kinds == {
+        "source_family": "categorical",
+        "promoter_standard__strength_value_numeric": "continuous",
+    }
 
 
 def test_plot_review_sections_marks_missing_render_path_as_missing(monkeypatch, tmp_path: Path) -> None:

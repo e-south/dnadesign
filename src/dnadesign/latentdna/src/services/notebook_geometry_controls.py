@@ -51,7 +51,7 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
 }
 
 _JOINABLE_KEY_COLUMNS = {"construct__anchor_id", "id", "subject_id", "context_id"}
-_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
+_DEFAULT_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
@@ -146,6 +146,33 @@ def _geometry_order(context, *, notebook_id: str | None) -> list[str]:
     notebook = _resolve_notebook(context, notebook_id)
     configured = list(getattr(notebook, "geometry_order", []) or []) if notebook is not None else []
     return configured or list(_DEFAULT_GEOMETRY_ORDER)
+
+
+def _unique_in_order(values) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
+def _preferred_hue_order(context, *, notebook_id: str | None) -> list[str]:
+    notebook = _resolve_notebook(context, notebook_id)
+    configured = list(getattr(notebook, "preferred_hues", []) or []) if notebook is not None else []
+    return _unique_in_order([*_PREFERRED_HUES, *configured])
+
+
+def _preferred_hue_kind_defaults(context, *, notebook_id: str | None) -> dict[str, str]:
+    notebook = _resolve_notebook(context, notebook_id)
+    configured = dict(getattr(notebook, "preferred_hue_kinds", {}) or {}) if notebook is not None else {}
+    return {
+        **_PREFERRED_HUE_KIND_DEFAULTS,
+        **{str(column): str(kind) for column, kind in configured.items() if str(column).strip()},
+    }
 
 
 def _view_shape(context, view_id: str) -> tuple[int, int] | None:
@@ -245,6 +272,7 @@ def _table_inventory(
     context,
     *,
     visible_view_ids: set[str],
+    joinable_value_columns: set[str],
 ) -> tuple[list[WorkspaceNotebookTableRef], dict[str, object]]:
     inventory: list[WorkspaceNotebookTableRef] = []
     schemas: dict[str, object] = {}
@@ -281,7 +309,7 @@ def _table_inventory(
             field_names = [field.name for field in schema]
             if not _JOINABLE_KEY_COLUMNS.intersection(field_names):
                 continue
-            if not _JOINABLE_VALUE_COLUMNS.intersection(field_names):
+            if not joinable_value_columns.intersection(field_names):
                 continue
             schemas[relative_path] = schema
             row_scope_view_ids = _manifest_view_ids(manifest, input_kinds={"view_rows"})
@@ -299,6 +327,19 @@ def _table_inventory(
                 )
             )
     return inventory, schemas
+
+
+def _view_row_schema_inventory(context, *, visible_view_ids: set[str]) -> dict[str, object]:
+    schemas: dict[str, object] = {}
+    for view_id in sorted(visible_view_ids):
+        rows_path = context.output_root / "views" / view_id / "rows.parquet"
+        if not rows_path.is_file():
+            continue
+        try:
+            schemas[view_id] = read_schema(rows_path)
+        except Exception:
+            continue
+    return schemas
 
 
 def _infer_hue_kind_from_type(field_type) -> str | None:
@@ -320,9 +361,12 @@ def _preferred_hue_kinds(
     joinable_tables: list[WorkspaceNotebookTableRef],
     *,
     schemas_by_path: dict[str, object],
+    view_row_schemas_by_id: dict[str, object],
+    preferred_hues: list[str],
+    default_hue_kinds: dict[str, str],
 ) -> dict[str, str]:
     kinds: dict[str, str] = {}
-    preferred = set(_PREFERRED_HUES)
+    preferred = set(preferred_hues)
     discovered: set[str] = set()
     for table_ref in joinable_tables:
         schema = schemas_by_path[table_ref.relative_path]
@@ -335,10 +379,20 @@ def _preferred_hue_kinds(
             kind = _infer_hue_kind_from_type(field.type)
             if kind is not None:
                 kinds[field.name] = kind
-    for column, kind in _PREFERRED_HUE_KIND_DEFAULTS.items():
+    for schema in view_row_schemas_by_id.values():
+        for field in schema:
+            if field.name not in preferred:
+                continue
+            discovered.add(field.name)
+            if field.name in kinds:
+                continue
+            kind = _infer_hue_kind_from_type(field.type)
+            if kind is not None:
+                kinds[field.name] = kind
+    for column, kind in default_hue_kinds.items():
         if column in discovered:
             kinds[column] = kind
-    return {column: kinds[column] for column in _PREFERRED_HUES if column in kinds}
+    return {column: kinds[column] for column in preferred_hues if column in kinds}
 
 
 def _layout_presets(
@@ -476,17 +530,33 @@ def _default_layout_id(
 def build_workspace_geometry_controls(context, *, notebook_id: str | None = None) -> WorkspaceNotebookGeometryControls:
     projection_ids_by_view = _projection_inventory(context)
     geometry_order = _geometry_order(context, notebook_id=notebook_id)
+    preferred_hue_order = _preferred_hue_order(context, notebook_id=notebook_id)
+    default_hue_kinds = _preferred_hue_kind_defaults(context, notebook_id=notebook_id)
     geometries = _geometry_inventory(
         context,
         projection_ids_by_view=projection_ids_by_view,
         geometry_order=geometry_order,
     )
+    visible_view_ids = {row.view_id for row in geometries}
     joinable_tables, schemas_by_path = _table_inventory(
         context,
-        visible_view_ids={row.view_id for row in geometries},
+        visible_view_ids=visible_view_ids,
+        joinable_value_columns=_DEFAULT_JOINABLE_VALUE_COLUMNS | set(preferred_hue_order),
     )
-    hue_kinds = _preferred_hue_kinds(joinable_tables, schemas_by_path=schemas_by_path)
-    preferred_hues = [column for column in _PREFERRED_HUES if column in hue_kinds]
+    view_row_schemas_by_id = _view_row_schema_inventory(
+        context,
+        visible_view_ids=visible_view_ids,
+    )
+    hue_kinds = _preferred_hue_kinds(
+        joinable_tables,
+        schemas_by_path=schemas_by_path,
+        view_row_schemas_by_id=view_row_schemas_by_id,
+        preferred_hues=preferred_hue_order,
+        default_hue_kinds=default_hue_kinds,
+    )
+    preferred_hues = [column for column in preferred_hue_order if column in hue_kinds]
+    view_row_columns = {field.name for schema in view_row_schemas_by_id.values() for field in schema}
+    row_metadata_hues = [column for column in preferred_hue_order if column in hue_kinds and column in view_row_columns]
     comparison_bases = _comparison_bases(context, geometries)
     default_compare_left, default_compare_right = _default_compare_views(
         context,
@@ -503,6 +573,7 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         default_compare_right=default_compare_right,
         geometries=geometries,
         preferred_hues=preferred_hues,
+        row_metadata_hues=row_metadata_hues,
         hue_kinds=hue_kinds,
         joinable_tables=joinable_tables,
         layout_presets=layout_presets,

@@ -1035,6 +1035,16 @@ notebooks:
     candidate_grid_panel_titles: &browser_candidate_panel_titles
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
+    preferred_hues:
+      - source_family
+      - selection_basis
+      - promoter_standard__collection_id
+      - promoter_standard__strength_value_numeric
+    preferred_hue_kinds:
+      source_family: categorical
+      selection_basis: categorical
+      promoter_standard__collection_id: categorical
+      promoter_standard__strength_value_numeric: continuous
     default_layout: candidate_grid
     default_compare_views:
       - intermediate_embedding_7b_anchor_60bp

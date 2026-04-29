@@ -495,6 +495,52 @@ def test_notebook_controls_only_surface_preferred_hues_backed_by_joinable_tables
     assert controls.geometry_controls.hue_kinds == {"context_shift_l2": "continuous"}
 
 
+def test_notebook_controls_surface_configured_hues_backed_by_view_rows(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["notebooks"]["latent_geometry_browser"]["preferred_hues"] = [
+        "source_family",
+        "promoter_standard__strength_value_numeric",
+    ]
+    config["notebooks"]["latent_geometry_browser"]["preferred_hue_kinds"] = {
+        "source_family": "categorical",
+        "promoter_standard__strength_value_numeric": "continuous",
+    }
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["row0", "row1"],
+            "subject_id": ["row0", "row1"],
+            "source_family": ["reference", "densegen"],
+            "promoter_standard__strength_value_numeric": [0.35, None],
+        }
+    ).to_parquet(view_dir / "rows.parquet", index=False)
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert controls.geometry_controls.joinable_tables == []
+    assert controls.geometry_controls.preferred_hues == [
+        "source_family",
+        "promoter_standard__strength_value_numeric",
+    ]
+    assert controls.geometry_controls.row_metadata_hues == [
+        "source_family",
+        "promoter_standard__strength_value_numeric",
+    ]
+    assert controls.geometry_controls.hue_kinds == {
+        "source_family": "categorical",
+        "promoter_standard__strength_value_numeric": "continuous",
+    }
+
+
 def test_notebook_controls_ignore_legacy_scalar_tables_without_manifest_bindings(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
