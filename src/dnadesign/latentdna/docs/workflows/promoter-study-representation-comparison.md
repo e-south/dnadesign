@@ -15,11 +15,11 @@ canonical Infer feature sidecars. The row sources remain useful for cohort,
 landmark, and dataset-overview plots. Embedding-bearing views must come from
 `_derived/infer/feature_aliases.parquet` joined to `feature_vectors.parquet`
 and the dataset-local sequence-view sidecars; LatentDNA no longer depends on
-legacy row-overlay embedding columns for the active 7B study surfaces.
+USR row-overlay embedding columns for the active 7B study surfaces.
 Sigma-35 metadata is source-backed, not ladder-hardcoded: builders derive
 `sig35_variant` from DenseGen plan tokens, DenseGen fixed-element details, USR
 `seq_annot` `-35` features, or Construct retained-feature bounds. Annotated
-unranked hexamers are kept in source inventory and compatible plots; only
+unranked hexamers are kept in source inventory and eligible plots; only
 ordinal-rank statistics restrict themselves to the explicit b-f order file.
 
 The active contract is still pre-assay representation triage: choose a plausible
@@ -131,7 +131,7 @@ workspace contract.
 - Reference-normalization plots will use explicit `analysis_window` and
   `realized_context` sequence-view features once `infer_prom_eth_cip_reference_views_7b`
   exists. Native exact-60 source rows are not relabeled as analysis windows.
-- Existing view artifacts built from legacy row-overlay columns are stale under
+- Existing view artifacts built from USR row-overlay embedding columns are stale under
   this contract. Deep validation reports source-contract drift; rerun view
   materialization from sidecars before using refreshed plots as current evidence.
 

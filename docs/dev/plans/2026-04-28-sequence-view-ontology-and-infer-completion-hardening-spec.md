@@ -748,57 +748,21 @@ Tests:
 - Thresholded CLI validation fails when `missing_products` or `stale_vectors`
   exceed the configured submit gate.
 
-#### Slice 6: Add Infer feature alias migration
+#### Slice 6: Hard-cut Infer feature sidecars and stale-overlay pruning
 
-Status: implemented as a conservative one-time bridge; active-study anchor and
-forward context backfill is written locally, and active row-overlay Infer parts
-have been removed from the local generated datasets. Remaining work is true new
-inference plus generated-artifact sync/publish.
+Status: implemented as a hard cut to sequence-view sidecars. Runtime feature
+execution writes modern feature alias/vector sidecars for new sequence-view
+runs. USR row-overlay payload columns are not a coverage or migration source.
+Remaining work is true new inference plus generated-artifact sync/publish.
 
-Runtime feature execution writes aliases and feature vectors for
-new sequence-view runs. The standalone migration command now audits and, when
-explicitly run with `--write`, copies verified legacy row-overlay vectors into
-the sequence-view `feature_aliases.parquet` and `feature_vectors.parquet`
-sidecars.
+`core60_mean`, `seq_mean`, and `anchor_mean` are distinct feature identities.
+Exact repeated input sequences still share one Evo2 forward pass through the
+`forward_pass_key`, but they do not share feature-vector keys unless the full
+feature identity is identical.
 
-Command:
-
-```bash
-uv run infer migrate legacy-overlay-aliases \
-  --config <sequence-view-config.yaml> \
-  --job <sequence-view-job-id> \
-  --legacy-job-id <old-row-overlay-job-id> \
-  --format json
-```
-
-Use `--max-views <n>` for smoke tests and omit it for full metadata-only
-planning. Dry-run mode intentionally skips large embedding payload columns and
-reports those rows in `payload_unverified_vectors`; add `--verify-payloads` only
-when the expensive payload scan is required before write. Use `--write` only
-after the reusable, missing, unclassified, and orientation-blocked counts match
-expectations.
-
-After alias/vector sidecars are protected, retire duplicated legacy payload
-columns with:
-
-```bash
-uv run infer migrate retire-legacy-payloads \
-  --config <sequence-view-config.yaml> \
-  --job <sequence-view-job-id> \
-  --legacy-job-id <old-row-overlay-job-id>
-```
-
-The retirement command is dry-run by default. It scans legacy metadata and
-canonical feature-vector keys without reading embedding payload columns. With
-`--write`, it refuses to mutate if any legacy-present vector lacks canonical
-sidecar protection or if the legacy identity is unclassified. It deletes parts
-that become `id`-only and refreshes or removes stale overlay digest ledgers, so
-normal cleanup does not materialize multi-GB embedding tables in memory.
-
-Approved stale lanes that are not protected by a modern semantic sidecar use a
-different command. This is intentionally explicit: it is for payload families
-that have been declared out of scope or non-actionable, not for reusable legacy
-vectors.
+Approved stale lanes that are not part of the sequence-view sidecar contract
+use explicit schema-only pruning. The command is for payload families declared
+out of scope or non-actionable; it does not backfill or reinterpret old payloads.
 
 ```bash
 uv run infer migrate prune-stale-overlay-columns \
@@ -816,27 +780,15 @@ parts that become `id`-only, refreshes/removes stale digest ledgers, and logs an
 
 Deliverables:
 
-- Done: add alias backfill from verified old row overlays into new feature alias
-  maps.
-- Done: backfill `157164` anchor `construct_insert` aliases/vectors from the
-  compatible legacy `anchor_only` row-overlay lane.
-- Done: backfill `157164` forward `realized_context` anchor-mean
-  aliases/vectors from the compatible legacy forward-context row-overlay lane.
+- Done: remove row-overlay alias migration and duplicate-payload retirement
+  commands from active Infer code.
 - Done: write `forward_pass_key` and `feature_vector_key` where existing vectors
   can be proven equivalent.
 - Done: preserve `metadata__feature_request_digest` as resume metadata; do not
   reuse it as the feature-vector identity.
-- Done: make full-study dry-runs metadata-only by default so planning does not
-  load large embedding payload columns.
 - Done: make completion/status count persisted feature-vector sidecars through
   key-only parquet inventory so normal checks do not load multi-GB embedding
   payload columns.
-- Done: retire duplicated legacy row-overlay embedding payload columns for
-  `anchor_construct_insert_seq_mean_7b` and `context_forward_anchor_mean_7b`
-  after verifying `157164` protected vectors in each canonical sidecar store.
-  The cleanup rewrote `57` anchor overlay parts and `1012` context overlay parts,
-  reclaiming about `2.1 GB` total while preserving modern
-  `_derived/infer/feature_vectors.parquet` payloads.
 - Done: remove collapsed/debug-required `infer__evo2_20b__*` row-overlay payload
   and metadata columns from the active study handoffs after explicit approval.
   The cleanup rewrote one mixed part and deleted 20B-only parts in each dataset:
@@ -865,18 +817,14 @@ Deliverables:
 
 Tests:
 
-- Existing runtime tests cover exact 60 bp `seq_mean` and `core60_mean` views
-  aliasing to one vector when the
-  pooling span is identical.
+- Runtime tests cover exact 60 bp `seq_mean` and `core60_mean` views sharing
+  one forward pass while retaining distinct feature-vector keys.
 - Existing runtime tests cover same sequence with different pooling span
   producing a different feature vector key.
 - Existing runtime tests cover forward and reverse-complement emitted
   orientations remaining different forward pass keys.
-- New migration tests cover verified forward legacy-overlay reuse and refusal to
-  reuse forward overlays for reverse-complement views.
-- New retirement tests cover refusing cleanup before canonical vectors exist and
-  pruning only protected duplicate payload columns while preserving legacy
-  metadata columns.
+- Stale-overlay pruning tests cover explicit-prefix pruning and refusal to remove
+  the required overlay join column.
 
 #### Slice 7: Upgrade Study/Ops status and preflight
 

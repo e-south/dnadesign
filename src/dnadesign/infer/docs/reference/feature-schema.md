@@ -4,9 +4,9 @@
 **Last verified:** 2026-04-28
 
 Use this page when you need the stable bundle contract for Evo2 feature extraction from explicit sequence views.
-The repository now supports two sibling surfaces:
+The repository supports two sibling surfaces:
 
-- legacy context bundles driven by `context.kind` plus bundle-level pooling flags
+- context bundles driven by `context.kind` plus bundle-level pooling flags
 - explicit sequence-view bundles driven by `sequence_view_inputs[]`
 
 The v1 schema literal is `evo2_sequence_feature_v1`. It describes the generic
@@ -27,7 +27,7 @@ The semantic bundle is one resolved context per row:
 ```yaml
 feature_bundle:
   kind: evo2_sequence_feature_v1
-  intermediate_block: 26  # legacy config default; evo2_20b resolves it to block 23
+  intermediate_block: 26  # stable config default; evo2_20b resolves it to block 23
   collect_log_likelihood: true
   collect_output_layer_mean: true
   collect_intermediate_embedding: true
@@ -79,11 +79,10 @@ Sequence-view rules:
 - reverse-complement context rows must already contain reverse-complement sequences and
   reverse-complement-orientation pooling bounds; Infer must not apply a second `L-b, L-a`
   transform.
-- `core60_mean` aliases `seq_mean` only when the emitted sequence is exactly 60 bp and the pooling span is the full row
-- a native or designed exact-60 `construct_insert` can feature-alias with a true
-  `analysis_window` row when the sequence, model, layer, and pooling span are
-  identical; USR should not duplicate the native row as `analysis_window` just
-  to make that alias possible
+- `seq_mean`, `anchor_mean`, and `core60_mean` are distinct feature identities.
+  An exact repeated input sequence can share one Evo2 forward pass through the
+  `forward_pass_key`, but it still receives a distinct feature-vector key when
+  its pooling semantics differ.
 - view-aware bundles persist feature aliases under `_derived/infer/feature_aliases.parquet`
 - view-aware bundles persist reusable feature vectors under `_derived/infer/feature_vectors.parquet`
 - view-aware bundles persist log-likelihood scalar aliases under
@@ -98,24 +97,13 @@ Sequence-view rules:
   --config <config.yaml> --format json` to classify vectors and scalars as
   reusable, stale, missing, or product-missing without loading the model.
   Sequence-view `root` values resolve relative to the config file directory.
-  Legacy row-based overlays are reusable only when the planner can match the
-  requested feature identity; otherwise they remain stale or unclassified
-  instead of being silently trusted.
+  USR row-overlay payload columns are not counted as sequence-view feature
+  coverage.
 - Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0
   --max-stale-scalars 0` to fail before submit when required sequence products
   are absent or existing vector/scalar sidecars are stale. Do not set
   `--max-missing-vectors 0` or `--max-missing-scalars 0` for a lane whose
   purpose is to generate missing features.
-- To preserve compatible old row-overlay vectors under the newer sidecar
-  contract, run `uv run infer migrate legacy-overlay-aliases --config
-  <sequence-view-config.yaml> --job <sequence-view-job-id> --legacy-job-id
-  <old-row-overlay-job-id> --format json` first as a dry run. The command only
-  writes `feature_aliases.parquet` and `feature_vectors.parquet` with `--write`,
-  and it refuses to treat old forward overlays as reverse-complement coverage.
-  Dry-run mode is metadata-only by default so full-study planning does not read
-  large embedding payload columns; add `--verify-payloads` when an expensive
-  exact payload scan is intentionally required. `--write` always reads payloads.
-
 ### Default output ids
 
 - `log_likelihood__total`
@@ -181,8 +169,7 @@ The canonical selector is the stable contract. Provider-layer strings are adapte
 ### Export contract for OPAL
 
 Use `dnadesign.infer.export_evo2_sequence_opal_matrix(...)` when OPAL needs a deterministic flattened matrix.
-The helper name is legacy; the exported rows are keyed by feature metadata, not
-by a promoter-only primitive.
+The exported rows are keyed by feature metadata, not by a promoter-only primitive.
 
 Export guarantees:
 

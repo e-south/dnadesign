@@ -72,41 +72,16 @@ uv run notify setup resolve-events \
   --json
 ```
 
-Use the legacy-overlay migration bridge only after a sequence-view completion
-dry-run. Its default dry-run is metadata-only, so full-study planning can prove
-row/model/pooling identity without loading large embedding payload columns. It
-copies verified row-overlay vectors into the new feature alias/vector sidecars
-only with `--write`; it does not mutate the original overlay parts and it does
-not treat old forward context overlays as reverse-complement coverage:
-
-```bash
-uv run infer migrate legacy-overlay-aliases \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml \
-  --job anchor_construct_insert_seq_mean_7b \
-  --legacy-job-id anchor_only_7b_features \
-  --max-views 100 \
-  --format json
-
-uv run infer migrate legacy-overlay-aliases \
-  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml \
-  --job context_forward_seq_and_anchor_mean_7b \
-  --legacy-job-id template_1kb_7b_features \
-  --max-views 100 \
-  --format json
-```
-
-Omit `--max-views` for a full metadata-only dry-run. Add `--verify-payloads` if
-the dry-run must read embedding payloads before write. Add `--write` only for a
-deliberate generated-data backfill run after the reusable, missing, and
-orientation-blocked counts match expectations.
-The historical 7B forward-context row overlay only backfills the forward
-`anchor_mean` intermediate vectors. It is not evidence for full-context
-`seq_mean`, output-layer mean, log-likelihood, or reverse-complement coverage.
-
 The multi-job sequence-view completion configs are planning surfaces, not live
 Notify units. They classify reusable, stale, missing, and product-missing work
 for `construct_insert`, forward `realized_context`, reverse-complement
 `realized_context`, and reference `analysis_window` views without loading Evo2.
+Reusable work is counted only from canonical sequence-view feature/scalar
+sidecars. USR row-overlay payload columns are not a coverage source.
+`core60_mean`, `seq_mean`, and `anchor_mean` are distinct feature identities.
+Exact repeated input sequences still share one Evo2 forward pass through the
+`forward_pass_key`; they do not share feature-vector keys unless the full
+feature identity is identical.
 The lane-specific sequence-view runbooks also render this completion planner as
 a pre-submit gate with `--max-missing-products 0 --max-stale-vectors 0
 --max-stale-scalars 0`. Missing feature vectors and log-likelihood scalars are
@@ -115,8 +90,7 @@ sequence products, stale vectors, or stale scalar sidecars are not allowed to
 slip through as a submit-ready plan.
 The local generated `_views/sequence_views.parquet` sidecars now use the generic
 product-kind vocabulary. Completion checks will still report attention until
-compatible old row-overlay vectors are migrated into feature alias/vector
-sidecars or newly inferred where no compatible old vector exists.
+the missing feature vectors and log-likelihood scalars are generated.
 
 Once the study-owned datasets exist, dry-run the same configs. For resumable
 batch work with Notify, use the sequence-view presets rather than the multi-job

@@ -26,14 +26,14 @@
 - Conservative baseline: `evo2_7b` anchor-only intermediate embedding
 - Challenger: none currently active; concat is retired from the current Infer and LatentDNA plan
 - Secondary/debug-required family: `evo2_20b`
-- Active study feature-completion target: `evo2_7b`; historical `evo2_20b` row-overlay payloads were retired from the active USR handoffs because that lane is collapsed/debug-required and not part of the current sequence-view completion plan.
+- Active study feature-completion target: `evo2_7b`; stale `evo2_20b` row-overlay payloads were removed from the active USR handoffs because that lane is collapsed/debug-required and not part of the current sequence-view completion plan.
 - The study phase is `infer_batch_preparation`
 - This is a pre-assay representation-triage study. The current notebook/browser surface does not claim a phenotype-validated final `X`.
 - Use `uv run ops progress show usr.data-plane.promoter-study-status --json` for the checked-in study record
 - Current attention surfaces: sequence-view feature completion and Notify setup/preflight
 - Current primary-surface ok: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - Source-level Sigma-35 inventory is annotation-backed: LatentDNA derives `sig35_variant` from DenseGen plan tokens, DenseGen fixed-element details, USR `seq_annot` `-35` features, or Construct retained-feature bounds. The current merged anchor source resolves every row to a Sigma-35 sequence or b-f ladder value; rows are not hard-omitted from source inventory merely because they are reference, SFXI, or derived core rows.
-- Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the ranked active subset: `f > e > d > c > b` (`a` is not in this study). Annotated unranked hexamers remain visible in inventory and compatible plot/scalar surfaces, but they are excluded from ordinal Spearman rank calculations until an explicit order file ranks them.
+- Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the ranked active subset: `f > e > d > c > b` (`a` is not in this study). Annotated unranked hexamers remain visible in inventory and eligible plot/scalar surfaces, but they are excluded from ordinal Spearman rank calculations until an explicit order file ranks them.
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix surfaces remain secondary audit material
 - Browser default geometry layout: candidate grid over `intermediate_embedding_7b_anchor_60bp` and `intermediate_embedding_7b_full_context_anchor_mean`
@@ -104,14 +104,14 @@
 - Reference context rows include paired `realized_context` sequence views with
   `orientation=forward` and `orientation=reverse_complement` plus
   emitted-orientation anchor bounds for `anchor_mean` Infer pooling.
-- The shared `construct_prom_eth_cip_context` handoff also has paired forward and reverse-complement sequence views for every merged anchor row. Sequence-view sidecars are the authoritative orientation/pooling surface for Infer; legacy forward rows may retain null `construct__orientation` values in the older Construct overlay.
+- The shared `construct_prom_eth_cip_context` handoff also has paired forward and reverse-complement sequence views for every merged anchor row. Sequence-view sidecars are the authoritative orientation/pooling surface for Infer.
 - In this record, `anchor_mean` means Infer receives the full emitted 1 kb pDual context, then mean-pools model features over the Construct-provided anchor coordinates. It does not mean Construct or Infer truncates the context to the anchor before model execution. Reverse-complement contexts use the reverse-complement sequence and its emitted-orientation anchor bounds.
 - Construct details live in `src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md` and `src/dnadesign/construct/docs/reference/config.md`.
 - The downstream reference Infer branch remains planned and non-blocking for the main study state while the study remains in pre-assay representation triage
 
 ### LatentDNA source contract
 
-- Active embedding-bearing LatentDNA sources now read canonical Infer feature sidecars, not legacy USR row-overlay embedding columns.
+- Active embedding-bearing LatentDNA sources now read canonical Infer feature sidecars, not USR row-overlay embedding columns.
 - `anchor_7b_seq_mean_features` exposes `157164` reusable 7B anchor vectors from `usr_prom_eth_cip_anchor/_derived/infer`.
 - `full_context_7b_forward_anchor_mean_features` exposes `157164` reusable 7B forward-context anchor-mean vectors from `construct_prom_eth_cip_context/_derived/infer`.
 - LatentDNA also declares canonical Infer scalar-sidecar sources for Evo2
@@ -140,8 +140,7 @@
 ### Current Infer coverage
 
 - Canonical Infer feature coverage is stored only in `_derived/infer/feature_aliases.parquet` and
-  `_derived/infer/feature_vectors.parquet`; active study row-overlay Infer parts have been retired from
-  the local generated handoff datasets.
+  `_derived/infer/feature_vectors.parquet`; USR row-overlay Infer payloads are not a coverage source.
 - The sequence-view completion planner reports `missing_products=0`, `314328` reusable main 7B
   sequence-view feature vectors, `1258462` missing main 7B vectors, `0` reusable main 7B
   log-likelihood scalar specs, and `1572790` missing main 7B log-likelihood scalar specs under the
@@ -152,8 +151,7 @@
   for `157164` anchor construct-insert intermediate vectors and `157164` forward-context anchor-mean
   intermediate vectors.
 - The active handoff datasets no longer carry stale `infer__evo2_20b__*` row-overlay columns or active
-  7B row-overlay Infer parts. Historical row-overlay payloads were used only as a migration source,
-  then removed after the protected sequence-view sidecars were written.
+  7B row-overlay Infer parts.
 - The remaining main Infer work is targeted: `115` anchor intermediate vectors, all `157279` anchor
   output-layer vectors, forward-context sequence-mean vectors, the remaining `115` forward-context
   anchor-mean intermediate vectors, all forward-context output-layer vectors, all reverse-complement
@@ -167,6 +165,10 @@
 - Infer should consume explicit sequence views and fail fast on missing required product kinds. It
   should not synthesize missing `analysis_window` or reverse-complement products; Construct owns those
   completion steps.
+- `core60_mean`, `seq_mean`, and `anchor_mean` are distinct feature identities.
+  Exact repeated input sequences share one Evo2 forward pass through the
+  `forward_pass_key`, but they do not share feature-vector keys unless the
+  complete feature identity is the same.
 - Before submitting a new feature batch, use the sequence-view completion planner to separate
   canonical reusable vectors from missing work:
   `uv run infer validate sequence-view-completion --config <config.yaml> --format json`.
@@ -181,7 +183,7 @@
   layer through `sequence_view_contract_state` and `infer_feature_completion_state`. The status route
   is for record-plane situational awareness; use preflight for command-level blockers and host
   execution readiness.
-- With the hard-cut generic product-kind vocabulary, generated sidecars that still contain legacy
+- With the hard-cut generic product-kind vocabulary, generated sidecars that still contain old
   values such as `promoter_insert`, `analysis_core60`, or `context1kb_forward` correctly report
   product-contract `attention`. The local study sidecars have been migrated to
   `construct_insert`, `analysis_window`, `selected_region`, and `realized_context` with recomputed

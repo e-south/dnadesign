@@ -61,7 +61,7 @@ jobs: # Keep contexts explicit as separate infer jobs.
       path: inputs/anchor_only_records.jsonl # Point at the anchor-only input plane.
       field: sequence # Read the sequence field from each input record.
     feature_bundle: # Let the bundle surface choose the default feature groups.
-      intermediate_block: 26 # Use the legacy config default; runtime resolves it model-aware.
+      intermediate_block: 26 # Use the stable config default; runtime resolves it model-aware.
       context: # Record the explicit context metadata for this job.
         kind: anchor_only # Mark this lane as the anchor-only context.
 
@@ -82,7 +82,7 @@ jobs: # Keep contexts explicit as separate infer jobs.
 - use `evo2_7b` for the first green path and local smoke runs
 - switch to `evo2_20b` with a one-line config change: `model.id: evo2_20b`
 - keep the project-default intermediate selector unchanged unless repo-local
-  benchmarks justify another lane; the legacy config default `26` resolves
+  benchmarks justify another lane; the stable config default `26` resolves
   model-aware, so `evo2_20b` uses block 23 at runtime
 
 ### What the bundle writes
