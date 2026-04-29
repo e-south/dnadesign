@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..contracts.deliverable import DeliverableEntryStatus
 from ..contracts.workspace import (
+    InferFeatureScalarSidecarSourceConfig,
     InferFeatureSidecarSourceConfig,
     MatrixBundleSourceConfig,
     ParquetSourceConfig,
@@ -41,7 +42,7 @@ def _source_snapshot(context) -> dict[str, WorkspaceSnapshotSource]:
             dataset_id = source.path
         elif isinstance(source, MatrixBundleSourceConfig):
             dataset_id = source.path
-        elif isinstance(source, InferFeatureSidecarSourceConfig):
+        elif isinstance(source, InferFeatureSidecarSourceConfig | InferFeatureScalarSidecarSourceConfig):
             dataset_id = source.dataset
         snapshots[source_id] = WorkspaceSnapshotSource(
             kind=source.kind,

@@ -52,6 +52,16 @@ sources:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
       orientation: forward
+  anchor_7b_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_prom_eth_cip_anchor
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: forward
   full_context_1kb:
     kind: usr
     root: ../../../usr/datasets
@@ -95,6 +105,17 @@ sources:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
       orientation: forward
+  full_context_7b_forward_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: forward
   full_context_7b_forward_seq_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
@@ -130,6 +151,17 @@ sources:
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  full_context_7b_forward_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
       orientation: forward
   full_context_7b_reverse_complement_anchor_mean_features:
     kind: infer_feature_sidecar
@@ -167,6 +199,17 @@ sources:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
       orientation: reverse_complement
+  full_context_7b_reverse_complement_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: reverse_complement
   full_context_7b_reverse_complement_seq_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
@@ -202,6 +245,267 @@ sources:
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
+      orientation: reverse_complement
+  full_context_7b_reverse_complement_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_context
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: reverse_complement
+  reference_native:
+    kind: usr
+    root: ../../../usr/datasets
+    dataset: usr_promoter_references
+    record_key: id
+    subject_key: id
+  reference_core60:
+    kind: usr
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_core60
+    record_key: id
+    subject_key: id
+  reference_core60_7b_core60_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_core60
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: core60_mean
+      orientation: forward
+  reference_core60_7b_core60_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_core60
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: core60_mean
+      orientation: forward
+  reference_core60_7b_core60_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_core60
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  reference_core60_7b_core60_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_core60
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: forward
+  reference_contexts:
+    kind: usr
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+  reference_context_7b_forward_anchor_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      orientation: forward
+  reference_context_7b_forward_anchor_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      orientation: forward
+  reference_context_7b_forward_anchor_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  reference_context_7b_forward_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: forward
+  reference_context_7b_forward_seq_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      orientation: forward
+  reference_context_7b_forward_seq_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      orientation: forward
+  reference_context_7b_forward_seq_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: forward
+  reference_context_7b_forward_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: forward
+  reference_context_7b_reverse_complement_anchor_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_anchor_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_anchor_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_seq_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_seq_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_seq_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: reverse_complement
+  reference_context_7b_reverse_complement_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: construct_prom_eth_cip_reference_contexts
+    record_key: alias_id
+    subject_key: construct__anchor_id
+    context_key: construct__context_id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
       orientation: reverse_complement
 metadata:
   include:
@@ -316,6 +620,86 @@ views:
       name: value
     coordinate_space_id: evo2_7b_output_layer_mean
     tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reverse_complement_context_1kb}
+    role: planned
+  intermediate_embedding_7b_reference_core60:
+    source: reference_core60_7b_core60_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_core60}
+    role: planned
+  output_layer_mean_7b_reference_core60:
+    source: reference_core60_7b_core60_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reference_core60}
+    role: planned
+  intermediate_embedding_7b_reference_context_forward_anchor_mean:
+    source: reference_context_7b_forward_anchor_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_forward_anchor_mean}
+    role: planned
+  output_layer_mean_7b_reference_context_forward_anchor_mean:
+    source: reference_context_7b_forward_anchor_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reference_context_forward_anchor_mean}
+    role: planned
+  intermediate_embedding_7b_reference_context_forward_1kb:
+    source: reference_context_7b_forward_seq_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_forward_1kb}
+    role: planned
+  output_layer_mean_7b_reference_context_forward_1kb:
+    source: reference_context_7b_forward_seq_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reference_context_forward_1kb}
+    role: planned
+  intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean:
+    source: reference_context_7b_reverse_complement_anchor_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_reverse_complement_anchor_mean}
+    role: planned
+  output_layer_mean_7b_reference_context_reverse_complement_anchor_mean:
+    source: reference_context_7b_reverse_complement_anchor_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reference_context_reverse_complement_anchor_mean}
+    role: planned
+  intermediate_embedding_7b_reference_context_reverse_complement_1kb:
+    source: reference_context_7b_reverse_complement_seq_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_reverse_complement_1kb}
+    role: planned
+  output_layer_mean_7b_reference_context_reverse_complement_1kb:
+    source: reference_context_7b_reverse_complement_seq_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: reference_context_reverse_complement_1kb}
     role: planned
 landmarks:
   spyp:
@@ -651,6 +1035,7 @@ notebooks:
     candidate_grid_panel_titles: &browser_candidate_panel_titles
       - Evo 2 7B · 60 bp anchor · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
+    default_layout: candidate_grid
     default_compare_views:
       - intermediate_embedding_7b_anchor_60bp
       - intermediate_embedding_7b_full_context_anchor_mean

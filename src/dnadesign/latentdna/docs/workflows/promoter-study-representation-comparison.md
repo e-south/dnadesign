@@ -7,7 +7,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-28
 **Registry-id:** latentdna.promoter-study.representation-comparison
-**Entry artifact:** usr_prom_eth_cip_anchor and construct_prom_eth_cip_context
+**Entry artifact:** usr_prom_eth_cip_anchor, construct_prom_eth_cip_context, usr_promoter_references, construct_prom_eth_cip_reference_core60, and construct_prom_eth_cip_reference_contexts
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 
 The promoter study now binds LatentDNA to row-level USR metadata sources plus
@@ -106,12 +106,15 @@ Use the notes for:
 - `intermediate_embedding_7b_full_context_anchor_mean`
 
 Planned sidecar-backed surfaces are declared for forward full-context sequence
-mean, reverse-complement full-context sequence mean, and reverse-complement
-context anchor mean, but they currently select zero feature aliases. Output-layer
-mean vectors are declared as planned vector views. Log-likelihood total and
-mean-per-token values are tracked by Infer scalar sidecars and remain
-diagnostic/QC surfaces, not active LatentDNA geometry defaults. 20B and concat
-surfaces are not active in this workspace contract.
+mean, reverse-complement full-context sequence mean, reverse-complement context
+anchor mean, reference core60 `analysis_window`, and reference forward and
+reverse-complement contexts. The reference sources select zero feature aliases
+until Infer writes the canonical sidecars for
+`infer_prom_eth_cip_reference_views_7b`. Output-layer mean vectors are declared
+as planned vector views. Log-likelihood total and mean-per-token values are
+tracked by Infer scalar sidecars and remain diagnostic/QC surfaces, not active
+LatentDNA geometry defaults. 20B and concat surfaces are not active in this
+workspace contract.
 
 ### Sequence-View Plot Contract
 
@@ -143,6 +146,8 @@ uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --de
 uv run latentdna inspect source anchor_7b_seq_mean_features --workspace stress_ethanol_cipro_growth --json
 # Inspect the paired forward-context anchor-mean sidecar source.
 uv run latentdna inspect source full_context_7b_forward_anchor_mean_features --workspace stress_ethanol_cipro_growth --json
+# Inspect the planned reference core60 sidecar source without requiring completed vectors.
+uv run latentdna inspect source reference_core60_7b_core60_mean_features --workspace stress_ethanol_cipro_growth --json
 # Check whether the representation-health gate is fresh enough to review.
 uv run latentdna deliverable status representation_health_summary --workspace stress_ethanol_cipro_growth
 # Check whether the context-robustness summary is fresh enough to review.

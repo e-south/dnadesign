@@ -69,6 +69,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
     assert geometry_roles["intermediate_embedding_7b_full_context_anchor_mean"] == "primary"
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
+    assert controls.geometry_controls.default_layout == "candidate_grid"
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
     assert "spacer_length" in preferred_hues
@@ -95,6 +96,38 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
 
     assert snapshot["schema_version"] == "latentdna.workspace_snapshot.v1"
     assert snapshot["workspace_id"] == "stress_ethanol_cipro_growth"
+    assert snapshot["sources"]["anchor_7b_seq_mean_log_likelihood_total"]["dataset_id"] == "usr_prom_eth_cip_anchor"
+    assert context.config.sources["reference_native"].dataset == "usr_promoter_references"
+    assert context.config.sources["reference_core60"].dataset == "construct_prom_eth_cip_reference_core60"
+    assert context.config.sources["reference_contexts"].dataset == "construct_prom_eth_cip_reference_contexts"
+    expected_reference_views = [
+        "intermediate_embedding_7b_reference_core60",
+        "intermediate_embedding_7b_reference_context_forward_1kb",
+        "intermediate_embedding_7b_reference_context_forward_anchor_mean",
+        "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+        "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+        "output_layer_mean_7b_reference_core60",
+        "output_layer_mean_7b_reference_context_forward_1kb",
+        "output_layer_mean_7b_reference_context_forward_anchor_mean",
+        "output_layer_mean_7b_reference_context_reverse_complement_1kb",
+        "output_layer_mean_7b_reference_context_reverse_complement_anchor_mean",
+    ]
+    assert all(context.config.views[view_id].role == "planned" for view_id in expected_reference_views)
+    initial_control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    assert all(view_id not in initial_control_geometry_ids for view_id in expected_reference_views)
+    expected_total_log_likelihood_sources = [
+        "anchor_7b_seq_mean_log_likelihood_total",
+        "full_context_7b_forward_anchor_mean_log_likelihood_total",
+        "full_context_7b_forward_seq_mean_log_likelihood_total",
+        "full_context_7b_reverse_complement_anchor_mean_log_likelihood_total",
+        "full_context_7b_reverse_complement_seq_mean_log_likelihood_total",
+        "reference_core60_7b_core60_mean_log_likelihood_total",
+        "reference_context_7b_forward_anchor_mean_log_likelihood_total",
+        "reference_context_7b_forward_seq_mean_log_likelihood_total",
+        "reference_context_7b_reverse_complement_anchor_mean_log_likelihood_total",
+        "reference_context_7b_reverse_complement_seq_mean_log_likelihood_total",
+    ]
+    assert all(source_id in context.config.sources for source_id in expected_total_log_likelihood_sources)
     expected_decision_prefix = [
         "dataset_overview",
         "design_structure_summary",
@@ -114,6 +147,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert control_geometry_ids == expected_browser_geometries
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
+    assert controls.geometry_controls.default_layout == "candidate_grid"
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
     assert "log_likelihood_per_token_7b" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_ethanol_vs_control" not in snapshot["browser"]["preferred_hues"]

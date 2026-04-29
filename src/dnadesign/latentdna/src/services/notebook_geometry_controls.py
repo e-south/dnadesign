@@ -459,6 +459,20 @@ def _default_compare_views(
     return None, None
 
 
+def _default_layout_id(
+    context,
+    presets: list[WorkspaceNotebookLayoutPreset],
+    *,
+    notebook_id: str | None,
+) -> str:
+    available = {preset.id for preset in presets}
+    notebook = _resolve_notebook(context, notebook_id)
+    configured = str(getattr(notebook, "default_layout", "") or "").strip() if notebook is not None else ""
+    if configured and configured in available:
+        return configured
+    return "single_view"
+
+
 def build_workspace_geometry_controls(context, *, notebook_id: str | None = None) -> WorkspaceNotebookGeometryControls:
     projection_ids_by_view = _projection_inventory(context)
     geometry_order = _geometry_order(context, notebook_id=notebook_id)
@@ -479,18 +493,19 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         geometries,
         notebook_id=notebook_id,
     )
+    layout_presets = _layout_presets(context, geometries, notebook_id=notebook_id)
     return WorkspaceNotebookGeometryControls(
         default_model="7b",
         default_family="intermediate_embedding",
         default_context="anchor_60bp",
-        default_layout="single_view",
+        default_layout=_default_layout_id(context, layout_presets, notebook_id=notebook_id),
         default_compare_left=default_compare_left,
         default_compare_right=default_compare_right,
         geometries=geometries,
         preferred_hues=preferred_hues,
         hue_kinds=hue_kinds,
         joinable_tables=joinable_tables,
-        layout_presets=_layout_presets(context, geometries, notebook_id=notebook_id),
+        layout_presets=layout_presets,
         comparison_bases=comparison_bases,
         reference_labels=_reference_labels(context),
         compare_metrics=WorkspaceNotebookCompareMetrics(

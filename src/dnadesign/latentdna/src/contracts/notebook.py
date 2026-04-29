@@ -22,6 +22,7 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     geometry_order: list[str] = Field(default_factory=list)
     candidate_grid_views: list[str] = Field(default_factory=list)
     candidate_grid_panel_titles: list[str] = Field(default_factory=list)
+    default_layout: str | None = None
     default_compare_views: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

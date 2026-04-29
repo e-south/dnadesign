@@ -87,6 +87,9 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "workspace snapshot" in workflow
     assert latentdna_binding["supported_model_families"] == ["evo2_7b", "evo2_20b"]
     assert latentdna_binding["default_model_family"] == "evo2_7b"
+    assert latentdna_binding["source_datasets"]["reference_native"] == "usr_promoter_references"
+    assert latentdna_binding["source_datasets"]["reference_core60"] == "construct_prom_eth_cip_reference_core60"
+    assert latentdna_binding["source_datasets"]["reference_contexts"] == "construct_prom_eth_cip_reference_contexts"
     assert study_pipeline["study_pipeline"]["infer"]["preferred_model_family"] == "evo2_7b"
     assert study_pipeline["study_pipeline"]["infer"]["supported_model_families"] == ["evo2_7b", "evo2_20b"]
 
@@ -105,6 +108,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "latentdna_binding.yaml" in workspace_readme
     assert "workspace_snapshot.json" in workspace_readme
     assert "UMAP role: appendix orientation only" in workspace_readme
+    assert "Reference metadata sources:" in workspace_readme
 
     assert "Gate:" in study_routes
     assert "representation_health_summary" in study_routes

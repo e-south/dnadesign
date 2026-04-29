@@ -74,15 +74,18 @@ Current runtime limits:
   sources make `value` the vector column and keep sequence-view fields such as
   `view_id`, `product_kind`, `orientation`, `recommended_pooling`,
   `source_family`, `selection_basis`, and `view_collections` available as row
-  metadata.
+  metadata. Missing vector sidecar files expose a zero-row schema so planned
+  vector sources can be declared before Infer has produced rows. Alias rows
+  that reference absent vector keys still fail validation.
 - `infer_feature_scalar_sidecar` sources expose canonical Infer scalar outputs
   from `<usr-dataset>/_derived/infer/feature_scalar_aliases.parquet` joined to
   `feature_scalars.parquet`, `_views/sequence_views.parquet`, mutable
   `_views/view_semantics.parquet`, and the owning USR dataset rows. These
   sources make `value` the scalar column for diagnostics such as
-  `log_likelihood__mean_per_token`. Missing scalar sidecar files expose a
-  zero-row schema so planned scalar sources can coexist with partial feature
-  datasets without pretending the scalar evidence is present.
+  `log_likelihood__total` and `log_likelihood__mean_per_token`. Missing scalar
+  sidecar files expose a zero-row schema so planned scalar sources can coexist
+  with partial feature datasets without pretending the scalar evidence is
+  present.
 - Source-backed views with `role: planned` or `role: retired` are skipped by
   deep vector-column checks and omitted from notebook geometry controls. This
   is a visible degraded contract for upstream feature gaps; planned or retired

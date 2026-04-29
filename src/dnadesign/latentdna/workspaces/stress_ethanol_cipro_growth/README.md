@@ -8,13 +8,15 @@ This workspace holds the LatentDNA comparison surfaces for the active stress / e
 - Gate: `representation_health_summary`
 - Active feature source contract: canonical Infer feature sidecars joined to USR sequence-view and view-semantics sidecars
 - Available active geometry: 7B construct-insert `seq_mean` and 7B forward 1 kb context `anchor_mean`
-- Planned geometry: reverse-complement 1 kb context `anchor_mean`, reference `analysis_window`, and reference context features after Infer sidecars exist
+- Planned geometry: forward 1 kb context `seq_mean`, reverse-complement 1 kb context `seq_mean` and `anchor_mean`, reference core60 `analysis_window`, and reference forward/reverse-complement context features after Infer sidecars exist
+- Reference metadata sources: `usr_promoter_references`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Sigma-35 inventory: source-backed from DenseGen plan tokens, DenseGen fixed-element details, USR `seq_annot` `-35` features, or Construct retained-feature bounds; missing embedding rows mean missing Infer vectors, not filtered Sigma-35 categories
 - Primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
 - Companion visuals: `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix support: `sigma35_centroid_distance_gallery`
 - Appendix surfaces: `design_centroid_margin_gallery`, `reference_alignment_summary`, `representation_scree_diagnostic`, `appendix_umap_gallery`
 - UMAP role: appendix orientation only
+- Browser geometry default: candidate grid with 60 bp anchor and 1 kb context anchor-mean panels
 
 Common commands:
 

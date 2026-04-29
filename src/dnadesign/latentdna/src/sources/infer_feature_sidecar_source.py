@@ -30,6 +30,35 @@ _VECTOR_COLUMN = "value"
 _VECTOR_CREATED_AT_COLUMN = "feature_vector_created_at"
 _ALIAS_CREATED_AT_COLUMN = "feature_alias_created_at"
 _BATCH_SIZE = 2048
+_ALIAS_SCHEMA = pa.schema(
+    [
+        pa.field("alias_id", pa.string()),
+        pa.field("view_id", pa.string()),
+        pa.field("view_name", pa.string()),
+        pa.field("sequence_id", pa.string()),
+        pa.field("feature_vector_key", pa.string()),
+        pa.field("forward_pass_key", pa.string()),
+        pa.field("provider", pa.string()),
+        pa.field("model_name", pa.string()),
+        pa.field("model_revision", pa.string()),
+        pa.field("layer_name", pa.string()),
+        pa.field("representation_kind", pa.string()),
+        pa.field("pooling_operation", pa.string()),
+        pa.field("pooling_start_0", pa.int64()),
+        pa.field("pooling_end_0", pa.int64()),
+        pa.field("orientation", pa.string()),
+        pa.field("source_dataset_id", pa.string()),
+        pa.field("feature_request_digest", pa.string()),
+        pa.field("created_at", pa.string()),
+    ]
+)
+_VECTOR_SCHEMA = pa.schema(
+    [
+        pa.field("feature_vector_key", pa.string()),
+        pa.field(_VECTOR_COLUMN, pa.list_(pa.float64())),
+        pa.field("created_at", pa.string()),
+    ]
+)
 
 
 def dataset_dir(root: str, dataset: str, *, workspace_dir: Path) -> Path:
@@ -58,6 +87,10 @@ def _require_table(path: Path, *, label: str) -> pa.Table:
     if not path.is_file():
         raise SourceResolutionError(f"{label} not found: {path}")
     return pq.read_table(path)
+
+
+def _empty_table(schema: pa.Schema) -> pa.Table:
+    return pa.Table.from_arrays([pa.array([], type=field.type) for field in schema], schema=schema)
 
 
 def _normalize_where(where: Mapping[str, object] | None) -> dict[str, set[str]]:
@@ -99,13 +132,17 @@ def _read_alias_table(
     where: Mapping[str, object] | None,
 ) -> pa.Table:
     path = feature_aliases_path(root, dataset, workspace_dir=workspace_dir)
-    return _apply_where(_require_table(path, label="feature aliases"), where)
+    if not path.is_file():
+        return _apply_where(_empty_table(_ALIAS_SCHEMA), where)
+    return _apply_where(pq.read_table(path), where)
 
 
 @lru_cache(maxsize=16)
 def _vector_key_set_for_path(path_text: str) -> set[str]:
     path = Path(path_text)
-    table = _require_table(path, label="feature vectors").select(["feature_vector_key"])
+    if not path.is_file():
+        return set()
+    table = pq.read_table(path, columns=["feature_vector_key"])
     return {str(value) for value in table.column("feature_vector_key").to_pylist() if value is not None}
 
 
@@ -136,6 +173,9 @@ def _assert_vectors_exist(
 def _schema_field_types(root: str, dataset: str, *, workspace_dir: Path) -> dict[str, pa.DataType]:
     ds = _dataset(root, dataset, workspace_dir=workspace_dir)
     field_types = {field.name: field.type for field in ds.schema()}
+    for field in _ALIAS_SCHEMA:
+        name = _ALIAS_CREATED_AT_COLUMN if field.name == "created_at" else field.name
+        field_types.setdefault(name, field.type)
     for sidecar_path in [feature_aliases_path(root, dataset, workspace_dir=workspace_dir), sequence_views_path(ds)]:
         if not sidecar_path.is_file():
             continue
@@ -146,7 +186,7 @@ def _schema_field_types(root: str, dataset: str, *, workspace_dir: Path) -> dict
     if semantics_path.is_file():
         for field in read_schema(semantics_path):
             field_types.setdefault(field.name, field.type)
-    field_types[_VECTOR_COLUMN] = pa.list_(pa.float64())
+    field_types[_VECTOR_COLUMN] = _VECTOR_SCHEMA.field(_VECTOR_COLUMN).type
     field_types[_VECTOR_CREATED_AT_COLUMN] = pa.string()
     return field_types
 
@@ -334,7 +374,12 @@ def read_table(
     if batches:
         return pa.Table.from_batches(batches)
     selected_columns = list(columns or _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where))
-    return pa.Table.from_pydict({column: [] for column in selected_columns})
+    schema = _stable_batch_schema(
+        selected_columns,
+        {},
+        field_types=_schema_field_types(root, dataset, workspace_dir=workspace_dir),
+    )
+    return pa.Table.from_arrays([pa.array([], type=field.type) for field in schema], schema=schema)
 
 
 def source_provenance(

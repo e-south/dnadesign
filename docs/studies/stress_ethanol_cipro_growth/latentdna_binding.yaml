@@ -4,6 +4,9 @@ snapshot_ref: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/out
 source_datasets:
   anchor_60bp: usr_prom_eth_cip_anchor
   full_context_1kb: construct_prom_eth_cip_context
+  reference_native: usr_promoter_references
+  reference_core60: construct_prom_eth_cip_reference_core60
+  reference_contexts: construct_prom_eth_cip_reference_contexts
 supported_model_families:
   - evo2_7b
   - evo2_20b
@@ -23,11 +26,21 @@ default_geometry_inventory:
     - intermediate_embedding_7b_full_context_1kb
     - intermediate_embedding_7b_reverse_complement_context_1kb
     - intermediate_embedding_7b_reverse_complement_context_anchor_mean
+    - intermediate_embedding_7b_reference_core60
+    - intermediate_embedding_7b_reference_context_forward_1kb
+    - intermediate_embedding_7b_reference_context_forward_anchor_mean
+    - intermediate_embedding_7b_reference_context_reverse_complement_1kb
+    - intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean
     - output_layer_mean_7b_anchor_60bp
     - output_layer_mean_7b_full_context_1kb
     - output_layer_mean_7b_full_context_anchor_mean
     - output_layer_mean_7b_reverse_complement_context_1kb
     - output_layer_mean_7b_reverse_complement_context_anchor_mean
+    - output_layer_mean_7b_reference_core60
+    - output_layer_mean_7b_reference_context_forward_1kb
+    - output_layer_mean_7b_reference_context_forward_anchor_mean
+    - output_layer_mean_7b_reference_context_reverse_complement_1kb
+    - output_layer_mean_7b_reference_context_reverse_complement_anchor_mean
   planned_scalar_diagnostics:
     - log_likelihood_total_7b_anchor_60bp
     - log_likelihood_mean_per_token_7b_anchor_60bp
@@ -39,6 +52,16 @@ default_geometry_inventory:
     - log_likelihood_mean_per_token_7b_reverse_complement_context_1kb
     - log_likelihood_total_7b_reverse_complement_context_anchor_mean
     - log_likelihood_mean_per_token_7b_reverse_complement_context_anchor_mean
+    - log_likelihood_total_7b_reference_core60
+    - log_likelihood_mean_per_token_7b_reference_core60
+    - log_likelihood_total_7b_reference_context_forward_1kb
+    - log_likelihood_mean_per_token_7b_reference_context_forward_1kb
+    - log_likelihood_total_7b_reference_context_forward_anchor_mean
+    - log_likelihood_mean_per_token_7b_reference_context_forward_anchor_mean
+    - log_likelihood_total_7b_reference_context_reverse_complement_1kb
+    - log_likelihood_mean_per_token_7b_reference_context_reverse_complement_1kb
+    - log_likelihood_total_7b_reference_context_reverse_complement_anchor_mean
+    - log_likelihood_mean_per_token_7b_reference_context_reverse_complement_anchor_mean
 attention_deliverables:
   - dataset_overview
   - representation_health_summary

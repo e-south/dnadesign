@@ -124,7 +124,7 @@ def _read_alias_table(
 ) -> pa.Table:
     path = feature_scalar_aliases_path(root, dataset, workspace_dir=workspace_dir)
     if not path.is_file():
-        return _empty_table(_ALIAS_SCHEMA)
+        return _apply_where(_empty_table(_ALIAS_SCHEMA), where)
     return _apply_where(pq.read_table(path).cast(_ALIAS_SCHEMA), where)
 
 

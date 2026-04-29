@@ -36,7 +36,7 @@
 - Sigma-35 ordinal surfaces use the reverse-alphabetical promoter ladder over the ranked active subset: `f > e > d > c > b` (`a` is not in this study). Annotated unranked hexamers remain visible in inventory and compatible plot/scalar surfaces, but they are excluded from ordinal Spearman rank calculations until an explicit order file ranks them.
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix surfaces remain secondary audit material
-- Browser default geometries: `intermediate_embedding_7b_anchor_60bp`, `intermediate_embedding_7b_full_context_anchor_mean`
+- Browser default geometry layout: candidate grid over `intermediate_embedding_7b_anchor_60bp` and `intermediate_embedding_7b_full_context_anchor_mean`
 
 ### Current row counts
 
@@ -115,10 +115,17 @@
 - `anchor_7b_seq_mean_features` exposes `157164` reusable 7B anchor vectors from `usr_prom_eth_cip_anchor/_derived/infer`.
 - `full_context_7b_forward_anchor_mean_features` exposes `157164` reusable 7B forward-context anchor-mean vectors from `construct_prom_eth_cip_context/_derived/infer`.
 - LatentDNA also declares canonical Infer scalar-sidecar sources for Evo2
-  log-likelihood mean-per-token diagnostics. These sources currently expose
-  zero rows because local Infer scalar sidecars have not been generated, but the
-  schema is valid and ready for partial fills/resumes.
-- Planned sidecar sources for mean-pooled output-layer logits, forward full-context sequence mean, reverse-complement full-context sequence mean, and reverse-complement context anchor mean currently select zero aliases until Infer fills those vectors.
+  log-likelihood total and mean-per-token diagnostics. These sources currently
+  expose zero rows because local Infer scalar sidecars have not been generated,
+  but the schema is valid and ready for partial fills/resumes.
+- Planned sidecar sources for mean-pooled output-layer logits, forward
+  full-context sequence mean, reverse-complement full-context sequence mean,
+  reverse-complement context anchor mean, reference core60, and reference
+  context views currently select zero aliases until Infer fills those vectors.
+- The LatentDNA workspace also declares the native reference, reference core60,
+  and reference context USR datasets as row-level metadata sources. Anderson and
+  W-collection promoter-standard fields remain available as metadata even while
+  the reference feature sidecars are still empty.
 - Current regenerated LatentDNA source inventory is sidecar/annotation-backed. Feature-backed embedding plots still include only rows with existing Infer feature aliases; SFXI/reference/core rows that lack vectors are missing feature coverage, not ineligible plot categories. Deep validation should be treated as the source-of-truth check for stale materialized artifacts after any source or sidecar refresh.
 - Materialized LatentDNA view rows now carry `source_family`,
   `selection_basis`, `view_collections`, `role_tags`, and

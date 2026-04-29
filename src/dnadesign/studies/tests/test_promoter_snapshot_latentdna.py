@@ -30,6 +30,8 @@ def _write_latentdna_binding_fixture(tmp_path: Path) -> Path:
                 "source_datasets": {
                     "anchor_60bp": "promoter/demo_anchor_set",
                     "full_context_1kb": "promoter/demo_construct_contexts",
+                    "reference_core60": "promoter/demo_reference_core60",
+                    "reference_contexts": "promoter/demo_reference_contexts",
                 },
                 "supported_model_families": ["evo2_20b", "evo2_7b"],
                 "default_model_family": "evo2_20b",
@@ -216,6 +218,8 @@ def test_inspect_promoter_latentdna_readiness_uses_binding_and_snapshot_contract
     assert readiness["source_datasets"] == {
         "anchor_60bp": "promoter/demo_anchor_set",
         "full_context_1kb": "promoter/demo_construct_contexts",
+        "reference_core60": "promoter/demo_reference_core60",
+        "reference_contexts": "promoter/demo_reference_contexts",
     }
     assert readiness["ok_deliverables"] == [
         "dataset_overview",

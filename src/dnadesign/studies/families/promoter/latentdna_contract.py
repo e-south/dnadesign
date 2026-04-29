@@ -105,6 +105,11 @@ def _validate_binding(binding: Mapping[str, object]) -> dict[str, object]:
     )
     if missing_sources:
         raise ValueError(f"latentdna binding source_datasets missing required entries: {missing_sources}")
+    normalized_source_datasets = {
+        str(scope): text
+        for scope, value in sorted(source_datasets.items(), key=lambda item: str(item[0]))
+        if (text := _string_or_none(value)) is not None
+    }
 
     workspace_id = _require_binding_text(binding, "workspace_id")
     workspace_ref = _require_binding_text(binding, "workspace_ref")
@@ -119,9 +124,7 @@ def _validate_binding(binding: Mapping[str, object]) -> dict[str, object]:
         "workspace_id": workspace_id,
         "workspace_ref": workspace_ref,
         "snapshot_ref": snapshot_ref,
-        "source_datasets": {
-            scope: _string_or_none(source_datasets.get(scope)) for scope in sorted(_REQUIRED_SOURCE_DATASETS)
-        },
+        "source_datasets": normalized_source_datasets,
         "supported_model_families": model_families,
         "default_model_family": default_model_family,
         "required_wildtype_references": _require_binding_list(binding, "required_wildtype_references"),

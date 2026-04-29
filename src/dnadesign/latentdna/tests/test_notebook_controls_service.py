@@ -250,6 +250,7 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
         "Pooled logits",
         "Intermediate",
     ]
+    config["notebooks"]["latent_geometry_browser"]["default_layout"] = "candidate_grid"
     config["notebooks"]["latent_geometry_browser"]["default_compare_views"] = [
         "pooled_logits_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
@@ -264,6 +265,7 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
         "pooled_logits_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
     ]
+    assert controls.geometry_controls.default_layout == "candidate_grid"
     assert controls.geometry_controls.default_compare_left == "pooled_logits_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_anchor_60bp"
 
