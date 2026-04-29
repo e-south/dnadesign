@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_recipe_deliverable_workflow.py
 
 Workflow tests for recipe orchestration and deliverable status/run.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

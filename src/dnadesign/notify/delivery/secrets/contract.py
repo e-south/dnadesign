@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 
 BACKEND_KEYCHAIN = "keychain"
 BACKEND_SECRET_SERVICE = "secretservice"  # pragma: allowlist secret

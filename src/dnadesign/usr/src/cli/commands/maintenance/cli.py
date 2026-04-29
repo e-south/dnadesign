@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/cli.py
 
 Typer registration helpers for USR maintenance commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -25,6 +25,7 @@ def register_maintenance_commands(
     cmd_overlay_compact: Callable[[object], None],
     cmd_overlay_project: Callable[[object], None],
     cmd_overlay_remove: Callable[[object], None],
+    cmd_event_log_garden: Callable[[object], None],
     cmd_merge_datasets: Callable[[object], None],
 ) -> None:
     @maintenance_app.command("dedupe")
@@ -110,6 +111,30 @@ def register_maintenance_commands(
                 overwrite=overwrite,
                 allow_missing=allow_missing,
                 dry_run=dry_run,
+            )
+        )
+
+    @maintenance_app.command("event-log-garden")
+    def cli_event_log_garden(
+        ctx: typer.Context,
+        dataset: str = typer.Argument(...),
+        retain_last: int = typer.Option(1000, "--retain-last", help="Number of recent event lines to keep live."),
+        write: bool = typer.Option(False, "--write", help="Archive and rewrite .events.log. Default is dry-run."),
+        acknowledge_notify_cursor_reset: bool = typer.Option(
+            False,
+            "--acknowledge-notify-cursor-reset",
+            help="Required with --write; confirms Notify watchers are stopped and cursors will be reseeded.",
+        ),
+        reason: str = typer.Option("", "--reason", help="Short audit reason recorded on write."),
+    ) -> None:
+        cmd_event_log_garden(
+            ctx_args_builder(
+                ctx,
+                dataset=dataset,
+                retain_last=retain_last,
+                write=write,
+                acknowledge_notify_cursor_reset=acknowledge_notify_cursor_reset,
+                reason=reason,
             )
         )
 

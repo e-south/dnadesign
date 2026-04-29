@@ -5,7 +5,7 @@ src/dnadesign/usr/src/runtime/__init__.py
 
 USR runtime helper package.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

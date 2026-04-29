@@ -11,9 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import ssl
-from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from importlib import resources
@@ -41,10 +39,36 @@ from dnadesign.cruncher.ingest.normalize import (
     compute_pwm_from_sites,
     normalize_site_sequence,
 )
+from dnadesign.cruncher.ingest.promoters import (
+    PromoterDescriptor,
+    PromoterExportManifest,
+    PromoterQuery,
+    PromoterRecord,
+    build_promoter_source_inventory,
+    export_promoter_records,
+    parse_regulondb_promoter_payload,
+)
+
+from .regulondb_alignment import (
+    _compute_pwm_from_alignment,
+    _parse_alignment_matrix,
+    _parse_alignment_sequences,
+)
+from .regulondb_queries import (
+    _DATABASE_INFO_QUERY,
+    _HT_DATASET_TYPES_QUERY,
+    _HT_DATASETS_QUERY,
+    _HT_PEAKS_QUERY,
+    _HT_SOURCES_QUERY,
+    _HT_TF_BINDING_QUERY,
+    _OPERON_PROMOTER_QUERY,
+    _REGULON_ALL_QUERY,
+    _REGULON_DETAIL_QUERY,
+    _REGULON_LIST_QUERY,
+)
 
 _REGULONDB_URL = "https://regulondb.ccg.unam.mx/graphql"
 _REGULONDB_INTERMEDIATE_PEM = "globalsign_rsa_ov_ssl_ca_2018.pem"
-_FLOAT_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
 logger = logging.getLogger(__name__)
 _GRAPHQL_LENGTH_ERROR = "Cannot read properties of undefined (reading 'length')"
 
@@ -90,6 +114,13 @@ def _expect_list_field(container: dict, key: str, context: str) -> list:
     if not isinstance(value, list):
         raise RuntimeError(f"RegulonDB {context} response '{key}' must be a list.")
     return value
+
+
+def _clean_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _expect_list_nested(container: dict, key: str, subkey: str, context: str) -> list:
@@ -148,242 +179,6 @@ class RegulonDBAdapterConfig:
     uppercase_binding_site_only: bool = True
 
 
-_REGULON_LIST_QUERY = """
-query ($search: String, $limit: Int, $page: Int) {
-  getRegulonBy(search: $search, limit: $limit, page: $page) {
-    data {
-      _id
-      regulator { name abbreviatedName synonyms }
-      organism { name }
-    }
-  }
-}
-"""
-
-_REGULON_ALL_QUERY = """
-query ($limit: Int, $page: Int) {
-  getAllRegulon(limit: $limit, page: $page) {
-    data {
-      _id
-      regulator { name abbreviatedName synonyms }
-      organism { name }
-    }
-  }
-}
-"""
-
-_REGULON_DETAIL_QUERY = """
-query ($search: String, $limit: Int, $page: Int) {
-  getRegulonBy(search: $search, limit: $limit, page: $page) {
-    data {
-      _id
-      regulator { name abbreviatedName synonyms }
-      regulatoryInteractions {
-        _id
-        regulatoryBindingSites {
-          _id
-          leftEndPosition
-          rightEndPosition
-          strand
-          sequence
-        }
-      }
-      aligmentMatrix {
-        matrix
-        aligment
-        consensus
-      }
-    }
-  }
-}
-"""
-
-_HT_SOURCES_QUERY = """
-query {
-  listAllHTSources
-}
-"""
-
-_HT_DATASET_TYPES_QUERY = """
-query {
-  listAllDatasetTypes
-}
-"""
-
-_HT_DATASETS_QUERY = """
-query($datasetType: String!, $source: String!) {
-  getDatasetsWithMetadata(datasetType: $datasetType, source: $source) {
-    datasets {
-      _id
-      collectionData { type source }
-      objectsTested { name abbreviatedName synonyms }
-      referenceGenome
-      assemblyGenomeId
-    }
-  }
-}
-"""
-
-_HT_TF_BINDING_QUERY = """
-query($datasetId: String!, $limit: Int, $page: Int) {
-  getAllTFBindingOfDataset(datasetId: $datasetId, limit: $limit, page: $page) {
-    _id
-    chromosome
-    chrLeftPosition
-    chrRightPosition
-    strand
-    sequence
-    score
-    datasetIds
-    peakId
-  }
-}
-"""
-
-_HT_PEAKS_QUERY = """
-query($datasetId: String!, $limit: Int, $page: Int) {
-  getAllPeaksOfDataset(datasetId: $datasetId, limit: $limit, page: $page) {
-    _id
-    name
-    chromosome
-    peakLeftPosition
-    peakRightPosition
-    score
-    siteIds
-    datasetIds
-  }
-}
-"""
-
-
-def _tokenize_line(line: str) -> list[str]:
-    return [tok for tok in re.split(r"[,\s]+", line.strip()) if tok]
-
-
-def _parse_float(token: str) -> float:
-    if not _FLOAT_RE.match(token):
-        raise ValueError(f"invalid numeric token: {token}")
-    return float(token)
-
-
-def _parse_alignment_matrix(text: str) -> List[List[float]]:
-    if not text or not text.strip():
-        raise ValueError("alignment matrix payload is empty")
-    raw = text.strip()
-    # JSON payload
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        parsed = None
-    if isinstance(parsed, list):
-        if all(isinstance(row, list) for row in parsed):
-            if all(len(row) == 4 for row in parsed):
-                return [[float(v) for v in row] for row in parsed]
-            if len(parsed) == 4 and all(isinstance(row, list) for row in parsed):
-                lengths = {len(row) for row in parsed}
-                if len(lengths) != 1:
-                    raise ValueError("alignment matrix JSON rows must have equal length")
-                length = lengths.pop()
-                return [
-                    [
-                        float(parsed[0][i]),
-                        float(parsed[1][i]),
-                        float(parsed[2][i]),
-                        float(parsed[3][i]),
-                    ]
-                    for i in range(length)
-                ]
-    lines = [line for line in raw.splitlines() if line.strip()]
-    if not lines:
-        raise ValueError("alignment matrix has no data rows")
-    tokens = [_tokenize_line(line) for line in lines]
-    # header row A C G T
-    if len(tokens) > 1 and len(tokens[0]) == 4 and all(tok.upper() in "ACGT" for tok in tokens[0]):
-        rows = []
-        for row in tokens[1:]:
-            if len(row) != 4:
-                raise ValueError("alignment matrix rows must have 4 numeric columns")
-            rows.append([_parse_float(v) for v in row])
-        return rows
-    # base-labeled rows
-    if all(row and row[0].upper() in "ACGT" for row in tokens):
-        base_rows: Dict[str, list[float]] = {}
-        for row in tokens:
-            base = row[0].upper()
-            nums = [_parse_float(v) for v in row[1:]]
-            base_rows[base] = nums
-        if set(base_rows.keys()) != {"A", "C", "G", "T"}:
-            raise ValueError("alignment matrix must include A/C/G/T rows")
-        lengths = {len(vals) for vals in base_rows.values()}
-        if len(lengths) != 1:
-            raise ValueError("alignment matrix base rows must have equal length")
-        length = lengths.pop()
-        return [[base_rows["A"][i], base_rows["C"][i], base_rows["G"][i], base_rows["T"][i]] for i in range(length)]
-    # position rows with 4 numeric columns
-    if all(len(row) == 4 for row in tokens):
-        return [[_parse_float(v) for v in row] for row in tokens]
-    raise ValueError("unrecognized alignment matrix format")
-
-
-def _parse_alignment_sequences(text: str) -> List[str]:
-    if not text or not text.strip():
-        raise ValueError("alignment payload is empty")
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        raise ValueError("alignment payload has no sequences")
-    sequences: List[str] = []
-    if any(line.startswith(">") for line in lines):
-        current: list[str] = []
-        for line in lines:
-            if line.startswith(">"):
-                if current:
-                    sequences.append("".join(current))
-                    current = []
-                continue
-            current.append(line)
-        if current:
-            sequences.append("".join(current))
-    else:
-        sequences = lines
-    cleaned: List[str] = []
-    for seq in sequences:
-        seq = seq.strip().upper()
-        if not seq:
-            continue
-        if any(ch not in "ACGT-" for ch in seq):
-            raise ValueError("alignment sequences must contain only A/C/G/T/- characters")
-        cleaned.append(seq)
-    if not cleaned:
-        raise ValueError("alignment sequences are empty after cleaning")
-    return cleaned
-
-
-def _compute_pwm_from_alignment(sequences: List[str]) -> List[List[float]]:
-    lengths = {len(seq) for seq in sequences}
-    if len(lengths) != 1:
-        raise ValueError("alignment sequences must be the same length")
-    length = lengths.pop()
-    matrix: List[List[float]] = []
-    for i in range(length):
-        counts = Counter()
-        for seq in sequences:
-            base = seq[i]
-            if base in "ACGT":
-                counts[base] += 1
-        total = sum(counts.get(b, 0) for b in "ACGT")
-        if total == 0:
-            raise ValueError("alignment column has no A/C/G/T bases")
-        matrix.append(
-            [
-                counts.get("A", 0) / total,
-                counts.get("C", 0) / total,
-                counts.get("G", 0) / total,
-                counts.get("T", 0) / total,
-            ]
-        )
-    return matrix
-
-
 class RegulonDBAdapter:
     source_id = "regulondb"
 
@@ -407,6 +202,7 @@ class RegulonDBAdapter:
 
     def capabilities(self) -> Set[str]:
         caps = {"motifs:list", "motifs:get", "motifs:iter"}
+        caps.update({"promoters:list", "promoters:iter", "promoters:export"})
         if self._config.curated_sites or self._config.ht_sites:
             caps.add("sites:list")
         if self._config.ht_sites:
@@ -638,6 +434,263 @@ class RegulonDBAdapter:
             raise ValueError(
                 f"Unknown RegulonDB dataset type '{self._config.ht_dataset_type}'. Available types: {available}"
             )
+
+    def _current_database_info(self) -> dict:
+        data = self._transport(_DATABASE_INFO_QUERY, {})
+        rows = _expect_list_field(data, "getDatabaseInfo", "database info")
+        for row in rows:
+            if isinstance(row, dict) and _clean_text(row.get("regulonDBVersion")):
+                return row
+        raise RuntimeError("RegulonDB database info response did not include a release version.")
+
+    def _sigma_factor_payloads(self, raw_sigma: object) -> list[dict]:
+        sigma = raw_sigma if isinstance(raw_sigma, dict) else {}
+        if not sigma:
+            return []
+        if not any(
+            _clean_text(sigma.get(key))
+            for key in (
+                "_id",
+                "id",
+                "name",
+                "abbreviatedName",
+                "abbrev",
+            )
+        ):
+            return []
+        return [
+            {
+                "_id": sigma.get("_id") or sigma.get("id"),
+                "name": sigma.get("name"),
+                "abbreviatedName": sigma.get("abbreviatedName") or sigma.get("abbrev"),
+                "citations": sigma.get("citations") or [],
+            }
+        ]
+
+    def _sigma_factor_labels_from_payload(self, payload: dict) -> tuple[str, ...]:
+        labels: list[str] = []
+        for sigma in payload.get("sigmaFactors") or []:
+            if not isinstance(sigma, dict):
+                continue
+            label = (
+                _clean_text(sigma.get("abbreviatedName"))
+                or _clean_text(sigma.get("abbrev"))
+                or _clean_text(sigma.get("name"))
+                or _clean_text(sigma.get("_id"))
+                or _clean_text(sigma.get("id"))
+            )
+            if label and label not in labels:
+                labels.append(label)
+        return tuple(labels)
+
+    def _regulatory_interaction_payloads(self, promoter: dict) -> list[dict]:
+        interactions: list[dict] = []
+        for binding_group in promoter.get("regulatorBindingSites") or []:
+            if not isinstance(binding_group, dict):
+                continue
+            regulator = binding_group.get("regulator") or {}
+            group_function = binding_group.get("function")
+            group_mechanism = binding_group.get("mechanism")
+            for raw_interaction in binding_group.get("regulatoryInteractions") or []:
+                if not isinstance(raw_interaction, dict):
+                    continue
+                regulatory_site = raw_interaction.get("regulatorySite") or {}
+                mechanism = raw_interaction.get("mechanism") or group_mechanism
+                if isinstance(mechanism, list):
+                    mechanism = ";".join(str(item) for item in mechanism if _clean_text(item))
+                interactions.append(
+                    {
+                        "_id": raw_interaction.get("_id"),
+                        "confidenceLevel": raw_interaction.get("confidenceLevel"),
+                        "function": raw_interaction.get("function") or group_function,
+                        "mechanism": mechanism,
+                        "regulator": regulator,
+                        "regulatoryBindingSites": {
+                            "_id": regulatory_site.get("_id"),
+                            "leftEndPosition": regulatory_site.get("leftEndPosition"),
+                            "rightEndPosition": regulatory_site.get("rightEndPosition"),
+                            "sequence": regulatory_site.get("sequence"),
+                        },
+                        "evidence": raw_interaction.get("additiveEvidences") or [],
+                        "citations": raw_interaction.get("citations") or [],
+                    }
+                )
+        return interactions
+
+    def _promoter_payload_from_operon_datamart(
+        self,
+        item: dict,
+        transcription_unit: dict,
+        *,
+        genome_accession: str | None,
+    ) -> dict:
+        promoter = transcription_unit.get("promoter")
+        if not isinstance(promoter, dict):
+            return {}
+        operon = item.get("operon") or {}
+        first_gene = transcription_unit.get("firstGene") or {}
+        tss = promoter.get("transcriptionStartSite") or {}
+        payload = {
+            "_id": promoter.get("_id"),
+            "name": promoter.get("name"),
+            "sequence": promoter.get("sequence"),
+            "score": promoter.get("score"),
+            "confidenceLevel": promoter.get("confidenceLevel") or transcription_unit.get("confidenceLevel"),
+            "strand": promoter.get("strand") or operon.get("strand"),
+            "genomeAccession": genome_accession,
+            "tssLeftEndPosition": tss.get("leftEndPosition"),
+            "tssRightEndPosition": tss.get("rightEndPosition"),
+            "sigmaFactors": self._sigma_factor_payloads(promoter.get("bindsSigmaFactor")),
+            "boxes": promoter.get("boxes") or [],
+            "evidence": promoter.get("additiveEvidences") or [],
+            "citations": promoter.get("citations") or [],
+            "regulatoryInteractions": self._regulatory_interaction_payloads(promoter),
+            "transcriptionUnits": [
+                {
+                    "_id": transcription_unit.get("_id"),
+                    "name": transcription_unit.get("name"),
+                }
+            ],
+            "operon": {
+                "_id": operon.get("_id") or item.get("_id"),
+                "name": operon.get("name"),
+            },
+            "firstGene": {
+                "_id": first_gene.get("_id"),
+                "name": first_gene.get("name"),
+            },
+        }
+        if tss.get("leftEndPosition") == tss.get("rightEndPosition"):
+            payload["posTSS"] = tss.get("leftEndPosition")
+        return payload
+
+    def _iter_operon_promoter_payloads(
+        self,
+        query: PromoterQuery,
+        *,
+        genome_accession: str | None,
+    ) -> Iterable[tuple[dict, str, int]]:
+        page_size = max(1, query.page_size)
+        page = 0
+        yielded = 0
+        while True:
+            data = self._transport(_OPERON_PROMOTER_QUERY, {"limit": page_size, "page": page})
+            root = _expect_mapping(data, "getAllOperon", "operon promoter inventory")
+            items = _expect_list_field(root, "data", "operon promoter inventory")
+            pagination = root.get("pagination") if isinstance(root.get("pagination"), dict) else {}
+            if not items:
+                if pagination.get("hasNextPage") is True:
+                    raise RuntimeError(
+                        f"RegulonDB partial promoter pagination: page {page} returned no data while hasNextPage=true."
+                    )
+                break
+            for item_index, item in enumerate(items):
+                if not isinstance(item, dict):
+                    continue
+                for tu_index, transcription_unit in enumerate(item.get("transcriptionUnits") or []):
+                    if not isinstance(transcription_unit, dict) or not transcription_unit.get("promoter"):
+                        continue
+                    payload = self._promoter_payload_from_operon_datamart(
+                        item,
+                        transcription_unit,
+                        genome_accession=genome_accession,
+                    )
+                    raw_ref = f"getAllOperon[page={page}].data[{item_index}].transcriptionUnits[{tu_index}].promoter"
+                    yield payload, raw_ref, page
+                    yielded += 1
+                    if query.limit is not None and yielded >= query.limit:
+                        return
+            if pagination.get("hasNextPage") is False:
+                break
+            page += 1
+
+    def iter_promoters(self, query: PromoterQuery) -> Iterable[PromoterRecord]:
+        if query.page_size < 1:
+            raise ValueError("promoter page_size must be >= 1")
+        release_info = self._current_database_info()
+        source_release = _clean_text(release_info.get("regulonDBVersion"))
+        if source_release is None:
+            raise RuntimeError("RegulonDB database info response did not include regulonDBVersion.")
+        source_release_date = _clean_text(release_info.get("releaseDate"))
+        genome_accession = _clean_text(release_info.get("genomeVersion"))
+        for payload, raw_ref, page in self._iter_operon_promoter_payloads(query, genome_accession=genome_accession):
+            yield parse_regulondb_promoter_payload(
+                payload,
+                source_release=source_release,
+                source_release_date=source_release_date,
+                source_route="operon_tu_promoter",
+                source_url=self._config.base_url,
+                raw_payload_ref=raw_ref,
+                source_stratum="live_graphql_curated",
+                query={
+                    "route": "getAllOperon",
+                    "page": page,
+                    "page_size": query.page_size,
+                    "source_release": source_release,
+                    "promoter_id": payload.get("_id"),
+                },
+            )
+
+    def list_promoters(self, query: PromoterQuery) -> Iterable[PromoterDescriptor]:
+        if query.page_size < 1:
+            raise ValueError("promoter page_size must be >= 1")
+        release_info = self._current_database_info()
+        source_release = _clean_text(release_info.get("regulonDBVersion"))
+        if source_release is None:
+            raise RuntimeError("RegulonDB database info response did not include regulonDBVersion.")
+        genome_accession = _clean_text(release_info.get("genomeVersion"))
+        for payload, _raw_ref, _page in self._iter_operon_promoter_payloads(
+            query,
+            genome_accession=genome_accession,
+        ):
+            promoter_id = _clean_text(payload.get("_id") or payload.get("id"))
+            if promoter_id is None:
+                raise ValueError("RegulonDB promoter descriptor is missing required promoter id.")
+            sigma_labels = self._sigma_factor_labels_from_payload(payload)
+            yield PromoterDescriptor(
+                source=self.source_id,
+                source_release=source_release,
+                source_route="operon_tu_promoter",
+                promoter_id=promoter_id,
+                promoter_name=_clean_text(payload.get("name")),
+                sequence_present=_clean_text(payload.get("sequence")) is not None,
+                tss_present=(
+                    _clean_text(payload.get("posTSS"))
+                    or _clean_text(payload.get("tssLeftEndPosition"))
+                    or _clean_text(payload.get("tssRightEndPosition"))
+                )
+                is not None,
+                sigma_present=bool(sigma_labels),
+                confidence_present=_clean_text(payload.get("confidenceLevel")) is not None,
+                box_annotation_present=bool(payload.get("boxes")),
+                sigma_factor_labels=sigma_labels,
+            )
+
+    def get_promoter(self, query: PromoterQuery) -> PromoterRecord:
+        one_record_query = PromoterQuery(
+            source_release_policy=query.source_release_policy,
+            source_release=query.source_release,
+            routes=query.routes,
+            limit=1,
+            page_size=query.page_size,
+            include_relations=query.include_relations,
+            timeout_seconds=query.timeout_seconds,
+            source_stratum=query.source_stratum,
+        )
+        for record in self.iter_promoters(one_record_query):
+            return record
+        raise ValueError("No RegulonDB promoter records found.")
+
+    def export_promoters(self, query: PromoterQuery, destination: Path) -> PromoterExportManifest:
+        records = list(self.iter_promoters(query))
+        inventory = build_promoter_source_inventory(records)
+        return export_promoter_records(
+            records,
+            destination,
+            query=query,
+            inventory=inventory,
+            source_selection_status="live_regulondb_graphql_candidate",
+        )
 
     def _list_ht_datasets(self, source: str) -> List[dict]:
         if source in self._ht_datasets_cache:

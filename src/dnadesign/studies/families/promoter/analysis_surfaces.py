@@ -5,7 +5,7 @@ src/dnadesign/studies/families/promoter/analysis_surfaces.py
 
 Study-owned exploratory-analysis route inventory for promoter-study snapshots.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

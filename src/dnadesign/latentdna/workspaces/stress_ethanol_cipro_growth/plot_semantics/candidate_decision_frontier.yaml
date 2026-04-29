@@ -7,7 +7,7 @@ guardrails:
   - Read this figure as a synthesis of the healthy-candidate review path, not a replacement for the health gate or the direct context comparison.
   - Read the row-level bridge plots before treating small point-to-point differences as meaningful.
 caption: Neutral decision-frontier synthesis across the candidate representation inventory.
-alt_text: Scatter plot comparing balanced design-family separation and Sigma-35 ordinal Spearman across the healthy study-facing candidates, with direct labels on the three points.
+alt_text: Scatter plot comparing balanced design-family separation and Sigma-35 ordinal Spearman across the healthy study-facing candidates, with direct labels on each point.
 preprocessing_md: This plot reuses persisted scalar summaries rather than recomputing row-level geometry. Each contributing summary already follows the study contract of view-level standardization plus row L2 normalization before cosine-based metrics are formed.
 math_md: |
   Point size is the effective rank

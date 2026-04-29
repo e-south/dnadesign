@@ -14,8 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ...contracts import parse_notify_profile_webhook
-from ...errors import NotifyConfigError
+from ...core.contracts import parse_notify_profile_webhook
+from ...core.errors import NotifyConfigError
 from ...events.source import normalize_tool_name
 from .contract import PROFILE_VERSION, WEBHOOK_SOURCES
 

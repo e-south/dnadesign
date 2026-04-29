@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import pkg_usr_root
 from dnadesign.usr.src.contracts import REQUIRED_COLUMNS
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset

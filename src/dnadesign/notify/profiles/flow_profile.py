@@ -15,8 +15,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ..core.errors import NotifyConfigError
 from ..delivery.secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
-from ..errors import NotifyConfigError
 from ..runtime.spool import ensure_private_directory
 from .flow_types import (
     _validate_progress_heartbeat_seconds,

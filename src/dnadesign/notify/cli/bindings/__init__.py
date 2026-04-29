@@ -18,7 +18,7 @@ from pathlib import Path
 
 import typer
 
-from ...errors import NotifyDeliveryError
+from ...core.errors import NotifyDeliveryError
 from . import deps as _deps
 from . import helpers as _helpers
 from .deps import DEPENDENCY_EXPORTS

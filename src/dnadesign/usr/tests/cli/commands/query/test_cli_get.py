@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/cli/commands/query/test_cli_get.py
 
 CLI tests for usr get record-addressing forms.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr.src.cli import app
 from dnadesign.usr.src.dataset import Dataset
 

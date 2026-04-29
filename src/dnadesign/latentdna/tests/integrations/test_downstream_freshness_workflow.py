@@ -6,7 +6,7 @@ src/dnadesign/latentdna/tests/integrations/test_downstream_freshness_workflow.py
 Workflow tests for downstream freshness/readiness reporting over
 table-derived scalars and agreement-summary plots.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

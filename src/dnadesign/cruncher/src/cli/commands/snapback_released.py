@@ -91,6 +91,11 @@ def released_target_search_cmd(
         "--release-additional-path",
         help="Additional workspace-relative release-enzyme catalog overlays (repeatable).",
     ),
+    release_variant_id: list[str] = typer.Option(
+        [],
+        "--release-variant-id",
+        help="Restrict the released-product search to one release-enzyme variant id (repeatable).",
+    ),
     workspace_root: Path = typer.Option(
         Path("."),
         "--workspace-root",
@@ -143,6 +148,7 @@ def released_target_search_cmd(
             release_preset=release_preset,
             release_additional_preset=release_additional_preset,
             release_additional_path=release_additional_path,
+            release_variant_id=release_variant_id,
             workspace_root=workspace_root,
             nick_boundary=nick_boundary,
             paired_bp=paired_bp,
@@ -199,6 +205,11 @@ def released_solve_cmd(
         [],
         "--release-additional-path",
         help="Additional workspace-relative release-enzyme catalog overlays (repeatable).",
+    ),
+    release_variant_id: list[str] = typer.Option(
+        [],
+        "--release-variant-id",
+        help="Restrict the released-product solve to one release-enzyme variant id (repeatable).",
     ),
     workspace_root: Path = typer.Option(
         Path("."),
@@ -274,6 +285,7 @@ def released_solve_cmd(
             release_preset=release_preset,
             release_additional_preset=release_additional_preset,
             release_additional_path=release_additional_path,
+            release_variant_id=release_variant_id,
             workspace_root=workspace_root,
             nick_boundary=nick_boundary,
             paired_bp=paired_bp,

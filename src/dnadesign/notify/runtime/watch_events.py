@@ -17,8 +17,8 @@ from typing import Any
 
 import typer
 
+from ..core.errors import NotifyConfigError
 from ..delivery.payload import build_payload
-from ..errors import NotifyConfigError
 from ..providers import format_payload
 from ..tool_events import ToolEventState
 from ..tool_events import evaluate_tool_event as _evaluate_tool_event

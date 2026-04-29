@@ -5,7 +5,7 @@ src/dnadesign/studies/families/cruncher/preflight.py
 
 Read-only preflight coordination for Cruncher study-family records.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

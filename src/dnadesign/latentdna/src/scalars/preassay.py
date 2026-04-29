@@ -741,11 +741,6 @@ def _sigma35_centroid_distance_table(
     inputs.append(ScalarInputRef(kind="workspace_input", artifact_id="sig35_order", path=order_config["path"]))
     ranks = dict(order_config["ranks"])
     sequences = dict(order_config["sequences"])
-    ordered_variants = [variant for variant, _ in sorted(ranks.items(), key=lambda item: int(item[1]))]
-    variant_labels = {
-        variant: f"variant {variant}" if not sequences.get(variant) else f"{sequences[variant]} ({variant})"
-        for variant in ordered_variants
-    }
     for candidate in candidates:
         candidate_sample = _load_candidate_sample(context, candidate)
         inputs.extend(candidate_sample.inputs)
@@ -754,7 +749,23 @@ def _sigma35_centroid_distance_table(
             candidate_sample.rows,
             column="sig35_variant",
             exclude_values={"control"},
-            allowed_values=set(ranks),
+        )
+        unranked_variants = sorted(set(groups) - set(ranks), key=str.casefold)
+        ordered_variants = [
+            variant for variant, _ in sorted(ranks.items(), key=lambda item: int(item[1])) if variant in groups
+        ]
+        ordered_variants.extend(unranked_variants)
+        variant_labels = {
+            variant: f"{sequences[variant]} ({variant})"
+            for variant in ordered_variants
+            if variant in sequences and sequences[variant]
+        }
+        variant_labels.update(
+            {
+                variant: f"{variant} (annotated, unranked)" if variant in unranked_variants else f"variant {variant}"
+                for variant in ordered_variants
+                if variant not in variant_labels
+            }
         )
         centroids = centroid_map(normalized, groups)
         for row_variant in ordered_variants:

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 
 def resolve_cli_optional_string(*, field: str, cli_value: str | None) -> str | None:

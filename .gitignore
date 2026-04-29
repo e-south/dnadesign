@@ -171,6 +171,7 @@ src/dnadesign/cruncher/projects/**/projects/
 src/dnadesign/archived/
 src/dnadesign/prototypes/
 src/dnadesign/usr/archived/
+src/dnadesign/usr/datasets/usr_regulondb_native_promoters/
 
 # Permuter docs (local only for now)
 src/dnadesign/permuter/docs/
@@ -220,6 +221,11 @@ src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/**
 !src/dnadesign/densegen/src/adapters/outputs/**
 src/dnadesign/densegen/src/adapters/outputs/**/__pycache__/
 src/dnadesign/densegen/src/adapters/outputs/**/*.pyc
+# BaseRender code package named "outputs" (not a run artifact)
+!src/dnadesign/baserender/src/outputs/
+!src/dnadesign/baserender/src/outputs/**
+src/dnadesign/baserender/src/outputs/**/__pycache__/
+src/dnadesign/baserender/src/outputs/**/*.pyc
 # DenseGen workspaces: ignore everything by default, allow packaged templates and shared runbook flow
 src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/README.md
@@ -232,6 +238,13 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.sh
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/*.csv
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/README.md
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/config.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.md
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.sh
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/*.csv
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/README.md
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/config.yaml
@@ -261,12 +274,14 @@ src/dnadesign/densegen/workspaces/**
 src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/README.md
 !src/dnadesign/baserender/workspaces/demo_densegen_render/
+!src/dnadesign/baserender/workspaces/demo_densegen_render/.baserender-workspace
 !src/dnadesign/baserender/workspaces/demo_densegen_render/job.yaml
 !src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/
 !src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/input.parquet
 !src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/
 !src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/.gitkeep
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/.baserender-workspace
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/README.md
@@ -274,6 +289,30 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/motif_library.json
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/.gitkeep
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/.baserender-workspace
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/README.md
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/job.yaml
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/inputs/
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/inputs/README.md
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/outputs/
+!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/outputs/.gitkeep
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/.baserender-workspace
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/README.md
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/job.yaml
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/inputs/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/inputs/README.md
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/.gitkeep
+
+# LatentDNA workspaces: keep configs/templates tracked; generated analysis outputs stay local.
+src/dnadesign/latentdna/workspaces/**/outputs/
+!src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/
+src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/*
+!src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/
+src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/*
+!src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
 
 # Legacy DenseGen runs (ignored to avoid local artifact noise)
 src/dnadesign/densegen/runs/**
@@ -326,7 +365,10 @@ meta.yaml
 
 # ADEs
 AGENTS.md
+!src/dnadesign/baserender/AGENTS.md
+!src/dnadesign/construct/AGENTS.md
 !src/dnadesign/cruncher/AGENTS.md
+!src/dnadesign/latentdna/AGENTS.md
 !src/dnadesign/notify/AGENTS.md
 src/dnadesign/notify/.secrets/
 

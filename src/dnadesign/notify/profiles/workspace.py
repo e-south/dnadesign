@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 
 @dataclass(frozen=True)

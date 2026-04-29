@@ -113,6 +113,7 @@ class BrowserGeometry:
     model_default: str
     model_values: list[str]
     preferred_hues: list[str]
+    row_metadata_hues: list[str]
     reference_labels: list[str]
     selected_hue_default: str
 
@@ -188,6 +189,7 @@ def _runtime_hue_columns(
     *,
     joinable_tables: list[dict[str, object]],
     preferred_hues: list[str],
+    row_metadata_hues: list[str],
     configured_hue_kinds: dict[str, object],
     joinable_artifact_suffixes: set[str],
 ) -> tuple[list[str], dict[str, str]]:
@@ -198,9 +200,10 @@ def _runtime_hue_columns(
         for column in row.get("columns", [])
         if isinstance(column, str) and include_hue_column(str(column), joinable_artifact_suffixes)
     )
+    row_metadata_set = set(row_metadata_hues)
     ordered_candidates = unique_in_order(
         [
-            *[column for column in preferred_hues if column in actual_columns],
+            *[column for column in preferred_hues if column in actual_columns or column in row_metadata_set],
             *[column for column in actual_columns if column in configured_hue_kinds],
         ]
     )
@@ -590,11 +593,13 @@ def build_workspace_browser_runtime(
     }
     compare_metrics = geometry_control.get("compare_metrics", {})
     preferred_hues = [str(item) for item in geometry_control.get("preferred_hues", []) if isinstance(item, str)]
+    row_metadata_hues = [str(item) for item in geometry_control.get("row_metadata_hues", []) if isinstance(item, str)]
     configured_hue_kinds = geometry_control.get("hue_kinds", {})
     reference_labels = [str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)]
     global_hue_columns, hue_kinds = _runtime_hue_columns(
         joinable_tables=joinable_tables,
         preferred_hues=preferred_hues,
+        row_metadata_hues=row_metadata_hues,
         configured_hue_kinds=configured_hue_kinds,
         joinable_artifact_suffixes=joinable_artifact_suffixes,
     )
@@ -685,6 +690,7 @@ def build_workspace_browser_runtime(
             model_default=model_default,
             model_values=model_values,
             preferred_hues=preferred_hues,
+            row_metadata_hues=row_metadata_hues,
             reference_labels=reference_labels,
             selected_hue_default=selected_hue_default,
         ),

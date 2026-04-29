@@ -18,15 +18,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.infer.src.errors import WriteBackError
 from dnadesign.infer.src.features.contracts import (
-    PromoterContextConfig,
-    PromoterFeatureBundleConfig,
-    PromoterPoolingConfig,
+    SequenceFeatureBundleConfig,
+    SequenceFeatureContextConfig,
+    SequenceFeaturePoolingConfig,
 )
 from dnadesign.infer.src.features.execution import build_feature_bundle_outputs
 from dnadesign.infer.src.runtime.resume_planner import plan_resume_for_usr, read_usr_column_values, read_usr_columns
-from dnadesign.testsupport.usr import register_test_namespace
 from dnadesign.usr import Dataset
 
 
@@ -299,9 +299,9 @@ def test_read_usr_columns_overlay_parts_keep_last_non_null_values_across_multipl
 
 
 def test_plan_resume_for_usr_preserves_feature_output_mapping_with_mixed_overlay_nulls(tmp_path: Path) -> None:
-    bundle = PromoterFeatureBundleConfig(
-        context=PromoterContextConfig(kind="template_1kb"),
-        pooling=PromoterPoolingConfig(seq_mean=True, anchor_mean_for_templated=True),
+    bundle = SequenceFeatureBundleConfig(
+        context=SequenceFeatureContextConfig(kind="template_1kb"),
+        pooling=SequenceFeaturePoolingConfig(seq_mean=True, anchor_mean_for_templated=True),
         collect_log_likelihood=True,
         collect_output_layer_mean=True,
         collect_intermediate_embedding=True,

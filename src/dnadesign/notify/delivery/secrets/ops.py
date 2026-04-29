@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 from .contract import BACKEND_FILE, BACKEND_KEYCHAIN, backend_command, normalize_backend, parse_secret_ref
 from .file_backend import read_file_secret, write_file_secret
 from .keyring_backend import keyring_client_for_backend

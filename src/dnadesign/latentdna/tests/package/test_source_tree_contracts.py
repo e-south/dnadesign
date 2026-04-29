@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/package/test_source_tree_contracts.py
 
 Source-tree contracts for the latentdna package layout.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -31,6 +31,8 @@ def test_latentdna_root_keeps_progressive_disclosure_directories() -> None:
     assert (latentdna_root / "docs" / "dev").is_dir()
     assert (latentdna_root / "src").is_dir()
     assert (latentdna_root / "tests").is_dir()
+    assert (latentdna_root / "tests" / "sources").is_dir()
+    assert (latentdna_root / "tests" / "views").is_dir()
     assert (latentdna_root / "tests" / "perf").is_dir()
     assert (latentdna_root / "workspaces").is_dir()
 
@@ -38,7 +40,9 @@ def test_latentdna_root_keeps_progressive_disclosure_directories() -> None:
 def test_latentdna_root_keeps_minimal_top_level_surface() -> None:
     latentdna_root = _latentdna_root()
     observed = {
-        path.name for path in latentdna_root.iterdir() if path.name != "__pycache__" and not path.name.startswith(".")
+        path.name
+        for path in latentdna_root.iterdir()
+        if path.name != "__pycache__" and not path.name.startswith(".") and path.name != "AGENTS.md"
     }
     assert observed == {
         "README.md",

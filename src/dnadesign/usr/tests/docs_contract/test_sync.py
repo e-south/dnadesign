@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/docs_contract/test_sync.py
 
 Structural sync and workflow-surface contracts for USR docs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

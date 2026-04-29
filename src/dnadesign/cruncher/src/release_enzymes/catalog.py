@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/release_enzymes/catalog.py
 Release-enzyme catalog loading and merging for released-product snapback
 workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

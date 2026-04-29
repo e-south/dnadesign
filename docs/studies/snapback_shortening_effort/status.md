@@ -1,14 +1,14 @@
 ## Snapback Shortening Effort
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-22
+**Last verified:** 2026-04-25
 
 ### At a glance
 
 - This study tracks one narrowing question: can released-product Snapback own the shortening problem without forcing an exact preserved-site nickase into the final compact object?
 - The active execution lane is `released-product Snapback` in `de033`.
 - `YIU` stays in the record as a contrast check on boundary language. It is not the topology engine for this effort.
-- The retron/P4 note stays in scope as framing evidence only. It motivates compact exposed-bottom products and shorter uninterrupted duplex burden, but it does not become Cruncher scoring logic.
+- The retron/P4 note stays in scope as framing evidence only. It motivates compact released products and shorter uninterrupted duplex burden, but it does not become Cruncher scoring logic.
 
 ### Quick route
 
@@ -22,12 +22,16 @@
 ### What is settled
 
 - The active construction lane is still `released-product Snapback` in `de033`.
-- The tracked study default is still the exposed-bottom released-product policy.
-- The evaluation target is the exposed post-release bottom strand, not the
-  retained preserved-site top-strand geometry.
+- The tracked study default is the retained-active released-product policy,
+  with retained top and bottom product routes evaluated.
+- The Type IIS release enzyme is pinned to `BspQI` for the `de033`
+  operational route; `BsaI-HFv2` is not part of the default route.
+- Near-hit evaluation still treats retained duplex left of the nick as part of
+  the effective folded stem, but the current BspQI-pinned retained-active
+  screen reports exact origin-`0`, stem-`3`, cap-`3` hits.
 - The operational catalog surface is `neb_nicking_v1 + thermo_nicking_v1`, with
   `FREQUENT_CUTTER` nickases excluded by default.
-- The checked-in downstream-`BspQI` explicit spec is a validation fixture and is
+- The checked-in downstream-`BspQI` explicit spec remains a validation fixture and is
   expected to remain `invalid_precursor`.
 - The validation fixture is expected to report `invalid_precursor` under the
   degenerate-prefix-aware nonnegative-origin rule because it does not provide a
@@ -60,9 +64,14 @@
 - Study route map:
   `docs/studies/snapback_shortening_effort/routes.md` for the canonical
   post-probe handoff
-- Active released-product solve bundle:
+- Regenerable released-product solve bundle:
   `src/dnadesign/cruncher/workspaces/de033/outputs/released_solve`
-  with a solve report, hit table, and materialized per-hit triptych plots
+  with a solve report, hit table, and materialized per-hit triptych plots when
+  produced by the runbook. Generated outputs are ignored and may be absent after
+  workspace cleanup.
+- Explicit MSD-HOPV5 visual comparison:
+  `src/dnadesign/cruncher/workspaces/msd-HOPV5_snapback` renders the prior
+  `Nt.Bpu10I` MSD-HOPV5 example without treating it as a released-product solve result.
 - Study command ladder:
   `docs/studies/snapback_shortening_effort/pipeline.yaml` for machine-readable
   command groups and bootstrap support

@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/tests_layout_inventory.py
 
 Single source of truth for the sanctioned USR test layout.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -88,6 +88,7 @@ TEST_FAMILY_SUBPACKAGES = {
 NESTED_TEST_PACKAGE_SUBPACKAGES = {
     ("cli", "commands"): {
         "datasets",
+        "genbank",
         "lifecycle",
         "maintenance",
         "namespace",
@@ -106,6 +107,10 @@ NESTED_TEST_PACKAGE_FILES = {
         "__init__.py",
         "test_cli_archived_paths.py",
         "test_cli_datasets_package_module.py",
+    },
+    ("cli", "commands", "genbank"): {
+        "__init__.py",
+        "test_cli_genbank_import.py",
     },
     ("cli", "commands", "lifecycle"): {
         "__init__.py",
@@ -198,7 +203,9 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_layout.py",
         "test_dedupe.py",
         "test_duckdb_session_contract.py",
+        "test_event_log_gardening.py",
         "test_events_schema.py",
+        "test_genbank_import.py",
         "test_import_strict.py",
         "test_normalize_id.py",
     },
@@ -255,5 +262,6 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_reporting_module.py",
         "test_dataset_scan_projection.py",
         "test_dataset_views_module.py",
+        "test_sequence_views.py",
     },
 }

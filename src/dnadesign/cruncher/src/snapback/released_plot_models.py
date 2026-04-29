@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_plot_models.py
 
 Typed plot-context contracts for released-product snapback hit rendering.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from dnadesign.cruncher.nickases.models import normalize_dna
+from dnadesign.cruncher.nickases.models import normalize_dna, normalize_iupac
 from dnadesign.cruncher.snapback.models import StrictSnapbackModel
 from dnadesign.cruncher.snapback.released_route_policy import ReleasedActiveStrand
 
@@ -37,22 +37,32 @@ class PlotSpan(StrictSnapbackModel):
 
 class PlotFragmentRow(StrictSnapbackModel):
     role: Literal["active_product", "retained_partner"]
+    physical_state: Literal["retained", "released"]
     strand: ReleasedActiveStrand
     label: str
     sequence: str
     span: PlotSpan
     start_terminal: str | None = None
     end_terminal: str | None = None
+    assignable_base_positions: list[int] = Field(default_factory=list)
 
     @field_validator("sequence")
     @classmethod
     def _validate_sequence(cls, value: str) -> str:
-        return normalize_dna(value, allow_empty=True)
+        text = str(value or "").strip().upper()
+        if not text:
+            return ""
+        return normalize_iupac(text)
 
     @model_validator(mode="after")
     def _validate_row(self) -> "PlotFragmentRow":
         if len(self.sequence) != self.span.width:
             raise ValueError("plot fragment row sequence length must match the visible span width.")
+        if len(set(self.assignable_base_positions)) != len(self.assignable_base_positions):
+            raise ValueError("plot fragment row assignable_base_positions must not repeat values.")
+        for position in self.assignable_base_positions:
+            if not self.span.start <= position < self.span.end:
+                raise ValueError("plot fragment row assignable_base_positions must stay inside the visible span.")
         return self
 
 
@@ -62,16 +72,25 @@ class PlotFoldbackRow(StrictSnapbackModel):
     sequence: str
     span: PlotSpan
     left_terminal: str | None = None
+    assignable_base_positions: list[int] = Field(default_factory=list)
 
     @field_validator("sequence")
     @classmethod
     def _validate_sequence(cls, value: str) -> str:
-        return normalize_dna(value, allow_empty=True)
+        text = str(value or "").strip().upper()
+        if not text:
+            return ""
+        return normalize_iupac(text)
 
     @model_validator(mode="after")
     def _validate_row(self) -> "PlotFoldbackRow":
         if len(self.sequence) != self.span.width:
             raise ValueError("plot foldback row sequence length must match the visible span width.")
+        if len(set(self.assignable_base_positions)) != len(self.assignable_base_positions):
+            raise ValueError("plot foldback row assignable_base_positions must not repeat values.")
+        for position in self.assignable_base_positions:
+            if not self.span.start <= position < self.span.end:
+                raise ValueError("plot foldback row assignable_base_positions must stay inside the visible span.")
         return self
 
 
@@ -94,6 +113,8 @@ class PlotTarget(StrictSnapbackModel):
 class PlotPrecursorPanelContext(StrictSnapbackModel):
     top_sequence: str
     bottom_sequence: str
+    top_assignable_base_positions: list[int] = Field(default_factory=list)
+    bottom_assignable_base_positions: list[int] = Field(default_factory=list)
     nick_site: dict[str, Any]
     nick_event: dict[str, Any]
     nicked_strand: ReleasedActiveStrand
@@ -112,7 +133,27 @@ class PlotPrecursorPanelContext(StrictSnapbackModel):
     @field_validator("top_sequence", "bottom_sequence")
     @classmethod
     def _validate_sequence(cls, value: str) -> str:
-        return normalize_dna(value, allow_empty=True)
+        text = str(value or "").strip().upper()
+        if not text:
+            return ""
+        return normalize_iupac(text)
+
+    @model_validator(mode="after")
+    def _validate_assignable_base_positions(self) -> "PlotPrecursorPanelContext":
+        for label, positions, sequence, span in (
+            ("top", self.top_assignable_base_positions, self.top_sequence, self.top_span),
+            ("bottom", self.bottom_assignable_base_positions, self.bottom_sequence, self.bottom_span),
+        ):
+            if len(set(positions)) != len(positions):
+                raise ValueError(f"plot precursor {label}_assignable_base_positions must not repeat values.")
+            row_start = span.start
+            row_end = span.start + len(sequence)
+            for position in positions:
+                if not row_start <= position < row_end:
+                    raise ValueError(
+                        f"plot precursor {label}_assignable_base_positions must stay inside the visible span."
+                    )
+        return self
 
     @model_validator(mode="after")
     def _validate_sequences(self) -> "PlotPrecursorPanelContext":
@@ -151,12 +192,18 @@ class PlotReleasedProductContext(StrictSnapbackModel):
     @field_validator(
         "retained_partner_sequence",
         "active_product_sequence",
-        "duplex_top_sequence",
-        "duplex_bottom_sequence",
     )
     @classmethod
-    def _validate_sequence(cls, value: str) -> str:
+    def _validate_product_sequence(cls, value: str) -> str:
         return normalize_dna(value, allow_empty=True)
+
+    @field_validator("duplex_top_sequence", "duplex_bottom_sequence")
+    @classmethod
+    def _validate_display_sequence(cls, value: str) -> str:
+        text = str(value or "").strip().upper()
+        if not text:
+            return ""
+        return normalize_iupac(text)
 
     @model_validator(mode="after")
     def _validate_panel(self) -> "PlotReleasedProductContext":
@@ -164,6 +211,13 @@ class PlotReleasedProductContext(StrictSnapbackModel):
             raise ValueError("released-product top_row must stay on the physical top lane.")
         if self.bottom_row.strand != "bottom":
             raise ValueError("released-product bottom_row must stay on the physical bottom lane.")
+        for row in (self.top_row, self.bottom_row):
+            expected_state = "released" if row.strand == self.nicked_strand else "retained"
+            if row.physical_state != expected_state:
+                raise ValueError(
+                    "released-product row physical_state must mark the nicked strand as released "
+                    "and the opposite strand as retained."
+                )
         if self.duplex_overlap_span is None:
             if self.duplex_top_sequence or self.duplex_bottom_sequence or self.duplex_mismatch_positions:
                 raise ValueError("released-product duplex payload must be empty when there is no overlap span.")
@@ -186,6 +240,7 @@ class PlotFoldbackPanelContext(StrictSnapbackModel):
     top_row: PlotFoldbackRow
     bottom_row: PlotFoldbackRow
     foldback_mismatch_positions: list[int] = Field(default_factory=list)
+    assignable_cap_base_positions: list[int] = Field(default_factory=list)
 
     @field_validator("stem_sequence", "cap_sequence", "foldback_sequence", "foldback_partner_sequence")
     @classmethod
@@ -194,6 +249,11 @@ class PlotFoldbackPanelContext(StrictSnapbackModel):
 
     @model_validator(mode="after")
     def _validate_panel(self) -> "PlotFoldbackPanelContext":
+        if len(set(self.assignable_cap_base_positions)) != len(self.assignable_cap_base_positions):
+            raise ValueError("foldback assignable_cap_base_positions must not repeat values.")
+        for position in self.assignable_cap_base_positions:
+            if not 0 <= position < len(self.cap_sequence):
+                raise ValueError("foldback assignable_cap_base_positions must stay inside cap_sequence.")
         return self
 
 

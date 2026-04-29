@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/snapback/planner.py
 Deterministic validation and reporting for v2 explicit single-nick snapback
 specs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/studies/families/cruncher/snapshot.py
 
 Snapshot builder for read-only Cruncher study records.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

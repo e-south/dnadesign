@@ -688,6 +688,159 @@ def runbook_plan(
     typer.echo(json.dumps(plan.as_dict(), indent=2, sort_keys=True))
 
 
+@app.command("fill-infer")
+def runbook_fill_infer(
+    study_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--study-dir",
+            help=(
+                "Checked-in study record root. If omitted and --runbook is not provided, "
+                "the active study from docs/studies/index.yaml is used."
+            ),
+        ),
+    ] = None,
+    runbook: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--runbook",
+            help="Explicit Infer runbook path; repeat to bypass study discovery or add extra lanes.",
+        ),
+    ] = None,
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root used for study discovery and relative runbook paths.",
+        ),
+    ] = None,
+    mode: Annotated[
+        Literal["auto", "fresh", "resume"] | None,
+        typer.Option("--mode", help="Run mode policy override for runnable lanes."),
+    ] = None,
+    smoke: Annotated[
+        Literal["dry", "live"] | None,
+        typer.Option("--notify-smoke", help="Notify smoke override for runnable lanes."),
+    ] = None,
+    active_job_id: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--active-job-id",
+            help=(
+                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
+            ),
+        ),
+    ] = None,
+    discover_active_jobs: Annotated[
+        bool,
+        typer.Option(
+            "--discover-active-jobs/--no-discover-active-jobs",
+            help="Auto-discover active matching jobs from qstat/qstat -j and merge into hold_jid decisions.",
+        ),
+    ] = True,
+    max_discovery_jobs: Annotated[
+        int,
+        typer.Option("--max-discovery-jobs", help="Maximum qstat jobs inspected during active-job discovery."),
+    ] = 24,
+    execute: Annotated[
+        bool,
+        typer.Option(
+            "--execute/--plan-only",
+            help="Run preflight and notify-smoke phases for runnable lanes. Default only renders the fill plan.",
+        ),
+    ] = False,
+    submit: Annotated[
+        bool,
+        typer.Option(
+            "--submit/--no-submit",
+            help="Submit qsub commands after preflight/smoke pass. Implies --execute.",
+        ),
+    ] = False,
+    command_timeout_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--command-timeout-seconds",
+            help="Per-command timeout in seconds for executed phases.",
+        ),
+    ] = 300.0,
+    allow_fresh_reset: Annotated[
+        bool,
+        typer.Option(
+            "--allow-fresh-reset/--no-allow-fresh-reset",
+            help="Allow --mode fresh when resume artifacts already exist in a lane workspace.",
+        ),
+    ] = False,
+    allow_unknown_active_jobs: Annotated[
+        bool,
+        typer.Option(
+            "--allow-unknown-active-jobs/--no-allow-unknown-active-jobs",
+            help="Allow submit planning despite degraded active-job visibility.",
+        ),
+    ] = False,
+    allow_missing_qstat: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing-qstat/--no-allow-missing-qstat",
+            help=("Render qstat-dependent preflight gates in explicit degraded mode. Only valid with --no-submit."),
+        ),
+    ] = False,
+) -> None:
+    from dnadesign.ops import api as ops_api
+
+    if max_discovery_jobs <= 0:
+        raise_contract_error("Runbook contract error: --max-discovery-jobs must be > 0")
+    if command_timeout_seconds is not None and command_timeout_seconds <= 0:
+        raise_contract_error("Runbook contract error: --command-timeout-seconds must be > 0")
+    if submit and allow_missing_qstat:
+        raise_contract_error(
+            "Runbook contract error: --allow-missing-qstat is only allowed with --no-submit dry-run demos."
+        )
+    repo_base = _resolve_repo_base(repo_root)
+
+    selected_study_dir: Path | None = None
+    if study_dir is not None:
+        selected_study_dir = study_dir.expanduser()
+        if not selected_study_dir.is_absolute():
+            selected_study_dir = repo_base / selected_study_dir
+        selected_study_dir = selected_study_dir.resolve()
+
+    selected_runbooks: list[Path] = []
+    for value in runbook or ():
+        selected = value.expanduser()
+        if not selected.is_absolute():
+            selected = repo_base / selected
+        selected_runbooks.append(selected.resolve())
+
+    try:
+        fill_plan = ops_api.build_infer_fill_plan(
+            repo_root=repo_base,
+            study_dir=selected_study_dir,
+            runbook_paths=selected_runbooks,
+            requested_mode=mode,
+            requested_smoke=smoke,
+            active_job_ids=_split_active_job_id_tokens(active_job_id or ()),
+            discover_active_jobs=discover_active_jobs,
+            max_discovery_jobs=max_discovery_jobs,
+            allow_fresh_reset=allow_fresh_reset,
+            allow_missing_qstat=allow_missing_qstat,
+            allow_unknown_active_jobs=allow_unknown_active_jobs,
+        )
+        if submit:
+            execute = True
+        if execute:
+            fill_plan = ops_api.execute_infer_fill_plan(
+                fill_plan=fill_plan,
+                submit=submit,
+                command_timeout_seconds=command_timeout_seconds,
+            )
+    except (FileNotFoundError, ValueError) as exc:
+        raise_contract_error(f"Runbook contract error: {exc}")
+
+    typer.echo(json.dumps(fill_plan.as_dict(), indent=2, sort_keys=True))
+    if not fill_plan.ok:
+        raise typer.Exit(code=1)
+
+
 @app.command("active-jobs")
 def runbook_active_jobs(
     runbook: Annotated[Path, typer.Option("--runbook", help="Path to orchestration runbook yaml.")],

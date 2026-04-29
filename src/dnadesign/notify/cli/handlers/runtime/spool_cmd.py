@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 import typer
 
-from ....errors import NotifyError
+from ....core.errors import NotifyError
 
 
 def run_spool_drain_command(

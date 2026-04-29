@@ -5,7 +5,7 @@ src/dnadesign/studies/families/cruncher/ops/provider.py
 
 OPS status-provider entrypoints for the Cruncher study adapter.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

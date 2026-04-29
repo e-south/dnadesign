@@ -13,11 +13,23 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
-from ..contracts.workspace import MatrixBundleSourceConfig, ParquetSourceConfig, SourceConfig, USRSourceConfig
+from ..contracts.workspace import (
+    InferFeatureScalarSidecarSourceConfig,
+    InferFeatureSidecarSourceConfig,
+    MatrixBundleSourceConfig,
+    ParquetSourceConfig,
+    SourceConfig,
+    USRSourceConfig,
+)
 from ..io.hashing import sha256_payload
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_row_count, read_schema, read_table
-from . import parquet_source, usr_source
+from . import (
+    infer_feature_scalar_sidecar_source,
+    infer_feature_sidecar_source,
+    parquet_source,
+    usr_source,
+)
 from .provenance import source_provenance_digest
 
 _OVERLAY_MISSING_COLUMNS_PREFIX = "Requested columns not found after overlay merge:"
@@ -63,6 +75,20 @@ def resolve_source(source_id: str, source: SourceConfig, *, workspace_dir: Path)
             rows_path=rows_path,
             manifest_path=bundle / "manifest.json",
         )
+    if isinstance(source, InferFeatureSidecarSourceConfig):
+        records = infer_feature_sidecar_source.feature_aliases_path(
+            source.root,
+            source.dataset,
+            workspace_dir=workspace_dir,
+        )
+        return ResolvedSource(source_id=source_id, source=source, workspace_dir=workspace_dir, records_path=records)
+    if isinstance(source, InferFeatureScalarSidecarSourceConfig):
+        records = infer_feature_scalar_sidecar_source.feature_scalar_aliases_path(
+            source.root,
+            source.dataset,
+            workspace_dir=workspace_dir,
+        )
+        return ResolvedSource(source_id=source_id, source=source, workspace_dir=workspace_dir, records_path=records)
     raise SourceResolutionError(f"unsupported source kind for {source_id}: {source.kind}")
 
 
@@ -100,6 +126,20 @@ def missing_overlay_merge_columns(exc: Exception) -> list[str]:
 
 
 def inspect_source_schema(resolved: ResolvedSource) -> dict[str, Any]:
+    if isinstance(resolved.source, InferFeatureSidecarSourceConfig):
+        return infer_feature_sidecar_source.inspect_schema(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            where=resolved.source.where,
+        )
+    if isinstance(resolved.source, InferFeatureScalarSidecarSourceConfig):
+        return infer_feature_scalar_sidecar_source.inspect_schema(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            where=resolved.source.where,
+        )
     if resolved.records_path is not None:
         records_path = require_records_path(resolved)
         if isinstance(resolved.source, USRSourceConfig):
@@ -143,6 +183,22 @@ def read_records_table(
     *,
     columns: list[str] | None = None,
 ) -> pa.Table:
+    if isinstance(resolved.source, InferFeatureSidecarSourceConfig):
+        return infer_feature_sidecar_source.read_table(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            where=resolved.source.where,
+            columns=columns,
+        )
+    if isinstance(resolved.source, InferFeatureScalarSidecarSourceConfig):
+        return infer_feature_scalar_sidecar_source.read_table(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            where=resolved.source.where,
+            columns=columns,
+        )
     if isinstance(resolved.source, USRSourceConfig):
         dataset = _load_usr_dataset(resolved)
         batches = list(
@@ -170,6 +226,26 @@ def iter_records_batches(
     columns: list[str] | None = None,
     batch_size: int = 4096,
 ):
+    if isinstance(resolved.source, InferFeatureSidecarSourceConfig):
+        yield from infer_feature_sidecar_source.iter_batches(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            where=resolved.source.where,
+            columns=columns,
+            batch_size=batch_size,
+        )
+        return
+    if isinstance(resolved.source, InferFeatureScalarSidecarSourceConfig):
+        yield from infer_feature_scalar_sidecar_source.iter_batches(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            where=resolved.source.where,
+            columns=columns,
+            batch_size=batch_size,
+        )
+        return
     if isinstance(resolved.source, USRSourceConfig):
         dataset = _load_usr_dataset(resolved)
         yield from dataset.scan(
@@ -197,6 +273,20 @@ def source_provenance(
         )
     if isinstance(resolved.source, ParquetSourceConfig):
         return parquet_source.source_provenance(resolved.source.path, workspace_dir=resolved.workspace_dir)
+    if isinstance(resolved.source, InferFeatureSidecarSourceConfig):
+        return infer_feature_sidecar_source.source_provenance(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            columns=columns,
+        )
+    if isinstance(resolved.source, InferFeatureScalarSidecarSourceConfig):
+        return infer_feature_scalar_sidecar_source.source_provenance(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+            columns=columns,
+        )
     if isinstance(resolved.source, MatrixBundleSourceConfig):
         rows_path, matrix_path, manifest_path = require_matrix_bundle_paths(resolved)
         return [

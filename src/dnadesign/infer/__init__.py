@@ -5,10 +5,10 @@ src/dnadesign/infer/__init__.py
 
 Public API:
   - run_extract
-  - run_evo2_promoter_features
+  - run_evo2_sequence_features
   - run_generate
   - run_job (YAML-driven)
-  - export_evo2_promoter_opal_matrix
+  - export_evo2_sequence_opal_matrix
   - inspect_local_gpu_inventory
   - resolve_infer_runtime_lane_contracts
   - validate_runbook_gpu_resources
@@ -26,6 +26,8 @@ from typing import Any
 from .contracts import (
     InferRuntimeLaneContract,
     infer_model_family_suffix,
+    plan_sequence_view_feature_completion_from_config,
+    plan_sequence_view_feature_inventory_completion_from_config,
     resolve_infer_runtime_lane_contracts,
     validate_infer_config_contract,
     validate_infer_dry_run_contract,
@@ -44,10 +46,10 @@ def run_generate(*args: Any, **kwargs: Any):
     return _run_generate(*args, **kwargs)
 
 
-def run_evo2_promoter_features(*args: Any, **kwargs: Any):
-    from .src.api import run_evo2_promoter_features as _run_evo2_promoter_features
+def run_evo2_sequence_features(*args: Any, **kwargs: Any):
+    from .src.api import run_evo2_sequence_features as _run_evo2_sequence_features
 
-    return _run_evo2_promoter_features(*args, **kwargs)
+    return _run_evo2_sequence_features(*args, **kwargs)
 
 
 def run_job(*args: Any, **kwargs: Any):
@@ -56,10 +58,10 @@ def run_job(*args: Any, **kwargs: Any):
     return _run_job(*args, **kwargs)
 
 
-def export_evo2_promoter_opal_matrix(*args: Any, **kwargs: Any):
-    from .src.api import export_evo2_promoter_opal_matrix as _export_evo2_promoter_opal_matrix
+def export_evo2_sequence_opal_matrix(*args: Any, **kwargs: Any):
+    from .src.api import export_evo2_sequence_opal_matrix as _export_evo2_sequence_opal_matrix
 
-    return _export_evo2_promoter_opal_matrix(*args, **kwargs)
+    return _export_evo2_sequence_opal_matrix(*args, **kwargs)
 
 
 def inspect_local_gpu_inventory() -> dict[str, object]:
@@ -99,13 +101,15 @@ def validate_runbook_gpu_resources(
 
 __all__ = (
     "run_extract",
-    "run_evo2_promoter_features",
+    "run_evo2_sequence_features",
     "run_generate",
     "run_job",
-    "export_evo2_promoter_opal_matrix",
+    "export_evo2_sequence_opal_matrix",
     "InferRuntimeLaneContract",
     "infer_model_family_suffix",
     "inspect_local_gpu_inventory",
+    "plan_sequence_view_feature_completion_from_config",
+    "plan_sequence_view_feature_inventory_completion_from_config",
     "resolve_infer_runtime_lane_contracts",
     "validate_infer_config_contract",
     "validate_infer_dry_run_contract",

@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/dense_array_video_source.py
 
 Dense-array video source validation, ordering, and sampling helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -83,10 +84,16 @@ def sample_video_source_rows(
     stride: int,
     max_source_rows: int,
     max_snapshots: int,
+    plan_snapshot_counts: Mapping[str, int] | None = None,
 ) -> tuple[pd.DataFrame, int]:
     total_rows = len(frame)
     if total_rows < 1:
         raise ValueError("Dense-array video has no source rows to sample.")
+    if plan_snapshot_counts:
+        sampled = _sample_video_source_rows_by_plan(frame, plan_snapshot_counts=plan_snapshot_counts)
+        if len(sampled) > int(max_snapshots):
+            raise ValueError("Dense-array video plan snapshot selection exceeds max_snapshots.")
+        return sampled, 1
     source_cap_stride = max(1, int(math.ceil(float(total_rows) / float(max(1, int(max_source_rows))))))
     effective_stride = max(1, int(stride), source_cap_stride)
     sampled_indices = list(range(0, total_rows, effective_stride))
@@ -109,6 +116,42 @@ def sample_video_source_rows(
     if sampled.empty:
         raise ValueError("Dense-array video sampling produced zero snapshots.")
     return sampled, effective_stride
+
+
+def _sample_video_source_rows_by_plan(
+    frame: pd.DataFrame,
+    *,
+    plan_snapshot_counts: Mapping[str, int],
+) -> pd.DataFrame:
+    plan_values = frame["densegen__plan"].astype(str).tolist()
+    plan_order = [str(plan_name).strip() for plan_name in plan_snapshot_counts if str(plan_name).strip()]
+    if not plan_order:
+        raise ValueError("Dense-array video plan snapshot selection requires at least one plan.")
+
+    selected_by_plan: dict[str, list[int]] = {}
+    for plan_name in plan_order:
+        bucket = [idx for idx, value in enumerate(plan_values) if value == plan_name]
+        if not bucket:
+            raise ValueError(f"Dense-array video plan_snapshots references unknown or empty plan {plan_name!r}.")
+        requested = int(plan_snapshot_counts[plan_name])
+        selected_by_plan[plan_name] = _uniform_pick(bucket, min(requested, len(bucket)))
+
+    selected_indices: list[int] = []
+    cursor = 0
+    while True:
+        emitted = False
+        for plan_name in plan_order:
+            bucket = selected_by_plan[plan_name]
+            if cursor < len(bucket):
+                selected_indices.append(int(bucket[cursor]))
+                emitted = True
+        if not emitted:
+            break
+        cursor += 1
+    sampled = frame.iloc[selected_indices].reset_index(drop=True)
+    if sampled.empty:
+        raise ValueError("Dense-array video plan snapshot selection produced zero snapshots.")
+    return sampled
 
 
 def encode_video_source_annotations(frame: pd.DataFrame) -> pd.DataFrame:

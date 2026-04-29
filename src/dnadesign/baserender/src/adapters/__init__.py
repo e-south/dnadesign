@@ -26,6 +26,7 @@ from .registry import (
 from .sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
 from .sequence_windows_v1 import SequenceWindowsV1Adapter
 from .snapback_visual_v1 import SnapbackVisualV1Adapter
+from .usr_genbank_annotations_v1 import UsrGenbankAnnotationsV1Adapter
 from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter
 from .yiu_linear_state_v1 import YiuLinearStateV1Adapter
 from .yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
@@ -42,6 +43,7 @@ __all__ = [
     "CruncherBestWindowAdapter",
     "SequenceEvidenceMapV1Adapter",
     "SnapbackVisualV1Adapter",
+    "UsrGenbankAnnotationsV1Adapter",
     "SequenceWindowsV1Adapter",
     "DuplexSequenceV1Adapter",
     "HairpinTopologyV1Adapter",

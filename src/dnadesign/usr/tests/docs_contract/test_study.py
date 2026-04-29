@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/docs_contract/test_study.py
 
 Structural study and skill-doc contracts touched by USR runbook surfaces.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

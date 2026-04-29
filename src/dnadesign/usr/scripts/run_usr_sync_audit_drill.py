@@ -5,7 +5,7 @@ src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py
 
 Backward-compatible wrapper for the package-owned USR sync audit drill entrypoint.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

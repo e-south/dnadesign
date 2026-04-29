@@ -66,8 +66,8 @@ def run_extract_job(
     progress_factory: ProgressFactory = None,
 ) -> Dict[str, List[object]]:
     # ingest
-    source = job.ingest.source
-    payload = load_extract_ingest(inputs, ingest=job.ingest)
+    payload = load_extract_ingest(inputs, ingest=job.ingest, feature_bundle=job.feature_bundle)
+    source = payload.source_kind
     seqs = payload.seqs
     ids = payload.ids
     records = payload.records

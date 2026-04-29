@@ -5,7 +5,7 @@ src/dnadesign/usr/src/events/defaults.py
 
 Default event payload fragments for USR event records.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -81,6 +81,10 @@ def _event_defaults(action: str) -> dict:
         "remove_overlay": {
             "metrics": {"removed": 0},
             "artifacts": {"overlay": {}},
+        },
+        "event_log_garden": {
+            "metrics": {"total_lines": 0, "retained_lines": 0, "archived_lines": 0},
+            "artifacts": {"source_sha256": None},
         },
     }
     return defaults.get(action, {"metrics": {}, "artifacts": {}})

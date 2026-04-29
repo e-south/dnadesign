@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/tooling/legacy.py
 
 Legacy-import USR tooling commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -36,6 +36,17 @@ def test_public_package_root_only_contains_intentional_facade_modules() -> None:
 def test_public_package_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr")
     assert hasattr(module, "Dataset")
+    assert hasattr(module, "SEQ_ANNOT_NAMESPACE")
+    assert hasattr(module, "DERIVED_NAMESPACE")
+    assert hasattr(module, "SequenceViewRecord")
+    assert hasattr(module, "write_sequence_views")
+    assert hasattr(module, "load_sequence_view_index")
+    assert hasattr(module, "load_sequence_view_ids")
+    assert hasattr(module, "ViewSemanticsRecord")
+    assert hasattr(module, "write_view_semantics")
+    assert hasattr(module, "load_view_semantics_index")
+    assert hasattr(module, "SequenceViewContractExpectation")
+    assert hasattr(module, "validate_sequence_view_contract")
     assert hasattr(module, "RESERVED_NAMESPACES")
     assert hasattr(module, "MUTATION_RESERVED_NAMESPACES")
     assert hasattr(module, "load_overlay_catalog")
@@ -85,9 +96,20 @@ def test_runtime_package_exports_expected_symbols() -> None:
     assert hasattr(module, "connect_duckdb_utc")
 
 
+def test_genbank_package_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.genbank")
+    assert hasattr(module, "BiopythonGenBankParser")
+    assert hasattr(module, "GenBankImportManifest")
+    assert hasattr(module, "import_genbank_manifest")
+
+
 def test_api_package_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.api")
     assert hasattr(module, "Dataset")
+    assert hasattr(module, "ensure_sequence_contract_namespaces")
+    assert hasattr(module, "SequenceViewSemanticKey")
+    assert hasattr(module, "load_sequence_view_index")
+    assert hasattr(module, "load_sequence_view_ids")
     assert hasattr(module, "USR_EVENT_VERSION")
     assert hasattr(module, "__version__")
 
@@ -126,10 +148,22 @@ def test_events_module_exports_expected_symbols() -> None:
 def test_registry_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.registry")
     assert hasattr(module, "RegistryColumn")
+    assert hasattr(module, "SEQ_ANNOT_NAMESPACE")
+    assert hasattr(module, "ensure_sequence_contract_namespaces")
     assert hasattr(module, "load_registry")
     assert hasattr(module, "register_namespace")
     assert hasattr(module, "parse_columns_spec")
     assert hasattr(module, "registry_hash")
+
+
+def test_sequence_views_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.sequence_views")
+    assert hasattr(module, "SequenceViewRecord")
+    assert hasattr(module, "SequenceViewSemanticKey")
+    assert hasattr(module, "compute_sequence_view_id")
+    assert hasattr(module, "write_sequence_views")
+    assert hasattr(module, "load_sequence_view_index")
+    assert hasattr(module, "load_sequence_view_ids")
 
 
 def test_overlays_module_exports_expected_symbols() -> None:
@@ -558,8 +592,8 @@ def test_cli_surface_module_exports_expected_symbols() -> None:
     assert hasattr(module, "build_cli_apps")
 
 
-def test_repo_level_usr_testsupport_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.testsupport.usr")
+def test_devtools_usr_test_support_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.devtools.tests.support.usr")
     assert hasattr(module, "ensure_registry")
     assert hasattr(module, "register_test_namespace")
 

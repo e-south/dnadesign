@@ -49,6 +49,15 @@ entries:
         required: false
         default: next
         choices: [next, full]
+      - name: command_timeout_seconds
+        manifest_key: command_timeout_seconds
+        cli_flag: --command-timeout-seconds
+        placeholder: "30"
+        summary: Per-command timeout for command-backed preflight checks on this host.
+        type: int
+        required: false
+        default: 180
     notes:
       - This route composes read-only command preflights. Use it after the cheaper `usr.data-plane.promoter-study-status` snapshot when you need command-level blockers.
+      - Pass `--command-timeout-seconds <seconds>` for bounded local probes when a full host readiness check is too slow.
       - If `docs/studies/index.yaml` declares `active_study_id`, you can omit `--study-dir` for the active-study preflight. Pass `--study-dir` to pin or override the checked-in study directory.

@@ -5,7 +5,7 @@ src/dnadesign/studies/families/promoter/downstream_surfaces.py
 
 Uniform downstream surface inspection for promoter-study snapshot evidence.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

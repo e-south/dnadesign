@@ -14,12 +14,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from dnadesign.baserender.src.config import Style, VideoOutputCfg
-from dnadesign.baserender.src.core import Display, Record
+from dnadesign.baserender.src.core import Display, Feature, Record, SchemaError, Span
 from dnadesign.baserender.src.outputs import (
     _apply_fixed_content_radius,
     _letterbox_rgba,
+    _scale_rgba_to_width,
     _target_frame_size,
     _trim_white_border_rgba,
     _union_centered_content_bounds,
@@ -68,7 +70,7 @@ def test_write_video_handles_later_frames_larger_than_first(monkeypatch, tmp_pat
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _FakeFFMpegWriter)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(id="small", alphabet="DNA", sequence="ACGT"),
@@ -99,6 +101,540 @@ def test_write_video_handles_later_frames_larger_than_first(monkeypatch, tmp_pat
     )
 
     assert out_path.exists()
+
+
+def test_scale_rgba_to_width_can_upscale_cropped_content_for_fill_width_video() -> None:
+    arr = np.zeros((10, 20, 4), dtype=np.uint8)
+    arr[:, :, 3] = 255
+
+    scaled = np.asarray(_scale_rgba_to_width(arr, width=40))
+
+    assert scaled.shape[:2] == (20, 40)
+
+
+def test_write_video_accepts_title_without_dynamic_subtitle(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del record, renderer_name, style, palette
+        fig, ax = plt.subplots(figsize=(2.0, 1.0), dpi=100)
+        ax.plot([0, 1], [0, 1], color="black")
+        ax.set_axis_off()
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _FakeFFMpegWriter)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "title-only.mp4",
+        fmt="mp4",
+        fps=2,
+        frames_per_record=1,
+        pauses={},
+        width_px=640,
+        height_px=None,
+        aspect_ratio=16 / 9,
+        total_duration=None,
+        title_text="Title without subtitle",
+        title_font_size=18,
+        title_align="center",
+    )
+
+    out_path = write_video(
+        [Record(id="r1", alphabet="DNA", sequence="ACGT", display=Display())],
+        output=output,
+        renderer_name="sequence_rows",
+        style=Style(dpi=100, uniform_display_font_size=True),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+
+
+def test_write_video_draws_updated_canvas_for_each_record(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    writer_instances: list[object] = []
+
+    class _CanvasCaptureWriter:
+        class _SavingContext:
+            def __init__(self, writer: "_CanvasCaptureWriter", path: str):
+                self._writer = writer
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                self._writer.fig.canvas.draw()
+                return self._writer
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self.fig = None
+            self.frames: list[np.ndarray] = []
+            writer_instances.append(self)
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self.fig = fig
+            return self._SavingContext(self, path)
+
+        def grab_frame(self):
+            self.frames.append(np.asarray(self.fig.canvas.buffer_rgba()).copy())
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del renderer_name, style, palette
+        fig, ax = plt.subplots(figsize=(1.6, 0.8), dpi=100)
+        color = "#D94848" if record.id == "red" else "#2F6FDB"
+        ax.add_patch(plt.Rectangle((0, 0), 1, 1, color=color))
+        ax.text(0.5, 0.5, record.id, ha="center", va="center", color="white", fontsize=18)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _CanvasCaptureWriter)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "record-updates.mp4",
+        fmt="mp4",
+        fps=2,
+        frames_per_record=1,
+        pauses={},
+        width_px=200,
+        height_px=100,
+        aspect_ratio=None,
+        total_duration=None,
+    )
+
+    out_path = write_video(
+        [
+            Record(id="red", alphabet="DNA", sequence="ACGT"),
+            Record(id="blue", alphabet="DNA", sequence="TGCA"),
+        ],
+        output=output,
+        renderer_name="hairpin_cartoon",
+        style=Style(dpi=100),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+    writer = writer_instances[0]
+    assert len(writer.frames) == 2
+    assert not np.array_equal(writer.frames[0], writer.frames[1])
+
+
+def test_write_video_fill_width_without_header_top_aligns_sequence_rows(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    class _FrameCaptureWriter:
+        class _SavingContext:
+            def __init__(self, writer: "_FrameCaptureWriter", path: str):
+                self._writer = writer
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self._fig = None
+            self.frame_top_margins: list[int] = []
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self._fig = fig
+            return self._SavingContext(self, path)
+
+        def grab_frame(self):
+            if self._fig is None:
+                raise AssertionError("Expected figure to be bound before frame capture.")
+            image = self._fig.axes[0].images[0]
+            arr = np.asarray(image.get_array())
+            non_white = np.any(arr[:, :, :3] < 245, axis=2)
+            ys, _xs = np.where(non_white)
+            self.frame_top_margins.append(int(ys.min()))
+
+    writer_box: dict[str, _FrameCaptureWriter] = {}
+
+    def _writer_factory(*args, **kwargs):
+        writer = _FrameCaptureWriter(*args, **kwargs)
+        writer_box["writer"] = writer
+        return writer
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del renderer_name, style, palette
+        fig, ax = plt.subplots(figsize=(3.0, 1.0), dpi=100)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+        ax.add_patch(plt.Rectangle((0.1, 0.88), 0.8, 0.04, color="black"))
+        y0 = 0.76 if record.id == "top" else 0.06
+        ax.add_patch(plt.Rectangle((0.1, y0), 0.8, 0.18, color="black"))
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    records = [
+        Record(id="top", alphabet="DNA", sequence="ACGT"),
+        Record(id="bottom", alphabet="DNA", sequence="TGCA"),
+    ]
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "fill-width-no-header.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=None,
+        height_px=None,
+        aspect_ratio=None,
+        total_duration=None,
+        content_fit="fill_width",
+        title_text=None,
+        title_font_size=None,
+        title_align="center",
+    )
+
+    out_path = write_video(
+        records,
+        output=output,
+        renderer_name="sequence_rows",
+        style=Style(dpi=100),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+    assert writer_box["writer"].frame_top_margins
+    assert max(writer_box["writer"].frame_top_margins) <= 24
+
+
+def test_write_video_fill_width_keeps_embedded_legend_level_stable(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    class _LegendCaptureWriter:
+        class _SavingContext:
+            def __init__(self, writer: "_LegendCaptureWriter", path: str):
+                self._writer = writer
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self._fig = None
+            self.legend_y0: list[int] = []
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self._fig = fig
+            return self._SavingContext(self, path)
+
+        def grab_frame(self):
+            if self._fig is None:
+                raise AssertionError("Expected figure to be bound before frame capture.")
+            image = self._fig.axes[0].images[0]
+            arr = np.asarray(image.get_array())[:, :, :3]
+            green = (arr[:, :, 1] > 100) & (arr[:, :, 0] < 80) & (arr[:, :, 2] < 80)
+            ys, _xs = np.where(green)
+            if ys.size == 0:
+                raise AssertionError("Expected green legend marker in captured frame.")
+            self.legend_y0.append(int(ys.min()))
+
+    writer_box: dict[str, _LegendCaptureWriter] = {}
+
+    def _writer_factory(*args, **kwargs):
+        writer = _LegendCaptureWriter(*args, **kwargs)
+        writer_box["writer"] = writer
+        return writer
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del renderer_name, style, palette
+        fig, ax = plt.subplots(figsize=(4.0, 2.0), dpi=100)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+        # Varying top content should not move the embedded legend band.
+        content_y = 0.76 if record.id == "high" else 0.48
+        ax.add_patch(plt.Rectangle((0.1, content_y), 0.18, 0.08, color="black"))
+        ax.add_patch(plt.Rectangle((0.42, 0.06), 0.16, 0.06, color="#008000"))
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    records = [
+        Record(id="high", alphabet="DNA", sequence="ACGT"),
+        Record(id="low", alphabet="DNA", sequence="TGCA"),
+    ]
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "legend-stable.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=None,
+        height_px=None,
+        aspect_ratio=None,
+        total_duration=None,
+        content_fit="fill_width",
+        title_text=None,
+        title_font_size=None,
+        title_align="center",
+    )
+
+    out_path = write_video(
+        records,
+        output=output,
+        renderer_name="sequence_rows",
+        style=Style(dpi=100),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+    assert len(set(writer_box["writer"].legend_y0)) == 1
+
+
+def test_write_video_fill_width_per_frame_preserves_content_aspect(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    class _AspectCaptureWriter:
+        class _SavingContext:
+            def __init__(self, writer: "_AspectCaptureWriter", path: str):
+                self._writer = writer
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self._fig = None
+            self.content_shapes: list[tuple[int, int]] = []
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self._fig = fig
+            return self._SavingContext(self, path)
+
+        def grab_frame(self):
+            if self._fig is None:
+                raise AssertionError("Expected figure to be bound before frame capture.")
+            image = self._fig.axes[0].images[0]
+            arr = np.asarray(image.get_array())
+            non_white = np.any(arr[:, :, :3] < 245, axis=2)
+            ys, xs = np.where(non_white)
+            self.content_shapes.append((int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)))
+
+    writer_box: dict[str, _AspectCaptureWriter] = {}
+
+    def _writer_factory(*args, **kwargs):
+        writer = _AspectCaptureWriter(*args, **kwargs)
+        writer_box["writer"] = writer
+        return writer
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del renderer_name, style, palette
+        fig_width = 4.0 if record.id == "wide" else 2.0
+        fig, ax = plt.subplots(figsize=(fig_width, 1.0), dpi=100)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+        ax.add_patch(plt.Rectangle((0.0, 0.0), 1.0, 1.0, color="black"))
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    records = [
+        Record(id="wide", alphabet="DNA", sequence="ACGT"),
+        Record(id="narrow", alphabet="DNA", sequence="TGCA"),
+    ]
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "fill-width-per-frame.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=240,
+        height_px=140,
+        aspect_ratio=None,
+        total_duration=None,
+        content_fit="fill_width_per_frame",
+        title_text=None,
+        title_font_size=None,
+        title_align="center",
+    )
+
+    out_path = write_video(
+        records,
+        output=output,
+        renderer_name="sequence_rows",
+        style=Style(dpi=100),
+        palette=Palette(),
+    )
+
+    assert out_path.exists()
+    assert len(writer_box["writer"].content_shapes) == 2
+    wide_shape, narrow_shape = writer_box["writer"].content_shapes
+    assert abs(wide_shape[0] - narrow_shape[0]) <= 8
+    assert abs((wide_shape[0] / wide_shape[1]) - 4.0) < 0.15
+    assert abs((narrow_shape[0] / narrow_shape[1]) - 2.0) < 0.15
+
+
+def test_write_video_footer_legend_font_is_stable_for_variable_sequence_lengths(monkeypatch, tmp_path: Path) -> None:
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    class _LegendFontCaptureWriter:
+        class _SavingContext:
+            def __init__(self, writer: "_LegendFontCaptureWriter", path: str):
+                self._writer = writer
+                self._path = Path(path)
+
+            def __enter__(self):
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._path.write_bytes(b"fake-mp4")
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+            self._fig = None
+            self.legend_font_sizes: list[tuple[float, ...]] = []
+            self.legend_patch_sizes: list[tuple[tuple[float, float], ...]] = []
+
+        def saving(self, fig, path: str, dpi: int):
+            del dpi
+            self._fig = fig
+            return self._SavingContext(self, path)
+
+        def grab_frame(self):
+            if self._fig is None:
+                raise AssertionError("Expected figure to be bound before frame capture.")
+            self.legend_font_sizes.append(
+                tuple(
+                    float(text.get_fontsize())
+                    for text in self._fig.texts
+                    if str(text.get_gid()).startswith("video_footer_legend_label:")
+                )
+            )
+            self.legend_patch_sizes.append(
+                tuple(
+                    (float(patch.get_width()), float(patch.get_height()))
+                    for patch in self._fig.artists
+                    if str(patch.get_gid()).startswith("video_footer_legend_patch:")
+                )
+            )
+
+    writer_box: dict[str, _LegendFontCaptureWriter] = {}
+
+    def _writer_factory(*args, **kwargs):
+        writer = _LegendFontCaptureWriter(*args, **kwargs)
+        writer_box["writer"] = writer
+        return writer
+
+    def _fake_render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+        del renderer_name, style, palette
+        fig_width = 8.0 if record.id == "long" else 2.0
+        fig, ax = plt.subplots(figsize=(fig_width, 1.0), dpi=100)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_axis_off()
+        ax.add_patch(plt.Rectangle((0.0, 0.2), 1.0, 0.6, color="black"))
+        return fig
+
+    monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
+    monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+
+    feature = Feature(id="tfbs", kind="kmer", span=Span(start=0, end=4), label="ACGT", tags=("tf:LexA",))
+    records = [
+        Record(
+            id="short",
+            alphabet="DNA",
+            sequence="ACGT",
+            features=(feature,),
+            display=Display(tag_labels={"tf:LexA": "LexA sites"}),
+        ),
+        Record(
+            id="long",
+            alphabet="DNA",
+            sequence="ACGT" * 16,
+            features=(feature,),
+            display=Display(tag_labels={"tf:LexA": "LexA sites"}),
+        ),
+    ]
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "stable-footer-legend.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=320,
+        height_px=120,
+        aspect_ratio=None,
+        total_duration=None,
+        content_fit="fill_width_per_frame",
+        title_text=None,
+        title_font_size=None,
+        title_align="center",
+    )
+
+    out_path = write_video(
+        records,
+        output=output,
+        renderer_name="sequence_rows",
+        style=Style(dpi=100, legend=True, legend_mode="bottom", legend_font_size=14),
+        palette=Palette({"tf:LexA": "#2D9B66"}),
+    )
+
+    assert out_path.exists()
+    assert writer_box["writer"].legend_font_sizes == [(10.08,), (10.08,)]
+    assert writer_box["writer"].legend_patch_sizes
+    assert all(
+        max(width * output.width_px, height * output.height_px) <= 14.0
+        for frame_sizes in writer_box["writer"].legend_patch_sizes
+        for width, height in frame_sizes
+    )
 
 
 def test_letterbox_centers_content_vertically() -> None:
@@ -144,6 +680,27 @@ def test_target_frame_size_keeps_explicit_height_even_when_smaller_than_natural(
 
     assert width == 1000
     assert height == 200
+
+
+def test_target_frame_size_rejects_conflicting_explicit_size_and_aspect_ratio(tmp_path: Path) -> None:
+    output = VideoOutputCfg(
+        kind="video",
+        path=tmp_path / "conflicting-size.mp4",
+        fmt="mp4",
+        fps=8,
+        frames_per_record=1,
+        pauses={},
+        width_px=100,
+        height_px=55,
+        aspect_ratio=2.0,
+        total_duration=2.0,
+        title_text=None,
+        title_font_size=None,
+        title_align="center",
+    )
+
+    with pytest.raises(SchemaError, match="aspect"):
+        _target_frame_size(natural_w=80, natural_h=40, output=output)
 
 
 def test_trim_white_border_rgba_crops_white_edges() -> None:
@@ -252,7 +809,7 @@ def test_write_video_updates_subtitle_per_frame_from_record_display(monkeypatch,
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -359,7 +916,7 @@ def test_write_video_long_title_text_is_fitted_within_figure_bounds(monkeypatch,
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [Record(id="frame-1", alphabet="DNA", sequence="ACGT")]
     output = VideoOutputCfg(
@@ -463,7 +1020,7 @@ def test_write_video_keeps_title_font_larger_than_subtitle_font(monkeypatch, tmp
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -567,7 +1124,7 @@ def test_write_video_can_lock_title_and_subtitle_to_uniform_display_font_size(mo
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -671,7 +1228,7 @@ def test_write_video_title_avoids_bbox_patch_to_prevent_subtitle_clip(monkeypatc
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -786,9 +1343,9 @@ def test_write_video_anchors_title_block_to_content_envelope(monkeypatch, tmp_pa
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
     monkeypatch.setattr(
-        "dnadesign.baserender.src.outputs._sequence_rows_content_envelope_norms",
+        "dnadesign.baserender.src.outputs.video._sequence_rows_content_envelope_norms",
         lambda records, style: (0.68, 0.28),
     )
 
@@ -900,9 +1457,9 @@ def test_write_video_anchor_respects_high_content_envelope_without_low_cap(monke
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
     monkeypatch.setattr(
-        "dnadesign.baserender.src.outputs._sequence_rows_content_envelope_norms",
+        "dnadesign.baserender.src.outputs.video._sequence_rows_content_envelope_norms",
         lambda records, style: (0.92, 0.26),
     )
 
@@ -1031,7 +1588,7 @@ def test_write_video_places_subtitle_above_rendered_content(monkeypatch, tmp_pat
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(
@@ -1162,7 +1719,7 @@ def test_write_video_stacks_header_block_above_high_content_without_collision(mo
 
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
-    monkeypatch.setattr("dnadesign.baserender.src.outputs.render_record", _fake_render_record)
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
 
     records = [
         Record(

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/target_search.py
 
 Target-first snapback catalog search for exact preserved-site geometry hits.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

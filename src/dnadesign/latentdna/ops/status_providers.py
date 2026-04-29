@@ -5,7 +5,7 @@ src/dnadesign/latentdna/ops/status_providers.py
 
 Provider-owned LatentDNA status builders.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/source_layout_inventory.py
 
 Single source of truth for the sanctioned USR source layout.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -22,11 +22,13 @@ TOP_LEVEL_SOURCE_PACKAGES = {
     "dataset",
     "datasets",
     "events",
+    "genbank",
     "legacy",
     "maintenance",
     "overlays",
     "registry",
     "runtime",
+    "sequence_views",
     "storage",
     "sync",
     "version",
@@ -76,8 +78,15 @@ PACKAGE_FILES = {
         "actor.py",
         "defaults.py",
         "fingerprint.py",
+        "gardening.py",
         "recording.py",
         "redaction.py",
+    },
+    ("genbank",): {
+        "__init__.py",
+        "importer.py",
+        "models.py",
+        "parser.py",
     },
     ("legacy",): {
         "__init__.py",
@@ -112,6 +121,13 @@ PACKAGE_FILES = {
         "__init__.py",
         "duckdb.py",
     },
+    ("sequence_views",): {
+        "__init__.py",
+        "models.py",
+        "qa.py",
+        "semantics.py",
+        "store.py",
+    },
     ("storage",): {
         "__init__.py",
         "locking.py",
@@ -137,6 +153,10 @@ PACKAGE_FILES = {
         "catalog.py",
         "resolution.py",
     },
+    ("cli", "commands", "genbank"): {
+        "__init__.py",
+        "cli.py",
+    },
     ("cli", "commands", "lifecycle"): {
         "__init__.py",
         "cli.py",
@@ -149,6 +169,7 @@ PACKAGE_FILES = {
         "__init__.py",
         "cli.py",
         "dedupe.py",
+        "events.py",
         "merge.py",
         "overlay.py",
         "registry.py",
@@ -261,6 +282,7 @@ PACKAGE_SUBPACKAGES = {
     },
     ("cli", "commands"): {
         "datasets",
+        "genbank",
         "lifecycle",
         "maintenance",
         "namespace",
@@ -271,6 +293,7 @@ PACKAGE_SUBPACKAGES = {
         "tooling",
     },
     ("cli", "commands", "datasets"): set(),
+    ("cli", "commands", "genbank"): set(),
     ("cli", "commands", "lifecycle"): set(),
     ("cli", "commands", "maintenance"): set(),
     ("cli", "commands", "namespace"): set(),
@@ -308,12 +331,14 @@ PACKAGE_SUBPACKAGES = {
     ("datasets", "validate"): set(),
     ("datasets", "views"): set(),
     ("events",): set(),
+    ("genbank",): set(),
     ("legacy",): set(),
     ("maintenance",): set(),
     ("overlays",): {"support"},
     ("overlays", "support"): set(),
     ("registry",): set(),
     ("runtime",): set(),
+    ("sequence_views",): set(),
     ("storage",): set(),
     ("sync",): {"remote"},
     ("sync", "remote"): set(),

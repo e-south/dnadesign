@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from .source_builtin import register_builtin_tool_events_sources
 
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/view_contracts.py
 
 QA view publication for v2 snapback designs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.infer.cli import app
 from dnadesign.infer.src.runtime.capacity_planner import GpuDeviceInfo, GpuInventory
+from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 _RUNNER = CliRunner()
 
@@ -157,6 +158,302 @@ jobs:
 
     assert result.exit_code == 2
     assert "USR write-back jobs must set ingest.root explicitly." in (result.stdout or "")
+
+
+def test_validate_sequence_view_completion_renders_json_plan(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test")
+    add_result = dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-28T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+    config = _write(
+        tmp_path / "config.yaml",
+        f"""
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: reference_views
+    operation: extract
+    ingest:
+      source: records
+      field: sequence
+    feature_bundle:
+      collect_log_likelihood: false
+      sequence_view_inputs:
+        - dataset: reference_views
+          root: {usr_root.as_posix()}
+          view_selector:
+            product_kind: analysis_window
+          pooling:
+            operation: core60_mean
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        ["validate", "sequence-view-completion", "--config", config.as_posix(), "--format", "json"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert '"required_views":1' in (result.stdout or "")
+    assert '"missing_vectors":2' in (result.stdout or "")
+    assert '"missing_scalars":0' in (result.stdout or "")
+
+    inventory_result = _RUNNER.invoke(
+        app,
+        [
+            "validate",
+            "sequence-view-completion",
+            "--config",
+            config.as_posix(),
+            "--format",
+            "json",
+            "--mode",
+            "inventory",
+        ],
+    )
+
+    assert inventory_result.exit_code == 0, inventory_result.stdout
+    assert '"required_views":1' in (inventory_result.stdout or "")
+    assert '"missing_vectors":2' in (inventory_result.stdout or "")
+    assert '"stale_vectors":0' in (inventory_result.stdout or "")
+
+
+def test_validate_sequence_view_completion_thresholds_fail_before_batch_submission(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test")
+    add_result = dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-28T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+    config = _write(
+        tmp_path / "config.yaml",
+        f"""
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: reference_views
+    operation: extract
+    ingest:
+      source: records
+      field: sequence
+    feature_bundle:
+      collect_log_likelihood: false
+      sequence_view_inputs:
+        - dataset: reference_views
+          root: {usr_root.as_posix()}
+          view_selector:
+            product_kind: source_record
+          pooling:
+            operation: seq_mean
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "validate",
+            "sequence-view-completion",
+            "--config",
+            config.as_posix(),
+            "--format",
+            "json",
+            "--max-missing-products",
+            "0",
+        ],
+    )
+
+    assert result.exit_code == 1
+    output = " ".join((result.stdout or "").split())
+    assert "sequence-view completion thresholds failed" in output
+    assert "missing_products=1 exceeds max_missing_products=0" in output
+
+
+def test_validate_sequence_view_completion_scalar_thresholds_fail_before_batch_submission(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test")
+    add_result = dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-28T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+    config = _write(
+        tmp_path / "config.yaml",
+        f"""
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: reference_views
+    operation: extract
+    ingest:
+      source: records
+      field: sequence
+    feature_bundle:
+      collect_log_likelihood: true
+      collect_output_layer_mean: false
+      collect_intermediate_embedding: false
+      sequence_view_inputs:
+        - dataset: reference_views
+          root: {usr_root.as_posix()}
+          view_selector:
+            product_kind: analysis_window
+          pooling:
+            operation: core60_mean
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "validate",
+            "sequence-view-completion",
+            "--config",
+            config.as_posix(),
+            "--format",
+            "json",
+            "--max-missing-scalars",
+            "0",
+        ],
+    )
+
+    assert result.exit_code == 1
+    output = " ".join((result.stdout or "").split())
+    assert "sequence-view completion thresholds failed" in output
+    assert "missing_scalars=2 exceeds max_missing_scalars=0" in output
+
+
+def test_validate_sequence_view_completion_resolves_roots_relative_to_config(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace" / "infer"
+    workspace.mkdir(parents=True)
+    usr_root = tmp_path / "workspace" / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test")
+    add_result = dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="core60_view",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                analysis_only=True,
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-28T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+    config = _write(
+        workspace / "config.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: reference_views
+    operation: extract
+    ingest:
+      source: records
+      field: sequence
+    feature_bundle:
+      collect_log_likelihood: false
+      sequence_view_inputs:
+        - dataset: reference_views
+          root: ../usr_root
+          view_selector:
+            product_kind: analysis_window
+          pooling:
+            operation: core60_mean
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        ["validate", "sequence-view-completion", "--config", config.as_posix(), "--format", "json"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert '"required_views":1' in (result.stdout or "")
+    assert '"missing_products":0' in (result.stdout or "")
 
 
 def test_validate_config_fails_capacity_for_20b_on_single_hopper_with_insufficient_memory(

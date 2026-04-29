@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/support/resolution/__init__.py
 
 CLI resolution helpers for roots, paths, dataset targets, and policies.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

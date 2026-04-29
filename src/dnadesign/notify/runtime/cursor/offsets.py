@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 
 
 def load_cursor_offset(cursor_path: Path | None) -> int:

@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/contracts/test_workspace_config.py
 
 Workspace contract validation tests for latentdna.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

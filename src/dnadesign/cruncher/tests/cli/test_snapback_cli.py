@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/cli/test_snapback_cli.py
 
 CLI contract tests for the snapback command group.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -170,6 +170,7 @@ def test_snapback_help_describes_workspace_validate_design_solve_and_show_surfac
     assert "init-workspace" in result.output
     assert "validate" in result.output
     assert "design" in result.output
+    assert "visual" in result.output
     assert "solve" in result.output
     assert "target-search" in result.output
     assert "show" in result.output
@@ -180,6 +181,13 @@ def test_snapback_solve_help_describes_v3_codesign_contract() -> None:
 
     assert result.exit_code == 0
     assert "v3 co-design solve spec" in result.output
+
+
+def test_snapback_visual_help_describes_visual_spec_contract() -> None:
+    result = runner.invoke(app, ["snapback", "visual", "--help"], color=False)
+
+    assert result.exit_code == 0
+    assert "visual-only snapback example" in result.output
 
 
 def test_snapback_target_search_json_reports_exact_and_near_hits(tmp_path: Path) -> None:
@@ -195,8 +203,9 @@ def test_snapback_target_search_json_reports_exact_and_near_hits(tmp_path: Path)
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["status"] == "exact_hits_found"
-    assert payload["exact_hits"][0]["variant_id"] == "Nt.CviPII"
+    assert payload["exact_hits"][0]["variant_id"] == "Nb.BsrDI"
     assert payload["exact_hits"][0]["nick_boundary_from_left"] == 0
+    assert {hit["variant_id"] for hit in payload["exact_hits"]} == {"Nb.BsrDI", "Nb.BtsI", "Nt.CviPII"}
     assert any(hit["variant_id"] == "Nt.Bpu10I" and hit["nick_boundary_from_left"] == 2 for hit in payload["near_hits"])
 
 

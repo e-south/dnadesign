@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/tooling/shared.py
 
 Shared dependency contract for USR tooling commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -63,6 +63,10 @@ def build_precursor_sequence(
             return BuiltPrecursorResult(precursor=None, blocker_code="RELEASE_SITE_LEFT_OF_ORIGIN")
         coordinate_offset = 0
     else:
+        if nick_site_start < 0 and not nick_placement.allows_left_of_origin_prefix(boundary):
+            return BuiltPrecursorResult(precursor=None, blocker_code="PRE_NICK_SITE_LEFT_OF_ORIGIN")
+        if release_site_start < 0:
+            return BuiltPrecursorResult(precursor=None, blocker_code="RELEASE_SITE_LEFT_OF_ORIGIN")
         coordinate_offset = max(0, -nick_site_start, -release_site_start)
     top_cut = release_placement.top_cut_for_boundary(boundary) + coordinate_offset
     bottom_cut = release_placement.bottom_cut_for_boundary(boundary) + coordinate_offset

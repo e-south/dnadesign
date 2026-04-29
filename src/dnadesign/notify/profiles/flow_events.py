@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from ..events.source import normalize_tool_name, resolve_tool_events_path
 from .flow_types import SetupEventsResolution
 from .workspace import resolve_tool_workspace_config_path

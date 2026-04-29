@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/plot_run_summary.py
 
 Summary-table helpers for DenseGen run-health plotting.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

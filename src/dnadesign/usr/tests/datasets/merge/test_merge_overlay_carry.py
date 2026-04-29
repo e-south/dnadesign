@@ -19,7 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.testsupport.usr import ensure_registry, register_test_namespace
+from dnadesign.devtools.tests.support.usr import ensure_registry, register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.contracts import SchemaError
 from dnadesign.usr.src.datasets.merge import MergeColumnsMode, MergePolicy, merge_usr_to_usr

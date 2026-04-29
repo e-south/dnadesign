@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_models.py
 
 Compatibility facade for released-product snapback contracts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -59,8 +59,16 @@ from dnadesign.cruncher.snapback.released_spec_models import (
     ReleasedSnapbackOutputConfig,
     SingleNickReleasedSnapbackSpec,
 )
+from dnadesign.cruncher.snapback.screen_models import (
+    CoordinateFrameTransform,
+    SnapbackMechanismClass,
+    SnapbackMechanismLedgerEntry,
+    SnapbackScreenReport,
+    SnapbackScreenTargetTopology,
+)
 
 __all__ = [
+    "CoordinateFrameTransform",
     "ReleaseCatalogNormalizationInfo",
     "ReleaseCatalogSources",
     "ReleasedActiveStrand",
@@ -88,6 +96,10 @@ __all__ = [
     "ReleasedTargetSearchHit",
     "ReleasedTargetSearchMetadata",
     "ReleasedTargetSearchReport",
+    "SnapbackMechanismClass",
+    "SnapbackMechanismLedgerEntry",
+    "SnapbackScreenReport",
+    "SnapbackScreenTargetTopology",
     "SingleNickReleasedSnapbackSpec",
     "SingleNickReleasedTargetSearchRequest",
     "build_release_catalog_info",

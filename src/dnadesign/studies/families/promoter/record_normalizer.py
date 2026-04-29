@@ -339,7 +339,7 @@ def resolve_promoter_study_context(
     current_phase_is_known = current_phase in phase_index if current_phase is not None else False
     next_ready_phase = _first_phase_by_status(phase_states, status="ready")
     next_in_progress_phase = _first_phase_by_status(phase_states, status="in_progress")
-    next_planned_phase = _first_phase_by_status(phase_states, status="planned")
+    next_planned_phase = _first_phase_by_status(phase_states, status="planned", require_main_study_state=True)
     blocked_phases = tuple(phase for phase in phase_states if phase["status"] == "blocked_gpu")
 
     densegen_dataset_id = dependencies.string_or_none(
@@ -478,9 +478,18 @@ def _build_execution_surface_states(
     return execution_surface_states, missing_execution_surfaces
 
 
-def _first_phase_by_status(phases: list[dict[str, object]], *, status: str) -> dict[str, object] | None:
+def _first_phase_by_status(
+    phases: list[dict[str, object]],
+    *,
+    status: str,
+    require_main_study_state: bool | None = None,
+) -> dict[str, object] | None:
     for phase in phases:
         if str(phase.get("status") or "").strip() == status:
+            if require_main_study_state is not None:
+                is_required = bool(phase.get("required_for_main_study_state", True))
+                if is_required is not require_main_study_state:
+                    continue
             return dict(phase)
     return None
 

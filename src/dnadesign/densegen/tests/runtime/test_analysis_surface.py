@@ -5,7 +5,7 @@ src/dnadesign/densegen/tests/runtime/test_analysis_surface.py
 
 Coverage for the public DenseGen analysis-surface contract.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

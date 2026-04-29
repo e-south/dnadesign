@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-04-15
+  last_verified: 2026-04-28
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
   densegen:
@@ -15,27 +15,51 @@ study_pipeline:
     infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
     densegen_batch_with_notify: src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
     infer_batch_7b_with_notify:
-      anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
-      anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+      sequence_views_anchor_construct_insert: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml
+      sequence_views_context_forward_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+      sequence_views_context_reverse_complement_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
+      sequence_views_reference_analysis_window_core60: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml
+      sequence_views_reference_context_forward_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
+      sequence_views_reference_context_reverse_complement_seq_and_anchor_mean: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
     infer_batch_20b_with_notify:
       anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
       anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
   datasets:
     densegen_anchor_source: densegen_prom_eth_cip_source
+    sfxi_pdual10_densegen_source: usr_sfxi_pdual10_densegen_promoters
     merged_anchor_dataset: usr_prom_eth_cip_anchor
     construct_context_dataset: construct_prom_eth_cip_context
+    reference_native_dataset: usr_promoter_references
+    reference_core60_dataset: construct_prom_eth_cip_reference_core60
+    reference_context_dataset: construct_prom_eth_cip_reference_contexts
+    reference_feature_dataset: infer_prom_eth_cip_reference_views_7b
   infer:
-    preferred_model_family: evo2_20b
+    preferred_model_family: evo2_7b
     supported_model_families:
-      - evo2_20b
       - evo2_7b
+      - evo2_20b
+    infer_priority:
+      working_candidate_family: evo2_7b_full_context_anchor_mean_intermediate
+      conservative_baseline: evo2_7b_anchor_60bp_intermediate
+      challenger: none_currently_active
+      full_context_seq_mean_status: collect_for_diagnostic_not_primary_x
+      output_layer_mean_status: collect_for_diagnostic_not_primary_x
+      log_likelihood_status: collect_as_scalar_qc_not_primary_x
+      evo2_20b_status: secondary_debug_required
+      concat_status: retired_from_current_infer_and_latentdna_plan
     configs:
-      anchor_only_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
-      anchor_plus_template_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+      sequence_views_anchor_construct_insert_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
+      sequence_views_context_forward_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
+      sequence_views_context_reverse_complement_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
+      sequence_views_reference_analysis_window_core60_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml
+      sequence_views_reference_context_forward_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml
+      sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
       anchor_only_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
       anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
       full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
       full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
+      sequence_views_main_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml
+      sequence_views_reference_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference.evo2_7b.yaml
   latentdna:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md

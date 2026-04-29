@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/snapback/released_target_search.py
 Target-first paired nickase plus release-enzyme search for released-product
 snapback designs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

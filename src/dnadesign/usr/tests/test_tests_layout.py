@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/test_tests_layout.py
 
 Test layout contract for USR package decomposition.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

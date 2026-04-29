@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/support/resolution/dataset_targets.py
 
 CLI dataset-target resolution helpers shared by the USR entrypoint facade.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

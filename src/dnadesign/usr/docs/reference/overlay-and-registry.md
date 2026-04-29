@@ -1,7 +1,7 @@
 # USR overlay and registry contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-26
 
 
 ## Overlay merge semantics
@@ -36,6 +36,12 @@ All dataset mutations require a registry at the datasets root (`registry.yaml`).
 - `usr:namespace_contract_hash` hashes only the namespace id plus ordered column name/type pairs; owner and description remain catalog metadata, not compatibility inputs.
 - Opt into namespace-scoped validation explicitly with `--registry-mode namespace-current`, `namespace-frozen`, or `namespace-either`.
 
+Shared sequence-product namespaces currently tracked in the repo registry:
+
+- `usr_label`: canonical human-readable names and aliases
+- `seq_annot`: imported GenBank-backed source annotation overlays
+- `derived`: parent/child lineage, product kind, focal-selection, and feature-retention summaries
+
 Register namespace:
 
 ```bash
@@ -60,6 +66,34 @@ uv run usr maintenance registry-freeze densegen_demo
 
 Auto-freeze behavior: on first dataset mutation with a registry present, USR writes `_registry/registry.<hash>.yaml` and stamps `usr:registry_hash` into `records.parquet`.
 
+## Sequence-view sidecars
+
+Semantic sequence views are stored outside overlay parts in dataset-local sidecars:
+
+- path: `_views/sequence_views.parquet`
+- cardinality: many semantic views may reference one base `records.parquet.id`
+- authority: USR owns durable `view_id`, product kind, orientation, parent lineage, optional source intervals, and optional emitted anchor bounds
+- mutability: human aliases may grow, but a `view_id` collision with different semantic content is an error
+
+Conflict behavior is explicit-only:
+
+- `error`: reject any conflicting existing semantic row
+- `idempotent`: allow exact repeats
+- `replace`: rewrite an existing view row
+- `append_alias`: add human aliases only when the semantic key is unchanged
+
+Sequence views are additive metadata. They do not replace sequence-derived base ids, and they are not inferred implicitly by downstream tools.
+
+Merged anchor handoffs should use product kinds conservatively. For example,
+`usr_prom_eth_cip_anchor` is a construct-ready promoter-insert handoff, so its
+dataset-local sequence-view sidecar uses one `construct_insert` view per base
+row with `context_kind=anchor_only` and `recommended_pooling=seq_mean`. Rows
+that came from `construct_prom_eth_cip_reference_core60` keep
+`analysis_only=true` and parent lineage, but the merged handoff does not
+relabel every native or designed 60 bp row as `analysis_window`. The source
+`construct_prom_eth_cip_reference_core60` dataset remains the authoritative
+surface for true derived analysis-core products.
+
 ## Design contracts
 
 - Canonical essentials are stable: `id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`.
@@ -67,6 +101,15 @@ Auto-freeze behavior: on first dataset mutation with a registry present, USR wri
 - Writes are atomic; snapshots are written under `_snapshots/`.
 - Tombstones are logical (`usr__deleted`, `usr__deleted_at`, `usr__deleted_reason`) and hidden by default.
 - `usr_state` fields are standardized and registry-governed.
+
+Explicit propagation rule for downstream tools:
+
+- carry a namespace unchanged only when the downstream dataset can preserve the same key and semantics
+- project a namespace only with an explicit coordinate or id transform
+- summarize rich source metadata into downstream overlays when exact carry-through would be misleading
+- drop a namespace intentionally when the downstream product no longer supports it
+
+Construct and Infer must not assume rich overlays or sequence-view semantics propagate automatically through merge/materialize paths.
 
 ## Next steps
 

@@ -21,7 +21,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.testsupport.usr import ensure_registry, register_test_namespace
+from dnadesign.devtools.tests.support.usr import ensure_registry, register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.contracts import TransferError

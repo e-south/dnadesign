@@ -6,7 +6,7 @@ src/dnadesign/usr/src/datasets/lifecycle/__init__.py
 Dataset lifecycle helper package for registry freeze/state and write-session
 coordination.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

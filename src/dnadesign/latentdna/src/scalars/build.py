@@ -20,8 +20,8 @@ from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_table, write_table
 from ..labels import humanize_label
 from ..metrics.definitions import resolve_metric_definition, validate_metric_registry
-from ..sources.resolver import read_records_table, resolve_source
-from ..views.materialize import _promoter_metadata_value
+from ..sources.resolver import inspect_source_schema, read_records_table, resolve_source
+from ..views.promoter_metadata import _promoter_metadata_value
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
 from .common import (
@@ -62,6 +62,18 @@ def _scalar_table_path(context: WorkspaceContext, scalar_id: str) -> Path:
     if not path.is_file():
         raise MissingArtifactError(f"scalar artifact is missing for scalar.build: {scalar_id}")
     return path
+
+
+def _ordered_dataset_overview_categories(
+    counts: Counter[str],
+    category_order: list[tuple[str, int]],
+) -> list[tuple[str, int]]:
+    ordered = list(category_order)
+    known = {category for category, _ in ordered}
+    next_order = max((order for _, order in ordered), default=0) + 1
+    for offset, category in enumerate(sorted(set(counts) - known, key=str.casefold)):
+        ordered.append((category, next_order + offset))
+    return ordered
 
 
 def _neighbor_paths(context: WorkspaceContext, neighbor_id: str) -> tuple[Path, Path, Path]:
@@ -1626,6 +1638,7 @@ def build_scalar_artifact(
         for source_id in source_ids:
             source = context.require_source(source_id)
             resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
+            available_columns = set(inspect_source_schema(resolved)["columns"])
             population_key = source.subject_key or source.record_key
             required_columns = list(
                 dict.fromkeys(
@@ -1633,11 +1646,16 @@ def build_scalar_artifact(
                         source.record_key,
                         population_key,
                         "usr_label__primary",
+                        "sequence",
                         "densegen__plan",
                         "densegen__required_regulators",
+                        "densegen__used_tfbs_detail",
+                        "seq_annot__features",
+                        "derived__features_retained",
                     ]
                 )
             )
+            required_columns = [column for column in required_columns if column in available_columns]
             table = read_records_table(resolved, columns=required_columns)
             inputs.append(ScalarInputRef(kind="source", artifact_id=source_id, path=resolved.records_path))
             row_dicts = table.to_pylist()
@@ -1673,12 +1691,13 @@ def build_scalar_artifact(
         assert denominator is not None
         for dimension, dimension_label, _, category_order in dimension_specs:
             counts = canonical_counts[dimension]
-            dimension_total = sum(int(counts.get(category, 0)) for category, _ in category_order)
+            ordered_categories = _ordered_dataset_overview_categories(counts, category_order)
+            dimension_total = sum(int(counts.get(category, 0)) for category, _ in ordered_categories)
             if dimension_total != denominator:
                 raise ContractViolationError(
                     f"dataset_overview dimension {dimension!r} sums to {dimension_total}, expected {denominator}"
                 )
-            for category, order in category_order:
+            for category, order in ordered_categories:
                 count = int(counts.get(category, 0))
                 fraction = count / float(denominator)
                 output_rows.append(

@@ -5,7 +5,7 @@ src/dnadesign/usr/src/overlays/paths.py
 
 Overlay path and directory enumeration helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

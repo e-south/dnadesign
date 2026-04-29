@@ -1,7 +1,7 @@
 # USR schema contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-04-27
 
 
 ## Core schema
@@ -44,10 +44,22 @@ Conventional cross-tool label namespace:
 - Use `usr_label__aliases` for stable alternate names or legacy labels.
 - Use tool-specific namespaces for tool provenance, not for the canonical human label itself.
 
+Additive shared namespaces used by the current sequence-product contract:
+
+| namespace | purpose | notable columns |
+| --- | --- | --- |
+| `usr_label` | canonical human-readable names and aliases | `usr_label__primary`, `usr_label__aliases` |
+| `seq_annot` | source-faithful imported annotation overlays | `seq_annot__source_sha256`, `seq_annot__record_id`, `seq_annot__features` |
+| `derived` | parent/child lineage and derived-product semantics | `derived__parent_id`, `derived__product_kind`, `derived__source_interval_*`, `derived__features_*` |
+
+`seq_annot__features` preserves imported feature order, raw location text, normalized 0-based half-open intervals where available, qualifier multiplicity, and confidence for fuzzy or unsupported source locations.
+
+`derived__features_retained`, `derived__features_clipped`, and `derived__features_lost` summarize how parent annotations survive derived sequence products such as `analysis_window` windows or template-expanded contexts.
+
 Dataset id naming convention:
 
 - Prefer the least-coupled semantic id that still makes the dataset obvious to operators.
-- Flat ids are first-class: examples include `usr_mg1655_promoter_controls`, `usr_pdual10_plasmid_template`, and `anchor_template_slot_a_window_1kb_demo`.
+- Flat ids are first-class: examples include `usr_promoter_references`, `usr_pdual10_plasmid_template`, and `anchor_template_slot_a_window_1kb_demo`.
 - Namespace-qualified ids remain valid when they genuinely improve disambiguation.
 - Avoid encoding the producing tool name in the dataset id when the dataset is intended to be consumed across sibling packages.
 
@@ -69,6 +81,41 @@ Parquet key/value metadata for derived overlays:
 - `usr:overlay_created_at`
 - `usr:registry_hash`
 - `usr:namespace_contract_hash`
+
+## Sidecars and semantic aliases
+
+USR keeps the base `records.parquet` schema stable and stores richer semantic view identity in additive sidecars.
+
+- Dataset-local sequence views live at `_views/sequence_views.parquet`.
+- Optional mutable view semantics live at `_views/view_semantics.parquet`.
+- `view_id` identifies a semantic sequence product/view, not a base sequence row.
+- Multiple `view_id` values may point to the same `id` in `records.parquet`.
+- Sequence views carry product kind, orientation, parent lineage, optional source intervals, optional emitted anchor bounds, and recommended pooling metadata.
+- Human labels and aliases are mutable metadata on the view row; they are not part of the stable semantic hash.
+- The view-semantics addendum is keyed by `view_id` and can carry `source_family`,
+  `selection_basis`, `view_collections`, and `role_tags` without changing stable
+  view identity. It is the right place for study cohort membership; do not
+  encode cohort membership by inventing misleading `product_kind` values.
+
+This separation allows provenance-faithful native records, analysis-only cores, and forward or reverse-complement construct contexts to alias the same base sequence when the literal sequence string collides.
+
+Current product-kind vocabulary:
+
+- `source_record`: source-faithful imported record.
+- `selected_region`: explicitly selected biological insert from a source record.
+- `construct_insert`: construct-ready promoter/anchor row in a merged handoff dataset.
+- `analysis_window`: Construct-derived 60 bp analysis-only comparability view.
+- `realized_context`: Construct-realized emitted context; `orientation` and
+  length distinguish forward 1 kb pDual contexts from reverse-complement
+  contexts.
+
+Product kind describes the sequence product's lineage and semantics, not every
+downstream analysis cohort. A natively 60 bp promoter insert remains a
+`construct_insert`; it must not be duplicated or relabeled as `analysis_window`
+solely because it is 60 bp. `analysis_window` is reserved for rows Construct
+derived by trimming/windowing or template-expanding around an explicit focal
+rule. Exact 60 bp `seq_mean` and `core60_mean` equivalence belongs to Infer's
+feature-alias layer, not to USR base rows.
 
 ## Next steps
 

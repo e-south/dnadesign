@@ -42,7 +42,7 @@ It is a policy map with links to operator runbooks and implementation details.
   - `detect-private-key`
   - `detect-secrets` with `.secrets.baseline`
 - CI enforces secrets hygiene as a blocking lane (`.github/workflows/ci.yaml`):
-  - `dnadesign.devtools.secrets_baseline_check` verifies `.secrets.baseline` paths still exist in the repo tree.
+  - `dnadesign.devtools.security.secrets_baseline` verifies `.secrets.baseline` paths still exist in the repo tree.
   - `pre-commit run detect-secrets --all-files` scans the full tracked tree against baseline policy.
 - Core CI lane runs pre-commit checks on PR diff or full tree (`.github/workflows/ci.yaml`).
 - CI validates workflow definitions using `check-github-workflows` via pre-commit configuration.

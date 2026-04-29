@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/support/wiring/dependencies.py
 
 USR CLI dependency-builder wiring for the entrypoint facade.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,11 +1,11 @@
 ## Evo2 Provider Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-04-28
 
-Use this page for the repo-aligned Evo2 promoter feature contract inside `infer`.
+Use this page for the repo-aligned Evo2 sequence-feature contract inside `infer`.
 
-### Supported promoter lane set
+### Supported Evo2 lanes
 
 - `evo2_7b`
 - `evo2_20b`
@@ -14,7 +14,7 @@ Use this page for the repo-aligned Evo2 promoter feature contract inside `infer`
 
 ### Project default intermediate selector
 
-`infer` uses a model-aware project default for promoter feature extraction.
+`infer` uses a model-aware project default for sequence-feature extraction.
 
 - this is a repo default, not a universal scientific claim
 - `evo2_7b` uses block `26` because public Evo 2 interpretability work examined layer 26 and reported biologically meaningful features there; see [Interpreting Evo 2](https://www.goodfire.ai/research/interpreting-evo-2)
@@ -34,7 +34,7 @@ The bundle resolves that to a model-aware canonical selector:
 
 ### Feature groups
 
-Default promoter bundles collect all three groups:
+Default feature bundles collect all three groups:
 
 - `log_likelihood`
 - `output_layer_mean`
@@ -50,20 +50,27 @@ Interpret these names as feature families, not persisted tensor shapes:
 
 ### Pooling modes
 
-For promoter bundles, `infer` uses:
+For feature bundles, `infer` uses:
 
 - `seq_mean`: mean across the full resolved sequence
 - `anchor_mean`: mean across the anchor span inside a templated context
+- `core60_mean`: explicit 60 bp analysis-core pooling for sequence-view bundles
 
 Rules:
 
 - `anchor_only` contexts emit `seq_mean` only
 - templated contexts emit both `seq_mean` and `anchor_mean`
+- sequence-view bundles emit the union of the row-level pooling operations requested by `sequence_view_inputs[]`
 - tokenwise tensors are pooled in memory and discarded; tokenwise persistence is not part of the v1 repo-aligned contract
 
 When writing to USR, the persisted outputs for `output_layer_mean` and
 `intermediate_embedding` are the pooled summaries. The pooling mode is part of
 the stored semantic id, for example `seq_mean` or `anchor_mean`.
+For explicit 60 bp sequence views, `core60_mean` is semantically distinct from
+`seq_mean` and receives a distinct feature-vector key. Exact repeated input
+sequences can still share one Evo2 forward pass through the `forward_pass_key`.
+A natively 60 bp `construct_insert` should stay an anchor insert in USR, while a
+true `analysis_window` row means Construct derived a 60 bp analysis-only view.
 
 ### Context ownership
 
@@ -71,7 +78,7 @@ the stored semantic id, for example `seq_mean` or `anchor_mean`.
 - `infer` reads that metadata and computes feature pooling
 - `infer` does not build templates internally
 
-Templated promoter bundles require these construct columns alongside the resolved sequence:
+Templated context bundles require these construct columns alongside the resolved sequence:
 
 - `construct__context_id`
 - `construct__template_id`
@@ -84,7 +91,7 @@ The generic USR persistence contract remains:
 
 - `infer__<model_id>__<job_id>__<out_id>`
 
-Promoter bundles emit stable out ids such as:
+Feature bundles emit stable out ids such as:
 
 - `log_likelihood__total`
 - `log_likelihood__mean_per_token`
@@ -98,6 +105,7 @@ Promoter bundles emit stable out ids such as:
 Read these ids literally:
 
 - `output_layer_mean__seq_mean` is the mean-pooled final-layer embedding across sequence positions
+- `output_layer_mean__core60_mean` is the explicit 60 bp analysis-core mean-pooling surface for sequence-view bundles
 - `intermediate_embedding__block26_mlp_out__seq_mean` is the mean-pooled 7B block-26 representation across sequence positions
 - `intermediate_embedding__block23_mlp_out__seq_mean` is the mean-pooled 20B block-23 representation across sequence positions
 - bare names such as `output_layer_mean` or `intermediate_embedding` are bundle categories, not raw persisted tensors

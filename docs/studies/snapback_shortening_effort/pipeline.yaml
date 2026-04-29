@@ -19,17 +19,17 @@ intent:
 
 command_groups:
   - id: snapback_released_probe
-    purpose: Confirm the allowed-policy exact-hit versus near-hit posture for the released-product 0/3/3 lane against the real release-enzyme catalog before any mutating solve run.
+    purpose: Confirm the allowed-policy exact-hit versus near-hit posture for the released-product 0/3/3 lane against the real release-enzyme catalog with the Type IIS release enzyme pinned to BspQI before any mutating solve run.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
     validation_role: read_only_probe
     commands:
-      - uv run cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --nick-boundary 0 --paired-bp 3 --cap-nt 3 --json
+      - uv run cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --json
   - id: snapback_released_solve
-    purpose: Materialize the whole-catalog allowed released-product exact-hit bundle, or the bounded near-hit fallback when exact hits are absent, and emit one plot per hit after the read-only probe is clean.
+    purpose: Materialize the BspQI-pinned released-product exact-hit bundle, or the bounded near-hit fallback when exact hits are absent, and emit one plot per hit after the read-only probe is clean.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
     mutates_outputs: true
     commands:
-      - uv run cruncher snapback released-solve --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --nick-boundary 0 --paired-bp 3 --cap-nt 3 --run-dir outputs/released_solve --materialize-top-k 8 --render-format pdf --emit-renders --force-overwrite --json
+      - uv run cruncher snapback released-solve --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --run-dir outputs/released_solve --materialize-top-k 16 --render-format pdf --emit-renders --force-overwrite --json
   - id: snapback_released_invalid_bundle_audit
     purpose: Revalidate the checked-in downstream-BspQI explicit spec as a degenerate-prefix-aware nonnegative-origin audit fixture. This path is expected to report invalid_precursor rather than a green bundle.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033

@@ -1,0 +1,20 @@
+version: 2
+path_base: repo
+campaign_id: regulondb_native_promoter_panel
+steps:
+  - label: regulondb-source-inventory
+    registry_id: usr.data-plane.promoter-study-status
+    inputs:
+      study_dir: repo:docs/studies/regulondb_native_promoter_panel
+      source_contract: repo:src/dnadesign/cruncher/src/ingest/promoters.py
+  - label: cruncher-promoter-export
+    registry_id: usr.data-plane.promoter-study-status
+    inputs:
+      export_contract: repo:src/dnadesign/cruncher/src/ingest/promoters.py
+      output_status: local_validated_untracked
+  - label: usr-ingest-dry-run
+    registry_id: usr.data-plane.promoter-study-preflight
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: usr_regulondb_native_promoters
+      import_script: repo:src/dnadesign/usr/scripts/create_regulondb_native_promoters.py

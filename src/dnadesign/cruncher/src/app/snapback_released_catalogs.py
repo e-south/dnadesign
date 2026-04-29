@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/snapback_released_catalogs.py
 
 Shared catalog resolution helpers for released-product Snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

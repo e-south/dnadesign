@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_solve_models.py
 
 Report and solve materialization contracts for released-product snapback.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -31,6 +31,7 @@ from dnadesign.cruncher.snapback.released_route_policy import (
     infer_released_search_final_geometry_source,
     normalize_active_strand_list,
     normalize_route_family_list,
+    normalize_variant_id_list,
     normalize_warning_code_list,
 )
 from dnadesign.cruncher.snapback.released_search_models import ReleasedTargetSearchHit, ReleasedTargetSearchReport
@@ -122,6 +123,7 @@ class ReleasedSolveReportMetadata(StrictSnapbackModel):
     nick_catalog_source: str
     release_catalog_source: str
     disallowed_nickase_warning_codes: list[str] = Field(default_factory=list)
+    allowed_release_variant_ids: list[str] = Field(default_factory=list)
     allowed_active_strands: list[ReleasedActiveStrand] = Field(default_factory=list)
     allowed_route_families: list[ReleasedRouteFamily] = Field(default_factory=list)
     evaluated_pair_count: int = Field(ge=0)
@@ -138,6 +140,11 @@ class ReleasedSolveReportMetadata(StrictSnapbackModel):
     @classmethod
     def _validate_solve_disallowed_nickase_warning_codes(cls, value: list[str]) -> list[str]:
         return normalize_warning_code_list(value, label="metadata.disallowed_nickase_warning_codes")
+
+    @field_validator("allowed_release_variant_ids")
+    @classmethod
+    def _validate_solve_allowed_release_variant_ids(cls, value: list[str]) -> list[str]:
+        return normalize_variant_id_list(value, label="metadata.allowed_release_variant_ids")
 
     @field_validator("allowed_active_strands")
     @classmethod

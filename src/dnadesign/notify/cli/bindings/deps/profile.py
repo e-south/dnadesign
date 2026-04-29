@@ -16,9 +16,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ....core.errors import NotifyConfigError
 from ....delivery.secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from ....delivery.validation import resolve_tls_ca_bundle, resolve_webhook_url, validate_provider_webhook_url
-from ....errors import NotifyConfigError
 from ....profiles.flows import create_wizard_profile as _create_wizard_profile_flow
 from ....profiles.flows import resolve_profile_path_for_wizard as _resolve_profile_path_for_wizard
 from ....profiles.policy import DEFAULT_PROFILE_PATH as _DEFAULT_PROFILE_PATH

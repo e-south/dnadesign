@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_spec_models.py
 
 Explicit spec-side contracts for released-product snapback.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 _DENSEGEN_PROFILE_PRESET = {
     "only_actions": "densegen_health,densegen_flush_failed,materialize",

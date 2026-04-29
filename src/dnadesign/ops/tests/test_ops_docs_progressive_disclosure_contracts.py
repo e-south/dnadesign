@@ -206,6 +206,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "--project <project>" in text
     assert "--preset bu-scc-dunlop" in text
     assert "uv run ops runbook presets" in text
+    assert "uv run ops runbook fill-infer --study-dir docs/studies/<study-id>" in text
     assert "uv run ops runbook active-jobs" in text
     assert "ops runbook diagnostics session-counts" in text
     assert "--allow-unknown-active-jobs" in text
@@ -240,14 +241,14 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "model.parallelism" in text
     assert "gpu_capability=8.9 -> 45.0 GiB" in text
     assert "gpu_capability=9.0 -> 80.0 GiB" in text
-    assert "including overlays that arrived through explicit USR merge carry" in text
-    assert "passes `--overwrite` to `infer run`" in text
+    assert "does not render `usr-overlay-guard`" in text
+    assert "does not pass `INFER_RUN_ARGS=--overwrite`" in text
     assert "without implicitly pruning the namespace" in text
     assert "python -m dnadesign.ops.orchestrator.gates" not in text
     assert "--mode fresh --allow-fresh-reset" in text
     assert "--no-discover-active-jobs" in text
     assert "operator-visible warning" in text
-    assert "infer.overlay_guard.overlay_namespace` is fixed to `infer`" in text
+    assert "skips non-sequence-view Infer runbooks before SGE plan rendering" in text
     assert "densegen_batch_with_notify" in text
     assert "infer_batch_with_notify" in text
     assert "project: <project>" in text
@@ -299,6 +300,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "uv run ops progress scaffold <registry-id> ..." in text
     assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
+    assert "uv run ops runbook fill-infer --study-dir docs/studies/<study-id>" in text
     assert "prints to stdout unless you pass `--out`" in text
     assert "### Common examples" in text
     assert "### Cross-tool procedures" in text
@@ -374,7 +376,7 @@ def test_dev_docs_index_is_action_oriented() -> None:
         label="docs/dev/README.md",
     )
     assert "journal.md" in text
-    assert "uv run python -m dnadesign.devtools.docs_checks --repo-root ." in text
+    assert "uv run python -m dnadesign.devtools.docs.checks --repo-root ." in text
     assert "for agents" not in text.lower()
     assert "for humans" not in text.lower()
 

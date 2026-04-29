@@ -1,7 +1,7 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-15
+**Last verified:** 2026-04-28
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
@@ -28,7 +28,7 @@ Core sections:
 
 Implemented schema slices:
 
-- Sources: `usr`, `parquet`, and `matrix_bundle`
+- Sources: `usr`, `parquet`, `matrix_bundle`, `infer_feature_sidecar`, and `infer_feature_scalar_sidecar`
 - Views: source-backed `vector.kind: column` and `vector.kind: bundle_matrix`, plus derived `vector_difference`, `normalize`, `aggregate_by_key`, `apply_reducer`, and `concatenate`
 - Alignments: named `intersection` support over `record_key`, `subject_key`, or explicit key columns
 - Scalars: `vector_norm`, safe `column_expression`, `select_columns`, `rename_columns`, and `join_tables`
@@ -67,6 +67,34 @@ Current runtime limits:
 - `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
 - `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
 - `validate workspace --deep` currently performs schema-only pressure checks against declared sources, views, cohorts, landmarks, and the bound study directory without loading embedding payloads.
+- `infer_feature_sidecar` sources expose canonical Infer outputs from
+  `<usr-dataset>/_derived/infer/feature_aliases.parquet` joined to
+  `feature_vectors.parquet`, `_views/sequence_views.parquet`, mutable
+  `_views/view_semantics.parquet`, and the owning USR dataset rows. These
+  sources make `value` the vector column and keep sequence-view fields such as
+  `view_id`, `product_kind`, `orientation`, `recommended_pooling`,
+  `source_family`, `selection_basis`, and `view_collections` available as row
+  metadata. Missing vector sidecar files expose a zero-row schema so planned
+  vector sources can be declared before Infer has produced rows. Alias rows
+  that reference absent vector keys still fail validation.
+- `infer_feature_scalar_sidecar` sources expose canonical Infer scalar outputs
+  from `<usr-dataset>/_derived/infer/feature_scalar_aliases.parquet` joined to
+  `feature_scalars.parquet`, `_views/sequence_views.parquet`, mutable
+  `_views/view_semantics.parquet`, and the owning USR dataset rows. These
+  sources make `value` the scalar column for diagnostics such as
+  `log_likelihood__total` and `log_likelihood__mean_per_token`. Missing scalar
+  sidecar files expose a zero-row schema so planned scalar sources can coexist
+  with partial feature datasets without pretending the scalar evidence is
+  present.
+- Source-backed views with `role: planned` or `role: retired` are skipped by
+  deep vector-column checks and omitted from notebook geometry controls. This
+  is a visible degraded contract for upstream feature gaps; planned or retired
+  views must not be treated as materialized evidence until their source sidecars
+  contain matching rows.
+- When a materialized view artifact was built from an older source/vector
+  declaration, deep validation reports `materialized_contract_status:
+  stale_source_contract` instead of silently accepting the old rows as current.
+  Refresh the view artifact before using downstream plots as current evidence.
 - Deliverable loading now rejects declared outputs that the linked recipe does not actually produce, including config-backed outputs such as `views`, `scalars`, `reducers`, `reduced_views`, and `exports`.
 - Deliverables must now declare explicit semantic fields in config. The runtime no longer hydrates missing `title`, `summary`, `question`, or `section` from legacy `description` and `kind` fields.
 - Deliverable status and run inventory now use recorded input and source digests where available, including export and alignment manifests with explicit path-backed provenance.

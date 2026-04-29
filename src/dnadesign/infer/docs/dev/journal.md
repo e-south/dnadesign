@@ -1186,7 +1186,7 @@ Deterministic path for each slice:
 - `uv run pytest -q src/dnadesign/infer/tests/test_extract_ingest_helper.py src/dnadesign/infer/tests/test_generate_ingest_helper.py src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_usr_writeback_contract.py`
 - `uv run pytest -q src/dnadesign/infer/tests/test_cli_builders.py`
 - `uv run pytest -q src/dnadesign/infer/tests/test_cli_builders.py src/dnadesign/infer/tests/test_presets.py src/dnadesign/infer/tests/test_extract_ingest_helper.py src/dnadesign/infer/tests/test_generate_ingest_helper.py src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
 - `uv run pytest -q src/dnadesign/infer/tests`
 
 ### Task Board
@@ -1228,7 +1228,7 @@ Deterministic path for each slice:
 
 - `uv run pytest -q src/dnadesign/infer/tests/test_cli_ingest.py`
 - `uv run pytest -q src/dnadesign/infer/tests/test_cli_ingest.py src/dnadesign/infer/tests/test_cli_builders.py src/dnadesign/infer/tests/test_presets.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
-- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
 
 ### Information Architecture Update
 
@@ -1272,7 +1272,7 @@ Deterministic path for each slice:
 
 - `uv run pytest -q src/dnadesign/infer/tests/test_cli_requests.py`
 - `uv run pytest -q src/dnadesign/infer/tests/test_cli_requests.py src/dnadesign/infer/tests/test_cli_ingest.py src/dnadesign/infer/tests/test_cli_builders.py src/dnadesign/infer/tests/test_presets.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
-- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
 
 ### Information Architecture Update
 
@@ -1317,7 +1317,7 @@ Reduce `infer` top-level module sprawl and align package shape with sibling prog
 ### Verification evidence
 
 - `uv run pytest -q src/dnadesign/infer/tests/test_source_tree_contracts.py src/dnadesign/infer/tests/test_wrapper_contracts.py src/dnadesign/infer/tests/test_docs_information_architecture_contracts.py`
-- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
 - `uv run infer --help`
 
 ### Notes / remaining opportunities
@@ -1326,7 +1326,7 @@ Reduce `infer` top-level module sprawl and align package shape with sibling prog
 - Next decoupling slice should split `src/cli.py` command handlers into `src/cli_commands/` to reduce command-path coupling while preserving CLI contracts.
 - Additional verification rerun (unfiltered infer suite):
   - `uv run pytest -q src/dnadesign/infer/tests`
-  - `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+  - `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 
 ## 2026-03-06 - Phase 2 Slice C (CLI Package + Test Area Modularization)
 
@@ -1364,7 +1364,7 @@ Reduce internal `infer/src` flatness by introducing a dedicated `src/cli/` packa
 
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/cli/test_builders.py src/dnadesign/infer/tests/cli/test_ingest.py src/dnadesign/infer/tests/cli/test_requests.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer --help`
 - `uv run python -m dnadesign.infer --help`
 
@@ -1410,7 +1410,7 @@ Further reduce CLI monolith coupling by splitting `src/cli/app.py` command bodie
 
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/cli src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer --help`
 - `uv run python -m dnadesign.infer --help`
 
@@ -1455,7 +1455,7 @@ Apply next two IA quality increments:
 
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/runtime src/dnadesign/infer/tests/contracts src/dnadesign/infer/tests/cli src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer --help`
 - `uv run python -m dnadesign.infer --help`
 
@@ -1503,7 +1503,7 @@ Apply the next two decoupling increments:
 
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py src/dnadesign/infer/tests/runtime/test_generate_ingest_helper.py src/dnadesign/infer/tests/cli/test_console.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer --help`
 - `uv run python -m dnadesign.infer --help`
 
@@ -1522,7 +1522,7 @@ Run an end-to-end maintainer audit for infer shipping readiness, then harden hig
 
 - Baseline suites:
   - `uv run pytest -q src/dnadesign/infer/tests`
-  - `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+  - `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - Primary CLI usage-path checks:
   - `uv run infer validate config --config src/dnadesign/infer/config.yaml`
   - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
@@ -1576,7 +1576,7 @@ Run an end-to-end maintainer audit for infer shipping readiness, then harden hig
 
 - `uv run pytest -q src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer validate config --config src/dnadesign/infer/config.yaml`
 - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
 - `uv run infer validate config --config /tmp/infer_bad_extra.yaml` (now explicit failure, exit `2`)
@@ -1627,7 +1627,7 @@ Reduce implicit coupling in adapter registration and remove hidden config fallba
 
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_registry_bootstrap_contracts.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/cli/test_adapters_commands.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer validate config --config src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
 - `uv run infer adapters list`
 
@@ -1687,7 +1687,7 @@ Add an explicit infer workspace harness path so pressure-test runs are easier to
 
 - `uv run pytest -q src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer workspace where`
 - `uv run infer workspace init --id demo_tmp --root <tmp>`
 - `uv run infer validate config --config src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
@@ -1708,7 +1708,7 @@ Confirm workspace intent for end-to-end pressure-test demos and remove high-sign
 - Scope: `src/dnadesign/infer` (`src/`, `docs/`, `tests/`, CLI user path).
 - Baseline verification before fixes:
   - `uv run pytest -q src/dnadesign/infer/tests`
-  - `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+  - `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - Baseline cruft scan:
   - 35 infer `src/*.py` headers still contained `<dnadesign project>` template token.
   - docs outside `docs/dev/journal.md` were already mostly aligned with new module layout.
@@ -1753,7 +1753,7 @@ Confirm workspace intent for end-to-end pressure-test demos and remove high-sign
 
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_src_headers_do_not_use_template_project_placeholder src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py::test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 - `uv run infer workspace init --id test_stress_ethanol --root <tmp>`
 - `uv run infer validate config --config <tmp>/test_stress_ethanol/config.yaml`
 
@@ -1810,7 +1810,7 @@ Clarify infer UX for workspace-local datasets (not only USR) and harden config-d
 - `uv run pytest -q src/dnadesign/infer/tests/cli/test_config_inputs.py src/dnadesign/infer/tests/cli/test_validate_command.py`
 - `uv run pytest -q src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
 
 ### Notes / next opportunities
 
@@ -1868,7 +1868,7 @@ Address open infer Codex PR critique(s), harden `infer run` mode ergonomics with
 - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py -k minimal_top_level_surface`
 - `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/package/test_source_tree_contracts.py`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k infer`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k infer`
 
 ### Notes / next opportunities
 
@@ -1931,7 +1931,7 @@ Remove workspace-init portability footguns by making local-file scaffolds the de
 - `uv run infer workspace where`
 - `uv run infer workspace where --profile usr-pressure`
 - `uv run pytest -q src/dnadesign/infer/tests`
-- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k infer`
+- `uv run pytest -q src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k infer`
 
 ### Notes / next opportunities
 
@@ -2062,7 +2062,7 @@ while preserving 7B support and allowing 40B pressure tests.
 - Validation gates per increment:
   - `uv run pytest -q src/dnadesign/infer/tests`
   - `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_sge_gates.py -k infer`
-  - `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_events_source.py -k infer`
+  - `uv run pytest -q src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/notify/tests/events/test_source.py -k infer`
 - Risk controls:
   - keep infer reset strictly column-scoped and opt-in.
   - no implicit mode fallback.
@@ -3171,7 +3171,7 @@ After refactor, same benchmark and workload:
 
 1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
 2. `uv run pytest -q src/dnadesign/infer/tests`
-3. `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer or workspace"`
+3. `uv run pytest -q src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer or workspace"`
 
 ## 2026-03-07 - Phase 2 Slice AG (Ops/Infer Boundary Decoupling + Generic Infer Overlay Guard Routing)
 
@@ -3296,9 +3296,9 @@ Observed effect: approximately `15.9x` lower mean runtime for subset-id ingest p
 
 ### Verification commands
 
-1. `uv run pytest -q src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/test_workflow_policy_module.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k 'infer' src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/cli/test_common.py`
-2. `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_cli_profile_init.py src/dnadesign/notify/tests/test_cli_setup.py src/dnadesign/notify/tests/test_cli_usr_events.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py src/dnadesign/infer/tests/runtime/test_generate_ingest_helper.py src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/cli/test_common.py`
-3. `uv run pytest -q src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py`
+1. `uv run pytest -q src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/profiles/test_workflow_policy_module.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k 'infer' src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/cli/test_common.py`
+2. `uv run pytest -q src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/notify/tests/cli/test_profile_init.py src/dnadesign/notify/tests/cli/test_setup.py src/dnadesign/notify/tests/cli/test_usr_events.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py src/dnadesign/infer/tests/runtime/test_generate_ingest_helper.py src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/cli/test_common.py`
+3. `uv run pytest -q src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py`
 4. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests src/dnadesign/notify/tests`
 
 ## 2026-03-07 - Phase 2 Slice AI (Risk Closure: Canonical Infer Naming + Alias Removal)
@@ -3337,7 +3337,7 @@ Close outstanding coupling risks by removing legacy `infer_evo2` naming from not
 
 ### Verification commands
 
-1. `uv run pytest -q src/dnadesign/notify/tests/test_tool_events_registry.py src/dnadesign/notify/tests/test_tool_events.py src/dnadesign/notify/tests/test_package_layout.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_cli_profile_init.py src/dnadesign/notify/tests/test_cli_setup.py src/dnadesign/notify/tests/test_hpc_notify_watch_qsub.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer or tool_events or workspace"`
+1. `uv run pytest -q src/dnadesign/notify/tests/tool_events/test_registry.py src/dnadesign/notify/tests/tool_events/test_tool_events.py src/dnadesign/notify/tests/package/test_layout.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/notify/tests/profiles/test_workflow_policy_module.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/cli/test_profile_init.py src/dnadesign/notify/tests/cli/test_setup.py src/dnadesign/notify/tests/hpc/test_watch_qsub.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer or tool_events or workspace"`
 2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests src/dnadesign/notify/tests`
 
 ## 2026-03-07 - Phase 2 Slice AJ (Infer/Ops Contract Hardening + Codex Comment Closure)
@@ -3389,8 +3389,8 @@ Close still-valid Codex review findings for infer/ops contracts while keeping be
 
 1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/runtime/test_capacity_planner.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
 2. `uv run pytest -q src/dnadesign/infer/tests`
-3. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py -k "infer or workspace or policy"`
-4. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/notify/tests/profiles/test_workflow_policy_module.py -k "infer or workspace or policy"`
+4. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`
 
 ### Contract impact
 
@@ -3452,8 +3452,8 @@ Observed effect: import-time coupling to GPU runtime stack was removed from infe
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/infer/tests/package/test_wrapper_contracts.py::test_infer_import_does_not_eagerly_load_gpu_runtime_modules src/dnadesign/ops/tests/test_runbook_orchestrator.py::test_ops_plan_import_does_not_eagerly_load_gpu_runtime_modules src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py::test_run_preset_requires_usr_dataset_flag`
-2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py`
-3. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/profiles/test_workspace_source.py src/dnadesign/notify/tests/profiles/test_workflow_policy_module.py`
+3. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`
 
 ### Contract impact
 
@@ -3794,7 +3794,7 @@ Observed effect: filtered guard reads remove repeated whole-overlay scans and ma
 1. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k "overwrite_guard_reads_only_requested_ids or interrupted_partial_write"`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_mode_auto_selects_fresh_when_only_usr_registry_exists or infer_mode_auto_selects_resume_when_infer_overlay_exists or infer_mode_resume_raises_without_resume_artifacts or infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist"`
 3. `uv run pytest -q src/dnadesign/infer/tests`
-4. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+4. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -3849,7 +3849,7 @@ Close the infer mode-selection gap where ops only probed workspace-local USR ove
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous or infer_mode_auto_selects_resume_when_infer_overlay_exists or infer_mode_auto_selects_fresh_when_only_usr_registry_exists or infer_mode_resume_raises_without_resume_artifacts or infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist"`
-2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -3895,7 +3895,7 @@ Address remaining mode-resolution coupling by replacing densegen/infer condition
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "mode_decision_raises_when_runbook_has_no_workload_blocks or mode_decision_raises_when_runbook_has_multiple_workload_blocks or infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous or mode_auto_selects_fresh_without_artifacts"`
-2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -3942,7 +3942,7 @@ Complete the next ops decoupling increment by moving mode-tool adapter policy ou
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "mode_tool_adapters_cover_all_schema_workflow_ids or mode_decision_raises_when_runbook_has_no_workload_blocks or mode_decision_raises_when_runbook_has_multiple_workload_blocks or infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous"`
-2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4005,7 +4005,7 @@ Observed reduction: ~`30x` mean latency improvement on this workload shape.
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "mode_tool or infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous or mode_decision_raises_when_runbook_has_no_workload_blocks or mode_decision_raises_when_runbook_has_multiple_workload_blocks"`
-3. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4057,7 +4057,7 @@ Finish the next ops decoupling increment by making runbook schema the canonical 
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py -k "list_registered_mode_tools or registered_mode_tools_exactly_match_schema_workflow_tools"`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "list_registered_mode_tools or registered_mode_tools_exactly_match_schema_workflow_tools or list_workflow_tools_matches_schema_workflow_ids or mode_tool_adapters_cover_all_schema_workflow_ids"`
-3. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4108,7 +4108,7 @@ Reduce remaining tool branching in ops plan rendering by extracting workflow-spe
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "plan_tool or mode_tool or infer_runbook_uses_gpu_submit_template_and_filters or infer_batch_submit_without_notify_skips_notify_phase or build_batch_plan"`
-3. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4161,7 +4161,7 @@ Remove the remaining duplicated workflow-tool registry and runbook-tool resoluti
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py`
-3. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4219,8 +4219,8 @@ Make ops more explicit and future-proof by replacing mutable import-built adapte
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_orchestration_notify.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "build_workflow_tool_registry_returns_read_only_mapping or build_orchestration_notify_argv_requires_secret_ref or resolve_notify_runtime_contract_prefers_profile_secret_ref_when_env_missing or batch_plan_includes_live_canary_when_overridden"`
-2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_orchestration_notify.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
-3. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_orchestration_notify.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4268,7 +4268,7 @@ Reduce schema monolith size and make workflow-tool / notify-policy semantics mor
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_metadata.py src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "workflow_metadata or workflow_helpers_classify_all_schema_workflow_ids or list_workflow_tools_matches_schema_workflow_ids or mode_tool_adapters_cover_all_schema_workflow_ids or plan_tool_adapters_cover_all_schema_workflow_ids or cli_plan_invalid_runbook_shows_contract_error_without_traceback"`
-2. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+2. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4322,7 +4322,7 @@ Remove the remaining single-tool bias from ops runbook defaults and continue shr
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_layout.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "runbook_layout or notify_policy_defaults_to_generic_when_omitted or cli_runbook_init_generates_densegen_notify_scaffold or runbook_rejects_stdout_dir_outside_workspace_ops_logs or runbook_rejects_notify_profile_outside_workspace_notify_namespace"`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_notify_scaffold_with_generic_policy or cli_runbook_init_generates_densegen_notify_scaffold or notify_policy_defaults_to_generic_when_omitted"`
-3. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 
 ### Contract impact
 
@@ -4379,7 +4379,7 @@ Continue shrinking ops runbook coupling by extracting resolved-path rewriting ou
 1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_metadata.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "resolve_workflow_id_for_tool_and_notify_contract or runbook_path_resolution_module_is_available"`
 2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_metadata.py src/dnadesign/ops/tests/test_runbook_layout.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "workflow_metadata or runbook_path_resolution_module_is_available or runbook_relative_paths_resolve_against_runbook_parent or runbook_default_post_run_template_resolves_to_repo_jobs_template or cli_runbook_init_creates_valid_densegen_contract or cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy or notify_policy_defaults_to_generic_when_omitted"`
 3. `rg -n 'densegen_batch_submit|densegen_batch_with_notify_slack|infer_batch_submit|infer_batch_with_notify_slack' src/dnadesign/ops -g'*.py' -g'!**/tests/**'`
-4. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+4. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 5. Real CLI path:
    - `uv run ops runbook init --workflow infer --runbook <tmp>/contracts/infer-runbook.yaml --workspace-root <tmp>/workspace --project dunlop --id infer_demo --no-notify`
    - `uv run ops runbook plan --runbook <tmp>/contracts/infer-runbook.yaml --no-discover-active-jobs`
@@ -4426,7 +4426,7 @@ Keep notify enabled by default for ops runbook scaffolding while making the noti
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "cli_runbook_init_creates_valid_densegen_contract or cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy or cli_runbook_init_without_notify_emits_no_notify_contract_warning"`
-2. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+2. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/events/test_source.py src/dnadesign/notify/tests/tool_events/test_tool_events.py`
 3. Real CLI path:
    - `uv run ops runbook init --workflow infer --runbook <tmp>/contracts/infer-runbook.yaml --workspace-root <tmp>/workspace --project dunlop --id infer_demo`
 
@@ -4686,7 +4686,7 @@ Replace Infer's bespoke dataset-prune path with the generic USR overlay-maintena
 
 ### Verification commands
 
-1. `uv run pytest -q src/dnadesign/usr/tests src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/test_events_source.py`
+1. `uv run pytest -q src/dnadesign/usr/tests src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/events/test_source.py`
 2. `uv run pytest -q src/dnadesign/infer/tests`
 
 ### Contract impact
@@ -4725,7 +4725,7 @@ Remove a mixed-suite skip from the USR lazy-import test so import-hygiene verifi
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/usr/tests/test_convert_legacy_imports.py src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
-2. `uv run pytest -q src/dnadesign/usr/tests src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/test_events_source.py`
+2. `uv run pytest -q src/dnadesign/usr/tests src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/events/test_source.py`
 
 ### Contract impact
 
@@ -4778,7 +4778,7 @@ Shrink `usr/src/dataset.py` by extracting overlay catalog loading and overlay-aw
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/usr/tests`
-2. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py`
+2. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py`
 3. `uv run pytest -q src/dnadesign/infer/tests`
 
 ### Contract impact
@@ -4833,7 +4833,7 @@ Continue shrinking `usr/src/dataset.py` by extracting record-batch key derivatio
 1. `uv run pytest -q src/dnadesign/usr/tests/test_dataset_read_keys_module.py src/dnadesign/usr/tests/test_module_layout.py -k "read_keys"`
 2. `uv run pytest -q src/dnadesign/usr/tests/test_dedupe.py src/dnadesign/usr/tests/test_dataset_read_ops.py`
 3. `uv run pytest -q src/dnadesign/usr/tests`
-4. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py`
+4. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/events/test_source.py src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py`
 5. `uv run pytest -q src/dnadesign/infer/tests`
 
 ### Contract impact
@@ -4896,7 +4896,7 @@ Remove the hardcoded personal USR root from infer pressure-test workspaces and m
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py -k "usr_pressure_profile or usr_ingest_root_resolves_relative_to_config or usr_registry_resolves_relative_ingest_root_from_config or hardcoded_personal_usr_roots or USR_ROOT"`
-2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/test_events_source.py -k "workspace or usr_registry or prune or pressure or infer"`
+2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/events/test_source.py -k "workspace or usr_registry or prune or pressure or infer"`
 3. `tmp_root=$(mktemp -d /scratch/infer-workspace-XXXXXX) && uv run infer workspace init --id demo_usr_pressure --root "$tmp_root" --profile usr-pressure && uv run infer validate usr-registry --config "$tmp_root/demo_usr_pressure/config.yaml"`
 
 ### Contract impact

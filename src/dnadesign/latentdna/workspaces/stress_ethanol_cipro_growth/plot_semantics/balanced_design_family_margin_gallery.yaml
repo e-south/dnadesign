@@ -1,14 +1,14 @@
 plot_id: balanced_design_family_margin_gallery
 question: Does design-family separation remain visible across the full promoter population when the balanced centroid directions behind the scalar metric are used?
 decision_role: primary
-encoding: Three-panel scatter gallery of full-population ethanol-vs-background and ciprofloxacin-vs-background centroid margins across the main 7B intermediate candidates, with the family centroids derived from balanced study subsets.
-scope: The full shared promoter population in the three main 7B intermediate candidates, while the family centroid directions are computed from balanced synthetic subsets so the explanatory axes are not driven by Sigma-35 or spacer imbalance.
+encoding: Two-panel scatter gallery of full-population ethanol-vs-background and ciprofloxacin-vs-background centroid margins across the active 7B intermediate candidates, with the family centroids derived from balanced study subsets.
+scope: The full shared promoter population in the active 7B intermediate candidates, while the family centroid directions are computed from balanced synthetic subsets so the explanatory axes are not driven by Sigma-35 or spacer imbalance.
 guardrails:
   - Use this gallery as the row-level bridge for the balanced design-family separation metric, not as a replacement for the scalar summary.
   - Treat the axes as study-internal design-family directions, not phenotype evidence.
   - Judge candidate ranking from the metric summary first and use this gallery to explain the score.
 caption: Balanced design-family margin gallery across the main 7B intermediate candidates.
-alt_text: Scatter-panel gallery showing ethanol-versus-background and ciprofloxacin-versus-background centroid margins for the full promoter population in the anchor, 1 kb seq-mean, and 1 kb anchor-mean intermediate spaces, with balanced study-internal family directions.
+alt_text: Scatter-panel gallery showing ethanol-versus-background and ciprofloxacin-versus-background centroid margins for the full promoter population in the 60 bp anchor and 1 kb context anchor-mean intermediate spaces, with balanced study-internal family directions.
 preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted population stays full, while the underlying design-family centroid directions are computed from balanced synthetic subsets over `design_family`, `sig35_variant`, and `spacer_length`, with leave-one-out handling for in-cohort rows that participate in those balanced centroids.
 math_md: |
   The plotted margins are

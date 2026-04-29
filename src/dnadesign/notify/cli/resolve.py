@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 
 
 def resolve_cli_optional_string(*, field: str, cli_value: str | None) -> str | None:

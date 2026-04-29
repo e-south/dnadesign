@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/registry.py
 
 USR CLI maintenance registry command implementations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

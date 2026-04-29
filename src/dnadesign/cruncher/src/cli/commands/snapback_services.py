@@ -31,6 +31,34 @@ def run_snapback_target_search(*args, **kwargs):
     return _run_snapback_target_search(*args, **kwargs)
 
 
+def run_snapback_visual(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_visual_workflow import run_snapback_visual as _run_snapback_visual
+
+    return _run_snapback_visual(*args, **kwargs)
+
+
+def build_snapback_screen_request(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_screen_workflow import (
+        build_snapback_screen_request as _build_snapback_screen_request,
+    )
+
+    return _build_snapback_screen_request(*args, **kwargs)
+
+
+def parse_retained_product_strands(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_screen_workflow import (
+        parse_retained_product_strands as _parse_retained_product_strands,
+    )
+
+    return _parse_retained_product_strands(*args, **kwargs)
+
+
+def run_snapback_screen(*args, **kwargs):
+    from dnadesign.cruncher.app.snapback_screen_workflow import run_snapback_screen as _run_snapback_screen
+
+    return _run_snapback_screen(*args, **kwargs)
+
+
 def validate_released_snapback_spec(*args, **kwargs):
     from dnadesign.cruncher.app.snapback_released_workflow import (
         validate_released_snapback_spec as _validate_released_snapback_spec,
@@ -88,14 +116,18 @@ def snapback_workspace_path(*args, **kwargs):
 
 
 __all__ = [
+    "build_snapback_screen_request",
     "init_snapback_workspace",
+    "parse_retained_product_strands",
     "released_show_payload",
     "run_released_snapback_design",
     "run_released_snapback_solve",
     "run_released_snapback_target_search",
     "run_snapback_design",
+    "run_snapback_screen",
     "run_snapback_solve",
     "run_snapback_target_search",
+    "run_snapback_visual",
     "snapback_show_payload",
     "snapback_workspace_path",
     "validate_released_snapback_spec",

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/release_enzymes/errors.py
 
 Explicit error contracts for release-enzyme catalog workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

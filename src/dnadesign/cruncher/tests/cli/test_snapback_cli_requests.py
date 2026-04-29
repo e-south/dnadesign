@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/cli/test_snapback_cli_requests.py
 
 Typed request-builder tests for Snapback CLI/app boundaries.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -57,6 +57,7 @@ def test_build_released_target_search_invocation_requires_explicit_sources() -> 
             cap_nt=3,
             max_results=8,
             near_boundary_search_limit=8,
+            release_variant_id=[],
             allow_demo_hits=False,
             allow_frequent_cutter_nickases=False,
             allow_top_active_routes=False,
@@ -78,6 +79,7 @@ def test_build_released_target_search_invocation_sets_retained_active_route_poli
         cap_nt=3,
         max_results=8,
         near_boundary_search_limit=8,
+        release_variant_id=["BspQI"],
         allow_demo_hits=False,
         allow_frequent_cutter_nickases=False,
         allow_top_active_routes=True,
@@ -90,6 +92,7 @@ def test_build_released_target_search_invocation_sets_retained_active_route_poli
         "top_active_from_bottom_nick",
     ]
     assert invocation.request.search.route_policy_final_geometry_source == "retained_active_strand"
+    assert invocation.request.search.allowed_release_variant_ids == ["BspQI"]
     assert invocation.request.search.allow_precut_footprint_outside_active_product is True
     assert invocation.request.search.disallowed_nickase_warning_codes == ["FREQUENT_CUTTER"]
 
@@ -109,6 +112,7 @@ def test_build_released_solve_invocation_raises_max_results_to_materialize_top_k
         max_results=1,
         near_boundary_search_limit=8,
         materialize_top_k=4,
+        release_variant_id=[],
         run_dir=Path("outputs/released_solve"),
         render_format="pdf",
         emit_renders=False,

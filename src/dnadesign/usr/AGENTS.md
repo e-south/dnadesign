@@ -7,10 +7,11 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
   - Package-root Python should stay limited to `__init__.py` and `__main__.py`; public API exports belong on the package root, but implementation modules belong under `src/`.
   - `usr/src` root should contain package directories only plus `__init__.py`; do not reintroduce flat implementation files at that level.
   - Coordinator packages are reserved for high-level roots such as `api/`, `cli/`, `dataset/`, `maintenance/`, `sync/`, and `version/`.
-  - Helper families should live under explicit subpackages: `cli/commands/`, `cli/support/`, `contracts/`, `datasets/`, `events/`, `legacy/`, `overlays/support/`, `overlays/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
+  - Helper families should live under explicit subpackages: `cli/commands/`, `cli/support/`, `contracts/`, `datasets/`, `events/`, `genbank/`, `legacy/`, `overlays/support/`, `overlays/`, `registry/`, `runtime/`, `sequence_views/`, `storage/`, and `sync/remote/`.
   - `contracts/` owns shared error classes, schema constants, response dataclasses, and sequence normalization/id rules; do not reintroduce sibling root files for those concerns.
   - `api/` owns the internal public-library export facade that feeds `dnadesign.usr`.
   - `events/` owns event actor normalization, redaction, fingerprinting, payload defaults, and append-only logging; keep event helper concerns out of coordinator packages.
+  - `genbank/` owns GenBank parsing, import manifests, source-hash fidelity, and optional feature extraction into USR overlays; keep source-annotation import concerns out of `dataset/` and `cli/`.
   - `dataset/` owns the main dataset coordinator surface and should stay as a package root over the `datasets/*` implementation families.
   - `cli/support/` owns CLI-only helper families and should stay split into `resolution/`, `wiring/`, and `presentation/` rather than re-accumulating a flat helper bucket.
   - `cli/support/resolution/` owns root/path resolution, dataset-target heuristics, and merge-policy lookup.
@@ -23,17 +24,18 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
   - `sync/remote/` owns remote endpoint config/loading plus SSH stat, diff, execution orchestration, sidecar, and transfer helpers used by `sync/`.
   - `registry/` owns namespace registry models, YAML/cache/hash IO, and registry type/schema validation; keep registry mechanics out of `dataset/` and `cli/`.
   - `runtime/` owns reusable runtime helpers such as DuckDB session initialization and timezone contracts; keep runtime stateful helpers out of the root coordinator layer.
+  - `sequence_views/` owns semantic sequence-view identity, stable `view_id` derivation, sidecar IO, and selector/store helpers; keep view-ontology mechanics out of `datasets/views/`.
   - `storage/` owns low-level parquet IO, snapshotting, and dataset write-lock primitives; do not reintroduce sibling root files for those concerns.
   - `sync/` owns the sync facade and runtime wiring over `sync/remote/*`.
   - `version/` owns the version singleton so even tiny constants do not leak back into the root.
-  - When a helper family grows into a closed internal cluster, nest it again instead of re-flattening `usr/src/`; current sanctioned second-level packages are `cli/commands/datasets/`, `cli/commands/lifecycle/`, `cli/commands/maintenance/`, `cli/commands/namespace/`, `cli/commands/query/`, `cli/commands/read_views/`, `cli/commands/remotes/`, `cli/commands/sync/`, `cli/commands/tooling/`, `cli/support/presentation/`, `cli/support/resolution/`, `cli/support/wiring/`, `datasets/core/`, `datasets/demo/`, `datasets/lifecycle/`, `datasets/maintenance/`, `datasets/merge/`, `datasets/overlay/`, `datasets/query/`, `datasets/state/`, `datasets/validate/`, `datasets/views/`, `overlays/support/`, and `sync/remote/`.
+  - When a helper family grows into a closed internal cluster, nest it again instead of re-flattening `usr/src/`; current sanctioned second-level packages are `cli/commands/datasets/`, `cli/commands/genbank/`, `cli/commands/lifecycle/`, `cli/commands/maintenance/`, `cli/commands/namespace/`, `cli/commands/query/`, `cli/commands/read_views/`, `cli/commands/remotes/`, `cli/commands/sync/`, `cli/commands/tooling/`, `cli/support/presentation/`, `cli/support/resolution/`, `cli/support/wiring/`, `datasets/core/`, `datasets/demo/`, `datasets/lifecycle/`, `datasets/maintenance/`, `datasets/merge/`, `datasets/overlay/`, `datasets/query/`, `datasets/state/`, `datasets/validate/`, `datasets/views/`, `overlays/support/`, and `sync/remote/`.
   - Tests should stay organized by family under `src/dnadesign/usr/tests/cli/`, `datasets/`, `legacy/`, `overlays/`, and `sync/`; keep root `tests/` for cross-cutting contracts only.
   - `tests/cli/` is allowed one more owned layer when a command family becomes a closed internal cluster; the current sanctioned CLI test buckets are `tests/cli/commands/`, `tests/cli/support/`, and `tests/cli/sync/`.
   - `tests/cli/commands/` must mirror command namespaces instead of becoming another flat bucket; current sanctioned command test buckets are `datasets/`, `lifecycle/`, `maintenance/`, `namespace/`, `query/`, `read_views/`, `remotes/`, and `tooling/`.
   - `tests/datasets/` is allowed one more owned layer when mirroring stable source families; the current sanctioned dataset test buckets are `tests/datasets/core/`, `tests/datasets/lifecycle/`, `tests/datasets/merge/`, `tests/datasets/overlay/`, `tests/datasets/query/`, `tests/datasets/state/`, `tests/datasets/validate/`, and `tests/datasets/views/`.
   - `tests/overlays/support/` mirrors higher-level overlay support helpers; low-level overlay primitive tests stay in `tests/overlays/`.
   - `tests/sync/remote/` mirrors remote endpoint, diff, transfer, and sidecar helpers; `tests/sync/` stays focused on the sync facade.
-  - Shared test fixtures consumed outside USR belong under `src/dnadesign/testsupport/`, not under `dnadesign.usr.tests`.
+  - Shared test fixtures consumed outside USR belong under `src/dnadesign/devtools/tests/support/`, not under `dnadesign.usr.tests`.
 - Ops integration: `src/dnadesign/usr/ops/`
   - Keep only Ops-facing provider glue, stable ops entrypoints, and status registries here; dataset/sync implementation stays under `src/`.
   - `src/dnadesign/usr/ops/sync_audit_drill.py` owns the stable deterministic sync drill entrypoint exposed as `uv run usr-sync-audit-drill`.

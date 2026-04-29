@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/query/__init__.py
 
 USR CLI query command family.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

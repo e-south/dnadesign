@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .bootstrap import initialize_registry
 from .errors import ConfigError
-from .features.contracts import PromoterFeatureBundleConfig
+from .features.contracts import SequenceFeatureBundleConfig
 from .registry import resolve_fn
 
 Precision = Literal["fp32", "fp16", "bf16"]
@@ -152,7 +152,7 @@ class JobConfig(StrictConfigModel):
     ingest: IngestConfig
     # extract
     outputs: Optional[List[OutputSpec]] = None
-    feature_bundle: Optional[PromoterFeatureBundleConfig] = None
+    feature_bundle: Optional[SequenceFeatureBundleConfig] = None
     # generate
     fn: Optional[str] = None  # NEW: optional namespaced fn for generation
     params: Optional[Dict[str, Any]] = None

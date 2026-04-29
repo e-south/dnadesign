@@ -11,7 +11,7 @@
 **Status-kind:** promoter-study-preflight
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-13
+**Last verified:** 2026-04-29
 
 Use this after the cheaper
 [Promoter Study Status Contract](promoter-study-status-contract.md) when you
@@ -97,6 +97,14 @@ actionable scope versus the full study surface:
   and Notify event-path resolution
 - `scheduler_queue` checks for declared submit-threshold posture
 - `runbook_plan` checks for DenseGen and Infer batch presets
+
+For large sequence-view Infer lanes, the checked-in preflight surfaces should
+use `infer validate sequence-view-completion --mode inventory`. That mode is
+the bounded readiness contract: it verifies expected sequence-view products,
+counts reusable/missing sidecar aliases and payloads, and reports stale
+alias-to-payload references without deriving every missing feature key. Use the
+default exact planner separately when an operator needs deeper batch-planning
+detail and can tolerate the runtime.
 
 `ops.study.yaml` is the visible source of readiness shape: it declares phases,
 groups, artifacts, execution surfaces, and generic checks. The promoter-family

@@ -9,12 +9,14 @@ This guide defines workspace operations and the curated demo entrypoints.
 ## Workspace Contract
 
 Each workspace contains:
+- `.baserender-workspace`
 - `job.yaml`
 - `inputs/`
 - `outputs/`
 - `README.md`
 
 Operational behavior:
+- BaseRender only applies workspace output/path scoping when the workspace marker is present; this prevents accidental inference from arbitrary `job.yaml` directories.
 - `job.yaml` relative paths resolve from the workspace root.
 - If `results_root` is omitted, runtime defaults to `outputs/`.
 - For `images` output with no explicit `dir`, workspace jobs default to `outputs/plots/`.

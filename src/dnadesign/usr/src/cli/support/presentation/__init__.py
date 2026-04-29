@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/support/presentation/__init__.py
 
 CLI presentation helpers for output formatting and rendering.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

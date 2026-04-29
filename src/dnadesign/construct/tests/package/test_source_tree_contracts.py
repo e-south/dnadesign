@@ -35,7 +35,9 @@ def test_construct_root_keeps_progressive_disclosure_directories() -> None:
 def test_construct_root_keeps_minimal_top_level_surface() -> None:
     construct_root = _construct_root()
     observed = {
-        path.name for path in construct_root.iterdir() if path.name != "__pycache__" and not path.name.startswith(".")
+        path.name
+        for path in construct_root.iterdir()
+        if path.name != "__pycache__" and not path.name.startswith(".") and path.name != "AGENTS.md"
     }
     assert observed == {
         "README.md",

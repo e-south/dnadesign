@@ -22,7 +22,7 @@ For the shared repo root `src/dnadesign/usr/datasets`, keep `registry.yaml` comm
   - `densegen_prom_eth_cip_source/` — DenseGen-owned promoter ethanol/ciprofloxacin source dataset
   - `densegen_study_constitutive_sigma_panel/` — DenseGen-owned constitutive sigma-panel study output dataset
   - `usr_demo_cli_examples/` — USR-owned CLI example dataset for local walkthroughs
-  - `usr_mg1655_promoter_controls/` — USR-curated MG1655 promoter control anchors used by construct and promoter-study assembly flows
+  - `usr_promoter_references/` — USR-curated promoter reference anchors used by construct and promoter-study assembly flows; includes primer-flank-stripped MG1655 GenBank-projected inserts plus source-backed synthetic promoter standards with queryable strength metadata
   - `usr_pdual10_plasmid_template/` — USR-curated pDual-10 plasmid template record used by construct context expansion
   - `usr_prom_eth_cip_anchor/` — USR-owned merged promoter ethanol/ciprofloxacin anchor handoff
   - `construct_prom_eth_cip_context/` — Construct-owned promoter ethanol/ciprofloxacin context handoff

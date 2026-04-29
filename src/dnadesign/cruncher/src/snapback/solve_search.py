@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/solve_search.py
 
 Frontier enumeration and co-design input ordering for v3 snapback solve.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -119,12 +119,17 @@ def _write_contract(tmp_path: Path, payload: dict[str, object]) -> Path:
 
 
 def test_load_study_ops_contract_accepts_valid_repo_scoped_surface_refs(tmp_path: Path) -> None:
-    study_root = _write_contract(tmp_path, _base_payload())
+    payload = _base_payload()
+    payload["phases"][1]["required_for_main_study_state"] = False
+    study_root = _write_contract(tmp_path, payload)
 
     contract = load_study_ops_contract(study_root)
 
     assert contract.snapshot_summary_scope == "repo"
     assert contract.phases[0].next_surface == "repo:src/dnadesign/ops/runbooks/presets/demo.yaml"
+    assert contract.phases[0].required_for_main_study_state is True
+    assert contract.phases[1].required_for_main_study_state is False
+    assert contract.phases[1].as_dict()["required_for_main_study_state"] is False
 
 
 def test_supported_preflight_kinds_come_from_single_registry() -> None:
@@ -273,6 +278,15 @@ def test_load_study_ops_contract_rejects_unknown_phase_status(tmp_path: Path) ->
     study_root = _write_contract(tmp_path, payload)
 
     with pytest.raises(ValueError, match="unsupported status"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_rejects_non_boolean_main_state_flag(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["phases"][1]["required_for_main_study_state"] = "false"
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="required_for_main_study_state must be boolean"):
         load_study_ops_contract(study_root)
 
 

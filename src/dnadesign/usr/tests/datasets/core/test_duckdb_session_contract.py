@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr import Dataset
 
 

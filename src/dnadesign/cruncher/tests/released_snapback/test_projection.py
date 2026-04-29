@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/released_snapback/test_projection.py
 
 Projection and evaluator-reuse tests for released-product snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

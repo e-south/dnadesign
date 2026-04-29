@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset, SchemaError
 
 

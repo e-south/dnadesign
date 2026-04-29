@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/nickases/selection.py
 
 Central nickase selection helpers for downstream workflow ranking/reporting.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

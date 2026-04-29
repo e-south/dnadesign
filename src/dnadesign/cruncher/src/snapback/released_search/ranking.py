@@ -29,14 +29,22 @@ class ReleasedRankingPolicy:
 
     target: ReleasedFinalTargetGeometry | None = None
 
+    @staticmethod
+    def upstream_retained_duplex_bp(hit: ReleasedTargetSearchHit) -> int:
+        return min(hit.projection.retained_partner_length_nt, hit.nick_boundary_from_left)
+
+    @classmethod
+    def effective_stem_bp(cls, hit: ReleasedTargetSearchHit) -> int:
+        return cls.upstream_retained_duplex_bp(hit) + hit.final_candidate.paired_bp
+
     def dedupe_key(self, hit: ReleasedTargetSearchHit) -> tuple[str, str, str]:
-        post_nick_sequence = hit.final_candidate.post_nick_sequence
-        paired_bp = hit.final_candidate.paired_bp
+        active_product_sequence = hit.projection.active_product_sequence
+        effective_stem_bp = self.effective_stem_bp(hit)
         cap_nt = hit.final_candidate.cap_nt
         return (
             hit.active_strand,
-            post_nick_sequence[:paired_bp],
-            post_nick_sequence[paired_bp : paired_bp + cap_nt],
+            active_product_sequence[:effective_stem_bp],
+            active_product_sequence[effective_stem_bp : effective_stem_bp + cap_nt],
         )
 
     def dedupe_ranked_hits(self, ranked_hits: list[ReleasedTargetSearchHit]) -> list[ReleasedTargetSearchHit]:
@@ -94,8 +102,10 @@ class ReleasedRankingPolicy:
     def near_hit_key(self, hit: ReleasedTargetSearchHit) -> tuple[object, ...]:
         if self.target is None:
             raise ValueError("ReleasedRankingPolicy.near_hit_key requires a target geometry.")
-        target_input_length = self.target.nick_boundary_from_left + self.target.paired_bp + self.target.cap_nt
+        target_effective_stem_bp = self.target.nick_boundary_from_left + self.target.paired_bp
+        target_input_length = target_effective_stem_bp + self.target.cap_nt
         return (
+            abs(self.effective_stem_bp(hit) - target_effective_stem_bp),
             abs(hit.nick_boundary_from_left - self.target.nick_boundary_from_left),
             abs(hit.active_product_input_length_nt - target_input_length),
             *self.exact_hit_key(hit),

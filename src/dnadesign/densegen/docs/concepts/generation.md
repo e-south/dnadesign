@@ -81,6 +81,10 @@ plan:
 
 #### Current packaged workspace behavior
 - `demo_tfbs_baseline` and `demo_sampling_baseline` do not use matrix expansion.
+- `demo_dense_array_showcase` uses matrix expansion for fixed-element variants:
+  - `single_anchor`: `4` explicit upstream/downstream pairs, `sequences: 175`.
+  - `dual_anchor`: the same `4` explicit pairs plus one static fixed element, `sequences: 175`.
+  - The unexpanded `dense_free` plan contributes `150` sequences without fixed elements.
 - `study_constitutive_sigma_panel` uses matrix expansion for a full panel:
   - `sigma70_panel`: `6 x 8 = 48` variants, `sequences: 100`.
   - Total: `48` concrete plans, aggregate target `100` (`4` variants at quota `3`, `44` variants at quota `2`).

@@ -70,11 +70,21 @@ def _inspect_no_exploratory_analysis(**_: object) -> dict[str, dict[str, object]
     return {}
 
 
+def _inspect_no_sequence_view_contracts(**_: object) -> dict[str, object] | None:
+    return None
+
+
+def _inspect_no_infer_feature_completion(**_: object) -> dict[str, object] | None:
+    return None
+
+
 @dataclass(frozen=True)
 class PromoterStudyStatusDependencies:
     infer_runtime: PromoterStudyInferRuntimeDependencies
     phase_matches_infer_model_family: Callable[..., bool]
     inspect_semantic_completeness: Callable[..., dict[str, object] | None]
+    inspect_sequence_view_contracts: Callable[..., dict[str, object] | None] = _inspect_no_sequence_view_contracts
+    inspect_infer_feature_completion: Callable[..., dict[str, object] | None] = _inspect_no_infer_feature_completion
     inspect_latentdna_readiness: Callable[..., dict[str, object] | None] = _inspect_no_latentdna_readiness
     inspect_additional_downstream_surfaces: Callable[..., dict[str, dict[str, object]]] = (
         _inspect_no_additional_downstream_surfaces
@@ -115,6 +125,8 @@ def build_promoter_study_status(
     )
     planned_outputs_state = _build_planned_outputs_state(study_context=study_context)
     semantic_completeness_state = dependencies.inspect_semantic_completeness(study_context=study_context)
+    sequence_view_contract_state = dependencies.inspect_sequence_view_contracts(study_context=study_context)
+    infer_feature_completion_state = dependencies.inspect_infer_feature_completion(study_context=study_context)
     latentdna_state = dependencies.inspect_latentdna_readiness(study_context=study_context)
     additional_downstream_surfaces = dependencies.inspect_additional_downstream_surfaces(study_context=study_context)
     exploratory_analysis = dependencies.inspect_exploratory_analysis(
@@ -132,6 +144,8 @@ def build_promoter_study_status(
             "handoff_readiness_state": handoff_readiness_state,
             "planned_outputs_state": planned_outputs_state,
             "semantic_completeness_state": semantic_completeness_state,
+            "sequence_view_contract_state": sequence_view_contract_state,
+            "infer_feature_completion_state": infer_feature_completion_state,
             "infer_runtime_models": [
                 summary.as_dict() for summary in status_context.infer_runtime.runtime_model_summaries
             ],
@@ -160,6 +174,10 @@ def build_promoter_study_status(
         summary_parts.append(str(source_growth_state["summary"]))
     if semantic_completeness_state is not None:
         summary_parts.append(str(semantic_completeness_state["summary"]))
+    if sequence_view_contract_state is not None:
+        summary_parts.append(str(sequence_view_contract_state["summary"]))
+    if infer_feature_completion_state is not None:
+        summary_parts.append(str(infer_feature_completion_state["summary"]))
     if planned_outputs_state is not None and bool(planned_outputs_state.get("include_in_summary")):
         summary_parts.append(str(planned_outputs_state["summary"]))
     if study_context.next_ready_phase is not None:
@@ -180,6 +198,14 @@ def build_promoter_study_status(
         attention_reasons.append("shared handoff outputs are pending or stale")
     if semantic_completeness_state is not None and bool(semantic_completeness_state.get("drives_top_level_attention")):
         attention_reasons.append("shared handoff metadata is semantically incomplete")
+    if sequence_view_contract_state is not None and bool(
+        sequence_view_contract_state.get("drives_top_level_attention")
+    ):
+        attention_reasons.append("sequence-view product contracts are incomplete")
+    if infer_feature_completion_state is not None and bool(
+        infer_feature_completion_state.get("drives_top_level_attention")
+    ):
+        attention_reasons.append("Infer feature completion is incomplete")
     if planned_outputs_state is not None and bool(planned_outputs_state.get("drives_top_level_attention")):
         attention_reasons.append("planned shared outputs remain pending")
     if status_context.infer_runtime.preferred_model_family is not None and any(

@@ -5,7 +5,7 @@ src/dnadesign/studies/tests/test_cruncher_study_docs_and_skill_contracts.py
 
 Docs and repo-local skill contracts for the checked-in Cruncher shortening study.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -63,7 +63,8 @@ def test_snapback_shortening_study_record_and_skill_keep_boundary_language_expli
     ops_study = _read("docs/studies/snapback_shortening_effort/ops.study.yaml")
 
     assert "released-product Snapback" in status
-    assert "exposed post-release bottom strand" in status
+    assert "retained-active released-product policy" in status
+    assert "retained top and bottom product routes" in status
     assert "Current phase: `snapback_released_solve`" in status
     assert "src/dnadesign/cruncher/workspaces/de033/runbook.md" in status
     assert "Next-scope preflight stays read-only" in status
@@ -79,7 +80,7 @@ def test_snapback_shortening_study_record_and_skill_keep_boundary_language_expli
     assert "--nick-preset neb_nicking_v1" in routes
     assert "--nick-additional-preset thermo_nicking_v1" in routes
     assert "--release-preset type_iis_release_v1" in routes
-    assert "exposed post-release bottom strand" in routes
+    assert "retained active top and bottom products" in routes
     assert "whole-catalog released" in routes
     assert "plots/released_hit_triptych.pdf" in routes
     assert "Treat `released-design` and `released-show` as an optional audit path only." in routes
@@ -105,7 +106,7 @@ def test_snapback_shortening_study_record_and_skill_keep_boundary_language_expli
     assert "knowledge-integrity" in skill
     assert "autonomy-capability" in skill
     assert "architecture-invariants" in skill
-    assert "exposed-bottom-strand geometry lane" in skill
+    assert "BspQI-pinned retained-active geometry lane" in skill
     assert "FREQUENT_CUTTER" in skill
     assert "contiguous fully degenerate `N` block" in skill
     assert "do not require `pipeline.yaml` or `ops.study.yaml`" in skill

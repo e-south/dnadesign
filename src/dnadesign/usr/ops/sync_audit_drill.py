@@ -5,7 +5,7 @@ src/dnadesign/usr/ops/sync_audit_drill.py
 
 Stable USR-owned sync audit drill entrypoint and implementation.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

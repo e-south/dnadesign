@@ -5,7 +5,7 @@ src/dnadesign/densegen/tests/runtime/test_stage_b_summary_plots.py
 
 Focused coverage for contract-grade Stage-B summary plots.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -114,6 +114,7 @@ class Style:
     overlay_align: str = "left"
     overlay_title_color: str = "#6b7280"
     overlay_title_gap_reduction_px: float = 0.0
+    balance_content_radius: bool = True
 
     legend: bool = True
     legend_mode: str = "bottom"
@@ -125,6 +126,7 @@ class Style:
     legend_gap_x: float = 14.0
     legend_pad_px: float = 16.0
     legend_height_px: float = 40.0
+    legend_content_gap_px: float | None = None
     legend_gap_patch_text: float = 6.0
     legend_center: bool = True
     legend_vertical_align: float = 0.5
@@ -218,6 +220,7 @@ class Style:
             "style.overlay_title_gap_reduction_px must be >= 0",
             SchemaError,
         )
+        ensure(isinstance(self.balance_content_radius, bool), "style.balance_content_radius must be bool", SchemaError)
         ensure(
             str(self.legend_mode).lower() in {"bottom", "inline", "none"},
             "style.legend_mode must be 'bottom', 'inline', or 'none'",
@@ -238,6 +241,8 @@ class Style:
             "style.legend_vertical_align must be between 0 and 1",
             SchemaError,
         )
+        if self.legend_content_gap_px is not None:
+            ensure(self.legend_content_gap_px >= 0, "style.legend_content_gap_px must be >= 0", SchemaError)
         ensure(self.sequence.strand_gap_cells >= 0, "style.sequence.strand_gap_cells must be >= 0", SchemaError)
         ensure(self.sequence.to_kmer_gap_cells >= 0, "style.sequence.to_kmer_gap_cells must be >= 0", SchemaError)
         dash_raw = self.connector_dash

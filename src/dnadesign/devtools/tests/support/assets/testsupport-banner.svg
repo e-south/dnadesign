@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-labelledby="title desc">
+  <title id="title">testsupport banner</title>
+  <desc id="desc">Minimal banner for the dnadesign testsupport package.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0f2d46"/>
+      <stop offset="100%" stop-color="#214f59"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="240" fill="url(#bg)"/>
+  <rect x="48" y="48" width="1104" height="144" rx="20" fill="#f3f1e8" fill-opacity="0.08" stroke="#f3f1e8" stroke-opacity="0.16"/>
+  <text x="80" y="118" fill="#f3f1e8" font-family="Menlo, Consolas, monospace" font-size="46" font-weight="700">dnadesign.devtools.testsupport</text>
+  <text x="80" y="164" fill="#d5ddd5" font-family="Menlo, Consolas, monospace" font-size="24">shared cross-tool test fixtures</text>
+</svg>

@@ -19,7 +19,7 @@ from typing import Any
 
 import typer
 
-from ..errors import NotifyConfigError, NotifyDeliveryError
+from ..core.errors import NotifyConfigError, NotifyDeliveryError
 from .spool import spool_payload as _spool_payload
 
 

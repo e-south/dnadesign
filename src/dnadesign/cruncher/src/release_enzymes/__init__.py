@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/release_enzymes/__init__.py
 
 Shared release-enzyme catalog and scanning contracts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

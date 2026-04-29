@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_plot_diagnostics_workflow.py
 
 Workflow tests for the remaining read-only plot kinds.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -28,6 +28,7 @@ class RunReport:
     skipped_records_by_reason: dict[str, int] = field(default_factory=dict)
     missing_selection_keys: list[str] = field(default_factory=list)
     outputs: dict[str, str] = field(default_factory=dict)
+    output_metrics: dict[str, dict[str, int | float | str]] = field(default_factory=dict)
 
     def note_skip_row(self, reason: str) -> None:
         self.skipped_rows_by_reason[reason] = self.skipped_rows_by_reason.get(reason, 0) + 1

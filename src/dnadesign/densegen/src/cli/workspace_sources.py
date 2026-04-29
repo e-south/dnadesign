@@ -22,6 +22,7 @@ import typer
 
 PACKAGED_WORKSPACE_IDS: tuple[str, ...] = (
     "demo_tfbs_baseline",
+    "demo_dense_array_showcase",
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
     "study_stress_ethanol_cipro",

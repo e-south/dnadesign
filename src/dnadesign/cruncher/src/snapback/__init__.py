@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/__init__.py
 
 Public snapback workflow contracts for Cruncher.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

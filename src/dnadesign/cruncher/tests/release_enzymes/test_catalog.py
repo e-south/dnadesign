@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/release_enzymes/test_catalog.py
 
 Contract tests for release-enzyme catalog loading and cut normalization.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -53,6 +53,7 @@ def test_builtin_release_catalog_loads_current_type_iis_starting_set() -> None:
     assert by_id["BspQI"].recognition_sequence == "GCTCTTC"
     assert by_id["BspQI"].top_cut_offset == 8
     assert by_id["BspQI"].bottom_cut_offset == 11
+    assert by_id["BspQI"].source_url == "https://www.neb.com/en-us/products/r3712-bspqi-hf"
 
 
 def test_release_catalog_rejects_missing_second_cut_offset(tmp_path: Path) -> None:

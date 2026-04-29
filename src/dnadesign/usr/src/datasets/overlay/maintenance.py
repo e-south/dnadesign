@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/overlay/maintenance.py
 
 Overlay inventory and maintenance operations for USR datasets.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

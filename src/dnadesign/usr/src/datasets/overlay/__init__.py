@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/overlay/__init__.py
 
 Overlay helper package for dataset attach/write/maintenance operations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

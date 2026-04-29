@@ -6,7 +6,7 @@ src/dnadesign/baserender/tests/test_snapback_contract_jobs.py
 Tests for snapback visual-contract rendering through the public baserender job
 surface.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

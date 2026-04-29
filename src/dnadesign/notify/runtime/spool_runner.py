@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from ..errors import NotifyConfigError, NotifyDeliveryError, NotifyError
+from ..core.errors import NotifyConfigError, NotifyDeliveryError, NotifyError
 
 
 def run_spool_drain(

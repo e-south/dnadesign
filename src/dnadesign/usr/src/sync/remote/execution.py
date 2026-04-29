@@ -5,7 +5,7 @@ src/dnadesign/usr/src/sync/remote/execution.py
 
 Remote sync execution orchestration helpers used by the root sync facade.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

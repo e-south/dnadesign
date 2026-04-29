@@ -1,0 +1,37 @@
+workspace_id: regulondb_native_promoter_panel
+workspace_ref: src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel
+snapshot_ref: src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/outputs/status/workspace_snapshot.json
+source_datasets:
+  native_records: usr_regulondb_native_promoters
+  native_7b_seq_mean_features: usr_regulondb_native_promoters/_derived/infer
+  native_7b_seq_mean_output_layer_features: usr_regulondb_native_promoters/_derived/infer
+  native_7b_seq_mean_log_likelihood_mean: usr_regulondb_native_promoters/_derived/infer
+  native_7b_seq_mean_log_likelihood_total: usr_regulondb_native_promoters/_derived/infer
+  core60_tss_upstream: usr_regulondb_native_promoter_core60
+  core60_tss_upstream_7b_core60_mean_features: usr_regulondb_native_promoter_core60/_derived/infer
+  core60_tss_upstream_7b_core60_mean_output_layer_features: usr_regulondb_native_promoter_core60/_derived/infer
+  core60_tss_upstream_7b_core60_mean_log_likelihood_mean: usr_regulondb_native_promoter_core60/_derived/infer
+  core60_tss_upstream_7b_core60_mean_log_likelihood_total: usr_regulondb_native_promoter_core60/_derived/infer
+supported_model_families:
+  - evo2_7b
+default_model_family: evo2_7b
+required_wildtype_references: []
+default_geometry_inventory:
+  default_review_geometries:
+    - intermediate_embedding_7b_native_source_record_seq_mean
+  working_candidate: intermediate_embedding_7b_native_source_record_seq_mean
+  conservative_baseline: intermediate_embedding_7b_native_source_record_seq_mean
+  challengers: []
+  planned_geometries:
+    - output_layer_mean_7b_native_source_record_seq_mean
+    - intermediate_embedding_7b_core60_tss_upstream
+    - output_layer_mean_7b_core60_tss_upstream
+  planned_scalar_diagnostics:
+    - log_likelihood_total_7b_native_source_record_seq_mean
+    - log_likelihood_mean_per_token_7b_native_source_record_seq_mean
+    - log_likelihood_total_7b_core60_tss_upstream
+    - log_likelihood_mean_per_token_7b_core60_tss_upstream
+decision_deliverables:
+  - dataset_overview
+  - representation_health_summary
+  - regulondb_metadata_audit

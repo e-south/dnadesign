@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/snapback_released_target_search_workflow.py
 
 Application orchestration for released-product snapback target-search.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

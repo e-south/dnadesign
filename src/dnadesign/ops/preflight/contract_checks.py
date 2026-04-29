@@ -11,12 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
+from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from dnadesign.ops.status.path_ref import resolve_path_ref
+from dnadesign.usr import Dataset, SequenceViewContractExpectation, validate_sequence_view_contract
 
 from .check_protocols import CommandCheckTarget, RunbookPlanCheckTarget, SchedulerQueueCheckTarget
 from .checks import (
@@ -27,7 +30,7 @@ from .checks import (
     build_runbook_plan_checks,
     build_scheduler_queue_checks,
 )
-from .models import CommandExecution, PreflightCheck, build_state_check
+from .models import CommandExecution, PreflightCheck, build_command_check, build_state_check
 from .support import execute_runbook_plan as default_execute_runbook_plan
 
 _ENVIRONMENT_MATCH_MODES = frozenset({"all", "any"})
@@ -134,6 +137,48 @@ def build_contract_preflight_checks(
                     repo_root=repo_root,
                     study_root=study_root,
                     dataset_index=dataset_index,
+                    base_details=details,
+                )
+            )
+            continue
+
+        if kind == "sequence_view_contract":
+            artifact_id = str(spec.get("artifact") or "").strip()
+            checks.append(
+                _build_sequence_view_contract_check(
+                    check_id=check_id,
+                    check_group=check_group,
+                    phase=phase,
+                    phase_id=phase_id,
+                    summary=summary,
+                    required=required,
+                    artifact_id=artifact_id,
+                    expected_payload=spec.get("expected"),
+                    contract=contract,
+                    repo_root=repo_root,
+                    study_root=study_root,
+                    dataset_index=dataset_index,
+                    base_details=details,
+                )
+            )
+            continue
+
+        if kind == "infer_sequence_view_completion":
+            surface_id = str(spec.get("surface") or "").strip()
+            checks.append(
+                _build_infer_sequence_view_completion_check(
+                    check_id=check_id,
+                    check_group=check_group,
+                    phase=phase,
+                    phase_id=phase_id,
+                    summary=summary,
+                    required=required,
+                    surface_id=surface_id,
+                    expected_payload=spec.get("expected"),
+                    contract=contract,
+                    repo_root=repo_root,
+                    study_root=study_root,
+                    dependencies=dependencies,
                     base_details=details,
                 )
             )
@@ -543,6 +588,385 @@ def _build_dataset_snapshot_check(
             "row_gap": max(target_rows - int(rows), 0) if isinstance(rows, int) else None,
         },
     )
+
+
+def _build_sequence_view_contract_check(
+    *,
+    check_id: str,
+    check_group: str,
+    phase: str,
+    phase_id: str,
+    summary: str,
+    required: bool,
+    artifact_id: str,
+    expected_payload: object,
+    contract: _StudyOpsContractLike,
+    repo_root: Path,
+    study_root: Path,
+    dataset_index: Mapping[str, Mapping[str, object]],
+    base_details: Mapping[str, object],
+) -> PreflightCheck:
+    artifact_state = _resolve_artifact_state(
+        artifact_id=artifact_id,
+        contract=contract,
+        repo_root=repo_root,
+        study_root=study_root,
+        dataset_index=dataset_index,
+    )
+    if not bool(artifact_state["exists"]):
+        return build_state_check(
+            check_id=check_id,
+            kind="sequence_view_contract",
+            required=required,
+            check_group=check_group,
+            phase=phase,
+            phase_id=phase_id,
+            state="missing",
+            summary=f"{summary.rstrip('.')} Missing dataset artifact: {artifact_state['path']}.",
+            artifact_id=artifact_id,
+            details={**dict(base_details), **artifact_state},
+        )
+    dataset_id = str(artifact_state.get("dataset_id") or "").strip()
+    dataset_state = dict(dataset_index.get(dataset_id) or {})
+    usr_root = str(dataset_state.get("usr_root") or "").strip()
+    if not dataset_id or not usr_root:
+        return build_state_check(
+            check_id=check_id,
+            kind="sequence_view_contract",
+            required=required,
+            check_group=check_group,
+            phase=phase,
+            phase_id=phase_id,
+            state="attention",
+            summary=f"{summary.rstrip('.')} Dataset root could not be resolved for artifact {artifact_id}.",
+            artifact_id=artifact_id,
+            details={**dict(base_details), **artifact_state},
+        )
+    try:
+        expectation = _sequence_view_expectation_from_payload(expected_payload)
+        report = validate_sequence_view_contract(
+            Dataset(Path(usr_root), dataset_id),
+            expectation=expectation,
+            raise_on_error=False,
+        )
+    except Exception as exc:
+        return build_state_check(
+            check_id=check_id,
+            kind="sequence_view_contract",
+            required=required,
+            check_group=check_group,
+            phase=phase,
+            phase_id=phase_id,
+            state="attention",
+            summary=f"{summary.rstrip('.')} Sequence-view contract probe failed: {exc}",
+            artifact_id=artifact_id,
+            details={**dict(base_details), **artifact_state, "probe_error": str(exc)},
+        )
+    report_details = {
+        "dataset": report.dataset,
+        "total_records": report.total_records,
+        "total_views": report.total_views,
+        "counts_by_product_kind": report.counts_by_product_kind,
+        "counts_by_orientation": report.counts_by_orientation,
+        "counts_by_context_kind": report.counts_by_context_kind,
+        "counts_by_recommended_pooling": report.counts_by_recommended_pooling,
+        "invalid_bounds": report.invalid_bounds,
+        "errors": list(report.errors),
+    }
+    return build_state_check(
+        check_id=check_id,
+        kind="sequence_view_contract",
+        required=required,
+        check_group=check_group,
+        phase=phase,
+        phase_id=phase_id,
+        state="ok" if report.ok else "attention",
+        summary=summary if report.ok else f"{summary.rstrip('.')} {len(report.errors)} contract error(s).",
+        artifact_id=artifact_id,
+        details={
+            **dict(base_details),
+            **artifact_state,
+            **report_details,
+        },
+    )
+
+
+def _build_infer_sequence_view_completion_check(
+    *,
+    check_id: str,
+    check_group: str,
+    phase: str,
+    phase_id: str,
+    summary: str,
+    required: bool,
+    surface_id: str,
+    expected_payload: object,
+    contract: _StudyOpsContractLike,
+    repo_root: Path,
+    study_root: Path,
+    dependencies: ContractPreflightCheckDependencies,
+    base_details: Mapping[str, object],
+) -> PreflightCheck:
+    surface_payload = dict(contract.execution_surfaces.get(surface_id) or {})
+    argv = tuple(str(token) for token in surface_payload.get("argv") or ())
+    execution = dependencies.run_preflight_command(
+        argv,
+        cwd=_resolve_command_cwd(
+            surface_payload=surface_payload,
+            repo_root=repo_root,
+            study_root=study_root,
+        ),
+    )
+    base_command_details = {
+        **dict(base_details),
+        "surface": surface_id,
+    }
+    if execution.returncode != 0 or execution.timed_out:
+        return build_command_check(
+            check_id=check_id,
+            kind="infer_sequence_view_completion",
+            required=required,
+            check_group=check_group,
+            phase=phase,
+            phase_id=phase_id,
+            summary=summary,
+            execution=execution,
+            surface_id=surface_id,
+            details=base_command_details,
+        )
+
+    try:
+        raw_payload = json.loads(execution.stdout or "null")
+        plans = _infer_completion_plan_list(raw_payload)
+        aggregate = _aggregate_infer_completion_plans(plans)
+        expectation = _infer_completion_expectation_from_payload(expected_payload)
+    except Exception as exc:
+        return build_command_check(
+            check_id=check_id,
+            kind="infer_sequence_view_completion",
+            required=required,
+            check_group=check_group,
+            phase=phase,
+            phase_id=phase_id,
+            summary=f"{summary.rstrip('.')} Infer completion planner output could not be parsed: {exc}",
+            execution=execution,
+            surface_id=surface_id,
+            details={**base_command_details, "probe_error": str(exc)},
+            override_state="attention",
+        )
+
+    violations = _infer_completion_threshold_violations(aggregate=aggregate, expectation=expectation)
+    state = "attention" if violations else "ok"
+    resolved_summary = (
+        f"{summary.rstrip('.')}. "
+        f"reusable_vectors={aggregate['reusable_vectors']} stale_vectors={aggregate['stale_vectors']} "
+        f"missing_vectors={aggregate['missing_vectors']} reusable_scalars={aggregate['reusable_scalars']} "
+        f"stale_scalars={aggregate['stale_scalars']} missing_scalars={aggregate['missing_scalars']} "
+        f"missing_products={aggregate['missing_products']}."
+    )
+    return build_command_check(
+        check_id=check_id,
+        kind="infer_sequence_view_completion",
+        required=required,
+        check_group=check_group,
+        phase=phase,
+        phase_id=phase_id,
+        summary=resolved_summary,
+        execution=execution,
+        surface_id=surface_id,
+        details={
+            **base_command_details,
+            **aggregate,
+            "thresholds": expectation,
+            "violations": violations,
+            "plans": plans,
+        },
+        override_state=state,
+    )
+
+
+def _infer_completion_plan_list(payload: object) -> list[dict[str, object]]:
+    if isinstance(payload, Mapping) and isinstance(payload.get("plans"), list):
+        payload = payload["plans"]
+    if not isinstance(payload, list):
+        raise ValueError("expected a JSON list or an object with a plans list.")
+    plans: list[dict[str, object]] = []
+    for index, item in enumerate(payload, start=1):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"plan entry {index} must be a mapping.")
+        plans.append(dict(item))
+    if not plans:
+        raise ValueError("planner returned zero plans.")
+    return plans
+
+
+def _aggregate_infer_completion_plans(plans: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    scalar_fields = (
+        "required_views",
+        "required_vectors",
+        "required_scalars",
+        "existing_vectors",
+        "existing_scalars",
+        "reusable_vectors",
+        "reusable_scalars",
+        "stale_vectors",
+        "stale_scalars",
+        "missing_vectors",
+        "missing_scalars",
+        "missing_products",
+        "persisted_vector_reusable",
+        "persisted_scalar_reusable",
+        "existing_aliases",
+        "existing_scalar_aliases",
+    )
+    totals = {field: 0 for field in scalar_fields}
+    product_counts: Counter[str] = Counter()
+    orientation_counts: Counter[str] = Counter()
+    pooling_counts: Counter[str] = Counter()
+    command_lists: dict[str, list[str]] = {
+        "construct_completion": [],
+        "infer_backfill": [],
+    }
+    datasets: list[str] = []
+    bundle_ids: list[str] = []
+    model_families: list[str] = []
+    for plan in plans:
+        for field in scalar_fields:
+            totals[field] += _required_int(plan.get(field, 0))
+        _update_counter(product_counts, plan.get("by_product_kind"))
+        _update_counter(orientation_counts, plan.get("by_orientation"))
+        _update_counter(pooling_counts, plan.get("by_pooling_operation"))
+        commands = plan.get("commands")
+        if isinstance(commands, Mapping):
+            for key in command_lists:
+                command_lists[key].extend(str(item) for item in commands.get(key) or () if str(item).strip())
+        dataset = str(plan.get("dataset") or "").strip()
+        if dataset:
+            datasets.append(dataset)
+        bundle_id = str(plan.get("bundle_id") or "").strip()
+        if bundle_id:
+            bundle_ids.append(bundle_id)
+        model_family = str(plan.get("model_family") or "").strip()
+        if model_family:
+            model_families.append(model_family)
+    return {
+        "plans_count": len(plans),
+        "datasets": _ordered_unique(datasets),
+        "bundle_ids": _ordered_unique(bundle_ids),
+        "model_families": _ordered_unique(model_families),
+        **totals,
+        "counts_by_product_kind": dict(sorted(product_counts.items())),
+        "counts_by_orientation": dict(sorted(orientation_counts.items())),
+        "counts_by_pooling_operation": dict(sorted(pooling_counts.items())),
+        "commands": {key: _ordered_unique(values) for key, values in command_lists.items()},
+    }
+
+
+def _update_counter(counter: Counter[str], payload: object) -> None:
+    if not isinstance(payload, Mapping):
+        return
+    for raw_key, raw_value in payload.items():
+        key = str(raw_key or "").strip()
+        if key:
+            counter[key] += _required_int(raw_value)
+
+
+def _ordered_unique(values: Sequence[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
+
+
+def _infer_completion_expectation_from_payload(payload: object) -> dict[str, int]:
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, Mapping):
+        raise ValueError("infer_sequence_view_completion expected payload must be a mapping.")
+    return {
+        "max_missing_vectors": _optional_int(payload.get("max_missing_vectors")) or 0,
+        "max_missing_scalars": _optional_int(payload.get("max_missing_scalars")) or 0,
+        "max_stale_vectors": _optional_int(payload.get("max_stale_vectors")) or 0,
+        "max_stale_scalars": _optional_int(payload.get("max_stale_scalars")) or 0,
+        "max_missing_products": _optional_int(payload.get("max_missing_products")) or 0,
+    }
+
+
+def _infer_completion_threshold_violations(
+    *,
+    aggregate: Mapping[str, object],
+    expectation: Mapping[str, int],
+) -> list[str]:
+    checks = (
+        ("missing_vectors", "max_missing_vectors"),
+        ("missing_scalars", "max_missing_scalars"),
+        ("stale_vectors", "max_stale_vectors"),
+        ("stale_scalars", "max_stale_scalars"),
+        ("missing_products", "max_missing_products"),
+    )
+    violations: list[str] = []
+    for observed_key, threshold_key in checks:
+        observed = _required_int(aggregate.get(observed_key, 0))
+        threshold = _required_int(expectation.get(threshold_key, 0))
+        if observed > threshold:
+            violations.append(f"{observed_key}={observed} exceeds {threshold_key}={threshold}")
+    return violations
+
+
+def _sequence_view_expectation_from_payload(payload: object) -> SequenceViewContractExpectation:
+    if payload is None:
+        return SequenceViewContractExpectation()
+    if not isinstance(payload, Mapping):
+        raise ValueError("sequence_view_contract expected payload must be a mapping.")
+    return SequenceViewContractExpectation(
+        total_records=_optional_int(payload.get("total_records")),
+        total_views=_optional_int(payload.get("total_views")),
+        counts_by_product_kind=_string_int_mapping(payload.get("counts_by_product_kind")),
+        counts_by_orientation=_string_int_mapping(payload.get("counts_by_orientation")),
+        counts_by_context_kind=_string_int_mapping(payload.get("counts_by_context_kind")),
+        counts_by_recommended_pooling=_string_int_mapping(payload.get("counts_by_recommended_pooling")),
+        exact_lengths_by_product_kind=_string_int_mapping(payload.get("exact_lengths_by_product_kind")),
+        require_bounds_for_pooling=tuple(
+            str(item).strip()
+            for item in payload.get("require_bounds_for_pooling", ("anchor_mean",))
+            if str(item).strip()
+        ),
+    )
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError("sequence_view_contract integer expectations must not be boolean.")
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    return int(text) if text else None
+
+
+def _string_int_mapping(value: object) -> dict[str, int]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("sequence_view_contract count expectations must be mappings.")
+    out: dict[str, int] = {}
+    for raw_key, raw_value in value.items():
+        key = str(raw_key or "").strip()
+        if not key:
+            raise ValueError("sequence_view_contract count expectation keys must be non-empty.")
+        out[key] = _required_int(raw_value)
+    return out
+
+
+def _required_int(value: object) -> int:
+    resolved = _optional_int(value)
+    if resolved is None:
+        raise ValueError("sequence_view_contract count expectation values must be integers.")
+    return resolved
 
 
 def _resolve_artifact_state(

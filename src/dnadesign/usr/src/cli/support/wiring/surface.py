@@ -26,6 +26,7 @@ _ROOT_HELP = (
 class CliApps:
     app: typer.Typer
     remotes_app: typer.Typer
+    genbank_app: typer.Typer
     legacy_app: typer.Typer
     maintenance_app: typer.Typer
     densegen_app: typer.Typer
@@ -38,6 +39,7 @@ class CliApps:
 def build_cli_apps(*, show_dev_commands: bool) -> CliApps:
     app = typer.Typer(add_completion=True, no_args_is_help=True, help=_ROOT_HELP)
     remotes_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Manage SSH remotes.")
+    genbank_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Import GenBank-backed references.")
     legacy_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Legacy dataset utilities.")
     maintenance_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Dataset maintenance utilities.")
     densegen_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Densegen-specific utilities.")
@@ -47,6 +49,7 @@ def build_cli_apps(*, show_dev_commands: bool) -> CliApps:
     state_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Record state utilities.")
 
     app.add_typer(remotes_app, name="remotes")
+    app.add_typer(genbank_app, name="genbank")
     app.add_typer(legacy_app, name="legacy")
     app.add_typer(maintenance_app, name="maintenance")
     app.add_typer(densegen_app, name="densegen")
@@ -59,6 +62,7 @@ def build_cli_apps(*, show_dev_commands: bool) -> CliApps:
     return CliApps(
         app=app,
         remotes_app=remotes_app,
+        genbank_app=genbank_app,
         legacy_app=legacy_app,
         maintenance_app=maintenance_app,
         densegen_app=densegen_app,

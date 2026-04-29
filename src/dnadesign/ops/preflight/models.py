@@ -21,9 +21,11 @@ _SUPPORTED_PREFLIGHT_CHECK_KINDS = frozenset(
         "dataset_snapshot",
         "environment",
         "gpu_availability",
+        "infer_sequence_view_completion",
         "path_exists",
         "runbook_plan",
         "scheduler_queue",
+        "sequence_view_contract",
         "workspace_layout",
     }
 )

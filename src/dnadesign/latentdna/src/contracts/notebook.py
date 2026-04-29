@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+HueKind = Literal["categorical", "binary", "continuous", "ordinal"]
+
 
 class StrictNotebookModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -22,6 +24,9 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     geometry_order: list[str] = Field(default_factory=list)
     candidate_grid_views: list[str] = Field(default_factory=list)
     candidate_grid_panel_titles: list[str] = Field(default_factory=list)
+    preferred_hues: list[str] = Field(default_factory=list)
+    preferred_hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
+    default_layout: str | None = None
     default_compare_views: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -95,7 +100,8 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     default_compare_right: str | None = None
     geometries: list[WorkspaceNotebookGeometry]
     preferred_hues: list[str]
-    hue_kinds: dict[str, Literal["categorical", "binary", "continuous", "ordinal"]] = Field(default_factory=dict)
+    row_metadata_hues: list[str] = Field(default_factory=list)
+    hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
     joinable_tables: list[WorkspaceNotebookTableRef]
     layout_presets: list[WorkspaceNotebookLayoutPreset]
     comparison_bases: list[WorkspaceNotebookComparisonBasis]

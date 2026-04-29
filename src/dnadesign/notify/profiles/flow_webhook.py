@@ -16,8 +16,8 @@ from pathlib import Path
 
 import typer
 
+from ..core.errors import NotifyConfigError
 from ..delivery.secrets import is_secret_backend_available, parse_secret_ref, resolve_secret_ref, store_secret_ref
-from ..errors import NotifyConfigError
 from .policy import DEFAULT_WEBHOOK_ENV
 from .resolve import resolve_cli_optional_string
 

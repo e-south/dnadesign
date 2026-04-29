@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from ..errors import NotifyDeliveryError
+from ..core.errors import NotifyDeliveryError
 
 
 def post_json(

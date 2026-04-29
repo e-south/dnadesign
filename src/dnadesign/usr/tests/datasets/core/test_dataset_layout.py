@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr.src.cli import _resolve_dataset_name_interactive, _resolve_existing_dataset_id, list_datasets
 from dnadesign.usr.src.contracts import SequencesError
 from dnadesign.usr.src.dataset import Dataset, normalize_dataset_id

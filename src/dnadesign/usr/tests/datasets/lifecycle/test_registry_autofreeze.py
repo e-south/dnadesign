@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.registry import registry_hash
 

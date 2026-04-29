@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from contextlib import contextmanager
 from pathlib import Path
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.datasets.merge import MergeColumnsMode, MergePolicy, merge_usr_to_usr
 from dnadesign.usr.src.datasets.merge import execution as merge_module

@@ -8,6 +8,7 @@ Use **[docs/README.md](README.md)** as the primary docs entry. This page is a co
 
 ### Tutorials
 - **[TFBS baseline tutorial](tutorials/demo_tfbs_baseline.md)**
+- **[Dense array showcase tutorial](tutorials/demo_dense_array_showcase.md)**
 - **[Sampling baseline tutorial](tutorials/demo_sampling_baseline.md)**
 - **[Constitutive sigma panel study tutorial](tutorials/study_constitutive_sigma_panel.md)**
 - **[Stress ethanol and ciprofloxacin study tutorial](tutorials/study_stress_ethanol_cipro.md)**

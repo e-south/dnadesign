@@ -40,7 +40,7 @@ Run and record the exact commands and outcomes:
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pytest -q`
-- `uv run python -m dnadesign.devtools.docs_checks`
+- `uv run python -m dnadesign.devtools.docs.checks`
 - <Manual CLI/API path run and expected output>
 
 ### Links

@@ -1,0 +1,124 @@
+study_id: regulondb_native_promoter_panel
+usr_remotes_path: n/a
+datasets:
+  - role: native_promoter_source
+    dataset: usr_regulondb_native_promoters
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: local_validated_untracked
+    lifecycle: source
+    owner_tool: usr
+    onboard_mode: create_new
+    authority: shared
+    notes: >-
+      Local generated native reference dataset created from a deterministic
+      Cruncher promoter superset export. The dataset id is intentionally stable,
+      but the source scope is a strict deduplicated native promoter panel, not a
+      live-only RegulonDB route dump. The current base rows are drawn from
+      release-pinned RegulonDB 13 PromoterSet.tsv and historical RegulonDB 11
+      PromoterSet.csv source rows that have strict ACGT sequence and sigma
+      evidence after sequence-level grouping. Live RegulonDB 14.5 GraphQL
+      promoter route rows are documented as a modern overlay/source-completeness
+      check, while RegulonDB 13 sigmulon, RegulonDB 11 RACE/454, RegulonDB 11
+      prediction rows, and EcoCyc 28 promoter SmartTable rows remain
+      inventoried/deferred strata. The dataset keeps one canonical sequence row
+      per deduplicated retained sequence and places source identities, skipped
+      rows, excluded no-sigma rows, sigma affiliations, coordinates,
+      predictions, evidence, citations, boxes, and other many-to-many metadata
+      in relation sidecars. Write mode also emits dataset-local sequence-view
+      sidecars: each retained native row is a generic source_record view, with
+      RegulonDB-specific source family, strict selection basis, study collection,
+      and role tags stored in view_semantics rather than product_kind. The
+      generated dataset root is intentionally ignored by git and should be moved
+      through USR data sync rather than committed. As of 2026-04-29, the
+      dataset is materialized in the local canonical USR root with 3,182 base
+      rows and passes `uv run usr validate usr_regulondb_native_promoters
+      --strict`.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: native_full_features_7b
+    dataset: infer_regulondb_native_promoter_views_7b
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: infer
+    onboard_mode: create_new
+    authority: shared
+    notes: >-
+      Planned Evo2 7B native/full promoter feature surface. The checked-in Infer
+      config consumes `source_record` sequence views from
+      `usr_regulondb_native_promoters` with `seq_mean` pooling and writes
+      canonical intermediate-embedding, output-layer-mean, and log-likelihood
+      scalar sidecars under the source dataset's `_derived/infer` directory.
+      The local completion inventory currently reports all vectors/scalars
+      missing because no Evo2 batch has run.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: native_core60_view
+    dataset: usr_regulondb_native_promoter_core60
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: local_validated_untracked
+    lifecycle: shared_handoff
+    owner_tool: construct
+    onboard_mode: create_new
+    authority: shared
+    notes: >-
+      Local generated TSS-upstream core60 view materialized by Construct on
+      2026-04-29. The local native source dataset has no populated -10/-35 box
+      annotations, but its RegulonDB source-window contract places TSS at
+      sequence offset 60. Construct therefore emits the half-open upstream
+      interval `[0,60)` as an `analysis_window` with `core60_mean` pooling
+      metadata. The dataset validates strictly and contains 3,181 canonical
+      60 bp sequence rows plus 3,182 sequence-view rows; the one-row difference
+      is expected USR sequence deduplication for duplicate derived windows, not
+      a lost source view.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: native_core60_features_7b
+    dataset: infer_regulondb_native_promoter_core60_views_7b
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: infer
+    onboard_mode: create_new
+    authority: shared
+    notes: >-
+      Planned Evo2 7B feature surface for the Construct-derived TSS-upstream
+      core60 dataset. The checked-in Infer config consumes `analysis_window`
+      sequence views from `usr_regulondb_native_promoter_core60` with
+      `core60_mean` pooling and writes the same intermediate-embedding,
+      output-layer-mean, and log-likelihood scalar sidecars as the native/full
+      lane under that dataset's `_derived/infer` directory.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a

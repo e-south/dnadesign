@@ -6,7 +6,7 @@ src/dnadesign/densegen/src/cli/run_outcome_sources.py
 Resolve DenseGen run outcome/pressure summaries from finalized manifests or the
 best available workspace artifacts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

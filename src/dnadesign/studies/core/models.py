@@ -76,6 +76,7 @@ class StudyPhaseContract:
     blocker: str | None = None
     output_dataset: str | None = None
     primary_dataset: str | None = None
+    required_for_main_study_state: bool = True
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -85,6 +86,7 @@ class StudyPhaseContract:
             "blocker": self.blocker,
             "output_dataset": self.output_dataset,
             "primary_dataset": self.primary_dataset,
+            "required_for_main_study_state": self.required_for_main_study_state,
         }
 
 

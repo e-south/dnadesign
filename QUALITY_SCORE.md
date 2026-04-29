@@ -41,8 +41,8 @@ Each score uses a `0-4` rubric:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ci-devtools` | contract enforcement | 3 | stable | enforced | `.github/workflows/ci.yaml`; `src/dnadesign/devtools` | dnadesign-maintainers | 2026-02-18 | keep scope and boundary checks test-backed |
 | `tool-coverage` | correctness floor | 3 | stable | enforced | `.github/tool-coverage-baseline.json`; `https://codecov.io/gh/e-south/dnadesign` | dnadesign-maintainers | 2026-02-18 | raise non-zero baselines for currently unmeasured tools |
-| `docs-sor` | documentation fidelity | 3 | improving | enforced | `src/dnadesign/devtools/docs_checks.py`; `docs/exec-plans/README.md` | dnadesign-maintainers | 2026-02-18 | expand owner granularity to per-domain maintainers |
-| `architecture-boundaries` | architecture invariants | 3 | improving | enforced | `ARCHITECTURE.md`; `DESIGN.md`; `src/dnadesign/devtools/docs_checks.py`; boundary contract tests in tool packages | dnadesign-maintainers | 2026-03-18 | keep root docs abstract, tool READMEs lightweight, and boundary contracts test-backed |
+| `docs-sor` | documentation fidelity | 3 | improving | enforced | `src/dnadesign/devtools/docs/checks.py`; `docs/exec-plans/README.md` | dnadesign-maintainers | 2026-02-18 | expand owner granularity to per-domain maintainers |
+| `architecture-boundaries` | architecture invariants | 3 | improving | enforced | `ARCHITECTURE.md`; `DESIGN.md`; `src/dnadesign/devtools/docs/checks.py`; boundary contract tests in tool packages | dnadesign-maintainers | 2026-03-18 | keep root docs abstract, tool READMEs lightweight, and boundary contracts test-backed |
 
 ## Generated score inputs
 - Score inputs are generated in CI only for full-core scope (`run_full_core=true`) from:
@@ -59,20 +59,20 @@ Each score uses a `0-4` rubric:
 ## Mechanical enforcement coverage
 | Contract | Enforcement path | Status |
 | --- | --- | --- |
-| Docs naming/link integrity | `dnadesign.devtools.docs_checks` + CI | enforced |
+| Docs naming/link integrity | `dnadesign.devtools.docs.checks` + CI | enforced |
 | Core vs external integration test semantics | pytest markers + CI lanes | enforced |
-| External integration non-skipped execution (per in-scope external integration tool) | `dnadesign.devtools.pytest_gate` + JUnit XML in CI | enforced |
-| Per-tool coverage floors | `dnadesign.devtools.tool_coverage` + baseline JSON | enforced |
-| Quality score input generation | `dnadesign.devtools.coverage_summary` + `dnadesign.devtools.quality_score` in CI | enforced |
-| Tool-inventory alignment | `dnadesign.devtools.ci_changes` contracts | enforced |
-| Root README tool catalog integrity | `dnadesign.devtools.docs_checks` tool table + path checks | enforced |
-| Runbook catalog completeness and registry metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Selected runbook metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Operational runbook path placement | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Transient operational artifact placement (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Active shared USR dataset id policy | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Cross-tool boundary terminology drift prevention | `dnadesign.devtools.docs_checks` stale-term checks + CI | enforced |
-| Tool-boundary utility placement (`src/dnadesign/utils` disallowed) | `dnadesign.devtools.docs_checks` shared-utils path check + CI | enforced |
+| External integration non-skipped execution (per in-scope external integration tool) | `dnadesign.devtools.runtime.pytest_gate` + JUnit XML in CI | enforced |
+| Per-tool coverage floors | `dnadesign.devtools.quality.tool_coverage` + baseline JSON | enforced |
+| Quality score input generation | `dnadesign.devtools.quality.coverage_summary` + `dnadesign.devtools.quality.score` in CI | enforced |
+| Tool-inventory alignment | `dnadesign.devtools.ci.changes` contracts | enforced |
+| Root README tool catalog integrity | `dnadesign.devtools.docs.checks` tool table + path checks | enforced |
+| Runbook catalog completeness and registry metadata | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Selected runbook metadata | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Operational runbook path placement | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Transient operational artifact placement (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Active shared USR dataset id policy | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Cross-tool boundary terminology drift prevention | `dnadesign.devtools.docs.checks` stale-term checks + CI | enforced |
+| Tool-boundary utility placement (`src/dnadesign/utils` disallowed) | `dnadesign.devtools.docs.checks` shared-utils path check + CI | enforced |
 | Selected cross-tool runbook safety contracts | `dnadesign.ops.runbooks.schema`; orchestration contract tests | enforced |
 | Dataset overlay namespace validity at orchestration boundaries | `dnadesign.ops.runbooks.schema` + orchestration contract tests | enforced |
 

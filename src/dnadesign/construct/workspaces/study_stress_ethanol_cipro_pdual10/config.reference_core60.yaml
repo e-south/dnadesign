@@ -1,0 +1,56 @@
+job:
+  id: construct_prom_eth_cip_reference_core60
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: usr_promoter_references
+      root: ../../../usr/datasets
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_window
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: annotation_pair_midpoint
+          first:
+            role_hint: sigma70_minus35
+            labels: ["-35"]
+          second:
+            role_hint: sigma70_minus10
+            labels: ["-10"]
+          confidence: high
+    over_length_policy:
+      kind: trim
+      target_length: 60
+      require_focal_inside: true
+    under_length_policy:
+      kind: expand_from_template
+      target_length: 60
+      template:
+        id: pdual10_forward_anchor_window
+        source:
+          kind: usr
+          dataset: usr_pdual10_plasmid_template
+          root: ../../../usr/datasets
+          record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+          field: sequence
+        circular: true
+      placement_ref: replace:3574-3666
+    feature_retention_policy:
+      fail_if_loses_roles: [sigma70_minus35, sigma70_minus10]
+      warn_if_clips_roles: [TFBS]
+    fallback_policy:
+      allow_low_confidence: false
+      mark_low_confidence_rows: false
+    emit_feature_retention_report: true
+    output_sequence_view:
+      create: true
+      recommended_pooling: core60_mean
+  output:
+    on_conflict: ignore
+    target:
+      kind: usr
+      dataset: construct_prom_eth_cip_reference_core60
+      root: ../../../usr/datasets

@@ -5,7 +5,7 @@ src/dnadesign/studies/families/cruncher/adapter.py
 
 Cruncher study-family adapter for tracked study snapshots and preflights.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

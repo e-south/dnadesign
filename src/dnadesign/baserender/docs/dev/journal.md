@@ -620,3 +620,110 @@ Conclusion: base track/kmer rendering is already compatible.
 - `uv run ruff format --check src/dnadesign/baserender` -> passed
 - `uv run baserender job validate --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed
 - `uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed
+
+## 2026-04-26 - CLI information-architecture consolidation
+
+### Audit finding
+
+- BaseRender's CLI implementation was split across loose root modules:
+  - `src/dnadesign/baserender/src/cli.py`
+  - `src/dnadesign/baserender/src/cli_actions.py`
+- The package-root `dnadesign.baserender.cli` facade remains the console-script target; implementation lives under `src/cli/`.
+
+### Refactor
+
+- Moved CLI implementation under the organized source package:
+  - `src/dnadesign/baserender/src/cli/app.py`
+  - `src/dnadesign/baserender/src/cli/actions.py`
+  - `src/dnadesign/baserender/src/cli/__init__.py`
+- Kept the `baserender` console script pointed at `dnadesign.baserender.cli:app`.
+- Added package-layout tests so loose `src/cli.py` and `src/cli_actions.py` do not regress.
+
+### Deferred IA findings
+
+- Output emission is now split under `src/dnadesign/baserender/src/outputs/`; keep future writer behavior in the focused image/video modules instead of reintroducing a flat `outputs.py`.
+- `src/dnadesign/baserender/src/config/cruncher_showcase_job.py` still owns too much of the job-schema parsing lifecycle; a future slice should move path resolution, output parsing, and run parsing behind package-local modules.
+- `src/dnadesign/baserender/src/render/sequence_rows.py` remains a rendering monolith; future visual feature additions should extract layout sections, glyph/track rendering, and legend/header composition rather than growing this file.
+
+## 2026-04-26 - Output writer package split
+
+### Refactor
+
+- Split the flat output writer module into focused package modules:
+  - `src/dnadesign/baserender/src/outputs/images.py`
+  - `src/dnadesign/baserender/src/outputs/video.py`
+  - `src/dnadesign/baserender/src/outputs/names.py`
+  - `src/dnadesign/baserender/src/outputs/__init__.py`
+- Kept the existing `dnadesign.baserender.src.outputs` import surface for `write_images`, `write_video`, and existing test-visible helper functions.
+- Added a package-layout regression test so `src/outputs.py` does not return.
+
+### Remaining IA risks
+
+- `src/dnadesign/baserender/src/config/cruncher_showcase_job.py` still needs a focused config-parser package split.
+- `src/dnadesign/baserender/src/render/sequence_rows.py` remains the largest visual-rendering monolith and should be decomposed before adding more visual behavior.
+
+## 2026-04-26 - BaseRender boundary hardening
+
+### Refactor
+
+- Enforced adapter compatibility at job-parse time:
+  - adapter `supported_renderers` must include the requested renderer
+  - adapter `supported_alphabets` must include the declared input alphabet
+- Made video sizing fail fast when explicit `width_px`, `height_px`, and aspect settings disagree.
+- Repointed the `baserender` console script at the public `dnadesign.baserender.cli:app` facade while keeping CLI implementation under `src/cli/`.
+- Made package-root imports lazy so `import dnadesign.baserender` does not eagerly load numpy, matplotlib, the render stack, or the runtime API.
+- Changed `run.emit_report` to opt-in by default, matching the reference docs and workspace scaffolds.
+- Added explicit `.baserender-workspace` markers so workspace behavior is not inferred from incidental `job.yaml` plus `inputs/` and `outputs/` directories.
+- Refreshed BaseRender-local agent guidance to match the current `src/`, `tests/`, and `workspaces/` layout.
+
+### Remaining IA risks
+
+- `Record.meta` still carries some implicit render/output control state. The next cleanup should introduce a typed render/output context instead of growing that side channel.
+- `cruncher_showcase_job.py` remains the main config parser concentration point; future config additions should move into focused parser modules.
+- `render/sequence_rows.py` remains the largest rendering module; future visual additions should extract layout, glyph/track, legend, and header concerns first.
+
+## 2026-04-26 - Render-contract descriptor hardening
+
+### Refactor
+
+- Added explicit render-contract descriptors in `src/dnadesign/baserender/src/config/job_contracts.py`.
+- Kept `BaseRenderJobV3` / `RenderJobV3` as the generic orchestration schema, while adding use-case descriptors:
+  - `sequence_rows_render_v3`
+  - `nucleotide_evidence_map_render_v3`
+  - `hairpin_cartoon_render_v3`
+  - `topology_cartoon_render_v3`
+  - `snapback_map_render_v3`
+- Added `src/dnadesign/baserender/src/config/jobs/base_render_v3.py` as the canonical generic job-schema namespace.
+- Kept `src/dnadesign/baserender/src/config/jobs/sequence_rows_v3.py` as a compatibility/use-case namespace instead of the generic authority.
+- Added optional YAML `contract.kind` validation so declared render contracts fail fast when paired with an incompatible `render.renderer`.
+- Routed public API adapter helpers through the same adapter descriptor validation as job YAML.
+- Replaced raw scalar coercions in the job parser with field-aware `SchemaError` failures.
+
+### Remaining IA risks
+
+- `nucleotide_evidence_map` still shares the sequence-row implementation; the descriptor now names the semantic use case, but a dedicated renderer implementation remains future work if behavior diverges.
+- `Record.meta` remains the main untyped cross-layer control channel.
+- `SequenceRowsRenderer` still needs decomposition into explicit planning and drawing passes.
+
+## 2026-04-26 - BaseRender source-package IA hardening
+
+### Refactor
+
+- Removed the package-root `dnadesign.baserender.cli` facade and repointed the `baserender` console script directly at `dnadesign.baserender.src.cli.app:app`.
+- Moved loose implementation modules out of `src/dnadesign/baserender/src/`:
+  - API implementation: `src/public/api.py`
+  - job execution: `src/execution/runner.py`
+  - runtime bootstrap: `src/runtime/bootstrap.py`
+  - workspace model/resolution: `src/workspaces/`
+  - curated showcase style: `src/styles/curated/`
+- Added layout tests requiring `src/__init__.py` to be the only Python file directly under the implementation root.
+- Made `--workspace` resolution require the `.baserender-workspace` marker plus `inputs/` and `outputs/`, matching discovery behavior.
+- Made strict/fail-on-skips jobs materialize skip state before writing images, videos, or reports.
+- Added explicit `contract.kind: sequence_rows_render_v3` to checked-in demos and docs examples.
+- Removed the tracked generated Matplotlib cache file from the demo workspace and added a tracked-artifact guard.
+
+### Remaining IA risks
+
+- `src/config/cruncher_showcase_job.py` still owns too much parsing logic; the next config cleanup should split base-render v3 parser, path, output, run, and compatibility modules.
+- `Record.meta` is still an untyped side channel between adapters, renderers, and output writers.
+- `render/sequence_rows.py` remains a large mixed planning/drawing module and should be decomposed before adding more visual behavior.

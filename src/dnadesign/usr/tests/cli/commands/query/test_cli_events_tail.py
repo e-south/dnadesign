@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.testsupport.usr import register_test_namespace
+from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.cli import app
 

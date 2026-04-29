@@ -5,7 +5,7 @@ src/dnadesign/usr/src/overlays/constants.py
 
 Shared constants for USR overlay storage helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -6,7 +6,7 @@ src/dnadesign/cruncher/tests/docs/test_docs_ontology_contracts.py
 Docs contracts for Cruncher workflow-family ontology and released Snapback route
 vocabulary.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

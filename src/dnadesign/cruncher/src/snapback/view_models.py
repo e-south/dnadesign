@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/view_models.py
 
 Producer-owned QA view contracts for snapback visual artifacts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -69,6 +69,7 @@ CommercialConfidence = Literal[
 ]
 SnapbackTier = Literal["tier1", "tier2", "tier3"]
 YesNoUnknown = Literal["yes", "no", "unknown"]
+RawCutOffsetReference = Literal["motif_start", "motif_end"]
 
 
 def normalize_dna(value: str, *, allow_empty: bool = False) -> str:
@@ -175,6 +176,7 @@ class NickaseCatalogEntry(StrictNickaseModel):
     selection: NickaseSelectionProfile | None = None
     operational: NickaseOperationalProfile | None = None
     raw_cut_notation: str | None = None
+    raw_cut_offset_reference: RawCutOffsetReference | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("id", "specificity_id")

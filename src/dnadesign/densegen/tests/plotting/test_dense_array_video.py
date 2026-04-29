@@ -150,11 +150,14 @@ def _patch_video_job_capture(monkeypatch, captured: dict[str, object]) -> None:
         captured["caller_root"] = caller_root
         captured["job_mapping"] = job_mapping
         captured["adapter_columns"] = dict(job_mapping["input"]["adapter"]["columns"])
-        selection_path = Path(str(job_mapping["selection"]["path"]))
-        with selection_path.open(newline="") as handle:
-            rows = list(csv.DictReader(handle))
-        captured["selection_ids"] = [str(row["id"]) for row in rows]
         captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
+        if "selection" in job_mapping:
+            selection_path = Path(str(job_mapping["selection"]["path"]))
+            with selection_path.open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
+            captured["selection_ids"] = [str(row["id"]) for row in rows]
+        else:
+            captured["selection_ids"] = captured["records_df"]["id"].astype(str).tolist()
         out_path = Path(str(job_mapping["outputs"][0]["path"]))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"fake-mp4")
@@ -214,6 +217,43 @@ def test_dense_array_video_runs_when_enabled_without_only(monkeypatch, tmp_path:
 
     assert captured["selection_ids"] == ["rec_a_1", "rec_b_1", "rec_a_2", "rec_b_2"]
     assert (run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.mp4").exists()
+
+
+def test_dense_array_video_plan_snapshot_counts_bias_selection(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(
+        cfg_path,
+        video_yaml="""
+enabled: true
+mode: all_plans_round_robin_single_video
+sampling:
+  stride: 1
+  max_source_rows: 100
+  max_snapshots: 3
+  plan_snapshots:
+    plan_b: 2
+    plan_a: 1
+playback:
+  target_duration_sec: 5
+  fps: 8
+""",
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    _patch_records_loader(monkeypatch, _base_records_df(), records_path)
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+
+    assert captured["selection_ids"] == ["rec_b_1", "rec_a_2", "rec_b_2"]
 
 
 def test_dense_array_video_requires_explicit_selection_even_when_enabled(monkeypatch, tmp_path: Path) -> None:
@@ -514,6 +554,91 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
         "Sequence rec_a_2 | Plan plan a",
         "Sequence rec_b_2 | Plan plan b",
     ]
+
+
+def test_dense_array_video_can_suppress_header_text(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(
+        cfg_path,
+        video_yaml="""
+enabled: true
+show_title: false
+show_subtitle: false
+mode: all_plans_round_robin_single_video
+sampling:
+  stride: 1
+  max_source_rows: 100
+  max_snapshots: 20
+playback:
+  target_duration_sec: 5
+  fps: 8
+""",
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    _patch_records_loader(monkeypatch, _base_records_df(), records_path)
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+
+    assert captured["job_mapping"]["outputs"][0]["title_text"] is None
+    assert captured["job_mapping"]["outputs"][0]["content_fit"] == "fill_width"
+    assert "selection" not in captured["job_mapping"]
+    assert "video_subtitle" not in captured["adapter_columns"]
+    assert set(captured["records_df"]["densegen__video_subtitle"].tolist()) == {""}
+
+
+def test_dense_array_video_applies_presentation_overrides(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(
+        cfg_path,
+        video_yaml="""
+enabled: true
+mode: all_plans_round_robin_single_video
+presentation:
+  legend_font_size: 30
+  legend_height_px: 176
+  palette:
+    "tf:TF_A": "#0072B2"
+    "promoter:alpha_anchor:upstream": "#332288"
+sampling:
+  stride: 1
+  max_source_rows: 100
+  max_snapshots: 20
+playback:
+  target_duration_sec: 5
+  fps: 8
+""",
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    _patch_records_loader(monkeypatch, _base_records_df(), records_path)
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
+
+    style = captured["job_mapping"]["render"]["style"]["overrides"]
+    assert style["legend_font_size"] == 30
+    assert style["legend_height_px"] == 176.0
+    assert style["palette"]["tf:TF_A"] == "#0072B2"
+    assert style["palette"]["promoter:alpha_anchor:upstream"] == "#332288"
+    assert captured["job_mapping"]["outputs"][0]["title_font_size"] == 30
 
 
 def test_dense_array_video_accepts_ndarray_annotation_payloads(monkeypatch, tmp_path: Path) -> None:

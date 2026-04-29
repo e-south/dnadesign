@@ -5,7 +5,7 @@ src/dnadesign/densegen/src/viz/plot_stage_b_allocation.py
 
 Stage-B TFBS allocation summaries factored out from the occupancy plot module.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -36,6 +36,7 @@ def densegen_job_payload(
 ) -> dict:
     base = {
         "version": 3,
+        "contract": {"kind": "sequence_rows_render_v3"},
         "results_root": str(results_root),
         "input": {
             "kind": "parquet",

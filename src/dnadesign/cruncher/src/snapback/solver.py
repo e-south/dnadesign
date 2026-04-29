@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/solver.py
 
 Bounded co-design solve/search for v3 snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

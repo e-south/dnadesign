@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/snapback/released_projection_selection.py
 Match selection and precursor-boundary validation helpers for released-product
 projection.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/usr/src/events/recording.py
 
 USR event payload assembly and append-only recording.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

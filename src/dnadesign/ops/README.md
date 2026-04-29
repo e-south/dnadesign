@@ -14,7 +14,7 @@ grouping, artifact refs, execution surfaces, and generic readiness checks.
 Family adapters normalize study-local paths and derived refs into that checked-in
 contract, and OPS executes only generic kinds such as `command`,
 `workspace_layout`, `scheduler_queue`, `gpu_availability`, `path_exists`,
-`dataset_snapshot`, and `runbook_plan`.
+`dataset_snapshot`, `sequence_view_contract`, and `runbook_plan`.
 Treat the command families as three neutral surfaces: `ops catalog` is the
 discovery plane, `ops progress` is the observation plane, and `ops runbook` is
 the control plane for deterministic batch execution.
@@ -49,6 +49,7 @@ Use this README for package scope, the shared command entrypoints below, and lin
 - `uv run ops catalog list --simple`: start with a quick inventory from the shell.
 - `uv run ops catalog show <registry-id>`: inspect one registered route, its owner docs, and related procedures.
 - `uv run ops progress explain <registry-id>`: print the required flags before you use a status surface.
+- `uv run ops runbook fill-infer --study-dir docs/studies/<study-id>`: inspect a study's Infer runbooks and plan only incomplete sequence-view lanes.
 - Use [How to use Ops](docs/how-to-use-ops.md) for the expanded command ladder and [Ops orchestration index](../../../docs/operations/README.md) once you are in the runbook lifecycle.
 
 ## Python API

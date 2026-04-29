@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/nickases/scan_plan.py
 
 Precomputed motif scan plans for nickase recognition-site scanning.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

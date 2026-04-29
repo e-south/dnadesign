@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/nickases/test_scan_plan.py
 
 Tests for precomputed nickase motif scan plans.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

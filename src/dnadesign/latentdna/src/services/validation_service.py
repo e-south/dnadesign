@@ -6,7 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..contracts.errors import WorkspaceValidationError
+from dnadesign.usr import SequencesError
+
+from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
 from ..io.json_io import read_json
@@ -24,12 +26,61 @@ _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
         "densegen__required_regulators",
         "usr_label__primary",
     },
-    "sig35_variant": {"densegen__plan", "usr_label__primary"},
+    "sig35_variant": {"usr_label__primary"},
     "spacer_length": {"densegen__used_tfbs_detail", "usr_label__primary"},
     "campaign_prior": {"densegen__plan", "usr_label__primary"},
     "is_control": {"densegen__plan", "usr_label__primary"},
     "source_class": {"densegen__plan", "usr_label__primary"},
+    "regulondb__sigma_factor_set": {"regulondb__sigma_factor_set"},
+    "regulondb__regulator_composition": {"regulondb__regulator_composition"},
+    "regulondb__box_pattern": {"regulondb__box_pattern"},
+    "regulondb__confidence_level_set": {"regulondb__confidence_level_set"},
+    "regulondb__metadata_completeness_class": {"regulondb__metadata_completeness_class"},
 }
+_PROMOTER_METADATA_ANY_COLUMN_GROUPS: dict[str, tuple[set[str], ...]] = {
+    "sig35_variant": (
+        {"densegen__plan"},
+        {"densegen__used_tfbs_detail"},
+        {"seq_annot__features"},
+        {"sequence", "derived__features_retained"},
+    ),
+}
+_NON_MATERIALIZABLE_VIEW_ROLES = {"planned", "retired"}
+_OPTIONAL_SOURCE_ROLES = {"planned", "retired"}
+_MISSING_SOURCE_MARKERS = ("not found", "not initialized")
+
+
+def _normalized_role(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _is_optional_missing_source_error(exc: Exception) -> bool:
+    if isinstance(exc, FileNotFoundError):
+        return True
+    if not isinstance(exc, SourceResolutionError | SequencesError):
+        return False
+    message = str(exc).lower()
+    return any(marker in message for marker in _MISSING_SOURCE_MARKERS)
+
+
+def _materialized_view_source_contract_state(
+    view_dir: Path,
+    *,
+    source_id: str,
+    vector_column: str | None,
+) -> str:
+    manifest_path = view_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return "unknown"
+    manifest = read_json(manifest_path)
+    params = manifest.get("params", {}) if isinstance(manifest, dict) else {}
+    if not isinstance(params, dict):
+        return "unknown"
+    if params.get("source") != source_id:
+        return "stale"
+    if vector_column is not None and params.get("vector_column") != vector_column:
+        return "stale"
+    return "current"
 
 
 def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
@@ -84,11 +135,30 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     for source_id in sorted(context.config.sources):
         source = context.require_source(source_id)
         resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
-        schema_info = inspect_source_schema(resolved)
-        columns = set(schema_info["columns"])
         required_columns = [source.record_key, source.subject_key]
         if source.context_key is not None:
             required_columns.append(source.context_key)
+        try:
+            schema_info = inspect_source_schema(resolved)
+        except Exception as exc:
+            source_role = _normalized_role(getattr(source, "role", None))
+            if source_role not in _OPTIONAL_SOURCE_ROLES or not _is_optional_missing_source_error(exc):
+                raise
+            source_columns[source_id] = set()
+            source_details.append(
+                {
+                    "source_id": source_id,
+                    "kind": source.kind,
+                    "path": resolved.records_path.as_posix() if resolved.records_path is not None else None,
+                    "row_count": 0,
+                    "required_columns": required_columns,
+                    "vector_columns": [],
+                    "validation_status": f"skipped_{source_role}",
+                    "missing_reason": str(exc),
+                }
+            )
+            continue
+        columns = set(schema_info["columns"])
         missing_columns = [name for name in required_columns if name not in columns]
         if missing_columns:
             missing_rendered = ", ".join(missing_columns)
@@ -108,6 +178,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     view_details: list[dict[str, object]] = []
     for view_id in sorted(context.config.views):
         view = context.require_view(view_id)
+        role = str(getattr(view, "role", "") or "").strip().lower()
         if isinstance(view, SourceBackedViewConfig):
             source = context.require_source(view.source)
             columns = source_columns[view.source]
@@ -118,6 +189,11 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                 "vector_kind": view.vector.kind,
                 "coordinate_space_id": view.coordinate_space_id,
             }
+            if role in _NON_MATERIALIZABLE_VIEW_ROLES:
+                view_detail["materialized"] = False
+                view_detail["validation_status"] = f"skipped_{role}"
+                view_details.append(view_detail)
+                continue
             if view.vector.kind == "column" and view.vector.name not in columns:
                 raise WorkspaceValidationError(
                     f"view {view_id} vector column is missing from source {view.source}: {view.vector.name}"
@@ -143,13 +219,23 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                     column for column in required_materialized_columns if column not in materialized_columns
                 )
                 if missing_materialized_columns:
-                    if str(getattr(view, "role", "") or "").strip().lower() != "hidden":
+                    source_contract_state = _materialized_view_source_contract_state(
+                        view_dir,
+                        source_id=view.source,
+                        vector_column=getattr(view.vector, "name", None),
+                    )
+                    if source_contract_state == "stale":
+                        view_detail["materialized_contract_status"] = "stale_source_contract"
+                        view_detail["missing_materialized_row_columns"] = missing_materialized_columns
+                        view_detail["materialized_source"] = "stale"
+                    elif str(getattr(view, "role", "") or "").strip().lower() != "hidden":
                         raise WorkspaceValidationError(
                             "materialized view rows are missing configured metadata columns: "
                             f"{view_id} ({missing_materialized_columns})"
                         )
-                    view_detail["materialized_contract_status"] = "skipped_hidden"
-                    view_detail["missing_materialized_row_columns"] = missing_materialized_columns
+                    else:
+                        view_detail["materialized_contract_status"] = "skipped_hidden"
+                        view_detail["missing_materialized_row_columns"] = missing_materialized_columns
                 else:
                     view_detail["materialized_contract_status"] = "ok"
                 view_detail["materialized"] = True
@@ -206,6 +292,13 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
         if missing:
             raise WorkspaceValidationError(
                 f"cohort {cohort_id} promoter metadata inputs are missing from source {cohort.source}: {missing}"
+            )
+        any_groups = _PROMOTER_METADATA_ANY_COLUMN_GROUPS.get(cohort.derive, ())
+        if any_groups and not any(group.issubset(source_columns[cohort.source]) for group in any_groups):
+            rendered_groups = ["{" + ", ".join(sorted(group)) + "}" for group in any_groups]
+            raise WorkspaceValidationError(
+                f"cohort {cohort_id} promoter metadata inputs require at least one of "
+                f"{rendered_groups} in source {cohort.source}"
             )
         cohort_details.append(
             {

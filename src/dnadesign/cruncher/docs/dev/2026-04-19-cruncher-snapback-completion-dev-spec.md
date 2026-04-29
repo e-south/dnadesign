@@ -852,7 +852,7 @@ Required checks:
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - targeted `pytest` for new `snapback` and `nickases` coverage
-- `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
+- `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 
 ## Rejected Alternatives
 

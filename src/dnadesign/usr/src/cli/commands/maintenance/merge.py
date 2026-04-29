@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/merge.py
 
 USR CLI maintenance merge command implementations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

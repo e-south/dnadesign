@@ -609,14 +609,14 @@ uv run pytest -q src/dnadesign/cruncher/tests/cli/test_snapback_cli.py
 Repo docs:
 
 ```bash
-uv run python -m dnadesign.devtools.docs_checks --repo-root .
+uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
 
 ### Current validation evidence
 
 After adding this spec document:
 
-- `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
+- `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 
 should pass before implementation begins, so the design artifact is checked in under the same docs contract as the rest of Cruncher.
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ..errors import NotifyConfigError
+from ..core.errors import NotifyConfigError
 from .densegen_common import _to_float_or_none, _to_int_or_none
 
 _DENSEGEN_HEALTH_PROGRESS_STEP_PCT_SMALL_QUOTA = 25

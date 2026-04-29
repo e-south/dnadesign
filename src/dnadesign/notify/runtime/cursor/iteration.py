@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Iterable
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 
 
 def _is_stale_handle_error(exc: OSError) -> bool:

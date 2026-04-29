@@ -5,7 +5,7 @@ src/dnadesign/studies/tests/test_cruncher_preflight.py
 
 Focused tests for the Cruncher study preflight adapter.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

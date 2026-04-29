@@ -5,6 +5,6 @@ src/dnadesign/usr/tests/datasets/overlay/__init__.py
 
 USR dataset overlay test package.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

@@ -5,7 +5,7 @@ src/dnadesign/usr/src/events/redaction.py
 
 Argument redaction helpers for USR event payloads.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

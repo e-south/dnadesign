@@ -98,6 +98,38 @@ def test_shared_catalog_normalizes_outside_site_raw_cut_offsets_relative_to_moti
     assert entries["Nt.BstNBI"].resolved_vendor_diagram_top_5to3 == "GAGTCNNNNN"
 
 
+def test_shared_catalog_normalizes_vendor_cut_notation_from_motif_end_when_declared(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "nickases.yaml"
+    catalog_path.write_text(
+        yaml.safe_dump(
+            {
+                "nickases": {
+                    "schema_version": 1,
+                    "entries": [
+                        {
+                            "id": "Nb.BtsI",
+                            "specificity_id": "BtsI",
+                            "motif_top_5to3": "GCAGTG",
+                            "vendor_diagram_top_5to3": "GCAGTGNN",
+                            "raw_cut_notation": "GCAGTG(none/0)",
+                            "raw_cut_offset_reference": "motif_end",
+                            "source": "neb",
+                        }
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    catalog = load_nickase_catalog(catalog_path)
+    entry = catalog.by_id()["Nb.BtsI"]
+
+    assert entry.bottom_cut_offset == 6
+    assert entry.raw_cut_offset_reference == "motif_end"
+    assert entry.resolved_vendor_diagram_top_5to3 == "GCAGTGNN"
+
+
 def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() -> None:
     catalog = load_builtin_nickase_catalog_preset("neb_nicking_v1")
 
@@ -109,6 +141,10 @@ def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() 
     assert "Nt.BbvCI" in entries
     assert entries["Nt.BstNBI"].vendor_catalog_number == "R0607"
     assert entries["Nt.BstNBI"].source_url == "https://www.neb.com/en-us/products/r0607-ntbstnbi"
+    assert entries["Nb.BsrDI"].bottom_cut_offset == 6
+    assert entries["Nb.BtsI"].bottom_cut_offset == 6
+    assert entries["Nt.AlwI"].top_cut_offset == 9
+    assert entries["Nt.BsmAI"].top_cut_offset == 6
     assert entries["Nt.BstNBI"].resolved_vendor_diagram_top_5to3 == "GAGTCNNNNN"
     assert entries["Nb.BsrDI"].resolved_vendor_diagram_top_5to3 == "GCAATGNN"
     assert entries["Nb.BtsI"].resolved_vendor_diagram_top_5to3 == "GCAGTGNN"

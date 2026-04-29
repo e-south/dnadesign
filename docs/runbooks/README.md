@@ -21,6 +21,7 @@ Use the command table first. The generated tables later on are reference.
 | Check one status view | `uv run ops progress show <registry-id> ...` | One registered status surface with explicit artifact inputs. |
 | Start a campaign manifest | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | YAML manifest skeleton for one route or one related route set. It prints to stdout unless you pass `--out`. |
 | Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Summary of the steps you list in the manifest. |
+| Fill missing Infer lanes | `uv run ops runbook fill-infer --study-dir docs/studies/<study-id>` | Inspects checked-in Infer runbooks, skips complete sequence-view lanes, and plans only missing vector/scalar work. |
 
 ### Common examples
 
@@ -29,6 +30,7 @@ Use the command table first. The generated tables later on are reference.
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status view.
 - `uv run ops progress show usr.data-plane.promoter-study-status`: one checked-in active-study summary for current phase, dataset presence, and next ready surface. Add `--repo-root <repo-root> --study-dir docs/studies/<study-id>` to pin a different study or invoke it from outside the repo checkout.
 - `uv run ops progress show usr.data-plane.promoter-study-preflight`: deeper read-only preflight across DenseGen, Construct, Infer, Notify, and batch-plan surfaces for the checked-in active study.
+- `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel`: study-level Infer completion plan for all declared sequence-view runbooks; add `--submit` only from the target HPC batch environment after Notify is configured.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
 - For one live promoter study, keep the checked-in files under `docs/studies/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.

@@ -109,7 +109,7 @@ This section lists dated entries so you can jump to a specific investigation win
 - Decoupling pass (option 1 + option 2):
   - Added first-class `infer_evo2` events-source resolver in `notify/events_source.py` with strict ambiguity checks.
   - Resolver contract now fails fast when infer config has no USR write-back jobs or multiple USR destinations.
-  - Added `notify/tests/test_events_source.py` covering infer resolver success, env-root behavior, ambiguity, and missing-source errors.
+  - Added `notify/tests/events/test_source.py` covering infer resolver success, env-root behavior, ambiguity, and missing-source errors.
   - Split notify operational helpers into dedicated modules:
     - `notify/profile_ops.py` (profile naming/state root/next-step guidance)
     - `notify/watch_ops.py` (cursor locking and follow-loop primitives)
@@ -253,12 +253,12 @@ This section lists dated entries so you can jump to a specific investigation win
 - Extended docs check contract to validate relative links from root system-of-record docs, not only `docs/` plus root `README.md`.
 - SOR hardening pass implemented with CI/devtool enforcement:
   - Root SOR docs now include required metadata (`Type`, `Owner`, `Last verified`).
-  - `dnadesign.devtools.docs_checks` now enforces:
+  - `dnadesign.devtools.docs.checks` now enforces:
     - root SOR metadata presence/date freshness (`--max-sor-age-days`)
     - execution-plan metadata and traceability link requirements for non-README files under `docs/exec-plans/`.
-  - Added `dnadesign.devtools.architecture_boundaries` and wired it into the core CI lane to fail on undeclared cross-tool imports.
-  - Added `dnadesign.devtools.quality_score` to generate CI-backed quality score inputs from coverage summary, baseline, and lane outcomes.
-  - Added `dnadesign.devtools.quality_entropy` and a scheduled/workflow-dispatch CI job that uploads an entropy report artifact and fails on stale SOR metadata or broken quality evidence links.
+  - Added `dnadesign.devtools.architecture.boundaries` and wired it into the core CI lane to fail on undeclared cross-tool imports.
+  - Added `dnadesign.devtools.quality.score` to generate CI-backed quality score inputs from coverage summary, baseline, and lane outcomes.
+  - Added `dnadesign.devtools.quality.entropy` and a scheduled/workflow-dispatch CI job that uploads an entropy report artifact and fails on stale SOR metadata or broken quality evidence links.
   - Updated `QUALITY_SCORE.md` to treat CI evidence links and Codecov status signal as canonical numeric source inputs, keeping narrative guidance separate.
 
 ### 2026-03-16
@@ -312,8 +312,8 @@ This section lists dated entries so you can jump to a specific investigation win
     - slice 4: tighten `ops` infer mode probing so it reasons only over the resolved target dataset, or surfaces fallback behavior as an explicit operator-visible contract
   - Verification target for the planned slice:
     - targeted docs-contract and runtime regression tests first
-    - then `uv run python -m dnadesign.devtools.docs_checks`
-    - then `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
+    - then `uv run python -m dnadesign.devtools.docs.checks`
+    - then `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
     - then `uv run ruff check .`
     - then `uv run ruff format --check .`
     - then `uv run pytest -q`

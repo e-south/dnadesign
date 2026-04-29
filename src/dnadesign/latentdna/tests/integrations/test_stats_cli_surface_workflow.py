@@ -6,7 +6,7 @@ src/dnadesign/latentdna/tests/integrations/test_stats_cli_surface_workflow.py
 Workflow tests for view stats, scalar-table joins, and common CLI
 preview/quiet behavior.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

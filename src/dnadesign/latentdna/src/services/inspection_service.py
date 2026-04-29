@@ -47,9 +47,14 @@ def inspect_views(workspace: str | Path) -> dict[str, object]:
         else:
             item["declaration_kind"] = "derived"
             item["derive_kind"] = view.derive.kind
-            item["left"] = view.derive.left
-            item["right"] = view.derive.right
-            item["alignment"] = view.derive.alignment
+            if view.derive.kind == "vector_difference":
+                item["left"] = view.derive.left
+                item["right"] = view.derive.right
+                item["alignment"] = view.derive.alignment
+            elif view.derive.kind == "concatenate":
+                item["inputs"] = list(view.derive.inputs)
+            else:
+                item["input_view"] = view.derive.view
         views.append(item)
     return {
         "schema_version": "latentdna.inspect_result.v1",

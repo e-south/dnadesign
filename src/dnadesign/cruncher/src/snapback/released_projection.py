@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_projection.py
 
 Released-product precursor projection and explicit evaluator reuse.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

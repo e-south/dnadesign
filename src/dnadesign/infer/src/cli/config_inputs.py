@@ -19,6 +19,7 @@ from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_env
 
 from ..config import JobConfig
 from ..errors import ConfigError, ValidationError
+from ..features.sequence_views import bundle_uses_sequence_views
 from ..input_parsing import load_nonempty_lines
 
 
@@ -47,6 +48,13 @@ def resolve_config_usr_root(*, usr_root: str | None, config_dir: Path) -> str | 
     return normalize_usr_root(resolved).as_posix()
 
 
+def resolve_config_sequence_view_roots(*, job: JobConfig, config_dir: Path) -> None:
+    if job.feature_bundle is None or not bundle_uses_sequence_views(job.feature_bundle):
+        return
+    for input_cfg in job.feature_bundle.sequence_view_inputs:
+        input_cfg.root = resolve_config_usr_root(usr_root=input_cfg.root, config_dir=config_dir)
+
+
 def resolve_config_job_inputs(
     *,
     job: JobConfig,
@@ -54,6 +62,10 @@ def resolve_config_job_inputs(
     i_know_this_is_pickle: bool,
     guard_pickle: Callable[[bool], None],
 ) -> Any:
+    resolve_config_sequence_view_roots(job=job, config_dir=config_dir)
+    if job.feature_bundle is not None and bundle_uses_sequence_views(job.feature_bundle):
+        return None
+
     source = job.ingest.source
     ingest_path = str(job.ingest.path or "").strip()
 

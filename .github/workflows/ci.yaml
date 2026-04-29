@@ -39,7 +39,7 @@ jobs:
 
       - name: Collect changed files for scope detection
         run: |
-          PYTHONPATH=src python3 -m dnadesign.devtools.ci_changed_files \
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
             --base-ref "${{ github.base_ref }}" \
@@ -49,7 +49,7 @@ jobs:
       - name: Compute CI scope
         id: scope
         run: |
-          PYTHONPATH=src python3 -m dnadesign.devtools.ci_changes \
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci.changes \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
             --baseline-json .github/tool-coverage-baseline.json \
@@ -82,7 +82,7 @@ jobs:
         id: entropy
         continue-on-error: true
         run: |
-          uv run python -m dnadesign.devtools.quality_entropy \
+          uv run python -m dnadesign.devtools.quality.entropy \
             --repo-root . \
             --max-sor-age-days 90 \
             --report-file quality-entropy-report.md
@@ -121,7 +121,7 @@ jobs:
 
       - name: Detect-secrets baseline path hygiene
         run: |
-          uv run python -m dnadesign.devtools.secrets_baseline_check \
+          uv run python -m dnadesign.devtools.security.secrets_baseline \
             --repo-root . \
             --baseline .secrets.baseline
 
@@ -175,10 +175,10 @@ jobs:
           echo "FFmpeg install timed out or failed; continuing without video-output coverage."
 
       - name: Docs checks (links + naming)
-        run: uv run python -m dnadesign.devtools.docs_checks
+        run: uv run python -m dnadesign.devtools.docs.checks
 
       - name: Architecture boundary checks
-        run: uv run python -m dnadesign.devtools.architecture_boundaries
+        run: uv run python -m dnadesign.devtools.architecture.boundaries
 
       - name: Pre-commit (non-Ruff hooks)
         env:
@@ -205,7 +205,7 @@ jobs:
           marker_expr="not fimo and not integration"
           run_coverage_gate="${{ needs.detect-ci-scope.outputs.run-coverage-gate }}"
           smoke_targets=(
-            src/dnadesign/devtools/tests/test_docs_checks.py
+            src/dnadesign/devtools/tests/docs/test_checks.py
             src/dnadesign/usr/tests/test_cli_command_surface.py
           )
 
@@ -229,7 +229,7 @@ jobs:
           fi
 
           mapfile -t targets < <(
-            PYTHONPATH=src python3 -m dnadesign.devtools.ci_test_targets \
+            PYTHONPATH=src python3 -m dnadesign.devtools.ci.test_targets \
               --repo-root . \
               --affected-tools-csv "$affected_csv"
           )
@@ -253,7 +253,7 @@ jobs:
         shell: bash
         run: |
           cmd=(
-            uv run python -m dnadesign.devtools.tool_coverage
+            uv run python -m dnadesign.devtools.quality.tool_coverage
             --coverage-json coverage-core.json
             --baseline-json .github/tool-coverage-baseline.json
           )
@@ -266,7 +266,7 @@ jobs:
         if: needs.detect-ci-scope.outputs.run-full-core == 'true'
         shell: bash
         run: |
-          uv run python -m dnadesign.devtools.coverage_summary \
+          uv run python -m dnadesign.devtools.quality.coverage_summary \
             --coverage-json coverage-core.json \
             --baseline-json .github/tool-coverage-baseline.json \
             --output-json quality-score-coverage-summary.json
@@ -327,7 +327,7 @@ jobs:
 
       - name: Resolve MEME_BIN and PATH
         run: |
-          PYTHONPATH=src python3 -m dnadesign.devtools.meme_env \
+          PYTHONPATH=src python3 -m dnadesign.devtools.runtime.meme_env \
             --repo-root . \
             --github-env "$GITHUB_ENV" \
             --github-path "$GITHUB_PATH"
@@ -357,7 +357,7 @@ jobs:
             fi
 
             mapfile -t targets < <(
-              PYTHONPATH=src python3 -m dnadesign.devtools.ci_test_targets \
+              PYTHONPATH=src python3 -m dnadesign.devtools.ci.test_targets \
                 --repo-root . \
                 --affected-tools-csv "$affected_csv"
             )
@@ -373,7 +373,7 @@ jobs:
               --cov-report=xml:coverage-external-integration.xml
           fi
 
-          uv run python -m dnadesign.devtools.pytest_gate \
+          uv run python -m dnadesign.devtools.runtime.pytest_gate \
             --junit-xml "$report_path" \
             --lane-name external-integration \
             --required-tools-csv "${{ needs.detect-ci-scope.outputs.external-integration-tools-csv }}"
@@ -414,7 +414,7 @@ jobs:
 
       - name: Build quality score inputs
         run: |
-          PYTHONPATH=src python3 -m dnadesign.devtools.quality_score \
+          PYTHONPATH=src python3 -m dnadesign.devtools.quality.score \
             --coverage-summary-json quality-score-coverage-summary.json \
             --baseline-json .github/tool-coverage-baseline.json \
             --core-lane-result "${{ needs.core-lint-test-build.result }}" \

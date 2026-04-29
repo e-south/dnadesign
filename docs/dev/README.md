@@ -16,8 +16,8 @@ Use this index to find maintainer workflows, checks, and planning records.
 
 | If you changed | Run this first |
 | --- | --- |
-| docs, READMEs, or runbooks | `uv run python -m dnadesign.devtools.docs_checks --repo-root .` |
-| cross-tool imports or ownership boundaries | `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .` |
+| docs, READMEs, or runbooks | `uv run python -m dnadesign.devtools.docs.checks --repo-root .` |
+| cross-tool imports or ownership boundaries | `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .` |
 | OPS CLI entrypoints, parsing, or error rendering | `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py` |
 | OPS native gate stderr or audit-fidelity behavior | `uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr` |
 | OPS orchestration state or active-job discovery | `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"` |
@@ -30,9 +30,9 @@ Use this index to find maintainer workflows, checks, and planning records.
 2. Track structure and IA risks in [`monorepo-organization-audit.md`](monorepo-organization-audit.md).
 3. Create or update proposals in [`plans/`](plans/).
 4. Run docs checks before merging docs updates:
-`uv run python -m dnadesign.devtools.docs_checks --repo-root .`
+`uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 5. Run boundary checks when changing cross-tool imports:
-`uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
+`uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
 6. Run the repo-local skill audits when changing `.agents/skills/`:
 `bash .agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh`
 `bash .agents/skills/snapback-hairpin-study/scripts/audit-snapback-hairpin-study-skill.sh`
@@ -40,7 +40,7 @@ Use this index to find maintainer workflows, checks, and planning records.
 `bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh`
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
 7. Run the subtree routing contract checks when changing critical `AGENTS.md` surfaces or repo-local workflow skills:
-`uv run pytest -q src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+`uv run pytest -q src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`
 `uv run pytest -q src/dnadesign/usr/tests/test_usr_docs_contract.py`
 8. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
 `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py`
@@ -60,7 +60,7 @@ uv sync --locked --group dev
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest -q
-uv run python -m dnadesign.devtools.docs_checks --repo-root .
+uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
 
 ### CI and quality checks
@@ -72,18 +72,18 @@ uv run python -m dnadesign.devtools.docs_checks --repo-root .
 export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
 uv run pytest -q -m "not fimo and not integration"
 uv run pytest -q -m "not fimo and not integration" --cov=src/dnadesign --cov-report=json:coverage-core.json
-uv run python -m dnadesign.devtools.tool_coverage --coverage-json coverage-core.json --baseline-json .github/tool-coverage-baseline.json
-uv run python -m dnadesign.devtools.coverage_summary --coverage-json coverage-core.json --baseline-json .github/tool-coverage-baseline.json --output-json quality-score-coverage-summary.json
-uv run python -m dnadesign.devtools.quality_score --coverage-summary-json quality-score-coverage-summary.json --baseline-json .github/tool-coverage-baseline.json --core-lane-result success --external-integration-lane-result skipped --publish-lane-result skipped --output-json quality-score-inputs.json
+uv run python -m dnadesign.devtools.quality.tool_coverage --coverage-json coverage-core.json --baseline-json .github/tool-coverage-baseline.json
+uv run python -m dnadesign.devtools.quality.coverage_summary --coverage-json coverage-core.json --baseline-json .github/tool-coverage-baseline.json --output-json quality-score-coverage-summary.json
+uv run python -m dnadesign.devtools.quality.score --coverage-summary-json quality-score-coverage-summary.json --baseline-json .github/tool-coverage-baseline.json --core-lane-result success --external-integration-lane-result skipped --publish-lane-result skipped --output-json quality-score-inputs.json
 ```
 - External integration local parity:
 ```bash
 pixi install --locked
 export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
-eval "$(PYTHONPATH=src python3 -m dnadesign.devtools.meme_env --repo-root . --print-shell-export)"
+eval "$(PYTHONPATH=src python3 -m dnadesign.devtools.runtime.meme_env --repo-root . --print-shell-export)"
 fimo --version
 uv run pytest -q -m "fimo or integration" --junitxml external-integration-junit.xml
-uv run python -m dnadesign.devtools.pytest_gate --junit-xml external-integration-junit.xml --lane-name external-integration --required-tools-csv "<tool1,tool2>"
+uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-integration-junit.xml --lane-name external-integration --required-tools-csv "<tool1,tool2>"
 ```
 
 ### Planning and decisions
@@ -91,6 +91,8 @@ uv run python -m dnadesign.devtools.pytest_gate --junit-xml external-integration
 1. Proposal lifecycle and promotion rules: [PLANS](../../PLANS.md)
 2. Execution plan indexes: [active plans](../exec-plans/active/README.md), [completed plans](../exec-plans/completed/README.md)
 3. Decision records: [architecture decisions](../architecture/decisions/README.md)
+4. Sequence-view, reference-product, reverse-complement context, and Infer-completion hardening proposal:
+   [2026-04-28 sequence-view ontology and Infer completion spec](plans/2026-04-28-sequence-view-ontology-and-infer-completion-hardening-spec.md)
 
 ### Naming and file layout
 

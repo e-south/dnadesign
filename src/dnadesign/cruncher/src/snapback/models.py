@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/models.py
 
 Schema and reporting contracts for v2 explicit snapback workflows.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -168,6 +168,41 @@ def test_public_adapter_helpers_adapt_in_memory_contract_rows() -> None:
     assert [item.id for item in records] == ["assembled_payload", "assembled_payload"]
 
 
+def test_public_adapter_helpers_reject_unknown_adapter_columns() -> None:
+    row = {"sequence": "ACGT", "features": []}
+
+    with pytest.raises(baserender.SchemaError, match="Unknown keys in input.adapter.columns"):
+        baserender.adapt_record(
+            row,
+            adapter_kind="generic_features",
+            adapter_columns={"sequence": "sequence", "features": "features", "bogus": "ignored"},
+        )
+
+
+def test_public_adapter_helpers_reject_unknown_adapter_policies() -> None:
+    row = {"sequence": "ACGT", "features": []}
+
+    with pytest.raises(baserender.SchemaError, match="Unknown keys in input.adapter.policies"):
+        baserender.adapt_record(
+            row,
+            adapter_kind="generic_features",
+            adapter_columns={"sequence": "sequence", "features": "features"},
+            adapter_policies={"typo_policy": True},
+        )
+
+
+def test_public_adapter_helpers_enforce_adapter_alphabet_compatibility() -> None:
+    row = {"sequence": "ACGU", "features": []}
+
+    with pytest.raises(baserender.SchemaError, match="input.adapter.kind.*input.alphabet"):
+        baserender.adapt_record(
+            row,
+            adapter_kind="generic_features",
+            adapter_columns={"sequence": "sequence", "features": "features"},
+            alphabet="RNA",
+        )
+
+
 def test_public_parquet_render_helper_rejects_legacy_densegen_tfbs_keys(tmp_path) -> None:
     parquet = write_parquet(
         tmp_path / "input.parquet",
@@ -278,8 +313,10 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     assert hasattr(baserender, "adapt_records")
     assert hasattr(baserender, "list_adapters")
     assert hasattr(baserender, "list_renderers")
+    assert hasattr(baserender, "list_render_contracts")
     assert hasattr(baserender, "get_adapter_descriptor")
     assert hasattr(baserender, "get_renderer_descriptor")
+    assert hasattr(baserender, "get_render_contract_descriptor")
     assert hasattr(baserender, "render")
 
     validated = baserender.validate_job(job_path, caller_root=tmp_path)
@@ -312,6 +349,18 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     assert "span_link" in evidence_renderer_descriptor.optional_record_features
     assert snapback_adapter_descriptor.supported_renderers == ("snapback_map",)
     assert snapback_renderer_descriptor.name == "snapback_map"
+
+    contract_kinds = baserender.list_render_contracts()
+    assert "base_render_job_v3" in contract_kinds
+    assert "sequence_rows_render_v3" in contract_kinds
+    assert "usr_genbank_annotation_render_v1" in contract_kinds
+    assert "nucleotide_evidence_map_render_v3" in contract_kinds
+    sequence_contract = baserender.get_render_contract_descriptor("sequence_rows_v3")
+    generic_contract = baserender.get_render_contract_descriptor("render_job_v3")
+    assert sequence_contract.kind == "sequence_rows_render_v3"
+    assert sequence_contract.accepted_renderers == ("sequence_rows",)
+    assert generic_contract.kind == "base_render_job_v3"
+    assert "nucleotide_evidence_map" in generic_contract.accepted_renderers
 
 
 def test_public_api_rejects_unknown_renderer_lookup() -> None:
@@ -433,7 +482,7 @@ def test_public_render_defaults_to_single_row_for_record_lists(monkeypatch: pyte
         assert renderer_name == "sequence_rows"
         return plt.figure(figsize=(2, 2), dpi=100)
 
-    monkeypatch.setattr("dnadesign.baserender.src.api.render_record_grid_figure", _fake_grid)
+    monkeypatch.setattr("dnadesign.baserender.src.public.api.render_record_grid_figure", _fake_grid)
     fig = baserender.render(records)
     assert seen["ncols"] == 3
     plt.close(fig)
@@ -470,6 +519,27 @@ def test_public_api_accepts_render_job_v3_kind_alias(tmp_path: Path) -> None:
 
     assert validated.version == 3
     assert "images_dir" in report.outputs
+
+
+def test_public_api_kind_descriptor_rejects_incompatible_renderer(tmp_path: Path) -> None:
+    json_path = tmp_path / "input.json"
+    json_path.write_text("[]")
+    payload = {
+        "version": 3,
+        "results_root": str(tmp_path / "outputs"),
+        "input": {
+            "kind": "json",
+            "path": str(json_path),
+            "adapter": {"kind": "sequence_evidence_map_v1", "columns": {}, "policies": {}},
+            "alphabet": "DNA",
+        },
+        "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
+        "outputs": [{"kind": "images", "fmt": "png"}],
+    }
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(baserender.SchemaError, match="kind.*render.renderer"):
+        baserender.validate_job(job_path, kind="sequence_rows_v3", caller_root=tmp_path)
 
 
 def test_public_api_exposes_render_job_alias(tmp_path: Path) -> None:

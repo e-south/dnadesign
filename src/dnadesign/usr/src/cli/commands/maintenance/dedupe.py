@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/dedupe.py
 
 USR CLI maintenance dedupe command implementations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

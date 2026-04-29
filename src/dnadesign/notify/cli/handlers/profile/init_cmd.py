@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 import typer
 
-from ....errors import NotifyError
+from ....core.errors import NotifyError
 from ....profiles.schema import PROFILE_VERSION
 
 

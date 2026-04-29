@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/integrations/test_snapshot_build_workflow.py
 
 Workflow tests for source snapshot row ledgers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

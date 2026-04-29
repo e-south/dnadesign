@@ -23,7 +23,7 @@ _REQUIRED_BINDING_FIELDS = {
     "required_wildtype_references",
     "decision_deliverables",
 }
-_REQUIRED_SOURCE_DATASETS = {"anchor_60bp", "full_context_1kb"}
+_LEGACY_SOURCE_DATASETS = ("anchor_60bp", "full_context_1kb")
 _WORKSPACE_SNAPSHOT_SCHEMA_VERSION = "latentdna.workspace_snapshot.v1"
 _REQUIRED_WORKSPACE_SNAPSHOT_FIELDS = {
     "schema_version",
@@ -92,19 +92,34 @@ def _require_binding_list(binding: Mapping[str, object], field: str) -> list[str
     return values
 
 
+def _normalize_source_datasets(source_datasets: object) -> dict[str, str]:
+    if not isinstance(source_datasets, Mapping):
+        raise ValueError("latentdna binding 'source_datasets' must be a mapping")
+    normalized = {
+        str(scope): text
+        for scope, value in sorted(source_datasets.items(), key=lambda item: str(item[0]))
+        if (text := _string_or_none(value)) is not None
+    }
+    if not normalized:
+        raise ValueError("latentdna binding requires at least one non-empty source_datasets entry")
+    return normalized
+
+
+def _snapshot_source_dataset_keys(binding: Mapping[str, object] | None) -> list[str]:
+    source_datasets = (binding or {}).get("source_datasets")
+    if isinstance(source_datasets, Mapping):
+        normalized = _normalize_source_datasets(source_datasets)
+        if normalized:
+            return sorted(normalized)
+    return sorted(_LEGACY_SOURCE_DATASETS)
+
+
 def _validate_binding(binding: Mapping[str, object]) -> dict[str, object]:
     missing = sorted(field for field in _REQUIRED_BINDING_FIELDS if field not in binding)
     if missing:
         raise ValueError(f"latentdna binding missing required top-level fields: {missing}")
 
-    source_datasets = binding.get("source_datasets")
-    if not isinstance(source_datasets, Mapping):
-        raise ValueError("latentdna binding 'source_datasets' must be a mapping")
-    missing_sources = sorted(
-        field for field in _REQUIRED_SOURCE_DATASETS if _string_or_none(source_datasets.get(field)) is None
-    )
-    if missing_sources:
-        raise ValueError(f"latentdna binding source_datasets missing required entries: {missing_sources}")
+    normalized_source_datasets = _normalize_source_datasets(binding.get("source_datasets"))
 
     workspace_id = _require_binding_text(binding, "workspace_id")
     workspace_ref = _require_binding_text(binding, "workspace_ref")
@@ -119,12 +134,10 @@ def _validate_binding(binding: Mapping[str, object]) -> dict[str, object]:
         "workspace_id": workspace_id,
         "workspace_ref": workspace_ref,
         "snapshot_ref": snapshot_ref,
-        "source_datasets": {
-            scope: _string_or_none(source_datasets.get(scope)) for scope in sorted(_REQUIRED_SOURCE_DATASETS)
-        },
+        "source_datasets": normalized_source_datasets,
         "supported_model_families": model_families,
         "default_model_family": default_model_family,
-        "required_wildtype_references": _require_binding_list(binding, "required_wildtype_references"),
+        "required_wildtype_references": _string_list(binding.get("required_wildtype_references")),
         "decision_deliverables": _require_binding_list(binding, "decision_deliverables"),
     }
 
@@ -186,8 +199,12 @@ def _validate_workspace_snapshot(
     sources = snapshot.get("sources")
     if not isinstance(sources, Mapping):
         raise ValueError("latentdna snapshot 'sources' must be a mapping")
-    for source_name in _REQUIRED_SOURCE_DATASETS:
+    missing_binding_sources: list[str] = []
+    for source_name in _snapshot_source_dataset_keys(binding):
         source_payload = sources.get(source_name)
+        if source_payload is None:
+            missing_binding_sources.append(source_name)
+            continue
         if not isinstance(source_payload, Mapping):
             raise ValueError(f"latentdna snapshot source {source_name!r} must be a mapping")
         for field in ("kind", "path", "row_count"):
@@ -204,8 +221,12 @@ def _validate_workspace_snapshot(
     deliverables = snapshot.get("deliverables")
     if not isinstance(deliverables, Mapping):
         raise ValueError("latentdna snapshot 'deliverables' must be a mapping")
+    missing_decision_deliverables: list[str] = []
     for deliverable_id in _string_list((binding or {}).get("decision_deliverables")):
         deliverable_payload = deliverables.get(deliverable_id)
+        if deliverable_payload is None:
+            missing_decision_deliverables.append(deliverable_id)
+            continue
         if not isinstance(deliverable_payload, Mapping):
             raise ValueError(f"latentdna snapshot deliverable {deliverable_id!r} must be a mapping")
         for field in ("title", "status", "freshness", "acceptance_checks", "artifact_paths", "docs_refs", "warnings"):
@@ -221,7 +242,11 @@ def _validate_workspace_snapshot(
         for field in ("status", "artifact_path", "manifest_path"):
             if field not in export_payload:
                 raise ValueError(f"latentdna snapshot export {export_id!r} missing required field {field!r}")
-    return dict(snapshot)
+    return {
+        **dict(snapshot),
+        "missing_binding_sources": missing_binding_sources,
+        "missing_decision_deliverables": missing_decision_deliverables,
+    }
 
 
 def load_latentdna_snapshot(

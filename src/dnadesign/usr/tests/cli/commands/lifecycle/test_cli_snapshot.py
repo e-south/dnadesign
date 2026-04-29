@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/cli/commands/lifecycle/test_cli_snapshot.py
 
 CLI tests for usr snapshot lifecycle behavior.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.testsupport.usr import ensure_registry
+from dnadesign.devtools.tests.support.usr import ensure_registry
 from dnadesign.usr.src.cli import app
 from dnadesign.usr.src.dataset import Dataset
 

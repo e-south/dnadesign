@@ -67,4 +67,4 @@ variants:
       - FLANKING_BASE_RECOMMENDED
     recommended_5prime_flanking_bases: 6
     source_catalog_id: type_iis_release_v1
-    source_url: https://www.neb.com/en-us/products/r0712-bspqi
+    source_url: https://www.neb.com/en-us/products/r3712-bspqi-hf

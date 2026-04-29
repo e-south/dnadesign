@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/released_route_policy.py
 
 Route-policy literals and validators for released-product snapback.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -48,6 +48,15 @@ def normalize_release_catalog_path_list(value: list[Path], *, label: str) -> lis
 
 
 def normalize_warning_code_list(value: list[str], *, label: str) -> list[str]:
+    normalized = [str(item or "").strip() for item in value]
+    if any(not item for item in normalized):
+        raise ValueError(f"{label} must not contain blank values.")
+    if len(set(normalized)) != len(normalized):
+        raise ValueError(f"{label} must not repeat values.")
+    return normalized
+
+
+def normalize_variant_id_list(value: list[str], *, label: str) -> list[str]:
     normalized = [str(item or "").strip() for item in value]
     if any(not item for item in normalized):
         raise ValueError(f"{label} must not contain blank values.")

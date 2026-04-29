@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import subprocess
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 
 
 def probe_command(*, args: list[str], ok_codes: set[int], timeout_seconds: float = 2.0) -> bool:

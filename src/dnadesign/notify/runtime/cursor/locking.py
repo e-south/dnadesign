@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable
 
-from ...errors import NotifyConfigError
+from ...core.errors import NotifyConfigError
 
 
 def cursor_lock_path(cursor_path: Path) -> Path:

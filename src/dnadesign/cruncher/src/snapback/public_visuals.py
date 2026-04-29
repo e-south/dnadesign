@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/snapback/public_visuals.py
 
 Public snapback visual-contract publication for renderer-facing artifacts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/nickases/test_selection.py
 
 Contract tests for nickase selection ordering used by snapback solve.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

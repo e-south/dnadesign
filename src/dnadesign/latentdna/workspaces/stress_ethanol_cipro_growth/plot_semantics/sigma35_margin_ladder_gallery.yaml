@@ -1,14 +1,14 @@
 plot_id: sigma35_margin_ladder_gallery
 question: Does the row-level Sigma-35 margin actually form the ordered ladder summarized by the ordinal Spearman score?
 decision_role: primary
-encoding: Three-panel violin-and-box ladder showing the distribution of the Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the main 7B intermediate candidates.
-scope: The full shared promoter population in the main 7B intermediate comparison views.
+encoding: Two-panel violin-and-box ladder showing the distribution of the Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the active 7B intermediate candidates.
+scope: The full shared promoter population in the active 7B intermediate comparison views.
 guardrails:
   - Use this ladder as the row-level bridge to the Sigma-35 ordinal summary, not as a replacement for the scalar audit.
   - Do not interpret the y axis as promoter activity or assay strength.
   - The ordinal score still governs ranking; the ladder explains why the score moves.
-caption: Row-level Sigma-35 margin ladder across the main 7B intermediate candidates.
-alt_text: Violin-and-box panel gallery showing the distribution of the Sigma-35 F-versus-B centroid margin across Sigma-35 variants for the full promoter population in the anchor, 1 kb seq-mean, and 1 kb anchor-mean intermediate spaces.
+caption: Row-level Sigma-35 margin ladder across the active 7B intermediate candidates.
+alt_text: Violin-and-box panel gallery showing the distribution of the Sigma-35 F-versus-B centroid margin across Sigma-35 variants for the full promoter population in the 60 bp anchor and 1 kb context anchor-mean intermediate spaces.
 preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted value is then the leave-one-out centroid margin between the `f` and `b` Sigma-35 cohorts over the full shared promoter population in each candidate view.
 math_md: |
   The plotted margin is

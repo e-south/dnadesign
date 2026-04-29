@@ -5,7 +5,7 @@ src/dnadesign/studies/tests/test_cruncher_snapshot.py
 
 Focused tests for the Cruncher study snapshot adapter.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -81,6 +81,12 @@ catalog:
 - `specificity_id`: recognition-specificity family identifier shared across related variants.
 - `motif_top_5to3`: top-strand recognition motif. IUPAC nucleotide symbols are allowed.
 - `raw_cut_notation`: optional vendor/source notation parsed into normalized offsets.
+- `raw_cut_offset_reference`: optional coordinate basis for raw notation values.
+  Use `motif_start` when the raw values are already normalized as bond-boundary
+  offsets from the left edge of `motif_top_5to3`; use `motif_end` when vendor
+  notation reports offsets relative to the 3' end of the listed recognition
+  motif, such as `GCAGTG(none/0)` for a bottom nick immediately after the
+  six-base `GCAGTG` site.
 - `top_cut_offset`: signed bond-boundary offset from the motif start on the top strand.
 - `bottom_cut_offset`: signed bond-boundary offset from the motif start on the bottom strand.
 - Exactly one of `top_cut_offset` or `bottom_cut_offset` must be defined for a nickase variant.
@@ -139,6 +145,7 @@ Do not mix legacy geometry fields with normalized `top_cut_offset` or `bottom_cu
 - `motif_top_5to3` must contain valid IUPAC nucleotide symbols.
 - `raw_cut_notation` must parse cleanly, for example `CCTCAGC(-5/none)` or `CCTCAGC(none/-2)`.
 - `raw_cut_notation` must agree with any explicit `motif_top_5to3` or `recognition_sequence` present in the same entry.
+- `raw_cut_offset_reference`, when present, must be `motif_start` or `motif_end`.
 - exactly one of `top_cut_offset` or `bottom_cut_offset` must be populated after normalization.
 - duplicate `id` values are rejected.
 - duplicate `product_aliases.alias_id` values are rejected.

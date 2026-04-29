@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/docs_contract/helpers.py
 
 Shared helpers for structural USR docs contract tests.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

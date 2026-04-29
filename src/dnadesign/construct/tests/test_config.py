@@ -14,7 +14,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from dnadesign.construct.src.config import InputConfig, OutputConfig, PlacementConfig, RealizeConfig, TemplateConfig
+from dnadesign.construct.src.config import (
+    InputConfig,
+    JobConfig,
+    OutputConfig,
+    PlacementConfig,
+    RealizeConfig,
+    TemplateConfig,
+)
 
 
 def test_realize_config_rejects_legacy_window_fields() -> None:
@@ -185,5 +192,56 @@ def test_output_config_rejects_legacy_flat_shape() -> None:
                 "dataset": "anchors_constructed",
                 "root": "outputs/usr_datasets",
                 "source": "construct run demo",
+            }
+        )
+
+
+def test_job_config_normalize_anchor_requires_normalize_block() -> None:
+    with pytest.raises(PydanticValidationError, match="job.normalize_anchor is required"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "normalize_demo",
+                    "mode": "normalize_anchor",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "anchors", "root": "/tmp/usr"},
+                        "field": "sequence",
+                    },
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "anchors_norm", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_normalize_anchor_rejects_template_realization_fields() -> None:
+    with pytest.raises(PydanticValidationError, match="job.template is only allowed"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "normalize_demo",
+                    "mode": "normalize_anchor",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "anchors", "root": "/tmp/usr"},
+                        "field": "sequence",
+                    },
+                    "template": {
+                        "id": "template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTT"},
+                    },
+                    "normalize_anchor": {
+                        "product_kind": "analysis_window",
+                        "target_length": 60,
+                        "focal_selector": {
+                            "kind": "chain",
+                            "selectors": [{"kind": "sequence_midpoint", "allowed": True}],
+                        },
+                        "over_length_policy": {"kind": "trim", "target_length": 60},
+                    },
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "anchors_norm", "root": "/tmp/usr"},
+                    },
+                }
             }
         )

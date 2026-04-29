@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/datasets/lifecycle/test_dataset_lifecycle_package_module
 
 Layout contract tests for Dataset lifecycle package decomposition.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

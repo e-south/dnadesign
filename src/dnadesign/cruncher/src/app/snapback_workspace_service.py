@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/snapback_workspace_service.py
 
 Scaffold v2 explicit and v3 co-design solve snapback workspaces.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

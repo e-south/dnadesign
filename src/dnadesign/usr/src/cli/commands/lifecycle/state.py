@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/lifecycle/state.py
 
 USR CLI lifecycle state and soft-delete command implementations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

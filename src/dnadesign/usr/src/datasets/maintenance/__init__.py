@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/maintenance/__init__.py
 
 Maintenance-gated dataset mutation helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

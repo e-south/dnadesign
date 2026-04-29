@@ -5,7 +5,7 @@ src/dnadesign/usr/src/datasets/overlay/attach.py
 
 Overlay attach helpers for dataset overlay mutations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

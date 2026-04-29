@@ -56,10 +56,10 @@ def nick_placements(
                         else display_motif_for_orientation(entry, orientation=orientation)
                     ),
                     site_start_at_boundary_zero=site_start,
-                    left_of_origin_slack_nt=(
-                        leading_fully_degenerate_prefix_nt(entry, orientation=orientation)
-                        if not use_vendor_diagram
-                        else 0
+                    left_of_origin_slack_nt=leading_fully_degenerate_prefix_nt(
+                        entry,
+                        orientation=orientation,
+                        use_vendor_diagram=use_vendor_diagram,
                     ),
                 )
             )

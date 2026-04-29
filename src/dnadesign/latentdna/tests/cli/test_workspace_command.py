@@ -5,7 +5,7 @@ src/dnadesign/latentdna/tests/cli/test_workspace_command.py
 
 Workspace command contracts for latentdna CLI.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -20,9 +20,25 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.devtools.tests.support.usr import register_test_namespace
+from dnadesign.infer.src.features.aliases import (
+    compute_feature_alias_id,
+    compute_feature_scalar_alias_id,
+    compute_feature_scalar_key,
+    persist_feature_alias_rows,
+    persist_feature_scalar_alias_rows,
+    persist_feature_scalar_rows,
+    persist_feature_vector_rows,
+)
 from dnadesign.latentdna.src.cli import app
-from dnadesign.testsupport.usr import register_test_namespace
-from dnadesign.usr import Dataset
+from dnadesign.usr import (
+    Dataset,
+    SequenceViewRecord,
+    ViewSemanticsRecord,
+    ensure_sequence_contract_namespaces,
+    write_sequence_views,
+    write_view_semantics,
+)
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 
 _RUNNER = CliRunner()
@@ -66,6 +82,135 @@ def _build_overlay_usr_sources(tmp_path: Path) -> Path:
         key="id",
     )
     return usr_root
+
+
+def _build_infer_feature_sidecar_usr_source(tmp_path: Path) -> tuple[Path, str]:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "sidecar_anchor")
+    dataset.init(source="test", notes="latentdna infer feature sidecar source test")
+    sequence_id = dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test").ids[0]
+    created_at = "2026-04-28T00:00:00+00:00"
+    view = SequenceViewRecord(
+        sequence_id=sequence_id,
+        view_name="fixture_construct_insert",
+        product_kind="construct_insert",
+        context_kind="anchor_only",
+        orientation="forward",
+        analysis_only=False,
+        source_dataset_id=dataset.name,
+        recommended_pooling="seq_mean",
+        created_at=created_at,
+        created_by="test",
+    )
+    write_sequence_views(dataset, [view], conflict_policy="error")
+    write_view_semantics(
+        dataset,
+        [
+            ViewSemanticsRecord(
+                view_id=str(view.view_id),
+                sequence_id=sequence_id,
+                source_family="fixture_source",
+                selection_basis="fixture_sequence",
+                view_collections=["fixture_collection"],
+                role_tags=["test"],
+                study_id="fixture_study",
+                created_at=created_at,
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+
+    feature_vector_key = "fv_fixture_7b_seq_mean"
+    forward_pass_key = "fp_fixture_7b_seq_mean"
+    alias_id = compute_feature_alias_id(
+        view_id=view.view_id,
+        sequence_id=sequence_id,
+        feature_vector_key=feature_vector_key,
+        representation_kind="intermediate_embedding",
+    )
+    persist_feature_alias_rows(
+        [
+            {
+                "_dataset_root": usr_root.as_posix(),
+                "_dataset_id": dataset.name,
+                "alias_id": alias_id,
+                "view_id": view.view_id,
+                "view_name": view.view_name,
+                "sequence_id": sequence_id,
+                "feature_vector_key": feature_vector_key,
+                "forward_pass_key": forward_pass_key,
+                "provider": "evo2",
+                "model_name": "evo2_7b",
+                "model_revision": None,
+                "layer_name": "block26_mlp_out",
+                "representation_kind": "intermediate_embedding",
+                "pooling_operation": "seq_mean",
+                "pooling_start_0": None,
+                "pooling_end_0": None,
+                "orientation": "forward",
+                "source_dataset_id": dataset.name,
+                "feature_request_digest": "digest_fixture",
+                "created_at": created_at,
+            }
+        ]
+    )
+    feature_scalar_key = compute_feature_scalar_key(
+        forward_pass_key=forward_pass_key,
+        scalar_kind="log_likelihood__mean_per_token",
+    )
+    scalar_alias_id = compute_feature_scalar_alias_id(
+        view_id=view.view_id,
+        sequence_id=sequence_id,
+        feature_scalar_key=feature_scalar_key,
+        scalar_kind="log_likelihood__mean_per_token",
+    )
+    persist_feature_scalar_alias_rows(
+        [
+            {
+                "_dataset_root": usr_root.as_posix(),
+                "_dataset_id": dataset.name,
+                "alias_id": scalar_alias_id,
+                "view_id": view.view_id,
+                "view_name": view.view_name,
+                "sequence_id": sequence_id,
+                "feature_scalar_key": feature_scalar_key,
+                "forward_pass_key": forward_pass_key,
+                "provider": "evo2",
+                "model_name": "evo2_7b",
+                "model_revision": None,
+                "scalar_kind": "log_likelihood__mean_per_token",
+                "orientation": "forward",
+                "source_dataset_id": dataset.name,
+                "feature_request_digest": "digest_fixture",
+                "created_at": created_at,
+            }
+        ]
+    )
+    persist_feature_scalar_rows(
+        [
+            {
+                "_dataset_root": usr_root.as_posix(),
+                "_dataset_id": dataset.name,
+                "feature_scalar_key": feature_scalar_key,
+                "value": -4.25,
+                "created_at": created_at,
+            }
+        ]
+    )
+    persist_feature_vector_rows(
+        [
+            {
+                "_dataset_root": usr_root.as_posix(),
+                "_dataset_id": dataset.name,
+                "feature_vector_key": feature_vector_key,
+                "value": [0.25, 0.75],
+                "created_at": created_at,
+            }
+        ]
+    )
+    return usr_root, dataset.name
 
 
 def _build_committee_usr_sources(tmp_path: Path) -> Path:
@@ -575,6 +720,165 @@ def test_inspect_and_validate_workspace_use_usr_overlay_columns(tmp_path: Path) 
     assert validate_payload["status"] == "ok"
     ctx_detail = next(detail for detail in validate_payload["source_details"] if detail["source_id"] == "ctx1k")
     assert ctx_detail["required_columns"] == ["id", "construct__anchor_id", "construct__context_id"]
+
+
+def test_infer_feature_sidecar_source_validates_and_materializes_sequence_view_semantics(tmp_path: Path) -> None:
+    usr_root, dataset_name = _build_infer_feature_sidecar_usr_source(tmp_path)
+    workspace_dir = tmp_path / "sidecar_latentdna"
+    workspace_dir.mkdir(parents=True)
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "sidecar_latentdna", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "feature_sidecar": {
+                        "kind": "infer_feature_sidecar",
+                        "root": usr_root.as_posix(),
+                        "dataset": dataset_name,
+                        "record_key": "alias_id",
+                        "subject_key": "id",
+                        "where": {
+                            "model_name": "evo2_7b",
+                            "representation_kind": "intermediate_embedding",
+                            "pooling_operation": "seq_mean",
+                            "orientation": "forward",
+                        },
+                    }
+                },
+                "metadata": {"include": ["source_family"]},
+                "views": {
+                    "z_sidecar": {
+                        "source": "feature_sidecar",
+                        "vector": {"kind": "column", "name": "value"},
+                        "coordinate_space_id": "evo2_7b_intermediate_block26_mlp_out",
+                        "tags": {"model": "7b", "family": "intermediate_embedding"},
+                        "role": "primary",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    inspect_result = _RUNNER.invoke(
+        app,
+        ["inspect", "source", "feature_sidecar", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert inspect_result.exit_code == 0, inspect_result.stdout
+    inspect_payload = yaml.safe_load(inspect_result.stdout)
+    assert inspect_payload["data"]["row_count"] == 1
+    assert "value" in inspect_payload["data"]["vector_columns"]
+    assert "product_kind" in inspect_payload["data"]["columns"]
+    assert "source_family" in inspect_payload["data"]["columns"]
+
+    validate_result = _RUNNER.invoke(
+        app,
+        ["validate", "workspace", "--workspace", workspace_dir.as_posix(), "--deep", "--json"],
+    )
+    assert validate_result.exit_code == 0, validate_result.stdout
+
+    materialize_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z_sidecar", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert materialize_result.exit_code == 0, materialize_result.stdout
+    materialize_payload = yaml.safe_load(materialize_result.stdout)
+    assert materialize_payload["metrics"]["rows"] == 1
+    assert materialize_payload["metrics"]["dims"] == 2
+
+    rows = pq.read_table(workspace_dir / "outputs" / "views" / "z_sidecar" / "rows.parquet").to_pylist()
+    assert rows[0]["source_family"] == "fixture_source"
+    assert rows[0]["alias_id"].startswith("alias_")
+
+
+def test_infer_feature_scalar_sidecar_source_validates_and_reads_sequence_view_semantics(tmp_path: Path) -> None:
+    usr_root, dataset_name = _build_infer_feature_sidecar_usr_source(tmp_path)
+    workspace_dir = tmp_path / "scalar_sidecar_latentdna"
+    workspace_dir.mkdir(parents=True)
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "scalar_sidecar_latentdna", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "log_likelihood_sidecar": {
+                        "kind": "infer_feature_scalar_sidecar",
+                        "root": usr_root.as_posix(),
+                        "dataset": dataset_name,
+                        "record_key": "alias_id",
+                        "subject_key": "id",
+                        "where": {
+                            "model_name": "evo2_7b",
+                            "scalar_kind": "log_likelihood__mean_per_token",
+                            "orientation": "forward",
+                        },
+                    }
+                },
+                "metadata": {"include": []},
+                "views": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    inspect_result = _RUNNER.invoke(
+        app,
+        ["inspect", "source", "log_likelihood_sidecar", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert inspect_result.exit_code == 0, inspect_result.stdout
+    inspect_payload = yaml.safe_load(inspect_result.stdout)
+    assert inspect_payload["data"]["row_count"] == 1
+    assert "value" in inspect_payload["data"]["columns"]
+    assert "source_family" in inspect_payload["data"]["columns"]
+    assert inspect_payload["data"]["vector_columns"] == []
+
+    validate_result = _RUNNER.invoke(
+        app,
+        ["validate", "workspace", "--workspace", workspace_dir.as_posix(), "--deep", "--json"],
+    )
+    assert validate_result.exit_code == 0, validate_result.stdout
+
+    missingness_result = _RUNNER.invoke(
+        app,
+        [
+            "inspect",
+            "missingness",
+            "log_likelihood_sidecar",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--column",
+            "value",
+            "--column",
+            "source_family",
+            "--column",
+            "scalar_kind",
+            "--json",
+        ],
+    )
+    assert missingness_result.exit_code == 0, missingness_result.stdout
+    missingness_payload = yaml.safe_load(missingness_result.stdout)
+    assert {row["column"] for row in missingness_payload["data"]["missingness"]} == {
+        "value",
+        "source_family",
+        "scalar_kind",
+    }
 
 
 def test_workspace_init_promoter_reference_margin_template_validates_with_realish_promoter_study_data(

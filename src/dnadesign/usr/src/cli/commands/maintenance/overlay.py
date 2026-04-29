@@ -5,7 +5,7 @@ src/dnadesign/usr/src/cli/commands/maintenance/overlay.py
 
 USR CLI maintenance overlay command implementations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

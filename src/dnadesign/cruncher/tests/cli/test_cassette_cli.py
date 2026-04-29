@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.baserender.cli import app as baserender_app
+from dnadesign.baserender import app as baserender_app
 from dnadesign.cruncher.cli.app import app
 
 runner = CliRunner()

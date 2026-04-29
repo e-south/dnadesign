@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/features/export.py
 
-Deterministic OPAL-ready matrix export for Evo2 promoter feature bundles.
+Deterministic OPAL-ready matrix export for Evo2 feature bundles.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Mapping, Sequence
 
 from ..errors import CapabilityError
-from .contracts import OpalMatrixExport, PromoterFeatureBundleConfig
+from .contracts import OpalMatrixExport, SequenceFeatureBundleConfig
 from .execution import (
     _LOG_LIKELIHOOD_MEAN,
     _LOG_LIKELIHOOD_TOTAL,
@@ -28,7 +28,7 @@ def export_opal_matrix(
     *,
     row_ids: Sequence[str],
     columnar: Mapping[str, Sequence[object]],
-    bundle: PromoterFeatureBundleConfig,
+    bundle: SequenceFeatureBundleConfig,
     model_id: str,
 ) -> OpalMatrixExport:
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)

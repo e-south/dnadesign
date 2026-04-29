@@ -100,6 +100,7 @@ class SourceBase(StrictWorkspaceModel):
     record_key: str
     subject_key: str
     context_key: str | None = None
+    role: str | None = None
     where: dict[str, Any] | None = None
     metadata_include: list[str] | None = None
     vector_cache_policy: str | None = None
@@ -121,7 +122,26 @@ class MatrixBundleSourceConfig(SourceBase):
     path: str
 
 
-SourceConfig = Annotated[USRSourceConfig | ParquetSourceConfig | MatrixBundleSourceConfig, Field(discriminator="kind")]
+class InferFeatureSidecarSourceConfig(SourceBase):
+    kind: Literal["infer_feature_sidecar"]
+    root: str
+    dataset: str
+
+
+class InferFeatureScalarSidecarSourceConfig(SourceBase):
+    kind: Literal["infer_feature_scalar_sidecar"]
+    root: str
+    dataset: str
+
+
+SourceConfig = Annotated[
+    USRSourceConfig
+    | ParquetSourceConfig
+    | MatrixBundleSourceConfig
+    | InferFeatureSidecarSourceConfig
+    | InferFeatureScalarSidecarSourceConfig,
+    Field(discriminator="kind"),
+]
 
 
 class VectorColumnSpec(StrictWorkspaceModel):
@@ -291,6 +311,11 @@ class PromoterMetadataCohortConfig(StrictWorkspaceModel):
         "campaign_prior",
         "is_control",
         "source_class",
+        "regulondb__sigma_factor_set",
+        "regulondb__regulator_composition",
+        "regulondb__box_pattern",
+        "regulondb__confidence_level_set",
+        "regulondb__metadata_completeness_class",
     ]
 
 

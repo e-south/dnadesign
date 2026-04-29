@@ -16,6 +16,7 @@ For the full DenseGen doc map, use the **[DenseGen documentation index](../index
 | Template id | Class | Intent | Additional requirements |
 | --- | --- | --- | --- |
 | `demo_tfbs_baseline` | demo | Minimal lifecycle walkthrough with binding-sites input | Solver backend |
+| `demo_dense_array_showcase` | demo | Dense-array packing showcase with toy TFBS inputs and no, one, or two fixed anchors | Solver backend |
 | `demo_sampling_baseline` | demo | PWM artifact sampling walkthrough with two plans | Solver backend plus FIMO |
 | `study_constitutive_sigma_panel` | study | Sigma70 constitutive promoter panel with fixed-element combinatorics and LacI/AraC background exclusion | Solver backend plus FIMO |
 | `study_stress_ethanol_cipro` | study | Larger stress-response campaign with three plans | Solver backend plus FIMO |
@@ -23,6 +24,7 @@ For the full DenseGen doc map, use the **[DenseGen documentation index](../index
 ### Tutorial mapping
 
 - Use **[TFBS baseline tutorial](../tutorials/demo_tfbs_baseline.md)** for `demo_tfbs_baseline`.
+- Use **[dense array showcase tutorial](../tutorials/demo_dense_array_showcase.md)** for `demo_dense_array_showcase`.
 - Use **[sampling baseline tutorial](../tutorials/demo_sampling_baseline.md)** for `demo_sampling_baseline`.
 - Use **[constitutive sigma panel study tutorial](../tutorials/study_constitutive_sigma_panel.md)** for `study_constitutive_sigma_panel`.
 - Use **[stress ethanol and ciprofloxacin study tutorial](../tutorials/study_stress_ethanol_cipro.md)** for `study_stress_ethanol_cipro`.

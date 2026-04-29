@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from .actor import _default_actor, _normalize_actor
 from .defaults import USR_EVENT_VERSION, _event_defaults
 from .fingerprint import _sha256_file, fingerprint_parquet
+from .gardening import EventLogGardenResult, garden_event_log
 from .recording import record_event
 from .redaction import _arg_key_is_sensitive, _redact_arg_value, _redact_args
 
@@ -24,6 +25,8 @@ __all__ = [
     "_redact_arg_value",
     "_redact_args",
     "_sha256_file",
+    "EventLogGardenResult",
     "fingerprint_parquet",
+    "garden_event_log",
     "record_event",
 ]

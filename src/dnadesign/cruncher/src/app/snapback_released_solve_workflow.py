@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/snapback_released_solve_workflow.py
 
 Application orchestration for released-product snapback solve/materialization.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
