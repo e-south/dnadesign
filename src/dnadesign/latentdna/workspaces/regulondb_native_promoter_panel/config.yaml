@@ -1,0 +1,129 @@
+schema_version: latentdna.workspace.v1
+workspace:
+  id: regulondb_native_promoter_panel
+  title: RegulonDB native promoter panel
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats:
+    - svg
+    - png
+  neighbor_backend: auto
+  memory_policy:
+    warn_fraction_of_system_ram: 0.5
+    fail_fraction_of_system_ram: 0.75
+    require_override_above_fail: true
+study_binding:
+  study_id: regulondb_native_promoter_panel
+  docs_root: src/dnadesign/studies/regulondb_native_promoter_panel
+sources:
+  native_records:
+    kind: usr
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoters
+    record_key: id
+    subject_key: id
+  native_7b_seq_mean_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoters
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      orientation: unknown
+  native_7b_seq_mean_output_layer_features:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoters
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      orientation: unknown
+  native_7b_seq_mean_log_likelihood_mean:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoters
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      orientation: unknown
+  native_7b_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: usr_regulondb_native_promoters
+    record_key: alias_id
+    subject_key: id
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      orientation: unknown
+metadata:
+  include:
+    - regulondb__sigma_factor_set
+    - regulondb__sigma_factor_count
+    - regulondb__confidence_level_set
+    - regulondb__regulator_composition
+    - regulondb__box_pattern
+    - regulondb__metadata_completeness_class
+    - regulondb__source_strata_set
+    - regulondb__primary_promoter_name
+    - source_family
+    - selection_basis
+    - view_collections
+views:
+  intermediate_embedding_7b_native_source_record_seq_mean:
+    source: native_7b_seq_mean_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_native_source_record_seq_mean
+    role: planned
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: native_source_record
+      pooling: seq_mean
+  output_layer_mean_7b_native_source_record_seq_mean:
+    source: native_7b_seq_mean_output_layer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_native_source_record_seq_mean
+    role: planned
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: native_source_record
+      pooling: seq_mean
+cohorts:
+  regulondb__sigma_factor_set:
+    kind: promoter_metadata
+    source: native_records
+    derive: regulondb__sigma_factor_set
+  regulondb__regulator_composition:
+    kind: promoter_metadata
+    source: native_records
+    derive: regulondb__regulator_composition
+  regulondb__box_pattern:
+    kind: promoter_metadata
+    source: native_records
+    derive: regulondb__box_pattern
+  regulondb__confidence_level_set:
+    kind: promoter_metadata
+    source: native_records
+    derive: regulondb__confidence_level_set
+  regulondb__metadata_completeness_class:
+    kind: promoter_metadata
+    source: native_records
+    derive: regulondb__metadata_completeness_class

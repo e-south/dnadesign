@@ -96,10 +96,16 @@ artifacts:
   infer_native_full_runbook_7b:
     artifact_type: file
     ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
+  infer_core60_config_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+  infer_core60_runbook_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml
   infer_native_full_dataset_7b:
     artifact_type: dataset
     dataset_id: infer_regulondb_native_promoter_views_7b
-    ref: repo:src/dnadesign/usr/datasets/infer_regulondb_native_promoter_views_7b
+    ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoters/_derived/infer
   infer_workspace_root:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
@@ -114,6 +120,21 @@ artifacts:
     ref: repo:src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel
 
 execution_surfaces:
+  construct_workspace:
+    surface_type: workspace
+    workspace_ref: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
+  infer_workspace:
+    surface_type: workspace
+    workspace_ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
+  latentdna_workspace:
+    surface_type: workspace
+    workspace_ref: repo:src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel
+  infer_batch_native_full_7b:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
+  infer_batch_core60_7b:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml
   usr_validate_native_dataset:
     surface_type: command
     argv:
@@ -123,6 +144,87 @@ execution_surfaces:
       - validate
       - usr_regulondb_native_promoters
       - --strict
+  construct_workspace_doctor:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - construct
+      - workspace
+      - doctor
+      - --workspace
+      - src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
+  construct_validate_core60:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - construct
+      - workspace
+      - validate-project
+      - --workspace
+      - src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
+      - --project
+      - native_tss_upstream_core60
+  infer_validate_native_full_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - config
+      - --config
+      - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+  infer_validate_core60_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - config
+      - --config
+      - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+  infer_completion_native_full_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - sequence-view-completion
+      - --config
+      - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+      - --format
+      - json
+      - --mode
+      - inventory
+  notify_resolve_events_native_full_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - setup
+      - resolve-events
+      - --tool
+      - infer
+      - --config
+      - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+      - --json
+  latentdna_validate_workspace:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - latentdna
+      - validate
+      - workspace
+      - --workspace
+      - regulondb_native_promoter_panel
+      - --deep
+      - --json
 
 snapshot:
   summary_scope: repo
@@ -208,11 +310,41 @@ preflight:
         required: true
         artifact: infer_native_full_runbook_7b
       - kind: path_exists
-        check_id: notify.profile.native_full_7b.present
-        check_group: notify
-        summary: Native/full 7B Notify profile is present.
+        check_id: infer.config.core60_7b.present
+        check_group: infer
+        summary: Core60 TSS-upstream 7B Infer sequence-view config is present.
         required: true
-        artifact: notify_native_full_profile_7b
+        artifact: infer_core60_config_7b
+      - kind: path_exists
+        check_id: infer.runbook.core60_7b.present
+        check_group: infer
+        summary: Core60 TSS-upstream 7B Infer batch runbook is present.
+        required: true
+        artifact: infer_core60_runbook_7b
+      - kind: command
+        check_id: infer.config.native_full_7b.validates
+        check_group: infer
+        summary: Native/full 7B Infer config validates without loading Evo2.
+        required: true
+        surface: infer_validate_native_full_7b
+      - kind: command
+        check_id: infer.config.core60_7b.validates
+        check_group: infer
+        summary: Core60 TSS-upstream 7B Infer config validates without loading Evo2.
+        required: true
+        surface: infer_validate_core60_7b
+      - kind: command
+        check_id: infer.native_full_7b.completion.inventory
+        check_group: infer
+        summary: Native/full 7B sequence-view completion inventory is inspectable and resumable.
+        required: true
+        surface: infer_completion_native_full_7b
+      - kind: command
+        check_id: notify.events.native_full_7b.resolve
+        check_group: notify
+        summary: Notify can resolve the native/full 7B Infer event path from the config.
+        required: true
+        surface: notify_resolve_events_native_full_7b
     core60_view_definition:
       - kind: path_exists
         check_id: construct.workspace.layout
@@ -223,14 +355,26 @@ preflight:
       - kind: path_exists
         check_id: construct.core60.config.present
         check_group: construct
-        summary: Native promoter core60 Construct config is present.
+        summary: Native promoter TSS-upstream core60 Construct config is present.
         required: true
         artifact: construct_core60_config
+      - kind: command
+        check_id: construct.workspace.doctor
+        check_group: construct
+        summary: RegulonDB Construct workspace registry and config are aligned.
+        required: true
+        surface: construct_workspace_doctor
+      - kind: command
+        check_id: construct.core60.contract.validates
+        check_group: construct
+        summary: TSS-upstream core60 project validates before generated dataset materialization.
+        required: true
+        surface: construct_validate_core60
       - kind: path_exists
         check_id: construct.core60.dataset.present
         check_group: construct
-        summary: Native promoter core60 derived dataset is present.
-        required: true
+        summary: Native promoter TSS-upstream core60 derived dataset is present after Construct run.
+        required: false
         artifact: construct_core60_dataset
     latentdna_native_audit:
       - kind: path_exists
@@ -248,9 +392,15 @@ preflight:
       - kind: path_exists
         check_id: latentdna.input.native_full_7b.present
         check_group: latentdna
-        summary: Native/full 7B feature dataset is present for LatentDNA.
-        required: true
+        summary: Native/full 7B Infer sidecar features are present for LatentDNA after batch execution.
+        required: false
         artifact: infer_native_full_dataset_7b
+      - kind: command
+        check_id: latentdna.workspace.deep.validates
+        check_group: latentdna
+        summary: RegulonDB LatentDNA workspace validates with planned feature views.
+        required: true
+        surface: latentdna_validate_workspace
   next_scope:
     target_phase_groups:
       regulondb_source_inventory: [study_record, cruncher_contract, usr_import_contract]

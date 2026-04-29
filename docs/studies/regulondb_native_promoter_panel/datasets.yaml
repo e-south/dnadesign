@@ -52,7 +52,13 @@ datasets:
     owner_tool: infer
     onboard_mode: create_new
     authority: shared
-    notes: Planned Evo2 7B native/full promoter feature surface. This remains blocked on validated USR import.
+    notes: >-
+      Planned Evo2 7B native/full promoter feature surface. The checked-in Infer
+      config consumes `source_record` sequence views from
+      `usr_regulondb_native_promoters` with `seq_mean` pooling and writes
+      canonical vector/scalar sidecars under the source dataset's
+      `_derived/infer` directory. The local completion inventory currently
+      reports all vectors/scalars missing because no Evo2 batch has run.
     sync:
       enabled: false
       remote_name: n/a
@@ -71,7 +77,13 @@ datasets:
     owner_tool: usr
     onboard_mode: create_new
     authority: shared
-    notes: Planned derived TSS/core view. The derivation rule is deliberately deferred until source TSS and strand coverage are validated.
+    notes: >-
+      Planned derived TSS-upstream core60 view. The local native source dataset
+      has no populated -10/-35 box annotations, but its RegulonDB source-window
+      contract places TSS at sequence offset 60. Construct therefore emits the
+      half-open upstream interval `[0,60)` as an `analysis_window` with
+      `core60_mean` pooling metadata. A local dry-run planned 3,182 output
+      records without writing generated artifacts.
     sync:
       enabled: false
       remote_name: n/a

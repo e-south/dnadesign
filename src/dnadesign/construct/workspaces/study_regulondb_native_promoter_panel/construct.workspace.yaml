@@ -1,0 +1,24 @@
+workspace:
+  id: study_regulondb_native_promoter_panel
+  profile: study-owned
+  description: >
+    Study-owned Construct workspace for RegulonDB native promoter records.
+    It derives a 60 bp upstream analysis window from the declared source TSS
+    offset without requiring -10/-35 box annotations.
+  roots:
+    shared_usr_root: ../../../usr/datasets
+    workspace_usr_root: outputs/usr_datasets
+  projects:
+    - id: native_tss_upstream_core60
+      artifacts:
+        config:
+          path: config.core60.yaml
+          job_id: construct_regulondb_native_promoter_core60_tss_upstream
+      contract:
+        input_dataset: usr_regulondb_native_promoters
+        output_dataset: usr_regulondb_native_promoter_core60
+      notes: >
+        RegulonDB PromoterSet source sequences are declared as native windows
+        with the transcription start site at sequence offset 60. The derived
+        analysis window is the half-open interval [0,60), i.e. exactly the
+        60 bp upstream of the TSS. This route does not infer -10/-35 boxes.

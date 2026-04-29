@@ -3,9 +3,10 @@
 **Last verified:** 2026-04-29
 
 Use this page after the checked-in study status establishes the current phase.
-This study remains inactive/source-intake-only for downstream work. The native
-USR dataset is materialized locally and validated, but it is a generated data
-artifact and is not git-tracked.
+This study remains inactive for production execution, but downstream
+Construct/Infer/Notify/LatentDNA contracts are now checked in. The native USR
+dataset is materialized locally and validated; generated data artifacts remain
+untracked.
 
 - Status: `uv run ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json`
 - Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json`
@@ -82,11 +83,15 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `not_configured`
+- Current state: `configured_preflight_ready`
 - Entry artifact: `usr_regulondb_native_promoters`
-- Exit artifact: `infer_regulondb_native_promoter_views_7b`
-- Route note: This route remains blocked until USR validation passes and a
-  checked-in Infer sequence-view config plus notify-backed runbook exists.
+- Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoters`
+- Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml`
+- Runbook: `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml`
+- Route note: This lane extracts native `source_record` views with
+  `seq_mean` pooling. Local preflight validates the config, resolves the Notify
+  event path, and reports all vectors/scalars missing as expected before Evo2
+  batch execution.
 
 ### Construct Native/Core60/Context
 
@@ -94,12 +99,28 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `data-plane`
 - Surface role: `derivation`
 - Owner-boundary: `construct`
-- Current state: `not_configured`
+- Current state: `configured_dry_run_validated`
 - Entry artifact: `usr_regulondb_native_promoters`
-- Exit artifact: explicit derived core60 and context USR datasets once rules are accepted
-- Route note: Native `source_record` rows are the source view. Core60 or context
-  views must be new explicit derivations with sequence-view contracts, not
-  reinterpretations of the native source rows.
+- Exit artifact: `usr_regulondb_native_promoter_core60`
+- Workspace: `src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel`
+- Route note: Native `source_record` rows remain source views. The checked-in
+  core60 route emits a new `analysis_window` dataset by taking `[0,60)` from
+  the native 81 bp source window, using the declared TSS offset `60`. This is
+  not -10/-35 box centering.
+
+### Infer Core60 TSS-Upstream 7B
+
+- Type: `route`
+- Plane: `control-plane`
+- Surface role: `feature-extraction`
+- Owner-boundary: `infer`
+- Current state: `configured_waiting_for_construct_output`
+- Entry artifact: `usr_regulondb_native_promoter_core60`
+- Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoter_core60`
+- Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml`
+- Runbook: `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml`
+- Route note: This lane extracts derived `analysis_window` views with
+  `core60_mean` pooling after Construct materializes the core60 dataset.
 
 ### LatentDNA Native Audit
 
@@ -107,6 +128,11 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `not_configured`
+- Current state: `configured_planned_features`
 - Entry artifact: native/full and later core60 7B feature surfaces
-- Route note: Native cohorts use `regulondb__*` fields. They must not derive DenseGen metadata or alias native sigma factors into `sig35_variant`. This route needs a checked-in `latentdna_binding.yaml`, workspace config, snapshot, deliverables, and browser hue plan before it can be treated as an executable downstream surface.
+- Workspace: `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel`
+- Binding: `docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml`
+- Route note: Native cohorts use `regulondb__*` fields. They must not derive
+  DenseGen metadata or alias native sigma factors into `sig35_variant`.
+  Current feature views are declared as planned so workspace validation can run
+  before Evo2 sidecars exist.

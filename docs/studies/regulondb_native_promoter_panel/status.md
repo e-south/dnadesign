@@ -6,7 +6,7 @@
 - Route map: `routes.md`
 - Study execution map: `pipeline.yaml`
 - USR root: `src/dnadesign/usr/datasets`
-- Lifecycle posture: inactive source-intake lane; local native USR dataset is materialized, but no end-to-end downstream lane is configured in this checkout
+- Lifecycle posture: inactive source-intake lane; local native USR dataset is materialized, and downstream Construct/Infer/Notify/LatentDNA contracts are configured for preflight and future batch execution
 
 ### Current Datasets
 
@@ -94,6 +94,18 @@ an explicit Construct/USR derivation step.
 - `infer_regulondb_native_promoter_views_7b`: n/a (`planned`)
 - `usr_regulondb_native_promoter_core60`: n/a (`planned`)
 
+### TSS/Core60 Contract
+
+The current local dataset has no populated -10/-35 box annotations:
+`_relations/promoter_boxes.parquet` has zero rows, and
+`regulondb__has_minus10_box` / `regulondb__has_minus35_box` are false for all
+3,182 base records. It does have TSS coverage for all retained base records.
+RegulonDB PromoterSet source sequences are 81 bp native windows with the
+transcription start site at sequence offset `60`, so the configured Construct
+core60 route emits the half-open upstream interval `[0,60)` as an
+`analysis_window`. This is a TSS-upstream source-window contract, not inferred
+box centering.
+
 ### Read-Only Probe Evidence
 
 Latest local source probe on 2026-04-27 produced a temporary Cruncher superset
@@ -132,28 +144,37 @@ current completeness base.
 
 ### Current Downstream Posture
 
-- Construct: not configured. No checked-in Construct workspace or core60/context derivation exists for this study.
-- Infer: not configured. No checked-in Infer config, runbook, feature-completion check, or Notify profile exists for this study.
-- Notify: not configured. No study-specific webhook/profile/event-path doctor surface is declared.
-- LatentDNA: not configured. No `latentdna_binding.yaml`, workspace, snapshot, deliverables, or browser metadata profile exists for this study.
+- Construct: configured for `native_tss_upstream_core60`. Local dry-run on
+  2026-04-29 planned 3,182 records and wrote no generated artifacts.
+- Infer: configured for native source-record `seq_mean` and derived core60
+  `core60_mean` Evo2 7B lanes. No Evo2 batch has been executed in this checkout.
+- Notify: native Infer event-path resolution succeeds against
+  `usr_regulondb_native_promoters/.events.log`; webhook/profile materialization
+  remains an operator step in the batch environment.
+- LatentDNA: configured with a workspace and study binding. The workspace
+  validates with native feature sources empty/planned and RegulonDB metadata
+  cohorts available from USR.
 - Cluster: not configured.
 - OPAL: not configured.
 
 ### End-to-End Readiness Audit
 
-This study does not yet meet the same end-to-end standard as
-`stress_ethanol_cipro_growth`. It has a maintained source-intake record, a
-tested USR import script, and a local validated native USR dataset, but the
-current checkout cannot execute the USR-to-Construct-to-Infer-to-LatentDNA path.
+This study now has a maintained source-intake record, a tested USR import
+script, a local validated native USR dataset, and checked-in downstream
+contracts for Construct, Infer, Notify event resolution, and LatentDNA planned
+feature consumption. The current checkout still has not run Evo2 or materialized
+the generated core60 dataset.
 
 Record-backed evidence from 2026-04-29:
 
 - `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` reports `is_active_study=false`, current phase `metadata_overlay_validation`, and `configured=false` for LatentDNA.
-- The same status surface reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and `exists=false` for `infer_regulondb_native_promoter_views_7b` and `usr_regulondb_native_promoter_core60`.
-- A repo-wide search finds RegulonDB study implementation only in `src/dnadesign/usr/scripts/create_regulondb_native_promoters.py` and its tests; no Construct, Infer, LatentDNA, or Notify workspace/config surfaces are checked in for this study.
+- The same status surface reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and `exists=false` for generated Infer/core60 artifacts that have not been run.
 - `uv run usr validate usr_regulondb_native_promoters --strict` passes locally.
-- `ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 10 --json` runs the current metadata-validation probe and returns `state=ok`.
-- `ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope full --command-timeout-seconds 10 --json` returns `state=missing` with ten required downstream blockers: Construct workspace/config/core60 dataset, Infer workspace/config/runbook, Notify profile, LatentDNA binding/workspace, and the native/full 7B feature dataset.
+- `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --dry-run --format json` returns `records_total=3182`.
+- `uv run infer validate config --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml` passes without GPU inventory.
+- `uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --format json --mode inventory` reports 3,182 required views and missing vectors/scalars as expected before batch execution.
+- `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --json` resolves the native USR `.events.log`.
+- `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json` returns `status=ok`.
 
 To reach the active promoter-study standard, this study needs these gates in
 order:
@@ -161,18 +182,16 @@ order:
 1. Materialize or sync `usr_regulondb_native_promoters` into the canonical USR
    root, then require `uv run usr validate usr_regulondb_native_promoters
    --strict` to pass.
-2. Add a Construct workspace that derives explicit native/core60/context
-   sequence-view products without relabeling native `source_record` rows as
-   `analysis_window`.
-3. Add Infer sequence-view configs and notify-backed runbooks for native source
-   records, any derived core60 views, and any constructed context views. The
-   outputs should use canonical `_derived/infer` vector/scalar sidecars.
-4. Add Notify profile/event-path doctors for the Infer lanes.
-5. Add a LatentDNA binding and workspace that consume RegulonDB-specific
-   metadata such as `regulondb__sigma_factor_set`,
-   `regulondb__confidence_level_set`, and `regulondb__regulator_composition`;
-   it must not borrow DenseGen fields or map native sigma metadata into
-   `sig35_variant`.
+2. Materialize `usr_regulondb_native_promoter_core60` from the checked-in
+   TSS-upstream Construct workspace when a generated-artifact lane is intended.
+3. Run the native source-record Evo2 7B batch, then the core60 Evo2 7B batch
+   after Construct output exists. Outputs use canonical `_derived/infer`
+   vector/scalar sidecars.
+4. Materialize Notify profiles in the target batch environment and start one
+   watcher per Infer lane.
+5. Refresh LatentDNA snapshots and plots after feature sidecars exist; native
+   metadata cohorts use `regulondb__*` fields and do not borrow DenseGen fields
+   or map native sigma metadata into `sig35_variant`.
 
 ### Next Actions
 

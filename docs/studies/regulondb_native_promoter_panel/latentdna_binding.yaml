@@ -1,0 +1,16 @@
+workspace_id: regulondb_native_promoter_panel
+workspace_ref: src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel
+snapshot_ref: src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/outputs/status/workspace_snapshot.json
+source_datasets:
+  native_source_records: usr_regulondb_native_promoters
+  native_source_record_features_7b: usr_regulondb_native_promoters/_derived/infer
+  core60_tss_upstream: usr_regulondb_native_promoter_core60
+  core60_tss_upstream_features_7b: usr_regulondb_native_promoter_core60/_derived/infer
+supported_model_families:
+  - evo2_7b
+default_model_family: evo2_7b
+required_wildtype_references: []
+decision_deliverables:
+  - dataset_overview
+  - representation_health_summary
+  - regulondb_metadata_audit
