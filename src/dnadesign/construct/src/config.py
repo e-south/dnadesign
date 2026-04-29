@@ -447,8 +447,28 @@ class SequenceMidpointSelectorConfig(StrictConfigModel):
     confidence: Literal["high", "medium", "low"] = "low"
 
 
+class SequenceOffsetSelectorConfig(StrictConfigModel):
+    kind: Literal["sequence_offset"]
+    offset_0: int = Field(ge=0)
+    label: Optional[str] = None
+    confidence: Literal["high", "medium", "low"] = "high"
+
+    @field_validator("label")
+    @classmethod
+    def _label_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("sequence_offset label cannot be empty when provided.")
+        return text
+
+
 NormalizeAnchorSelectorConfig = Annotated[
-    AnnotationPairMidpointSelectorConfig | AnnotationFeatureCenterSelectorConfig | SequenceMidpointSelectorConfig,
+    AnnotationPairMidpointSelectorConfig
+    | AnnotationFeatureCenterSelectorConfig
+    | SequenceMidpointSelectorConfig
+    | SequenceOffsetSelectorConfig,
     Field(discriminator="kind"),
 ]
 
@@ -468,6 +488,7 @@ class OverLengthTrimPolicyConfig(StrictConfigModel):
     kind: Literal["trim"] = "trim"
     target_length: int = Field(ge=1)
     require_focal_inside: bool = True
+    window_anchor: Literal["retention_optimized", "upstream_of_focal"] = "retention_optimized"
 
 
 class NormalizeTemplateConfig(StrictConfigModel):

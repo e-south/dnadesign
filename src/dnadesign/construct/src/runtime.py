@@ -608,10 +608,22 @@ def _best_trim_window(
     focal_selection: FocalSelection,
     target_length: int,
     required_roles: list[str],
+    window_anchor: str = "retention_optimized",
 ) -> tuple[int, int]:
     if len(sequence) < target_length:
         raise ValidationError("trim window requested for sequence shorter than target length")
     focal_point = float(focal_selection.focal_point_0)
+    if window_anchor == "upstream_of_focal":
+        end = int(focal_point)
+        start = end - target_length
+        if start < 0 or end > len(sequence):
+            raise ValidationError(
+                "normalize_anchor upstream_of_focal trim requires the focal offset to have "
+                f"{target_length} upstream bases inside the input sequence."
+            )
+        return int(start), int(end)
+    if window_anchor != "retention_optimized":
+        raise ValidationError(f"Unsupported normalize_anchor trim window_anchor: {window_anchor!r}.")
     min_start = max(0, int(focal_point) - target_length + 1)
     max_start = min(len(sequence) - target_length, int(focal_point))
     if min_start > max_start:
@@ -1814,6 +1826,7 @@ def _build_normalize_record(
             focal_selection=focal_selection,
             target_length=normalize_cfg.target_length,
             required_roles=list(normalize_cfg.feature_retention_policy.fail_if_loses_roles),
+            window_anchor=normalize_cfg.over_length_policy.window_anchor,
         )
         if normalize_cfg.over_length_policy.require_focal_inside and not (
             source_start_0 <= float(focal_selection.focal_point_0) < source_end_0
@@ -1821,6 +1834,11 @@ def _build_normalize_record(
             raise ValidationError(f"normalize_anchor trim window excludes the focal point for row '{row.get('id')}'.")
         analysis_sequence = sequence[source_start_0:source_end_0]
     elif len(sequence) < normalize_cfg.target_length:
+        if normalize_cfg.over_length_policy.window_anchor != "retention_optimized":
+            raise ValidationError(
+                "normalize_anchor under-length template expansion currently supports only "
+                "retention_optimized trim semantics."
+            )
         policy = normalize_cfg.under_length_policy
         if policy is None:
             raise ValidationError(
@@ -1900,10 +1918,16 @@ def _build_normalize_record(
         "construct__focal_part_length": len(analysis_sequence),
         "construct__window_semantics": "normalize_anchor",
         "construct__window_reference": focal_selection.focal_rule,
-        "construct__window_direction": "symmetric",
+        "construct__window_direction": (
+            "upstream" if normalize_cfg.over_length_policy.window_anchor == "upstream_of_focal" else "symmetric"
+        ),
         "construct__window_size_bp": len(analysis_sequence),
-        "construct__window_upstream_bp": None,
-        "construct__window_downstream_bp": None,
+        "construct__window_upstream_bp": (
+            len(analysis_sequence) if normalize_cfg.over_length_policy.window_anchor == "upstream_of_focal" else None
+        ),
+        "construct__window_downstream_bp": (
+            0 if normalize_cfg.over_length_policy.window_anchor == "upstream_of_focal" else None
+        ),
         "construct__window_offset_bp": None,
         "construct__window_start": source_start_0,
         "construct__window_end": source_end_0,

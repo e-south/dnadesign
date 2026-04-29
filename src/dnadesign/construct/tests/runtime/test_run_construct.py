@@ -2211,6 +2211,129 @@ job:
     assert views[0].parent_sequence_id == add_result.ids[0]
 
 
+def test_run_construct_normalize_anchor_selects_fixed_upstream_window_from_sequence_offset(
+    tmp_path: Path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    input_ds = Dataset(usr_root, "native_windows")
+    input_ds.init(source="test", notes="fixed upstream window test")
+    source_sequence = ("ACGT" * 15) + "T" + ("GCTA" * 5)
+    add_result = input_ds.add_sequences([source_sequence], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "normalize_tss_upstream.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_tss_upstream_demo
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: native_windows
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_window
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: sequence_offset
+          offset_0: 60
+          label: tss_offset_0
+          confidence: high
+    over_length_policy:
+      kind: trim
+      target_length: 60
+      require_focal_inside: false
+      window_anchor: upstream_of_focal
+    output_sequence_view:
+      create: true
+      recommended_pooling: core60_mean
+  output:
+    target:
+      kind: usr
+      dataset: tss_upstream_core60
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    output_ds = Dataset(usr_root, "tss_upstream_core60")
+    frame = output_ds.head(n=5)
+    assert frame.iloc[0]["sequence"].upper() == source_sequence[:60]
+    assert frame.iloc[0]["derived__source_interval_start_0"] == 0
+    assert frame.iloc[0]["derived__source_interval_end_0"] == 60
+    assert frame.iloc[0]["derived__focal_rule"] == "sequence_offset"
+    assert frame.iloc[0]["derived__focal_features"] == ["tss_offset_0"]
+    assert frame.iloc[0]["construct__window_direction"] == "upstream"
+    assert frame.iloc[0]["construct__window_upstream_bp"] == 60
+    assert frame.iloc[0]["construct__window_downstream_bp"] == 0
+
+    views = load_sequence_views(output_ds)
+    assert len(views) == 1
+    assert views[0].product_kind == "analysis_window"
+    assert views[0].parent_sequence_id == add_result.ids[0]
+    assert views[0].source_interval_start_0 == 0
+    assert views[0].source_interval_end_0 == 60
+
+
+def test_run_construct_normalize_anchor_fails_when_upstream_offset_lacks_coverage(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    input_ds = Dataset(usr_root, "short_upstream_window")
+    input_ds.init(source="test", notes="short upstream window test")
+    input_ds.add_sequences(["A" * 81], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "normalize_tss_upstream_short.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: normalize_tss_upstream_short_demo
+  mode: normalize_anchor
+  input:
+    source:
+      kind: usr
+      dataset: short_upstream_window
+      root: {usr_root.as_posix()}
+    field: sequence
+  normalize_anchor:
+    product_kind: analysis_window
+    target_length: 60
+    focal_selector:
+      kind: chain
+      selectors:
+        - kind: sequence_offset
+          offset_0: 59
+          label: tss_offset_0
+    over_length_policy:
+      kind: trim
+      target_length: 60
+      require_focal_inside: false
+      window_anchor: upstream_of_focal
+  output:
+    target:
+      kind: usr
+      dataset: tss_upstream_core60
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="60 upstream bases"):
+        run_from_config(config_path)
+
+
 def test_run_construct_normalize_anchor_fails_on_ambiguous_annotation_pair(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)

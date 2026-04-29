@@ -150,6 +150,9 @@ native/reference sequence.
 - `job.normalize_anchor.target_length`: required emitted length, for example `60`
 - `job.normalize_anchor.focal_selector`: ordered selector chain; the first successful selector wins
 - `job.normalize_anchor.over_length_policy.kind=trim`: emit an exact-length window from the parent sequence around the focal point
+- `job.normalize_anchor.over_length_policy.window_anchor=upstream_of_focal`: emit the half-open
+  upstream interval ending at the focal offset, for sources that declare a fixed sequence-relative
+  TSS or other feature offset
 - `job.normalize_anchor.under_length_policy.kind=expand_from_template`: expand a short parent sequence only from an explicit template context
 - `job.normalize_anchor.feature_retention_policy`: fail/warn rules for retained, clipped, and lost annotated roles
 - `job.normalize_anchor.fallback_policy.allow_low_confidence`: opt-in gate for low-confidence selectors such as `sequence_midpoint`
@@ -160,6 +163,9 @@ Supported focal selectors:
 - `annotation_pair_midpoint`: require one first feature and one second feature, then use the midpoint
   between their feature centers
 - `annotation_feature_center`
+- `sequence_offset`: use a declared 0-based sequence-relative offset such as a source-provided TSS
+  offset; pair it with `window_anchor=upstream_of_focal` when the intended product excludes the
+  focal base
 - `sequence_midpoint`
 
 For the promoter-reference core60 lane, the intended high-confidence selector is

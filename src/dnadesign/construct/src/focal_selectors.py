@@ -20,6 +20,7 @@ from .config import (
     NormalizeAnchorSelectorConfig,
     SelectorChainConfig,
     SequenceMidpointSelectorConfig,
+    SequenceOffsetSelectorConfig,
 )
 
 
@@ -110,6 +111,16 @@ def _resolve_single_selector(
             focal_point_0=float(sequence_length) / 2.0,
             focal_rule="sequence_midpoint",
             focal_features=(),
+            focal_confidence=selector.confidence,
+        )
+
+    if isinstance(selector, SequenceOffsetSelectorConfig):
+        if selector.offset_0 > sequence_length:
+            raise ValueError(f"sequence_offset {selector.offset_0} is outside sequence length {sequence_length}.")
+        return FocalSelection(
+            focal_point_0=float(selector.offset_0),
+            focal_rule="sequence_offset",
+            focal_features=(selector.label,) if selector.label is not None else (),
             focal_confidence=selector.confidence,
         )
 
