@@ -213,6 +213,11 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - `Families` reports persisted writeback coverage across rows still missing or stale for each feature family.
 - On grouped infer `write_overlay_part` events, Notify can omit `Current output` because the event covers multiple columns at once; treat that update as aggregate writeback progress, not per-family GPU compute.
 - A flat family percentage during a repair or resume pass can mean the current rows already had that family populated even while other families are still being repaired.
+- Sequence-view feature lanes can set Infer `io.write_back: false`; those lanes
+  emit sparse `infer_feature_bundle_progress` updates plus a terminal
+  `infer_feature_bundle_complete` event on the watched USR stream. Low-level
+  `infer_feature_*_write` sidecar events remain available for explicit audit
+  filters but are not part of the default Slack policy.
 
 ### Event schema source of truth
 

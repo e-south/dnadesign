@@ -105,6 +105,29 @@ def test_tool_event_status_override_handles_infer_materialize_as_terminal() -> N
     assert tool_event_status_override("materialize", event) == "success"
 
 
+def test_tool_event_status_override_handles_infer_feature_sidecar_events() -> None:
+    event = _event("infer_feature_vectors_write")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {"rows_written": 157164}
+
+    assert tool_event_status_override("infer_feature_vectors_write", event) == "running"
+
+
+def test_tool_event_status_override_handles_infer_feature_bundle_progress() -> None:
+    event = _event("infer_feature_bundle_progress")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {"progress_pct": 42.0}
+
+    assert tool_event_status_override("infer_feature_bundle_progress", event) == "running"
+
+
+def test_tool_event_status_override_handles_infer_feature_bundle_complete_as_terminal() -> None:
+    event = _event("infer_feature_bundle_complete")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+
+    assert tool_event_status_override("infer_feature_bundle_complete", event) == "success"
+
+
 def test_tool_event_message_override_formats_infer_attach_message() -> None:
     event = _event("attach")
     event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
@@ -217,6 +240,82 @@ def test_tool_event_message_override_explains_grouped_infer_writeback_semantics(
     assert "- Elapsed: 00:15:15" in msg
 
 
+def test_tool_event_message_override_formats_infer_feature_sidecar_message() -> None:
+    event = _event("infer_feature_vectors_write")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {"rows_written": 157164}
+    event["artifacts"] = {"path": "_derived/infer/feature_vectors.parquet"}
+
+    msg = tool_event_message_override(
+        "infer_feature_vectors_write",
+        event,
+        run_id="infer-run-1",
+        duration_seconds=None,
+    )
+
+    assert msg is not None
+    assert "Infer feature sidecar write" in msg
+    assert "Rows written: 157164" in msg
+    assert "_derived/infer/feature_vectors.parquet" in msg
+
+
+def test_tool_event_message_override_formats_infer_feature_bundle_progress_message() -> None:
+    event = _event("infer_feature_bundle_progress")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {
+        "job_id": "context_forward_seq_and_anchor_mean_7b",
+        "model_id": "evo2_7b",
+        "contexts_completed": 78640,
+        "contexts_total": 157279,
+        "progress_pct": 50.0,
+        "unique_forward_passes_completed": 78640,
+        "unique_forward_passes_total": 157279,
+        "required_vector_keys": 629116,
+        "required_scalar_keys": 314558,
+    }
+
+    msg = tool_event_message_override(
+        "infer_feature_bundle_progress",
+        event,
+        run_id="infer-run-1",
+        duration_seconds=1800.0,
+    )
+
+    assert msg is not None
+    assert "Infer feature bundle 50.0% | job=context_forward_seq_and_anchor_mean_7b | dataset=demo" in msg
+    assert "- Model: evo2_7b" in msg
+    assert "- Views this run: 78640/157279 | forward passes: 78640/157279" in msg
+    assert "- ETA: 00:30:00" in msg
+    assert "- Sidecar keys: vectors=629116 scalars=314558" in msg
+    assert "- Elapsed: 00:30:00" in msg
+
+
+def test_tool_event_message_override_formats_infer_feature_bundle_complete_message() -> None:
+    event = _event("infer_feature_bundle_complete")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {
+        "job_id": "context_forward_seq_and_anchor_mean_7b",
+        "model_id": "evo2_7b",
+        "contexts_completed": 314558,
+        "unique_forward_passes": 157279,
+        "required_vector_keys": 629116,
+        "required_scalar_keys": 314558,
+    }
+
+    msg = tool_event_message_override(
+        "infer_feature_bundle_complete",
+        event,
+        run_id="infer-run-1",
+        duration_seconds=None,
+    )
+
+    assert msg is not None
+    assert "Infer feature bundle complete" in msg
+    assert "job=context_forward_seq_and_anchor_mean_7b" in msg
+    assert "- Forward passes: 157279" in msg
+    assert "- Sidecar keys: vectors=629116 scalars=314558" in msg
+
+
 def test_evaluate_tool_event_infer_attach_exposes_elapsed_duration() -> None:
     state = ToolEventState()
     first = _event("attach", timestamp="2026-02-06T00:00:00+00:00")
@@ -303,6 +402,60 @@ def test_evaluate_tool_event_infer_write_overlay_part_exposes_elapsed_duration()
     assert first_decision.duration_seconds == 0.0
     assert second_decision.emit is True
     assert second_decision.duration_seconds == 70.0
+
+
+def test_evaluate_tool_event_infer_feature_bundle_progress_is_step_throttled() -> None:
+    state = ToolEventState()
+    first = _event("infer_feature_bundle_progress", timestamp="2026-02-06T00:00:00+00:00")
+    first["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    first["args"] = {
+        "contexts_completed": 1,
+        "contexts_total": 1000,
+        "progress_pct": 0.1,
+    }
+    second = _event("infer_feature_bundle_progress", timestamp="2026-02-06T00:00:30+00:00")
+    second["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    second["args"] = {
+        "contexts_completed": 90,
+        "contexts_total": 1000,
+        "progress_pct": 9.0,
+    }
+    third = _event("infer_feature_bundle_progress", timestamp="2026-02-06T00:01:10+00:00")
+    third["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    third["args"] = {
+        "contexts_completed": 110,
+        "contexts_total": 1000,
+        "progress_pct": 11.0,
+    }
+
+    first_decision = evaluate_tool_event("infer_feature_bundle_progress", first, run_id="infer-run-1", state=state)
+    second_decision = evaluate_tool_event("infer_feature_bundle_progress", second, run_id="infer-run-1", state=state)
+    third_decision = evaluate_tool_event("infer_feature_bundle_progress", third, run_id="infer-run-1", state=state)
+
+    assert first_decision.emit is True
+    assert first_decision.duration_seconds == 0.0
+    assert second_decision.emit is False
+    assert third_decision.emit is True
+    assert third_decision.duration_seconds == 70.0
+
+
+def test_evaluate_tool_event_infer_feature_bundle_complete_exposes_duration() -> None:
+    state = ToolEventState()
+    progress = _event("infer_feature_bundle_progress", timestamp="2026-02-06T00:00:00+00:00")
+    progress["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    progress["args"] = {
+        "contexts_completed": 1,
+        "contexts_total": 100,
+        "progress_pct": 1.0,
+    }
+    complete = _event("infer_feature_bundle_complete", timestamp="2026-02-06T00:12:34+00:00")
+    complete["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+
+    _ = evaluate_tool_event("infer_feature_bundle_progress", progress, run_id="infer-run-1", state=state)
+    decision = evaluate_tool_event("infer_feature_bundle_complete", complete, run_id="infer-run-1", state=state)
+
+    assert decision.emit is True
+    assert decision.duration_seconds == 754.0
 
 
 def test_evaluate_tool_event_infer_attach_is_throttled_by_min_seconds() -> None:

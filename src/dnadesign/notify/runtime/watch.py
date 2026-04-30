@@ -77,6 +77,12 @@ def watch_usr_events_loop(
         "progress_min_seconds": progress_min_seconds,
         "progress_heartbeat_seconds": progress_heartbeat_seconds,
     }
+    infer_feature_bucket = tool_event_state.get_bucket("infer_feature_bundle")
+    infer_feature_bucket["notify_config"] = {
+        "progress_step_pct": progress_step_pct,
+        "progress_min_seconds": progress_min_seconds,
+        "progress_heartbeat_seconds": progress_heartbeat_seconds,
+    }
 
     def _save_cursor_if_enabled(next_offset: int) -> None:
         if should_advance_cursor:
