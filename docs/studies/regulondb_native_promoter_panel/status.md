@@ -1,28 +1,33 @@
 ## regulondb_native_promoter_panel
 
-- Last verified: 2026-04-29
+- Last verified: 2026-04-30
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
 - Study execution map: `pipeline.yaml`
 - USR root: `src/dnadesign/usr/datasets`
-- Lifecycle posture: inactive source-intake lane; local native USR and TSS-upstream core60 datasets are materialized, and downstream Infer/Notify/LatentDNA contracts are configured for preflight and future batch execution
+- Lifecycle posture: inactive source-intake lane; local native USR and TSS-upstream core60 datasets are materialized, and the standard local Evo2 7B Infer sidecars are complete for the native/full and derived core60 lanes
 
 ### Current Datasets
 
 - Native promoter source: `usr_regulondb_native_promoters` (`local validated`, generated/untracked)
-- Native/full 7B vector/scalar sidecars: `infer_regulondb_native_promoter_views_7b` (`planned`)
+- Native/full 7B vector/scalar sidecars: `infer_regulondb_native_promoter_views_7b` (`local complete`)
 - Core60 view: `usr_regulondb_native_promoter_core60` (`local validated`, generated/untracked)
-- Core60 7B vector/scalar sidecars: `infer_regulondb_native_promoter_core60_views_7b` (`planned`)
+- Core60 7B vector/scalar sidecars: `infer_regulondb_native_promoter_core60_views_7b` (`local complete`)
+- Native/full plus in-context TSS-upstream core60 sidecars:
+  `config.sequence_views.native_full_plus_tss_upstream_core60.evo2_7b.yaml`
+  (`local complete`, additive dogfood lane, not part of the default fill quota)
 
 ### Current Phase
 
-- Declared phase: `native_full_infer_7b`
+- Declared phase: `local_infer_complete_7b`
 - Source export status: local Cruncher superset export validated; export artifacts are not checked in
 - USR dataset status: `src/dnadesign/usr/datasets/usr_regulondb_native_promoters` is materialized locally and passes strict USR validation as of 2026-04-29
 - Sequence-view status: write mode now emits one `source_record` sequence view per retained native promoter sequence, plus mutable view semantics for `source_family`, `selection_basis`, `view_collections`, and `role_tags`
 - Preferred first infer family: `evo2_7b`
-- Current batch ergonomics: `ops runbook fill-infer` can inspect the checked-in Infer runbooks and plan only lanes with missing sequence-view vectors/scalars.
+- Current batch ergonomics: `ops runbook fill-infer` inspects the checked-in
+  Infer runbooks, skips complete sequence-view vector/scalar lanes, and now
+  plans zero RegulonDB GPU submissions from this checkout.
 
 ### Placement Boundary
 
@@ -93,8 +98,19 @@ an explicit Construct/USR derivation step.
 - `usr_regulondb_native_promoters`: 3,182 base rows (`local validated`, untracked)
 - `usr_regulondb_native_promoters/_views/sequence_views.parquet`: 3,182 `source_record` views
 - `usr_regulondb_native_promoters/_views/view_semantics.parquet`: 3,182 mutable semantics rows
-- `infer_regulondb_native_promoter_views_7b`: n/a (`planned`)
+- `infer_regulondb_native_promoter_views_7b`: 3,182 source-record
+  `seq_mean` views complete; 6,364 vector keys and 6,364 scalar keys are
+  reusable from canonical native `_derived/infer` sidecars
 - `usr_regulondb_native_promoter_core60`: 3,181 canonical 60 bp sequence rows plus 3,182 `analysis_window` sequence views (`local validated`, generated/untracked)
+- `usr_regulondb_native_promoters/_derived/infer`: 12,728 feature alias rows,
+  12,728 feature vector rows, 6,364 scalar alias rows, and 6,364 scalar rows
+  after the native/full plus in-context core60 dogfood run. The checked-in
+  native/full runbook quota reuses the 6,364 `seq_mean` vector rows and 6,364
+  scalar rows from this sidecar set.
+- `usr_regulondb_native_promoter_core60/_derived/infer`: 6,364 feature alias
+  rows and 6,364 scalar alias rows. The payload sidecars have 6,362 vector
+  rows and 6,362 scalar rows because one duplicate 60 bp sequence is reused by
+  two sequence views; alias rows preserve the view-level identities.
 
 ### TSS/Core60 Contract
 
@@ -150,74 +166,87 @@ current completeness base.
   `native_tss_upstream_core60` on 2026-04-29. The run wrote 3,182 sequence-view
   rows and 3,181 canonical 60 bp sequence rows; the difference is expected USR
   sequence deduplication for duplicate derived windows.
-- Infer: configured for native source-record `seq_mean` and derived core60
-  `core60_mean` Evo2 7B lanes. Both lanes request intermediate block means,
-  output-layer means, mean-per-token log likelihoods, and total log
-  likelihoods. No Evo2 batch has been executed in this checkout.
-- Notify: native Infer event-path resolution succeeds against
-  `usr_regulondb_native_promoters/.events.log`; webhook/profile materialization
-  remains an operator step in the batch environment.
+- Infer: the standard native source-record `seq_mean` and derived core60
+  `core60_mean` Evo2 7B lanes are locally complete. Both lanes request
+  intermediate block means, output-layer means, mean-per-token log likelihoods,
+  and total log likelihoods. An additive dogfood config also extracts
+  `core60_mean` over `[0,60)` from the full 81 bp native context in the same
+  forward pass group as native `seq_mean`.
+- Notify: native and core60 Infer event-path/profile smoke checks succeeded
+  during local dogfood. Watcher cursors consumed the terminal Infer events with
+  no remaining spool files.
 - Ops: `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel`
   now discovers the native/full and core60 Infer runbooks, blocks stale or
-  missing-product lanes, and plans only lanes with missing vectors/scalars. With
-  Notify secrets present, the current local plan marks both 7B lanes runnable
-  with 12,728 missing vectors and 12,728 missing scalars total.
-- LatentDNA: configured with a workspace and study binding. The workspace
-  validates with native feature sources empty/planned and RegulonDB metadata
-  cohorts available from USR. A local snapshot exists and reports the native
-  record plus native 7B vector/scalar source declarations, with the core60
-  source family now present and decision deliverables still pending until Infer
-  sidecars exist.
-- Cluster: not configured.
+  missing-product lanes, and plans only lanes with missing vectors/scalars. The
+  2026-04-30 local plan marks both checked-in 7B lanes `skip_complete`, with
+  zero blocked lanes, zero missing products, zero missing vectors, and zero
+  missing scalars.
+- LatentDNA: configured with a workspace and study binding. The workspace has
+  validated with RegulonDB metadata cohorts and planned native/core60 feature
+  source declarations. Refresh downstream snapshots/plots against the completed
+  Infer sidecars before treating LatentDNA feature deliverables as current.
+- Cluster: submit-ready runbooks exist, but no SCC submission is currently
+  needed for the local RegulonDB 7B standard lanes because sidecars are
+  complete.
 - OPAL: not configured.
 
 ### End-to-End Readiness Audit
 
 This study now has a maintained source-intake record, a tested USR import
-script, a local validated native USR dataset, and checked-in downstream
-contracts for Construct, Infer, Notify event resolution, and LatentDNA planned
-feature consumption. The current checkout still has not run Evo2.
+script, a local validated native USR dataset, checked-in downstream contracts
+for Construct, Infer, Notify event resolution, and LatentDNA planned feature
+consumption, plus local Evo2 7B sidecars for the standard native/full and
+derived core60 lanes.
 
-Record-backed evidence from 2026-04-29:
+Record-backed evidence through 2026-04-30:
 
-- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` reports `is_active_study=false`, current phase `native_full_infer_7b`, and LatentDNA `state=attention` with pending decision deliverables plus missing planned Infer sidecars.
+- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` previously reported `is_active_study=false` and `native_full_infer_7b`; the checked-in record now advances the local phase to `local_infer_complete_7b` based on sidecar inventory.
 - The same status surface reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and reports the generated core60 dataset as present in the local canonical USR root.
 - `uv run usr validate usr_regulondb_native_promoters --strict` passes locally.
 - `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --format json` returned `records_total=3182`, `records_written=3182`, and `dry_run=false`.
 - `uv run usr validate usr_regulondb_native_promoter_core60 --strict` passes locally.
 - `uv run infer validate config --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml` passes without GPU inventory.
-- `uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --format json --mode inventory` reports 3,182 required views and missing vectors/scalars as expected before batch execution.
+- `uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --format json --mode inventory` now reports 3,182 required views with zero missing vectors and zero missing scalars.
 - `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml --json` resolves the native USR `.events.log`.
 - `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml --json` resolves the core60 USR `.events.log`.
-- `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel --no-discover-active-jobs --allow-unknown-active-jobs --allow-missing-qstat` reports both Infer lanes as blocked locally when Notify secrets are absent, and runnable when a Notify secret file plus TLS bundle are present.
+- `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel --repo-root . --plan-only` reports `lanes_total=2`, `skip_complete_lanes=2`, `runnable_lanes=0`, `blocked_lanes=0`, and zero missing or stale vector/scalar products.
+- Local Evo2 7B dogfood on a Blackwell GPU completed the additive native/full
+  plus in-context core60 config in 58.74 seconds wall time with about 18.8 GiB
+  peak GPU memory observed, then completed the derived core60 standard lane in
+  49.57 seconds wall time with about 17.9 GiB peak GPU memory observed.
+- A read-only empirical recompute check sampled 128 native source records and
+  128 derived core60 views through `Evo2Adapter('evo2_7b', 'cuda:0', 'bf16')`;
+  fresh output-layer means, intermediate embedding means, and log-likelihood
+  scalars matched persisted sidecars exactly (`max_abs_diff=0.0`, missing
+  payloads `0`).
+- A direct USR congruence check reports native records are all 81 bp, derived
+  core60 records/views are all 60 bp, every core60 view has a parent native
+  sequence, and `core60_sequence == parent_native_sequence[0:60]` for all
+  3,182 views.
+- `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json` reports `state=ok`, 13 ok checks, no missing checks, and no blockers when run from this checkout on 2026-04-30.
 - `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json` returns `status=ok`.
-- `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json` writes the local partial snapshot contract. It is valid for native metadata review, but does not claim feature plots before native/full or core60 Infer sidecars exist.
+- `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json` writes the local partial snapshot contract. It is valid for native metadata review; feature plots should be refreshed against the completed sidecars when the downstream analysis step is resumed.
 
-To reach the active promoter-study standard, this study needs these gates in
-order:
+Residual operational footgun:
 
-1. Materialize or sync `usr_regulondb_native_promoters` into the canonical USR
-   root, then require `uv run usr validate usr_regulondb_native_promoters
-   --strict` to pass.
-2. Run `uv run ops runbook fill-infer --study-dir
-   docs/studies/regulondb_native_promoter_panel --submit` from the target HPC
-   batch environment after Notify webhook and TLS settings are materialized.
-   This single control-plane command plans/submits only incomplete
-   sequence-view Infer lanes.
-3. Run or resume the native source-record Evo2 7B batch and the core60 Evo2 7B
-   batch. Both batches must emit intermediate
-   embeddings, output-layer means, and log-likelihood scalar sidecars under the
-   canonical `_derived/infer` contract.
-4. Keep one Notify watcher per Infer lane; the fill command preserves the
-   checked-in runbooks' lane-specific event streams instead of merging them into
-   one ambiguous watcher.
-5. Refresh LatentDNA snapshots and plots after feature sidecars exist; native
-   metadata cohorts use `regulondb__*` fields and do not borrow DenseGen fields
-   or map native sigma metadata into `sig35_variant`.
+- Directly rerunning a completed Infer config is GPU-free but still spends about
+  24.5 seconds and about 3.6 GiB RSS reconciling/re-writing completion
+  sidecars. The study-level `fill-infer` path avoids this by skipping complete
+  lanes; future optimization should add a fast no-op return inside direct
+  `infer run` when all vector/scalar sidecars are already complete.
 
 ### Next Actions
 
-- Review the local `usr_regulondb_native_promoters` and `usr_regulondb_native_promoter_core60` validation output plus the strict omission policy.
-- Decide whether to promote the local generated datasets through the normal USR data sync path. Do not add generated dataset roots to git.
-- On the HPC submit host, run `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel --submit` after Notify webhook/TLS materialization.
+- Review or sync the local generated USR datasets and Infer sidecars through the
+  normal USR data sync path. Do not add generated dataset roots to git.
+- Do not submit another standard RegulonDB Infer batch from this checkout unless
+  completion inventory reports missing or stale vectors/scalars. The current
+  handoff command is `uv run ops runbook fill-infer --study-dir
+  docs/studies/regulondb_native_promoter_panel --repo-root . --plan-only`.
+- Decide whether the additive full-native-context `[0,60)` pooled core60 values
+  should become part of the official study quota. If yes, promote the additive
+  config into a checked-in runbook; until then it remains dogfood evidence and
+  a reusable config, not a default batch lane.
+- Refresh LatentDNA snapshots and plots against the completed native/full and
+  core60 sidecars.
 - Keep live RegulonDB 14.5, sigmulon, HT, prediction, and EcoCyc strata as explicit future reconciliation work rather than silently widening the current base table.

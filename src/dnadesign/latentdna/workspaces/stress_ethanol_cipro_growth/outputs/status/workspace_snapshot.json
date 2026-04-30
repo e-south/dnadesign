@@ -1,11 +1,11 @@
 {
   "schema_version": "latentdna.workspace_snapshot.v1",
   "workspace_id": "stress_ethanol_cipro_growth",
-  "output_root": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs",
+  "output_root": "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs",
   "sources": {
     "anchor_60bp": {
       "kind": "usr",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/records.parquet",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/records.parquet",
       "dataset_id": "usr_prom_eth_cip_anchor",
       "row_count": 157279,
       "columns": [
@@ -158,7 +158,7 @@
     },
     "anchor_7b_seq_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
       "dataset_id": "usr_prom_eth_cip_anchor",
       "row_count": 157164,
       "columns": [
@@ -341,7 +341,7 @@
     },
     "anchor_7b_seq_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
       "dataset_id": "usr_prom_eth_cip_anchor",
       "row_count": 0,
       "columns": [
@@ -524,7 +524,7 @@
     },
     "anchor_7b_seq_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
       "dataset_id": "usr_prom_eth_cip_anchor",
       "row_count": 0,
       "columns": [
@@ -701,7 +701,7 @@
     },
     "anchor_7b_seq_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/infer",
       "dataset_id": "usr_prom_eth_cip_anchor",
       "row_count": 0,
       "columns": [
@@ -878,7 +878,7 @@
     },
     "full_context_1kb": {
       "kind": "usr",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/records.parquet",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/records.parquet",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 314558,
       "columns": [
@@ -982,7 +982,7 @@
     },
     "full_context_7b_forward_anchor_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 157164,
       "columns": [
@@ -1122,7 +1122,7 @@
     },
     "full_context_7b_forward_anchor_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -1262,7 +1262,7 @@
     },
     "full_context_7b_forward_anchor_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -1396,7 +1396,7 @@
     },
     "full_context_7b_forward_anchor_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -1530,7 +1530,7 @@
     },
     "full_context_7b_forward_seq_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -1670,7 +1670,7 @@
     },
     "full_context_7b_forward_seq_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -1810,7 +1810,7 @@
     },
     "full_context_7b_forward_seq_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -1944,7 +1944,7 @@
     },
     "full_context_7b_forward_seq_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2078,7 +2078,7 @@
     },
     "full_context_7b_reverse_complement_anchor_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2218,7 +2218,7 @@
     },
     "full_context_7b_reverse_complement_anchor_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2358,7 +2358,7 @@
     },
     "full_context_7b_reverse_complement_anchor_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2492,7 +2492,7 @@
     },
     "full_context_7b_reverse_complement_anchor_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2626,7 +2626,7 @@
     },
     "full_context_7b_reverse_complement_seq_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2766,7 +2766,7 @@
     },
     "full_context_7b_reverse_complement_seq_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -2906,7 +2906,7 @@
     },
     "full_context_7b_reverse_complement_seq_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -3040,7 +3040,7 @@
     },
     "full_context_7b_reverse_complement_seq_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_context",
       "row_count": 0,
       "columns": [
@@ -3174,7 +3174,7 @@
     },
     "reference_native": {
       "kind": "usr",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/usr_promoter_references/records.parquet",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/usr_promoter_references/records.parquet",
       "dataset_id": "usr_promoter_references",
       "row_count": 48,
       "columns": [
@@ -3253,7 +3253,7 @@
     },
     "reference_core60": {
       "kind": "usr",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/records.parquet",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/records.parquet",
       "dataset_id": "construct_prom_eth_cip_reference_core60",
       "row_count": 48,
       "columns": [
@@ -3353,9 +3353,9 @@
     },
     "reference_core60_7b_core60_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_core60",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -3490,9 +3490,9 @@
     },
     "reference_core60_7b_core60_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_core60",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -3627,9 +3627,9 @@
     },
     "reference_core60_7b_core60_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_core60",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -3758,9 +3758,9 @@
     },
     "reference_core60_7b_core60_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_core60",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -3889,7 +3889,7 @@
     },
     "reference_contexts": {
       "kind": "usr",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/records.parquet",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/records.parquet",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
       "row_count": 96,
       "columns": [
@@ -3961,9 +3961,9 @@
     },
     "reference_context_7b_forward_anchor_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4075,9 +4075,9 @@
     },
     "reference_context_7b_forward_anchor_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4189,9 +4189,9 @@
     },
     "reference_context_7b_forward_anchor_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4297,9 +4297,9 @@
     },
     "reference_context_7b_forward_anchor_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4405,9 +4405,9 @@
     },
     "reference_context_7b_forward_seq_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4519,9 +4519,9 @@
     },
     "reference_context_7b_forward_seq_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4633,9 +4633,9 @@
     },
     "reference_context_7b_forward_seq_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4741,9 +4741,9 @@
     },
     "reference_context_7b_forward_seq_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4849,9 +4849,9 @@
     },
     "reference_context_7b_reverse_complement_anchor_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -4963,9 +4963,9 @@
     },
     "reference_context_7b_reverse_complement_anchor_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5077,9 +5077,9 @@
     },
     "reference_context_7b_reverse_complement_anchor_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5185,9 +5185,9 @@
     },
     "reference_context_7b_reverse_complement_anchor_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5293,9 +5293,9 @@
     },
     "reference_context_7b_reverse_complement_seq_mean_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5407,9 +5407,9 @@
     },
     "reference_context_7b_reverse_complement_seq_mean_output_layer_features": {
       "kind": "infer_feature_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5521,9 +5521,9 @@
     },
     "reference_context_7b_reverse_complement_seq_mean_log_likelihood_mean": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5629,9 +5629,9 @@
     },
     "reference_context_7b_reverse_complement_seq_mean_log_likelihood_total": {
       "kind": "infer_feature_scalar_sidecar",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
+      "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts/_derived/infer",
       "dataset_id": "construct_prom_eth_cip_reference_contexts",
-      "row_count": 0,
+      "row_count": 48,
       "columns": [
         "id",
         "bio_type",
@@ -5768,13 +5768,13 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/dataset_overview"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/dataset_overview"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/dataset_overview",
           "relative_ref": "deliverables/dataset_overview",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/dataset_overview.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/dataset_overview.md"
         }
       ],
       "warnings": []
@@ -5785,13 +5785,13 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_health_summary"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_health_summary"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/representation_health_summary",
           "relative_ref": "deliverables/representation_health_summary",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/representation_health_summary.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/representation_health_summary.md"
         }
       ],
       "warnings": []
@@ -5802,14 +5802,14 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/design_structure_summary",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/balanced_design_family_margin_gallery"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/design_structure_summary",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/balanced_design_family_margin_gallery"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/design_structure_summary",
           "relative_ref": "deliverables/design_structure_summary",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/design_structure_summary.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/design_structure_summary.md"
         }
       ],
       "warnings": []
@@ -5820,16 +5820,16 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_ordinal_audit",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_margin_ladder_gallery",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_stress_margin_gallery",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_centroid_distance_gallery"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_ordinal_audit",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_margin_ladder_gallery",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_stress_margin_gallery",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/sigma35_centroid_distance_gallery"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit",
           "relative_ref": "deliverables/sigma35_ordinal_audit",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit.md"
         }
       ],
       "warnings": []
@@ -5840,14 +5840,14 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_robustness_summary",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_pair_summary"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_robustness_summary",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/context_pair_summary"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/context_robustness_summary",
           "relative_ref": "deliverables/context_robustness_summary",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/context_robustness_summary.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/context_robustness_summary.md"
         }
       ],
       "warnings": []
@@ -5858,13 +5858,13 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/candidate_decision_frontier"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/candidate_decision_frontier"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/candidate_decision_frontier",
           "relative_ref": "deliverables/candidate_decision_frontier",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/candidate_decision_frontier.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/candidate_decision_frontier.md"
         }
       ],
       "warnings": []
@@ -5875,33 +5875,30 @@
       "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/design_centroid_margin_gallery",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_alignment_summary",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_scree_diagnostic"
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/design_centroid_margin_gallery",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_alignment_summary",
+        "/project/dunlop/esouth/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/representation_scree_diagnostic"
       ],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit",
           "relative_ref": "deliverables/appendix_geometry_audit",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit.md"
         }
       ],
       "warnings": []
     },
     "appendix_umap_gallery": {
       "title": "UMAP gallery",
-      "status": "ok",
-      "freshness": "ok",
+      "status": "missing",
+      "freshness": "missing",
       "acceptance_checks": [],
-      "artifact_paths": [
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/appendix_umap_gallery",
-        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/notebooks/latent_geometry_browser"
-      ],
+      "artifact_paths": [],
       "docs_refs": [
         {
           "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/appendix_umap_gallery",
           "relative_ref": "deliverables/appendix_umap_gallery",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_umap_gallery.md"
+          "path": "/project/dunlop/esouth/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_umap_gallery.md"
         }
       ],
       "warnings": []
@@ -5937,5 +5934,5 @@
     "context_robustness_summary",
     "candidate_decision_frontier"
   ],
-  "last_updated_at": "2026-04-29T14:35:17.190722+00:00"
+  "last_updated_at": "2026-04-30T19:38:23.124148+00:00"
 }

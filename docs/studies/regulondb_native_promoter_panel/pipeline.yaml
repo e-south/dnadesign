@@ -72,6 +72,51 @@ command_groups:
       - MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json
       - MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json
 
+execution_surfaces:
+  construct_workspace: src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
+  infer_workspace: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
+  infer_batch_7b_with_notify:
+    native_full: src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
+    core60_tss_upstream: src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml
+
+infer:
+  preferred_model_family: evo2_7b
+  configs:
+    native_full_7b: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+    core60_tss_upstream_7b: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+    native_full_plus_tss_upstream_core60_7b: src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full_plus_tss_upstream_core60.evo2_7b.yaml
+  batch_readiness:
+    last_checked: 2026-04-30
+    runtime_target: BU SCC SGE Blackwell lane
+    notify_secret_contract:
+      required_env:
+        - NOTIFY_WEBHOOK_FILE
+        - SSL_CERT_FILE
+        - REQUESTS_CA_BUNDLE
+      tls_bundle_example: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+      profile_secret_policy: file_backed_secret_ref_only
+    sge_resource_contract:
+      pe_omp: 4
+      h_rt: "12:00:00"
+      mem_per_core: 8G
+      gpus: 1
+      gpu_capability: "12.0"
+      gpu_type: RTXP6000
+      gpu_memory_gib: 80.0
+    no_submit_smoke:
+      status: passed_representative_lanes
+      representative_runbooks:
+        - src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
+      evidence:
+        - qsub -verify passed for notify-watch.qsub and evo2-gpu-infer.qsub
+        - infer validate sequence-view-completion passed with max missing products/stale vectors/stale scalars set to 0
+        - infer run --dry-run passed
+        - notify profile smoke passed in dry-run mode
+    live_submit_shape:
+      per_lane: one notify watcher qsub plus one infer GPU qsub
+      two_lane_fanout: 4 qsub commands
+      advisor: prefer array_or_dependency_chain if submitting both lanes as one fanout
+
 native_agent_bootstrap:
   open_first:
     - manifest:status.md
@@ -84,6 +129,7 @@ native_agent_bootstrap:
     - USR imports from a fixed export and defaults to dry-run.
     - Native RegulonDB imports never write sig35_variant.
     - TSS-upstream core60 is a source-window contract over offset 60, not an inferred -10/-35 box-centered view.
+    - The native_full_plus_tss_upstream_core60 config is additive dogfood evidence unless a runbook promotes it into the default fill quota.
     - usr_regulondb_native_promoters remains the single USR dataset for the strict deduplicated native promoter superset.
     - Generated USR parquet artifacts remain untracked; study docs record provenance and validation evidence.
     - Source provenance remains visible for RegulonDB 13, live RegulonDB 14.5, RegulonDB 13 sigmulon, RegulonDB 11 curated/HT/prediction, and EcoCyc 28 rows.
