@@ -15,12 +15,14 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr.src.cli import app
+from dnadesign.usr.src.contracts import SchemaError
 from dnadesign.usr.src.dataset import Dataset
-from dnadesign.usr.src.overlays import overlay_dir_path, overlay_path
+from dnadesign.usr.src.overlays import overlay_dir_path, overlay_metadata, overlay_path
 from dnadesign.usr.src.registry import registry_hash
 
 
@@ -77,6 +79,57 @@ def test_cli_overlay_compact(tmp_path: Path) -> None:
     assert overlay_path(ds.dir, "audit").exists()
     archived = ds.dir / "_derived" / "_archived" / "audit"
     assert not archived.exists()
+
+
+def test_cli_overlay_refresh_metadata_restamps_compact_overlay(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    ds = _make_dataset(root)
+
+    ids = ds.head(2)["id"].tolist()
+    tbl = pa.table({"id": ids, "audit__score": [0.1, 0.2]})
+    ds.write_overlay("audit", tbl, key="id", overwrite=True)
+
+    compact_path = overlay_path(ds.dir, "audit")
+    table = pq.read_table(compact_path)
+    metadata = dict(table.schema.metadata or {})
+    metadata[b"usr:registry_hash"] = b"stale"
+    pq.write_table(table.replace_schema_metadata(metadata), compact_path)
+
+    assert overlay_metadata(compact_path)["registry_hash"] == "stale"
+    with pytest.raises(SchemaError, match="registry_hash mismatch"):
+        ds.validate(strict=True)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["--root", str(root), "maintenance", "overlay-refresh-metadata", "demo", "--namespace", "audit"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "previous_registry_hash=stale" in result.output
+    assert overlay_metadata(compact_path)["registry_hash"] == registry_hash(root, required=True)
+    ds.validate(strict=True)
+
+
+def test_cli_overlay_refresh_metadata_rejects_part_overlay_with_compact_instruction(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    ds = _make_dataset(root)
+
+    ids = ds.head(2)["id"].tolist()
+    tbl = pa.table({"id": ids, "audit__score": [0.1, 0.2]})
+    ds.write_overlay_part("audit", tbl, key="id", allow_missing=False)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["--root", str(root), "maintenance", "overlay-refresh-metadata", "demo", "--namespace", "audit"],
+    )
+
+    assert result.exit_code != 0
+    assert result.exception is not None
+    assert "overlay-compact" in str(result.exception)
+    assert overlay_dir_path(ds.dir, "audit").exists()
+    assert not overlay_path(ds.dir, "audit").exists()
 
 
 def test_cli_overlay_remove_archives_overlay(tmp_path: Path) -> None:

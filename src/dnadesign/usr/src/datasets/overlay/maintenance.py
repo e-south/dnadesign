@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -21,6 +22,9 @@ from ...contracts import Fingerprint, NamespaceError, OverlayInfo, SchemaError
 from ...maintenance import require_maintenance
 from ...overlays import (
     OVERLAY_META_CREATED,
+    OVERLAY_META_KEY,
+    OVERLAY_META_NAMESPACE,
+    OVERLAY_META_NAMESPACE_CONTRACT_HASH,
     OVERLAY_META_REGISTRY_HASH,
     list_overlays,
     overlay_dir_path,
@@ -29,7 +33,7 @@ from ...overlays import (
     overlay_schema,
 )
 from ...overlays.support.digest_ledger import write_overlay_digest_ledger
-from ...registry import validate_overlay_schema
+from ...registry import namespace_contract_hash_for_entries, validate_overlay_schema
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import now_utc, write_parquet_atomic_batches
 
@@ -37,8 +41,21 @@ _REMOVE_ARCHIVE_KEEP_LAST = 1
 _COMPACT_ARCHIVE_KEEP_LAST = 0
 
 
+@dataclass(frozen=True)
+class OverlayMetadataRefreshResult:
+    dataset: str
+    namespace: str
+    overlay_path: str
+    rows_refreshed: int
+    previous_registry_hash: str | None
+    refreshed_registry_hash: str | None
+    previous_namespace_contract_hash: str | None
+    refreshed_namespace_contract_hash: str | None
+
+
 class DatasetOverlayMaintenanceHost(Protocol):
     dir: Path
+    name: str
 
     def _require_exists(self) -> None: ...
 
@@ -236,6 +253,101 @@ def compact_overlay_namespace(
             actor=ctx.actor,
         )
         return file_path
+
+
+def refresh_compact_overlay_metadata(
+    dataset: DatasetOverlayMaintenanceHost,
+    namespace: str,
+    *,
+    reserved_namespaces: set[str],
+) -> OverlayMetadataRefreshResult:
+    ctx = require_maintenance("refresh_overlay_metadata")
+    dataset._require_exists()
+    with dataset_write_lock(dataset.dir):
+        file_path = overlay_path(dataset.dir, namespace)
+        dir_path = overlay_dir_path(dataset.dir, namespace)
+        if file_path.exists() and dir_path.exists():
+            raise SchemaError(
+                f"Overlay '{namespace}' has both compact file and part directory sources; resolve manually."
+            )
+        if dir_path.exists():
+            raise SchemaError(
+                f"Overlay namespace '{namespace}' uses a part directory. "
+                f"Run `usr maintenance overlay-compact {dataset.name} --namespace {namespace}` "
+                "to rewrite it through current registry metadata."
+            )
+        if not file_path.exists():
+            raise SchemaError(f"Compact overlay not found for namespace '{namespace}': {file_path}")
+        if not file_path.is_file():
+            raise SchemaError(f"Expected compact overlay file for namespace '{namespace}': {file_path}")
+
+        dataset._auto_freeze_registry()
+        meta = overlay_metadata(file_path)
+        previous_registry_hash = meta.get("registry_hash")
+        previous_namespace_hash = meta.get("namespace_contract_hash")
+        key = meta.get("key") or "id"
+
+        parquet_file = pq.ParquetFile(str(file_path))
+        schema = parquet_file.schema_arrow
+        if key not in schema.names:
+            raise SchemaError(f"Overlay '{namespace}' metadata key '{key}' is not present in schema.")
+
+        registry_hash = dataset._registry_hash(required=namespace not in reserved_namespaces)
+        namespace_hash = None
+        if namespace not in reserved_namespaces:
+            registry = dataset._registry(required=True)
+            validate_overlay_schema(namespace, schema, registry=registry, key=key)
+            namespace_hash = namespace_contract_hash_for_entries(registry, namespace)
+
+        metadata = dict(schema.metadata or {})
+        metadata[OVERLAY_META_NAMESPACE.encode("utf-8")] = str(namespace).encode("utf-8")
+        metadata[OVERLAY_META_KEY.encode("utf-8")] = str(key).encode("utf-8")
+        metadata[OVERLAY_META_CREATED.encode("utf-8")] = str(now_utc()).encode("utf-8")
+        if registry_hash:
+            metadata[OVERLAY_META_REGISTRY_HASH.encode("utf-8")] = str(registry_hash).encode("utf-8")
+        else:
+            metadata.pop(OVERLAY_META_REGISTRY_HASH.encode("utf-8"), None)
+        if namespace_hash:
+            metadata[OVERLAY_META_NAMESPACE_CONTRACT_HASH.encode("utf-8")] = str(namespace_hash).encode("utf-8")
+        else:
+            metadata.pop(OVERLAY_META_NAMESPACE_CONTRACT_HASH.encode("utf-8"), None)
+
+        rows_refreshed = int(parquet_file.metadata.num_rows)
+        write_parquet_atomic_batches(
+            parquet_file.iter_batches(batch_size=65536),
+            schema,
+            file_path,
+            snapshot_dir=None,
+            metadata=metadata,
+        )
+        refreshed = overlay_metadata(file_path)
+        dataset._record_event(
+            "refresh_overlay_metadata",
+            args={
+                "namespace": namespace,
+                "key": key,
+                "rows_refreshed": rows_refreshed,
+                "previous_registry_hash": previous_registry_hash,
+                "refreshed_registry_hash": refreshed.get("registry_hash"),
+                "previous_namespace_contract_hash": previous_namespace_hash,
+                "refreshed_namespace_contract_hash": refreshed.get("namespace_contract_hash"),
+                "maintenance_reason": ctx.reason,
+            },
+            metrics={"rows_refreshed": rows_refreshed},
+            maintenance={"reason": ctx.reason},
+            target_path=file_path,
+            actor=ctx.actor,
+        )
+        return OverlayMetadataRefreshResult(
+            dataset=dataset.name,
+            namespace=namespace,
+            overlay_path=str(file_path),
+            rows_refreshed=rows_refreshed,
+            previous_registry_hash=previous_registry_hash,
+            refreshed_registry_hash=refreshed.get("registry_hash"),
+            previous_namespace_contract_hash=previous_namespace_hash,
+            refreshed_namespace_contract_hash=refreshed.get("namespace_contract_hash"),
+        )
 
 
 def write_overlay_digest_ledger_namespace(

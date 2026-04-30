@@ -1,7 +1,7 @@
 # USR overlay and registry contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-26
+**Last verified:** 2026-04-29
 
 
 ## Overlay merge semantics
@@ -18,6 +18,7 @@ Operational implications:
 - Join keys in a single overlay part must be unique.
 - Re-attaching the same namespace/columns in a newer part overrides older values.
 - Compact parts periodically with `uv run usr maintenance overlay-compact ...` to reduce read overhead.
+- Refresh compact overlay metadata with `uv run usr maintenance overlay-refresh-metadata ...` when the namespace contract is current but the full-registry hash stamp is stale.
 - After compaction, future overlay-part appends are allowed; USR promotes the compact file into part form before appending.
 - Compact overlay snapshots are not retained by default.
 - Explicit overlay pruning is exposed through `uv run usr maintenance overlay-remove ...`; archive retention is bounded to the latest archived snapshot.
@@ -35,6 +36,24 @@ All dataset mutations require a registry at the datasets root (`registry.yaml`).
 - Overlay writers now also stamp `usr:namespace_contract_hash` for the specific namespace they emit.
 - `usr:namespace_contract_hash` hashes only the namespace id plus ordered column name/type pairs; owner and description remain catalog metadata, not compatibility inputs.
 - Opt into namespace-scoped validation explicitly with `--registry-mode namespace-current`, `namespace-frozen`, or `namespace-either`.
+
+Default strict validation uses the full current registry hash. That is intentionally conservative for shared dataset roots because a registry-wide edit can affect any downstream writer. When default strict validation fails on an overlay hash but namespace-scoped validation passes, the overlay rows still satisfy the namespace they use:
+
+```bash
+uv run usr validate <dataset> --strict --registry-mode namespace-current
+```
+
+For compact overlays, restamp the metadata through the package-owned maintenance surface:
+
+```bash
+uv run usr maintenance overlay-refresh-metadata <dataset> --namespace <namespace>
+```
+
+For part-directory overlays, compact instead:
+
+```bash
+uv run usr maintenance overlay-compact <dataset> --namespace <namespace>
+```
 
 Shared sequence-product namespaces currently tracked in the repo registry:
 

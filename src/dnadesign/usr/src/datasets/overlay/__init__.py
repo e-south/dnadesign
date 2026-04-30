@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from .attach import _attach_frame_dataset, attach_columns_dataset, attach_dataset
 from .maintenance import (
+    OverlayMetadataRefreshResult,
     compact_overlay_namespace,
     list_overlay_infos,
+    refresh_compact_overlay_metadata,
     remove_overlay_namespace,
     write_overlay_digest_ledger_namespace,
 )
@@ -28,6 +30,8 @@ __all__ = [
     "attach_frame_dataset",
     "compact_overlay_namespace",
     "list_overlay_infos",
+    "OverlayMetadataRefreshResult",
+    "refresh_compact_overlay_metadata",
     "remove_overlay_namespace",
     "write_overlay_dataset",
     "write_overlay_digest_ledger_namespace",

@@ -13,10 +13,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-import pyarrow.parquet as pq
-
 from dnadesign.usr import Dataset
-from dnadesign.usr.src.overlays import overlay_metadata
+from dnadesign.usr.src.contracts import SchemaError
 
 
 @dataclass(frozen=True)
@@ -41,27 +39,22 @@ def refresh_overlay_registry_metadata(
     validate_strict: bool = True,
 ) -> RefreshOverlayResult:
     dataset = Dataset(usr_root, dataset_name)
-    overlay_path = dataset.dir / "_derived" / f"{namespace}.parquet"
-    if not overlay_path.exists():
-        raise FileNotFoundError(f"Compact overlay not found: {overlay_path}")
-    if not overlay_path.is_file():
-        raise FileNotFoundError(f"Expected compact overlay file, got: {overlay_path}")
-
-    previous_hash = overlay_metadata(overlay_path).get("registry_hash")
-    table = pq.read_table(overlay_path)
-    key = overlay_metadata(overlay_path).get("key") or "id"
-    with dataset.maintenance(reason=f"refresh_{namespace}_overlay_registry_metadata"):
-        rows = dataset.write_overlay(namespace, table, key=key, overwrite=True)
+    try:
+        with dataset.maintenance(reason=f"refresh_{namespace}_overlay_registry_metadata"):
+            refresh_result = dataset.refresh_overlay_metadata(namespace)
+    except SchemaError as exc:
+        if "Compact overlay not found" in str(exc):
+            raise FileNotFoundError(str(exc)) from exc
+        raise
     if validate_strict:
         dataset.validate(strict=True)
-    refreshed_hash = overlay_metadata(overlay_path).get("registry_hash")
     return RefreshOverlayResult(
-        dataset=dataset.name,
-        namespace=namespace,
-        overlay_path=str(overlay_path),
-        rows_refreshed=int(rows),
-        previous_registry_hash=previous_hash,
-        refreshed_registry_hash=refreshed_hash,
+        dataset=refresh_result.dataset,
+        namespace=refresh_result.namespace,
+        overlay_path=refresh_result.overlay_path,
+        rows_refreshed=refresh_result.rows_refreshed,
+        previous_registry_hash=refresh_result.previous_registry_hash,
+        refreshed_registry_hash=refresh_result.refreshed_registry_hash,
     )
 
 

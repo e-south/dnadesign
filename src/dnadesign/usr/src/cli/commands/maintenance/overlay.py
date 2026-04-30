@@ -31,6 +31,27 @@ def cmd_overlay_compact(args, *, deps: MaintenanceDeps) -> None:
     print(f"[overlay-compact] wrote {out_path}")
 
 
+def cmd_overlay_refresh_metadata(args, *, deps: MaintenanceDeps) -> None:
+    ds_name = deps.resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
+    if not ds_name:
+        return
+    namespace = getattr(args, "namespace", None)
+    if not namespace:
+        raise SequencesError("overlay-refresh-metadata requires a namespace argument.")
+    dataset = Dataset(args.root, ds_name)
+    with dataset.maintenance(reason="overlay_refresh_metadata"):
+        result = dataset.refresh_overlay_metadata(str(namespace))
+    print(
+        "[overlay-refresh-metadata] "
+        f"dataset={result.dataset} namespace={result.namespace} rows={result.rows_refreshed} "
+        f"previous_registry_hash={result.previous_registry_hash} "
+        f"refreshed_registry_hash={result.refreshed_registry_hash} "
+        f"previous_namespace_contract_hash={result.previous_namespace_contract_hash} "
+        f"refreshed_namespace_contract_hash={result.refreshed_namespace_contract_hash} "
+        f"path={result.overlay_path}"
+    )
+
+
 def cmd_overlay_remove(args, *, deps: MaintenanceDeps) -> None:
     ds_name = deps.resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
     if not ds_name:

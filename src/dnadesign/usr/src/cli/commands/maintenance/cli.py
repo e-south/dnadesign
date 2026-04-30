@@ -24,6 +24,7 @@ def register_maintenance_commands(
     cmd_registry_freeze: Callable[[object], None],
     cmd_overlay_compact: Callable[[object], None],
     cmd_overlay_project: Callable[[object], None],
+    cmd_overlay_refresh_metadata: Callable[[object], None],
     cmd_overlay_remove: Callable[[object], None],
     cmd_event_log_garden: Callable[[object], None],
     cmd_merge_datasets: Callable[[object], None],
@@ -64,6 +65,14 @@ def register_maintenance_commands(
         namespace: str = typer.Option(..., "--namespace"),
     ) -> None:
         cmd_overlay_compact(ctx_args_builder(ctx, dataset=dataset, namespace=namespace))
+
+    @maintenance_app.command("overlay-refresh-metadata")
+    def cli_overlay_refresh_metadata(
+        ctx: typer.Context,
+        dataset: str = typer.Argument(...),
+        namespace: str = typer.Option(..., "--namespace"),
+    ) -> None:
+        cmd_overlay_refresh_metadata(ctx_args_builder(ctx, dataset=dataset, namespace=namespace))
 
     @maintenance_app.command("overlay-remove")
     def cli_overlay_remove(

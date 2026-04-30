@@ -15,7 +15,7 @@ from .cli import register_maintenance_commands
 from .dedupe import cmd_dedupe_sequences
 from .events import cmd_event_log_garden
 from .merge import MergeDeps, cmd_merge_datasets
-from .overlay import cmd_overlay_compact, cmd_overlay_project, cmd_overlay_remove
+from .overlay import cmd_overlay_compact, cmd_overlay_project, cmd_overlay_refresh_metadata, cmd_overlay_remove
 from .registry import MaintenanceDeps, cmd_registry_freeze
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     "cmd_merge_datasets",
     "cmd_overlay_compact",
     "cmd_overlay_project",
+    "cmd_overlay_refresh_metadata",
     "cmd_overlay_remove",
     "cmd_registry_freeze",
     "register_maintenance_commands",
