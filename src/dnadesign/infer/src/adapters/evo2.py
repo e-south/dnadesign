@@ -60,6 +60,14 @@ def _bucket_indices_by_token_length(tokens: Sequence[Sequence[int]]) -> List[Lis
     return [buckets[length] for length in sorted(buckets)]
 
 
+def _bucket_indices_by_sequence_length(seqs: Sequence[str]) -> List[List[int]]:
+    """Group sequence indices by string length for padding-free native scoring."""
+    buckets: Dict[int, List[int]] = {}
+    for index, seq in enumerate(seqs):
+        buckets.setdefault(len(seq), []).append(index)
+    return [buckets[length] for length in sorted(buckets)]
+
+
 def _normalize_pool_config(pool: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if pool is None:
         return None
@@ -456,14 +464,55 @@ class Evo2Adapter:
             raise CapabilityError("Evo2 supports only method='native' in v1.")
         if reduction not in {"sum", "mean"}:
             raise CapabilityError("Evo2 log_likelihood supports reduction='sum' or 'mean' only.")
-        red = reduction
+        if not seqs:
+            return []
+
+        # Evo2's scorer pads mixed-length batches. Score equal-length groups so
+        # shorter sequences never absorb a pad-token likelihood term.
+        values_by_input: List[Optional[float]] = [None] * len(seqs)
         with torch.inference_mode():
-            values = self.model.score_sequences(
-                seqs,
-                batch_size=max(1, len(seqs)),
-                reduce_method=red,
-            )
-        return [float(v) for v in values]
+            for group in _bucket_indices_by_sequence_length(seqs):
+                group_seqs = [seqs[index] for index in group]
+                group_values = self.model.score_sequences(
+                    group_seqs,
+                    batch_size=max(1, len(group_seqs)),
+                    reduce_method=reduction,
+                )
+                for row_index, sample_index in enumerate(group):
+                    values_by_input[sample_index] = float(group_values[row_index])
+
+        if any(value is None for value in values_by_input):
+            raise CapabilityError("Evo2 log-likelihood output assembly failed: missing scores.")
+        return [value for value in values_by_input if value is not None]
+
+    def log_likelihood_total_and_mean(
+        self, seqs: List[str], *, method: str = "native"
+    ) -> tuple[List[float], List[float]]:
+        """
+        Compute total and mean log likelihoods with one native sum score per length bucket.
+        """
+        if method != "native":
+            raise CapabilityError("Evo2 supports only method='native' in v1.")
+        if not seqs:
+            return [], []
+
+        totals_by_input: List[Optional[float]] = [None] * len(seqs)
+        with torch.inference_mode():
+            for group in _bucket_indices_by_sequence_length(seqs):
+                group_seqs = [seqs[index] for index in group]
+                group_totals = self.model.score_sequences(
+                    group_seqs,
+                    batch_size=max(1, len(group_seqs)),
+                    reduce_method="sum",
+                )
+                for row_index, sample_index in enumerate(group):
+                    totals_by_input[sample_index] = float(group_totals[row_index])
+
+        if any(value is None for value in totals_by_input):
+            raise CapabilityError("Evo2 log-likelihood output assembly failed: missing total scores.")
+        totals = [value for value in totals_by_input if value is not None]
+        means = [float("nan") if len(seq) <= 1 else total / float(len(seq) - 1) for seq, total in zip(seqs, totals)]
+        return totals, means
 
     def generate(
         self,

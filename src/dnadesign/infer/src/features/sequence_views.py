@@ -19,10 +19,9 @@ import pyarrow.parquet as pq
 
 from dnadesign.usr import (
     Dataset,
-    SequenceViewSelector,
     normalize_usr_root,
     resolve_usr_root_from_env,
-    select_sequence_views,
+    sequence_views_path,
 )
 
 from ..errors import CapabilityError, ValidationError
@@ -120,6 +119,53 @@ def _read_construct_rows(ds: Dataset, *, ids: list[str]) -> dict[str, dict[str, 
     return {}
 
 
+_SEQUENCE_VIEW_INPUT_COLUMNS = [
+    "view_id",
+    "sequence_id",
+    "view_name",
+    "aliases",
+    "product_kind",
+    "context_kind",
+    "orientation",
+    "parent_sequence_id",
+    "derivation_id",
+    "anchor_start_0",
+    "anchor_end_0",
+]
+
+
+def _aliases_contain(aliases: object, value: str) -> bool:
+    if not isinstance(aliases, list):
+        return False
+    return value.casefold() in {str(alias).casefold() for alias in aliases}
+
+
+def _select_sequence_view_rows(
+    ds: Dataset,
+    *,
+    product_kind: str | None,
+    view_name: str | None,
+    alias: str | None,
+    orientation: str | None,
+) -> list[dict[str, object]]:
+    path = sequence_views_path(ds)
+    if not path.exists():
+        return []
+    table = pq.read_table(path, columns=_SEQUENCE_VIEW_INPUT_COLUMNS)
+    rows: list[dict[str, object]] = []
+    for raw in table.to_pylist():
+        if product_kind is not None and raw.get("product_kind") != product_kind:
+            continue
+        if view_name is not None and raw.get("view_name") != view_name:
+            continue
+        if alias is not None and not _aliases_contain(raw.get("aliases"), alias):
+            continue
+        if orientation is not None and raw.get("orientation") != orientation:
+            continue
+        rows.append(dict(raw))
+    return rows
+
+
 def _context_kind_from_product_kind(product_kind: str, fallback: str | None) -> str:
     if fallback:
         return fallback
@@ -141,6 +187,21 @@ def _pooling_bounds_from_record(
     if operation == "seq_mean":
         return None, None
     if operation == "core60_mean":
+        start = record.get("_infer_pooling_start_0")
+        end = record.get("_infer_pooling_end_0")
+        if start is not None or end is not None:
+            if start is None or end is None:
+                raise CapabilityError(
+                    f"core60_mean requires paired explicit bounds for sequence view '{record.get('id')}'."
+                )
+            start_0 = int(start)
+            end_0 = int(end)
+            if start_0 < 0 or end_0 <= start_0 or end_0 > len(sequence) or (end_0 - start_0) != 60:
+                raise CapabilityError(
+                    "Sequence-view core60_mean received invalid explicit bounds: "
+                    f"id={record.get('id')} start={start_0} end={end_0} length={len(sequence)}"
+                )
+            return start_0, end_0
         if len(sequence) != 60:
             raise CapabilityError(
                 f"core60_mean requires an exact 60 bp sequence view. id={record.get('id')} length={len(sequence)}"
@@ -181,17 +242,33 @@ def load_sequence_view_input_records_with_status(
         return SequenceViewInputLoadResult(records=[], missing_products=[])
     records: list[dict[str, object]] = []
     missing_products: list[SequenceViewMissingProduct] = []
+    selected_cache: dict[tuple[str, str, str | None, str | None, str | None, str | None], list[dict[str, object]]] = {}
+    sequence_cache: dict[tuple[str, str, str | None, str | None, str | None, str | None], dict[str, str]] = {}
+    construct_cache: dict[
+        tuple[str, str, str | None, str | None, str | None, str | None],
+        dict[str, dict[str, object]],
+    ] = {}
     for input_cfg in bundle.sequence_view_inputs:
         root = _resolve_usr_root(input_cfg.root)
         ds = Dataset(root, input_cfg.dataset)
-        selector = SequenceViewSelector(
-            product_kind=input_cfg.view_selector.product_kind,
-            view_name=input_cfg.view_selector.view_name,
-            alias=input_cfg.view_selector.alias,
+        cache_key = (
+            str(root),
+            input_cfg.dataset,
+            input_cfg.view_selector.product_kind,
+            input_cfg.view_selector.view_name,
+            input_cfg.view_selector.alias,
+            input_cfg.view_selector.orientation,
         )
-        selected = select_sequence_views(ds, selector=selector)
-        if input_cfg.view_selector.orientation is not None:
-            selected = [row for row in selected if row.orientation == input_cfg.view_selector.orientation]
+        selected = selected_cache.get(cache_key)
+        if selected is None:
+            selected = _select_sequence_view_rows(
+                ds,
+                product_kind=input_cfg.view_selector.product_kind,
+                view_name=input_cfg.view_selector.view_name,
+                alias=input_cfg.view_selector.alias,
+                orientation=input_cfg.view_selector.orientation,
+            )
+            selected_cache[cache_key] = selected
         if not selected:
             missing_products.append(
                 SequenceViewMissingProduct(
@@ -205,19 +282,26 @@ def load_sequence_view_input_records_with_status(
                 )
             )
             continue
-        sequence_by_id = _read_sequence_rows(ds, ids=sorted({row.sequence_id for row in selected}))
-        construct_by_id = (
-            _read_construct_rows(ds, ids=sorted({row.sequence_id for row in selected}))
-            if input_cfg.pooling.bounds_from == "construct_overlay"
-            else {}
-        )
+        sequence_by_id = sequence_cache.get(cache_key)
+        if sequence_by_id is None:
+            sequence_by_id = _read_sequence_rows(ds, ids=sorted({str(row["sequence_id"]) for row in selected}))
+            sequence_cache[cache_key] = sequence_by_id
+        construct_by_id: dict[str, dict[str, object]] = {}
+        if input_cfg.pooling.bounds_from == "construct_overlay":
+            cached_construct_rows = construct_cache.get(cache_key)
+            if cached_construct_rows is None:
+                construct_by_id = _read_construct_rows(ds, ids=sorted({str(row["sequence_id"]) for row in selected}))
+                construct_cache[cache_key] = construct_by_id
+            else:
+                construct_by_id = cached_construct_rows
         for view in selected:
-            sequence = sequence_by_id.get(view.sequence_id)
+            sequence_id = str(view["sequence_id"])
+            sequence = sequence_by_id.get(sequence_id)
             if sequence is None:
                 raise ValidationError(
-                    f"Sequence-view input '{view.view_id}' references missing sequence_id '{view.sequence_id}'."
+                    f"Sequence-view input '{view['view_id']}' references missing sequence_id '{sequence_id}'."
                 )
-            construct_row = construct_by_id.get(view.sequence_id, {})
+            construct_row = construct_by_id.get(sequence_id, {})
             pooling_start_0: int | None = None
             pooling_end_0: int | None = None
             if input_cfg.pooling.operation == "anchor_mean":
@@ -233,27 +317,33 @@ def load_sequence_view_input_records_with_status(
                         else None
                     )
                     if pooling_start_0 is None:
-                        pooling_start_0 = view.anchor_start_0
+                        pooling_start_0 = view["anchor_start_0"]
                     if pooling_end_0 is None:
-                        pooling_end_0 = view.anchor_end_0
+                        pooling_end_0 = view["anchor_end_0"]
                 else:
-                    pooling_start_0 = view.anchor_start_0
-                    pooling_end_0 = view.anchor_end_0
+                    pooling_start_0 = view["anchor_start_0"]
+                    pooling_end_0 = view["anchor_end_0"]
+            elif input_cfg.pooling.operation == "core60_mean" and input_cfg.pooling.start_0 is not None:
+                pooling_start_0 = input_cfg.pooling.start_0
+                pooling_end_0 = input_cfg.pooling.end_0
             record = {
-                "id": view.view_id,
+                "id": view["view_id"],
                 "sequence": sequence,
-                "_infer_sequence_id": view.sequence_id,
-                "_infer_view_id": view.view_id,
-                "_infer_view_name": view.view_name,
-                "_infer_product_kind": view.product_kind,
-                "_infer_context_kind": _context_kind_from_product_kind(view.product_kind, view.context_kind),
-                "_infer_orientation": view.orientation,
-                "_infer_parent_sequence_id": view.parent_sequence_id,
-                "_infer_derivation_id": view.derivation_id,
+                "_infer_sequence_id": sequence_id,
+                "_infer_view_id": view["view_id"],
+                "_infer_view_name": view.get("view_name"),
+                "_infer_product_kind": view["product_kind"],
+                "_infer_context_kind": _context_kind_from_product_kind(
+                    str(view["product_kind"]),
+                    str(view["context_kind"]) if view.get("context_kind") not in {None, ""} else None,
+                ),
+                "_infer_orientation": view["orientation"],
+                "_infer_parent_sequence_id": view.get("parent_sequence_id"),
+                "_infer_derivation_id": view.get("derivation_id"),
                 "_infer_source_dataset_id": input_cfg.dataset,
                 "_infer_source_dataset_root": str(root),
-                "_infer_anchor_start_0": view.anchor_start_0,
-                "_infer_anchor_end_0": view.anchor_end_0,
+                "_infer_anchor_start_0": view["anchor_start_0"],
+                "_infer_anchor_end_0": view["anchor_end_0"],
                 "_infer_pooling_operation": input_cfg.pooling.operation,
                 "_infer_pooling_start_0": pooling_start_0,
                 "_infer_pooling_end_0": pooling_end_0,

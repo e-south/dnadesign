@@ -157,6 +157,114 @@ def test_sequence_view_completion_planner_reports_missing_products(tmp_path: Pat
     ]
 
 
+def test_sequence_view_input_records_preserve_pooling_slots_for_same_view(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "context_views")
+    dataset.init(source="test", notes="sequence-view pooling slot fidelity test")
+    add_result = dataset.add_sequences(["AAAACCCCGGGGTTTT"], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="context_forward",
+                product_kind="realized_context",
+                context_kind="template_1kb",
+                orientation="forward",
+                analysis_only=False,
+                source_dataset_id=dataset.name,
+                anchor_start_0=4,
+                anchor_end_0=8,
+                recommended_pooling="anchor_mean",
+                created_at="2026-04-28T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+    bundle = SequenceFeatureBundleConfig(
+        collect_log_likelihood=True,
+        collect_output_layer_mean=True,
+        collect_intermediate_embedding=True,
+        sequence_view_inputs=[
+            {
+                "dataset": dataset.name,
+                "root": usr_root.as_posix(),
+                "view_selector": {"product_kind": "realized_context", "orientation": "forward"},
+                "pooling": {"operation": "seq_mean"},
+            },
+            {
+                "dataset": dataset.name,
+                "root": usr_root.as_posix(),
+                "view_selector": {"product_kind": "realized_context", "orientation": "forward"},
+                "pooling": {"operation": "anchor_mean", "bounds_from": "sequence_view"},
+            },
+        ],
+    )
+
+    records = load_sequence_view_input_records(bundle=bundle)
+    contexts = resolve_sequence_view_contexts(records=records)
+    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id="evo2_7b")
+    planner_metadata_rows = build_feature_metadata_rows(
+        contexts=contexts,
+        bundle=bundle,
+        model_id="evo2_7b",
+        include_feature_request_digest=False,
+    )
+    selector = resolve_intermediate_selector(model_id="evo2_7b", intermediate_block=bundle.intermediate_block)
+    vector_specs = _sequence_view_feature_vector_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        selector=selector.intermediate_selector,
+    )
+    scalar_specs = _sequence_view_feature_scalar_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+    )
+    planner_vector_specs = _sequence_view_feature_vector_specs(
+        contexts=contexts,
+        metadata_rows=planner_metadata_rows,
+        bundle=bundle,
+        selector=selector.intermediate_selector,
+    )
+    planner_scalar_specs = _sequence_view_feature_scalar_specs(
+        contexts=contexts,
+        metadata_rows=planner_metadata_rows,
+        bundle=bundle,
+    )
+
+    assert [record["_infer_pooling_operation"] for record in records] == ["seq_mean", "anchor_mean"]
+    assert len({context.view_id for context in contexts}) == 1
+    assert len({(context.view_id, context.pooling_operation) for context in contexts}) == 2
+    assert [row["feature_request_digest"] for row in planner_metadata_rows] == [None, None]
+    assert [row["forward_pass_key"] for row in planner_metadata_rows] == [
+        row["forward_pass_key"] for row in metadata_rows
+    ]
+    assert {spec["feature_vector_key"] for spec in planner_vector_specs} == {
+        spec["feature_vector_key"] for spec in vector_specs
+    }
+    assert {spec["feature_scalar_key"] for spec in planner_scalar_specs} == {
+        spec["feature_scalar_key"] for spec in scalar_specs
+    }
+    assert len(vector_specs) == 4
+    assert len({spec["feature_vector_key"] for spec in vector_specs}) == 4
+    assert len(scalar_specs) == 4
+    assert len({spec["feature_scalar_key"] for spec in scalar_specs}) == 2
+    exact_plan = plan_sequence_view_feature_completion(bundle=bundle, model_id="evo2_7b", job_id="context_views")
+    inventory_plan = plan_sequence_view_feature_inventory_completion(
+        bundle=bundle,
+        model_id="evo2_7b",
+        job_id="context_views",
+    )
+    assert exact_plan.required_vectors == 4
+    assert inventory_plan.required_vectors == 4
+    assert exact_plan.required_scalars == 2
+    assert inventory_plan.required_scalars == 2
+
+
 def test_sequence_view_completion_planner_reuses_persisted_feature_vectors(tmp_path: Path) -> None:
     usr_root, dataset = _dataset_with_sequence_view(tmp_path)
     bundle = _bundle(usr_root, dataset)

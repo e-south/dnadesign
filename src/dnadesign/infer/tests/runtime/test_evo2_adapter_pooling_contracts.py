@@ -190,11 +190,11 @@ def test_logits_rejects_pool_dim_zero_that_consumes_batch_axis() -> None:
 def test_log_likelihood_reduction_sum_and_mean_map_directly_to_evo2_api() -> None:
     adapter = _adapter()
 
-    out_sum = adapter.log_likelihood(["AC", "ACGT"], method="native", reduction="sum")
-    out_mean = adapter.log_likelihood(["AC", "ACGT"], method="native", reduction="mean")
+    out_sum = adapter.log_likelihood(["AC", "TG"], method="native", reduction="sum")
+    out_mean = adapter.log_likelihood(["AC", "TG"], method="native", reduction="mean")
 
-    assert out_sum == [20.0, 40.0]
-    assert out_mean == [2.0, 4.0]
+    assert out_sum == [20.0, 20.0]
+    assert out_mean == [2.0, 2.0]
     assert adapter.model.reduce_calls == [("sum", 2), ("mean", 2)]
 
 

@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
+import socket
 from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
@@ -86,6 +88,18 @@ _FEATURE_SCALAR_SCHEMA = pa.schema(
 )
 _VECTOR_BATCH_SIZE = 256
 _SCALAR_BATCH_SIZE = 4096
+_FEATURE_BUNDLE_PROGRESS_ACTION = "infer_feature_bundle_progress"
+_FEATURE_BUNDLE_COMPLETE_ACTION = "infer_feature_bundle_complete"
+
+
+def _infer_sidecar_actor(*, default_run_id: str) -> dict[str, object]:
+    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip() or default_run_id
+    return {
+        "tool": "infer",
+        "run_id": run_id,
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+    }
 
 
 def feature_alias_path(*, dataset_root: str | Path, dataset_id: str) -> Path:
@@ -203,7 +217,7 @@ def persist_feature_alias_rows(rows: Iterable[dict[str, object]]) -> int:
                 args={"rows_written": group_written},
                 artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
                 target_path=path,
-                actor={"tool": "infer", "run_id": "feature-alias-persistence"},
+                actor=_infer_sidecar_actor(default_run_id="feature-alias-persistence"),
             )
     return total_written
 
@@ -252,7 +266,7 @@ def persist_feature_scalar_alias_rows(rows: Iterable[dict[str, object]]) -> int:
                 args={"rows_written": group_written},
                 artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
                 target_path=path,
-                actor={"tool": "infer", "run_id": "feature-scalar-alias-persistence"},
+                actor=_infer_sidecar_actor(default_run_id="feature-scalar-alias-persistence"),
             )
     return total_written
 
@@ -422,15 +436,28 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
                     raise ValueError(f"Feature vector collision within incoming payload for '{key}'.")
                 continue
             incoming_by_key[key] = payload
-        existing_matches = load_feature_vector_rows(
+        existing_keys = load_feature_vector_keys(
             dataset_root=dataset_root,
             dataset_id=dataset_id,
             keys=incoming_by_key,
         )
+        existing_matches = (
+            load_feature_vector_rows(
+                dataset_root=dataset_root,
+                dataset_id=dataset_id,
+                keys=existing_keys,
+            )
+            if existing_keys
+            else {}
+        )
+        if set(existing_matches) != existing_keys:
+            missing = sorted(existing_keys - set(existing_matches))
+            sample = ", ".join(missing[:3])
+            raise ValueError(f"Feature vector payload missing for existing key(s): {sample}")
         for key, existing_value in existing_matches.items():
             if existing_value != incoming_by_key[key]["value"]:
                 raise ValueError(f"Feature vector collision with different payload for '{key}'.")
-        append_rows = [row for key, row in incoming_by_key.items() if key not in existing_matches]
+        append_rows = [row for key, row in incoming_by_key.items() if key not in existing_keys]
         group_written = len(append_rows)
         if group_written:
             _append_feature_vector_rows(path, append_rows)
@@ -441,7 +468,7 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
                 args={"rows_written": group_written},
                 artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
                 target_path=path,
-                actor={"tool": "infer", "run_id": "feature-vector-persistence"},
+                actor=_infer_sidecar_actor(default_run_id="feature-vector-persistence"),
             )
     return total_written
 
@@ -471,15 +498,28 @@ def persist_feature_scalar_rows(rows: Iterable[dict[str, object]]) -> int:
                     raise ValueError(f"Feature scalar collision within incoming payload for '{key}'.")
                 continue
             incoming_by_key[key] = payload
-        existing_matches = load_feature_scalar_rows(
+        existing_keys = load_feature_scalar_keys(
             dataset_root=dataset_root,
             dataset_id=dataset_id,
             keys=incoming_by_key,
         )
+        existing_matches = (
+            load_feature_scalar_rows(
+                dataset_root=dataset_root,
+                dataset_id=dataset_id,
+                keys=existing_keys,
+            )
+            if existing_keys
+            else {}
+        )
+        if set(existing_matches) != existing_keys:
+            missing = sorted(existing_keys - set(existing_matches))
+            sample = ", ".join(missing[:3])
+            raise ValueError(f"Feature scalar payload missing for existing key(s): {sample}")
         for key, existing_value in existing_matches.items():
             if existing_value != float(incoming_by_key[key]["value"]):
                 raise ValueError(f"Feature scalar collision with different value for '{key}'.")
-        append_rows = [row for key, row in incoming_by_key.items() if key not in existing_matches]
+        append_rows = [row for key, row in incoming_by_key.items() if key not in existing_keys]
         group_written = len(append_rows)
         if group_written:
             _append_feature_scalar_rows(path, append_rows)
@@ -490,9 +530,114 @@ def persist_feature_scalar_rows(rows: Iterable[dict[str, object]]) -> int:
                 args={"rows_written": group_written},
                 artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
                 target_path=path,
-                actor={"tool": "infer", "run_id": "feature-scalar-persistence"},
+                actor=_infer_sidecar_actor(default_run_id="feature-scalar-persistence"),
             )
     return total_written
+
+
+def record_feature_bundle_complete(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+    job_id: str,
+    model_id: str,
+    contexts_completed: int,
+    unique_forward_passes: int,
+    required_vector_keys: int,
+    required_scalar_keys: int,
+    run_elapsed_seconds: float | None = None,
+) -> None:
+    dataset_dir = Path(dataset_root) / dataset_id
+    args: dict[str, object] = {
+        "job_id": str(job_id),
+        "model_id": str(model_id),
+        "contexts_completed": int(contexts_completed),
+        "unique_forward_passes": int(unique_forward_passes),
+        "required_vector_keys": int(required_vector_keys),
+        "required_scalar_keys": int(required_scalar_keys),
+        "sidecar_contract": "sequence_view_feature_bundle",
+    }
+    metrics: dict[str, object] = {
+        "contexts_completed": int(contexts_completed),
+        "unique_forward_passes": int(unique_forward_passes),
+        "required_vector_keys": int(required_vector_keys),
+        "required_scalar_keys": int(required_scalar_keys),
+    }
+    if run_elapsed_seconds is not None:
+        elapsed = max(0.0, float(run_elapsed_seconds))
+        args["run_elapsed_seconds"] = elapsed
+        metrics["run_elapsed_seconds"] = elapsed
+    Dataset(Path(dataset_root), dataset_id).log_event(
+        _FEATURE_BUNDLE_COMPLETE_ACTION,
+        args=args,
+        metrics=metrics,
+        artifacts={
+            "feature_aliases": FEATURE_ALIAS_RELATIVE_PATH,
+            "feature_vectors": FEATURE_VECTOR_RELATIVE_PATH,
+            "feature_scalar_aliases": FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
+            "feature_scalars": FEATURE_SCALAR_RELATIVE_PATH,
+        },
+        target_path=dataset_dir / "records.parquet",
+        actor=_infer_sidecar_actor(default_run_id=f"infer-{job_id}"),
+    )
+
+
+def record_feature_bundle_progress(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+    job_id: str,
+    model_id: str,
+    contexts_completed: int,
+    contexts_total: int,
+    unique_forward_passes_completed: int,
+    unique_forward_passes_total: int,
+    required_vector_keys: int,
+    required_scalar_keys: int,
+    run_elapsed_seconds: float | None = None,
+) -> None:
+    dataset_dir = Path(dataset_root) / dataset_id
+    total_contexts = max(0, int(contexts_total))
+    completed_contexts = max(0, min(int(contexts_completed), total_contexts))
+    progress_pct = 100.0 if total_contexts == 0 else (float(completed_contexts) * 100.0 / float(total_contexts))
+    args: dict[str, object] = {
+        "job_id": str(job_id),
+        "model_id": str(model_id),
+        "contexts_completed": completed_contexts,
+        "contexts_total": total_contexts,
+        "progress_pct": round(progress_pct, 3),
+        "unique_forward_passes_completed": max(0, int(unique_forward_passes_completed)),
+        "unique_forward_passes_total": max(0, int(unique_forward_passes_total)),
+        "required_vector_keys": int(required_vector_keys),
+        "required_scalar_keys": int(required_scalar_keys),
+        "sidecar_contract": "sequence_view_feature_bundle",
+    }
+    metrics: dict[str, object] = {
+        "contexts_completed": completed_contexts,
+        "contexts_total": total_contexts,
+        "progress_pct": round(progress_pct, 3),
+        "unique_forward_passes_completed": max(0, int(unique_forward_passes_completed)),
+        "unique_forward_passes_total": max(0, int(unique_forward_passes_total)),
+        "required_vector_keys": int(required_vector_keys),
+        "required_scalar_keys": int(required_scalar_keys),
+    }
+    if run_elapsed_seconds is not None:
+        elapsed = max(0.0, float(run_elapsed_seconds))
+        args["run_elapsed_seconds"] = elapsed
+        metrics["run_elapsed_seconds"] = elapsed
+    Dataset(Path(dataset_root), dataset_id).log_event(
+        _FEATURE_BUNDLE_PROGRESS_ACTION,
+        args=args,
+        metrics=metrics,
+        artifacts={
+            "feature_aliases": FEATURE_ALIAS_RELATIVE_PATH,
+            "feature_vectors": FEATURE_VECTOR_RELATIVE_PATH,
+            "feature_scalar_aliases": FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
+            "feature_scalars": FEATURE_SCALAR_RELATIVE_PATH,
+        },
+        target_path=dataset_dir / "records.parquet",
+        actor=_infer_sidecar_actor(default_run_id=f"infer-{job_id}"),
+    )
 
 
 def _table_from_rows(rows: list[dict[str, object]], *, schema: pa.Schema) -> pa.Table:

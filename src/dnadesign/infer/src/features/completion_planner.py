@@ -322,8 +322,8 @@ def plan_sequence_view_feature_inventory_completion(
             for scalar_kind in scalar_kinds:
                 expected_scalars.add((str(view.get("view_id")), scalar_kind, orientation))
 
-    required_vectors = required_views * len(vector_representations)
-    required_scalars = required_views * len(scalar_kinds)
+    required_vectors = sum(len(expected_vectors) for expected_vectors in expected_vectors_by_dataset.values())
+    required_scalars = sum(len(expected_scalars) for expected_scalars in expected_scalars_by_dataset.values())
     existing_aliases = 0
     existing_scalar_aliases = 0
     reusable_vectors = 0
@@ -436,6 +436,20 @@ def _persisted_feature_scalar_keys(specs: list[dict[str, object]]) -> set[str]:
     return existing
 
 
+def _unique_vector_specs(specs: list[dict[str, object]]) -> list[dict[str, object]]:
+    by_slot = {
+        (str(spec["dataset_root"]), str(spec["dataset_id"]), str(spec["feature_vector_key"])): spec for spec in specs
+    }
+    return list(by_slot.values())
+
+
+def _unique_scalar_specs(specs: list[dict[str, object]]) -> list[dict[str, object]]:
+    by_slot = {
+        (str(spec["dataset_root"]), str(spec["dataset_id"]), str(spec["feature_scalar_key"])): spec for spec in specs
+    }
+    return list(by_slot.values())
+
+
 def _existing_alias_ids(specs: list[dict[str, object]]) -> set[str]:
     alias_ids: set[str] = set()
     for dataset_root, dataset_id in _group_required_keys_by_dataset(specs):
@@ -462,7 +476,12 @@ def plan_sequence_view_feature_completion(
     records = load_result.records
     missing_product_selectors = [item.as_dict() for item in load_result.missing_products]
     contexts = resolve_sequence_view_contexts(records=records)
-    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id=model_id)
+    metadata_rows = build_feature_metadata_rows(
+        contexts=contexts,
+        bundle=bundle,
+        model_id=model_id,
+        include_feature_request_digest=False,
+    )
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
     specs = _sequence_view_feature_vector_specs(
         contexts=contexts,
@@ -475,21 +494,23 @@ def plan_sequence_view_feature_completion(
         metadata_rows=metadata_rows,
         bundle=bundle,
     )
+    unique_specs = _unique_vector_specs(specs)
+    unique_scalar_specs = _unique_scalar_specs(scalar_specs)
 
-    persisted_keys = _persisted_feature_vector_keys(specs)
+    persisted_keys = _persisted_feature_vector_keys(unique_specs)
     persisted_reusable = 0
     missing = 0
-    for spec in specs:
+    for spec in unique_specs:
         key = str(spec["feature_vector_key"])
         if key in persisted_keys:
             persisted_reusable += 1
             continue
         missing += 1
 
-    persisted_scalar_keys = _persisted_feature_scalar_keys(scalar_specs)
+    persisted_scalar_keys = _persisted_feature_scalar_keys(unique_scalar_specs)
     persisted_scalar_reusable = 0
     missing_scalars = 0
-    for spec in scalar_specs:
+    for spec in unique_scalar_specs:
         key = str(spec["feature_scalar_key"])
         if key in persisted_scalar_keys:
             persisted_scalar_reusable += 1
@@ -513,8 +534,8 @@ def plan_sequence_view_feature_completion(
         bundle_id=bundle_id or job_id,
         model_family=model_id,
         required_views=len(contexts),
-        required_vectors=len(specs),
-        required_scalars=len(scalar_specs),
+        required_vectors=len(unique_specs),
+        required_scalars=len(unique_scalar_specs),
         existing_vectors=persisted_reusable,
         existing_scalars=persisted_scalar_reusable,
         reusable_vectors=persisted_reusable,

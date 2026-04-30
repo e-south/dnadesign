@@ -110,7 +110,10 @@ def run_extract_job(
     if job.feature_bundle is not None:
         if job.outputs is None:
             raise ValidationError("feature_bundle extract jobs must resolve output specs before execution.")
-        adapter = _get_adapter(model)
+
+        def adapter_factory():
+            return _get_adapter(model)
+
         on_chunk_by_output = {
             out.id: build_extract_chunk_write_back(
                 source=source,
@@ -177,7 +180,8 @@ def run_extract_job(
                 bundle=job.feature_bundle,
                 existing=existing,
                 need_idx=todo_idx,
-                adapter=adapter,
+                adapter=None,
+                adapter_factory=adapter_factory,
                 micro_batch_size=micro_bs,
                 default_batch_size=default_bs,
                 auto_derate=auto_derate,
