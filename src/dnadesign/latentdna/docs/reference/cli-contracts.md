@@ -104,7 +104,7 @@ Workspace-specific flags:
 - `agreement_set`: persisted kNN-overlap rows plus optional cluster-agreement and landmark-neighborhood summary rows
 - `export_bundle`: deterministic numeric matrices or aligned tables plus row and feature ledgers, including alignment-backed block projection when the workspace declares it
 - `plot`: artifact-driven `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `xy_scatter`, `distribution`, `curve`, `correspondence_heatmap`, and `agreement_summary` outputs
-- `notebook`: generated read-only marimo artifact review apps over persisted outputs, including inline plot-file viewing, a workspace-wide plot browser over `outputs/plots`, and a persisted browser control plane in `outputs/notebooks/<id>/controls.json`
+- `notebook`: generated read-only marimo artifact review apps over persisted outputs, including inline plot-file viewing, a workspace-wide plot browser over `outputs/plots`, and a persisted browser control plane in `outputs/notebooks/<id>/controls.json`; the control plane carries the candidate X inventory ledger so notebook startup can describe candidate rows/dimensions without loading view matrices
 
 ### Plot render modes
 

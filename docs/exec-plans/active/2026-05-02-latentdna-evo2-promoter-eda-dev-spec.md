@@ -47,6 +47,7 @@ and narrow the package contract first.
 - [x] (2026-05-02 21:07Z) Slice 6: addressed a measured sampled-scope performance footgun without lossy sampling. `reference_alignment_summary_metrics` baseline over five stress scorecard samples was 10.3301s / 7.5557s / 7.6601s with cProfile showing `_load_view_scope_table` and `_sample_scope` consumed 10.105s of the first run and peak RSS around 1.03-1.11 GB. Added a byte-capped, file-stamped exact sample-scope cache and kept reference-collapse distances in the already-normalized candidate geometry instead of re-normalizing each reference set. The same three-run workload now reports 10.1382s cold, then 0.2998s and 0.2037s warm; warm cProfile shows `_load_view_scope_table` down to 0.095s and normalization calls down from 46 to 5. The affected stress scalar, plot, and generated notebook were regenerated.
 - [x] (2026-05-02 17:01Z) Added explicit handoff addendum for math/data-processing fidelity, plot-claim alignment, Marimo control discipline, and performance footguns so the next goal-tracked Codex run has non-negotiable acceptance gates rather than only plot-level intent.
 - [x] (2026-05-02 17:28Z) Slice 7: added a generic candidate X inventory ledger to workspace snapshots and catalogs, including candidate-set membership, source/dataset, row basis, model, feature family, modality, sequence scope, pooling, orientation, coordinate space, dimensions, materialization status, and freshness status. Planned views remain visible as planned without inspecting planned source payloads during status publication.
+- [x] (2026-05-02 18:07Z) Slice 8: promoted the candidate X ledger into generated notebook controls and switched notebook runtime shape summaries to the control-plane ledger/geometry rows instead of reopening `matrix.npy` files during Marimo startup. Stress runtime baseline over three runs was 0.1167s / 0.1024s / 0.0971s with 10 `np.load` calls per run; after the change it was 0.1061s / 0.0960s / 0.0979s with 0 `np.load` calls. cProfile still shows YAML config/semantics loading as the dominant startup cost, so further speed work should target pre-resolved notebook review metadata rather than matrix-shape inspection.
 - [ ] (2026-05-02 16:01Z) Later slices remain for any OPAL export-facing decisions that require maintainer weighting policy or phenotype-backed active-learning promotion rules.
 
 ### Surprises & Discoveries
@@ -118,6 +119,18 @@ stress scorecard samples reported `_load_view_scope_table` / `_sample_scope` as
 10.105s of a 10.3301s first run. After adding the scoped cache, the same
 process-local repeated workload ran in 0.2998s and 0.2037s after the cold
 population pass, with the same 141-row scalar contract.
+
+Observation: generated Marimo notebook startup was still reopening materialized
+view matrix files to reconstruct row-count and dimensionality text, even though
+the candidate inventory and geometry-control payloads already contained that
+metadata.
+
+Evidence: instrumenting
+`build_workspace_browser_runtime` for the stress notebook showed 10 `np.load`
+calls per startup before the control-plane change and 0 after it. The timing
+impact was small because YAML config and plot-semantics loading dominate this
+path, but the change removes a matrix-I/O dependency from notebook startup and
+keeps candidate-shape claims tied to the published ledger.
 
 Observation: reference-collapse distances were being computed after normalizing
 the full candidate matrix and then normalizing each reference subset again.

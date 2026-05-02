@@ -30,7 +30,9 @@ dataset or path, row basis, model name, feature family, modality, sequence
 scope, pooling operation, orientation, coordinate space, role, dimensions when
 known, materialization status, and freshness status. Planned or retired
 candidate views remain visible in this ledger instead of disappearing from
-representation comparisons.
+representation comparisons. The same row contract is also embedded in generated
+notebook controls so Marimo startup uses precomputed ledger metadata rather
+than reopening candidate matrices just to describe row counts or dimensions.
 
 Promoter-study tooling is allowed to know only:
 

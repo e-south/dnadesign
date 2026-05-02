@@ -1,7 +1,7 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-30
+**Last verified:** 2026-05-02
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
@@ -101,6 +101,11 @@ Current runtime limits:
   count, dimensionality, and availability so planned output-layer or other
   diagnostic representations can stay visible without being promoted to current
   decision geometry.
+- Notebook controls also publish the shared `candidate_inventory` ledger used
+  by workspace snapshots and catalogs. The generated Marimo runtime reads row
+  counts and dimensionality from this control-plane ledger, with geometry-control
+  rows as a compatibility fallback, instead of opening view matrices during
+  notebook startup.
 - Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
   for ordered metadata axes. The axis contract lives in recipe params:
   `axis.column` selects the grouping column, exactly one of `axis.order_path` or
