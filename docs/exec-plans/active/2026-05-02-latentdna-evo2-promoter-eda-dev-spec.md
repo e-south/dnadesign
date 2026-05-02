@@ -44,6 +44,8 @@ and narrow the package contract first.
 - [x] (2026-05-02 19:47Z) Slice 4 validation: all LatentDNA tests pass; both live workspaces deep-validate; stress `sigma35_ordinal_audit` and `dataset_overview` deliverables refreshed; generated Marimo notebooks pass `marimo check`; RegulonDB notebook smoke passes; stress notebook smoke has only the costly UMAP/reference appendix freshness gap.
 - [x] (2026-05-02 16:01Z) Slice 5: generalized stress reference-collapse scoring from broad metadata group columns into config-declared `reference_sets`, with explicit `reference_set_status` rows for absent, incomplete, too-small, and missing-column collections.
 - [x] (2026-05-02 16:01Z) Slice 5 validation: stress `reference_alignment_summary_metrics` rebuilt with 141 rows across 9 configured reference sets; stress `appendix_umap_gallery` refreshed with 8 executed and 72 skipped recipe steps; stress notebook generation, notebook smoke, Marimo check, deep workspace validation, and workspace snapshot all pass with every stress deliverable at `freshness: ok`.
+- [x] (2026-05-02 21:07Z) Slice 6: addressed a measured sampled-scope performance footgun without lossy sampling. `reference_alignment_summary_metrics` baseline over five stress scorecard samples was 10.3301s / 7.5557s / 7.6601s with cProfile showing `_load_view_scope_table` and `_sample_scope` consumed 10.105s of the first run and peak RSS around 1.03-1.11 GB. Added a byte-capped, file-stamped exact sample-scope cache and kept reference-collapse distances in the already-normalized candidate geometry instead of re-normalizing each reference set. The same three-run workload now reports 10.1382s cold, then 0.2998s and 0.2037s warm; warm cProfile shows `_load_view_scope_table` down to 0.095s and normalization calls down from 46 to 5. The affected stress scalar, plot, and generated notebook were regenerated.
+- [x] (2026-05-02 17:01Z) Added explicit handoff addendum for math/data-processing fidelity, plot-claim alignment, Marimo control discipline, and performance footguns so the next goal-tracked Codex run has non-negotiable acceptance gates rather than only plot-level intent.
 - [ ] (2026-05-02 16:01Z) Later slices remain for any OPAL export-facing decisions that require maintainer weighting policy or phenotype-backed active-learning promotion rules.
 
 ### Surprises & Discoveries
@@ -104,6 +106,27 @@ Evidence: `latentdna deliverable run appendix_umap_gallery --workspace
 stress_ethanol_cipro_growth --json` completed with 8 executed steps and 72
 skipped steps; subsequent notebook generation reported 17 plots, 8
 deliverables, 10 geometries, and no missing ordered plots.
+
+Observation: the stress reference-collapse path was bounded by repeated exact
+sample-scope reads from large materialized view matrices, not by the reference
+selector logic or plotting. The configured samples are only about 2,165-2,166
+rows each, but their source matrices are 2.4 GB per candidate.
+
+Evidence: cProfile for `reference_alignment_summary_metrics` over the five
+stress scorecard samples reported `_load_view_scope_table` / `_sample_scope` as
+10.105s of a 10.3301s first run. After adding the scoped cache, the same
+process-local repeated workload ran in 0.2998s and 0.2037s after the cold
+population pass, with the same 141-row scalar contract.
+
+Observation: reference-collapse distances were being computed after normalizing
+the full candidate matrix and then normalizing each reference subset again.
+That made within-reference collapse scores depend on the reference subset's own
+variance rather than the candidate X geometry being audited.
+
+Evidence: `src/dnadesign/latentdna/src/scalars/preassay.py` now computes
+reference-set pairwise distances from the candidate-level normalized rows, and
+`src/dnadesign/latentdna/tests/test_scalar_build.py` asserts the W-collection
+distance against that candidate-geometry calculation.
 
 ### Decision Log
 
@@ -195,9 +218,31 @@ collection, SFXI, or spyP/sulAp into package control flow.
 
 Date/Author: 2026-05-02 / Codex
 
+Decision: cache exact sampled scope matrices inside one Python process with
+file-stamp invalidation and byte caps, instead of writing sampled matrix
+sidecars or silently reducing sample sizes.
+
+Rationale: repeated scalar builders in one recipe reuse the same scorecard
+samples. A process-local cache preserves the row ledger contract, avoids new
+generated matrix artifacts, invalidates when matrix, manifest, view rows, or
+sample rows change, and makes the memory tradeoff explicit through entry and
+total byte limits.
+
+Date/Author: 2026-05-02 / Codex
+
+Decision: reference-collapse pairwise distances are measured in the
+candidate-level normalized geometry.
+
+Rationale: reference collapse is a question about a named collection inside
+one candidate X representation. Re-normalizing each reference collection creates
+collection-local geometries and can hide or distort collapse relative to the
+candidate space being ranked.
+
+Date/Author: 2026-05-02 / Codex
+
 ### Outcomes & Retrospective
 
-Slices 1-5 have shipped as the current implementation pass. The completed
+Slices 1-6 have shipped as the current implementation pass. The completed
 outcome is:
 
 - a narrower, clearer LatentDNA representation ontology;
@@ -215,6 +260,9 @@ outcome is:
 - selector-backed reference-collapse summaries that compare named reference
   collections through workspace config and emit explicit missing/incomplete
   status rows.
+- a measured performance hardening pass for exact sample-scope reuse, plus a
+  reference-collapse data-fidelity correction that keeps collection distances in
+  the candidate-level X geometry.
 
 Remaining outcomes are intentionally scoped to later work: deeper stress-study
 active-learning export policy and weighting choices for combining reference
@@ -346,6 +394,145 @@ Executor stop conditions:
   `regulondb_native_promoter_panel`, `promoter`, `sigma35`, `Anderson`, or
   `W collection`; those terms belong in config, metadata, and study docs.
 - Stop before committing generated output artifacts unless the user approves.
+
+### Handoff Addendum: Math, Data, and Performance Fidelity
+
+This addendum is a non-negotiable contract for the next goal-tracked executor.
+The implementation can change names and module boundaries, but it must preserve
+these semantics. Any plot, scalar, table, or notebook control that cannot meet
+the contract should be removed from the curated review path or marked
+diagnostic/appendix.
+
+Data-processing ledger:
+
+- Every candidate X must be describable by a machine-readable ledger row with
+  `study_id`, `view_id`, `source_id`, `dataset`, `row_basis`, `model_name`,
+  `feature_family`, `modality`, `sequence_scope`, `pooling_operation`,
+  `orientation`, `coordinate_space_id`, `n_rows`, `n_dims`, materialization
+  status, and freshness status.
+- Sequence product labels are provenance, not package control flow. Terms such
+  as anchor, core60, native source record, 1 kb context, Anderson, W collection,
+  spyP/sulAp, Sigma-35, and RegulonDB sigma factor may appear in workspace
+  config, metadata, semantics, and docs; they must not become hard-coded
+  LatentDNA runtime branches.
+- RegulonDB core60 rows are TSS-upstream analysis windows aligned back to the
+  native promoter parent; do not describe them as -10/-35-centered products
+  unless the USR/Construct product metadata explicitly says so.
+- Stress reference core60 rows may have been generated by source-length-aware
+  Construct sizing logic. The analysis must preserve that provenance and avoid
+  mixing short-expanded, long-centered, native, and synthetic-reference rows
+  unless the plot states the exact row set and selection basis.
+
+Pooling and orientation invariants:
+
+- `seq_mean` pools over the full emitted model input for that row.
+- `anchor_mean` does not change the model input. Evo2 receives the full emitted
+  context, then token features are mean-pooled over the explicit
+  `pooling_start_0:pooling_end_0` span in emitted-orientation coordinates.
+- `core60_mean` is a distinct feature identity even when its emitted sequence
+  length is also 60 bp. Do not collapse it with `seq_mean` by dimensional
+  compatibility alone.
+- Reverse-complement context rows must already be materialized upstream with
+  reverse-complement emitted sequences and pooling bounds. LatentDNA must not
+  synthesize reverse complements or apply a second coordinate transform.
+- Exact repeated emitted sequences may share Infer forward-pass payloads, but
+  different pooling operations, orientations, or sequence scopes remain
+  different LatentDNA candidate X identities.
+
+Metric and claim alignment:
+
+- A vector diagnostic must never silently include scalar features. Intermediate
+  embeddings and output-layer means are vector candidates; log-likelihood
+  totals and means are scalar diagnostics unless a downstream export explicitly
+  requests scalar feature blocks.
+- Cross-length log-likelihood comparisons must prefer
+  `log_likelihood__mean_per_token`. `log_likelihood__total` can be shown only
+  with an explicit length/confounding caveat.
+- UMAP is an orientation and inspection surface, not the ranking metric for X.
+  Rank representation candidates through high-dimensional summaries first:
+  effective rank/PCA variance, reference collapse, paired-view shift,
+  context/orientation robustness, ordinal-axis alignment, and categorical
+  enrichment or separation.
+- Any UMAP panel must record the fitted view, row count, deterministic seed,
+  reducer parameters, hue column, omitted-row count, and whether points from
+  multiple sequence scopes were fit jointly or shown in separate panels.
+- Effective-rank and PCA plots must include every materialized vector view in
+  the configured candidate set, including output-layer mean vectors when their
+  sidecars are current. Planned or missing views should appear as `NA` status
+  rows instead of disappearing from the comparison.
+- PCA/effective-rank samples must be deterministic and disclose sample size,
+  feature dimension, preprocessing policy, and rank threshold. A 2,000-row
+  sample supports triage language, not a population-level proof.
+- Reference-collapse distances must be computed in the candidate-level
+  normalized geometry. Do not normalize each reference set independently before
+  measuring collapse, because that changes the geometry being audited.
+- Ordinal-axis audits must evaluate one declared axis at a time. Sigma-35
+  variant labels, Anderson strength, and W-collection strength are incompatible
+  scales unless a workspace config explicitly defines a shared mapping.
+- Claims about "different manifolds" should be framed as observed geometric
+  shifts under a specified representation, pooling operation, sequence scope,
+  and projection/reducer. Do not claim biological manifold separation from UMAP
+  alone.
+
+Plot shortlist discipline:
+
+- The curated review path should answer distinct decisions: Is the X healthy?
+  Does sequence length/context/pooling move rows? Do named references collapse?
+  Do ordinal or categorical priors survive in high-dimensional geometry? Which
+  candidate X is least misleading for pre-assay active-learning triage?
+- Keep redundant UMAP variants in appendix orientation surfaces. Promote a plot
+  to `Review` only if it changes a maintainer decision that the other primary
+  plots do not already answer.
+- Each rendered plot must have plot semantics and, where applicable, study
+  deliverable markdown that explain question, row scope, preprocessing, math,
+  alt text, guardrails, limitations, and failure modes through progressive
+  disclosure. If the math cannot be summarized honestly, the plot is not ready
+  for the curated notebook.
+
+Marimo notebook contract:
+
+- The generated notebook is a browser over precomputed artifacts, not the place
+  to run expensive matrix builds, UMAP fitting, or study policy.
+- Keep two top-level surfaces: `Review` for the curated shortlist and
+  `Geometry browser` for one-off inspection/export review. Do not add a third
+  tab without a separate user job and acceptance criteria.
+- Controls must be config-backed through `controls.json` and use Marimo's
+  reactive DAG. Do not introduce duplicate globals, imperative callback state,
+  or notebook-local policy branches.
+- Use `mo.accordion` for progressive disclosure of math, interpretation,
+  guardrails, and failure modes, and keep exported notebook checks green with
+  `marimo check`.
+
+Performance footgun register:
+
+- Do not load full stress matrices repeatedly inside one recipe. Reuse exact
+  sampled scope tables with file-stamp invalidation and explicit byte caps.
+- Do not compute full pairwise distances over large candidate populations.
+  Collapse and nearest-neighbor summaries should operate on configured samples,
+  named reference sets, or bounded pair counts unless the executor records a
+  full-population performance baseline and maintainer approval.
+- Do not densify or concatenate all vector candidates just because they share a
+  dimension. Candidate views have different coordinate-space semantics, and
+  memory estimates must be checked before materialization.
+- Do not allow notebook load or dropdown changes to trigger reducer fitting,
+  scalar building, or large parquet scans. Interactive controls should select
+  existing artifacts and small metadata tables.
+- Before accepting any optimization, capture baseline runtime, row count,
+  memory/RSS posture, and profiler evidence. Keep only optimizations that
+  preserve scalar-table equality or documented numerical tolerances and improve
+  at least three comparable runs.
+
+Executor acceptance checklist:
+
+- Add or preserve tests that assert pooling/orientation identity, scalar versus
+  vector separation, candidate inventory status rows, reference-collapse
+  normalization scope, ordinal-axis single-scale behavior, and no study-id
+  runtime branches.
+- Regenerate only necessary derived artifacts after code/config changes, then
+  run deep validation, notebook generation, notebook smoke, and `marimo check`
+  for both live workspaces.
+- Report any plot whose visual claim is weaker than its title, caption, or
+  deliverable prose. Fix the wording or demote the plot before final handoff.
 
 ### Plan of Work
 
