@@ -12,7 +12,6 @@ from pathlib import Path
 from types import ModuleType
 
 import marimo as mo
-import numpy as np
 import pandas as pd
 
 from ..labels import humanize_plot_title
@@ -214,6 +213,57 @@ def _runtime_hue_columns(
     )
     hue_kinds = resolve_runtime_hue_kinds(ordered_candidates, configured_hue_kinds)
     return [column for column in ordered_candidates if column in hue_kinds], hue_kinds
+
+
+def _candidate_inventory_from_control_plane(
+    *,
+    controls: dict[str, object],
+    catalog: dict[str, object],
+) -> list[dict[str, object]]:
+    control_rows = controls.get("candidate_inventory")
+    if isinstance(control_rows, list):
+        rows = [row for row in control_rows if isinstance(row, dict) and row.get("view_id")]
+        if rows:
+            return rows
+    catalog_rows = catalog.get("candidate_inventory")
+    if isinstance(catalog_rows, list):
+        return [row for row in catalog_rows if isinstance(row, dict) and row.get("view_id")]
+    return []
+
+
+def _matrix_shapes_from_control_plane(
+    *,
+    candidate_inventory: list[dict[str, object]],
+    geometry_rows: list[dict[str, object]],
+) -> list[dict[str, int | str]]:
+    shapes: list[dict[str, int | str]] = []
+    seen: set[str] = set()
+    for row in candidate_inventory:
+        view_id = str(row.get("view_id") or "").strip()
+        rows = row.get("n_rows")
+        dims = row.get("n_dims")
+        if (
+            not view_id
+            or view_id in seen
+            or str(row.get("modality") or "") != "vector"
+            or str(row.get("materialization_status") or "") != "materialized"
+            or rows is None
+            or dims is None
+        ):
+            continue
+        shapes.append({"view_id": view_id, "rows": int(rows), "dims": int(dims)})
+        seen.add(view_id)
+    if shapes:
+        return shapes
+    for row in geometry_rows:
+        view_id = str(row.get("view_id") or "").strip()
+        rows = row.get("rows")
+        dims = row.get("dims")
+        if not view_id or view_id in seen or rows is None or dims is None:
+            continue
+        shapes.append({"view_id": view_id, "rows": int(rows), "dims": int(dims)})
+        seen.add(view_id)
+    return shapes
 
 
 def _reference_set_option_label(row: dict[str, object]) -> str:
@@ -583,40 +633,7 @@ def build_workspace_browser_runtime(
         if default_deliverable_row is not None
         else (section_names[0] if section_names else "Unsectioned")
     )
-
-    source_labels = []
-    for source_id, source in context.config.sources.items():
-        if hasattr(source, "dataset"):
-            source_labels.append(f"{source_id}:{source.dataset}")
-        elif hasattr(source, "path"):
-            source_labels.append(f"{source_id}:{source.path}")
-        else:
-            source_labels.append(source_id)
-    vector_columns = sorted(
-        {
-            view.vector.name
-            for view in context.config.views.values()
-            if hasattr(view, "vector") and getattr(view.vector, "kind", None) == "column"
-        }
-    )
-    visual_families = unique_in_order(
-        getattr(view, "tags", {}).get("family")
-        for view in context.config.views.values()
-        if getattr(view, "tags", {}).get("family") is not None
-    )
-    matrix_shapes = []
-    for view_id in context.config.views:
-        matrix_path = output_root / "views" / view_id / "matrix.npy"
-        if not matrix_path.is_file():
-            continue
-        matrix = np.load(matrix_path, mmap_mode="r")
-        matrix_shapes.append({"view_id": view_id, "rows": int(matrix.shape[0]), "dims": int(matrix.shape[1])})
-    row_count_text = "unknown"
-    dimensionality_text = "unknown"
-    if matrix_shapes:
-        row_count_text = ", ".join(f"{row['view_id']}={row['rows']}" for row in matrix_shapes[:4])
-        dimensionality_text = ", ".join(f"{row['view_id']}={row['dims']}" for row in matrix_shapes[:4])
-
+    candidate_inventory = _candidate_inventory_from_control_plane(controls=controls, catalog=catalog)
     geometry_control = controls.get("geometry_controls", {})
     geometry_rows = [
         row for row in geometry_control.get("geometries", []) if isinstance(row, dict) and row.get("view_id")
@@ -651,6 +668,36 @@ def build_workspace_browser_runtime(
         for row in geometry_control.get("candidate_sets", [])
         if isinstance(row, dict) and row.get("candidate_set_id")
     ]
+
+    source_labels = []
+    for source_id, source in context.config.sources.items():
+        if hasattr(source, "dataset"):
+            source_labels.append(f"{source_id}:{source.dataset}")
+        elif hasattr(source, "path"):
+            source_labels.append(f"{source_id}:{source.path}")
+        else:
+            source_labels.append(source_id)
+    vector_columns = sorted(
+        {
+            view.vector.name
+            for view in context.config.views.values()
+            if hasattr(view, "vector") and getattr(view.vector, "kind", None) == "column"
+        }
+    )
+    visual_families = unique_in_order(
+        getattr(view, "tags", {}).get("family")
+        for view in context.config.views.values()
+        if getattr(view, "tags", {}).get("family") is not None
+    )
+    matrix_shapes = _matrix_shapes_from_control_plane(
+        candidate_inventory=candidate_inventory,
+        geometry_rows=geometry_rows,
+    )
+    row_count_text = "unknown"
+    dimensionality_text = "unknown"
+    if matrix_shapes:
+        row_count_text = ", ".join(f"{row['view_id']}={row['rows']}" for row in matrix_shapes[:4])
+        dimensionality_text = ", ".join(f"{row['view_id']}={row['dims']}" for row in matrix_shapes[:4])
     reference_annotation_options = _reference_annotation_options(reference_sets)
     configured_default_reference_set = str(geometry_control.get("default_reference_set") or "").strip()
     reference_annotation_default = (

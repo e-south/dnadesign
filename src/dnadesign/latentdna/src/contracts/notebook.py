@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .candidate_inventory import CandidateInventoryRow
+
 HueKind = Literal["categorical", "binary", "continuous", "ordinal"]
 NotebookSurface = Literal["plots", "geometry_browser"]
 
@@ -194,6 +196,7 @@ class WorkspaceNotebookControls(StrictNotebookModel):
     notebook_id: str
     generated_at: str
     runtime_paths: WorkspaceNotebookRuntimePaths
+    candidate_inventory: list[CandidateInventoryRow] = Field(default_factory=list)
     plot_controls: WorkspaceNotebookPlotControls
     geometry_controls: WorkspaceNotebookGeometryControls
     context_audit: WorkspaceNotebookContextAudit

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
@@ -16,6 +17,7 @@ from dnadesign.latentdna.src.notebooks.browser_runtime import (
     _reference_annotation_options,
     _reference_required_columns,
     _runtime_hue_columns,
+    build_workspace_browser_runtime,
     resolve_plot_doc_block,
     resolve_runtime_hue_kinds,
 )
@@ -164,6 +166,140 @@ def test_runtime_hue_columns_accept_control_plane_view_row_metadata() -> None:
         "source_family": "categorical",
         "promoter_standard__strength_value_numeric": "continuous",
     }
+
+
+def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monkeypatch, tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    output_root = workspace_dir / "outputs"
+    notebook_dir = output_root / "notebooks" / "latent_geometry_browser"
+    view_dir = output_root / "views" / "candidate_view"
+    notebook_dir.mkdir(parents=True)
+    view_dir.mkdir(parents=True)
+    (view_dir / "matrix.npy").write_bytes(b"runtime should not inspect this matrix")
+    catalog_path = output_root / "catalog.json"
+    health_path = notebook_dir / "health.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "deliverables": [],
+                "plots": [],
+                "exports": [],
+                "notebooks": [],
+                "runs": [],
+                "candidate_inventory": [
+                    {
+                        "study_id": "runtime_shape_demo",
+                        "candidate_set_ids": ["demo_x"],
+                        "view_id": "candidate_view",
+                        "source_id": "features",
+                        "dataset": "features.parquet",
+                        "row_basis": "subject_id",
+                        "model_name": "evo2_7b",
+                        "feature_family": "intermediate_embedding",
+                        "modality": "vector",
+                        "sequence_scope": "anchor_60bp",
+                        "pooling_operation": "seq_mean",
+                        "orientation": "forward",
+                        "coordinate_space_id": "demo_space",
+                        "role": "primary",
+                        "n_rows": 123,
+                        "n_dims": 16,
+                        "materialization_status": "materialized",
+                        "freshness_status": "ok",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    health_path.write_text("{}", encoding="utf-8")
+    controls = {
+        "candidate_inventory": [
+            {
+                "study_id": "runtime_shape_demo",
+                "candidate_set_ids": ["demo_x"],
+                "view_id": "candidate_view",
+                "source_id": "features",
+                "dataset": "features.parquet",
+                "row_basis": "subject_id",
+                "model_name": "evo2_7b",
+                "feature_family": "intermediate_embedding",
+                "modality": "vector",
+                "sequence_scope": "anchor_60bp",
+                "pooling_operation": "seq_mean",
+                "orientation": "forward",
+                "coordinate_space_id": "demo_space",
+                "role": "primary",
+                "n_rows": 123,
+                "n_dims": 16,
+                "materialization_status": "materialized",
+                "freshness_status": "ok",
+            }
+        ],
+        "plot_controls": {"default_surface": "plots", "ordered_plot_ids": [], "plots": []},
+        "geometry_controls": {
+            "default_model": "7b",
+            "default_family": "intermediate_embedding",
+            "default_context": "anchor_60bp",
+            "default_layout": "single_view",
+            "geometries": [
+                {
+                    "view_id": "candidate_view",
+                    "label": "Candidate view",
+                    "model": "7b",
+                    "family": "intermediate_embedding",
+                    "context": "anchor_60bp",
+                    "role": "primary",
+                    "materialized": True,
+                    "projection_ids": [],
+                    "coordinate_space_id": "demo_space",
+                    "rows": 123,
+                    "dims": 16,
+                }
+            ],
+            "preferred_hues": [],
+            "row_metadata_hues": [],
+            "hue_kinds": {},
+            "joinable_tables": [],
+            "layout_presets": [],
+            "comparison_bases": [],
+            "reference_labels": [],
+            "reference_sets": [],
+            "candidate_sets": [],
+            "compare_metrics": {},
+        },
+    }
+    context = SimpleNamespace(
+        config=SimpleNamespace(
+            sources={},
+            views={"candidate_view": SimpleNamespace(tags={"family": "intermediate_embedding"})},
+            deliverables={},
+            plots={},
+        ),
+        workspace_dir=workspace_dir,
+    )
+    monkeypatch.setattr("dnadesign.latentdna.src.notebooks.browser_runtime.load_workspace_config", lambda _: context)
+
+    def _fail_matrix_load(*args, **kwargs):  # pragma: no cover - only runs on regression
+        raise AssertionError("notebook runtime should not load matrix files for shape metadata")
+
+    monkeypatch.setattr(np, "load", _fail_matrix_load)
+
+    runtime = build_workspace_browser_runtime(
+        title="Runtime shape demo",
+        description=None,
+        workspace_id="runtime_shape_demo",
+        notebook_id="latent_geometry_browser",
+        default_deliverable="demo",
+        workspace_dir=workspace_dir,
+        output_root=output_root,
+        catalog_path=catalog_path,
+        health_path=health_path,
+        controls=controls,
+    )
+
+    assert runtime.identity.row_count_text == "candidate_view=123"
+    assert runtime.identity.dimensionality_text == "candidate_view=16"
 
 
 def test_reference_annotation_options_keep_label_selection_separate_from_hues() -> None:

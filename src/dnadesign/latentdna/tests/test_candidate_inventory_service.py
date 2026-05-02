@@ -8,6 +8,7 @@ import yaml
 
 from dnadesign.latentdna.src.services.candidate_inventory_service import build_candidate_inventory
 from dnadesign.latentdna.src.services.catalog_service import workspace_catalog
+from dnadesign.latentdna.src.services.notebook_controls_service import build_workspace_notebook_controls_payload
 from dnadesign.latentdna.src.services.view_service import materialize_view
 from dnadesign.latentdna.src.services.workspace_snapshot_service import workspace_snapshot
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
@@ -189,3 +190,16 @@ def test_candidate_inventory_is_published_in_snapshot_and_catalog(tmp_path) -> N
 
     assert [row["view_id"] for row in snapshot["candidate_inventory"]] == ["embedding_anchor", "output_anchor"]
     assert [row["view_id"] for row in catalog["candidate_inventory"]] == ["embedding_anchor", "output_anchor"]
+
+
+def test_candidate_inventory_is_published_in_notebook_controls(tmp_path) -> None:
+    workspace_dir = _write_workspace(tmp_path)
+    materialize_view(workspace_dir, "embedding_anchor")
+    context = load_workspace_config(workspace_dir)
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert [row.view_id for row in controls.candidate_inventory] == ["embedding_anchor", "output_anchor"]
+    assert controls.candidate_inventory[0].n_rows == 2
+    assert controls.candidate_inventory[0].n_dims == 2
+    assert controls.candidate_inventory[1].materialization_status == "planned"

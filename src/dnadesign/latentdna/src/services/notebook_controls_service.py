@@ -15,6 +15,7 @@ from ..contracts.notebook import (
     WorkspaceNotebookRuntimePaths,
 )
 from ..io.json_io import read_json
+from .candidate_inventory_service import build_candidate_inventory
 from .notebook_context_audit import build_workspace_notebook_context_audit
 from .notebook_geometry_controls import build_workspace_geometry_controls
 
@@ -89,6 +90,18 @@ def _plot_controls(
     )
 
 
+def _candidate_inventory_payload(
+    context,
+    *,
+    catalog_payload: dict[str, object] | None,
+) -> list[dict[str, object]]:
+    if isinstance(catalog_payload, dict):
+        rows = catalog_payload.get("candidate_inventory")
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, dict)]
+    return build_candidate_inventory(context)
+
+
 def build_workspace_notebook_controls_payload(
     context,
     *,
@@ -101,6 +114,7 @@ def build_workspace_notebook_controls_payload(
         notebook_id=notebook_id,
         generated_at=datetime.now(UTC).isoformat(),
         runtime_paths=_runtime_paths(context, notebook_id=notebook_id),
+        candidate_inventory=_candidate_inventory_payload(context, catalog_payload=catalog_payload),
         plot_controls=_plot_controls(context, notebook_id=notebook_id, catalog_payload=catalog_payload),
         geometry_controls=build_workspace_geometry_controls(context, notebook_id=notebook_id),
         context_audit=build_workspace_notebook_context_audit(context),
