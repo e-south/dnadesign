@@ -1,0 +1,27 @@
+plot_id: representation_health_summary
+question: Which RegulonDB native/core60 Evo 2 7B representation views are healthy enough for downstream structure checks?
+decision_role: gate
+encoding: Candidate-by-metric bar panels for effective rank, PC1 variance fraction, median pairwise cosine distance, and pairwise cosine-distance spread.
+scope: Native source-record and TSS-upstream core60 RegulonDB promoter views across intermediate embedding and output-layer mean feature families.
+guardrails:
+  - Treat this as a high-dimensional health gate, not a biological sigma-factor separation test.
+  - Compare output-layer means and intermediate embeddings as separate feature families even when they share row metadata.
+  - Use UMAP only as an appendix orientation after this collapse check.
+caption: Representation-health gate for native and core60 RegulonDB promoter representation views.
+alt_text: Bar-panel summary comparing effective rank, PC1 variance fraction, and pairwise cosine-distance spread across native source-record and core60 RegulonDB representation views.
+preprocessing_md: Uses materialized view matrices, all-row scorecard samples, and persisted PCA reducer summaries for each configured candidate view. Pairwise cosine metrics follow the shared standardize-then-normalize representation-health contract.
+math_md: |
+  Effective rank is computed from the positive retained PCA variance ratios:
+  $$
+  r_{\mathrm{eff}} = \exp\left(-\sum_i p_i \log p_i\right),
+  \qquad
+  p_i = \frac{\lambda_i}{\sum_j \lambda_j}.
+  $$
+  PC1 variance fraction reports $\lambda_1 / \sum_j \lambda_j$.
+  The cosine-distance panels summarize median and interquartile range over normalized candidate rows.
+rationale_md: Filters out collapsed native/core60 or output-layer spaces before comparing sigma-factor structure or native-to-core60 shifts.
+limitations_md: The retained PCA spectrum is a reduced diagnostic, not the full original feature rank. Healthy representation geometry may still encode sequence length, metadata completeness, or other nuisance factors.
+failure_modes_md: Missing sidecars, stale reducers, or row-basis mismatches can make the health gate misleading; validate the workspace before using this plot.
+docs_refs:
+  - src/dnadesign/latentdna/docs/concepts/coordinate-spaces.md
+  - src/dnadesign/latentdna/docs/reference/artifact-manifests.md

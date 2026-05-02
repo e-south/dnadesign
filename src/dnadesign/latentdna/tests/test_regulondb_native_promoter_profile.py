@@ -13,6 +13,14 @@ from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
+
+
 def test_native_regulondb_promoter_cohorts_materialize_without_densegen_or_sig35(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "native_regulondb_workspace"
     source_path = workspace_dir / "inputs" / "native_promoters.parquet"
@@ -115,3 +123,48 @@ cohorts:
         "regulondb__confidence_level_set",
         "regulondb__metadata_completeness_class",
     }
+
+
+def test_live_regulondb_workspace_declares_representation_health_review_path() -> None:
+    workspace = _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "regulondb_native_promoter_panel"
+    context = load_workspace_config(workspace)
+
+    notebook = context.config.notebooks["latent_geometry_browser"]
+    recipe_steps = {step.id: step for step in context.config.recipes["regulondb_review_recipe"].steps}
+
+    assert notebook.default_deliverable == "representation_health_summary"
+    assert notebook.ordered_plots[:5] == [
+        "representation_health_summary",
+        "native_core60_shift_summary",
+        "sigma_factor_structure_summary",
+        "sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean",
+        "sigma_umap_intermediate_embedding_7b_core60_tss_upstream",
+    ]
+    assert context.config.deliverables["representation_health_summary"].recipe == "regulondb_review_recipe"
+    assert context.config.deliverables["native_core60_shift_summary"].recipe == "regulondb_review_recipe"
+    assert context.config.deliverables["sigma_factor_structure_summary"].recipe == "regulondb_review_recipe"
+    assert context.config.deliverables["sigma_umap_panel"].recipe == "regulondb_review_recipe"
+    assert context.config.plots["representation_health_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["native_core60_shift_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["sigma_factor_structure_summary"].kind == "metric_panel_grid"
+    assert context.config.alignments["intermediate_embedding_7b_native_to_core60"].left_on == [
+        "alignment_parent_sequence_id"
+    ]
+    assert context.config.alignments["output_layer_mean_7b_native_to_core60"].right_on == [
+        "alignment_parent_sequence_id"
+    ]
+    assert context.config.views["output_layer_mean_7b_native_source_record_seq_mean"].coordinate_space_id == (
+        "evo2_7b_output_layer_mean"
+    )
+    assert context.config.views["output_layer_mean_7b_core60_tss_upstream"].coordinate_space_id == (
+        "evo2_7b_output_layer_mean"
+    )
+    assert "materialize_native_source_record_output_layer" in recipe_steps
+    assert "materialize_core60_tss_upstream_output_layer" in recipe_steps
+    assert "build_representation_health_summary_metrics" in recipe_steps
+    assert "build_sigma_factor_structure_summary_metrics" in recipe_steps
+    assert "build_native_core60_shift_summary_metrics" in recipe_steps
+    assert "render_representation_health_summary" in recipe_steps
+    assert "render_native_core60_shift_summary" in recipe_steps
+    assert "render_sigma_factor_structure_summary" in recipe_steps
+    assert "generate_latent_geometry_browser" in recipe_steps
