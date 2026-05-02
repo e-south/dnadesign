@@ -17,6 +17,7 @@ from dnadesign.latentdna.src.scalars.build import (
     _reference_neighbor_metrics,
     build_scalar_artifact,
 )
+from dnadesign.latentdna.src.scalars.common import _normalized_geometry_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
@@ -1689,6 +1690,15 @@ def test_reference_alignment_summary_emits_configured_reference_set_status_rows(
     assert w_size["reference_set_status"] == "ok"
     assert w_size["reference_set_complete"] is True
     assert w_size["display_name"] == "Reference group size\nReference set: W collection"
+    normalized = _normalized_geometry_rows(np.asarray([row["embedding"] for row in rows], dtype=np.float32))
+    expected_w_distance = 1.0 - float(np.dot(normalized[0], normalized[1]))
+    w_distance = metrics[
+        (
+            "reference_w_collection",
+            "reference_group_pairwise_cosine_distance_median",
+        )
+    ]
+    assert w_distance["metric_value"] == pytest.approx(expected_w_distance)
     anderson_size = metrics[("reference_anderson_igem", "reference_group_size")]
     assert anderson_size["metric_value"] == 0.0
     assert anderson_size["reference_set_status"] == "absent"

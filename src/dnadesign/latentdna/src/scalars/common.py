@@ -151,7 +151,12 @@ def _kendall_tau(left: np.ndarray, right: np.ndarray) -> float:
 
 def _cosine_distance_upper(matrix: np.ndarray) -> np.ndarray:
     normalized = _normalized_geometry_rows(matrix)
+    return _cosine_distance_upper_from_normalized(normalized)
+
+
+def _cosine_distance_upper_from_normalized(normalized: np.ndarray) -> np.ndarray:
     distances = 1.0 - np.asarray(normalized @ normalized.T, dtype=np.float32)
+    distances = np.clip(distances, 0.0, 2.0)
     upper = np.triu_indices(distances.shape[0], k=1)
     return np.asarray(distances[upper], dtype=np.float64)
 

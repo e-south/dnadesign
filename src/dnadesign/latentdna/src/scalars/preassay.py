@@ -32,6 +32,7 @@ from .common import (
     ScalarInputRef,
     _candidate_descriptor_from_view,
     _cosine_distance_upper,
+    _cosine_distance_upper_from_normalized,
     _effective_rank,
     _kendall_tau,
     _load_sig35_order,
@@ -968,7 +969,7 @@ def _reference_distance_summary(
 ) -> tuple[float, float]:
     if len(indices) < min_reference_group_size:
         return float("nan"), float("nan")
-    distances = _cosine_distance_upper(np.asarray(normalized[indices], dtype=np.float32))
+    distances = _cosine_distance_upper_from_normalized(np.asarray(normalized[indices], dtype=np.float32))
     if not distances.size:
         return float("nan"), float("nan")
     return (
@@ -1155,7 +1156,7 @@ def _reference_alignment_summary_table(
             for group_value, indices in sorted(grouped.items()):
                 if len(indices) < min_reference_group_size:
                     continue
-                distances = _cosine_distance_upper(np.asarray(normalized[indices], dtype=np.float32))
+                distances = _cosine_distance_upper_from_normalized(np.asarray(normalized[indices], dtype=np.float32))
                 distance_median = float(np.median(distances)) if distances.size else 0.0
                 distance_iqr = (
                     float(np.percentile(distances, 75.0) - np.percentile(distances, 25.0)) if distances.size else 0.0
