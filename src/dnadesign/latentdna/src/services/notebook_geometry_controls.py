@@ -13,11 +13,14 @@ from ..contracts.notebook import (
     WorkspaceNotebookGeometry,
     WorkspaceNotebookGeometryControls,
     WorkspaceNotebookLayoutPreset,
+    WorkspaceNotebookReferenceSet,
     WorkspaceNotebookTableRef,
 )
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..labels import humanize_candidate
+from ..visual_style import reference_annotation_label
+from .candidate_set_service import build_workspace_candidate_sets, candidate_set_view_ids
 
 _DEFAULT_GEOMETRY_ORDER = [
     "intermediate_embedding_7b_anchor_60bp",
@@ -63,6 +66,12 @@ _SCOPE_LABELS = {
     "full_context_1kb": "1 kb construct context",
     "full_context_anchor_mean": "1 kb context anchor mean",
     "reverse_complement_context_anchor_mean": "1 kb reverse-complement context anchor mean",
+    "reverse_complement_context_1kb": "1 kb reverse-complement construct context",
+    "reference_core60": "reference core60",
+    "reference_context_forward_1kb": "reference 1 kb forward context",
+    "reference_context_forward_anchor_mean": "reference 1 kb forward anchor mean",
+    "reference_context_reverse_complement_1kb": "reference 1 kb reverse-complement context",
+    "reference_context_reverse_complement_anchor_mean": "reference 1 kb reverse-complement anchor mean",
     "anchor_plus_anchor_mean_concat": "anchor + anchor-mean concat",
 }
 
@@ -145,7 +154,25 @@ def _resolve_notebook(context, notebook_id: str | None):
 def _geometry_order(context, *, notebook_id: str | None) -> list[str]:
     notebook = _resolve_notebook(context, notebook_id)
     configured = list(getattr(notebook, "geometry_order", []) or []) if notebook is not None else []
-    return configured or list(_DEFAULT_GEOMETRY_ORDER)
+    if configured:
+        return configured
+    candidate_set_ids = list(getattr(notebook, "candidate_sets", []) or []) if notebook is not None else []
+    default_candidate_set = str(getattr(notebook, "default_candidate_set", "") or "") if notebook is not None else ""
+    ordered_candidate_sets = [
+        *([default_candidate_set] if default_candidate_set else []),
+        *[candidate_set_id for candidate_set_id in candidate_set_ids if candidate_set_id != default_candidate_set],
+    ]
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for candidate_set_id in ordered_candidate_sets:
+        if candidate_set_id not in context.config.candidate_sets:
+            continue
+        for view_id in candidate_set_view_ids(context, candidate_set_id):
+            if view_id in seen:
+                continue
+            seen.add(view_id)
+            resolved.append(view_id)
+    return resolved or list(_DEFAULT_GEOMETRY_ORDER)
 
 
 def _unique_in_order(values) -> list[str]:
@@ -400,6 +427,7 @@ def _layout_presets(
     geometry_rows: list[WorkspaceNotebookGeometry],
     *,
     notebook_id: str | None,
+    candidate_sets: list | None = None,
 ) -> list[WorkspaceNotebookLayoutPreset]:
     available = {row.view_id for row in geometry_rows}
     notebook = _resolve_notebook(context, notebook_id)
@@ -426,6 +454,31 @@ def _layout_presets(
                 panel_titles=candidate_grid_titles,
             )
         )
+    seen_preset_ids = {preset.id for preset in presets}
+    for candidate_set in candidate_sets or []:
+        candidate_set_id = str(getattr(candidate_set, "candidate_set_id", "") or "")
+        preset_id = f"candidate_set__{candidate_set_id}"
+        if not candidate_set_id or preset_id in seen_preset_ids:
+            continue
+        candidate_view_ids = [
+            view_id for view_id in getattr(candidate_set, "available_view_ids", []) if str(view_id) in available
+        ]
+        if len(candidate_view_ids) < 2:
+            continue
+        presets.append(
+            WorkspaceNotebookLayoutPreset(
+                id=preset_id,
+                label=str(getattr(candidate_set, "label", "") or candidate_set_id),
+                mode="fixed_grid",
+                description=str(
+                    getattr(candidate_set, "description", None)
+                    or "Projection grid across a configured candidate representation set."
+                ),
+                view_ids=[str(view_id) for view_id in candidate_view_ids],
+                panel_titles=[str(title) for title in getattr(candidate_set, "panel_titles", [])],
+            )
+        )
+        seen_preset_ids.add(preset_id)
     return presets
 
 
@@ -437,9 +490,21 @@ def _reference_labels(context) -> list[str]:
         if getattr(reference_set, "label_mode", None) != "label_and_highlight":
             continue
         display_labels = dict(getattr(reference_set, "display_labels", {}) or {})
-        for raw_label in getattr(reference_set, "ids", []):
+        explicit_ids = list(getattr(reference_set, "ids", []) or [])
+        selector_ids = [
+            str(value)
+            for selector in [
+                *(getattr(reference_set, "where", []) or []),
+                *(getattr(reference_set, "where_all", []) or []),
+            ]
+            for value in (getattr(selector, "in_values", []) or [])
+        ]
+        seed_ids = explicit_ids or selector_ids
+        if len(seed_ids) > 5:
+            continue
+        for raw_label in seed_ids:
             raw_text = str(raw_label).strip()
-            label = str(display_labels.get(raw_text, raw_text)).strip()
+            label = reference_annotation_label(display_labels.get(raw_text, raw_text))
             if not label or label in seen:
                 continue
             seen.add(label)
@@ -458,6 +523,33 @@ def _reference_labels(context) -> list[str]:
         seen.add(label)
         labels.append(label)
     return labels
+
+
+def _reference_set_controls(context) -> list[WorkspaceNotebookReferenceSet]:
+    controls: list[WorkspaceNotebookReferenceSet] = []
+    for reference_set_id, reference_set in context.config.reference_sets.items():
+        if not bool(getattr(reference_set, "notebook_exposed", True)):
+            continue
+        selector_columns = [
+            str(getattr(selector, "column"))
+            for selector in [
+                *(getattr(reference_set, "where", []) or []),
+                *(getattr(reference_set, "where_all", []) or []),
+            ]
+            if str(getattr(selector, "column", "")).strip()
+        ]
+        controls.append(
+            WorkspaceNotebookReferenceSet(
+                reference_set_id=reference_set_id,
+                label=getattr(reference_set, "label", None),
+                match_column=reference_set.match_column,
+                label_column=reference_set.label_column,
+                label_mode=reference_set.label_mode,
+                explicit_ids=[str(value) for value in reference_set.ids],
+                selector_columns=list(dict.fromkeys(selector_columns)),
+            )
+        )
+    return controls
 
 
 def _comparison_bases(
@@ -524,6 +616,12 @@ def _default_layout_id(
     configured = str(getattr(notebook, "default_layout", "") or "").strip() if notebook is not None else ""
     if configured and configured in available:
         return configured
+    default_candidate_set = (
+        str(getattr(notebook, "default_candidate_set", "") or "").strip() if notebook is not None else ""
+    )
+    candidate_preset_id = f"candidate_set__{default_candidate_set}" if default_candidate_set else ""
+    if candidate_preset_id in available:
+        return candidate_preset_id
     return "single_view"
 
 
@@ -538,6 +636,11 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         geometry_order=geometry_order,
     )
     visible_view_ids = {row.view_id for row in geometries}
+    candidate_sets = build_workspace_candidate_sets(
+        context,
+        notebook_id=notebook_id,
+        visible_view_ids=visible_view_ids,
+    )
     joinable_tables, schemas_by_path = _table_inventory(
         context,
         visible_view_ids=visible_view_ids,
@@ -563,12 +666,21 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         geometries,
         notebook_id=notebook_id,
     )
-    layout_presets = _layout_presets(context, geometries, notebook_id=notebook_id)
+    layout_presets = _layout_presets(
+        context,
+        geometries,
+        notebook_id=notebook_id,
+        candidate_sets=candidate_sets,
+    )
+    default_geometry = geometries[0] if geometries else None
+    notebook = _resolve_notebook(context, notebook_id)
+    default_reference_set = str(getattr(notebook, "default_reference_set", "") or "") if notebook is not None else ""
     return WorkspaceNotebookGeometryControls(
-        default_model="7b",
-        default_family="intermediate_embedding",
-        default_context="anchor_60bp",
+        default_model=default_geometry.model if default_geometry is not None else "7b",
+        default_family=default_geometry.family if default_geometry is not None else "intermediate_embedding",
+        default_context=default_geometry.context if default_geometry is not None else "anchor_60bp",
         default_layout=_default_layout_id(context, layout_presets, notebook_id=notebook_id),
+        default_reference_set=default_reference_set,
         default_compare_left=default_compare_left,
         default_compare_right=default_compare_right,
         geometries=geometries,
@@ -579,6 +691,8 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         layout_presets=layout_presets,
         comparison_bases=comparison_bases,
         reference_labels=_reference_labels(context),
+        reference_sets=_reference_set_controls(context),
+        candidate_sets=candidate_sets,
         compare_metrics=WorkspaceNotebookCompareMetrics(
             sample_rows=192,
             distance_pair_limit=4096,

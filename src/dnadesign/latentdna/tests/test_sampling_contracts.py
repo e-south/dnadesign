@@ -208,3 +208,77 @@ def test_sample_build_stratified_preserves_reference_set_rows(tmp_path) -> None:
     sample_rows = read_table(artifact_dir / "rows.parquet").to_pydict()
     assert rows >= 2
     assert {"row_01", "row_04"}.issubset(set(sample_rows["id"]))
+
+
+def test_sample_build_stratified_preserves_selector_reference_set_rows(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    outputs = workspace_dir / "outputs" / "views" / "z20_60"
+    outputs.mkdir(parents=True)
+    rows = pa.table(
+        {
+            "id": ["row_01", "row_02", "row_03", "row_04"],
+            "densegen__plan": ["plan_a", "plan_a", "plan_b", "plan_b"],
+            "source_family": ["reference_source", "densegen_generated", "construct_derived", "densegen_generated"],
+        }
+    )
+    from dnadesign.latentdna.src.io.parquet_io import write_table
+
+    write_table(rows, outputs / "rows.parquet")
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: ./inputs/anchor60.parquet
+    record_key: id
+    subject_key: id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: demo
+    tags: {model: demo}
+    role: primary
+reference_sets:
+  reference_rows:
+    match_column: id
+    where:
+      - column: source_family
+        in_values: [reference_source, construct_derived]
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    context = load_workspace_config(workspace_dir)
+
+    artifact_dir, rows_count = build_sample_artifact(
+        context,
+        sample_id="stratified_selector_reference_rows",
+        view_id="z20_60",
+        strategy="stratified",
+        n=1,
+        group_column="densegen__plan",
+        seed=17,
+        reference_set_id="reference_rows",
+    )
+
+    from dnadesign.latentdna.src.io.parquet_io import read_table
+
+    sample_rows = read_table(artifact_dir / "rows.parquet").to_pydict()
+    assert rows_count >= 2
+    assert {"row_01", "row_03"}.issubset(set(sample_rows["id"]))

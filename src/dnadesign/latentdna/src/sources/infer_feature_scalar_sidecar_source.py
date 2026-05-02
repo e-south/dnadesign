@@ -142,6 +142,17 @@ def _scalar_key_set(root: str, dataset: str, *, workspace_dir: Path) -> set[str]
     return _scalar_key_set_for_path(path.as_posix())
 
 
+def _alias_feature_scalar_keys(aliases: pa.Table, *, dataset: str) -> list[str]:
+    keys: list[str] = []
+    for index, raw_key in enumerate(aliases.column("feature_scalar_key").to_pylist()):
+        if raw_key is None or not str(raw_key).strip():
+            raise SourceResolutionError(
+                f"infer feature scalar sidecar alias row {index} in {dataset} has no feature_scalar_key"
+            )
+        keys.append(str(raw_key))
+    return keys
+
+
 def _assert_scalars_exist(
     aliases: pa.Table,
     *,
@@ -149,7 +160,7 @@ def _assert_scalars_exist(
     dataset: str,
     workspace_dir: Path,
 ) -> None:
-    wanted = {str(value) for value in aliases.column("feature_scalar_key").to_pylist() if value is not None}
+    wanted = set(_alias_feature_scalar_keys(aliases, dataset=dataset))
     if not wanted:
         return
     present = _scalar_key_set(root, dataset, workspace_dir=workspace_dir)
@@ -198,7 +209,7 @@ def inspect_schema(
     _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
     return {
         "path": (dataset_dir(root, dataset, workspace_dir=workspace_dir) / "_derived/infer").as_posix(),
-        "row_count": aliases.num_rows,
+        "row_count": len(_alias_feature_scalar_keys(aliases, dataset=dataset)),
         "columns": _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where),
         "vector_columns": [],
     }
@@ -280,7 +291,7 @@ def _metadata_rows(
     workspace_dir: Path,
     where: Mapping[str, object] | None,
     columns: list[str] | None,
-) -> dict[str, dict[str, object]]:
+) -> dict[str, list[dict[str, object]]]:
     ds = _dataset(root, dataset, workspace_dir=workspace_dir)
     aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
     _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
@@ -303,7 +314,7 @@ def _metadata_rows(
     record_columns = [column for column in record_columns if column in set(field.name for field in ds.schema())]
     records = _record_rows_by_id(ds, columns=record_columns)
 
-    rows: dict[str, dict[str, object]] = {}
+    rows: dict[str, list[dict[str, object]]] = {}
     for alias_row in alias_rows:
         sequence_id = str(alias_row["sequence_id"])
         record = records.get(sequence_id)
@@ -313,7 +324,8 @@ def _metadata_rows(
             )
         view_id = str(alias_row.get("view_id") or "")
         payload = {**record, **(sequence_views.get(view_id) or {}), **(semantics.get(view_id) or {}), **alias_row}
-        rows[str(alias_row["feature_scalar_key"])] = payload
+        feature_scalar_key = str(alias_row["feature_scalar_key"])
+        rows.setdefault(feature_scalar_key, []).append(payload)
     return rows
 
 
@@ -330,9 +342,12 @@ def iter_batches(
     metadata = _metadata_rows(root, dataset, workspace_dir=workspace_dir, where=where, columns=selected_columns)
     if not metadata:
         return
+    metadata_schema_rows = {
+        f"{feature_key}#{index}": row for feature_key, rows in metadata.items() for index, row in enumerate(rows)
+    }
     output_schema = _stable_batch_schema(
         selected_columns,
-        metadata,
+        metadata_schema_rows,
         field_types=_schema_field_types(root, dataset, workspace_dir=workspace_dir),
     )
     scalar_path = feature_scalars_path(root, dataset, workspace_dir=workspace_dir)
@@ -350,12 +365,13 @@ def iter_batches(
             key = str(scalar_row["feature_scalar_key"])
             if key not in wanted_keys:
                 continue
-            row = dict(metadata[key])
-            if _SCALAR_COLUMN in selected_columns:
-                row[_SCALAR_COLUMN] = scalar_row[_SCALAR_COLUMN]
-            if _SCALAR_CREATED_AT_COLUMN in selected_columns:
-                row[_SCALAR_CREATED_AT_COLUMN] = scalar_row.get("created_at")
-            batch_rows.append({column: row.get(column) for column in selected_columns})
+            for metadata_row in metadata[key]:
+                row = dict(metadata_row)
+                if _SCALAR_COLUMN in selected_columns:
+                    row[_SCALAR_COLUMN] = scalar_row[_SCALAR_COLUMN]
+                if _SCALAR_CREATED_AT_COLUMN in selected_columns:
+                    row[_SCALAR_CREATED_AT_COLUMN] = scalar_row.get("created_at")
+                batch_rows.append({column: row.get(column) for column in selected_columns})
         if batch_rows:
             yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
 

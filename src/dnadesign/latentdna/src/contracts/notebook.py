@@ -19,6 +19,9 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     description: str | None = None
     default_deliverable: str
     default_surface: Literal["plots", "geometry_audit", "comparison_audit"] = "plots"
+    candidate_sets: list[str] = Field(default_factory=list)
+    default_candidate_set: str | None = None
+    default_reference_set: str | None = None
     ordered_plots: list[str] = Field(default_factory=list)
     context_audit_scalar_ids: list[str] = Field(default_factory=list)
     geometry_order: list[str] = Field(default_factory=list)
@@ -37,6 +40,9 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
             raise ValueError("candidate_grid_panel_titles must match candidate_grid_views length")
         if self.default_compare_views and len(self.default_compare_views) != 2:
             raise ValueError("default_compare_views must declare exactly two view ids when provided")
+        if self.default_candidate_set is not None and self.candidate_sets:
+            if self.default_candidate_set not in self.candidate_sets:
+                raise ValueError("default_candidate_set must be declared in candidate_sets when candidate_sets are set")
         return self
 
 
@@ -85,10 +91,42 @@ class WorkspaceNotebookComparisonBasis(StrictNotebookModel):
     label: str
 
 
+class WorkspaceNotebookReferenceSet(StrictNotebookModel):
+    reference_set_id: str
+    label: str | None = None
+    match_column: str
+    label_column: str | None = None
+    label_mode: Literal["label_and_highlight", "highlight_only"]
+    explicit_ids: list[str] = Field(default_factory=list)
+    selector_columns: list[str] = Field(default_factory=list)
+
+
 class WorkspaceNotebookCompareMetrics(StrictNotebookModel):
     sample_rows: int
     distance_pair_limit: int
     knn_k: int
+
+
+class WorkspaceNotebookCandidateView(StrictNotebookModel):
+    view_id: str
+    label: str
+    panel_title: str
+    status: str
+    role: str | None = None
+    tags: dict[str, str] = Field(default_factory=dict)
+    materialized: bool
+    rows: int | None = None
+    dims: int | None = None
+
+
+class WorkspaceNotebookCandidateSet(StrictNotebookModel):
+    candidate_set_id: str
+    label: str
+    description: str | None = None
+    view_ids: list[str] = Field(default_factory=list)
+    available_view_ids: list[str] = Field(default_factory=list)
+    panel_titles: list[str] = Field(default_factory=list)
+    views: list[WorkspaceNotebookCandidateView] = Field(default_factory=list)
 
 
 class WorkspaceNotebookGeometryControls(StrictNotebookModel):
@@ -96,6 +134,7 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     default_family: str
     default_context: str
     default_layout: str
+    default_reference_set: str = ""
     default_compare_left: str | None = None
     default_compare_right: str | None = None
     geometries: list[WorkspaceNotebookGeometry]
@@ -106,6 +145,8 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     layout_presets: list[WorkspaceNotebookLayoutPreset]
     comparison_bases: list[WorkspaceNotebookComparisonBasis]
     reference_labels: list[str]
+    reference_sets: list[WorkspaceNotebookReferenceSet] = Field(default_factory=list)
+    candidate_sets: list[WorkspaceNotebookCandidateSet] = Field(default_factory=list)
     compare_metrics: WorkspaceNotebookCompareMetrics
 
 

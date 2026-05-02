@@ -1,7 +1,7 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-28
+**Last verified:** 2026-04-30
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
@@ -18,6 +18,7 @@ Core sections:
 - `views`
 - `scalars`
 - `landmarks`
+- `candidate_sets`
 - `plots`
 - `cohorts`
 - `exports`
@@ -33,6 +34,7 @@ Implemented schema slices:
 - Alignments: named `intersection` support over `record_key`, `subject_key`, or explicit key columns
 - Scalars: `vector_norm`, safe `column_expression`, `select_columns`, `rename_columns`, and `join_tables`
 - Landmarks: predicate-selected sets with `centroid`, `medoid`, or `rows` representation declarations
+- Candidate sets: named, study-agnostic groups of view ids or tag-selected views for notebook layouts and representation status surfaces
 - Plots: named artifact-driven recipes for `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `xy_scatter`, `distribution`, `curve`, `correspondence_heatmap`, and `agreement_summary`
 - Cohorts: named `kind: column` metadata groupings over declared sources
 - Exports: config-declared reducer/table block bundles for `export matrix`, including explicit alignment-backed block projection onto an `alignment_set` row basis
@@ -40,6 +42,9 @@ Implemented schema slices:
 - Notebooks: config-backed `workspace` marimo apps that load the persisted workspace catalog, artifact manifests, and the notebook control-plane payload under `outputs/notebooks/<id>/controls.json`
 - Recipes: thin DAGs over the currently implemented primitive command set
 - Deliverables: user-facing bundles that reference one recipe plus declared prerequisites and outputs
+- Reference sets: optional display `label`, explicit id lists, plus
+  selector-backed membership through `where` selectors over row metadata;
+  selectors support `equals`, `in_values`, and non-null membership checks.
 - Study binding: optional read-only link to one checked-in dnadesign study record through explicit `study_id` and `docs_root` fields, plus readiness vocabulary used by status surfaces
 - Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
@@ -50,7 +55,7 @@ Current runtime limits:
 - `view derive` now covers the full current declared set, but reducer fitting is still PCA-only.
 - `view reduce` currently fits PCA only.
 - `scalar derive` currently supports `vector_norm`, `column_expression`, `select_columns`, `rename_columns`, and `join_tables`.
-- `sample build` currently supports `all`, `random`, `stratified`, `explicit_ids`, `union`, and `intersection`, plus optional `reference_set` preservation for view-backed samples.
+- `sample build` currently supports `all`, `random`, `stratified`, `explicit_ids`, `union`, and `intersection`, plus optional `reference_set` preservation for view-backed samples. Reference-set preservation may use explicit ids or selector-backed row membership.
 - `export matrix` and `export table` currently support `reduced_view` and `table_columns` blocks, plus optional block-level `alignment` projection onto an explicit aligned row basis.
 - Landmark distance scoring is implemented against source-backed views.
 - `enrich score` currently supports landmark-neighborhood summaries over `kind: column` cohorts only.
@@ -59,9 +64,43 @@ Current runtime limits:
 - `agreement compare` now supports kNN-overlap plus optional cluster agreement and landmark-neighborhood overlap; richer agreement recipes remain deferred.
 - `plot render` now supports `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `xy_scatter`, `distribution`, `curve`, `correspondence_heatmap`, and `agreement_summary`.
 - `plot render` now accepts either a named `plots.<id>` recipe with no inline plot flags, or an ad hoc inline spec; mixing the two modes is rejected.
-- Projection plot recipes may declare a shared `color_column`, explicit `panel_titles`, and optional highlighted label subsets through `label_column` plus `label_values`.
+- Projection plot recipes may declare a shared `color_column`, explicit
+  `panel_titles` for grids, a `panel_title` for single projection scatters,
+  typed `hue_options`, and optional highlighted label subsets through
+  `label_column` plus `label_values`. Static projection scatters use continuous
+  colorbars for `type: continuous` hues and reserve figure space for categorical
+  legends instead of drawing legends over the axes.
+- Projection annotations may use `plots.<id>.annotation.reference_set` to
+  resolve a workspace reference set per panel. Render manifests record
+  `expected_ids`, `matched_ids`, and completeness for each panel. Reference sets
+  with `label_mode: highlight_only` are drawn as unlabeled overlay markers so
+  larger promoter-standard collections can be represented without dense static
+  labels.
+- `metadata.derivations` supports row-local `copy`, `regex_capture`,
+  `map_values`, `coalesce`, and `constant`, plus cross-source `lookup`.
+  Lookup derivations join a materialized source row's `left_key` to a declared
+  source table's `right_key` and copy one `value_column`, failing by default
+  on null keys, duplicate right keys, or missing matches.
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
 - `notebook generate` currently emits one workspace notebook surface per declared `notebooks.<id>`, with `notebooks.<id>.default_deliverable` selecting the initial catalog focus while all plot, run, and manifest browsing stays read-only.
+- Notebook controls expose both `reference_labels` for small static callout
+  sets and `reference_sets` for selector-backed all/collection/subset modes.
+  Reference sets may use `where` for OR-style selector membership and
+  `where_all` for AND-style membership. Selectors support exact `equals`,
+  `in_values`, `regex`, and `not_regex` checks so representation-specific
+  suffixes such as core60 or reverse-complement context rows can be included
+  without creating separate plot code. Set `notebook_exposed: false` for
+  internal preserve sets that should not appear in the annotation dropdown.
+  Notebook annotation dropdown labels come from `reference_sets.<id>.label`
+  when present; `notebooks.<id>.default_reference_set` selects the initial
+  overlay without hard-coding study-specific reference names in runtime code.
+- Notebook controls expose `candidate_sets` resolved from workspace
+  `candidate_sets` declarations. A candidate set may list explicit `views` or
+  select views by exact `include_tags`; optional `panel_titles` are presentation
+  labels only. Candidate sets carry each view's role, materialization state, row
+  count, dimensionality, and availability so planned output-layer or other
+  diagnostic representations can stay visible without being promoted to current
+  decision geometry.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
 - `notebook generate` now refuses to overwrite or regenerate a notebook when the default deliverable has freshness drift; refresh the deliverable or its linked recipe first so the notebook remains a review surface over fresh artifacts.
 - `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
@@ -76,7 +115,10 @@ Current runtime limits:
   `source_family`, `selection_basis`, and `view_collections` available as row
   metadata. Missing vector sidecar files expose a zero-row schema so planned
   vector sources can be declared before Infer has produced rows. Alias rows
-  that reference absent vector keys still fail validation.
+  that omit a vector key or reference absent vector keys still fail validation.
+  When multiple alias rows point at the same `feature_vector_key`, LatentDNA
+  preserves one row per alias/view and reuses the shared vector payload so row
+  metadata such as parent sequence ids cannot be collapsed by feature key.
 - `infer_feature_scalar_sidecar` sources expose canonical Infer scalar outputs
   from `<usr-dataset>/_derived/infer/feature_scalar_aliases.parquet` joined to
   `feature_scalars.parquet`, `_views/sequence_views.parquet`, mutable
@@ -85,7 +127,9 @@ Current runtime limits:
   `log_likelihood__total` and `log_likelihood__mean_per_token`. Missing scalar
   sidecar files expose a zero-row schema so planned scalar sources can coexist
   with partial feature datasets without pretending the scalar evidence is
-  present.
+  present. As with vector sidecars, aliases that omit a scalar key fail fast,
+  and multiple aliases pointing at one `feature_scalar_key` remain separate
+  materialized rows with the shared scalar payload.
 - Source-backed views with `role: planned` or `role: retired` are skipped by
   deep vector-column checks and omitted from notebook geometry controls. This
   is a visible degraded contract for upstream feature gaps; planned or retired

@@ -17,10 +17,12 @@ import marimo as mo
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
 from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..labels import humanize_column_name
+from ..reference_sets import reference_set_required_columns, resolve_reference_set_rows
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
     DEFAULT_NOTEBOOK_FIG_DPI,
@@ -37,15 +39,13 @@ from ..visual_style import (
     categorical_color_map,
     display_category_text,
     humanize_display_text,
+    is_sig35_legend_category,
+    normalize_sig35_hue_category,
     ordered_categories,
+    reference_annotation_label,
 )
 from ..visual_style import scatter_style as shared_scatter_style
-
-REFERENCE_DISPLAY = {
-    "spyp": "spyP",
-    "sulap": "sulAp",
-    "j23105": "J23105",
-}
+from ..workspaces.loader import load_workspace_config
 
 _RUNTIME_TABLE_ARTIFACT_KINDS = {
     "alignments": "alignment_set",
@@ -144,6 +144,7 @@ def load_table(
     *,
     require_fresh_manifest: bool = False,
     allowed_statuses: set[str] | None = None,
+    columns: list[str] | None = None,
 ) -> pd.DataFrame:
     if not path.is_file():
         return pd.DataFrame()
@@ -161,7 +162,7 @@ def load_table(
                 allow_missing_status=artifact_kind != "view",
                 allowed_statuses=allowed_statuses,
             )
-    frame = pd.read_parquet(path)
+    frame = pd.read_parquet(path, columns=columns)
     if manifest is not None:
         status = str(manifest.get("status") or "").strip().lower()
         if status and status != "ok":
@@ -540,8 +541,130 @@ def normalize_label(value) -> str:
 
 
 def display_reference_label(value) -> str:
-    text = str(value or "")
-    return REFERENCE_DISPLAY.get(normalize_label(text), text)
+    return reference_annotation_label(value)
+
+
+def _missing_reference_display_value(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        return False
+    if isinstance(missing, bool):
+        return missing
+    return False
+
+
+@lru_cache(maxsize=16)
+def _load_workspace_reference_set(workspace_dir_text: str, reference_set_id: str):
+    context = load_workspace_config(Path(workspace_dir_text))
+    return context.config.reference_sets.get(reference_set_id)
+
+
+def resolve_reference_annotation(
+    reference_set_id: str | None,
+    frames: list[pd.DataFrame],
+    *,
+    workspace_dir: Path,
+    fallback_labels: list[str] | None = None,
+    label_limit: int | None = None,
+) -> dict[str, object]:
+    if reference_set_id is None:
+        return {
+            "reference_set_id": "",
+            "match_column": "usr_label__primary",
+            "labels": list(fallback_labels or []),
+            "display_labels": {},
+            "label_limit": label_limit,
+            "warnings": [],
+        }
+    selected_reference_set_id = str(reference_set_id or "").strip()
+    if not selected_reference_set_id:
+        return {
+            "reference_set_id": "",
+            "match_column": "usr_label__primary",
+            "labels": [],
+            "display_labels": {},
+            "label_limit": 0,
+            "warnings": [],
+        }
+
+    try:
+        reference_set = _load_workspace_reference_set(str(workspace_dir), selected_reference_set_id)
+    except Exception as exc:
+        return {
+            "reference_set_id": selected_reference_set_id,
+            "match_column": "usr_label__primary",
+            "labels": list(fallback_labels or []),
+            "display_labels": {},
+            "label_limit": label_limit,
+            "warnings": [f"reference set `{selected_reference_set_id}` could not be loaded: {exc}"],
+        }
+    if reference_set is None:
+        return {
+            "reference_set_id": selected_reference_set_id,
+            "match_column": "usr_label__primary",
+            "labels": list(fallback_labels or []),
+            "display_labels": {},
+            "label_limit": label_limit,
+            "warnings": [f"reference set `{selected_reference_set_id}` is not configured"],
+        }
+
+    required_columns = reference_set_required_columns(reference_set)
+    rows: list[dict[str, object]] = []
+    for frame in frames:
+        if frame.empty:
+            continue
+        available_columns = [column for column in required_columns if column in frame.columns]
+        if not available_columns:
+            continue
+        frame_rows = frame[available_columns].to_dict(orient="records")
+        for row in frame_rows:
+            rows.append({column: row.get(column) for column in required_columns})
+
+    resolution = resolve_reference_set_rows(reference_set, rows)
+    match_column = str(getattr(reference_set, "match_column", "usr_label__primary"))
+    label_column = getattr(reference_set, "label_column", None)
+    configured_display_labels = {
+        str(key): str(value)
+        for key, value in dict(getattr(reference_set, "display_labels", {}) or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+    display_labels: dict[str, str] = {}
+    for row in resolution.selected_rows:
+        match_value = str(row.get(match_column) or "").strip()
+        if not match_value:
+            continue
+        display_value = None
+        if label_column:
+            candidate_display = row.get(str(label_column))
+            if not _missing_reference_display_value(candidate_display) and str(candidate_display).strip():
+                display_value = str(candidate_display).strip()
+        if display_value is None:
+            display_value = configured_display_labels.get(match_value, match_value)
+        display_labels[match_value] = display_value
+
+    default_label_limit = 0 if len(resolution.matched_ids) > 5 else 5
+    warnings = []
+    if resolution.missing_columns:
+        warnings.append(
+            f"reference set `{selected_reference_set_id}` is missing columns: " + ", ".join(resolution.missing_columns)
+        )
+    if resolution.expected_ids and set(resolution.matched_ids) != set(resolution.expected_ids):
+        missing_ids = [value for value in resolution.expected_ids if value not in set(resolution.matched_ids)]
+        if missing_ids:
+            warnings.append(
+                f"reference set `{selected_reference_set_id}` has {len(missing_ids)} unmatched reference rows"
+            )
+    return {
+        "reference_set_id": selected_reference_set_id,
+        "match_column": match_column,
+        "labels": resolution.matched_ids,
+        "display_labels": display_labels,
+        "label_limit": default_label_limit if label_limit is None else label_limit,
+        "warnings": warnings,
+    }
 
 
 def display_hue_label(column: str) -> str:
@@ -569,6 +692,8 @@ def display_hue_value(column: str | None, value: object) -> str:
 def normalize_categorical_hue_value(column: str | None, value: object) -> str:
     if pd.isna(value):
         return "NA"
+    if str(column or "").strip() == "sig35_variant":
+        return normalize_sig35_hue_category(value)
     if str(column or "").strip() == "spacer_length":
         try:
             numeric = float(value)
@@ -627,13 +752,20 @@ def geometry_map(geometry_rows: list[dict[str, object]]) -> dict[str, dict[str, 
     return {str(row["view_id"]): row for row in geometry_rows}
 
 
-def load_view_rows(view_id: str, *, output_root: Path) -> pd.DataFrame:
+def _existing_parquet_columns(path: Path, requested_columns: list[str] | None) -> list[str] | None:
+    if requested_columns is None:
+        return None
+    existing = set(pq.read_schema(path).names)
+    return [column for column in dict.fromkeys(requested_columns) if column in existing]
+
+
+def load_view_rows(view_id: str, *, output_root: Path, columns: list[str] | None = None) -> pd.DataFrame:
     view_dir = output_root / "views" / view_id
     load_view_manifest(view_id, output_root=output_root)
     rows_path = view_dir / "rows.parquet"
     if not rows_path.is_file():
         raise ValueError(f"view rows artifact is missing for `{view_id}`")
-    return load_table(rows_path)
+    return load_table(rows_path, columns=_existing_parquet_columns(rows_path, columns))
 
 
 def load_view_matrix(view_id: str, *, output_root: Path) -> np.ndarray:
@@ -780,6 +912,8 @@ def scatter_style(row_count: int) -> tuple[float, float]:
 
 
 def category_color_map(categories: list[str], *, column: str | None = None) -> dict[str, str]:
+    if str(column or "").strip() == "sig35_variant":
+        categories = [category for category in categories if is_sig35_legend_category(category)]
     return categorical_color_map(ordered_categories(categories, column=column), column=column)
 
 
@@ -855,20 +989,28 @@ def draw_reference_labels(
     frame: pd.DataFrame,
     *,
     reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    reference_display_labels: dict[str, str] | None = None,
+    reference_label_limit: int | None = None,
     x_column: str = "x",
     y_column: str = "y",
     right_padding_px: float = 0.0,
     left_padding_px: float = 0.0,
 ) -> None:
-    if frame.empty or "usr_label__primary" not in frame.columns:
+    match_column = str(reference_match_column or "usr_label__primary")
+    if frame.empty or match_column not in frame.columns:
         return
     if x_column not in frame.columns or y_column not in frame.columns:
         return
-    selected = frame[
-        frame["usr_label__primary"]
-        .astype(str)
-        .map(normalize_label)
-        .isin({normalize_label(label) for label in reference_labels})
+    targets = {normalize_label(label) for label in reference_labels}
+    if not targets:
+        return
+    selected = frame[frame[match_column].astype(str).map(normalize_label).isin(targets)].copy()
+    if selected.empty:
+        return
+    selected = selected[
+        pd.to_numeric(selected[x_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
+        & pd.to_numeric(selected[y_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
     ].copy()
     if selected.empty:
         return
@@ -886,10 +1028,15 @@ def draw_reference_labels(
         edgecolors="white",
         zorder=5,
     )
-    for row in selected.sort_values("usr_label__primary").to_dict(orient="records"):
+    label_rows = selected.sort_values(match_column)
+    if reference_label_limit is not None and reference_label_limit >= 0:
+        label_rows = label_rows.head(reference_label_limit)
+    display_labels = reference_display_labels or {}
+    for row in label_rows.to_dict(orient="records"):
         point_x = float(row[x_column])
         point_y = float(row[y_column])
-        label = display_reference_label(row["usr_label__primary"])
+        match_value = str(row.get(match_column) or "")
+        label = display_reference_label(display_labels.get(match_value, match_value))
         display_x, display_y = ax.transData.transform((point_x, point_y))
         placement = choose_annotation_placement(
             display_x=display_x,

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -18,10 +19,12 @@ from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..contracts.plot_semantics import PlotSemantics
 from ..labels import humanize_candidate
+from ..reference_sets import resolve_reference_set_rows
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
     DEFAULT_PLOT_PNG_DPI,
     GRID_COLOR,
+    NONCANONICAL_SIG35_CATEGORY,
     PANEL_BACKGROUND_COLOR,
     PLOT_FONT_FAMILY,
     PLOT_LABEL_FONT_SIZE,
@@ -36,14 +39,18 @@ from ..visual_style import (
     compact_candidate_title,
     display_category_text,
     humanize_display_text,
+    is_sig35_legend_category,
     legend_layout,
+    normalize_sig35_hue_category_for_row,
     ordered_categories,
+    reference_annotation_label,
     scatter_style,
     wrap_plot_title,
 )
 from ..workspaces.loader import WorkspaceContext
 
 _SHAPE_MARKERS = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h"]
+_SIG35_ORDINAL_AUDIT_CATEGORY_KEYS = frozenset({"f", "e", "d", "c", "b"})
 _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
     {
         "balanced_design_family_margin_gallery",
@@ -68,13 +75,107 @@ def _pyplot():
     return plt
 
 
+def _compact_repeated_alpha_prefix(parts: list[str]) -> str | None:
+    if len(parts) < 2:
+        return None
+    first_match = re.fullmatch(r"([A-Za-z_ -]+)([0-9A-Za-z_.-]+)", parts[0])
+    if first_match is None:
+        return None
+    prefix = first_match.group(1)
+    suffixes = [first_match.group(2)]
+    for part in parts[1:]:
+        match = re.fullmatch(r"([A-Za-z_ -]+)([0-9A-Za-z_.-]+)", part)
+        if match is None or match.group(1) != prefix:
+            return None
+        suffixes.append(match.group(2))
+    return prefix + "+".join(suffixes)
+
+
+def _category_key(value: object) -> str:
+    if value is None:
+        return "None"
+    if isinstance(value, list | tuple | set):
+        values = sorted(value, key=lambda part: str(part)) if isinstance(value, set) else value
+        parts = [" ".join(str(part or "").split()) for part in values]
+        parts = [part for part in parts if part]
+        if not parts:
+            return "None"
+        compact = _compact_repeated_alpha_prefix(parts)
+        return compact or "+".join(parts)
+    return " ".join(str(value).split()) or "None"
+
+
+def _hue_option_type(spec: ResolvedPlotSpec, column: str | None) -> str | None:
+    if column is None:
+        return None
+    for option in spec.hue_options:
+        if option.column == column:
+            return option.type
+    return None
+
+
+def _hue_display_label(spec: ResolvedPlotSpec, column: str | None) -> str:
+    if spec.colorbar_label:
+        return str(spec.colorbar_label)
+    if column is None:
+        return "Value"
+    for option in spec.hue_options:
+        if option.column == column:
+            return option.label
+    return humanize_display_text(column)
+
+
+def _row_sig35_plot_category(row: dict[str, object], column: str) -> str:
+    return normalize_sig35_hue_category_for_row(row, row[column])
+
+
+def _is_sig35_ordinal_audit_category(value: object) -> bool:
+    return str(value or "").strip().lower().replace(" ", "_") in _SIG35_ORDINAL_AUDIT_CATEGORY_KEYS
+
+
+def _continuous_color_encoding(rows: list[dict], spec: ResolvedPlotSpec) -> dict[str, object] | None:
+    column = spec.color_column
+    hue_type = _hue_option_type(spec, column)
+    if hue_type in {"categorical", "binary", "ordinal"}:
+        return None
+    if hue_type == "continuous":
+        return _continuous_scatter_encoding(rows, column)
+    if str(column or "").strip() in {"spacer_length", "sig35_variant", "sigma35_variant"}:
+        return None
+    return _continuous_scatter_encoding(rows, column)
+
+
+def _add_continuous_colorbar(fig: Any, ax: Any, *, spec: ResolvedPlotSpec, color_encoding: dict[str, object]) -> None:
+    from matplotlib.cm import ScalarMappable
+
+    label = _explicit_axis_label(_hue_display_label(spec, spec.color_column), width=24, max_lines=3) or "Value"
+    colorbar = fig.colorbar(
+        ScalarMappable(norm=color_encoding["norm"], cmap=str(color_encoding["cmap"])),
+        ax=ax,
+        fraction=0.046,
+        pad=0.04,
+        label=label,
+    )
+    colorbar.ax.tick_params(labelsize=10, colors=TEXT_COLOR)
+    colorbar.set_label(label, fontsize=11, color=TEXT_COLOR)
+
+
 def _category_color_map(row_groups: list[list[dict]], column: str | None) -> tuple[dict[str, str], list[str]]:
     if column is None:
         return {}, []
     flattened = [row for rows in row_groups for row in rows]
     if flattened and column not in flattened[0]:
         raise ContractViolationError(f"plot color column is missing: {column!r}")
-    categories = ordered_categories((str(row[column]) for row in flattened), column=column)
+    if column == "sig35_variant":
+        values = [_row_sig35_plot_category(row, column) for row in flattened]
+        categories = ordered_categories(
+            (value for value in values if is_sig35_legend_category(value)),
+            column=column,
+        )
+        color_map = categorical_color_map(categories, column=column)
+        color_map[NONCANONICAL_SIG35_CATEGORY] = "#9AA5B1"
+        return color_map, categories
+    categories = ordered_categories((_category_key(row[column]) for row in flattened), column=column)
     color_map = categorical_color_map(categories, column=column)
     return color_map, categories
 
@@ -91,7 +192,9 @@ def _color_series(
         raise ContractViolationError(f"plot color column is missing: {column!r}")
     resolved_map = color_map or _category_color_map([rows], column)[0]
     categories = ordered_categories(resolved_map, column=column)
-    return [resolved_map[str(row[column])] for row in rows], categories
+    if column == "sig35_variant":
+        return [resolved_map.get(_row_sig35_plot_category(row, column), "#9AA5B1") for row in rows], categories
+    return [resolved_map[_category_key(row[column])] for row in rows], categories
 
 
 def _continuous_scatter_encoding(rows: list[dict], column: str | None) -> dict[str, object] | None:
@@ -173,7 +276,7 @@ def _shape_marker_map(row_groups: list[list[dict]], column: str | None) -> tuple
     flattened = [row for rows in row_groups for row in rows]
     if flattened and column not in flattened[0]:
         raise ContractViolationError(f"plot shape column is missing: {column!r}")
-    categories = sorted({str(row[column]) for row in flattened})
+    categories = sorted({_category_key(row[column]) for row in flattened})
     shape_map = {name: _SHAPE_MARKERS[index % len(_SHAPE_MARKERS)] for index, name in enumerate(categories)}
     return shape_map, categories
 
@@ -430,7 +533,7 @@ def _scatter_points(
     if rows and shape_column not in rows[0]:
         raise ContractViolationError(f"plot shape column is missing: {shape_column!r}")
     for shape_category, marker in shape_map.items():
-        group_indices = [index for index, row in enumerate(rows) if str(row[shape_column]) == shape_category]
+        group_indices = [index for index, row in enumerate(rows) if _category_key(row[shape_column]) == shape_category]
         group_rows = [rows[index] for index in group_indices]
         if not group_rows:
             continue
@@ -521,6 +624,7 @@ def _add_figure_legends(
     shape_categories: list[str],
     shape_map: dict[str, str],
     shape_title: str | None,
+    single_row: bool | None = True,
 ) -> float:
     legend_specs: list[list[Any]] = []
     if color_categories and color_title is not None:
@@ -540,13 +644,15 @@ def _add_figure_legends(
     base_margin = 0.08 if plot_id in lowered_plot_ids else 0.055
     for handles in legend_specs:
         legend_labels = [handle.get_label() for handle in handles]
+        resolved_single_row = False if single_row and len(legend_labels) > 12 else single_row
         layout = legend_layout(
             legend_labels,
             plot_id=plot_id,
             default_anchor_y=legend_y,
             default_base_margin=base_margin,
-            row_step=0.038,
-            single_row=True,
+            row_step=0.048 if resolved_single_row is False else 0.038,
+            max_columns=4,
+            single_row=resolved_single_row,
         )
         legend = fig.legend(
             handles=handles,
@@ -560,10 +666,51 @@ def _add_figure_legends(
         )
         _style_legend(legend)
         legend_y = layout.anchor_y + layout.bottom_margin
-    return min(max(legend_y + 0.014, 0.1), 0.24)
+    return min(max(legend_y + 0.014, 0.1), 0.40)
 
 
-def _tight_layout_kwargs(spec: ResolvedPlotSpec, *, legend_bottom: float) -> dict[str, object]:
+def _add_side_figure_legends(
+    fig: Any,
+    plt: Any,
+    *,
+    color_categories: list[str],
+    color_map: dict[str, str],
+    color_title: str | None,
+    shape_categories: list[str],
+    shape_map: dict[str, str],
+    shape_title: str | None,
+) -> float:
+    legend_specs: list[list[Any]] = []
+    if color_categories and color_title is not None:
+        legend_specs.append(_legend_handles(plt, color_categories, color_map, column=color_title))
+    if shape_categories and shape_title is not None:
+        legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
+    if not legend_specs:
+        return 0.0
+
+    width, height = fig.get_size_inches()
+    fig.set_size_inches(max(width + 2.6, 7.35), height, forward=True)
+    for index, handles in enumerate(legend_specs):
+        legend = fig.legend(
+            handles=handles,
+            loc="center right",
+            bbox_to_anchor=(0.985, 0.5 - (index * 0.22)),
+            ncol=1,
+            frameon=False,
+            borderaxespad=0.0,
+            columnspacing=1.0,
+            handletextpad=0.5,
+        )
+        _style_legend(legend)
+    return 0.30
+
+
+def _tight_layout_kwargs(
+    spec: ResolvedPlotSpec,
+    *,
+    legend_bottom: float,
+    legend_right: float = 0.0,
+) -> dict[str, object]:
     kwargs: dict[str, object] = {
         "pad": 0.95,
         "h_pad": 1.4,
@@ -577,8 +724,8 @@ def _tight_layout_kwargs(spec: ResolvedPlotSpec, *, legend_bottom: float) -> dic
         kwargs["w_pad"] = 1.85
     if spec.plot_id == "dataset_overview":
         kwargs["w_pad"] = 1.2
-    if legend_bottom > 0.0:
-        kwargs["rect"] = (0.0, legend_bottom, 1.0, 0.995)
+    if legend_bottom > 0.0 or legend_right > 0.0:
+        kwargs["rect"] = (0.0, legend_bottom, max(0.58, 1.0 - legend_right), 0.995)
     return kwargs
 
 
@@ -673,6 +820,28 @@ def _draw_annotation_callouts(
             annotation.arrow_patch.set_clip_on(True)
 
 
+def _draw_annotation_highlights(
+    ax: Any,
+    *,
+    rows: list[dict[str, object]],
+    resolved_x: str,
+    resolved_y: str,
+    marker_size: float = 96.0,
+) -> None:
+    if not rows:
+        return
+    ax.scatter(
+        [float(row[resolved_x]) for row in rows],
+        [float(row[resolved_y]) for row in rows],
+        s=marker_size,
+        marker="*",
+        facecolors="#111111",
+        edgecolors="#111111",
+        linewidths=0.75,
+        zorder=5,
+    )
+
+
 def _resolve_annotation_rows(
     context: WorkspaceContext,
     rows: list[dict],
@@ -698,9 +867,9 @@ def _resolve_annotation_rows(
     reference_set = context.config.reference_sets[spec.annotation.reference_set]
     match_column = reference_set.match_column
     label_column = reference_set.label_column or match_column
-    expected_ids = [str(value) for value in reference_set.ids]
-    missing_columns = [column for column in (match_column, label_column) if rows and column not in rows[0]]
-    if missing_columns:
+    resolution = resolve_reference_set_rows(reference_set, rows)
+    expected_ids = resolution.expected_ids
+    if resolution.missing_columns:
         return (
             [],
             None,
@@ -713,18 +882,21 @@ def _resolve_annotation_rows(
                 "matched_ids": [],
                 "complete": False,
                 "error": "missing_reference_columns",
-                "missing_columns": missing_columns,
+                "missing_columns": resolution.missing_columns,
             },
         )
-    selected_by_id = {str(row[match_column]): row for row in rows if str(row[match_column]) in set(expected_ids)}
-    missing_ids = [value for value in expected_ids if value not in selected_by_id]
+    missing_ids = [value for value in expected_ids if value not in resolution.matched_ids]
     if missing_ids and spec.annotation.missing_policy == "fail":
         raise ContractViolationError(
             f"reference_set {spec.annotation.reference_set!r} is missing required ids: {missing_ids}"
         )
-    selected = [selected_by_id[value] for value in expected_ids if value in selected_by_id]
+    if not expected_ids and spec.annotation.missing_policy == "fail" and reference_set.require_non_empty:
+        raise ContractViolationError(f"reference_set {spec.annotation.reference_set!r} matched no rows")
+    complete = not missing_ids and (bool(expected_ids) or not reference_set.require_non_empty)
+    if spec.annotation.missing_policy == "allow" and resolution.matched_ids:
+        complete = True
     return (
-        selected,
+        resolution.selected_rows,
         label_column,
         expected_ids,
         {
@@ -732,8 +904,9 @@ def _resolve_annotation_rows(
             "match_column": match_column,
             "label_column": label_column,
             "expected_ids": expected_ids,
-            "matched_ids": [value for value in expected_ids if value in selected_by_id],
-            "complete": not missing_ids,
+            "matched_ids": resolution.matched_ids,
+            "missing_ids": missing_ids,
+            "complete": complete,
         },
     )
 
@@ -746,12 +919,73 @@ def _annotation_label_text(
     resolved_label_column: str,
 ) -> str:
     if spec.annotation is None:
-        return humanize_display_text(str(row[resolved_label_column]))
+        return reference_annotation_label(str(row[resolved_label_column]))
     reference_set = context.config.reference_sets[spec.annotation.reference_set]
     display_labels = dict(getattr(reference_set, "display_labels", {}) or {})
     match_column = reference_set.match_column
     match_value = str(row.get(match_column, ""))
-    return humanize_display_text(str(display_labels.get(match_value, row[resolved_label_column])))
+    return reference_annotation_label(str(display_labels.get(match_value, row[resolved_label_column])))
+
+
+def _draw_resolved_annotations(
+    ax: Any,
+    *,
+    context: WorkspaceContext,
+    spec: ResolvedPlotSpec,
+    rows: list[dict[str, object]],
+    resolved_x: str,
+    resolved_y: str,
+    resolved_label_column: str | None,
+    color_map: dict[str, str],
+    font_size: float = 9.5,
+    marker_size: float = 128.0,
+    marker: str | None = "*",
+) -> None:
+    if not rows or resolved_label_column is None:
+        return
+    label_mode = (
+        "label_and_highlight"
+        if spec.annotation is None
+        else context.config.reference_sets[spec.annotation.reference_set].label_mode
+    )
+    if label_mode == "highlight_only" or len(rows) > 5:
+        _draw_annotation_highlights(
+            ax,
+            rows=rows,
+            resolved_x=resolved_x,
+            resolved_y=resolved_y,
+        )
+        return
+    if label_mode != "label_and_highlight":
+        return
+    highlight_colors = (
+        ["#111111"] * len(rows)
+        if spec.annotation is not None
+        else _color_series(
+            rows,
+            spec.color_column,
+            color_map=color_map if color_map else None,
+        )[0]
+    )
+    _draw_annotation_callouts(
+        ax,
+        rows=rows,
+        resolved_x=resolved_x,
+        resolved_y=resolved_y,
+        label_texts=[
+            _annotation_label_text(
+                context,
+                spec=spec,
+                row=row,
+                resolved_label_column=resolved_label_column,
+            )
+            for row in rows
+        ],
+        marker_colors=highlight_colors,
+        font_size=font_size,
+        marker_size=marker_size,
+        marker=marker,
+    )
 
 
 def _table_artifact_path(context: WorkspaceContext, spec: ResolvedPlotSpec) -> tuple[str, str, Path]:
@@ -882,8 +1116,7 @@ def _ordered_heatmap_axis_values(rows: list[dict[str, object]], column: str, con
     if not configured_order:
         return observed
     ordered = [value for value in configured_order if value in set(observed)]
-    ordered.extend(value for value in observed if value not in set(ordered))
-    return ordered
+    return ordered or observed
 
 
 def _heatmap_grid_from_rows(
@@ -909,9 +1142,13 @@ def _heatmap_grid_from_rows(
     column_index = {column_value: index for index, column_value in enumerate(column_values)}
     grid = np.full((len(row_values), len(column_values)), np.nan, dtype=np.float32)
     for row in rows:
+        row_key = str(row[row_column])
+        column_key = str(row[column_column])
+        if row_key not in row_index or column_key not in column_index:
+            continue
         grid[
-            row_index[str(row[row_column])],
-            column_index[str(row[column_column])],
+            row_index[row_key],
+            column_index[column_key],
         ] = float(row[value_column])
     return grid, row_values, column_values
 
@@ -968,14 +1205,24 @@ def _render_heatmap_panel(
 ) -> None:
     grid = np.asarray(grid, dtype=np.float32)
     image = ax.imshow(grid, cmap=cmap, norm=norm, aspect="equal" if square_cells else "auto")
+    x_tick_labels = (
+        [_compact_sig35_axis_key_label(value) for value in column_values]
+        if square_cells and str(column_column) == "column_variant"
+        else [humanize_display_text(value) for value in column_values]
+    )
+    y_tick_labels = (
+        [_compact_sig35_tick_label(value) for value in row_values]
+        if square_cells and str(row_column) == "row_variant"
+        else [humanize_display_text(value) for value in row_values]
+    )
     ax.set_xticks(
         range(len(column_values)),
-        [humanize_display_text(value) for value in column_values],
-        rotation=30,
-        ha="right",
+        x_tick_labels,
+        rotation=0 if square_cells and str(column_column) == "column_variant" else 30,
+        ha="center" if square_cells and str(column_column) == "column_variant" else "right",
     )
     if show_y_tick_labels:
-        ax.set_yticks(range(len(row_values)), [humanize_display_text(value) for value in row_values])
+        ax.set_yticks(range(len(row_values)), y_tick_labels)
     else:
         ax.set_yticks(range(len(row_values)), [])
         ax.tick_params(axis="y", length=0)
@@ -1007,6 +1254,10 @@ def _render_heatmap_panel(
                 fontsize=9.2,
             )
     _apply_axes_style(ax, grid=False)
+    if square_cells and str(column_column) == "column_variant":
+        _style_compact_category_tick_labels(ax, axis="x")
+    if square_cells and str(row_column) == "row_variant" and show_y_tick_labels:
+        _style_compact_category_tick_labels(ax, axis="y")
     return image
 
 
@@ -1032,6 +1283,34 @@ def _scatter_axis_label(
 
 def _wrapped_tick_label(value: object, *, width: int = 16, max_lines: int | None = None) -> str:
     return wrap_plot_title(humanize_display_text(str(value)), width=width, max_lines=max_lines)
+
+
+def _compact_sig35_tick_label(value: object) -> str:
+    display = display_category_text(value, column="sig35_variant")
+    match = re.fullmatch(r"([A-Za-z]+)\s+\(([A-Za-z0-9]+)\)", display)
+    if match is None:
+        match = re.fullmatch(r"([A-Za-z0-9]+)\s+\(([A-Za-z]+)\)", str(value or "").strip())
+    if match is None:
+        return display
+    sequence, variant = match.groups()
+    if len(sequence) < 5 or len(variant) > 4:
+        return display
+    return f"{variant}\n{sequence.upper()}"
+
+
+def _compact_sig35_axis_key_label(value: object) -> str:
+    return _compact_sig35_tick_label(value).split("\n", 1)[0]
+
+
+def _style_compact_category_tick_labels(ax: Any, *, axis: str = "x", font_size: float = 9.2) -> None:
+    tick_labels = ax.get_xticklabels() if axis == "x" else ax.get_yticklabels()
+    for label in tick_labels:
+        label.set_fontsize(font_size)
+        label.set_linespacing(0.92)
+        label.set_rotation(0)
+        label.set_rotation_mode("default")
+        label.set_ha("center" if axis == "x" else "right")
+        label.set_va("top" if axis == "x" else "center")
 
 
 def _wrapped_axis_label(value: object, *, width: int = 22, max_lines: int | None = 4) -> str:
@@ -1321,38 +1600,16 @@ def _render_xy_panel(
         finite_rows,
         spec=spec,
     )
-    if selected_rows and resolved_label_column is not None:
-        label_mode = (
-            "label_and_highlight"
-            if spec.annotation is None
-            else context.config.reference_sets[spec.annotation.reference_set].label_mode
-        )
-        if label_mode == "label_and_highlight":
-            highlight_colors = (
-                ["#111111"] * len(selected_rows)
-                if spec.annotation is not None
-                else _color_series(
-                    selected_rows,
-                    spec.color_column,
-                    color_map=color_map if color_map else None,
-                )[0]
-            )
-            _draw_annotation_callouts(
-                ax,
-                rows=selected_rows,
-                resolved_x=resolved_x,
-                resolved_y=resolved_y,
-                label_texts=[
-                    _annotation_label_text(
-                        context,
-                        spec=spec,
-                        row=row,
-                        resolved_label_column=resolved_label_column,
-                    )
-                    for row in selected_rows
-                ],
-                marker_colors=highlight_colors,
-            )
+    _draw_resolved_annotations(
+        ax,
+        context=context,
+        spec=spec,
+        rows=selected_rows,
+        resolved_x=resolved_x,
+        resolved_y=resolved_y,
+        resolved_label_column=resolved_label_column,
+        color_map=color_map,
+    )
     return annotation_state
 
 
@@ -1397,6 +1654,10 @@ def _render_distribution_panel(
     x_axis_label: str | None = None,
     y_axis_label: str | None = None,
 ) -> None:
+    if render_mode == "violin_box" and color_column == "sig35_variant":
+        rows = [row for row in rows if _is_sig35_ordinal_audit_category(row.get(color_column))]
+        if not rows:
+            raise ContractViolationError("Sigma-35 ordinal distribution requires at least one f/e/d/c/b row")
     values = np.asarray([float(row[metric_column]) for row in rows], dtype=np.float32)
     bin_count = max(5, min(30, int(np.sqrt(values.size)) + 1))
     boxplot_kwargs = {
@@ -1470,9 +1731,14 @@ def _render_distribution_panel(
             ax.boxplot(grouped_values, **boxplot_kwargs)
             ax.set_xticks(
                 range(1, len(categories) + 1),
-                [display_category_text(category, column=color_column) for category in categories],
-                rotation=25,
-                ha="right",
+                [
+                    _compact_sig35_tick_label(category)
+                    if color_column == "sig35_variant"
+                    else display_category_text(category, column=color_column)
+                    for category in categories
+                ],
+                rotation=0 if color_column == "sig35_variant" else 25,
+                ha="center" if color_column == "sig35_variant" else "right",
             )
         ax.set_ylabel(
             _resolved_axis_label(
@@ -1514,6 +1780,8 @@ def _render_distribution_panel(
     )
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
     _apply_axes_style(ax, grid=True, square=square)
+    if render_mode == "violin_box" and color_column == "sig35_variant":
+        _style_compact_category_tick_labels(ax, axis="x")
 
 
 def _metric_axis_label(
@@ -2195,7 +2463,7 @@ def render_plot_artifact(
 
         rows = _table_rows(table_path)
         fig, ax = plt.subplots(figsize=_grid_figure_size(1, square_panels=True))
-        color_encoding = _continuous_scatter_encoding(rows, spec.color_column)
+        color_encoding = _continuous_color_encoding(rows, spec)
         color_map, categories = (
             ({}, []) if color_encoding is not None else _category_color_map([rows], spec.color_column)
         )
@@ -2286,26 +2554,19 @@ def render_plot_artifact(
                 finite_rows,
                 spec=spec,
             )
-            if selected_rows and resolved_label_column is not None:
-                _draw_annotation_callouts(
-                    ax,
-                    rows=selected_rows,
-                    resolved_x=resolved_x,
-                    resolved_y=resolved_y,
-                    label_texts=[
-                        _annotation_label_text(
-                            context,
-                            spec=spec,
-                            row=row,
-                            resolved_label_column=resolved_label_column,
-                        )
-                        for row in selected_rows
-                    ],
-                    marker_colors=["#111111"] * len(selected_rows),
-                    font_size=8.6 if spec.plot_id == "candidate_decision_frontier" else 9.5,
-                    marker_size=0.0 if spec.plot_id == "candidate_decision_frontier" else 128.0,
-                    marker=None if spec.plot_id == "candidate_decision_frontier" else "*",
-                )
+            _draw_resolved_annotations(
+                ax,
+                context=context,
+                spec=spec,
+                rows=selected_rows,
+                resolved_x=resolved_x,
+                resolved_y=resolved_y,
+                resolved_label_column=resolved_label_column,
+                color_map=color_map,
+                font_size=8.4 if spec.plot_id == "candidate_decision_frontier" else 9.5,
+                marker_size=104.0 if spec.plot_id == "candidate_decision_frontier" else 128.0,
+                marker="*",
+            )
         plot_metadata["reference_panels"] = {
             spec.scalar_id or spec.distance_id or spec.plot_id: annotation_state,
         }
@@ -2317,11 +2578,12 @@ def render_plot_artifact(
                 ax=ax,
                 fraction=0.046,
                 pad=0.04,
-                label=humanize_display_text(str(spec.color_column or "value")),
+                label=_explicit_axis_label(_hue_display_label(spec, spec.color_column), width=24, max_lines=3)
+                or "Value",
             )
             colorbar.ax.tick_params(labelsize=10, colors=TEXT_COLOR)
             colorbar.set_label(
-                humanize_display_text(str(spec.color_column or "value")),
+                _explicit_axis_label(_hue_display_label(spec, spec.color_column), width=24, max_lines=3) or "Value",
                 fontsize=11,
                 color=TEXT_COLOR,
             )
@@ -2887,7 +3149,10 @@ def render_plot_artifact(
             projection_tables.append(_table_rows(projection_path))
         if spec.kind == "projection_scatter":
             rows = projection_tables[0]
-            color_map, categories = _category_color_map([rows], spec.color_column)
+            color_encoding = _continuous_color_encoding(rows, spec)
+            color_map, categories = (
+                ({}, []) if color_encoding is not None else _category_color_map([rows], spec.color_column)
+            )
             effective_shape_column = _effective_shape_column(spec)
             shape_map, shape_categories = _shape_marker_map([rows], effective_shape_column)
             fig, ax = plt.subplots(figsize=_grid_figure_size(1, square_panels=True))
@@ -2903,62 +3168,59 @@ def render_plot_artifact(
                 shape_map=shape_map,
                 point_size=point_style.point_size,
                 alpha=point_style.alpha,
+                continuous_color=color_encoding,
                 rasterized=point_style.rasterized,
                 edgecolors=point_style.edgecolors,
                 linewidths=point_style.linewidths,
             )
             ax.set_xlabel("Projection 1")
             ax.set_ylabel("Projection 2")
-            ax.set_title(wrap_plot_title(spec.projection_ids[0], width=28), pad=8)
+            panel_title = spec.panel_titles[0] if spec.panel_titles else spec.projection_ids[0]
+            ax.set_title(wrap_plot_title(compact_candidate_title(panel_title), width=28), pad=8)
             _apply_axes_style(ax, grid=True, square=True)
             selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
                 context,
                 rows,
                 spec=spec,
             )
-            if selected_rows and resolved_label_column is not None:
-                label_mode = (
-                    "label_and_highlight"
-                    if spec.annotation is None
-                    else context.config.reference_sets[spec.annotation.reference_set].label_mode
-                )
-                if label_mode == "label_and_highlight":
-                    highlight_colors = (
-                        ["#111111"] * len(selected_rows)
-                        if spec.annotation is not None
-                        else _color_series(
-                            selected_rows,
-                            spec.color_column,
-                            color_map=color_map if color_map else None,
-                        )[0]
-                    )
-                    _draw_annotation_callouts(
-                        ax,
-                        rows=selected_rows,
-                        resolved_x="x",
-                        resolved_y="y",
-                        label_texts=[
-                            _annotation_label_text(
-                                context,
-                                spec=spec,
-                                row=row,
-                                resolved_label_column=resolved_label_column,
-                            )
-                            for row in selected_rows
-                        ],
-                        marker_colors=highlight_colors,
-                    )
-            plot_metadata["reference_panels"] = {spec.projection_ids[0]: annotation_state}
-            _add_axis_legends(
+            _draw_resolved_annotations(
                 ax,
-                plt,
-                color_categories=categories,
+                context=context,
+                spec=spec,
+                rows=selected_rows,
+                resolved_x="x",
+                resolved_y="y",
+                resolved_label_column=resolved_label_column,
                 color_map=color_map,
-                color_title=spec.color_column,
-                shape_categories=shape_categories,
-                shape_map=shape_map,
-                shape_title=effective_shape_column,
             )
+            plot_metadata["reference_panels"] = {spec.projection_ids[0]: annotation_state}
+            if color_encoding is not None:
+                _add_continuous_colorbar(fig, ax, spec=spec, color_encoding=color_encoding)
+            else:
+                if len(categories) + len(shape_categories) > 8:
+                    grid_legend_right_margin = _add_side_figure_legends(
+                        fig,
+                        plt,
+                        color_categories=categories,
+                        color_map=color_map,
+                        color_title=spec.color_column,
+                        shape_categories=shape_categories,
+                        shape_map=shape_map,
+                        shape_title=effective_shape_column,
+                    )
+                else:
+                    grid_legend_bottom_margin = _add_figure_legends(
+                        fig,
+                        plt,
+                        plot_id=spec.plot_id,
+                        color_categories=categories,
+                        color_map=color_map,
+                        color_title=spec.color_column,
+                        shape_categories=shape_categories,
+                        shape_map=shape_map,
+                        shape_title=effective_shape_column,
+                        single_row=False,
+                    )
         else:
             prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(projection_tables))
             rows_count, columns = _panel_grid_dimensions(
@@ -3016,38 +3278,16 @@ def render_plot_artifact(
                     projection_rows,
                     spec=spec,
                 )
-                if selected_rows and resolved_label_column is not None:
-                    label_mode = (
-                        "label_and_highlight"
-                        if spec.annotation is None
-                        else context.config.reference_sets[spec.annotation.reference_set].label_mode
-                    )
-                    if label_mode == "label_and_highlight":
-                        highlight_colors = (
-                            ["#111111"] * len(selected_rows)
-                            if spec.annotation is not None
-                            else _color_series(
-                                selected_rows,
-                                spec.color_column,
-                                color_map=color_map if color_map else None,
-                            )[0]
-                        )
-                        _draw_annotation_callouts(
-                            axis,
-                            rows=selected_rows,
-                            resolved_x="x",
-                            resolved_y="y",
-                            label_texts=[
-                                _annotation_label_text(
-                                    context,
-                                    spec=spec,
-                                    row=row,
-                                    resolved_label_column=resolved_label_column,
-                                )
-                                for row in selected_rows
-                            ],
-                            marker_colors=highlight_colors,
-                        )
+                _draw_resolved_annotations(
+                    axis,
+                    context=context,
+                    spec=spec,
+                    rows=selected_rows,
+                    resolved_x="x",
+                    resolved_y="y",
+                    resolved_label_column=resolved_label_column,
+                    color_map=color_map,
+                )
                 plot_metadata.setdefault("reference_panels", {})[projection_id] = annotation_state
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
@@ -3061,21 +3301,25 @@ def render_plot_artifact(
                 shape_title=effective_shape_column,
             )
     grid_legend_bottom_margin = float(locals().get("grid_legend_bottom_margin", 0.0))
+    grid_legend_right_margin = float(locals().get("grid_legend_right_margin", 0.0))
     if spec.kind == "heatmap_grid":
         fig.subplots_adjust(left=0.08, right=0.92, top=0.94, bottom=0.08, wspace=0.30, hspace=0.48)
-    elif (
-        spec.kind
-        in {
-            "projection_grid",
-            "xy_scatter_grid",
-            "paired_xy_scatter_grid",
-            "categorical_count",
-            "metric_panel_grid",
-            "curve_grid",
-        }
-        and grid_legend_bottom_margin > 0.0
-    ):
-        fig.tight_layout(**_tight_layout_kwargs(spec, legend_bottom=grid_legend_bottom_margin))
+    elif spec.kind in {
+        "projection_scatter",
+        "projection_grid",
+        "xy_scatter_grid",
+        "paired_xy_scatter_grid",
+        "categorical_count",
+        "metric_panel_grid",
+        "curve_grid",
+    } and (grid_legend_bottom_margin > 0.0 or grid_legend_right_margin > 0.0):
+        fig.tight_layout(
+            **_tight_layout_kwargs(
+                spec,
+                legend_bottom=grid_legend_bottom_margin,
+                legend_right=grid_legend_right_margin,
+            )
+        )
     else:
         fig.tight_layout(**_tight_layout_kwargs(spec, legend_bottom=0.0))
 

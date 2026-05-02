@@ -80,12 +80,22 @@ class MetadataConstantDerivationConfig(StrictWorkspaceModel):
     value: str | int | float | bool | None
 
 
+class MetadataLookupDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["lookup"]
+    source: str
+    left_key: str
+    right_key: str
+    value_column: str
+    missing_policy: Literal["error", "null"] = "error"
+
+
 MetadataDerivationConfig = Annotated[
     MetadataCopyDerivationConfig
     | MetadataRegexCaptureDerivationConfig
     | MetadataMapValuesDerivationConfig
     | MetadataCoalesceDerivationConfig
-    | MetadataConstantDerivationConfig,
+    | MetadataConstantDerivationConfig
+    | MetadataLookupDerivationConfig,
     Field(discriminator="kind"),
 ]
 
@@ -358,12 +368,60 @@ class ExportConfig(StrictWorkspaceModel):
     metadata_columns: list[str] = Field(default_factory=list)
 
 
+class ReferenceSetSelectorConfig(StrictWorkspaceModel):
+    column: str
+    equals: str | int | float | bool | None = None
+    in_values: list[str | int | float | bool | None] = Field(default_factory=list)
+    regex: str | None = None
+    not_regex: str | None = None
+    non_null: bool = True
+
+    @model_validator(mode="after")
+    def _validate_selector(self) -> "ReferenceSetSelectorConfig":
+        has_selector = (
+            self.equals is not None
+            or bool(self.in_values)
+            or self.regex is not None
+            or self.not_regex is not None
+            or self.non_null
+        )
+        if not has_selector:
+            raise ValueError("reference_set selector must declare equals, in_values, regex, not_regex, or non_null")
+        return self
+
+
 class ReferenceSetConfig(StrictWorkspaceModel):
-    ids: list[str] = Field(min_length=1)
+    label: NonEmptyText | None = None
+    ids: list[str] = Field(default_factory=list)
     match_column: str = "id"
     label_column: str | None = None
     label_mode: Literal["label_and_highlight", "highlight_only"] = "label_and_highlight"
     display_labels: dict[str, str] = Field(default_factory=dict)
+    where: list[ReferenceSetSelectorConfig] = Field(default_factory=list)
+    where_all: list[ReferenceSetSelectorConfig] = Field(default_factory=list)
+    require_non_empty: bool = True
+    notebook_exposed: bool = True
+
+    @model_validator(mode="after")
+    def _validate_reference_membership(self) -> "ReferenceSetConfig":
+        if not self.ids and not self.where and not self.where_all:
+            raise ValueError("reference_sets must declare ids or where selectors")
+        return self
+
+
+class CandidateSetConfig(StrictWorkspaceModel):
+    label: NonEmptyText
+    description: str | None = None
+    views: list[Identifier] = Field(default_factory=list)
+    include_tags: dict[str, str] = Field(default_factory=dict)
+    exclude_roles: list[str] = Field(default_factory=lambda: ["hidden", "retired"])
+    panel_titles: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_membership_rule(self) -> "CandidateSetConfig":
+        if not self.views and not self.include_tags:
+            raise ValueError("candidate_sets must declare views or include_tags")
+        return self
 
 
 class AcceptanceCheckConfig(StrictWorkspaceModel):
@@ -423,6 +481,7 @@ class WorkspaceConfig(StrictWorkspaceModel):
     scalars: dict[str, ScalarConfig] = Field(default_factory=dict)
     landmarks: dict[str, LandmarkConfig] = Field(default_factory=dict)
     reference_sets: dict[str, ReferenceSetConfig] = Field(default_factory=dict)
+    candidate_sets: dict[str, CandidateSetConfig] = Field(default_factory=dict)
     plots: dict[str, PlotConfig] = Field(default_factory=dict)
     exports: dict[str, ExportConfig] = Field(default_factory=dict)
     cohorts: dict[str, CohortConfig] = Field(default_factory=dict)

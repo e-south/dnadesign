@@ -30,6 +30,13 @@ def test_template_tracks_canonical_views_and_pre_assay_deliverables() -> None:
         "pooled_logits_7b_full_context_1kb",
     }
     assert payload["views"]["intermediate_embedding_7b_full_context_anchor_mean"]["role"] == "primary"
+    assert payload["candidate_sets"]["five_view_7b_triage"]["views"] == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_full_context_1kb",
+        "pooled_logits_7b_full_context_1kb",
+        "intermediate_embedding_7b_full_context_anchor_mean",
+    ]
     assert list(payload["deliverables"]) == [
         "dataset_overview",
         "representation_health_summary",
@@ -46,14 +53,15 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
     payload = _template_payload()
 
     assert set(payload["landmarks"]) == {"spyp", "sulap", "j23105"}
-    assert payload["reference_sets"]["promoter_wildtype_primary"]["display_labels"] == {
-        "spyP": "spyp",
-        "sulAp": "sulap",
-        "J23105": "j23105",
+    assert payload["reference_sets"]["reference_spyp_sulap"]["display_labels"] == {
+        "spyP": "spyP",
+        "sulAp": "sulAp",
     }
     assert list(payload["notebooks"]) == ["latent_geometry_browser"]
     assert payload["notebooks"]["latent_geometry_browser"]["default_deliverable"] == "representation_health_summary"
     assert payload["notebooks"]["latent_geometry_browser"]["default_surface"] == "plots"
+    assert payload["notebooks"]["latent_geometry_browser"]["candidate_sets"] == ["five_view_7b_triage"]
+    assert payload["notebooks"]["latent_geometry_browser"]["default_candidate_set"] == "five_view_7b_triage"
     assert payload["notebooks"]["latent_geometry_browser"]["ordered_plots"] == [
         "dataset_overview",
         "representation_health_summary",

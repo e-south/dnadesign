@@ -229,6 +229,30 @@ def test_render_plot_review_surface_orders_sig35_legend_by_strength(monkeypatch,
         plt.close(fig)
 
 
+def test_plot_review_sig35_hue_keeps_context_derived_densegen_rows_categorical() -> None:
+    frame = pd.DataFrame(
+        {
+            "sig35_variant": ["f", "b", "f", "ACCGCG"],
+            "source_family": [
+                "construct_derived",
+                "construct_derived",
+                "construct_derived",
+                "reference_source",
+            ],
+            "source_class": ["densegen", "densegen", "construct_derived", "reference_control"],
+        }
+    )
+
+    series = plot_review_runtime._categorical_hue_series(frame, "sig35_variant")
+
+    assert series.tolist() == [
+        "f",
+        "b",
+        plot_review_runtime.NONCANONICAL_SIG35_CATEGORY,
+        plot_review_runtime.NONCANONICAL_SIG35_CATEGORY,
+    ]
+
+
 def test_render_plot_review_surface_preserves_explicit_math_axis_labels(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
     frames = [

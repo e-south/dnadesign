@@ -441,5 +441,12 @@ def _promoter_metadata_columns(
     arrays: dict[str, pa.Array] = {}
     for cohort_id, config in configs:
         values = [_promoter_metadata_value(row, derive=config.derive, context=context) for row in rows]
-        arrays[cohort_id] = pa.array(values)
+        field_type = None
+        if config.derive == "spacer_length":
+            field_type = pa.int64()
+        elif config.derive == "is_control":
+            field_type = pa.bool_()
+        elif config.derive not in _REGULONDB_NATIVE_PROMOTER_DERIVATIONS:
+            field_type = pa.string()
+        arrays[cohort_id] = pa.array(values, type=field_type)
     return arrays

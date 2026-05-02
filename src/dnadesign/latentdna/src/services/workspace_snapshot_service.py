@@ -95,9 +95,18 @@ def _model_families(context) -> list[str]:
 def _browser_snapshot(context) -> WorkspaceSnapshotBrowser:
     geometry_controls = build_workspace_geometry_controls(context)
     geometry_ids = [row.view_id for row in geometry_controls.geometries]
+    candidate_sets = {
+        row.candidate_set_id: {
+            "label": row.label,
+            "view_ids": list(row.view_ids),
+            "available_view_ids": list(row.available_view_ids),
+        }
+        for row in geometry_controls.candidate_sets
+    }
     return WorkspaceSnapshotBrowser(
         default_geometry_ids=geometry_ids,
         preferred_hues=list(geometry_controls.preferred_hues),
+        candidate_sets=candidate_sets,
     )
 
 

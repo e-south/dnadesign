@@ -13,6 +13,8 @@ from dnadesign.latentdna.src.contracts.plot_semantics import PlotSemantics
 from dnadesign.latentdna.src.notebooks.browser_runtime import (
     _parse_deliverable_markdown,
     _plot_review_sections,
+    _reference_annotation_options,
+    _reference_required_columns,
     _runtime_hue_columns,
     resolve_plot_doc_block,
     resolve_runtime_hue_kinds,
@@ -162,6 +164,52 @@ def test_runtime_hue_columns_accept_control_plane_view_row_metadata() -> None:
         "source_family": "categorical",
         "promoter_standard__strength_value_numeric": "continuous",
     }
+
+
+def test_reference_annotation_options_keep_label_selection_separate_from_hues() -> None:
+    reference_sets = [
+        {
+            "reference_set_id": "reference_zeta",
+            "label": "Zeta reference rows",
+            "match_column": "usr_label__primary",
+            "label_column": "promoter_standard__display_name",
+            "selector_columns": ["promoter_standard__collection_id", "selection_basis"],
+        },
+        {
+            "reference_set_id": "reference_alpha",
+            "match_column": "usr_label__primary",
+            "label_column": "promoter_standard__display_name",
+            "selector_columns": ["promoter_standard__collection_id", "selection_basis"],
+        },
+        {
+            "reference_set_id": "reference_beta",
+            "label": "Beta reference rows",
+            "match_column": "usr_label__primary",
+            "label_column": "usr_label__primary",
+            "selector_columns": [],
+        },
+        {
+            "reference_set_id": "reference_beta_duplicate_label",
+            "label": "Beta reference rows",
+            "match_column": "usr_label__primary",
+            "label_column": "usr_label__primary",
+            "selector_columns": [],
+        },
+    ]
+
+    assert _reference_annotation_options(reference_sets) == {
+        "Off": "",
+        "Zeta reference rows": "reference_zeta",
+        "Reference Alpha": "reference_alpha",
+        "Beta reference rows": "reference_beta",
+        "Beta reference rows (reference_beta_duplicate_label)": "reference_beta_duplicate_label",
+    }
+    assert _reference_required_columns(reference_sets) == [
+        "usr_label__primary",
+        "promoter_standard__display_name",
+        "promoter_standard__collection_id",
+        "selection_basis",
+    ]
 
 
 def test_plot_review_sections_marks_missing_render_path_as_missing(monkeypatch, tmp_path: Path) -> None:

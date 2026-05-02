@@ -11,7 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import ContractViolationError
-from ..contracts.workspace import PromoterMetadataCohortConfig
+from ..contracts.workspace import MetadataLookupDerivationConfig, PromoterMetadataCohortConfig
 from ..io.matrix_io import read_matrix, write_matrix
 from ..io.parquet_io import read_table, write_table
 from ..metadata.derivations import derive_metadata_value
@@ -20,6 +20,7 @@ from ..sources.resolver import (
     inspect_source_schema,
     iter_records_batches,
     missing_overlay_merge_columns,
+    read_records_table,
     require_matrix_bundle_paths,
     resolve_source,
 )
@@ -55,8 +56,120 @@ def _derived_metadata_value(
         return _construct_template_id(row)
     derivation = (context.config.metadata.derivations or {}).get(column_name)
     if derivation is not None:
+        if isinstance(derivation, MetadataLookupDerivationConfig):
+            raise ContractViolationError(
+                f"metadata column {column_name!r} uses a lookup derivation and must be materialized by batch"
+            )
         return derive_metadata_value(row, derivation)
     raise ContractViolationError(f"metadata column {column_name!r} is requested but no derivation is configured")
+
+
+def _derived_metadata_array(
+    context: WorkspaceContext,
+    rows: list[dict[str, object]],
+    *,
+    column_name: str,
+) -> pa.Array:
+    values = [_derived_metadata_value(context, row, column_name=column_name) for row in rows]
+    field_type = pa.string() if column_name == "construct_template_id" else None
+    return pa.array(values, type=field_type)
+
+
+def _lookup_key(value: object, *, column_name: str, key_name: str) -> object:
+    if value is None:
+        raise ContractViolationError(
+            f"metadata lookup derivation {column_name!r} found a null lookup key in row column {key_name!r}"
+        )
+    try:
+        hash(value)
+    except TypeError as exc:
+        raise ContractViolationError(
+            f"metadata lookup derivation {column_name!r} requires hashable lookup keys in column {key_name!r}"
+        ) from exc
+    return value
+
+
+def _lookup_metadata_mapping(
+    context: WorkspaceContext,
+    *,
+    column_name: str,
+    derivation: MetadataLookupDerivationConfig,
+) -> tuple[dict[object, object], pa.DataType]:
+    source = context.require_source(derivation.source)
+    resolved = resolve_source(derivation.source, source, workspace_dir=context.workspace_dir)
+    if resolved.records_path is None:
+        raise ContractViolationError(
+            f"metadata lookup derivation {column_name!r} source {derivation.source!r} does not expose records"
+        )
+    try:
+        table = read_records_table(resolved, columns=[derivation.right_key, derivation.value_column])
+    except Exception as exc:
+        missing_columns = missing_overlay_merge_columns(exc)
+        if missing_columns:
+            raise ContractViolationError(
+                f"metadata lookup derivation {column_name!r} source {derivation.source!r} "
+                f"is missing columns: {missing_columns}"
+            ) from exc
+        raise
+    missing = [name for name in (derivation.right_key, derivation.value_column) if name not in set(table.column_names)]
+    if missing:
+        raise ContractViolationError(
+            f"metadata lookup derivation {column_name!r} source {derivation.source!r} is missing columns: {missing}"
+        )
+    key_values = table[derivation.right_key].to_pylist()
+    value_column = table[derivation.value_column]
+    values = value_column.to_pylist()
+    mapping: dict[object, object] = {}
+    duplicate_keys: list[object] = []
+    for key, value in zip(key_values, values, strict=True):
+        normalized_key = _lookup_key(column_name=column_name, key_name=derivation.right_key, value=key)
+        if normalized_key in mapping:
+            duplicate_keys.append(normalized_key)
+            continue
+        mapping[normalized_key] = value
+    if duplicate_keys:
+        preview = sorted({str(key) for key in duplicate_keys})[:5]
+        raise ContractViolationError(
+            f"metadata lookup derivation {column_name!r} source {derivation.source!r} has duplicate "
+            f"right_key values: {preview}"
+        )
+    return mapping, value_column.type
+
+
+def _lookup_metadata_array(
+    context: WorkspaceContext,
+    row_dicts: list[dict[str, object]],
+    *,
+    column_name: str,
+    derivation: MetadataLookupDerivationConfig,
+    lookup_cache: dict[tuple[str, str, str, str], tuple[dict[object, object], pa.DataType]],
+) -> pa.Array:
+    cache_key = (derivation.source, derivation.right_key, derivation.value_column, column_name)
+    if cache_key not in lookup_cache:
+        lookup_cache[cache_key] = _lookup_metadata_mapping(
+            context,
+            column_name=column_name,
+            derivation=derivation,
+        )
+    mapping, value_type = lookup_cache[cache_key]
+    missing_keys: list[object] = []
+    values: list[object] = []
+    for row in row_dicts:
+        left_key = _lookup_key(
+            column_name=column_name, key_name=derivation.left_key, value=row.get(derivation.left_key)
+        )
+        if left_key not in mapping:
+            missing_keys.append(left_key)
+            values.append(None)
+            continue
+        values.append(mapping[left_key])
+    if missing_keys and derivation.missing_policy == "error":
+        preview = sorted({str(key) for key in missing_keys})[:5]
+        raise ContractViolationError(
+            f"metadata lookup derivation {column_name!r} has missing lookup matches for "
+            f"{derivation.left_key!r}: {preview}"
+        )
+    return pa.array(values, type=value_type)
 
 
 def _matrix_from_vector_column(column: pa.Array | pa.ChunkedArray, *, dtype: str, label: str) -> np.ndarray:
@@ -210,6 +323,7 @@ def _materialize_tabular_vector_artifact(
     matrix: np.memmap | None = None
     dims: int | None = None
     write_offset = 0
+    lookup_cache: dict[tuple[str, str, str, str], tuple[dict[object, object], pa.DataType]] = {}
 
     try:
         for batch in iter_records_batches(resolved, columns=columns, batch_size=_MATERIALIZE_BATCH_SIZE):
@@ -269,9 +383,22 @@ def _materialize_tabular_vector_artifact(
                 for column in derived_row_columns
                 if column not in promoter_cohort_ids and column not in rows_batch.column_names
             ]:
+                derivation = (context.config.metadata.derivations or {}).get(derived_column)
+                if isinstance(derivation, MetadataLookupDerivationConfig):
+                    rows_batch = rows_batch.append_column(
+                        derived_column,
+                        _lookup_metadata_array(
+                            context,
+                            row_dicts,
+                            column_name=derived_column,
+                            derivation=derivation,
+                            lookup_cache=lookup_cache,
+                        ),
+                    )
+                    continue
                 rows_batch = rows_batch.append_column(
                     derived_column,
-                    pa.array([_derived_metadata_value(context, row, column_name=derived_column) for row in row_dicts]),
+                    _derived_metadata_array(context, row_dicts, column_name=derived_column),
                 )
             if promoter_cohorts:
                 for cohort_id, array in _promoter_metadata_columns(

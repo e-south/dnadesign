@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
 
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec
 from dnadesign.latentdna.src.plots.render import (
+    _add_figure_legends,
+    _add_side_figure_legends,
     _category_color_map,
+    _category_key,
+    _continuous_color_encoding,
     _derived_panel_label,
     _draw_annotation_callouts,
+    _draw_resolved_annotations,
     _grid_figure_size,
+    _heatmap_grid_from_rows,
     _panel_grid_dimensions,
     _render_distribution_panel,
     _render_heatmap_panel,
     _render_metric_panel,
+    _row_sig35_plot_category,
 )
 from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
 
@@ -40,6 +48,116 @@ def _metric_spec(*, plot_id: str, color_column: str | None) -> ResolvedPlotSpec:
     if color_column is not None:
         payload["color_column"] = color_column
     return ResolvedPlotSpec.model_validate(payload)
+
+
+def test_category_key_compacts_list_values_for_categorical_legends() -> None:
+    rows = [
+        {"sigma_set": ["SIGMA24", "SIGMA38", "SIGMA70"]},
+        {"sigma_set": ["SIGMA70"]},
+    ]
+
+    color_map, categories = _category_color_map([rows], "sigma_set")
+
+    assert _category_key(["SIGMA24", "SIGMA38", "SIGMA70"]) == "SIGMA24+38+70"
+    assert categories == ["SIGMA24+38+70", "SIGMA70"]
+    assert set(color_map) == set(categories)
+
+
+def test_static_sig35_hue_keeps_context_derived_densegen_rows_categorical() -> None:
+    assert (
+        _row_sig35_plot_category(
+            {
+                "sig35_variant": "f",
+                "source_family": "construct_derived",
+                "source_class": "densegen",
+            },
+            "sig35_variant",
+        )
+        == "f"
+    )
+    assert (
+        _row_sig35_plot_category(
+            {
+                "sig35_variant": "f",
+                "source_family": "construct_derived",
+                "source_class": "construct_derived",
+            },
+            "sig35_variant",
+        )
+        == "__latentdna_noncanonical_sig35__"
+    )
+
+
+def test_continuous_color_encoding_honors_explicit_hue_option() -> None:
+    rows = [
+        {"x": 0.0, "y": 0.0, "strength": 0.01},
+        {"x": 1.0, "y": 1.0, "strength": 0.9},
+        {"x": 2.0, "y": 2.0, "strength": None},
+    ]
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "reference_strength_umap",
+            "kind": "projection_scatter",
+            "projection_ids": ["umap_reference_strength"],
+            "color_column": "strength",
+            "hue_options": [{"column": "strength", "label": "Reference strength", "type": "continuous"}],
+        }
+    )
+
+    encoding = _continuous_color_encoding(rows, spec)
+
+    assert encoding is not None
+    assert list(encoding["values"][:2]) == [0.01, 0.9]
+    assert math.isnan(float(encoding["values"][2]))
+
+
+def test_side_figure_legend_expands_single_panel_canvas() -> None:
+    fig, _ = plt.subplots(figsize=(5.15, 5.0))
+    categories = [f"SIGMA{index}" for index in range(15)]
+    color_map = {category: "#0072B2" for category in categories}
+    try:
+        right_margin = _add_side_figure_legends(
+            fig,
+            plt,
+            color_categories=categories,
+            color_map=color_map,
+            color_title="regulondb__sigma_factor_set",
+            shape_categories=[],
+            shape_map={},
+            shape_title=None,
+        )
+
+        assert right_margin > 0.0
+        assert fig.get_size_inches()[0] >= 7.35
+        assert fig.legends
+        assert fig.legends[0].get_texts()[0].get_text() == "SIGMA0"
+    finally:
+        plt.close(fig)
+
+
+def test_figure_legend_refuses_single_row_when_many_categories() -> None:
+    fig, _ = plt.subplots(figsize=(8.5, 5.0))
+    categories = [f"variant_{index}" for index in range(18)]
+    color_map = {category: "#0072B2" for category in categories}
+    try:
+        bottom_margin = _add_figure_legends(
+            fig,
+            plt,
+            plot_id="appendix_umap_gallery",
+            color_categories=categories,
+            color_map=color_map,
+            color_title="sig35_variant",
+            shape_categories=[],
+            shape_map={},
+            shape_title=None,
+            single_row=True,
+        )
+
+        assert bottom_margin > 0.1
+        assert fig.legends
+        assert getattr(fig.legends[0], "_ncols") < len(categories)
+    finally:
+        plt.close(fig)
 
 
 def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotations() -> None:
@@ -287,7 +405,9 @@ def test_render_distribution_panel_orders_sig35_categories_by_strength_and_uses_
         {"sig35_variant": "f", "sig35_margin_f_vs_b": 0.7},
         {"sig35_variant": "d", "sig35_margin_f_vs_b": 0.1},
         {"sig35_variant": "e", "sig35_margin_f_vs_b": 0.3},
+        {"sig35_variant": "c", "sig35_margin_f_vs_b": -0.1},
         {"sig35_variant": "control", "sig35_margin_f_vs_b": 0.0},
+        {"sig35_variant": "TTGACA", "sig35_margin_f_vs_b": 0.5},
     ]
     fig, ax = plt.subplots(figsize=(6, 4))
     try:
@@ -303,12 +423,14 @@ def test_render_distribution_panel_orders_sig35_categories_by_strength_and_uses_
 
         tick_labels = [label.get_text() for label in ax.get_xticklabels()]
         assert tick_labels == [
-            "TTGACA (f)",
-            "TAGACA (e)",
-            "TTTACA (d)",
-            "CTGACA (b)",
-            "Control",
+            "f\nTTGACA",
+            "e\nTAGACA",
+            "d\nTTTACA",
+            "c\nTTGTGA",
+            "b\nCTGACA",
         ]
+        assert all(label.get_rotation() == 0.0 for label in ax.get_xticklabels())
+        assert all(label.get_fontsize() <= 9.5 for label in ax.get_xticklabels())
     finally:
         plt.close(fig)
 
@@ -337,6 +459,38 @@ def test_render_distribution_panel_preserves_explicit_math_axis_label() -> None:
         plt.close(fig)
 
 
+def test_heatmap_grid_respects_configured_sig35_order_without_reference_pollution() -> None:
+    rows = [
+        {"row_variant": "TTGACA (f)", "column_variant": "TTGACA (f)", "metric_value": 0.0},
+        {"row_variant": "TTGACA (f)", "column_variant": "TAGACA (e)", "metric_value": 0.4},
+        {"row_variant": "TAGACA (e)", "column_variant": "TTGACA (f)", "metric_value": 0.4},
+        {"row_variant": "TAGACA (e)", "column_variant": "TAGACA (e)", "metric_value": 0.0},
+        {
+            "row_variant": "TTGACA (annotated, unranked)",
+            "column_variant": "TTGACA (f)",
+            "metric_value": 0.8,
+        },
+        {
+            "row_variant": "TTGACA (f)",
+            "column_variant": "TTGACA (annotated, unranked)",
+            "metric_value": 0.8,
+        },
+    ]
+
+    grid, row_values, column_values = _heatmap_grid_from_rows(
+        rows,
+        row_column="row_variant",
+        column_column="column_variant",
+        value_column="metric_value",
+        row_order=["TTGACA (f)", "TAGACA (e)"],
+        column_order=["TTGACA (f)", "TAGACA (e)"],
+    )
+
+    assert row_values == ["TTGACA (f)", "TAGACA (e)"]
+    assert column_values == ["TTGACA (f)", "TAGACA (e)"]
+    assert [[round(float(value), 3) for value in row] for row in grid.tolist()] == [[0.0, 0.4], [0.4, 0.0]]
+
+
 def test_render_heatmap_panel_can_hide_redundant_y_tick_labels() -> None:
     fig, ax = plt.subplots(figsize=(4, 3))
     try:
@@ -361,6 +515,31 @@ def test_render_heatmap_panel_can_hide_redundant_y_tick_labels() -> None:
         plt.close(fig)
 
 
+def test_render_heatmap_panel_compacts_sigma35_tick_labels_for_dense_grids() -> None:
+    fig, ax = plt.subplots(figsize=(3.8, 3.4))
+    try:
+        image = _render_heatmap_panel(
+            ax,
+            grid=[[0.0, 0.2], [0.2, 0.0]],
+            row_values=["TTGACA (f)", "CTGACA (b)"],
+            column_values=["TTGACA (f)", "CTGACA (b)"],
+            row_column="row_variant",
+            column_column="column_variant",
+            title="Sigma-35 centroid distance",
+            cmap="viridis",
+            norm=None,
+            square_cells=True,
+        )
+
+        assert image is not None
+        assert [label.get_text() for label in ax.get_xticklabels()] == ["f", "b"]
+        assert [label.get_text() for label in ax.get_yticklabels()] == ["f\nTTGACA", "b\nCTGACA"]
+        assert all(label.get_rotation() == 0.0 for label in ax.get_xticklabels())
+        assert all(label.get_fontsize() <= 9.5 for label in ax.get_xticklabels())
+    finally:
+        plt.close(fig)
+
+
 def test_draw_annotation_callouts_can_skip_marker_overlay() -> None:
     fig, ax = plt.subplots(figsize=(4, 3))
     try:
@@ -379,6 +558,36 @@ def test_draw_annotation_callouts_can_skip_marker_overlay() -> None:
 
         assert len(ax.collections) == 0
         assert [text.get_text() for text in ax.texts] == ["anchor"]
+    finally:
+        plt.close(fig)
+
+
+def test_draw_resolved_annotations_highlights_all_reference_rows_when_labels_are_suppressed() -> None:
+    rows = [{"x": float(index), "y": float(index), "usr_label__primary": f"J231{index:02d}"} for index in range(6)]
+    context = SimpleNamespace(
+        config=SimpleNamespace(
+            reference_sets={
+                "reference_anderson_igem": SimpleNamespace(label_mode="label_and_highlight"),
+            }
+        )
+    )
+    spec = SimpleNamespace(annotation=SimpleNamespace(reference_set="reference_anderson_igem"), color_column=None)
+    fig, ax = plt.subplots(figsize=(4, 3))
+    try:
+        _draw_resolved_annotations(
+            ax,
+            context=context,
+            spec=spec,
+            rows=rows,
+            resolved_x="x",
+            resolved_y="y",
+            resolved_label_column="usr_label__primary",
+            color_map={},
+        )
+
+        assert len(ax.collections) == 1
+        assert len(ax.collections[0].get_offsets()) == 6
+        assert len(ax.texts) == 0
     finally:
         plt.close(fig)
 

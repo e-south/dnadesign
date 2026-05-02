@@ -29,11 +29,14 @@ from ..plots.render import (
     _panel_grid_dimensions as static_panel_grid_dimensions,
 )
 from ..visual_style import (
+    NONCANONICAL_SIG35_CATEGORY,
     TEXT_COLOR,
     compact_candidate_title,
     display_category_text,
     humanize_display_text,
+    is_sig35_legend_category,
     legend_layout,
+    normalize_sig35_hue_category_for_row,
     ordered_categories,
     wrap_plot_title,
 )
@@ -51,6 +54,7 @@ from .browser_runtime_support import (
     load_table,
     normalize_categorical_hue_series,
     render_matplotlib_figure,
+    resolve_reference_annotation,
     style_notebook_axes,
     style_notebook_legend,
 )
@@ -113,6 +117,7 @@ def load_plot_review_frames(
     *,
     joinable_tables: list[dict[str, object]],
     output_root: Path,
+    reference_required_columns: list[str] | None = None,
 ) -> list[pd.DataFrame]:
     kind = str(plot_spec.get("kind") or "")
     if kind == "projection_grid":
@@ -121,6 +126,7 @@ def load_plot_review_frames(
             for option in plot_spec.get("hue_options", [])
             if isinstance(option, dict) and option.get("column")
         ]
+        requested_columns = list(dict.fromkeys([*requested_columns, *(reference_required_columns or [])]))
         frames: list[pd.DataFrame] = []
         for projection_id in plot_spec.get("projection_ids", []):
             view_id = _projection_view_id(output_root, str(projection_id))
@@ -255,14 +261,35 @@ def _continuous_hue_params(frames: list[pd.DataFrame], hue_column: str) -> dict[
 
 
 def _categorical_hue_values(frames: list[pd.DataFrame], hue_column: str) -> list[str]:
-    return ordered_categories(
+    categories = ordered_categories(
         {
             str(value)
             for frame in frames
             if hue_column in frame.columns
-            for value in normalize_categorical_hue_series(hue_column, frame[hue_column]).unique()
+            for value in _categorical_hue_series(frame, hue_column).unique()
         },
         column=hue_column,
+    )
+    if hue_column == "sig35_variant":
+        return [category for category in categories if is_sig35_legend_category(category)]
+    return categories
+
+
+def _categorical_hue_series(frame: pd.DataFrame, hue_column: str) -> pd.Series:
+    hue_series = normalize_categorical_hue_series(hue_column, frame[hue_column])
+    if hue_column != "sig35_variant":
+        return hue_series
+    discriminator_columns = [column for column in ("source_class", "source_family") if column in frame.columns]
+    if not discriminator_columns:
+        return hue_series
+    discriminator_frame = frame[discriminator_columns]
+    return pd.Series(
+        [
+            normalize_sig35_hue_category_for_row(row, value)
+            for row, value in zip(discriminator_frame.to_dict("records"), frame[hue_column], strict=False)
+        ],
+        index=frame.index,
+        dtype="object",
     )
 
 
@@ -279,6 +306,7 @@ def render_plot_review_surface(
     frames: list[pd.DataFrame],
     hue_column: str | None,
     reference_labels: list[str],
+    reference_set_id: str | None = None,
     joinable_tables: list[dict[str, object]],
     output_root: Path,
     workspace_dir: Path,
@@ -286,6 +314,22 @@ def render_plot_review_surface(
     plot_alt_text = str(plot_spec.get("alt_text") or plot_spec.get("plot_id") or "latentdna live plot")
     resolved_plot_spec = {key: value for key, value in plot_spec.items() if key != "alt_text"}
     kind = str(resolved_plot_spec.get("kind") or "")
+    reference_annotation = resolve_reference_annotation(
+        reference_set_id,
+        frames,
+        workspace_dir=workspace_dir,
+        fallback_labels=reference_labels,
+    )
+    resolved_reference_labels = [str(value) for value in reference_annotation.get("labels", []) if str(value).strip()]
+    reference_match_column = str(reference_annotation.get("match_column") or "usr_label__primary")
+    reference_display_labels = {
+        str(key): str(value)
+        for key, value in dict(reference_annotation.get("display_labels", {}) or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+    reference_label_limit = reference_annotation.get("label_limit")
+    if not isinstance(reference_label_limit, int):
+        reference_label_limit = None
     if kind == "projection_grid":
         prefer_single_row = _prefer_single_row_panel_layout(
             str(resolved_plot_spec.get("plot_id") or ""),
@@ -310,7 +354,10 @@ def render_plot_review_surface(
             hue_column=hue_column,
             hue_kinds=_configured_hue_kinds(resolved_plot_spec),
             joinable_tables=joinable_tables,
-            reference_labels=reference_labels,
+            reference_labels=resolved_reference_labels,
+            reference_match_column=reference_match_column,
+            reference_display_labels=reference_display_labels,
+            reference_label_limit=reference_label_limit,
             output_root=output_root,
             workspace_dir=workspace_dir,
             alt_text=plot_alt_text,
@@ -321,7 +368,10 @@ def render_plot_review_surface(
             resolved_plot_spec,
             frames=frames,
             hue_column=hue_column,
-            reference_labels=reference_labels,
+            reference_labels=resolved_reference_labels,
+            reference_match_column=reference_match_column,
+            reference_display_labels=reference_display_labels,
+            reference_label_limit=reference_label_limit,
             alt_text=plot_alt_text,
         )
     if kind == "categorical_count":
@@ -341,6 +391,9 @@ def _render_scatter_grid(
     frames: list[pd.DataFrame],
     hue_column: str | None,
     reference_labels: list[str],
+    reference_match_column: str,
+    reference_display_labels: dict[str, str],
+    reference_label_limit: int | None,
     alt_text: str,
 ):
     if not frames or not any(not frame.empty for frame in frames):
@@ -537,7 +590,8 @@ def _render_scatter_grid(
                     rasterized=point_style.rasterized,
                 )
         else:
-            hue_values = normalize_categorical_hue_series(effective_hue, finite_frame[effective_hue])
+            hue_values = _categorical_hue_series(finite_frame, effective_hue)
+            plotted_mask = pd.Series(False, index=finite_frame.index)
             if collapsed_panel:
                 centroid_x = float(x_values[0])
                 centroid_y = float(y_values[0])
@@ -545,7 +599,10 @@ def _render_scatter_grid(
                 ax.scatter(
                     [centroid_x],
                     [centroid_y],
-                    c=category_map.get(collapsed_category, "#111111"),
+                    c=category_map.get(
+                        collapsed_category,
+                        "#9AA5B1" if collapsed_category == NONCANONICAL_SIG35_CATEGORY else "#111111",
+                    ),
                     s=max(point_style.point_size * 18.0, 90.0),
                     alpha=0.92,
                     linewidths=0.7,
@@ -569,6 +626,7 @@ def _render_scatter_grid(
                     mask = hue_values == category
                     if not mask.any():
                         continue
+                    plotted_mask |= mask
                     ax.scatter(
                         finite_frame.loc[mask, x_column].to_numpy(dtype=float),
                         finite_frame.loc[mask, y_column].to_numpy(dtype=float),
@@ -579,6 +637,19 @@ def _render_scatter_grid(
                         edgecolors=point_style.edgecolors,
                         rasterized=point_style.rasterized,
                     )
+                if effective_hue == "sig35_variant":
+                    noncanonical_mask = (~plotted_mask) & (hue_values == NONCANONICAL_SIG35_CATEGORY)
+                    if noncanonical_mask.any():
+                        ax.scatter(
+                            finite_frame.loc[noncanonical_mask, x_column].to_numpy(dtype=float),
+                            finite_frame.loc[noncanonical_mask, y_column].to_numpy(dtype=float),
+                            c="#9AA5B1",
+                            s=point_style.point_size,
+                            alpha=max(point_style.alpha * 0.55, 0.08),
+                            linewidths=point_style.linewidths,
+                            edgecolors=point_style.edgecolors,
+                            rasterized=point_style.rasterized,
+                        )
 
         if x_values.size and float(x_values.min()) < 0.0 < float(x_values.max()):
             ax.axvline(0.0, color="#94A3B8", linewidth=0.9, linestyle="--", alpha=0.9, zorder=0)
@@ -699,6 +770,9 @@ def _render_scatter_grid(
                 ax,
                 frame,
                 reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_display_labels=reference_display_labels,
+                reference_label_limit=reference_label_limit,
                 x_column=x_column,
                 y_column=y_column,
                 right_padding_px=label_right_padding_px,

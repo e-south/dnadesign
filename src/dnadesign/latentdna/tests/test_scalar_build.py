@@ -1430,6 +1430,184 @@ def test_reference_alignment_summary_fails_when_required_references_are_missing(
         )
 
 
+def test_reference_alignment_summary_emits_collection_collapse_without_spyp_sulap(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "bg_1",
+            "subject_id": "bg_1",
+            "design_family": "background_only",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [0.0, 1.0, 0.0],
+        },
+        {
+            "id": "eth_1",
+            "subject_id": "eth_1",
+            "design_family": "ethanol",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [1.0, 0.0, 0.0],
+        },
+        {
+            "id": "w1",
+            "subject_id": "w1",
+            "design_family": "control",
+            "usr_label__primary": "W1_core60",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "embedding": [0.8, 0.2, 0.0],
+        },
+        {
+            "id": "w2",
+            "subject_id": "w2",
+            "design_family": "control",
+            "usr_label__primary": "W2_core60",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "embedding": [0.75, 0.25, 0.0],
+        },
+        {
+            "id": "j1",
+            "subject_id": "j1",
+            "design_family": "control",
+            "usr_label__primary": "J23101_core60",
+            "promoter_standard__collection_id": "anderson_igem",
+            "embedding": [0.1, 0.9, 0.0],
+        },
+        {
+            "id": "j2",
+            "subject_id": "j2",
+            "design_family": "control",
+            "usr_label__primary": "J23102_core60",
+            "promoter_standard__collection_id": "anderson_igem",
+            "embedding": [0.2, 0.8, 0.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="reference_alignment_summary_metrics",
+        builder_kind="reference_alignment_summary",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "reference_group_columns": ["promoter_standard__collection_id"],
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    metric_rows = {
+        (row["reference_group_column"], row["reference_group"], row["metric_id"]): row
+        for row in table_rows
+        if row.get("reference_group_column")
+    }
+    assert (
+        "promoter_standard__collection_id",
+        "t7_w_collection",
+        "reference_group_pairwise_cosine_distance_median",
+    ) in metric_rows
+    assert (
+        "promoter_standard__collection_id",
+        "anderson_igem",
+        "reference_group_size",
+    ) in metric_rows
+    anderson_size = metric_rows[
+        (
+            "promoter_standard__collection_id",
+            "anderson_igem",
+            "reference_group_size",
+        )
+    ]
+    assert anderson_size["display_name"] == "Reference group size\nStd: Anderson iGEM"
+    assert all(row["metric_value"] >= 0.0 for row in table_rows)
+
+
+def test_reference_alignment_summary_keeps_group_columns_with_legacy_alignment_rows(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "bg_1",
+            "subject_id": "bg_1",
+            "design_family": "background_only",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [0.0, 1.0, 0.0],
+        },
+        {
+            "id": "eth_1",
+            "subject_id": "eth_1",
+            "design_family": "ethanol",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [1.0, 0.0, 0.0],
+        },
+        {
+            "id": "cip_1",
+            "subject_id": "cip_1",
+            "design_family": "ciprofloxacin",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [0.3, 0.4, 1.0],
+        },
+        {
+            "id": "spyp",
+            "subject_id": "spyp",
+            "design_family": "control",
+            "usr_label__primary": "spyp",
+            "promoter_standard__collection_id": "diagnostic_controls",
+            "embedding": [0.8, 0.2, 0.0],
+        },
+        {
+            "id": "sulap",
+            "subject_id": "sulap",
+            "design_family": "control",
+            "usr_label__primary": "sulAp",
+            "promoter_standard__collection_id": "diagnostic_controls",
+            "embedding": [0.2, 0.8, 1.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="reference_alignment_summary_metrics",
+        builder_kind="reference_alignment_summary",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "reference_group_columns": ["promoter_standard__collection_id"],
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet")
+    assert "reference_group_column" in table.column_names
+    table_rows = table.to_pylist()
+    assert any(row["metric_id"] == "reference_alignment_ethanol_background_relative" for row in table_rows)
+    assert any(
+        row["reference_group_column"] == "promoter_standard__collection_id"
+        and row["reference_group"] == "diagnostic_controls"
+        for row in table_rows
+    )
+
+
 def test_sigma35_ordinal_audit_emits_confidence_intervals_for_spearman_summary_rows(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -1634,6 +1812,68 @@ def test_sigma35_centroid_distance_includes_annotated_unranked_variants(tmp_path
         and row["metric_value"] == pytest.approx(0.0, abs=1e-6)
         for row in rows_table
     )
+
+
+def test_representation_health_summary_records_effective_rank_basis(tmp_path: Path) -> None:
+    workspace_dir = tmp_path
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "a", "subject_id": "a", "embedding": [1.0, 0.0, 0.0, 0.0]},
+        {"id": "b", "subject_id": "b", "embedding": [0.0, 1.0, 0.0, 0.0]},
+        {"id": "c", "subject_id": "c", "embedding": [0.0, 0.0, 1.0, 0.0]},
+        {"id": "d", "subject_id": "d", "embedding": [0.0, 0.0, 0.0, 1.0]},
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+    reducer_dir = workspace_dir / "outputs" / "reducers" / "pca_degenerate_view"
+    reducer_dir.mkdir(parents=True)
+    (reducer_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "method": "pca",
+                "pca_method": "dense_svd",
+                "fit_rows": 2048,
+                "input_dims": 4096,
+                "output_dims": 16,
+                "scope_kind": "sample_set",
+                "scope_id": "scorecard_sample_demo",
+                "explained_variance_ratio": [0.6, 0.2, 0.1, 0.05],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="representation_health_summary_metrics",
+        builder_kind="representation_health_summary",
+        params={
+            "candidates": [
+                {
+                    "view_id": "degenerate_view",
+                    "reducer_id": "pca_degenerate_view",
+                }
+            ],
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    effective_rank = next(row for row in rows_table if row["metric_id"] == "effective_rank")
+
+    assert effective_rank["effective_rank_basis"] == "retained_pca_components"
+    assert effective_rank["effective_rank_component_count"] == 4
+    assert effective_rank["pca_output_dims"] == 16
+    assert effective_rank["pca_fit_rows"] == 2048
+    assert effective_rank["pca_fit_scope_kind"] == "sample_set"
+    assert effective_rank["pca_fit_scope_id"] == "scorecard_sample_demo"
+    assert effective_rank["explained_variance_captured"] == pytest.approx(0.95)
 
 
 def test_reference_neighbor_metrics_pool_row_level_censored_ranks_across_tasks() -> None:

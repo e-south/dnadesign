@@ -16,6 +16,7 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     continuous_hue_render_params,
     display_hue_label,
     display_hue_value,
+    display_reference_label,
     draw_reference_labels,
     key_value_table,
     labeled_options,
@@ -30,7 +31,7 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     select_plot_render_path,
     table_from_records,
 )
-from dnadesign.latentdna.src.visual_style import wrap_plot_title
+from dnadesign.latentdna.src.visual_style import NONCANONICAL_SIG35_CATEGORY, wrap_plot_title
 
 
 def test_select_plot_render_path_prefers_svg_assets(tmp_path: Path) -> None:
@@ -183,6 +184,19 @@ def test_display_hue_value_formats_sig35_variant_for_legends() -> None:
     assert display_hue_value("sig35_variant", "control") == "Control"
 
 
+def test_sig35_hue_normalization_keeps_reference_variants_out_of_densegen_legend() -> None:
+    assert normalize_categorical_hue_value("sig35_variant", "TTTACA") == NONCANONICAL_SIG35_CATEGORY
+    assert normalize_categorical_hue_value("sig35_variant", "ACCGCG") == NONCANONICAL_SIG35_CATEGORY
+    assert normalize_categorical_hue_value("sig35_variant", "f") == "f"
+
+
+def test_reference_display_label_strips_core60_context_suffixes() -> None:
+    assert display_reference_label("J23118_core60") == "J23118"
+    assert display_reference_label("W2_core60_context1kb_rc") == "W2"
+    assert display_reference_label("spyp") == "spyP"
+    assert display_reference_label("sulAp") == "sulAp"
+
+
 def test_labeled_options_disambiguates_duplicate_labels_without_dropping_values() -> None:
     options = labeled_options(
         [
@@ -314,6 +328,27 @@ def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:
 
     assert len(ax.collections) == 1
     assert any(text.get_text() == "spyP" for text in ax.texts)
+
+
+def test_draw_reference_labels_uses_reference_set_display_labels() -> None:
+    frame = pd.DataFrame(
+        {
+            "usr_label__primary": ["J23105", "background_only"],
+            "x": [0.4, -0.2],
+            "y": [0.25, -0.1],
+        }
+    )
+    fig, ax = plt.subplots()
+
+    draw_reference_labels(
+        ax,
+        frame,
+        reference_labels=["J23105"],
+        reference_display_labels={"J23105": "Anderson J23105"},
+    )
+
+    assert len(ax.collections) == 1
+    assert any(text.get_text() == "Anderson J23105" for text in ax.texts)
 
 
 def test_draw_reference_labels_separates_close_reference_annotations() -> None:

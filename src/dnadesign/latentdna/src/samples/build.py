@@ -13,6 +13,7 @@ import pyarrow as pa
 
 from ..contracts.errors import ContractViolationError
 from ..io.parquet_io import read_table, write_table
+from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..workspaces.loader import WorkspaceContext
 
 
@@ -164,21 +165,27 @@ def build_sample_artifact(
                 raise ContractViolationError(f"unknown reference_set for sampling: {reference_set_id}")
             reference_set = context.config.reference_sets[reference_set_id]
             match_column = reference_set.match_column
-            if match_column not in rows.column_names:
-                raise ContractViolationError(f"reference_set match column is missing from row ledger: {match_column!r}")
-            value_to_index: dict[str, int] = {}
-            for index, value in enumerate(rows[match_column].combine_chunks().to_pylist()):
-                value_to_index.setdefault(str(value), index)
-            missing_ids = [str(value) for value in reference_set.ids if str(value) not in value_to_index]
-            if missing_ids:
-                missing = ", ".join(missing_ids)
+            required_columns = reference_set_required_columns(reference_set)
+            missing_columns = [column for column in required_columns if column not in rows.column_names]
+            if missing_columns:
+                raise ContractViolationError(
+                    f"reference_set required columns are missing from row ledger: {missing_columns!r}"
+                )
+            column_values = {column: rows[column].combine_chunks().to_pylist() for column in required_columns}
+            resolution = resolve_reference_set_ids_from_columns(reference_set, column_values)
+            if not resolution.complete:
+                missing_ids = sorted(set(resolution.expected_ids).difference(resolution.matched_ids))
+                missing = ", ".join(missing_ids) if missing_ids else f"{reference_set_id} matched no rows"
                 raise ContractViolationError(
                     f"reference_set sampling could not find ids in {match_column!r}: {missing}"
                 )
+            value_to_index: dict[str, int] = {}
+            for index, value in enumerate(column_values[match_column]):
+                value_to_index.setdefault(str(value), index)
             selected_indices = sorted(
                 {
                     *selected_indices,
-                    *(value_to_index[str(value)] for value in reference_set.ids),
+                    *(value_to_index[str(value)] for value in resolution.expected_ids),
                 }
             )
 

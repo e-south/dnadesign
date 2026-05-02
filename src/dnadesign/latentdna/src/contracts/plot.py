@@ -79,13 +79,14 @@ class PlotHueOptionConfig(StrictPlotModel):
 class PlotAnnotationConfig(StrictPlotModel):
     reference_set: Identifier
     require_in_every_panel: bool = False
-    missing_policy: Literal["fail"] = "fail"
+    missing_policy: Literal["fail", "allow"] = "fail"
     collision_policy: Literal["repel_then_callout", "direct_label"] = "repel_then_callout"
 
 
 class ProjectionScatterPlotConfig(PlotBaseConfig):
     kind: Literal["projection_scatter"]
     projection: Identifier
+    panel_title: str | None = None
     color_column: str | None = None
     shape_column: str | None = None
     label_column: str | None = None

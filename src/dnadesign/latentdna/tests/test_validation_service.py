@@ -90,6 +90,59 @@ def test_deep_validate_workspace_still_fails_for_primary_materialized_view_row_c
         raise AssertionError("expected deep validation to fail for surfaced primary view row drift")
 
 
+def test_deep_validate_workspace_fails_for_materialized_view_row_count_drift(tmp_path) -> None:
+    workspace_dir, view_dir = _write_validation_workspace(tmp_path, role="primary")
+    pq.write_table(pa.table({"id": ["row_01"], "demo_metric": [0.1]}), view_dir / "rows.parquet")
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0]], dtype=np.float32))
+
+    try:
+        validate_workspace(workspace_dir, deep=True)
+    except WorkspaceValidationError as exc:
+        assert "materialized view row count no longer matches source schema" in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError("expected deep validation to fail for materialized row-count drift")
+
+
+def test_deep_validate_workspace_uses_each_views_own_source_row_count(tmp_path) -> None:
+    workspace_dir, view_dir = _write_validation_workspace(tmp_path, role="primary")
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["unused_01"],
+                "embedding": pa.array([[1.0, 1.0]], type=pa.list_(pa.float32())),
+                "score": [1.0],
+            }
+        ),
+        workspace_dir / "inputs" / "z_unused.parquet",
+    )
+    config_path = workspace_dir / "config.yaml"
+    config_text = config_path.read_text(encoding="utf-8")
+    config_path.write_text(
+        config_text.replace(
+            "metadata:\n",
+            """
+  z_unused:
+    kind: parquet
+    path: ./inputs/z_unused.parquet
+    record_key: id
+    subject_key: id
+metadata:
+""",
+        ),
+        encoding="utf-8",
+    )
+    pq.write_table(
+        pa.table({"id": ["row_01", "row_02"], "demo_metric": [0.1, 0.2]}),
+        view_dir / "rows.parquet",
+    )
+
+    payload = validate_workspace(workspace_dir, deep=True)
+
+    detail = next(item for item in payload["view_details"] if item["view_id"] == "z20_60")
+    assert detail["materialized_row_count"] == 2
+    assert detail["materialized_matrix_shape"] == [2, 2]
+
+
 def test_deep_validate_workspace_marks_old_materialized_view_source_contract_stale(tmp_path) -> None:
     workspace_dir, view_dir = _write_validation_workspace(tmp_path, role="primary")
     (view_dir / "manifest.json").write_text(

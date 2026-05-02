@@ -79,6 +79,13 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
     for deliverable_id in config.deliverables:
         validate_identifier(deliverable_id, label="deliverable id")
 
+    for column_name, derivation in config.metadata.derivations.items():
+        validate_identifier(column_name, label="metadata derivation id")
+        if derivation.kind == "lookup" and derivation.source not in config.sources:
+            raise WorkspaceValidationError(
+                f"metadata derivation {column_name!r} lookup references unknown source {derivation.source!r}"
+            )
+
     for alignment_id, alignment in config.alignments.items():
         if alignment.left not in config.views and alignment.left not in config.sources:
             raise WorkspaceValidationError(f"alignment {alignment_id} references unknown left input {alignment.left!r}")
@@ -171,6 +178,19 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
 
     for reference_set_id in config.reference_sets:
         validate_identifier(reference_set_id, label="reference_set id")
+
+    for candidate_set_id, candidate_set in config.candidate_sets.items():
+        validate_identifier(candidate_set_id, label="candidate_set id")
+        for view_id in candidate_set.views:
+            validate_identifier(view_id, label=f"candidate_set {candidate_set_id} view")
+            if view_id not in config.views:
+                raise WorkspaceValidationError(f"candidate_set {candidate_set_id} references unknown view {view_id!r}")
+        for view_id in candidate_set.panel_titles:
+            validate_identifier(view_id, label=f"candidate_set {candidate_set_id} panel title view")
+            if view_id not in config.views:
+                raise WorkspaceValidationError(
+                    f"candidate_set {candidate_set_id} panel_titles references unknown view {view_id!r}"
+                )
 
     for plot_id, plot in config.plots.items():
         _validate_plot(config, plot_id, plot)
@@ -275,6 +295,24 @@ def _validate_notebook(config: WorkspaceConfig, notebook_id: str, notebook: Note
             validate_identifier(view_id, label=f"notebook {notebook_id} {label} view")
             if view_id not in config.views:
                 raise WorkspaceValidationError(f"notebook {notebook_id} references unknown view {view_id!r} in {label}")
+    for candidate_set_id in notebook.candidate_sets:
+        validate_identifier(candidate_set_id, label=f"notebook {notebook_id} candidate_set")
+        if candidate_set_id not in config.candidate_sets:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown candidate_set {candidate_set_id!r}"
+            )
+    if notebook.default_candidate_set is not None:
+        validate_identifier(notebook.default_candidate_set, label=f"notebook {notebook_id} default_candidate_set")
+        if notebook.default_candidate_set not in config.candidate_sets:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown default_candidate_set {notebook.default_candidate_set!r}"
+            )
+    if notebook.default_reference_set is not None:
+        validate_identifier(notebook.default_reference_set, label=f"notebook {notebook_id} default_reference_set")
+        if notebook.default_reference_set not in config.reference_sets:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown default_reference_set {notebook.default_reference_set!r}"
+            )
 
 
 def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:

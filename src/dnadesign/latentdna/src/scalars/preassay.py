@@ -50,6 +50,33 @@ ScalarBuilderResult = tuple[pa.Table, list[ScalarInputRef], dict[str, object]]
 ScalarTableBuilder = Callable[[WorkspaceContext, dict[str, Any]], ScalarBuilderResult]
 
 
+_REFERENCE_GROUP_COLUMN_LABELS = {
+    "source_family": "Src",
+    "selection_basis": "Basis",
+    "promoter_standard__collection_id": "Std",
+}
+
+_REFERENCE_GROUP_VALUE_LABELS = {
+    "anderson_igem": "Anderson iGEM",
+    "archive_backed_insert": "Archive Insert",
+    "construct_derived": "Construct-Derived",
+    "legacy_construct_seed": "Legacy Seed",
+    "legacy_reference_control": "Legacy Reference",
+    "native_source_length": "Native Length",
+    "reference_source": "Reference Source",
+    "sfxi_archive": "SFXI Archive",
+    "sigma_site_pair_midpoint": "Sigma Midpoint",
+    "t7_w_collection": "T7 W collection",
+    "template_window_center": "Template Window",
+}
+
+_REFERENCE_GROUP_METRIC_LABELS = {
+    "reference_group_size": "Reference group size",
+    "reference_group_pairwise_cosine_distance_median": "Reference group median distance",
+    "reference_group_pairwise_cosine_distance_iqr": "Reference group distance IQR",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class _CandidateSample:
     descriptor: dict[str, object]
@@ -72,6 +99,27 @@ def _load_candidate_sample(
         rows=rows,
         inputs=inputs,
     )
+
+
+def _reference_group_label(value: object) -> str:
+    text = " ".join(str(value or "").replace("__", " ").replace("_", " ").split()).strip()
+    if not text:
+        return ""
+    words = []
+    for word in text.split(" "):
+        lowered = word.lower()
+        if lowered in {"igem", "t7", "w"}:
+            words.append(word.upper())
+        else:
+            words.append(word[:1].upper() + word[1:])
+    return " ".join(words)
+
+
+def _reference_group_panel_title(*, metric_id: str, group_column: str, group_value: str) -> str:
+    metric_label = _REFERENCE_GROUP_METRIC_LABELS.get(metric_id, _reference_group_label(metric_id))
+    column_label = _REFERENCE_GROUP_COLUMN_LABELS.get(group_column, _reference_group_label(group_column))
+    value_label = _REFERENCE_GROUP_VALUE_LABELS.get(group_value, _reference_group_label(group_value))
+    return f"{metric_label}\n{column_label}: {value_label}"
 
 
 def _load_scalar_rows(
@@ -133,6 +181,15 @@ def _representation_health_summary_table(
         extra = {
             "health_status": health_status,
             "collapse_flag": health_status != "pass",
+            "effective_rank_basis": "retained_pca_components",
+            "effective_rank_component_count": len([value for value in explained if value > 0.0]),
+            "explained_variance_captured": float(sum(explained)),
+            "pca_fit_rows": int(reducer_summary.get("fit_rows", 0) or 0),
+            "pca_input_dims": int(reducer_summary.get("input_dims", 0) or 0),
+            "pca_output_dims": int(reducer_summary.get("output_dims", len(explained)) or len(explained)),
+            "pca_fit_scope_kind": str(reducer_summary.get("scope_kind") or ""),
+            "pca_fit_scope_id": str(reducer_summary.get("scope_id") or ""),
+            "pca_method": str(reducer_summary.get("pca_method") or reducer_summary.get("method") or ""),
         }
         rows.extend(
             [
@@ -538,6 +595,16 @@ def _reference_alignment_summary_table(
     params: dict[str, Any],
 ) -> ScalarBuilderResult:
     candidates = [dict(value) for value in _require_param(params, "candidates")]
+    reference_group_columns = [
+        str(value)
+        for value in _optional_param(
+            params,
+            "reference_group_columns",
+            default=[],
+        )
+    ]
+    reference_label_column = str(_optional_param(params, "reference_label_column", default="usr_label__primary"))
+    min_reference_group_size = int(_optional_param(params, "min_reference_group_size", default=2))
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
     for candidate in candidates:
@@ -546,52 +613,133 @@ def _reference_alignment_summary_table(
         normalized = _normalized_geometry_rows(candidate_sample.matrix)
         design_groups = group_indices(candidate_sample.rows, column="design_family")
         reference_groups = group_indices(candidate_sample.rows, column="usr_label__primary")
-        if not {"background_only", "ethanol", "ciprofloxacin"}.issubset(design_groups):
-            raise ContractViolationError(
-                "reference_alignment_summary requires background_only, ethanol, "
-                f"and ciprofloxacin cohorts in {_require_param(candidate, 'view_id')!r}"
-            )
-        if not any(label.lower() == "spyp" for label in reference_groups) or not any(
-            label.lower() == "sulap" for label in reference_groups
+        emitted_rows = 0
+        if (
+            {"background_only", "ethanol", "ciprofloxacin"}.issubset(design_groups)
+            and any(label.lower() == "spyp" for label in reference_groups)
+            and any(label.lower() == "sulap" for label in reference_groups)
         ):
-            raise ContractViolationError(
-                "reference_alignment_summary requires carried SpyP and SulA rows in "
-                f"{_require_param(candidate, 'view_id')!r}"
-            )
-        centroids = centroid_map(normalized, design_groups)
-        reference_centroids = {
-            label.lower(): centroid
-            for label, indices in reference_groups.items()
-            if (centroid := try_l2_normalize_vector(np.asarray(normalized[indices].mean(axis=0), dtype=np.float32)))
-            is not None
-        }
-        if not {"background_only", "ethanol", "ciprofloxacin"}.issubset(centroids) or not {
-            "spyp",
-            "sulap",
-        }.issubset(reference_centroids):
-            ethanol_alignment = float("nan")
-            cipro_alignment = float("nan")
-        else:
+            centroids = centroid_map(normalized, design_groups)
+            reference_centroids = {
+                label.lower(): centroid
+                for label, indices in reference_groups.items()
+                if (centroid := try_l2_normalize_vector(np.asarray(normalized[indices].mean(axis=0), dtype=np.float32)))
+                is not None
+            }
             ethanol_alignment = float(np.dot(centroids["ethanol"], reference_centroids["spyp"])) - float(
                 np.dot(centroids["background_only"], reference_centroids["spyp"])
             )
             cipro_alignment = float(np.dot(centroids["ciprofloxacin"], reference_centroids["sulap"])) - float(
                 np.dot(centroids["background_only"], reference_centroids["sulap"])
             )
-        rows.extend(
-            [
-                _metric_row(
-                    descriptor=candidate_sample.descriptor,
-                    metric_id="reference_alignment_ethanol_background_relative",
-                    metric_value=ethanol_alignment,
-                ),
-                _metric_row(
-                    descriptor=candidate_sample.descriptor,
-                    metric_id="reference_alignment_cipro_background_relative",
-                    metric_value=cipro_alignment,
-                ),
-            ]
-        )
+            rows.extend(
+                [
+                    _metric_row(
+                        descriptor=candidate_sample.descriptor,
+                        metric_id="reference_alignment_ethanol_background_relative",
+                        metric_value=ethanol_alignment,
+                    ),
+                    _metric_row(
+                        descriptor=candidate_sample.descriptor,
+                        metric_id="reference_alignment_cipro_background_relative",
+                        metric_value=cipro_alignment,
+                    ),
+                ]
+            )
+            emitted_rows += 2
+        elif not reference_group_columns:
+            if not {"background_only", "ethanol", "ciprofloxacin"}.issubset(design_groups):
+                raise ContractViolationError(
+                    "reference_alignment_summary requires background_only, ethanol, "
+                    f"and ciprofloxacin cohorts in {_require_param(candidate, 'view_id')!r}"
+                )
+            raise ContractViolationError(
+                "reference_alignment_summary requires carried SpyP and SulA rows in "
+                f"{_require_param(candidate, 'view_id')!r}"
+            )
+        reference_indices = [
+            index
+            for index, row in enumerate(candidate_sample.rows)
+            if row.get(reference_label_column) is not None and str(row.get(reference_label_column)).strip()
+        ]
+        for group_column in reference_group_columns:
+            grouped: dict[str, list[int]] = {}
+            for index in reference_indices:
+                value = candidate_sample.rows[index].get(group_column)
+                if value is None or not str(value).strip() or str(value).lower() == "nan":
+                    continue
+                grouped.setdefault(str(value), []).append(index)
+            for group_value, indices in sorted(grouped.items()):
+                if len(indices) < min_reference_group_size:
+                    continue
+                distances = _cosine_distance_upper(np.asarray(normalized[indices], dtype=np.float32))
+                distance_median = float(np.median(distances)) if distances.size else 0.0
+                distance_iqr = (
+                    float(np.percentile(distances, 75.0) - np.percentile(distances, 25.0)) if distances.size else 0.0
+                )
+                extra = {
+                    "reference_group_column": group_column,
+                    "reference_group": group_value,
+                    "reference_rows": len(indices),
+                    "category": f"{group_column}: {group_value}",
+                    "label": group_value,
+                }
+                rows.extend(
+                    [
+                        _metric_row(
+                            descriptor=candidate_sample.descriptor,
+                            metric_id="reference_group_size",
+                            metric_value=float(len(indices)),
+                            category="reference collapse",
+                            extra={
+                                **extra,
+                                "display_name": _reference_group_panel_title(
+                                    metric_id="reference_group_size",
+                                    group_column=group_column,
+                                    group_value=group_value,
+                                ),
+                            },
+                        ),
+                        _metric_row(
+                            descriptor=candidate_sample.descriptor,
+                            metric_id="reference_group_pairwise_cosine_distance_median",
+                            metric_value=distance_median,
+                            category="reference collapse",
+                            extra={
+                                **extra,
+                                "display_name": _reference_group_panel_title(
+                                    metric_id="reference_group_pairwise_cosine_distance_median",
+                                    group_column=group_column,
+                                    group_value=group_value,
+                                ),
+                            },
+                        ),
+                        _metric_row(
+                            descriptor=candidate_sample.descriptor,
+                            metric_id="reference_group_pairwise_cosine_distance_iqr",
+                            metric_value=distance_iqr,
+                            category="reference collapse",
+                            extra={
+                                **extra,
+                                "display_name": _reference_group_panel_title(
+                                    metric_id="reference_group_pairwise_cosine_distance_iqr",
+                                    group_column=group_column,
+                                    group_value=group_value,
+                                ),
+                            },
+                        ),
+                    ]
+                )
+                emitted_rows += 3
+        if emitted_rows == 0:
+            raise ContractViolationError(
+                "reference_alignment_summary requires SpyP/SulA alignment rows or at least one "
+                f"reference group with >= {min_reference_group_size} rows in {_require_param(candidate, 'view_id')!r}"
+            )
+    for row in rows:
+        row.setdefault("reference_group_column", None)
+        row.setdefault("reference_group", None)
+        row.setdefault("reference_rows", None)
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
 
 

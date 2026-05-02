@@ -291,6 +291,129 @@ def test_alias_rows_without_feature_vectors_fail_fast(tmp_path: Path) -> None:
         )
 
 
+def test_feature_sidecar_source_preserves_alias_rows_that_share_vector_keys(tmp_path: Path) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    created_at = "2026-04-28T00:00:00+00:00"
+    vector_key = "fv_shared"
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "alias_a",
+                    "view_id": "view_a",
+                    "view_name": "fixture_a",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": vector_key,
+                    "forward_pass_key": "fp_shared",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "core60_mean",
+                    "pooling_start_0": 0,
+                    "pooling_end_0": 60,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_a",
+                    "created_at": created_at,
+                },
+                {
+                    "alias_id": "alias_b",
+                    "view_id": "view_b",
+                    "view_name": "fixture_b",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": vector_key,
+                    "forward_pass_key": "fp_shared",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "core60_mean",
+                    "pooling_start_0": 0,
+                    "pooling_end_0": 60,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_b",
+                    "created_at": created_at,
+                },
+            ],
+            schema=infer_feature_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_aliases.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"feature_vector_key": vector_key, "value": [0.1, 0.2], "created_at": created_at}],
+            schema=infer_feature_sidecar_source._VECTOR_SCHEMA,
+        ),
+        derived_dir / "feature_vectors.parquet",
+    )
+
+    schema = infer_feature_sidecar_source.inspect_schema(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_operation": "core60_mean"},
+    )
+    table = infer_feature_sidecar_source.read_table(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_operation": "core60_mean"},
+        columns=["feature_vector_key", "id", "value"],
+    )
+
+    assert schema["row_count"] == 2
+    assert table.num_rows == 2
+    assert table["feature_vector_key"].to_pylist() == [vector_key, vector_key]
+
+
+def test_feature_sidecar_alias_rows_without_vector_keys_fail_fast(tmp_path: Path) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "alias_null_key",
+                    "view_id": "view_null_key",
+                    "view_name": "fixture",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": None,
+                    "forward_pass_key": "fp_null_key",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "seq_mean",
+                    "pooling_start_0": None,
+                    "pooling_end_0": None,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest",
+                    "created_at": "2026-04-28T00:00:00+00:00",
+                }
+            ],
+            schema=infer_feature_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_aliases.parquet",
+    )
+
+    with pytest.raises(SourceResolutionError, match="has no feature_vector_key"):
+        infer_feature_sidecar_source.inspect_schema(
+            usr_root.as_posix(),
+            dataset.name,
+            workspace_dir=tmp_path,
+            where=None,
+        )
+
+
 def test_feature_sidecar_source_carries_reference_strength_metadata_into_materialized_rows(
     tmp_path: Path,
 ) -> None:
@@ -462,6 +585,117 @@ def test_alias_rows_without_feature_scalars_fail_fast(tmp_path: Path) -> None:
     )
 
     with pytest.raises(SourceResolutionError, match="missing feature scalars"):
+        infer_feature_scalar_sidecar_source.inspect_schema(
+            usr_root.as_posix(),
+            dataset.name,
+            workspace_dir=tmp_path,
+            where=None,
+        )
+
+
+def test_feature_scalar_sidecar_source_preserves_alias_rows_that_share_scalar_keys(tmp_path: Path) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    created_at = "2026-04-28T00:00:00+00:00"
+    scalar_key = "fs_shared"
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "scalar_alias_a",
+                    "view_id": "view_a",
+                    "view_name": "fixture_a",
+                    "sequence_id": sequence_id,
+                    "feature_scalar_key": scalar_key,
+                    "forward_pass_key": "fp_shared",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "scalar_kind": "log_likelihood__mean_per_token",
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_a",
+                    "created_at": created_at,
+                },
+                {
+                    "alias_id": "scalar_alias_b",
+                    "view_id": "view_b",
+                    "view_name": "fixture_b",
+                    "sequence_id": sequence_id,
+                    "feature_scalar_key": scalar_key,
+                    "forward_pass_key": "fp_shared",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "scalar_kind": "log_likelihood__mean_per_token",
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_b",
+                    "created_at": created_at,
+                },
+            ],
+            schema=infer_feature_scalar_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_scalar_aliases.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"feature_scalar_key": scalar_key, "value": -2.5, "created_at": created_at}],
+            schema=infer_feature_scalar_sidecar_source._SCALAR_SCHEMA,
+        ),
+        derived_dir / "feature_scalars.parquet",
+    )
+
+    schema = infer_feature_scalar_sidecar_source.inspect_schema(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"scalar_kind": "log_likelihood__mean_per_token"},
+    )
+    table = infer_feature_scalar_sidecar_source.read_table(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"scalar_kind": "log_likelihood__mean_per_token"},
+        columns=["feature_scalar_key", "id", "value"],
+    )
+
+    assert schema["row_count"] == 2
+    assert table.num_rows == 2
+    assert table["feature_scalar_key"].to_pylist() == [scalar_key, scalar_key]
+
+
+def test_feature_scalar_sidecar_alias_rows_without_scalar_keys_fail_fast(tmp_path: Path) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "scalar_alias_null_key",
+                    "view_id": "view_null_key",
+                    "view_name": "fixture",
+                    "sequence_id": sequence_id,
+                    "feature_scalar_key": None,
+                    "forward_pass_key": "fp_null_key",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "scalar_kind": "log_likelihood__mean_per_token",
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest",
+                    "created_at": "2026-04-28T00:00:00+00:00",
+                }
+            ],
+            schema=infer_feature_scalar_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_scalar_aliases.parquet",
+    )
+
+    with pytest.raises(SourceResolutionError, match="has no feature_scalar_key"):
         infer_feature_scalar_sidecar_source.inspect_schema(
             usr_root.as_posix(),
             dataset.name,

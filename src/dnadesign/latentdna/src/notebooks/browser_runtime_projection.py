@@ -13,11 +13,14 @@ import numpy as np
 import pandas as pd
 
 from ..visual_style import (
+    NONCANONICAL_SIG35_CATEGORY,
     PUBLICATION_PALETTE,
     TEXT_COLOR,
     compact_candidate_title,
     display_category_text,
+    is_sig35_legend_category,
     legend_layout,
+    normalize_sig35_hue_category_for_row,
     ordered_categories,
     wrap_plot_title,
 )
@@ -26,6 +29,7 @@ from ..visual_style import (
 )
 from .browser_runtime_support import (
     available_hues_for_frames,
+    candidate_join_keys,
     category_color_map,
     classify_hue_series,
     continuous_hue_render_params,
@@ -36,6 +40,7 @@ from .browser_runtime_support import (
     normalize_categorical_hue_series,
     render_matplotlib_figure,
     resolve_join_keys,
+    resolve_reference_annotation,
     style_notebook_axes,
     style_notebook_legend,
 )
@@ -140,7 +145,14 @@ def _merge_view_row_columns(
 ) -> tuple[pd.DataFrame, set[str]]:
     if not view_id or not required_columns:
         return frame, set()
-    view_rows = load_view_rows(view_id, output_root=output_root)
+    possible_view_join_columns = pd.DataFrame(columns=["construct__anchor_id", "context_id", "id", "subject_id"])
+    view_row_columns = sorted(
+        {
+            *required_columns,
+            *[right_key for _, right_key in candidate_join_keys(frame, possible_view_join_columns)],
+        }
+    )
+    view_rows = load_view_rows(view_id, output_root=output_root, columns=view_row_columns)
     if view_rows.empty:
         return frame, set()
     join_keys = resolve_join_keys(frame, view_rows)
@@ -169,7 +181,7 @@ def _required_column_sources(
     *,
     requested_columns: set[str],
     view_id: str | None,
-) -> dict[str, dict[str, object]]:
+) -> tuple[dict[str, dict[str, object]], dict[str, list[dict[str, object]]]]:
     sources_by_column: dict[str, list[dict[str, object]]] = {column: [] for column in requested_columns}
     for item in joinable_tables:
         relative_path = item.get("relative_path")
@@ -188,16 +200,25 @@ def _required_column_sources(
             )
 
     resolved: dict[str, dict[str, object]] = {}
+    ambiguous_sources: dict[str, list[dict[str, object]]] = {}
     for column, candidates in sources_by_column.items():
         if not candidates:
             continue
         if len(candidates) > 1:
-            candidate_labels = ", ".join(str(candidate["artifact_id"]) for candidate in candidates)
-            raise ValueError(
-                f"ambiguous metadata source for `{column}` on `{view_id or 'projection'}`: {candidate_labels}"
-            )
+            ambiguous_sources[column] = candidates
+            continue
         resolved[column] = candidates[0]
-    return resolved
+    return resolved, ambiguous_sources
+
+
+def _raise_ambiguous_required_columns(
+    *,
+    ambiguous_sources: dict[str, list[dict[str, object]]],
+    view_id: str | None,
+) -> None:
+    for column, candidates in sorted(ambiguous_sources.items()):
+        candidate_labels = ", ".join(str(candidate["artifact_id"]) for candidate in candidates)
+        raise ValueError(f"ambiguous metadata source for `{column}` on `{view_id or 'projection'}`: {candidate_labels}")
 
 
 def _merge_required_joinable_column(
@@ -249,6 +270,24 @@ def _column_has_required_values(frame: pd.DataFrame, column: str) -> bool:
     return bool(series.notna().any())
 
 
+def _categorical_hue_series(frame: pd.DataFrame, hue_column: str) -> pd.Series:
+    hue_series = normalize_categorical_hue_series(hue_column, frame[hue_column])
+    if hue_column != "sig35_variant":
+        return hue_series
+    discriminator_columns = [column for column in ("source_class", "source_family") if column in frame.columns]
+    if not discriminator_columns:
+        return hue_series
+    discriminator_frame = frame[discriminator_columns]
+    return pd.Series(
+        [
+            normalize_sig35_hue_category_for_row(row, value)
+            for row, value in zip(discriminator_frame.to_dict("records"), frame[hue_column], strict=False)
+        ],
+        index=frame.index,
+        dtype="object",
+    )
+
+
 def _assert_required_columns_materialized(
     frame: pd.DataFrame,
     *,
@@ -279,12 +318,17 @@ def enrich_projection_frame(
         view_id=view_id,
         required_columns=requested_columns,
     )
+    effective_requested_columns = set(requested_columns)
     if requested_columns:
-        required_sources = _required_column_sources(
+        required_sources, ambiguous_sources = _required_column_sources(
             joinable_tables,
             requested_columns=requested_columns.difference(authoritative_view_columns),
             view_id=view_id,
         )
+        if ambiguous_sources:
+            if strict_required_columns:
+                _raise_ambiguous_required_columns(ambiguous_sources=ambiguous_sources, view_id=view_id)
+            effective_requested_columns = requested_columns.difference(ambiguous_sources)
         for column in sorted(required_sources):
             enriched = _merge_required_joinable_column(
                 enriched,
@@ -308,7 +352,7 @@ def enrich_projection_frame(
         artifact_id = str(item.get("artifact_id") or "artifact")
         table_columns = [str(column) for column in item.get("columns", []) if isinstance(column, str)]
         if requested_columns:
-            needed_columns = requested_columns.difference(enriched.columns)
+            needed_columns = effective_requested_columns.difference(enriched.columns)
             selected_columns = [column for column in table_columns if column in needed_columns]
             if not selected_columns:
                 continue
@@ -436,10 +480,13 @@ def render_projection_grid(
     reference_labels: list[str],
     output_root: Path,
     workspace_dir: Path,
+    reference_set_id: str | None = None,
+    reference_match_column: str = "usr_label__primary",
+    reference_display_labels: dict[str, str] | None = None,
+    reference_label_limit: int | None = None,
     alt_text: str | None = None,
     prefer_single_row: bool = False,
 ):
-    del workspace_dir
     if not panel_specs:
         return mo.callout("No persisted projection coordinates are available for this geometry layout.", kind="warn")
 
@@ -458,6 +505,22 @@ def render_projection_grid(
             "The selected geometry layout is declared, but none of its projections are materialized yet.",
             kind="warn",
         )
+    if reference_set_id is not None:
+        reference_annotation = resolve_reference_annotation(
+            reference_set_id,
+            resolved_frames,
+            workspace_dir=workspace_dir,
+            fallback_labels=reference_labels,
+        )
+        reference_labels = [str(value) for value in reference_annotation.get("labels", []) if str(value).strip()]
+        reference_match_column = str(reference_annotation.get("match_column") or "usr_label__primary")
+        reference_display_labels = {
+            str(key): str(value)
+            for key, value in dict(reference_annotation.get("display_labels", {}) or {}).items()
+            if str(key).strip() and str(value).strip()
+        }
+        resolved_label_limit = reference_annotation.get("label_limit")
+        reference_label_limit = resolved_label_limit if isinstance(resolved_label_limit, int) else None
 
     effective_hue = hue_column
     if effective_hue:
@@ -519,10 +582,12 @@ def render_projection_grid(
             str(value)
             for frame in resolved_frames
             if effective_hue is not None and treat_as_categorical and effective_hue in frame.columns
-            for value in normalize_categorical_hue_series(effective_hue, frame[effective_hue]).unique()
+            for value in _categorical_hue_series(frame, effective_hue).unique()
         },
         column=effective_hue,
     )
+    if effective_hue == "sig35_variant":
+        category_values = [category for category in category_values if is_sig35_legend_category(category)]
     category_map = category_color_map(category_values, column=effective_hue)
 
     scatter_artist = None
@@ -578,11 +643,13 @@ def render_projection_grid(
                 rasterized=point_style.rasterized,
             )
         else:
-            hue_series = normalize_categorical_hue_series(effective_hue, frame[effective_hue])
+            hue_series = _categorical_hue_series(frame, effective_hue)
+            plotted_mask = pd.Series(False, index=frame.index)
             for category in category_values:
                 mask = hue_series == category
                 if not mask.any():
                     continue
+                plotted_mask |= mask
                 ax.scatter(
                     frame.loc[mask, "x"].to_numpy(dtype=float),
                     frame.loc[mask, "y"].to_numpy(dtype=float),
@@ -594,6 +661,19 @@ def render_projection_grid(
                     rasterized=point_style.rasterized,
                     label=category,
                 )
+            if effective_hue == "sig35_variant":
+                noncanonical_mask = (~plotted_mask) & (hue_series == NONCANONICAL_SIG35_CATEGORY)
+                if noncanonical_mask.any():
+                    ax.scatter(
+                        frame.loc[noncanonical_mask, "x"].to_numpy(dtype=float),
+                        frame.loc[noncanonical_mask, "y"].to_numpy(dtype=float),
+                        c="#9AA5B1",
+                        s=point_style.point_size,
+                        alpha=max(point_style.alpha * 0.55, 0.08),
+                        linewidths=point_style.linewidths,
+                        edgecolors=point_style.edgecolors,
+                        rasterized=point_style.rasterized,
+                    )
 
         ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
         if artifact_warning:
@@ -670,6 +750,9 @@ def render_projection_grid(
                 ax,
                 frame,
                 reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_display_labels=reference_display_labels,
+                reference_label_limit=reference_label_limit,
                 right_padding_px=label_right_padding_px,
                 left_padding_px=28.0,
             )

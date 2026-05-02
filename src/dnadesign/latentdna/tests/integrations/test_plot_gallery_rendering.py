@@ -57,14 +57,13 @@ def _write_workspace_config(workspace_dir: Path) -> None:
                     }
                 },
                 "reference_sets": {
-                    "promoter_wildtype_primary": {
-                        "ids": ["spyp", "sulap", "j23105"],
+                    "reference_spyp_sulap": {
+                        "ids": ["spyp", "sulap"],
                         "match_column": "usr_label__primary",
                         "label_column": "usr_label__primary",
                         "display_labels": {
-                            "spyp": "spyp",
-                            "sulap": "sulap",
-                            "j23105": "j23105",
+                            "spyp": "spyP",
+                            "sulap": "sulAp",
                         },
                     }
                 },

@@ -765,6 +765,112 @@ recipes:
     assert notebook.default_deliverable == "appendix_umap_gallery"
 
 
+def test_load_workspace_config_accepts_candidate_set_declarations(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "plot_semantics").mkdir()
+    (workspace_dir / "plot_semantics" / "appendix_umap_gallery.yaml").write_text(
+        """
+plot_id: appendix_umap_gallery
+question: What appendix projection is available for the demo notebook?
+decision_role: appendix
+encoding: Demo projection scatter plot for notebook wiring validation.
+scope: Full population.
+guardrails:
+  - This fixture only validates workspace loading.
+caption: Demo appendix plot semantics fixture.
+alt_text: Demo appendix plot semantics fixture.
+preprocessing_md: Fixture semantics do not declare additional preprocessing.
+math_md: Fixture semantics do not declare a mathematical definition.
+rationale_md: Fixture semantics exist only to validate workspace loading.
+limitations_md: Fixture semantics are not a study-facing scientific contract.
+failure_modes_md: Replace fixture semantics before using the plot outside tests.
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo, family: intermediate_embedding, scope: anchor_60bp}
+    role: primary
+candidate_sets:
+  demo_x:
+    label: Demo X
+    include_tags: {family: intermediate_embedding}
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    candidate_sets: [demo_x]
+    default_candidate_set: demo_x
+plots:
+  appendix_umap_gallery:
+    kind: projection_scatter
+    projection: umap_z20_60
+    semantics_ref: plot_semantics/appendix_umap_gallery.yaml
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      plots: [appendix_umap_gallery]
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: render_appendix
+        op: plot.render
+        params:
+          plot: appendix_umap_gallery
+      - id: generate_notebook
+        op: notebook.generate
+        depends_on: [render_appendix]
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+
+    assert context.config.candidate_sets["demo_x"].label == "Demo X"
+    assert context.require_notebook("latent_geometry_browser").default_candidate_set == "demo_x"
+
+
 def test_load_workspace_config_rejects_legacy_deliverable_shape(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -1227,6 +1333,140 @@ recipes:
     )
 
     with pytest.raises(ValidationError, match="candidate_grid_panel_titles must match candidate_grid_views length"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_unknown_notebook_candidate_set(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    candidate_sets: [missing_x]
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: generate_notebook
+        op: notebook.generate
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="unknown candidate_set"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_unknown_notebook_default_reference_set(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    default_reference_set: missing_reference_set
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: generate_notebook
+        op: notebook.generate
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="unknown default_reference_set"):
         load_workspace_config(workspace_dir)
 
 

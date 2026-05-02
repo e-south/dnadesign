@@ -9,6 +9,7 @@ from typing import Iterable
 
 from ..contracts.errors import ContractViolationError
 from ..contracts.workspace import PromoterMetadataCohortConfig
+from ..reference_sets import reference_set_required_columns
 from ..workspaces.loader import WorkspaceContext
 
 _PROMOTER_METADATA_INPUT_COLUMNS = (
@@ -49,9 +50,7 @@ def _unique_nonempty(values: Iterable[str | None]) -> list[str]:
 def reference_set_metadata_columns(context: WorkspaceContext) -> list[str]:
     columns: list[str] = []
     for reference_set in context.config.reference_sets.values():
-        columns.append(reference_set.match_column)
-        if reference_set.label_column:
-            columns.append(reference_set.label_column)
+        columns.extend(reference_set_required_columns(reference_set))
     return _unique_nonempty(columns)
 
 
@@ -87,6 +86,10 @@ def derivation_dependency_columns(
                 dependencies.extend(present_sources)
                 continue
             missing.extend(derivation.sources)
+        if derivation.kind == "lookup":
+            dependencies.append(derivation.left_key)
+            if available is not None and derivation.left_key not in available:
+                missing.append(derivation.left_key)
     return _unique_nonempty(dependencies), _unique_nonempty(missing)
 
 

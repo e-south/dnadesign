@@ -222,41 +222,4 @@ def render_selector_cells() -> tuple[str, ...]:
                 return (get_requested_hue, set_requested_hue)
             """
         ),
-        dedent(
-            """\
-            @app.cell
-            def _(runtime):
-                _geometry = runtime.geometry
-                _support = runtime.support
-
-                compare_options = _support.labeled_options(
-                    (
-                        str(row.get("label") or row["view_id"]),
-                        str(row["view_id"]),
-                    )
-                    for row in _geometry.geometry_rows
-                ) or {"No geometries": ""}
-                compare_left_selector = _support.mo.ui.dropdown(
-                    options=compare_options,
-                    value=(
-                        _support.option_key_for_value(compare_options, _geometry.compare_left_default)
-                        or next(iter(compare_options))
-                    ),
-                    label="Left geometry",
-                    searchable=True,
-                    full_width=True,
-                )
-                compare_right_selector = _support.mo.ui.dropdown(
-                    options=compare_options,
-                    value=(
-                        _support.option_key_for_value(compare_options, _geometry.compare_right_default)
-                        or next(iter(compare_options))
-                    ),
-                    label="Right geometry",
-                    searchable=True,
-                    full_width=True,
-                )
-                return (compare_left_selector, compare_right_selector)
-            """
-        ),
     )

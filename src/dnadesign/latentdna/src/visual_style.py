@@ -86,6 +86,8 @@ _SEMANTIC_CATEGORY_PRIORITY = {
 
 _SIG35_VARIANT_STRENGTH_ORDER = ["f", "e", "d", "c", "b", "a"]
 _SIG35_VARIANT_PRIORITY = {variant: index for index, variant in enumerate(_SIG35_VARIANT_STRENGTH_ORDER)}
+_SIG35_LEGEND_CATEGORY_KEYS = frozenset({"f", "e", "d", "c", "b", "control"})
+NONCANONICAL_SIG35_CATEGORY = "__latentdna_noncanonical_sig35__"
 _SIG35_VARIANT_COLORS = {
     "f": "#B2182B",
     "e": "#D6604D",
@@ -154,9 +156,54 @@ def normalize_category_key(value: object) -> str:
     return str(value or "").strip().lower().replace(" ", "_")
 
 
+def is_sig35_legend_category(value: object) -> bool:
+    return normalize_category_key(value) in _SIG35_LEGEND_CATEGORY_KEYS
+
+
+def normalize_sig35_hue_category(value: object) -> str:
+    normalized = normalize_category_key(value)
+    if normalized in _SIG35_LEGEND_CATEGORY_KEYS:
+        return normalized
+    if normalized in {"", "na", "n/a", "none", "unknown"}:
+        return NONCANONICAL_SIG35_CATEGORY
+    return NONCANONICAL_SIG35_CATEGORY
+
+
+def is_densegen_sig35_row(row: object) -> bool:
+    if not isinstance(row, dict):
+        return True
+    if "source_class" in row:
+        return normalize_category_key(row.get("source_class")) == "densegen"
+    if "source_family" in row:
+        return normalize_category_key(row.get("source_family")) == "densegen_generated"
+    return True
+
+
+def normalize_sig35_hue_category_for_row(row: object, value: object) -> str:
+    if not is_densegen_sig35_row(row):
+        return NONCANONICAL_SIG35_CATEGORY
+    return normalize_sig35_hue_category(value)
+
+
+def reference_annotation_label(value: object) -> str:
+    text = " ".join(str(value or "").split()).strip()
+    if not text:
+        return ""
+    text = re.sub(r"_context1kb_rc$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"_core60$", "", text, flags=re.IGNORECASE)
+    normalized = normalize_category_key(text)
+    return {
+        "spyp": "spyP",
+        "sulap": "sulAp",
+        "j23105": "J23105",
+    }.get(normalized, text)
+
+
 def _sig35_variant_sort_key(value: object) -> tuple[int, str]:
     text = str(value)
     normalized = normalize_category_key(text)
+    if normalized == NONCANONICAL_SIG35_CATEGORY:
+        return len(_SIG35_VARIANT_PRIORITY) + 2, text.casefold()
     if normalized in _SIG35_VARIANT_PRIORITY:
         return _SIG35_VARIANT_PRIORITY[normalized], text.casefold()
     if normalized == "control":
@@ -304,6 +351,8 @@ def humanize_display_text(value: object) -> str:
     text = " ".join(str(value or "").split())
     if not text:
         return ""
+    if re.fullmatch(r"[A-Z][A-Z0-9]*(?:\+[A-Z0-9]+)*", text):
+        return text.replace("+", " + ")
     normalized = text
     if normalized.startswith("log_likelihood_per_token_"):
         normalized = normalized.replace("log_likelihood_per_token_", "log likelihood per token ")
@@ -369,6 +418,8 @@ def display_category_text(value: object, *, column: str | None = None) -> str:
     if normalized_column == "sig35_variant":
         text = str(value or "").strip()
         normalized = normalize_category_key(text)
+        if normalized == NONCANONICAL_SIG35_CATEGORY:
+            return "Reference/other"
         if normalized in {"", "na", "n/a"}:
             return "NA"
         if normalized in {"control", "unknown"}:
@@ -402,7 +453,7 @@ def legend_bottom_margin(
     if label_count <= 0:
         return 0.0
     rows = max(1, ceil(label_count / max(columns, 1)))
-    return min(base_margin + (row_step * max(rows - 1, 0)), 0.22)
+    return min(base_margin + (row_step * max(rows - 1, 0)), 0.36)
 
 
 def legend_layout(

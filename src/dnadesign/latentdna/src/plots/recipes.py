@@ -43,6 +43,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             shape_column=config.shape_column,
             label_column=config.label_column,
             label_values=list(config.label_values),
+            panel_titles=[config.panel_title] if config.panel_title else [],
             annotation=config.annotation,
             **_resolved_hue_fields(config),
             **_resolved_label_fields(config),

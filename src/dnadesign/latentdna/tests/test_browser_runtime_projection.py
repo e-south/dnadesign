@@ -197,6 +197,97 @@ def test_render_projection_grid_orders_sig35_legend_by_strength(monkeypatch, tmp
         plt.close(fig)
 
 
+def test_render_projection_grid_keeps_reference_sig35_rows_neutral_and_out_of_legend(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0, 2.0, 3.0],
+            "y": [0.0, 1.0, 2.0, 3.0],
+            "sig35_variant": ["b", "f", "f", "ACCGCG"],
+            "source_family": ["densegen_generated", "densegen_generated", "reference_source", "sfxi_archive"],
+        }
+    )
+    panel_specs = [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}]
+
+    fig = projection_runtime.render_projection_grid(
+        panel_specs,
+        frames=[frame],
+        hue_column="sig35_variant",
+        hue_kinds={"sig35_variant": "categorical"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert _panel_offsets(fig) == [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        labels = [text.get_text() for text in fig.legends[0].get_texts()]
+        assert labels == ["TTGACA (f)", "CTGACA (b)"]
+    finally:
+        plt.close(fig)
+
+
+def test_projection_sig35_hue_keeps_context_derived_densegen_rows_categorical() -> None:
+    frame = pd.DataFrame(
+        {
+            "sig35_variant": ["f", "b", "f", "ACCGCG"],
+            "source_family": [
+                "construct_derived",
+                "construct_derived",
+                "construct_derived",
+                "reference_source",
+            ],
+            "source_class": ["densegen", "densegen", "construct_derived", "reference_control"],
+        }
+    )
+
+    series = projection_runtime._categorical_hue_series(frame, "sig35_variant")
+
+    assert series.tolist() == [
+        "f",
+        "b",
+        projection_runtime.NONCANONICAL_SIG35_CATEGORY,
+        projection_runtime.NONCANONICAL_SIG35_CATEGORY,
+    ]
+
+
+def test_render_projection_grid_draws_reference_stars_as_hue_independent_overlay(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0, 2.0, 3.0],
+            "y": [0.0, 1.0, 2.0, 3.0],
+            "sig35_variant": ["f", "b", "f", "b"],
+            "source_class": ["densegen", "densegen", "reference_control", "reference_control"],
+            "usr_label__primary": ["dense_a", "dense_b", "J23105_core60", "W1_core60"],
+        }
+    )
+    panel_specs = [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}]
+
+    fig = projection_runtime.render_projection_grid(
+        panel_specs,
+        frames=[frame],
+        hue_column="sig35_variant",
+        hue_kinds={"sig35_variant": "categorical"},
+        joinable_tables=[],
+        reference_labels=["J23105_core60", "W1_core60"],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        highlight_offsets = np.asarray(fig.axes[0].collections[-1].get_offsets(), dtype=float)
+        assert sorted(map(tuple, highlight_offsets.tolist())) == [(2.0, 2.0), (3.0, 3.0)]
+        assert [text.get_text() for text in fig.legends[0].get_texts()] == ["TTGACA (f)", "CTGACA (b)"]
+    finally:
+        plt.close(fig)
+
+
 def test_render_projection_grid_prefers_single_row_when_requested(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
 
@@ -374,6 +465,54 @@ def test_load_projection_frame_allows_attention_manifest_and_preserves_warning_a
     assert frame["design_family"].tolist() == ["ethanol", "cipro"]
     assert frame.attrs["artifact_status"] == "attention"
     assert "attention-state artifact" in str(frame.attrs["artifact_warning"])
+
+
+def test_load_projection_frame_reads_only_join_and_required_view_row_columns(monkeypatch, tmp_path: Path) -> None:
+    output_root = tmp_path
+    _write_view_rows(
+        output_root,
+        "view_a",
+        pd.DataFrame(
+            {
+                "id": ["row0", "row1"],
+                "design_family": ["ethanol", "cipro"],
+                "unused_large_metadata": ["x" * 1024, "y" * 1024],
+            }
+        ),
+    )
+    projection_dir = output_root / "projections" / "proj_a"
+    _write_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id="proj_a",
+        status="ok",
+        inputs=[{"kind": "view_matrix", "id": "view_a"}],
+    )
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        projection_dir / "coords.parquet",
+        index=False,
+    )
+    observed_columns_by_name: dict[str, list[str] | None] = {}
+    original_read_parquet = projection_runtime.load_table.__globals__["pd"].read_parquet
+
+    def recording_read_parquet(path, *args, **kwargs):
+        observed_columns_by_name[Path(path).name] = kwargs.get("columns")
+        return original_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(projection_runtime.load_table.__globals__["pd"], "read_parquet", recording_read_parquet)
+
+    frame = projection_runtime.load_projection_frame(
+        "view_a",
+        "proj_a",
+        [],
+        output_root=output_root,
+        required_columns=["design_family"],
+    )
+
+    assert not frame.empty
+    assert frame["design_family"].tolist() == ["ethanol", "cipro"]
+    assert "unused_large_metadata" not in frame.columns
+    assert observed_columns_by_name["rows.parquet"] == ["design_family", "id"]
 
 
 def test_load_projection_frame_does_not_badge_warning_only_ok_manifest(tmp_path: Path) -> None:
@@ -816,6 +955,58 @@ def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_p
             view_id="pooled_logits_20b_anchor_60bp",
             required_columns=["synthetic_margin_ethanol_vs_background"],
         )
+
+
+def test_enrich_projection_frame_skips_ambiguous_optional_columns_in_non_strict_mode(tmp_path: Path) -> None:
+    _write_scalar_table(
+        tmp_path,
+        "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.35, -0.22],
+            }
+        ),
+    )
+    _write_scalar_table(
+        tmp_path,
+        "sigma35_stress_margins_pooled_logits_20b_anchor_60bp",
+        pd.DataFrame(
+            {
+                "id": ["anchor_1", "anchor_2"],
+                "synthetic_margin_ethanol_vs_background": [0.10, 0.20],
+            }
+        ),
+    )
+    _write_view_rows(
+        tmp_path,
+        "pooled_logits_20b_anchor_60bp",
+        pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
+    )
+
+    frame = pd.DataFrame({"id": ["anchor_1", "anchor_2"], "x": [0.0, 1.0], "y": [1.0, 0.0]})
+    enriched = projection_runtime.enrich_projection_frame(
+        frame,
+        [
+            {
+                "artifact_id": "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+                "relative_path": "scalars/design_centroid_margins_pooled_logits_20b_anchor_60bp/table.parquet",
+                "columns": ["id", "synthetic_margin_ethanol_vs_background"],
+            },
+            {
+                "artifact_id": "sigma35_stress_margins_pooled_logits_20b_anchor_60bp",
+                "relative_path": "scalars/sigma35_stress_margins_pooled_logits_20b_anchor_60bp/table.parquet",
+                "columns": ["id", "synthetic_margin_ethanol_vs_background"],
+            },
+        ],
+        output_root=tmp_path,
+        view_id="pooled_logits_20b_anchor_60bp",
+        required_columns=["synthetic_margin_ethanol_vs_background"],
+        strict_required_columns=False,
+    )
+
+    assert "synthetic_margin_ethanol_vs_background" not in enriched.columns
+    assert enriched[["x", "y"]].to_dict(orient="records") == [{"x": 0.0, "y": 1.0}, {"x": 1.0, "y": 0.0}]
 
 
 def test_enrich_projection_frame_rejects_required_column_when_join_keys_do_not_resolve(tmp_path: Path) -> None:

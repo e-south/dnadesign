@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pyarrow.parquet as pq
+
 from dnadesign.usr import SequencesError
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
@@ -83,6 +86,21 @@ def _materialized_view_source_contract_state(
     return "current"
 
 
+def _materialized_view_row_count(rows_path: Path) -> int:
+    try:
+        return int(pq.read_metadata(rows_path).num_rows)
+    except Exception as exc:
+        raise WorkspaceValidationError(f"materialized view rows are unreadable: {rows_path}") from exc
+
+
+def _materialized_view_matrix_shape(matrix_path: Path) -> tuple[int, ...]:
+    try:
+        matrix = np.load(matrix_path, mmap_mode="r")
+        return tuple(int(value) for value in matrix.shape)
+    except Exception as exc:
+        raise WorkspaceValidationError(f"materialized view matrix is unreadable: {matrix_path}") from exc
+
+
 def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
     notebook_details: list[dict[str, object]] = []
     for notebook_id in sorted(context.config.notebooks):
@@ -131,6 +149,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     context = load_workspace_config(workspace)
     validate_plot_semantics_sidecars(context)
     source_columns: dict[str, set[str]] = {}
+    source_schemas: dict[str, dict[str, object]] = {}
     source_details: list[dict[str, object]] = []
     for source_id in sorted(context.config.sources):
         source = context.require_source(source_id)
@@ -164,6 +183,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             missing_rendered = ", ".join(missing_columns)
             raise WorkspaceValidationError(f"source {source_id} is missing required columns: {missing_rendered}")
         source_columns[source_id] = columns
+        source_schemas[source_id] = schema_info
         source_details.append(
             {
                 "source_id": source_id,
@@ -204,6 +224,23 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             rows_path = view_dir / "rows.parquet"
             matrix_path = view_dir / "matrix.npy"
             if rows_path.is_file() and matrix_path.is_file():
+                expected_row_count = int(source_schemas[view.source]["row_count"])
+                materialized_row_count = _materialized_view_row_count(rows_path)
+                materialized_matrix_shape = _materialized_view_matrix_shape(matrix_path)
+                view_detail["materialized_row_count"] = materialized_row_count
+                view_detail["materialized_matrix_shape"] = list(materialized_matrix_shape)
+                if not materialized_matrix_shape:
+                    raise WorkspaceValidationError(f"materialized view matrix has no shape: {view_id}")
+                if int(materialized_matrix_shape[0]) != materialized_row_count:
+                    raise WorkspaceValidationError(
+                        "materialized view row table and matrix row counts disagree: "
+                        f"{view_id} ({materialized_row_count} rows vs matrix shape {materialized_matrix_shape})"
+                    )
+                if materialized_row_count != expected_row_count:
+                    raise WorkspaceValidationError(
+                        "materialized view row count no longer matches source schema: "
+                        f"{view_id} ({materialized_row_count} materialized vs {expected_row_count} source rows)"
+                    )
                 materialized_columns = {field.name for field in read_schema(rows_path)}
                 try:
                     row_contract = source_backed_view_row_contract(
@@ -252,6 +289,32 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                 "coordinate_space_id": view.coordinate_space_id,
             }
         )
+
+    metadata_derivation_details: list[dict[str, object]] = []
+    for column_name, derivation in sorted(context.config.metadata.derivations.items()):
+        detail: dict[str, object] = {"column": column_name, "kind": derivation.kind}
+        if derivation.kind == "lookup":
+            source_columns_for_lookup = source_columns.get(derivation.source, set())
+            missing = sorted(
+                column
+                for column in (derivation.right_key, derivation.value_column)
+                if column not in source_columns_for_lookup
+            )
+            if missing:
+                raise WorkspaceValidationError(
+                    f"metadata derivation {column_name!r} lookup source {derivation.source!r} "
+                    f"is missing columns: {missing}"
+                )
+            detail.update(
+                {
+                    "source": derivation.source,
+                    "left_key": derivation.left_key,
+                    "right_key": derivation.right_key,
+                    "value_column": derivation.value_column,
+                    "missing_policy": derivation.missing_policy,
+                }
+            )
+        metadata_derivation_details.append(detail)
 
     landmark_details: list[dict[str, object]] = []
     for landmark_id in sorted(context.config.landmarks):
@@ -334,6 +397,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
         "study_binding": study_binding,
         "source_details": source_details,
         "view_details": view_details,
+        "metadata_derivation_details": metadata_derivation_details,
         "landmark_details": landmark_details,
         "cohort_details": cohort_details,
         "notebook_details": notebook_details,

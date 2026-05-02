@@ -96,6 +96,7 @@ class BrowserCatalog:
 
 @dataclass(frozen=True)
 class BrowserGeometry:
+    candidate_sets: list[dict[str, object]]
     compare_left_default: str
     compare_metrics: dict[str, object]
     compare_right_default: str
@@ -114,7 +115,11 @@ class BrowserGeometry:
     model_values: list[str]
     preferred_hues: list[str]
     row_metadata_hues: list[str]
+    reference_annotation_default: str
+    reference_annotation_options: dict[str, str]
     reference_labels: list[str]
+    reference_required_columns: list[str]
+    reference_sets: list[dict[str, object]]
     selected_hue_default: str
 
 
@@ -209,6 +214,46 @@ def _runtime_hue_columns(
     )
     hue_kinds = resolve_runtime_hue_kinds(ordered_candidates, configured_hue_kinds)
     return [column for column in ordered_candidates if column in hue_kinds], hue_kinds
+
+
+def _reference_set_option_label(row: dict[str, object]) -> str:
+    configured_label = str(row.get("label") or "").strip()
+    if configured_label:
+        return configured_label
+    return _humanize_plot_id(str(row.get("reference_set_id") or "reference_set"))
+
+
+def _reference_annotation_options(reference_sets: list[dict[str, object]]) -> dict[str, str]:
+    options = {"Off": ""}
+    seen_ids: set[str] = set()
+    for row in reference_sets:
+        if not isinstance(row, dict):
+            continue
+        reference_set_id = str(row.get("reference_set_id") or "").strip()
+        if not reference_set_id or reference_set_id in seen_ids:
+            continue
+        label = _reference_set_option_label(row)
+        if label in options:
+            label = f"{label} ({reference_set_id})"
+        options[label] = reference_set_id
+        seen_ids.add(reference_set_id)
+    return options
+
+
+def _reference_required_columns(reference_sets: list[dict[str, object]]) -> list[str]:
+    columns: list[str] = []
+    for row in reference_sets:
+        if not isinstance(row, dict):
+            continue
+        for column in [
+            row.get("match_column"),
+            row.get("label_column"),
+            *list(row.get("selector_columns") or []),
+        ]:
+            text = str(column or "").strip()
+            if text and text not in columns:
+                columns.append(text)
+    return columns
 
 
 def _live_plot_status_rows(catalog_plots: list[dict[str, object]] | None) -> dict[str, dict[str, object]]:
@@ -596,6 +641,24 @@ def build_workspace_browser_runtime(
     row_metadata_hues = [str(item) for item in geometry_control.get("row_metadata_hues", []) if isinstance(item, str)]
     configured_hue_kinds = geometry_control.get("hue_kinds", {})
     reference_labels = [str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)]
+    reference_sets = [
+        row
+        for row in geometry_control.get("reference_sets", [])
+        if isinstance(row, dict) and row.get("reference_set_id")
+    ]
+    candidate_sets = [
+        row
+        for row in geometry_control.get("candidate_sets", [])
+        if isinstance(row, dict) and row.get("candidate_set_id")
+    ]
+    reference_annotation_options = _reference_annotation_options(reference_sets)
+    configured_default_reference_set = str(geometry_control.get("default_reference_set") or "").strip()
+    reference_annotation_default = (
+        configured_default_reference_set
+        if configured_default_reference_set in set(reference_annotation_options.values())
+        else ""
+    )
+    reference_required_columns = _reference_required_columns(reference_sets)
     global_hue_columns, hue_kinds = _runtime_hue_columns(
         joinable_tables=joinable_tables,
         preferred_hues=preferred_hues,
@@ -673,6 +736,7 @@ def build_workspace_browser_runtime(
             section_names=section_names,
         ),
         geometry=BrowserGeometry(
+            candidate_sets=candidate_sets,
             compare_left_default=str(geometry_control.get("default_compare_left") or ""),
             compare_metrics=compare_metrics if isinstance(compare_metrics, dict) else {},
             compare_right_default=str(geometry_control.get("default_compare_right") or ""),
@@ -691,7 +755,11 @@ def build_workspace_browser_runtime(
             model_values=model_values,
             preferred_hues=preferred_hues,
             row_metadata_hues=row_metadata_hues,
+            reference_annotation_default=reference_annotation_default,
+            reference_annotation_options=reference_annotation_options,
             reference_labels=reference_labels,
+            reference_required_columns=reference_required_columns,
+            reference_sets=reference_sets,
             selected_hue_default=selected_hue_default,
         ),
         plot_review=plot_review,

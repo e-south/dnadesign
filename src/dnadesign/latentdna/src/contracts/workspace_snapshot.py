@@ -43,6 +43,7 @@ class WorkspaceSnapshotExport(StrictWorkspaceSnapshotModel):
 class WorkspaceSnapshotBrowser(StrictWorkspaceSnapshotModel):
     default_geometry_ids: list[str] = Field(default_factory=list)
     preferred_hues: list[str] = Field(default_factory=list)
+    candidate_sets: dict[str, dict[str, object]] = Field(default_factory=dict)
 
 
 class WorkspaceSnapshot(StrictWorkspaceSnapshotModel):

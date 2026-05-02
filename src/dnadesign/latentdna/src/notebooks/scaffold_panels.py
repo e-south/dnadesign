@@ -26,13 +26,7 @@ def render_scope_note_cell() -> str:
                     "Point positions are fixed by the saved coordinates, so hue changes only recolor the same geometry."
                 )
             )
-            comparison_scope_note = _support.mo.md(
-                (
-                    "This tab is a sampled diagnostic built from persisted artifacts. "
-                    "Use it to check agreement between views, not as a hidden total score or final authority."
-                )
-            )
-            return (comparison_scope_note, geometry_scope_note, plot_scope_note)
+            return (geometry_scope_note, plot_scope_note)
         """
     )
 
@@ -108,11 +102,13 @@ def render_plot_review_cell() -> str:
             active_plot_frames = []
             available_plot_hues = []
             plot_hue_selector = None
+            plot_reference_selector = None
             if selected_plot_card is not None and bool(selected_plot_card.get("live_render")):
                 _plot_spec = dict(selected_plot_card.get("plot_spec") or {})
                 active_plot_frames = _renderers.load_plot_review_frames(
                     _plot_spec,
                     joinable_tables=runtime.geometry.joinable_tables,
+                    reference_required_columns=runtime.geometry.reference_required_columns,
                 )
                 _configured_hue_kinds = {
                     str(_option.get("column")): str(_option.get("type"))
@@ -144,7 +140,26 @@ def render_plot_review_cell() -> str:
                         ),
                         label="Hue",
                     )
-            return (active_plot_frames, available_plot_hues, plot_hue_selector)
+                _reference_enabled_kinds = {
+                    "projection_grid",
+                    "projection_scatter",
+                    "xy_scatter_grid",
+                    "paired_xy_scatter_grid",
+                }
+                if str(_plot_spec.get("kind") or "") in _reference_enabled_kinds:
+                    _reference_options = runtime.geometry.reference_annotation_options or {"Off": ""}
+                    plot_reference_selector = _support.mo.ui.dropdown(
+                        options=_reference_options,
+                        value=(
+                            _support.option_key_for_value(
+                                _reference_options,
+                                runtime.geometry.reference_annotation_default,
+                            )
+                            or next(iter(_reference_options))
+                        ),
+                        label="Reference labels",
+                    )
+            return (active_plot_frames, available_plot_hues, plot_hue_selector, plot_reference_selector)
 
 
         @app.cell
@@ -152,6 +167,7 @@ def render_plot_review_cell() -> str:
             active_plot_frames,
             available_plot_hues,
             plot_hue_selector,
+            plot_reference_selector,
             plot_review_cards,
             plot_scope_note,
             plot_selector,
@@ -178,6 +194,11 @@ def render_plot_review_cell() -> str:
                 if bool(_active_card.get("live_render")):
                     _requested_hue = str(plot_hue_selector.value) if plot_hue_selector is not None else ""
                     _effective_hue = _requested_hue if _requested_hue in available_plot_hues else None
+                    _selected_reference_set = (
+                        str(plot_reference_selector.value)
+                        if plot_reference_selector is not None
+                        else runtime.geometry.reference_annotation_default
+                    )
                     _plot_spec = {
                         **dict(_active_card.get("plot_spec") or {}),
                         "alt_text": str(_active_card.get("alt_text") or _active_card.get("title") or ""),
@@ -187,6 +208,7 @@ def render_plot_review_cell() -> str:
                         frames=active_plot_frames,
                         hue_column=_effective_hue,
                         reference_labels=runtime.geometry.reference_labels,
+                        reference_set_id=_selected_reference_set,
                         joinable_tables=runtime.geometry.joinable_tables,
                     )
                 else:
@@ -206,7 +228,11 @@ def render_plot_review_cell() -> str:
                     plot_scope_note,
                     _heading,
                 ]
-                _selectors = [widget for widget in [plot_selector, plot_hue_selector] if widget is not None]
+                _selectors = [
+                    widget
+                    for widget in [plot_selector, plot_hue_selector, plot_reference_selector]
+                    if widget is not None
+                ]
                 if _selectors:
                     _section_blocks.insert(
                         1,
@@ -288,7 +314,22 @@ def render_plot_review_cell() -> str:
                         _support.mo.accordion(_accordion_sections, lazy=True)
                     )
 
-                plot_review_panel = _support.mo.vstack(_section_blocks, gap=0.4)
+                _grid_blocks = [
+                    plot_scope_note,
+                ]
+                if _selectors:
+                    _grid_blocks.append(
+                        _support.mo.hstack(_selectors, justify="start", align="end", wrap=True, gap=0.28)
+                    )
+                _grid_blocks.append(_plot_surface)
+                plot_review_panel = _support.mo.ui.tabs(
+                    {
+                        "Grid": _support.mo.vstack(_grid_blocks, gap=0.35),
+                        "Explore": _support.mo.vstack(_section_blocks, gap=0.4),
+                    },
+                    value="Grid",
+                    lazy=True,
+                )
             return (plot_review_panel,)
         """
     )
@@ -396,7 +437,10 @@ def render_geometry_frames_cell() -> str:
                         _view_id or None,
                         _projection_id,
                         _geometry.joinable_tables,
-                        required_columns=_geometry.preferred_hues,
+                        required_columns=[
+                            *_geometry.preferred_hues,
+                            *_geometry.reference_required_columns,
+                        ],
                         strict_required_columns=False,
                     )
                 except ValueError as exc:
@@ -440,7 +484,19 @@ def render_geometry_hue_selector_cell() -> str:
                 label="Hue",
                 on_change=set_requested_hue,
             )
-            return (hue_selector,)
+            _reference_options = _geometry.reference_annotation_options or {"Off": ""}
+            geometry_reference_selector = _support.mo.ui.dropdown(
+                options=_reference_options,
+                value=(
+                    _support.option_key_for_value(
+                        _reference_options,
+                        _geometry.reference_annotation_default,
+                    )
+                    or next(iter(_reference_options))
+                ),
+                label="Reference labels",
+            )
+            return (geometry_reference_selector, hue_selector)
         """
     )
 
@@ -453,6 +509,7 @@ def render_geometry_panel_cell() -> str:
             available_hues,
             context_selector,
             family_selector,
+            geometry_reference_selector,
             geometry_scope_note,
             geometry_selector,
             hue_selector,
@@ -478,11 +535,12 @@ def render_geometry_panel_cell() -> str:
                 hue_kinds=_geometry.hue_kinds,
                 joinable_tables=_geometry.joinable_tables,
                 reference_labels=_geometry.reference_labels,
+                reference_set_id=str(geometry_reference_selector.value),
             )
             _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
             if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
                 _control_widgets.append(geometry_selector)
-            _control_widgets.append(hue_selector)
+            _control_widgets.extend([hue_selector, geometry_reference_selector])
             _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
             _accordion_sections = {
                 "Selection": _support.mo.md(
@@ -551,133 +609,6 @@ def render_geometry_panel_cell() -> str:
     )
 
 
-def render_compare_panel_cell() -> str:
-    return dedent(
-        """\
-        @app.cell
-        def _(compare_left_selector, compare_right_selector, comparison_scope_note, runtime):
-            _geometry = runtime.geometry
-            _renderers = runtime.renderers
-            _support = runtime.support
-
-            def _format_metric_value(value):
-                if value is None:
-                    return "n/a"
-                if isinstance(value, float):
-                    if abs(value) >= 1e-3:
-                        return f"{value:.4f}"
-                    return f"{value:.3e}"
-                return value
-
-            selected_compare_left = str(compare_left_selector.value)
-            selected_compare_right = str(compare_right_selector.value)
-            compare_payload = _renderers.compare_pair_payload(
-                selected_compare_left,
-                selected_compare_right,
-                geometry_rows_by_id=_geometry.geometry_rows_by_id,
-                comparison_bases=_geometry.comparison_bases,
-                compare_metrics=_geometry.compare_metrics,
-            )
-            distance_correlation_plot = _renderers.render_distance_correlation(
-                compare_payload,
-                title="Pairwise distance Spearman",
-            )
-            rowwise_cosine_plot = _renderers.render_rowwise_distribution(
-                compare_payload,
-                value_key="rowwise_cosine",
-                title="Row-wise cosine similarity",
-                xlabel="Row-wise cosine similarity",
-            )
-            rowwise_diff_plot = _renderers.render_rowwise_distribution(
-                compare_payload,
-                value_key="rowwise_diff_norm",
-                title="Row-wise L2 difference",
-                xlabel="Row-wise L2 norm",
-            )
-            metrics_payload = compare_payload.get("metrics")
-            metrics_rows = [
-                {"Metric": "Basis", "Value": compare_payload.get("basis_display", "Unavailable")},
-                {"Metric": "Status", "Value": compare_payload.get("status", "missing")},
-                {"Metric": "Rows compared", "Value": compare_payload.get("rows", "n/a")},
-                {
-                    "Metric": "Sampling strategy",
-                    "Value": compare_payload.get("sample_strategy_display", "Unavailable"),
-                },
-                {
-                    "Metric": "Distance Spearman",
-                    "Value": (
-                        _format_metric_value(metrics_payload.get("distance_spearman"))
-                        if isinstance(metrics_payload, dict)
-                        else "n/a"
-                    ),
-                },
-                {
-                    "Metric": "Linear CKA",
-                    "Value": (
-                        _format_metric_value(metrics_payload.get("linear_cka"))
-                        if isinstance(metrics_payload, dict)
-                        else "n/a"
-                    ),
-                },
-                {
-                    "Metric": "Neighbor-set Jaccard",
-                    "Value": (
-                        _format_metric_value(metrics_payload.get("neighbor_set_jaccard"))
-                        if isinstance(metrics_payload, dict)
-                        else "n/a"
-                    ),
-                },
-                {
-                    "Metric": "Median row-wise cosine",
-                    "Value": (
-                        _format_metric_value(metrics_payload.get("median_rowwise_cosine"))
-                        if isinstance(metrics_payload, dict)
-                        else "n/a"
-                    ),
-                },
-                {
-                    "Metric": "Median row-wise L2",
-                    "Value": (
-                        _format_metric_value(metrics_payload.get("median_rowwise_diff_norm"))
-                        if isinstance(metrics_payload, dict)
-                        else "n/a"
-                    ),
-                },
-            ]
-            compare_panel = _support.mo.vstack(
-                [
-                    comparison_scope_note,
-                    _support.mo.hstack(
-                        [compare_left_selector, compare_right_selector],
-                        justify="start",
-                        align="end",
-                        wrap=True,
-                        gap=0.28,
-                    ),
-                    distance_correlation_plot,
-                    _support.mo.hstack(
-                        [rowwise_cosine_plot, rowwise_diff_plot],
-                        gap=0.35,
-                        wrap=True,
-                        align="start",
-                        justify="center",
-                    ),
-                    _support.mo.accordion(
-                        {
-                            "Comparison metadata": _support.key_value_table(
-                                [(row["Metric"], row["Value"]) for row in metrics_rows]
-                            )
-                        },
-                        lazy=True,
-                    ),
-                ],
-                gap=0.35,
-            )
-            return (compare_panel,)
-        """
-    )
-
-
 def render_page_tabs_cell() -> str:
     return dedent(
         """\
@@ -686,23 +617,22 @@ def render_page_tabs_cell() -> str:
             _support = runtime.support
             _plot_review = runtime.plot_review
             default_tab = {
-                "plots": "Plots",
+                "plots": "Review",
                 "geometry_audit": "Geometry audit",
-                "comparison_audit": "Comparison audit",
-            }.get(_plot_review.default_surface, "Plots")
+                "comparison_audit": "Geometry audit",
+            }.get(_plot_review.default_surface, "Review")
             get_active_top_tab, set_active_top_tab = _support.mo.state(default_tab)
             return (default_tab, get_active_top_tab, set_active_top_tab)
 
 
         @app.cell
-        def _(compare_panel, geometry_panel, get_active_top_tab, plot_review_panel, runtime, set_active_top_tab):
+        def _(geometry_panel, get_active_top_tab, plot_review_panel, runtime, set_active_top_tab):
             _support = runtime.support
-            active_top_tab = get_active_top_tab() or "Plots"
+            active_top_tab = get_active_top_tab() or "Review"
             page_tabs = _support.mo.ui.tabs(
                 {
-                    "Plots": plot_review_panel,
+                    "Review": plot_review_panel,
                     "Geometry audit": geometry_panel,
-                    "Comparison audit": compare_panel,
                 },
                 value=active_top_tab,
                 lazy=True,

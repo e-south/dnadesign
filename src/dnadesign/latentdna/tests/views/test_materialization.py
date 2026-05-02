@@ -12,8 +12,9 @@ import yaml
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.io.parquet_io import read_table
-from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
+from dnadesign.latentdna.src.views.materialize import _derived_metadata_array, materialize_view_artifact
 from dnadesign.latentdna.src.views.promoter_metadata import (
+    _promoter_metadata_columns,
     _sig35_variant,
     _source_class,
     _spacer_length,
@@ -167,6 +168,171 @@ def test_materialize_view_rejects_synthetic_rows_without_sig35_token(tmp_path: P
 
     with pytest.raises(ContractViolationError, match="sig35_variant"):
         materialize_view_artifact(context, view_id="intermediate_embedding_20b_anchor_60bp")
+
+
+def test_materialize_view_uses_lookup_derivation_for_parent_metadata(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["parent_a", "parent_b"], type=pa.string()),
+                "sigma_factor": pa.array(["sigma70", "sigma38"], type=pa.string()),
+            }
+        ),
+        inputs_dir / "parents.parquet",
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "subject_id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "parent_id": pa.array(["parent_a", "parent_b"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0], [1.0, 0.0]], type=pa.list_(pa.float32())),
+            }
+        ),
+        inputs_dir / "children.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "lookup_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "parents": {
+                        "kind": "parquet",
+                        "path": "inputs/parents.parquet",
+                        "record_key": "id",
+                        "subject_key": "id",
+                    },
+                    "children": {
+                        "kind": "parquet",
+                        "path": "inputs/children.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    },
+                },
+                "metadata": {
+                    "include": ["sigma_factor"],
+                    "derivations": {
+                        "sigma_factor": {
+                            "kind": "lookup",
+                            "source": "parents",
+                            "left_key": "parent_id",
+                            "right_key": "id",
+                            "value_column": "sigma_factor",
+                        }
+                    },
+                },
+                "views": {
+                    "child_embedding": {
+                        "source": "children",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="child_embedding")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert [row["sigma_factor"] for row in rows] == ["sigma70", "sigma38"]
+
+
+def test_materialize_view_lookup_derivation_fails_on_missing_parent_match(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["parent_a"], type=pa.string()),
+                "sigma_factor": pa.array(["sigma70"], type=pa.string()),
+            }
+        ),
+        inputs_dir / "parents.parquet",
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "subject_id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "parent_id": pa.array(["parent_a", "missing_parent"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0], [1.0, 0.0]], type=pa.list_(pa.float32())),
+            }
+        ),
+        inputs_dir / "children.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "lookup_missing_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "parents": {
+                        "kind": "parquet",
+                        "path": "inputs/parents.parquet",
+                        "record_key": "id",
+                        "subject_key": "id",
+                    },
+                    "children": {
+                        "kind": "parquet",
+                        "path": "inputs/children.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    },
+                },
+                "metadata": {
+                    "include": ["sigma_factor"],
+                    "derivations": {
+                        "sigma_factor": {
+                            "kind": "lookup",
+                            "source": "parents",
+                            "left_key": "parent_id",
+                            "right_key": "id",
+                            "value_column": "sigma_factor",
+                        }
+                    },
+                },
+                "views": {
+                    "child_embedding": {
+                        "source": "children",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+
+    with pytest.raises(ContractViolationError, match="missing lookup matches"):
+        materialize_view_artifact(context, view_id="child_embedding")
 
 
 def test_sig35_variant_uses_upstream_sigma70_core_annotation_when_plan_lacks_sig35() -> None:
@@ -532,6 +698,78 @@ def test_materialize_view_includes_source_promoter_cohorts_without_metadata_incl
     rows = read_table(artifact_dir / "rows.parquet").to_pylist()
 
     assert rows == [{"id": "row_a", "subject_id": "row_a", "spacer_length": 17}]
+
+
+def test_promoter_metadata_spacer_length_array_uses_stable_int_type_when_batch_is_all_null(
+    tmp_path: Path,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace: {id: stable_promoter_metadata_type_demo, output_root: ./outputs}
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg]
+  neighbor_backend: auto
+sources:
+  anchor_60bp:
+    kind: parquet
+    path: inputs/records.parquet
+    record_key: id
+    subject_key: id
+views: {}
+cohorts:
+  spacer_length:
+    kind: promoter_metadata
+    source: anchor_60bp
+    derive: spacer_length
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    context = load_workspace_config(workspace_dir)
+
+    arrays = _promoter_metadata_columns(
+        [{"densegen__used_tfbs_detail": None}],
+        context=context,
+        configs=[("spacer_length", context.config.cohorts["spacer_length"])],
+    )
+
+    assert arrays["spacer_length"].type == pa.int64()
+    assert arrays["spacer_length"].to_pylist() == [None]
+
+
+def test_construct_template_id_derivation_uses_stable_string_type_for_all_null_batch(
+    tmp_path: Path,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace: {id: stable_construct_template_type_demo, output_root: ./outputs}
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg]
+  neighbor_backend: auto
+sources: {}
+views: {}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    context = load_workspace_config(workspace_dir)
+
+    array = _derived_metadata_array(context, [{"construct__template_id": None}], column_name="construct_template_id")
+
+    assert array.type == pa.string()
+    assert array.to_pylist() == [None]
 
 
 def test_materialize_view_ignores_promoter_metadata_cohorts_from_other_sources(tmp_path: Path) -> None:

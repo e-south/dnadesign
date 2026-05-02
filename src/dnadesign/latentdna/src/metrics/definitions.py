@@ -359,7 +359,7 @@ _METRICS = [
     _metric(
         "effective_rank",
         "Effective rank",
-        "Entropy-derived effective rank of the centered representation spectrum.",
+        "Entropy-derived effective rank across the retained PCA components reported by the reducer summary.",
         metric_family="representation_health",
         evidence_tier="primary",
         unit="dims",
@@ -562,6 +562,39 @@ _METRICS = [
         unit="margin",
         direction="higher_is_better",
         aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "reference_group_size",
+        "Reference group size",
+        "Number of labeled reference rows in a collection-aware reference group.",
+        metric_family="reference_alignment",
+        evidence_tier="appendix",
+        unit="rows",
+        direction="descriptive",
+        aggregation_level="group_summary",
+    ),
+    _metric(
+        "reference_group_pairwise_cosine_distance_median",
+        "Reference group median distance",
+        "Median pairwise cosine distance within a labeled reference group after view-level normalization.",
+        metric_family="reference_alignment",
+        evidence_tier="appendix",
+        unit="distance",
+        direction="descriptive",
+        aggregation_level="group_summary",
+    ),
+    _metric(
+        "reference_group_pairwise_cosine_distance_iqr",
+        "Reference group distance IQR",
+        (
+            "Interquartile range of pairwise cosine distances within a labeled reference group "
+            "after view-level normalization."
+        ),
+        metric_family="reference_alignment",
+        evidence_tier="appendix",
+        unit="distance",
+        direction="descriptive",
+        aggregation_level="group_summary",
     ),
 ]
 

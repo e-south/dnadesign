@@ -270,6 +270,85 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_anchor_60bp"
 
 
+def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["pooled_logits_7b_anchor_60bp"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "demo_logits",
+        "tags": {"model": "7b", "family": "pooled_logits", "scope": "anchor_60bp"},
+    }
+    config["candidate_sets"] = {
+        "two_view_x": {
+            "label": "Two-view X",
+            "description": "Fixture candidate set.",
+            "views": [
+                "pooled_logits_7b_anchor_60bp",
+                "intermediate_embedding_7b_anchor_60bp",
+            ],
+            "panel_titles": {
+                "pooled_logits_7b_anchor_60bp": "Pooled logits",
+                "intermediate_embedding_7b_anchor_60bp": "Intermediate",
+            },
+        }
+    }
+    config["notebooks"]["latent_geometry_browser"]["candidate_sets"] = ["two_view_x"]
+    config["notebooks"]["latent_geometry_browser"]["default_candidate_set"] = "two_view_x"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    assert geometry_ids == [
+        "pooled_logits_7b_anchor_60bp",
+        "intermediate_embedding_7b_anchor_60bp",
+    ]
+    assert controls.geometry_controls.default_layout == "candidate_set__two_view_x"
+    candidate_set = controls.geometry_controls.candidate_sets[0]
+    assert candidate_set.candidate_set_id == "two_view_x"
+    assert candidate_set.view_ids == geometry_ids
+    assert candidate_set.available_view_ids == geometry_ids
+    assert candidate_set.panel_titles == ["Pooled logits", "Intermediate"]
+    assert [row.status for row in candidate_set.views] == ["missing", "missing"]
+    assert {preset.id for preset in controls.geometry_controls.layout_presets} >= {"candidate_set__two_view_x"}
+
+
+def test_notebook_controls_expose_reference_set_labels_and_default_from_config(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["reference_sets"] = {
+        "heldout_controls": {
+            "label": "Heldout controls",
+            "match_column": "id",
+            "label_column": "subject_id",
+            "ids": ["row0"],
+        },
+        "hidden_controls": {
+            "label": "Hidden controls",
+            "match_column": "id",
+            "ids": ["row1"],
+            "notebook_exposed": False,
+        },
+    }
+    config["notebooks"]["latent_geometry_browser"]["default_reference_set"] = "heldout_controls"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert controls.geometry_controls.default_reference_set == "heldout_controls"
+    assert [row.reference_set_id for row in controls.geometry_controls.reference_sets] == ["heldout_controls"]
+    assert controls.geometry_controls.reference_sets[0].label == "Heldout controls"
+
+
 def test_notebook_controls_degrade_invalid_plot_manifest_to_error_status(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
