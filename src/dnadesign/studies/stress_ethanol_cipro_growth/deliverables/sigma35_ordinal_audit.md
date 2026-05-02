@@ -1,12 +1,12 @@
 # Sigma-35 Ordinal Audit
 
-The audit measures whether each candidate space preserves the declared order across the five Sigma-35 variants.
+The audit measures whether each candidate space preserves a declared ordinal metadata axis. The current rendered group is the DenseGen synthetic Sigma-35 f/e/d/c/b ladder; Anderson iGEM strength and W Collection strength should use the same visual question through a group selector rather than separate lookalike plots.
 
 ### sigma35_ordinal_audit | Sigma-35 ordinal audit
 
 #### Plot details
 
-**Data.** Each candidate is evaluated on a stratified sample over the synthetic promoter population using the workspace Sigma-35 order mapping.
+**Data.** Each candidate is evaluated on a stratified sample over the synthetic promoter population using the workspace Sigma-35 order mapping. This group is intentionally separate from reference-standard strength scales.
 
 **Preprocessing.** All centroid distances use view-level standardization followed by row L2 normalization. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0`.
 
@@ -28,15 +28,15 @@ balanced Sigma-35 Spearman, a within-family mean Spearman, a within-regulator
 mean Spearman, and a shuffled-label permutation p-value. Confidence intervals
 are reported for the Spearman-based summary rows.
 
-**Decision use.** Ordered Sigma-35 structure adds a within-design signal beyond coarse cohort separation.
+**Decision use.** Ordered Sigma-35 structure adds a within-design signal beyond coarse cohort separation. Future ordinal groups should answer the same question with the same panels while keeping their categorical or numeric scale explicit in the selector.
 
-**Limits.** The current Sigma-35 order file stays exploratory until the exact literature note is checked into the repo. The output measures ordered design structure in pooled embeddings. It does not estimate promoter activity.
+**Limits.** The current Sigma-35 order file stays exploratory until the exact literature note is checked into the repo. The output measures ordered design structure in pooled embeddings. It does not estimate promoter activity and should not pool Anderson, W Collection, and DenseGen ordinal priors into one score.
 
 ### sigma35_margin_ladder_gallery | Sigma-35 margin ladder gallery
 
 #### Plot details
 
-**Data.** The gallery uses the same study-facing 7B intermediate candidate family as the main shortlist and shows the full shared promoter population in each candidate view.
+**Data.** The gallery uses the same study-facing 7B intermediate candidate family as the main shortlist and renders the declared DenseGen Sigma-35 f/e/d/c/b audit subset in each candidate view.
 
 **Preprocessing.** All margins are computed after view-level standardization and row L2 normalization. Leave-one-out handling is used when a row belongs to one of the scored Sigma-35 cohorts.
 
@@ -46,7 +46,7 @@ $$
 m_{\sigma35}(x) = \cos(z_x, c_f) - \cos(z_x, c_b),
 $$
 
-shown as a violin-and-box ladder across the declared Sigma-35 variants. Positive values mean a row sits closer to the `f` centroid than the `b` centroid; more negative values mean the opposite.
+shown as a violin-and-box ladder across the declared f/e/d/c/b Sigma-35 variants. Reference-derived or unranked annotated Sigma-35 sequences are intentionally not given extra x-axis categories. Positive values mean a row sits closer to the `f` centroid than the `b` centroid; more negative values mean the opposite.
 
 **Decision use.** This is the simplest row-level bridge to the Sigma-35 ordinal Spearman. It shows whether the intended `f > e > d > c > b` ladder is visible before that order is compressed into one scalar score.
 
@@ -96,9 +96,9 @@ Positive $m_{\mathrm{stress}}(x)$ values mean the row is closer to at least one 
 
 #### Plot details
 
-**Data.** The gallery uses the full shared promoter population and the same declared Sigma-35 ladder as the ordinal audit, but it restricts the visual to the study-facing 7B intermediate candidates.
+**Data.** The gallery uses the same declared f/e/d/c/b Sigma-35 ladder as the ordinal audit and restricts the visual to the study-facing 7B intermediate candidates.
 
-**Preprocessing.** Variant centroids are computed after view-level standardization and row L2 normalization on the sampled candidate rows used for the audit. Distances are cosine distances between those normalized centroids.
+**Preprocessing.** Variant centroids are computed after view-level standardization and row L2 normalization on the sampled candidate rows used for the audit. The rendered matrix keeps only the configured f/e/d/c/b axis even when source/reference rows carry additional annotated Sigma-35 sequences. Distances are cosine distances between those normalized centroids.
 
 **Definition.** For each variant \(g\),
 

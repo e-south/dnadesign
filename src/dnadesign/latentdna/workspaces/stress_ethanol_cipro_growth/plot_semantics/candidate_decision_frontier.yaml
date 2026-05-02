@@ -1,22 +1,22 @@
 plot_id: candidate_decision_frontier
 question: Which candidate best balances design structure, ordered Sigma-35 signal, and context retention without relying on UMAP aesthetics?
 decision_role: primary
-encoding: Single-panel decision frontier over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects effective rank, and each point is directly labeled with callout annotations.
+encoding: Single-panel representation tradeoff plot over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects retained-component effective rank, and each point is directly labeled.
 scope: The healthy 7B study-facing candidates summarized from the persisted health, design-structure, Sigma-35, and context-robustness scalar tables. Gate-failed pooled-logit candidates are adjudicated in the preceding health gate rather than repeated here.
 guardrails:
   - Read this figure as a synthesis of the healthy-candidate review path, not a replacement for the health gate or the direct context comparison.
   - Read the row-level bridge plots before treating small point-to-point differences as meaningful.
-caption: Neutral decision-frontier synthesis across the candidate representation inventory.
+caption: Representation tradeoff across the first-class candidate views.
 alt_text: Scatter plot comparing balanced design-family separation and Sigma-35 ordinal Spearman across the healthy study-facing candidates, with direct labels on each point.
 preprocessing_md: This plot reuses persisted scalar summaries rather than recomputing row-level geometry. Each contributing summary already follows the study contract of view-level standardization plus row L2 normalization before cosine-based metrics are formed.
 math_md: |
-  Point size is the effective rank
+  Point size is the retained-component effective rank from the sampled PCA reducer summary
   $$
   r_{\mathrm{eff}} = \exp\!\left(-\sum_i p_i \log p_i\right),
   \qquad
   p_i = \frac{\lambda_i}{\sum_j \lambda_j},
   $$
-  where the $\lambda_i$ values are the positive explained-variance ratios of the centered representation spectrum. In plain language: if variance is spread across many directions, $r_{\mathrm{eff}}$ is larger; if one direction dominates, $r_{\mathrm{eff}}$ moves toward 1.
+  where the $\lambda_i$ values are the positive explained-variance ratios among retained PCA components. In plain language: if retained variance is spread across many retained directions, $r_{\mathrm{eff}}$ is larger; if one retained direction dominates, $r_{\mathrm{eff}}$ moves toward 1.
 
   The x axis is the balanced design-family separation ratio
   $$
@@ -43,7 +43,7 @@ plot_details_md: |
 
   - **Balanced design-family separation ratio:** how cleanly the family structure survives after balancing away the easy Sigma-35 and spacer imbalances.
   - **Sigma-35 ordinal Spearman:** how faithfully the candidate respects the intended Sigma-35 strength ladder.
-  - **Effective-rank point size:** how distributed the candidate variance remains once the space is centered.
+  - **Effective-rank point size:** how distributed the retained PCA variance remains once the space is centered.
 
   A point is not “better” just because it is larger. Larger size only strengthens the case when the candidate is already competitive on the x and y axes.
 limitations_md: A two-axis synthesis still compresses a multi-panel decision process and cannot express every tradeoff, uncertainty interval, or context-specific caveat.

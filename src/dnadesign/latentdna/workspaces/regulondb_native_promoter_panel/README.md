@@ -3,12 +3,13 @@
 This workspace is the downstream analysis contract for
 `usr_regulondb_native_promoters`.
 
-The current checked-in config validates before Evo2 feature sidecars exist:
-native and core60 feature views are declared as `role: planned`, while metadata
-cohorts are read directly from the USR dataset. After each Infer batch runs,
-remove or revise the planned role before materializing that feature family.
+The active config expects both the native source-record 7B sequence-mean
+feature sidecars and the TSS-upstream core60 7B core60-mean feature sidecars.
+The core60 route preserves one row per Infer alias, then joins parent
+RegulonDB metadata from `usr_regulondb_native_promoters` through explicit
+metadata lookup derivations.
 
-The TSS-upstream core60 dataset and its 7B sidecars are declared as planned
-workspace sources. They remain absent from the published workspace snapshot
-until Construct materializes `usr_regulondb_native_promoter_core60` and Infer
-writes the matching `_derived/infer` vector/scalar sidecars.
+`latentdna validate workspace --workspace regulondb_native_promoter_panel
+--deep` is the contract check for row-count parity, materialized matrix shape,
+lookup metadata availability, and notebook control-plane health before using
+the workspace for exploratory plots.

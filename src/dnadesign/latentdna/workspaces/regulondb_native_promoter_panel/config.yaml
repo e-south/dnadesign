@@ -74,14 +74,12 @@ sources:
     dataset: usr_regulondb_native_promoter_core60
     record_key: id
     subject_key: id
-    role: planned
   core60_tss_upstream_7b_core60_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
-    subject_key: id
-    role: planned
+    subject_key: alias_id
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -93,8 +91,7 @@ sources:
     root: ../../../usr/datasets
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
-    subject_key: id
-    role: planned
+    subject_key: alias_id
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -105,8 +102,7 @@ sources:
     root: ../../../usr/datasets
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
-    subject_key: id
-    role: planned
+    subject_key: alias_id
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -116,8 +112,7 @@ sources:
     root: ../../../usr/datasets
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
-    subject_key: id
-    role: planned
+    subject_key: alias_id
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -132,9 +127,55 @@ metadata:
     - regulondb__metadata_completeness_class
     - regulondb__source_strata_set
     - regulondb__primary_promoter_name
-    - source_family
-    - selection_basis
-    - view_collections
+  derivations:
+    regulondb__sigma_factor_set:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__sigma_factor_set
+    regulondb__sigma_factor_count:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__sigma_factor_count
+    regulondb__confidence_level_set:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__confidence_level_set
+    regulondb__regulator_composition:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__regulator_composition
+    regulondb__box_pattern:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__box_pattern
+    regulondb__metadata_completeness_class:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__metadata_completeness_class
+    regulondb__source_strata_set:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__source_strata_set
+    regulondb__primary_promoter_name:
+      kind: lookup
+      source: native_records
+      left_key: parent_sequence_id
+      right_key: id
+      value_column: regulondb__primary_promoter_name
 views:
   intermediate_embedding_7b_native_source_record_seq_mean:
     source: native_7b_seq_mean_features
@@ -142,7 +183,6 @@ views:
       kind: column
       name: value
     coordinate_space_id: evo2_7b_native_source_record_seq_mean
-    role: planned
     tags:
       model: evo2_7b
       family: intermediate_embedding
@@ -154,7 +194,6 @@ views:
       kind: column
       name: value
     coordinate_space_id: evo2_7b_native_source_record_seq_mean
-    role: planned
     tags:
       model: evo2_7b
       family: output_layer_mean
@@ -166,7 +205,6 @@ views:
       kind: column
       name: value
     coordinate_space_id: evo2_7b_core60_tss_upstream_core60_mean
-    role: planned
     tags:
       model: evo2_7b
       family: intermediate_embedding
@@ -178,30 +216,140 @@ views:
       kind: column
       name: value
     coordinate_space_id: evo2_7b_core60_tss_upstream_core60_mean
-    role: planned
     tags:
       model: evo2_7b
       family: output_layer_mean
       scope: core60_tss_upstream
       pooling: core60_mean
-cohorts:
-  regulondb__sigma_factor_set:
-    kind: promoter_metadata
-    source: native_records
-    derive: regulondb__sigma_factor_set
-  regulondb__regulator_composition:
-    kind: promoter_metadata
-    source: native_records
-    derive: regulondb__regulator_composition
-  regulondb__box_pattern:
-    kind: promoter_metadata
-    source: native_records
-    derive: regulondb__box_pattern
-  regulondb__confidence_level_set:
-    kind: promoter_metadata
-    source: native_records
-    derive: regulondb__confidence_level_set
-  regulondb__metadata_completeness_class:
-    kind: promoter_metadata
-    source: native_records
-    derive: regulondb__metadata_completeness_class
+candidate_sets:
+  native_core60_7b_representations:
+    label: Native/core60 7B representation views
+    description: Native 81 bp source-record and TSS-upstream core60 views across intermediate and output-layer feature families.
+    views:
+      - intermediate_embedding_7b_native_source_record_seq_mean
+      - output_layer_mean_7b_native_source_record_seq_mean
+      - intermediate_embedding_7b_core60_tss_upstream
+      - output_layer_mean_7b_core60_tss_upstream
+    panel_titles:
+      intermediate_embedding_7b_native_source_record_seq_mean: Native source-record intermediate
+      output_layer_mean_7b_native_source_record_seq_mean: Native source-record output layer
+      intermediate_embedding_7b_core60_tss_upstream: Core60 TSS-upstream intermediate
+      output_layer_mean_7b_core60_tss_upstream: Core60 TSS-upstream output layer
+plots:
+  sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean:
+    kind: projection_scatter
+    visibility_tier: appendix
+    projection: umap_intermediate_embedding_7b_native_source_record_seq_mean
+    panel_title: Native source-record sigma UMAP
+    default_hue: regulondb__sigma_factor_set
+    hue_options:
+      - {column: regulondb__sigma_factor_set, label: Sigma factor set, type: categorical}
+    semantics_ref: plot_semantics/sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean.yaml
+  sigma_umap_intermediate_embedding_7b_core60_tss_upstream:
+    kind: projection_scatter
+    visibility_tier: appendix
+    projection: umap_intermediate_embedding_7b_core60_tss_upstream
+    panel_title: Core60 TSS-upstream sigma UMAP
+    default_hue: regulondb__sigma_factor_set
+    hue_options:
+      - {column: regulondb__sigma_factor_set, label: Sigma factor set, type: categorical}
+    semantics_ref: plot_semantics/sigma_umap_intermediate_embedding_7b_core60_tss_upstream.yaml
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: RegulonDB latent geometry browser
+    description: Read-only QC browser for native and TSS-upstream core60 RegulonDB promoter representation views.
+    default_deliverable: sigma_umap_panel
+    default_surface: plots
+    candidate_sets:
+      - native_core60_7b_representations
+    default_candidate_set: native_core60_7b_representations
+    geometry_order:
+      - intermediate_embedding_7b_native_source_record_seq_mean
+      - output_layer_mean_7b_native_source_record_seq_mean
+      - intermediate_embedding_7b_core60_tss_upstream
+      - output_layer_mean_7b_core60_tss_upstream
+    candidate_grid_views:
+      - intermediate_embedding_7b_native_source_record_seq_mean
+      - output_layer_mean_7b_native_source_record_seq_mean
+      - intermediate_embedding_7b_core60_tss_upstream
+      - output_layer_mean_7b_core60_tss_upstream
+    candidate_grid_panel_titles:
+      - Native source-record intermediate
+      - Native source-record output layer
+      - Core60 TSS-upstream intermediate
+      - Core60 TSS-upstream output layer
+    preferred_hues:
+      - regulondb__sigma_factor_set
+      - regulondb__confidence_level_set
+      - regulondb__metadata_completeness_class
+    preferred_hue_kinds:
+      regulondb__sigma_factor_set: categorical
+      regulondb__confidence_level_set: categorical
+      regulondb__metadata_completeness_class: categorical
+    default_layout: candidate_grid
+    default_compare_views:
+      - intermediate_embedding_7b_native_source_record_seq_mean
+      - intermediate_embedding_7b_core60_tss_upstream
+    ordered_plots:
+      - sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean
+      - sigma_umap_intermediate_embedding_7b_core60_tss_upstream
+recipes:
+  sigma_umap_panel_recipe:
+    steps:
+      - id: materialize_native_source_record_seq_mean
+        op: view.materialize
+        params: {view: intermediate_embedding_7b_native_source_record_seq_mean}
+      - id: materialize_core60_tss_upstream
+        op: view.materialize
+        params: {view: intermediate_embedding_7b_core60_tss_upstream}
+      - id: build_umap_sample_native_source_record_seq_mean
+        op: sample.build
+        depends_on: [materialize_native_source_record_seq_mean]
+        params: {sample: umap_sample_native_source_record_seq_mean, view: intermediate_embedding_7b_native_source_record_seq_mean, strategy: all, seed: 17}
+      - id: build_umap_sample_core60_tss_upstream
+        op: sample.build
+        depends_on: [materialize_core60_tss_upstream]
+        params: {sample: umap_sample_core60_tss_upstream, view: intermediate_embedding_7b_core60_tss_upstream, strategy: all, seed: 17}
+      - id: fit_umap_native_source_record_seq_mean
+        op: projection.fit
+        depends_on: [build_umap_sample_native_source_record_seq_mean]
+        params: {view: intermediate_embedding_7b_native_source_record_seq_mean, sample: umap_sample_native_source_record_seq_mean, run_id: umap_intermediate_embedding_7b_native_source_record_seq_mean, seed: 17}
+      - id: fit_umap_core60_tss_upstream
+        op: projection.fit
+        depends_on: [build_umap_sample_core60_tss_upstream]
+        params: {view: intermediate_embedding_7b_core60_tss_upstream, sample: umap_sample_core60_tss_upstream, run_id: umap_intermediate_embedding_7b_core60_tss_upstream, seed: 17}
+      - id: render_native_sigma_umap
+        op: plot.render
+        depends_on: [fit_umap_native_source_record_seq_mean]
+        params: {plot_id: sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean}
+      - id: render_core60_sigma_umap
+        op: plot.render
+        depends_on: [fit_umap_core60_tss_upstream]
+        params: {plot_id: sigma_umap_intermediate_embedding_7b_core60_tss_upstream}
+      - id: generate_latent_geometry_browser
+        op: notebook.generate
+        depends_on:
+          - render_native_sigma_umap
+          - render_core60_sigma_umap
+        params: {notebook_id: latent_geometry_browser}
+deliverables:
+  sigma_umap_panel:
+    title: Sigma-factor UMAP panel
+    section: Appendix
+    question: How do native and core60 RegulonDB promoter views organize under categorical sigma-factor annotations?
+    summary: Sanctioned exploratory UMAP plots and notebook review controls for the current RegulonDB promoter representation views.
+    recipe: sigma_umap_panel_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_native_source_record_seq_mean
+        - intermediate_embedding_7b_core60_tss_upstream
+    outputs:
+      plots:
+        - sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean
+        - sigma_umap_intermediate_embedding_7b_core60_tss_upstream
+      notebooks:
+        - latent_geometry_browser
+    docs_refs:
+      - study:regulondb_native_promoter_panel/deliverables/sigma_umap_panel
+    acceptance_checks: []

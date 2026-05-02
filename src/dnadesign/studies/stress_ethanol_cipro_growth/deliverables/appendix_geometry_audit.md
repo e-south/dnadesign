@@ -28,16 +28,21 @@ $$
 
 **Limits.** The scatter compresses high-dimensional geometry to two margins. Use the summary metrics for ranking.
 
-### reference_alignment_summary | Reference-alignment summary
+### reference_alignment_summary | Reference collapse summary
 
 #### Plot details
 
-**Data.** Full-context candidate samples that include the carried
-stress-reference promoters alongside the synthetic population.
+**Data.** Anchor and forward 1 kb anchor-mean candidate samples that include
+native references, derived core60 rows, SFXI controls, Anderson iGEM standards,
+and the T7/W collection when those labels are present in the materialized rows.
 
-**Preprocessing.** Uses the same view-level standardization and row normalization contract as the other cosine-based plots.
+**Preprocessing.** Uses the same view-level standardization and row
+normalization contract as the other cosine-based plots. Collection summaries
+are faceted by provenance or promoter-standard metadata; strength scales are
+not pooled into one biological scale.
 
-**Definition.** The panel reports background-relative reference alignment:
+**Definition.** The legacy stress-reference panels still report
+background-relative alignment:
 
 $$
 a_{\mathrm{eth}} = \cos(c_{\mathrm{eth}}, r_{\mathrm{SpyP}}) - \cos(c_{\mathrm{bg}}, r_{\mathrm{SpyP}})
@@ -49,11 +54,19 @@ $$
 a_{\mathrm{cipro}} = \cos(c_{\mathrm{cipro}}, r_{\mathrm{SulA}}) - \cos(c_{\mathrm{bg}}, r_{\mathrm{SulA}}).
 $$
 
-**Decision use.** The panel keeps the stress references in view as weak external landmarks without letting them drive selection.
+The collection-collapse panels report group size, median pairwise cosine
+distance, and pairwise cosine-distance IQR within each labeled reference group.
 
-**Limits.** Reference alignment stays well below assay-era evidence. Poor alignment does not automatically invalidate a candidate X. Anchor-only reference comparisons remain especially fragile because the carried controls are length-mismatched to the dominant 60 bp synthetic cohort.
+**Decision use.** The panel keeps reference landmarks and collapse diagnostics
+visible as appendix evidence while candidate selection remains on the primary
+ladder.
 
-### representation_scree_diagnostic | PCA variance-decay diagnostic
+**Limits.** Reference alignment stays well below assay-era evidence. Poor
+alignment does not automatically invalidate a candidate X. Small groups,
+mixed collection scales, and context dilution can make group-level distances
+look more collapsed or separated than the underlying biology supports.
+
+### representation_scree_diagnostic | PCA variance decay
 
 #### Plot details
 

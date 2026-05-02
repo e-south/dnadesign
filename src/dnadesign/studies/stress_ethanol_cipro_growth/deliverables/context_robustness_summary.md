@@ -32,7 +32,7 @@ variant.
 
 **Limits.** This panel reports a sample estimate rather than the full aligned population. High anchor-context agreement can still preserve nuisance structure, and low agreement does not automatically make the anchor-only space the right choice.
 
-### context_pair_summary | Direct context comparison
+### context_pair_summary | Anchor vs 1 kb context shift
 
 #### Plot details
 
@@ -52,6 +52,6 @@ $$
 \left\|z^{\mathrm{anchor}} - z^{\mathrm{context}}\right\|_2.
 $$
 
-**Decision use.** This is the direct context proof: the chosen anchor-mean path should show higher median self-cosine and lower median L2 shift than whole-sequence 1 kb pooling on the same aligned rows.
+**Decision use.** Use this as the direct sanity check for whether the 1 kb anchor-mean path stays closer to the 60 bp anchor than whole-sequence 1 kb pooling on the same aligned rows.
 
 **Limits.** Median summaries intentionally suppress subgroup shape and tails. Use the main context-robustness summary or the persisted row-level scalars when subgroup diagnostics are needed.

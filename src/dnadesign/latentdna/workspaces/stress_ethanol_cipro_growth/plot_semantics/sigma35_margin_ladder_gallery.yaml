@@ -1,15 +1,15 @@
 plot_id: sigma35_margin_ladder_gallery
 question: Does the row-level Sigma-35 margin actually form the ordered ladder summarized by the ordinal Spearman score?
 decision_role: primary
-encoding: Two-panel violin-and-box ladder showing the distribution of the Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the active 7B intermediate candidates.
-scope: The full shared promoter population in the active 7B intermediate comparison views.
+encoding: Violin-and-box ladder gallery showing the distribution of the Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the first-class 7B intermediate candidates.
+scope: The DenseGen synthetic Sigma-35 f/e/d/c/b audit subset in the first-class 7B intermediate comparison views.
 guardrails:
   - Use this ladder as the row-level bridge to the Sigma-35 ordinal summary, not as a replacement for the scalar audit.
   - Do not interpret the y axis as promoter activity or assay strength.
   - The ordinal score still governs ranking; the ladder explains why the score moves.
-caption: Row-level Sigma-35 margin ladder across the active 7B intermediate candidates.
-alt_text: Violin-and-box panel gallery showing the distribution of the Sigma-35 F-versus-B centroid margin across Sigma-35 variants for the full promoter population in the 60 bp anchor and 1 kb context anchor-mean intermediate spaces.
-preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted value is then the leave-one-out centroid margin between the `f` and `b` Sigma-35 cohorts over the full shared promoter population in each candidate view.
+caption: Row-level Sigma-35 margin ladder across candidate views.
+alt_text: Violin-and-box panel gallery showing the distribution of the Sigma-35 F-versus-B centroid margin across the f/e/d/c/b Sigma-35 variants across the first-class 7B intermediate candidate views.
+preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted value is then the leave-one-out centroid margin between the `f` and `b` Sigma-35 cohorts; the rendered ladder is restricted to the declared f/e/d/c/b audit categories so reference-derived annotations do not expand the ordinal axis.
 math_md: |
   The plotted margin is
   $$
@@ -18,4 +18,4 @@ math_md: |
   where $c_f$ and $c_b$ are the study-internal centroids for Sigma-35 variants `f` and `b`, using leave-one-out handling for in-cohort rows. Positive values mean a row sits closer to the `f` centroid than the `b` centroid; more negative values mean the opposite.
 rationale_md: This makes the ordinal Spearman feel earned. A better candidate shows the variant distributions shifting in the declared `f > e > d > c > b` order, so the scalar audit is summarizing a visible row-level ladder rather than inventing one.
 limitations_md: This is still a single derived axis conditioned on study labels, so it cannot substitute for the full ordinal audit or imply phenotype.
-failure_modes_md: If the category ordering regresses or control rows are overinterpreted, the ladder can be visually misleading.
+failure_modes_md: If the category ordering regresses or non-audit reference rows are allowed onto the x axis, the ladder can be visually misleading.

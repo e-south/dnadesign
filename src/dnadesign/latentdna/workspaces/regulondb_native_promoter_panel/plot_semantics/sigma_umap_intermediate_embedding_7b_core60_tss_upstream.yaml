@@ -1,0 +1,21 @@
+plot_id: sigma_umap_intermediate_embedding_7b_core60_tss_upstream
+question: Do TSS-upstream core60 RegulonDB windows preserve sigma-factor organization in the Evo 2 7B intermediate core60-mean space?
+decision_role: appendix
+encoding: UMAP scatter of core60 TSS-upstream embeddings colored by parent native RegulonDB sigma factor annotation.
+scope: Core60 TSS-upstream RegulonDB views with completed Evo 2 7B intermediate embedding sidecars and parent-linked native metadata.
+guardrails:
+  - Parent metadata must be joined through the workspace lookup derivation, not by ad hoc plot code.
+  - Treat UMAP as exploratory; verify any apparent separation with explicit high-dimensional summaries.
+  - Core60 rows are derived windows and should not be conflated with full native source sequences.
+caption: RegulonDB core60 TSS-upstream UMAP colored by parent native sigma factor annotation.
+alt_text: Scatter plot of RegulonDB core60 TSS-upstream promoter windows projected with UMAP and colored by the parent native promoter sigma factor category.
+preprocessing_md: Uses the core60 TSS-upstream intermediate embedding view. Sigma metadata are inherited from native RegulonDB records through the declared parent-key lookup derivation.
+math_md: |
+  The plotted coordinates are the persisted two-dimensional UMAP embedding of Evo 2 7B block26 intermediate vectors pooled over the core60 window.
+  Colors encode `regulondb__sigma_factor_set` copied from the parent native promoter record.
+rationale_md: Makes the native-versus-core60 comparison auditable without embedding RegulonDB-specific join logic inside LatentDNA plotting code.
+limitations_md: Core60 construction and UMAP projection both change the visible geometry; this plot is an inspection surface, not a decision metric.
+failure_modes_md: Duplicate Infer aliases, missing parent links, stale lookup metadata, or overinterpreted projection geometry can invalidate the visual.
+docs_refs:
+  - src/dnadesign/latentdna/docs/concepts/coordinate-spaces.md
+  - src/dnadesign/latentdna/docs/reference/view-contract.md
