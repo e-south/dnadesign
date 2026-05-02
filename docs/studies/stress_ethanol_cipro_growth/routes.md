@@ -92,11 +92,11 @@ This page keeps the downstream handoff map in one place.
   - `context_pair_summary`
 - Appendix deliverables:
   - `sigma35_centroid_distance_gallery`
-  - `appendix_geometry_audit`
+  - `appendix_geometry_review`
   - `appendix_umap_gallery`
 - Snapshot attention surfaces: none
 - Snapshot ok primary surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
-- Snapshot ok appendix surfaces: `appendix_geometry_audit`, `appendix_umap_gallery`
+- Snapshot ok appendix surfaces: `appendix_geometry_review`, `appendix_umap_gallery`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
 - Browser default geometry layout: candidate grid over the available 7B sequence-view sidecar geometries: construct-insert `seq_mean` and forward 1 kb context `anchor_mean`. Concat is retired from the current study plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, reverse-complement context anchor mean, and reference-view features are planned until Infer sidecars exist. Mean-pooled output-layer logits and log-likelihoods are collected diagnostics, not current decision geometry.

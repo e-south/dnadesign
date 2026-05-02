@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-30
+- Last verified: 2026-05-02
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -61,14 +61,14 @@
 - LatentDNA notebook role: plot-first review surface for available 7B sequence-view feature sidecars, with planned reverse-complement/reference and retired diagnostic surfaces kept secondary
 - Cluster: `planned`
 - OPAL: `not_configured`
-- Appendix deliverables remain secondary: `appendix_geometry_audit`, `appendix_umap_gallery`
-- Current appendix attention: `appendix_umap_gallery` until the all-row UMAP appendix is regenerated on a machine where that runtime cost is acceptable
-- Current appendix ok: `appendix_geometry_audit`
+- Appendix deliverables remain secondary: `appendix_geometry_review`, `appendix_umap_gallery`
+- Current appendix attention: none
+- Current appendix ok: `appendix_geometry_review`, `appendix_umap_gallery`
 - Current regenerated LatentDNA deliverables are ok for `dataset_overview`,
   `representation_health_summary`, `design_structure_summary`,
   `sigma35_ordinal_audit`, `context_robustness_summary`,
-  `candidate_decision_frontier`, and `appendix_geometry_audit`; only
-  `appendix_umap_gallery` remains missing.
+  `candidate_decision_frontier`, `appendix_geometry_review`, and
+  `appendix_umap_gallery`.
 - Current reference plot outputs include the official
   `reference_alignment_summary` appendix plot and an exploratory
   `reference_strength_probe` over the completed reference sidecars.
@@ -155,9 +155,13 @@
 - A 2026-04-30 `latentdna inspect source` smoke confirmed all local reference
   feature and scalar sources now resolve at 48 rows per core60 or per
   reference-context geometry. The same day, `latentdna deliverable run
-  dataset_overview` and `latentdna deliverable run appendix_geometry_audit`
+  dataset_overview` and `latentdna deliverable run appendix_geometry_review`
   regenerated the current non-UMAP plot surfaces and deep validation returned
   `status: ok`.
+- On 2026-05-02, LatentDNA refreshed the stress `appendix_umap_gallery`
+  deliverable after the appendix rename and reference-set summary changes. The
+  refreshed workspace snapshot reports all primary and appendix deliverables at
+  `status: ok` and `freshness: ok`.
 - Materialized LatentDNA view rows now carry `source_family`,
   `selection_basis`, `view_collections`, `role_tags`, and
   `promoter_standard__*` fields when those fields are present upstream. This

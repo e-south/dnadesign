@@ -26,7 +26,7 @@ def test_decision_ladder_excludes_appendix_only_deliverables() -> None:
         config=SimpleNamespace(
             deliverables={
                 "dataset_overview": _deliverable(plots=["dataset_overview"]),
-                "appendix_geometry_audit": _deliverable(
+                "appendix_geometry_review": _deliverable(
                     plots=["design_centroid_margin_gallery", "appendix_umap_gallery"],
                     section="Appendix",
                 ),

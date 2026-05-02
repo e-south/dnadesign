@@ -283,8 +283,8 @@ The next study-owned extensions should stay scoped:
    the persisted Infer outputs are already present.
 2. Keep any geodesic work as a debug or appendix pilot until assay-derived
    phenotype distances exist.
-3. When assay data arrives, move from design-geometry audit to
-   phenotype-geometry audit:
+3. When assay data arrives, move from design-geometry review to
+   phenotype-geometry review:
    - build phenotype vectors
    - compare phenotype distance to direct embedding distance
    - optionally compare phenotype distance to graph geodesics

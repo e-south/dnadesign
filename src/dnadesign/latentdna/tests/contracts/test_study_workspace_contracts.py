@@ -337,7 +337,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.deliverables["candidate_decision_frontier"].outputs["plots"] == [
         "candidate_decision_frontier"
     ]
-    assert context.config.deliverables["appendix_geometry_audit"].outputs["plots"] == [
+    assert context.config.deliverables["appendix_geometry_review"].outputs["plots"] == [
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
@@ -372,6 +372,20 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat" not in pre_assay_steps
     assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" not in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
+    representation_health_step = pre_assay_steps["build_representation_health_summary_metrics"]
+    omitted_candidate_ids = {row["view_id"] for row in representation_health_step.params.get("omitted_candidates", [])}
+    assert omitted_candidate_ids == {
+        "output_layer_mean_7b_anchor_60bp",
+        "output_layer_mean_7b_full_context_1kb",
+        "output_layer_mean_7b_full_context_anchor_mean",
+        "output_layer_mean_7b_reverse_complement_context_1kb",
+        "output_layer_mean_7b_reverse_complement_context_anchor_mean",
+        "output_layer_mean_7b_reference_core60",
+        "output_layer_mean_7b_reference_context_forward_1kb",
+        "output_layer_mean_7b_reference_context_forward_anchor_mean",
+        "output_layer_mean_7b_reference_context_reverse_complement_1kb",
+        "output_layer_mean_7b_reference_context_reverse_complement_anchor_mean",
+    }
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
     stress_margin_anchor = pre_assay_steps["build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp"]
@@ -417,10 +431,35 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         for step in pre_assay_steps.values()
         if getattr(step, "op", None) == "scalar.build"
     )
-    assert (
-        pre_assay_steps["build_sigma35_ordinal_audit_metrics"].params["sig35_order_path"]
-        == "study_inputs/sig35_order.yaml"
+    ordinal_axis_params = pre_assay_steps["build_sigma35_ordinal_audit_metrics"].params
+    assert ordinal_axis_params["kind"] == "ordinal_axis_audit"
+    assert ordinal_axis_params["axis"]["axis_id"] == "sigma35"
+    assert ordinal_axis_params["axis"]["column"] == "sig35_variant"
+    assert ordinal_axis_params["axis"]["order_path"] == "study_inputs/sig35_order.yaml"
+    assert ordinal_axis_params["axis"]["metric_ids"]["spearman"] == "sig35_ordinal_spearman"
+    assert [row["column"] for row in ordinal_axis_params["axis"]["within_groups"]] == [
+        "design_family",
+        "design_regulator_composition",
+    ]
+    assert pre_assay_steps["build_candidate_decision_frontier_metrics"].params["ordinal_scalar"] == (
+        "sigma35_ordinal_audit_metrics"
     )
+    assert pre_assay_steps["build_candidate_decision_frontier_metrics"].params["ordinal_metric_id"] == (
+        "sig35_ordinal_spearman"
+    )
+    reference_params = pre_assay_steps["build_reference_alignment_summary_metrics"].params
+    assert "reference_group_columns" not in reference_params
+    assert reference_params["reference_sets"] == [
+        "reference_spyp_sulap",
+        "reference_spyp_sulap_core60",
+        "reference_sfxi_archive",
+        "reference_native_mg1655",
+        "reference_native_mg1655_core60",
+        "reference_anderson_igem",
+        "reference_anderson_igem_core60",
+        "reference_w_collection",
+        "reference_w_collection_core60",
+    ]
     assert pre_assay_steps["build_context_delta_distribution_intermediate_embedding_7b_anchor_mean"].params[
         "where"
     ] == {
@@ -487,7 +526,7 @@ def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() 
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
-        / "appendix_geometry_audit.md"
+        / "appendix_geometry_review.md"
     ).read_text(encoding="utf-8")
     appendix_umap_doc = (
         _repo_root()

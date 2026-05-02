@@ -16,11 +16,13 @@ landmark, and dataset-overview plots. Embedding-bearing views must come from
 `_derived/infer/feature_aliases.parquet` joined to `feature_vectors.parquet`
 and the dataset-local sequence-view sidecars; LatentDNA no longer depends on
 USR row-overlay embedding columns for the active 7B study surfaces.
-Sigma-35 metadata is source-backed, not ladder-hardcoded: builders derive
+Sigma-35 metadata is source-backed, not ladder-hardcoded: workspace metadata derives
 `sig35_variant` from DenseGen plan tokens, DenseGen fixed-element details, USR
 `seq_annot` `-35` features, or Construct retained-feature bounds. Annotated
 unranked hexamers are kept in source inventory and eligible plots; only
 ordinal-rank statistics restrict themselves to the explicit b-f order file.
+The package-level scalar primitive is the generic `ordinal_axis_audit`; this
+workspace config maps that generic axis audit onto Sigma-35 metric names.
 
 The active contract is still pre-assay representation triage: choose a plausible
 mean-pooled Evo2 feature space \(X\) for later supervised modeling. Available
@@ -58,6 +60,11 @@ sidecars are present.
 - `reference_alignment_summary`
 - `representation_scree_diagnostic`
 - `appendix_umap_gallery`
+
+Named reference collections in `reference_alignment_summary` are selected
+through workspace `reference_sets`. Native MG1655, Anderson iGEM, W collection,
+spyP/sulAp, SFXI, or future non-promoter landmarks therefore share the same
+selector, label, overlay, and missing-status contract.
 
 ### Notebook role
 

@@ -36,7 +36,7 @@ Common commands:
 4. `uv run latentdna inspect source full_context_7b_forward_anchor_mean_features --workspace stress_ethanol_cipro_growth --json`
 5. `uv run latentdna inspect source reference_context_7b_forward_anchor_mean_features --workspace stress_ethanol_cipro_growth --json`
 6. `uv run latentdna deliverable status representation_health_summary --workspace stress_ethanol_cipro_growth`
-7. `uv run latentdna deliverable status appendix_geometry_audit --workspace stress_ethanol_cipro_growth`
+7. `uv run latentdna deliverable status appendix_geometry_review --workspace stress_ethanol_cipro_growth`
 8. `uv run latentdna notebook generate latent_geometry_browser --workspace stress_ethanol_cipro_growth`
 
 Existing materialized view/plot artifacts may predate the sidecar-backed source

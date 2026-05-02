@@ -5869,8 +5869,8 @@
       ],
       "warnings": []
     },
-    "appendix_geometry_audit": {
-      "title": "Appendix geometry audit",
+    "appendix_geometry_review": {
+      "title": "Appendix geometry review",
       "status": "ok",
       "freshness": "ok",
       "acceptance_checks": [],
@@ -5881,17 +5881,17 @@
       ],
       "docs_refs": [
         {
-          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit",
-          "relative_ref": "deliverables/appendix_geometry_audit",
-          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_geometry_audit.md"
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/appendix_geometry_review",
+          "relative_ref": "deliverables/appendix_geometry_review",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/appendix_geometry_review.md"
         }
       ],
       "warnings": []
     },
     "appendix_umap_gallery": {
       "title": "UMAP gallery",
-      "status": "attention",
-      "freshness": "attention",
+      "status": "ok",
+      "freshness": "ok",
       "acceptance_checks": [],
       "artifact_paths": [
         "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/appendix_umap_gallery",
@@ -5936,7 +5936,69 @@
       "context_shift_l2",
       "source_family",
       "selection_basis"
-    ]
+    ],
+    "candidate_sets": {
+      "first_class_intermediate_7b": {
+        "label": "First-class 7B intermediate X candidates",
+        "view_ids": [
+          "intermediate_embedding_7b_anchor_60bp",
+          "intermediate_embedding_7b_full_context_1kb",
+          "intermediate_embedding_7b_full_context_anchor_mean",
+          "intermediate_embedding_7b_reverse_complement_context_1kb",
+          "intermediate_embedding_7b_reverse_complement_context_anchor_mean"
+        ],
+        "available_view_ids": [
+          "intermediate_embedding_7b_anchor_60bp",
+          "intermediate_embedding_7b_full_context_1kb",
+          "intermediate_embedding_7b_full_context_anchor_mean",
+          "intermediate_embedding_7b_reverse_complement_context_1kb",
+          "intermediate_embedding_7b_reverse_complement_context_anchor_mean"
+        ]
+      },
+      "expanded_reference_intermediate_7b": {
+        "label": "Expanded 7B intermediate audit views",
+        "view_ids": [
+          "intermediate_embedding_7b_anchor_60bp",
+          "intermediate_embedding_7b_full_context_1kb",
+          "intermediate_embedding_7b_full_context_anchor_mean",
+          "intermediate_embedding_7b_reverse_complement_context_1kb",
+          "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+          "intermediate_embedding_7b_reference_core60",
+          "intermediate_embedding_7b_reference_context_forward_1kb",
+          "intermediate_embedding_7b_reference_context_forward_anchor_mean",
+          "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+          "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean"
+        ],
+        "available_view_ids": [
+          "intermediate_embedding_7b_anchor_60bp",
+          "intermediate_embedding_7b_full_context_1kb",
+          "intermediate_embedding_7b_full_context_anchor_mean",
+          "intermediate_embedding_7b_reverse_complement_context_1kb",
+          "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+          "intermediate_embedding_7b_reference_core60",
+          "intermediate_embedding_7b_reference_context_forward_1kb",
+          "intermediate_embedding_7b_reference_context_forward_anchor_mean",
+          "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+          "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean"
+        ]
+      },
+      "planned_output_layer_7b": {
+        "label": "Planned 7B output-layer diagnostics",
+        "view_ids": [
+          "output_layer_mean_7b_anchor_60bp",
+          "output_layer_mean_7b_full_context_1kb",
+          "output_layer_mean_7b_full_context_anchor_mean",
+          "output_layer_mean_7b_reverse_complement_context_1kb",
+          "output_layer_mean_7b_reverse_complement_context_anchor_mean",
+          "output_layer_mean_7b_reference_core60",
+          "output_layer_mean_7b_reference_context_forward_1kb",
+          "output_layer_mean_7b_reference_context_forward_anchor_mean",
+          "output_layer_mean_7b_reference_context_reverse_complement_1kb",
+          "output_layer_mean_7b_reference_context_reverse_complement_anchor_mean"
+        ],
+        "available_view_ids": []
+      }
+    }
   },
   "decision_ladder": [
     "dataset_overview",
@@ -5945,5 +6007,5 @@
     "context_robustness_summary",
     "candidate_decision_frontier"
   ],
-  "last_updated_at": "2026-05-02T00:52:16.193766+00:00"
+  "last_updated_at": "2026-05-02T16:01:15.405845+00:00"
 }

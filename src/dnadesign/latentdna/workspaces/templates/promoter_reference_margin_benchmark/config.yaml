@@ -779,8 +779,21 @@ recipes:
           - build_scorecard_sample_pooled_logits_7b_full_context_1kb
         params:
           scalar: sigma35_ordinal_audit_metrics
-          kind: sigma35_ordinal_audit
-          sig35_order_path: inputs/sig35_order.yaml
+          kind: ordinal_axis_audit
+          axis:
+            axis_id: sigma35
+            label: Sigma-35
+            column: sig35_variant
+            order_path: inputs/sig35_order.yaml
+            exclude_values: [control]
+            metric_ids:
+              spearman: sig35_ordinal_spearman
+              kendall: sig35_ordinal_kendall
+              balanced_spearman: sig35_balanced_ordinal_spearman
+              permutation_pvalue: sig35_label_permutation_pvalue
+            within_groups:
+              - {column: design_family, metric_id: sig35_within_family_mean_spearman}
+              - {column: design_regulator_composition, metric_id: sig35_within_regulator_mean_spearman}
           bootstrap_iterations: 100
           permutations: 100
           seed: 17
@@ -883,6 +896,8 @@ recipes:
         params:
           scalar: reference_alignment_summary_metrics
           kind: reference_alignment_summary
+          reference_sets:
+            - reference_spyp_sulap
           candidates:
             - {view_id: intermediate_embedding_7b_full_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_1kb}
             - {view_id: pooled_logits_7b_full_context_1kb, sample_id: scorecard_sample_pooled_logits_7b_full_context_1kb}
@@ -900,7 +915,10 @@ recipes:
           kind: candidate_decision_frontier
           health_scalar: representation_health_summary_metrics
           design_scalar: design_structure_summary_metrics
-          sigma35_scalar: sigma35_ordinal_audit_metrics
+          ordinal_scalar: sigma35_ordinal_audit_metrics
+          ordinal_metric_id: sig35_ordinal_spearman
+          ordinal_output_column: sig35_ordinal_spearman
+          ordinal_display_name: Sigma-35 ordinal Spearman
           context_scalar: context_robustness_summary_metrics
           candidate_ids:
             - intermediate_embedding_7b_anchor_60bp
@@ -1204,8 +1222,8 @@ deliverables:
       plots: [candidate_decision_frontier]
     docs_refs: []
     acceptance_checks: []
-  appendix_geometry_audit:
-    title: Appendix geometry audit
+  appendix_geometry_review:
+    title: Appendix geometry review
     section: Appendix
     question: Which secondary geometry surfaces still help orient candidate selection without driving it?
     summary: Internal centroid margins, weak external reference alignment, and scree diagnostics.

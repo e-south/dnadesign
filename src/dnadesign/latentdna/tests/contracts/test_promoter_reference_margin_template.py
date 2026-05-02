@@ -44,7 +44,7 @@ def test_template_tracks_canonical_views_and_pre_assay_deliverables() -> None:
         "sigma35_ordinal_audit",
         "context_robustness_summary",
         "candidate_decision_frontier",
-        "appendix_geometry_audit",
+        "appendix_geometry_review",
         "appendix_umap_gallery",
     ]
 
@@ -199,7 +199,7 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
         "context_pair_summary",
     ]
     assert payload["deliverables"]["candidate_decision_frontier"]["outputs"]["plots"] == ["candidate_decision_frontier"]
-    assert payload["deliverables"]["appendix_geometry_audit"]["outputs"]["plots"] == [
+    assert payload["deliverables"]["appendix_geometry_review"]["outputs"]["plots"] == [
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
@@ -220,10 +220,12 @@ def test_template_uses_background_relative_internal_margins_and_declared_sig35_o
         "control_values": ["background_only"],
         "output_column": "synthetic_margin_ethanol_vs_background",
     }
-    assert (
-        pre_assay_steps["build_sigma35_ordinal_audit_metrics"]["params"]["sig35_order_path"]
-        == "inputs/sig35_order.yaml"
-    )
+    ordinal_axis_params = pre_assay_steps["build_sigma35_ordinal_audit_metrics"]["params"]
+    assert ordinal_axis_params["kind"] == "ordinal_axis_audit"
+    assert ordinal_axis_params["axis"]["axis_id"] == "sigma35"
+    assert ordinal_axis_params["axis"]["column"] == "sig35_variant"
+    assert ordinal_axis_params["axis"]["order_path"] == "inputs/sig35_order.yaml"
+    assert ordinal_axis_params["axis"]["metric_ids"]["spearman"] == "sig35_ordinal_spearman"
     assert pre_assay_steps["build_design_structure_summary_metrics"]["params"]["balance_columns"] == [
         "sig35_variant",
         "spacer_length",
@@ -304,6 +306,9 @@ def test_template_recipes_are_self_materializing() -> None:
         is True
     )
     assert "build_reference_alignment_summary_metrics" in pre_assay_steps
+    assert pre_assay_steps["build_reference_alignment_summary_metrics"]["params"]["reference_sets"] == [
+        "reference_spyp_sulap"
+    ]
     assert "build_candidate_decision_frontier_metrics" in pre_assay_steps
     assert "render_balanced_design_family_margin_gallery" in pre_assay_steps
     assert "render_sigma35_margin_ladder_gallery" in pre_assay_steps

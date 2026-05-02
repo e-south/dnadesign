@@ -1,4 +1,4 @@
-# Appendix Geometry Audit
+# Appendix Geometry Review
 
 These appendix surfaces provide orientation and diagnostics. Candidate ranking stays on the primary review path.
 
@@ -38,8 +38,9 @@ and the T7/W collection when those labels are present in the materialized rows.
 
 **Preprocessing.** Uses the same view-level standardization and row
 normalization contract as the other cosine-based plots. Collection summaries
-are faceted by provenance or promoter-standard metadata; strength scales are
-not pooled into one biological scale.
+are resolved from workspace `reference_sets`, so missing or incomplete
+collections remain explicit status rows; strength scales are not pooled into
+one biological scale.
 
 **Definition.** The legacy stress-reference panels still report
 background-relative alignment:
@@ -55,7 +56,8 @@ a_{\mathrm{cipro}} = \cos(c_{\mathrm{cipro}}, r_{\mathrm{SulA}}) - \cos(c_{\math
 $$
 
 The collection-collapse panels report group size, median pairwise cosine
-distance, and pairwise cosine-distance IQR within each labeled reference group.
+distance, and pairwise cosine-distance IQR within each configured reference
+set.
 
 **Decision use.** The panel keeps reference landmarks and collapse diagnostics
 visible as appendix evidence while candidate selection remains on the primary

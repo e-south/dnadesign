@@ -71,7 +71,7 @@ study_pipeline:
           - SSL_CERT_FILE
           - REQUESTS_CA_BUNDLE
         tls_bundle_example: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
-        profile_secret_policy: file_backed_secret_ref_only
+        profile_secret_policy: file_backed_secret_ref_only  # pragma: allowlist secret
       sge_resource_contract:
         pe_omp: 4
         h_rt: "12:00:00"
@@ -188,11 +188,12 @@ study_pipeline:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
     latest_materialization:
-      checked: 2026-04-30
+      checked: 2026-05-02
       deep_validation: ok
       regenerated_deliverables:
         - dataset_overview
-        - appendix_geometry_audit
+        - appendix_geometry_review
+        - appendix_umap_gallery
       regenerated_recipe_outputs:
         - dataset_overview
         - representation_health_summary
