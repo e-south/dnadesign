@@ -590,7 +590,7 @@ def _span_link_label_boxes(
         base_fs = (
             max(6, int(round(style.display_font_size())))
             if bool(style.uniform_display_font_size)
-            else max(6, style.font_size_label - 2)
+            else _span_link_label_font_size(style)
         )
         avail = max(4.0, x2 - x1)
         label = str(effect.params.get("label", "")).strip()
@@ -661,15 +661,31 @@ def _compact_fixed_element_annotation_label(raw_label: str) -> str:
 
 
 def _fixed_element_annotation_font_size(style: Style) -> float:
+    if style.font_size_annotation_label is not None:
+        return float(style.font_size_annotation_label)
     if bool(style.uniform_display_font_size):
         return style.display_font_size()
     return float(max(6, style.font_size_label, style.font_size_seq))
 
 
 def _interval_annotation_fill_font_size(style: Style) -> float:
+    if style.font_size_annotation_label is not None:
+        return float(style.font_size_annotation_label)
     if bool(style.uniform_display_font_size):
         return float(max(style.display_font_size(), style.display_font_size() * 1.15))
     return float(max(10, style.font_size_label, style.legend_font_size))
+
+
+def _feature_label_font_size(style: Style) -> int:
+    if style.font_size_feature_label is not None:
+        return int(style.font_size_feature_label)
+    return int(style.font_size_seq)
+
+
+def _span_link_label_font_size(style: Style) -> int:
+    if style.font_size_span_link_label is not None:
+        return int(style.font_size_span_link_label)
+    return max(6, int(style.font_size_label) - 2)
 
 
 def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, palette: Palette, style: Style) -> None:
@@ -1657,7 +1673,8 @@ def _draw_feature_box(
     for idx, char in enumerate(label):
         if char.isspace():
             continue
-        tp = _mono_text_path(char, style.font_mono, style.font_size_seq)
+        label_font_size = _feature_label_font_size(style)
+        tp = _mono_text_path(char, style.font_mono, label_font_size)
         gb = tp.get_extents()
         gx = ((gb.x0 + gb.x1) / 2.0) * px_per_pt
         gy = ((gb.y0 + gb.y1) / 2.0) * px_per_pt

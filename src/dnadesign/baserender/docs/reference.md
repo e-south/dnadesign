@@ -223,9 +223,19 @@ Stable API surface:
 - `list_render_contracts`, `get_render_contract_descriptor`
 - `load_record_from_parquet`, `load_records_from_parquet`
 - `render_record_figure`, `render_record_grid_figure`, `render_parquet_record_figure`
+- `render_sequence_panel_image`, `sequence_panel_config_for_adapter`
 - `BaseRenderJobV3`, `RenderJobV3`, `RenderContractDescriptor`
+- `SequencePanelConfig`, `SequencePanelDiagnostics`, `SequencePanelImage`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
+- `Style`, `resolve_style`, `resolve_preset_path`, `list_style_presets`
 - `SchemaError`, `ContractError`, `LayoutError`
+
+Sequence-panel contract:
+- contract id: `dnadesign.baserender.sequence_panel.v1`
+- version: `BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION`
+- default profile: `promoter_compact_slide.v1`
+- supported adapters: `densegen_tfbs` and `usr_genbank_annotations_v1`
+- failure mode: unsupported adapters, unknown profiles, malformed annotation rows, and invalid target dimensions raise `SchemaError`
 
 `render(...)` grid default:
 - record list input defaults to a single-row layout (`ncols = len(records)`).
