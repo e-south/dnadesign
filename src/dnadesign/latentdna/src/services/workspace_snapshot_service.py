@@ -26,6 +26,7 @@ from ..contracts.workspace_snapshot import (
     WorkspaceSnapshotSource,
 )
 from ..io.json_io import write_json
+from ..services.candidate_inventory_service import build_candidate_inventory
 from ..services.deliverable_service import deliverable_status_from_context
 from ..services.freshness_service import FreshnessCache
 from ..services.notebook_geometry_controls import build_workspace_geometry_controls
@@ -188,6 +189,7 @@ def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
         sources=_source_snapshot(context),
         model_families=_model_families(context),
         canonical_views=list(context.config.views),
+        candidate_inventory=build_candidate_inventory(context),
         deliverables=_deliverable_snapshots(context),
         exports=_export_snapshots(context),
         browser=_browser_snapshot(context),

@@ -46,6 +46,27 @@ class WorkspaceSnapshotBrowser(StrictWorkspaceSnapshotModel):
     candidate_sets: dict[str, dict[str, object]] = Field(default_factory=dict)
 
 
+class WorkspaceSnapshotCandidate(StrictWorkspaceSnapshotModel):
+    study_id: str
+    candidate_set_ids: list[str] = Field(default_factory=list)
+    view_id: str
+    source_id: str | None = None
+    dataset: str | None = None
+    row_basis: str | None = None
+    model_name: str | None = None
+    feature_family: str | None = None
+    modality: str
+    sequence_scope: str | None = None
+    pooling_operation: str | None = None
+    orientation: str | None = None
+    coordinate_space_id: str | None = None
+    role: str | None = None
+    n_rows: int | None = None
+    n_dims: int | None = None
+    materialization_status: str
+    freshness_status: str
+
+
 class WorkspaceSnapshot(StrictWorkspaceSnapshotModel):
     schema_version: Literal["latentdna.workspace_snapshot.v1"]
     workspace_id: str
@@ -53,6 +74,7 @@ class WorkspaceSnapshot(StrictWorkspaceSnapshotModel):
     sources: dict[str, WorkspaceSnapshotSource]
     model_families: list[str] = Field(default_factory=list)
     canonical_views: list[str] = Field(default_factory=list)
+    candidate_inventory: list[WorkspaceSnapshotCandidate] = Field(default_factory=list)
     deliverables: dict[str, WorkspaceSnapshotDeliverable] = Field(default_factory=dict)
     exports: dict[str, WorkspaceSnapshotExport] = Field(default_factory=dict)
     browser: WorkspaceSnapshotBrowser

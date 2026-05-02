@@ -13,6 +13,7 @@ Required top-level fields:
 - `sources`
 - `model_families`
 - `canonical_views`
+- `candidate_inventory`
 - `deliverables`
 - `exports`
 - `browser`
@@ -22,6 +23,14 @@ Required top-level fields:
 `decision_ladder` publishes the primary decision surfaces only. Gate
 deliverables still appear under `deliverables`, but they are not listed as
 decision steps.
+
+`candidate_inventory` publishes one machine-readable row per configured
+candidate X view. Each row records the candidate set memberships, source,
+dataset or path, row basis, model name, feature family, modality, sequence
+scope, pooling operation, orientation, coordinate space, role, dimensions when
+known, materialization status, and freshness status. Planned or retired
+candidate views remain visible in this ledger instead of disappearing from
+representation comparisons.
 
 Promoter-study tooling is allowed to know only:
 

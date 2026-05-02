@@ -11,6 +11,7 @@ from ..io.json_io import read_json, write_json
 from ..studies.docs_refs import read_docs_ref
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
 from ._artifacts import artifact_dir, artifact_exists, prune_retired_managed_artifacts
+from .candidate_inventory_service import build_candidate_inventory
 from .deliverable_service import deliverable_status_from_context
 from .freshness_service import FreshnessCache
 from .plot_service import write_plot_index
@@ -83,6 +84,7 @@ def workspace_catalog_from_context(context: WorkspaceContext) -> dict[str, objec
         "plots": plots_payload.get("plots", []),
         "notebooks": notebooks,
         "exports": exports,
+        "candidate_inventory": build_candidate_inventory(context, freshness_cache=freshness_cache),
         "runs": runs,
         "docs_refs": docs_refs,
         "pruned_artifacts": pruned_artifacts,
