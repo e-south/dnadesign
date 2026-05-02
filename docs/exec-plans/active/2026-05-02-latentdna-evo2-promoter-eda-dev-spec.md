@@ -46,6 +46,7 @@ and narrow the package contract first.
 - [x] (2026-05-02 16:01Z) Slice 5 validation: stress `reference_alignment_summary_metrics` rebuilt with 141 rows across 9 configured reference sets; stress `appendix_umap_gallery` refreshed with 8 executed and 72 skipped recipe steps; stress notebook generation, notebook smoke, Marimo check, deep workspace validation, and workspace snapshot all pass with every stress deliverable at `freshness: ok`.
 - [x] (2026-05-02 21:07Z) Slice 6: addressed a measured sampled-scope performance footgun without lossy sampling. `reference_alignment_summary_metrics` baseline over five stress scorecard samples was 10.3301s / 7.5557s / 7.6601s with cProfile showing `_load_view_scope_table` and `_sample_scope` consumed 10.105s of the first run and peak RSS around 1.03-1.11 GB. Added a byte-capped, file-stamped exact sample-scope cache and kept reference-collapse distances in the already-normalized candidate geometry instead of re-normalizing each reference set. The same three-run workload now reports 10.1382s cold, then 0.2998s and 0.2037s warm; warm cProfile shows `_load_view_scope_table` down to 0.095s and normalization calls down from 46 to 5. The affected stress scalar, plot, and generated notebook were regenerated.
 - [x] (2026-05-02 17:01Z) Added explicit handoff addendum for math/data-processing fidelity, plot-claim alignment, Marimo control discipline, and performance footguns so the next goal-tracked Codex run has non-negotiable acceptance gates rather than only plot-level intent.
+- [x] (2026-05-02 17:28Z) Slice 7: added a generic candidate X inventory ledger to workspace snapshots and catalogs, including candidate-set membership, source/dataset, row basis, model, feature family, modality, sequence scope, pooling, orientation, coordinate space, dimensions, materialization status, and freshness status. Planned views remain visible as planned without inspecting planned source payloads during status publication.
 - [ ] (2026-05-02 16:01Z) Later slices remain for any OPAL export-facing decisions that require maintainer weighting policy or phenotype-backed active-learning promotion rules.
 
 ### Surprises & Discoveries
@@ -263,6 +264,9 @@ outcome is:
 - a measured performance hardening pass for exact sample-scope reuse, plus a
   reference-collapse data-fidelity correction that keeps collection distances in
   the candidate-level X geometry.
+- a machine-readable candidate X ledger published through workspace snapshots
+  and catalogs so current, planned, missing, stale, and retired representation
+  surfaces are visible without notebook-specific reconstruction.
 
 Remaining outcomes are intentionally scoped to later work: deeper stress-study
 active-learning export policy and weighting choices for combining reference
