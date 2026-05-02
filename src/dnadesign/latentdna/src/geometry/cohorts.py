@@ -202,13 +202,13 @@ def aligned_cohort_distance_vectors(
 def ordinal_gap_and_distance_vectors(
     *,
     centroids: dict[str, np.ndarray],
-    ranks: dict[str, int],
+    ranks: dict[str, float],
 ) -> tuple[np.ndarray, np.ndarray]:
     ordered = sorted(variant for variant in centroids if variant in ranks)
     gaps: list[float] = []
     distances: list[float] = []
     for left_index, left in enumerate(ordered):
         for right in ordered[left_index + 1 :]:
-            gaps.append(abs(int(ranks[left]) - int(ranks[right])))
+            gaps.append(abs(float(ranks[left]) - float(ranks[right])))
             distances.append(1.0 - float(np.dot(centroids[left], centroids[right])))
     return np.asarray(gaps, dtype=np.float64), np.asarray(distances, dtype=np.float64)

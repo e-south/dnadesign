@@ -95,6 +95,30 @@ def _write_margin_workspace_config(workspace_dir: Path) -> None:
                         "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
                     }
                 },
+                "reference_sets": {
+                    "reference_w_collection": {
+                        "label": "W collection",
+                        "match_column": "usr_label__primary",
+                        "label_column": "usr_label__primary",
+                        "where_all": [
+                            {
+                                "column": "promoter_standard__collection_id",
+                                "equals": "t7_w_collection",
+                            }
+                        ],
+                    },
+                    "reference_anderson_igem": {
+                        "label": "Anderson iGEM",
+                        "match_column": "usr_label__primary",
+                        "label_column": "usr_label__primary",
+                        "where_all": [
+                            {
+                                "column": "promoter_standard__collection_id",
+                                "equals": "anderson_igem",
+                            }
+                        ],
+                    },
+                },
             },
             sort_keys=False,
         ),
@@ -1608,6 +1632,123 @@ def test_reference_alignment_summary_keeps_group_columns_with_legacy_alignment_r
     )
 
 
+def test_reference_alignment_summary_emits_configured_reference_set_status_rows(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "w1",
+            "subject_id": "w1",
+            "design_family": "control",
+            "usr_label__primary": "W1_core60",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "embedding": [1.0, 0.0, 0.0],
+        },
+        {
+            "id": "w2",
+            "subject_id": "w2",
+            "design_family": "control",
+            "usr_label__primary": "W2_core60",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "embedding": [0.8, 0.2, 0.0],
+        },
+        {
+            "id": "design_row",
+            "subject_id": "design_row",
+            "design_family": "background_only",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [0.0, 1.0, 0.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="reference_alignment_summary_metrics",
+        builder_kind="reference_alignment_summary",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "reference_sets": ["reference_w_collection", "reference_anderson_igem"],
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    metrics = {(row["reference_set_id"], row["metric_id"]): row for row in table_rows if row.get("reference_set_id")}
+    w_size = metrics[("reference_w_collection", "reference_group_size")]
+    assert w_size["metric_value"] == 2.0
+    assert w_size["reference_set_status"] == "ok"
+    assert w_size["reference_set_complete"] is True
+    assert w_size["display_name"] == "Reference group size\nReference set: W collection"
+    anderson_size = metrics[("reference_anderson_igem", "reference_group_size")]
+    assert anderson_size["metric_value"] == 0.0
+    assert anderson_size["reference_set_status"] == "absent"
+    assert anderson_size["reference_set_complete"] is False
+    anderson_distance = metrics[
+        (
+            "reference_anderson_igem",
+            "reference_group_pairwise_cosine_distance_median",
+        )
+    ]
+    assert np.isnan(anderson_distance["metric_value"])
+
+
+def test_reference_alignment_summary_reports_missing_reference_set_columns(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "row_1",
+            "subject_id": "row_1",
+            "design_family": "control",
+            "usr_label__primary": "W1_core60",
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "row_2",
+            "subject_id": "row_2",
+            "design_family": "control",
+            "usr_label__primary": "W2_core60",
+            "embedding": [0.0, 1.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="reference_alignment_summary_metrics",
+        builder_kind="reference_alignment_summary",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "reference_sets": ["reference_w_collection"],
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    size_row = next(row for row in table_rows if row["metric_id"] == "reference_group_size")
+    assert size_row["metric_value"] == 0.0
+    assert size_row["reference_set_status"] == "missing_columns"
+    assert size_row["reference_set_missing_columns"] == "promoter_standard__collection_id"
+
+
 def test_sigma35_ordinal_audit_emits_confidence_intervals_for_spearman_summary_rows(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -1700,10 +1841,29 @@ def test_sigma35_ordinal_audit_emits_confidence_intervals_for_spearman_summary_r
     artifact = build_scalar_artifact(
         context,
         scalar_id="sigma35_ordinal_audit_metrics",
-        builder_kind="sigma35_ordinal_audit",
+        builder_kind="ordinal_axis_audit",
         params={
             "candidates": [{"view_id": "degenerate_view"}],
-            "sig35_order_path": "study_inputs/sig35_order.yaml",
+            "axis": {
+                "axis_id": "sigma35",
+                "label": "Sigma-35",
+                "column": "sig35_variant",
+                "order_path": "study_inputs/sig35_order.yaml",
+                "exclude_values": ["control"],
+                "metric_ids": {
+                    "spearman": "sig35_ordinal_spearman",
+                    "kendall": "sig35_ordinal_kendall",
+                    "balanced_spearman": "sig35_balanced_ordinal_spearman",
+                    "permutation_pvalue": "sig35_label_permutation_pvalue",
+                },
+                "within_groups": [
+                    {"column": "design_family", "metric_id": "sig35_within_family_mean_spearman"},
+                    {
+                        "column": "design_regulator_composition",
+                        "metric_id": "sig35_within_regulator_mean_spearman",
+                    },
+                ],
+            },
             "bootstrap_iterations": 20,
             "permutations": 20,
             "balance_columns": ["design_family", "spacer_length"],
@@ -1722,6 +1882,106 @@ def test_sigma35_ordinal_audit_emits_confidence_intervals_for_spearman_summary_r
             continue
         assert row["ci_lower"] is not None
         assert row["ci_upper"] is not None
+        assert row["ordinal_axis_id"] == "sigma35"
+        assert row["ordinal_axis_column"] == "sig35_variant"
+
+
+def test_ordinal_axis_audit_supports_numeric_rank_metadata_without_sig35_columns(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "low_1",
+            "subject_id": "low_1",
+            "standard_id": "std_low",
+            "strength": 1.0,
+            "batch": "a",
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "low_2",
+            "subject_id": "low_2",
+            "standard_id": "std_low",
+            "strength": 1.0,
+            "batch": "b",
+            "embedding": [0.9, 0.1],
+        },
+        {
+            "id": "mid_1",
+            "subject_id": "mid_1",
+            "standard_id": "std_mid",
+            "strength": 5.0,
+            "batch": "a",
+            "embedding": [0.1, 0.9],
+        },
+        {
+            "id": "mid_2",
+            "subject_id": "mid_2",
+            "standard_id": "std_mid",
+            "strength": 5.0,
+            "batch": "b",
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "high_1",
+            "subject_id": "high_1",
+            "standard_id": "std_high",
+            "strength": 10.0,
+            "batch": "a",
+            "embedding": [-1.0, 0.0],
+        },
+        {
+            "id": "high_2",
+            "subject_id": "high_2",
+            "standard_id": "std_high",
+            "strength": 10.0,
+            "batch": "b",
+            "embedding": [-0.9, 0.1],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="standard_strength_ordinal_metrics",
+        builder_kind="ordinal_axis_audit",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "axis": {
+                "axis_id": "standard_strength",
+                "label": "Standard strength",
+                "column": "standard_id",
+                "rank_column": "strength",
+                "within_groups": [{"column": "batch"}],
+            },
+            "bootstrap_iterations": 5,
+            "permutations": 5,
+            "balance_columns": ["batch"],
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    metric_ids = {row["metric_id"] for row in rows_table}
+
+    assert artifact.stats["axis_id"] == "standard_strength"
+    assert metric_ids == {
+        "ordinal_axis_spearman",
+        "ordinal_axis_kendall",
+        "ordinal_axis_balanced_spearman",
+        "ordinal_axis_within_group_mean_spearman",
+        "ordinal_axis_label_permutation_pvalue",
+    }
+    assert all(row["ordinal_axis_column"] == "standard_id" for row in rows_table)
+    assert all(row["ordinal_order_source"] == "strength" for row in rows_table)
 
 
 def test_sigma35_centroid_distance_includes_annotated_unranked_variants(tmp_path: Path) -> None:
@@ -1874,6 +2134,128 @@ def test_representation_health_summary_records_effective_rank_basis(tmp_path: Pa
     assert effective_rank["pca_fit_scope_kind"] == "sample_set"
     assert effective_rank["pca_fit_scope_id"] == "scorecard_sample_demo"
     assert effective_rank["explained_variance_captured"] == pytest.approx(0.95)
+
+
+def test_representation_health_summary_reports_planned_candidates_without_ranking(tmp_path: Path) -> None:
+    workspace_dir = tmp_path
+    _write_margin_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["planned_output_layer"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "demo_output_layer_space",
+        "tags": {"model": "7b", "family": "output_layer_mean", "scope": "anchor_60bp"},
+        "role": "planned",
+    }
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    rows = [
+        {"id": "a", "subject_id": "a", "embedding": [1.0, 0.0, 0.0, 0.0]},
+        {"id": "b", "subject_id": "b", "embedding": [0.0, 1.0, 0.0, 0.0]},
+        {"id": "c", "subject_id": "c", "embedding": [0.0, 0.0, 1.0, 0.0]},
+        {"id": "d", "subject_id": "d", "embedding": [0.0, 0.0, 0.0, 1.0]},
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+    reducer_dir = workspace_dir / "outputs" / "reducers" / "pca_degenerate_view"
+    reducer_dir.mkdir(parents=True)
+    (reducer_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "method": "pca",
+                "fit_rows": 4,
+                "input_dims": 4,
+                "output_dims": 4,
+                "explained_variance_ratio": [0.5, 0.25, 0.15, 0.1],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="representation_health_summary_metrics",
+        builder_kind="representation_health_summary",
+        params={
+            "candidates": [{"view_id": "degenerate_view", "reducer_id": "pca_degenerate_view"}],
+            "omitted_candidates": [
+                {"view_id": "planned_output_layer", "reason": "awaiting output-layer materialization"}
+            ],
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    planned_rows = [row for row in rows_table if row["candidate_id"] == "planned_output_layer"]
+
+    assert {row["metric_id"] for row in planned_rows} == {
+        "effective_rank",
+        "pc1_variance_fraction",
+        "pairwise_cosine_distance_median",
+        "pairwise_cosine_distance_iqr",
+    }
+    assert all(np.isnan(float(row["metric_value"])) for row in planned_rows)
+    assert all(row["candidate_status"] == "planned" for row in planned_rows)
+    assert all(row["omitted_from_ranking"] for row in planned_rows)
+    assert all(row["health_status"] == "planned" for row in planned_rows)
+    assert all(row["omission_reason"] == "awaiting output-layer materialization" for row in planned_rows)
+    assert planned_rows[0]["candidate_family"] == "output_layer_mean"
+
+
+def test_cohort_structure_summary_uses_configured_metadata_axis(tmp_path: Path) -> None:
+    workspace_dir = tmp_path
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "rpoD_1", "subject_id": "rpoD_1", "regulondb__sigma_factor_set": "rpoD", "embedding": [1.0, 0.0]},
+        {"id": "rpoD_2", "subject_id": "rpoD_2", "regulondb__sigma_factor_set": "rpoD", "embedding": [0.9, 0.1]},
+        {"id": "rpoS_1", "subject_id": "rpoS_1", "regulondb__sigma_factor_set": "rpoS", "embedding": [0.0, 1.0]},
+        {"id": "rpoS_2", "subject_id": "rpoS_2", "regulondb__sigma_factor_set": "rpoS", "embedding": [0.1, 0.9]},
+        {"id": "rare", "subject_id": "rare", "regulondb__sigma_factor_set": "rare", "embedding": [0.5, 0.5]},
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="cohort_structure_summary_metrics",
+        builder_kind="cohort_structure_summary",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "axes": [
+                {
+                    "axis_id": "regulondb_sigma_factor_set",
+                    "label": "Sigma-factor set",
+                    "column": "regulondb__sigma_factor_set",
+                    "min_group_size": 2,
+                }
+            ],
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    row = rows_table[0]
+
+    assert artifact.stats["axis_count"] == 1
+    assert artifact.stats["skipped_axes"] == []
+    assert row["metric_id"] == "cohort_separation_ratio"
+    assert row["display_name"] == "Sigma-factor set"
+    assert row["cohort_column"] == "regulondb__sigma_factor_set"
+    assert row["cohort_group_count"] == 2
+    assert row["cohort_usable_row_count"] == 4
+    assert np.isfinite(float(row["metric_value"]))
 
 
 def test_reference_neighbor_metrics_pool_row_level_censored_ranks_across_tasks() -> None:

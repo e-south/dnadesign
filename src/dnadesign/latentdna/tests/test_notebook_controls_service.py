@@ -10,7 +10,9 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 import yaml
+from pydantic import ValidationError
 
 from dnadesign.latentdna.src.services.notebook_controls_service import (
     _plot_controls,
@@ -316,6 +318,73 @@ def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Pa
     assert candidate_set.panel_titles == ["Pooled logits", "Intermediate"]
     assert [row.status for row in candidate_set.views] == ["missing", "missing"]
     assert {preset.id for preset in controls.geometry_controls.layout_presets} >= {"candidate_set__two_view_x"}
+
+
+def test_notebook_controls_accept_geometry_browser_as_canonical_surface(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["notebooks"]["latent_geometry_browser"]["default_surface"] = "geometry_browser"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert controls.plot_controls.default_surface == "geometry_browser"
+
+
+def test_notebook_controls_reject_legacy_surface_aliases(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["notebooks"]["latent_geometry_browser"]["default_surface"] = "geometry_audit"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="default_surface"):
+        load_workspace_config(workspace_dir)
+
+
+def test_notebook_controls_candidate_views_expose_representation_metadata(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["output_layer_mean_7b_native_source_record_seq_mean"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "evo2_7b_native_source_record_seq_mean",
+        "role": "planned",
+        "tags": {
+            "model": "evo2_7b",
+            "family": "output_layer_mean",
+            "scope": "native_source_record",
+            "pooling": "seq_mean",
+        },
+    }
+    config["candidate_sets"] = {
+        "native_output_layer": {
+            "label": "Native output layer",
+            "views": ["output_layer_mean_7b_native_source_record_seq_mean"],
+        }
+    }
+    config["notebooks"]["latent_geometry_browser"]["candidate_sets"] = ["native_output_layer"]
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    view = controls.geometry_controls.candidate_sets[0].views[0]
+    assert view.status == "planned"
+    assert view.model == "evo2_7b"
+    assert view.family == "output_layer_mean"
+    assert view.scope == "native_source_record"
+    assert view.coordinate_space_id == "evo2_7b_native_source_record_seq_mean"
+    assert view.label == "Evo 2 7B · Native source record · Output-layer mean"
 
 
 def test_notebook_controls_expose_reference_set_labels_and_default_from_config(tmp_path: Path) -> None:

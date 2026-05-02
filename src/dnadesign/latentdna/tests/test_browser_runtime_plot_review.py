@@ -163,11 +163,11 @@ def test_render_plot_review_surface_compacts_regulator_composition_legend(monkey
 
     rendered = render_plot_review_surface(
         {
-            "plot_id": "appendix_geometry_audit",
+            "plot_id": "appendix_geometry_review",
             "kind": "xy_scatter_grid",
             "x_column": "x",
             "y_column": "y",
-            "panel_titles": ["Geometry audit"],
+            "panel_titles": ["Geometry browser"],
             "hue_options": [
                 {"column": "design_regulator_composition", "label": "Reg. comp.", "type": "categorical"},
             ],
@@ -201,11 +201,11 @@ def test_render_plot_review_surface_orders_sig35_legend_by_strength(monkeypatch,
 
     fig = render_plot_review_surface(
         {
-            "plot_id": "appendix_geometry_audit",
+            "plot_id": "appendix_geometry_review",
             "kind": "xy_scatter_grid",
             "x_column": "x",
             "y_column": "y",
-            "panel_titles": ["Geometry audit"],
+            "panel_titles": ["Geometry browser"],
             "hue_options": [
                 {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
             ],

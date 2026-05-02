@@ -1,4 +1,4 @@
-"""Projection rendering regression tests for notebook geometry audit surfaces."""
+"""Projection rendering regression tests for notebook geometry browser surfaces."""
 
 from __future__ import annotations
 

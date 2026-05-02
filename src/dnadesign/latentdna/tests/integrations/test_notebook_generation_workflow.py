@@ -353,8 +353,8 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert 'label="Left geometry"' not in notebook_text
     assert 'label="Right geometry"' not in notebook_text
     assert "Plots" not in notebook_text
-    assert "Geometry audit" in notebook_text
-    assert "Comparison audit" not in notebook_text
+    assert "Geometry browser" in notebook_text
+    assert '"Geometry browser": geometry_panel' in notebook_text
     assert "Review" in notebook_text
     assert "mo.state(default_tab)" in notebook_text
     assert "value=active_top_tab" in notebook_text

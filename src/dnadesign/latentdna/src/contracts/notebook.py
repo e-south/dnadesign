@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 HueKind = Literal["categorical", "binary", "continuous", "ordinal"]
+NotebookSurface = Literal["plots", "geometry_browser"]
 
 
 class StrictNotebookModel(BaseModel):
@@ -18,7 +19,7 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     title: str
     description: str | None = None
     default_deliverable: str
-    default_surface: Literal["plots", "geometry_audit", "comparison_audit"] = "plots"
+    default_surface: NotebookSurface = "plots"
     candidate_sets: list[str] = Field(default_factory=list)
     default_candidate_set: str | None = None
     default_reference_set: str | None = None
@@ -113,6 +114,10 @@ class WorkspaceNotebookCandidateView(StrictNotebookModel):
     panel_title: str
     status: str
     role: str | None = None
+    model: str | None = None
+    family: str | None = None
+    scope: str | None = None
+    coordinate_space_id: str | None = None
     tags: dict[str, str] = Field(default_factory=dict)
     materialized: bool
     rows: int | None = None
@@ -178,7 +183,7 @@ class WorkspaceNotebookPlotEntry(StrictNotebookModel):
 
 
 class WorkspaceNotebookPlotControls(StrictNotebookModel):
-    default_surface: Literal["plots", "geometry_audit", "comparison_audit"]
+    default_surface: NotebookSurface
     ordered_plot_ids: list[str]
     plots: list[WorkspaceNotebookPlotEntry]
 

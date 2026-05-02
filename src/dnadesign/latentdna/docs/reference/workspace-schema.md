@@ -101,6 +101,22 @@ Current runtime limits:
   count, dimensionality, and availability so planned output-layer or other
   diagnostic representations can stay visible without being promoted to current
   decision geometry.
+- Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
+  for ordered metadata axes. The axis contract lives in recipe params:
+  `axis.column` selects the grouping column, exactly one of `axis.order_path` or
+  `axis.rank_column` supplies ranks, `axis.exclude_values` removes controls or
+  incompatible labels, and `axis.metric_ids` may map the generic outputs onto a
+  study-facing metric vocabulary. This keeps study terms such as Sigma-35 in
+  workspace config rather than package-level builder selection.
+- Pre-assay reference-collapse recipes use `reference_alignment_summary` with
+  config-declared `reference_sets` when the analysis needs named landmark or
+  standard collections. The builder emits group size, median pairwise cosine
+  distance, distance IQR, and explicit `reference_set_status` fields such as
+  `ok`, `absent`, `missing_rows`, `too_small`, or `missing_columns` instead of
+  silently dropping absent collections. `reference_group_columns` remains
+  available for broad metadata audits, but named collections should live in
+  `reference_sets` so selectors, labels, and notebook overlays share one
+  contract.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
 - `notebook generate` now refuses to overwrite or regenerate a notebook when the default deliverable has freshness drift; refresh the deliverable or its linked recipe first so the notebook remains a review surface over fresh artifacts.
 - `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.

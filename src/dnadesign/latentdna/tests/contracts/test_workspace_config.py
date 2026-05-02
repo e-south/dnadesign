@@ -661,7 +661,7 @@ def test_load_workspace_config_accepts_promoter_reference_margin_benchmark_templ
     assert "design_structure_summary" in context.config.deliverables
     assert "sigma35_ordinal_audit" in context.config.deliverables
     assert "context_robustness_summary" in context.config.deliverables
-    assert "appendix_geometry_audit" in context.config.deliverables
+    assert "appendix_geometry_review" in context.config.deliverables
     assert "appendix_umap_gallery" in context.config.deliverables
 
 

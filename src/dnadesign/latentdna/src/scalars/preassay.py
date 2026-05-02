@@ -24,6 +24,8 @@ from ..geometry.cohorts import (
 from ..geometry.preprocessing import try_l2_normalize_vector
 from ..io.json_io import read_json
 from ..io.parquet_io import write_table
+from ..labels import humanize_label
+from ..reference_sets import resolve_reference_set_rows
 from ..workspaces.loader import WorkspaceContext
 from .common import (
     BuiltScalarArtifact,
@@ -31,6 +33,7 @@ from .common import (
     _candidate_descriptor_from_view,
     _cosine_distance_upper,
     _effective_rank,
+    _kendall_tau,
     _load_sig35_order,
     _load_view_scope_table,
     _metric_row,
@@ -39,11 +42,8 @@ from .common import (
     _pearson_correlation,
     _reducer_summary_path,
     _require_param,
-    _sig35_global_statistics,
-    _sig35_mean_statistic_from_outer_groups,
-    _sig35_mean_statistic_within_groups,
-    _sig35_statistics_from_groups,
     _spearman_correlation,
+    _workspace_input_path,
 )
 
 ScalarBuilderResult = tuple[pa.Table, list[ScalarInputRef], dict[str, object]]
@@ -85,6 +85,35 @@ class _CandidateSample:
     inputs: list[ScalarInputRef]
 
 
+@dataclass(frozen=True, slots=True)
+class _OrdinalAxis:
+    axis_id: str
+    label: str
+    column: str
+    exclude_values: set[str]
+    ranks: dict[str, float]
+    order_source: str
+    exploratory: bool
+    input_ref: ScalarInputRef | None = None
+
+
+_REPRESENTATION_HEALTH_METRIC_IDS = (
+    "effective_rank",
+    "pc1_variance_fraction",
+    "pairwise_cosine_distance_median",
+    "pairwise_cosine_distance_iqr",
+)
+
+_ORDINAL_AXIS_DEFAULT_METRIC_IDS = {
+    "spearman": "ordinal_axis_spearman",
+    "kendall": "ordinal_axis_kendall",
+    "balanced_spearman": "ordinal_axis_balanced_spearman",
+    "permutation_pvalue": "ordinal_axis_label_permutation_pvalue",
+}
+
+_ORDINAL_AXIS_DEFAULT_WITHIN_GROUP_METRIC_ID = "ordinal_axis_within_group_mean_spearman"
+
+
 def _load_candidate_sample(
     context: WorkspaceContext,
     candidate: dict[str, Any],
@@ -122,6 +151,11 @@ def _reference_group_panel_title(*, metric_id: str, group_column: str, group_val
     return f"{metric_label}\n{column_label}: {value_label}"
 
 
+def _reference_set_panel_title(*, metric_id: str, reference_set_label: str) -> str:
+    metric_label = _REFERENCE_GROUP_METRIC_LABELS.get(metric_id, humanize_label(metric_id))
+    return f"{metric_label}\nReference set: {reference_set_label}"
+
+
 def _load_scalar_rows(
     context: WorkspaceContext,
     *,
@@ -150,6 +184,7 @@ def _representation_health_summary_table(
     params: dict[str, Any],
 ) -> ScalarBuilderResult:
     candidates = [dict(value) for value in _require_param(params, "candidates")]
+    omitted_candidates = [dict(value) for value in _optional_param(params, "omitted_candidates", default=[])]
     collapse_rules = {
         str(key): float(value) for key, value in dict(_optional_param(params, "collapse_rules", default={})).items()
     }
@@ -190,6 +225,10 @@ def _representation_health_summary_table(
             "pca_fit_scope_kind": str(reducer_summary.get("scope_kind") or ""),
             "pca_fit_scope_id": str(reducer_summary.get("scope_id") or ""),
             "pca_method": str(reducer_summary.get("pca_method") or reducer_summary.get("method") or ""),
+            "candidate_status": "materialized",
+            "candidate_materialized": True,
+            "omitted_from_ranking": False,
+            "omission_reason": "",
         }
         rows.extend(
             [
@@ -219,7 +258,57 @@ def _representation_health_summary_table(
                 ),
             ]
         )
-    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
+
+    for candidate in omitted_candidates:
+        view_id = str(_require_param(candidate, "view_id"))
+        status = _omitted_candidate_status(context, candidate, view_id=view_id)
+        reason = str(_optional_param(candidate, "reason", default=status) or status)
+        descriptor = _candidate_descriptor_from_view(context, view_id=view_id)
+        extra = {
+            "health_status": status,
+            "collapse_flag": False,
+            "effective_rank_basis": "unavailable",
+            "effective_rank_component_count": 0,
+            "explained_variance_captured": float("nan"),
+            "pca_fit_rows": 0,
+            "pca_input_dims": 0,
+            "pca_output_dims": 0,
+            "pca_fit_scope_kind": "",
+            "pca_fit_scope_id": "",
+            "pca_method": "",
+            "candidate_status": status,
+            "candidate_materialized": False,
+            "omitted_from_ranking": True,
+            "omission_reason": reason,
+        }
+        rows.extend(
+            _metric_row(
+                descriptor=descriptor,
+                metric_id=metric_id,
+                metric_value=float("nan"),
+                extra=extra,
+            )
+            for metric_id in _REPRESENTATION_HEALTH_METRIC_IDS
+        )
+
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {
+            "candidate_count": len(candidates) + len(omitted_candidates),
+            "ranked_candidate_count": len(candidates),
+            "omitted_candidate_count": len(omitted_candidates),
+            "rows": len(rows),
+        },
+    )
+
+
+def _omitted_candidate_status(context: WorkspaceContext, candidate: dict[str, Any], *, view_id: str) -> str:
+    explicit_status = str(_optional_param(candidate, "status", default="") or "").strip().lower()
+    if explicit_status:
+        return explicit_status
+    role = str(getattr(context.require_view(view_id), "role", "") or "").strip().lower()
+    return role or "unavailable"
 
 
 def _design_structure_summary_table(
@@ -309,12 +398,267 @@ def _design_structure_summary_table(
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
 
 
-def _sigma35_ordinal_audit_table(
+def _cohort_structure_summary_table(
     context: WorkspaceContext,
     params: dict[str, Any],
 ) -> ScalarBuilderResult:
     candidates = [dict(value) for value in _require_param(params, "candidates")]
-    sig35_order_path = str(_require_param(params, "sig35_order_path"))
+    axes = [dict(value) for value in _require_param(params, "axes")]
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    skipped_axes: list[str] = []
+    for candidate in candidates:
+        candidate_sample = _load_candidate_sample(context, candidate)
+        inputs.extend(candidate_sample.inputs)
+        normalized = _normalized_geometry_rows(candidate_sample.matrix)
+        for axis in axes:
+            column = str(_require_param(axis, "column"))
+            axis_id = str(_optional_param(axis, "axis_id", default=column) or column)
+            label = str(_optional_param(axis, "label", default=axis_id) or axis_id)
+            min_group_size = int(_optional_param(axis, "min_group_size", default=2))
+            exclude_values = _optional_param(axis, "exclude_values", default=None)
+            allowed_values = _optional_param(axis, "allowed_values", default=None)
+            groups = group_indices(
+                candidate_sample.rows,
+                column=column,
+                exclude_values={str(value) for value in exclude_values} if exclude_values else None,
+                allowed_values={str(value) for value in allowed_values} if allowed_values else None,
+            )
+            groups = {key: value for key, value in groups.items() if len(value) >= min_group_size}
+            usable_row_count = sum(len(value) for value in groups.values())
+            if len(groups) < 2:
+                skipped_axes.append(axis_id)
+            rows.append(
+                _metric_row(
+                    descriptor=candidate_sample.descriptor,
+                    metric_id="cohort_separation_ratio",
+                    metric_value=separation_ratio_from_groups(normalized, groups),
+                    category=axis_id,
+                    extra={
+                        "display_name": label,
+                        "cohort_axis_id": axis_id,
+                        "cohort_column": column,
+                        "cohort_group_count": len(groups),
+                        "cohort_usable_row_count": usable_row_count,
+                        "cohort_min_group_size": min_group_size,
+                    },
+                )
+            )
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {
+            "candidate_count": len(candidates),
+            "axis_count": len(axes),
+            "rows": len(rows),
+            "skipped_axes": sorted(set(skipped_axes)),
+        },
+    )
+
+
+def _coerce_float(value: object) -> float | None:
+    try:
+        numeric = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(numeric):
+        return None
+    return numeric
+
+
+def _resolve_ordinal_metric_ids(axis: dict[str, Any]) -> dict[str, str]:
+    metric_ids = dict(_ORDINAL_AXIS_DEFAULT_METRIC_IDS)
+    configured = _optional_param(axis, "metric_ids", default={})
+    if configured:
+        metric_ids.update({str(key): str(value) for key, value in dict(configured).items()})
+    return metric_ids
+
+
+def _load_ordinal_axis_order(
+    context: WorkspaceContext,
+    *,
+    axis_id: str,
+    relative_path: str,
+) -> tuple[dict[str, float], str, bool, ScalarInputRef]:
+    path = _workspace_input_path(context, relative_path)
+    payload = read_json(path) if path.suffix == ".json" else None
+    if payload is None:
+        import yaml
+
+        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        raise ContractViolationError("ordinal axis order config must decode to a mapping")
+    order = payload.get("order")
+    if not isinstance(order, list) or not order:
+        raise ContractViolationError("ordinal axis order config requires a non-empty order list")
+    ranks: dict[str, float] = {}
+    for entry in order:
+        if not isinstance(entry, dict):
+            raise ContractViolationError("ordinal axis order entries must be mappings")
+        raw_value = entry.get("value", entry.get("variant_id"))
+        value = str(raw_value or "").strip()
+        if not value:
+            raise ContractViolationError("ordinal axis order entries require value or variant_id")
+        rank = _coerce_float(entry.get("rank"))
+        if rank is None:
+            raise ContractViolationError(f"ordinal axis order entry {value!r} requires a finite rank")
+        ranks[value] = rank
+    return (
+        ranks,
+        str(payload.get("source") or "").strip(),
+        bool(payload.get("exploratory", False)),
+        ScalarInputRef(kind="workspace_input", artifact_id=f"{axis_id}_order", path=path),
+    )
+
+
+def _resolve_numeric_ordinal_axis(
+    *,
+    axis_id: str,
+    axis: dict[str, Any],
+    rows: list[dict[str, object]],
+    group_column: str,
+    exclude_values: set[str],
+) -> _OrdinalAxis:
+    rank_column = str(_require_param(axis, "rank_column"))
+    label = str(_optional_param(axis, "label", default=axis_id) or axis_id)
+    grouped_values: dict[str, list[float]] = {}
+    for row in rows:
+        group_value = str(row.get(group_column) or "").strip()
+        if not group_value or group_value in exclude_values:
+            continue
+        rank_value = _coerce_float(row.get(rank_column))
+        if rank_value is None:
+            continue
+        grouped_values.setdefault(group_value, []).append(rank_value)
+    ranks = {
+        group_value: float(np.median(np.asarray(values, dtype=np.float64)))
+        for group_value, values in grouped_values.items()
+        if values
+    }
+    if len(ranks) < 3:
+        raise ContractViolationError(
+            f"ordinal axis {axis_id!r} requires at least three finite ranked groups from {rank_column!r}"
+        )
+    return _OrdinalAxis(
+        axis_id=axis_id,
+        label=label,
+        column=group_column,
+        exclude_values=exclude_values,
+        ranks=ranks,
+        order_source=rank_column,
+        exploratory=bool(_optional_param(axis, "exploratory", default=True)),
+    )
+
+
+def _resolve_ordinal_axis(
+    context: WorkspaceContext,
+    *,
+    axis: dict[str, Any],
+    rows: list[dict[str, object]],
+) -> _OrdinalAxis:
+    axis_id = str(_require_param(axis, "axis_id"))
+    label = str(_optional_param(axis, "label", default=axis_id) or axis_id)
+    group_column = str(_require_param(axis, "column"))
+    exclude_values = {str(value) for value in _optional_param(axis, "exclude_values", default=[])}
+    order_path = _optional_param(axis, "order_path", default=None)
+    rank_column = _optional_param(axis, "rank_column", default=None)
+    if bool(order_path) == bool(rank_column):
+        raise ContractViolationError("ordinal axis requires exactly one of order_path or rank_column")
+    if rank_column:
+        return _resolve_numeric_ordinal_axis(
+            axis_id=axis_id,
+            axis=axis,
+            rows=rows,
+            group_column=group_column,
+            exclude_values=exclude_values,
+        )
+    ranks, order_source, exploratory, input_ref = _load_ordinal_axis_order(
+        context,
+        axis_id=axis_id,
+        relative_path=str(order_path),
+    )
+    return _OrdinalAxis(
+        axis_id=axis_id,
+        label=label,
+        column=group_column,
+        exclude_values=exclude_values,
+        ranks=ranks,
+        order_source=order_source,
+        exploratory=exploratory,
+        input_ref=input_ref,
+    )
+
+
+def _ordinal_statistics_from_groups(
+    matrix: np.ndarray,
+    groups: dict[str, list[int]],
+    *,
+    ranks: dict[str, float],
+) -> tuple[float, float]:
+    if len(groups) < 3:
+        return float("nan"), float("nan")
+    centroids = centroid_map(matrix, groups)
+    if len(centroids) < 3:
+        return float("nan"), float("nan")
+    gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=ranks)
+    if gaps.size == 0:
+        return float("nan"), float("nan")
+    return _spearman_correlation(gaps, distances), _kendall_tau(gaps, distances)
+
+
+def _ordinal_global_statistics(
+    matrix: np.ndarray,
+    rows: list[dict[str, object]],
+    *,
+    axis: _OrdinalAxis,
+) -> tuple[float, float]:
+    groups = group_indices(
+        rows,
+        column=axis.column,
+        exclude_values=axis.exclude_values,
+        allowed_values=set(axis.ranks),
+    )
+    return _ordinal_statistics_from_groups(matrix, groups, ranks=axis.ranks)
+
+
+def _ordinal_mean_statistic_from_outer_groups(
+    matrix: np.ndarray,
+    rows: list[dict[str, object]],
+    *,
+    outer_groups: dict[str, list[int]],
+    axis: _OrdinalAxis,
+) -> float:
+    statistics: list[float] = []
+    for _, outer_indices in outer_groups.items():
+        outer_rows = [rows[index] for index in outer_indices]
+        outer_matrix = matrix[np.asarray(outer_indices, dtype=np.int64)]
+        spearman, _ = _ordinal_global_statistics(outer_matrix, outer_rows, axis=axis)
+        if np.isfinite(spearman):
+            statistics.append(float(spearman))
+    if not statistics:
+        return float("nan")
+    return float(np.mean(np.asarray(statistics, dtype=np.float64)))
+
+
+def _ordinal_axis_extra(axis: _OrdinalAxis) -> dict[str, object]:
+    return {
+        "ordinal_axis_id": axis.axis_id,
+        "ordinal_axis_label": axis.label,
+        "ordinal_axis_column": axis.column,
+        "ordinal_order_source": axis.order_source,
+        "ordinal_order_exploratory": axis.exploratory,
+        "ordinal_ranked_group_count": len(axis.ranks),
+    }
+
+
+def _ordinal_axis_audit_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    candidates = [dict(value) for value in _require_param(params, "candidates")]
+    axis_config = dict(_require_param(params, "axis"))
+    metric_ids = _resolve_ordinal_metric_ids(axis_config)
+    within_groups = [dict(value) for value in _optional_param(axis_config, "within_groups", default=[])]
     bootstrap_iterations = int(_optional_param(params, "bootstrap_iterations", default=200))
     permutations = int(_optional_param(params, "permutations", default=200))
     seed = int(_optional_param(params, "seed", default=context.config.defaults.random_seed))
@@ -323,160 +667,135 @@ def _sigma35_ordinal_audit_table(
     ]
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
-    order_config = _load_sig35_order(context, relative_path=sig35_order_path)
-    inputs.append(ScalarInputRef(kind="workspace_input", artifact_id="sig35_order", path=order_config["path"]))
-    ranks = dict(order_config["ranks"])
     for offset, candidate in enumerate(candidates):
         rng = np.random.default_rng(seed + offset)
         candidate_sample = _load_candidate_sample(context, candidate)
         inputs.extend(candidate_sample.inputs)
         normalized = _normalized_geometry_rows(candidate_sample.matrix)
-        global_spearman, global_kendall = _sig35_global_statistics(normalized, candidate_sample.rows, ranks=ranks)
+        axis = _resolve_ordinal_axis(context, axis=axis_config, rows=candidate_sample.rows)
+        if axis.input_ref is not None and axis.input_ref not in inputs:
+            inputs.append(axis.input_ref)
+        axis_extra = _ordinal_axis_extra(axis)
+        global_spearman, global_kendall = _ordinal_global_statistics(normalized, candidate_sample.rows, axis=axis)
         global_groups = group_indices(
             candidate_sample.rows,
-            column="sig35_variant",
-            exclude_values={"control"},
-            allowed_values=set(ranks),
+            column=axis.column,
+            exclude_values=axis.exclude_values,
+            allowed_values=set(axis.ranks),
         )
         ci_lower, ci_upper = bootstrap_ci(
-            lambda groups=global_groups, rng=rng: _sig35_statistics_from_groups(
+            lambda groups=global_groups, rng=rng: _ordinal_statistics_from_groups(
                 normalized,
                 resample_groups(groups, rng=rng),
-                ranks=ranks,
+                ranks=axis.ranks,
             )[0],
             iterations=bootstrap_iterations,
         )
         rows.append(
             _metric_row(
                 descriptor=candidate_sample.descriptor,
-                metric_id="sig35_ordinal_spearman",
+                metric_id=metric_ids["spearman"],
                 metric_value=global_spearman,
                 ci_lower=ci_lower,
                 ci_upper=ci_upper,
-                extra={
-                    "sig35_order_source": order_config["source"],
-                    "exploratory": bool(order_config["exploratory"]),
-                },
+                extra=axis_extra,
             )
         )
         rows.append(
             _metric_row(
                 descriptor=candidate_sample.descriptor,
-                metric_id="sig35_ordinal_kendall",
+                metric_id=metric_ids["kendall"],
                 metric_value=global_kendall,
-                extra={
-                    "sig35_order_source": order_config["source"],
-                    "exploratory": bool(order_config["exploratory"]),
-                },
+                extra=axis_extra,
             )
         )
 
         balanced_groups = balanced_group_indices(
             candidate_sample.rows,
-            group_column="sig35_variant",
+            group_column=axis.column,
             balance_columns=balance_columns,
-            required_group_values=set(ranks),
-            exclude_group_values={"control"},
+            required_group_values=set(axis.ranks),
+            exclude_group_values=axis.exclude_values,
             rng=rng,
         )
         balanced_spearman = float("nan")
         if balanced_groups:
             centroids = centroid_map(normalized, balanced_groups)
-            gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=ranks)
+            gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=axis.ranks)
             balanced_spearman = _spearman_correlation(gaps, distances) if gaps.size else float("nan")
         ci_lower, ci_upper = bootstrap_ci(
-            lambda groups=balanced_groups, rng=rng: _sig35_statistics_from_groups(
+            lambda groups=balanced_groups, rng=rng: _ordinal_statistics_from_groups(
                 normalized,
                 resample_groups(groups, rng=rng),
-                ranks=ranks,
+                ranks=axis.ranks,
             )[0],
             iterations=bootstrap_iterations,
         )
         rows.append(
             _metric_row(
                 descriptor=candidate_sample.descriptor,
-                metric_id="sig35_balanced_ordinal_spearman",
+                metric_id=metric_ids["balanced_spearman"],
                 metric_value=balanced_spearman,
                 ci_lower=ci_lower,
                 ci_upper=ci_upper,
-                extra={
-                    "sig35_order_source": order_config["source"],
-                    "exploratory": bool(order_config["exploratory"]),
-                },
+                extra=axis_extra,
             )
         )
 
-        within_family_mean = _sig35_mean_statistic_within_groups(
-            normalized,
-            candidate_sample.rows,
-            outer_column="design_family",
-            ranks=ranks,
-        )
-        family_groups = group_indices(candidate_sample.rows, column="design_family", exclude_values={"control"})
-        ci_lower, ci_upper = bootstrap_ci(
-            lambda groups=family_groups, rng=rng: _sig35_mean_statistic_from_outer_groups(
+        for within_group in within_groups:
+            outer_column = str(_require_param(within_group, "column"))
+            metric_id = str(
+                _optional_param(
+                    within_group,
+                    "metric_id",
+                    default=_ORDINAL_AXIS_DEFAULT_WITHIN_GROUP_METRIC_ID,
+                )
+            )
+            outer_exclude_values = {
+                str(value)
+                for value in _optional_param(within_group, "exclude_values", default=axis.exclude_values or [])
+            }
+            outer_groups = group_indices(
+                candidate_sample.rows,
+                column=outer_column,
+                exclude_values=outer_exclude_values,
+            )
+            within_mean = _ordinal_mean_statistic_from_outer_groups(
                 normalized,
                 candidate_sample.rows,
-                outer_groups=resample_groups(groups, rng=rng),
-                ranks=ranks,
-            ),
-            iterations=bootstrap_iterations,
-        )
-        rows.append(
-            _metric_row(
-                descriptor=candidate_sample.descriptor,
-                metric_id="sig35_within_family_mean_spearman",
-                metric_value=within_family_mean,
-                ci_lower=ci_lower,
-                ci_upper=ci_upper,
-                extra={
-                    "sig35_order_source": order_config["source"],
-                    "exploratory": bool(order_config["exploratory"]),
-                },
+                outer_groups=outer_groups,
+                axis=axis,
             )
-        )
-
-        within_regulator_mean = _sig35_mean_statistic_within_groups(
-            normalized,
-            candidate_sample.rows,
-            outer_column="design_regulator_composition",
-            ranks=ranks,
-        )
-        regulator_groups = group_indices(
-            candidate_sample.rows,
-            column="design_regulator_composition",
-            exclude_values={"control"},
-        )
-        ci_lower, ci_upper = bootstrap_ci(
-            lambda groups=regulator_groups, rng=rng: _sig35_mean_statistic_from_outer_groups(
-                normalized,
-                candidate_sample.rows,
-                outer_groups=resample_groups(groups, rng=rng),
-                ranks=ranks,
-            ),
-            iterations=bootstrap_iterations,
-        )
-        rows.append(
-            _metric_row(
-                descriptor=candidate_sample.descriptor,
-                metric_id="sig35_within_regulator_mean_spearman",
-                metric_value=within_regulator_mean,
-                ci_lower=ci_lower,
-                ci_upper=ci_upper,
-                extra={
-                    "sig35_order_source": order_config["source"],
-                    "exploratory": bool(order_config["exploratory"]),
-                },
+            ci_lower, ci_upper = bootstrap_ci(
+                lambda groups=outer_groups, rng=rng: _ordinal_mean_statistic_from_outer_groups(
+                    normalized,
+                    candidate_sample.rows,
+                    outer_groups=resample_groups(groups, rng=rng),
+                    axis=axis,
+                ),
+                iterations=bootstrap_iterations,
             )
-        )
+            rows.append(
+                _metric_row(
+                    descriptor=candidate_sample.descriptor,
+                    metric_id=metric_id,
+                    metric_value=within_mean,
+                    ci_lower=ci_lower,
+                    ci_upper=ci_upper,
+                    extra={
+                        **axis_extra,
+                        "ordinal_within_group_column": outer_column,
+                    },
+                )
+            )
 
         observed = global_spearman
         permutation_values: list[float] = []
-        variants = [variant for variant in sorted(ranks) if variant != "control"]
+        variants = sorted(set(axis.ranks) - axis.exclude_values, key=str.casefold)
         if np.isfinite(observed) and len(variants) >= 3:
             centroids = centroid_map(normalized, global_groups)
             for _ in range(permutations):
-                shuffled = rng.permutation([ranks[variant] for variant in variants]).tolist()
+                shuffled = rng.permutation([axis.ranks[variant] for variant in variants]).tolist()
                 shuffled_ranks = {variant: rank for variant, rank in zip(variants, shuffled, strict=True)}
                 gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=shuffled_ranks)
                 if gaps.size:
@@ -492,15 +811,20 @@ def _sigma35_ordinal_audit_table(
         rows.append(
             _metric_row(
                 descriptor=candidate_sample.descriptor,
-                metric_id="sig35_label_permutation_pvalue",
+                metric_id=metric_ids["permutation_pvalue"],
                 metric_value=permutation_pvalue,
-                extra={
-                    "sig35_order_source": order_config["source"],
-                    "exploratory": bool(order_config["exploratory"]),
-                },
+                extra=axis_extra,
             )
         )
-    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {
+            "candidate_count": len(candidates),
+            "axis_id": str(_require_param(axis_config, "axis_id")),
+            "rows": len(rows),
+        },
+    )
 
 
 def _context_robustness_summary_table(
@@ -590,6 +914,164 @@ def _context_robustness_summary_table(
     )
 
 
+def _configured_reference_set_ids(params: dict[str, Any]) -> list[str]:
+    configured = _optional_param(params, "reference_sets", default=[])
+    reference_set_ids: list[str] = []
+    for item in list(configured or []):
+        if isinstance(item, dict):
+            reference_set_id = str(item.get("reference_set_id") or item.get("id") or "").strip()
+        else:
+            reference_set_id = str(item or "").strip()
+        if reference_set_id:
+            reference_set_ids.append(reference_set_id)
+    return list(dict.fromkeys(reference_set_ids))
+
+
+def _reference_indices_for_matched_ids(
+    rows: list[dict[str, object]],
+    *,
+    match_column: str,
+    matched_ids: list[str],
+) -> list[int]:
+    matched = set(matched_ids)
+    return [
+        index
+        for index, row in enumerate(rows)
+        if row.get(match_column) is not None and str(row.get(match_column)) in matched
+    ]
+
+
+def _reference_status(
+    *,
+    missing_columns: list[str],
+    expected_ids: list[str],
+    matched_ids: list[str],
+    selected_count: int,
+    min_reference_group_size: int,
+) -> str:
+    if missing_columns:
+        return "missing_columns"
+    if not expected_ids:
+        return "absent"
+    if not matched_ids:
+        return "missing_rows"
+    if selected_count < min_reference_group_size:
+        return "too_small"
+    return "ok"
+
+
+def _reference_distance_summary(
+    normalized: np.ndarray,
+    indices: list[int],
+    *,
+    min_reference_group_size: int,
+) -> tuple[float, float]:
+    if len(indices) < min_reference_group_size:
+        return float("nan"), float("nan")
+    distances = _cosine_distance_upper(np.asarray(normalized[indices], dtype=np.float32))
+    if not distances.size:
+        return float("nan"), float("nan")
+    return (
+        float(np.median(distances)),
+        float(np.percentile(distances, 75.0) - np.percentile(distances, 25.0)),
+    )
+
+
+def _append_reference_set_rows(
+    rows: list[dict[str, object]],
+    *,
+    context: WorkspaceContext,
+    descriptor: dict[str, object],
+    normalized: np.ndarray,
+    candidate_rows: list[dict[str, object]],
+    reference_set_id: str,
+    min_reference_group_size: int,
+) -> int:
+    if reference_set_id not in context.config.reference_sets:
+        raise ContractViolationError(
+            f"reference_alignment_summary references unknown reference_set {reference_set_id!r}"
+        )
+    reference_set = context.config.reference_sets[reference_set_id]
+    resolution = resolve_reference_set_rows(reference_set, candidate_rows)
+    match_column = str(getattr(reference_set, "match_column"))
+    indices = _reference_indices_for_matched_ids(
+        candidate_rows,
+        match_column=match_column,
+        matched_ids=resolution.matched_ids,
+    )
+    status = _reference_status(
+        missing_columns=resolution.missing_columns,
+        expected_ids=resolution.expected_ids,
+        matched_ids=resolution.matched_ids,
+        selected_count=len(indices),
+        min_reference_group_size=min_reference_group_size,
+    )
+    reference_set_label = str(getattr(reference_set, "label", None) or humanize_label(reference_set_id))
+    distance_median, distance_iqr = _reference_distance_summary(
+        normalized,
+        indices,
+        min_reference_group_size=min_reference_group_size,
+    )
+    extra = {
+        "reference_group_column": "reference_set",
+        "reference_group": reference_set_id,
+        "reference_rows": len(indices),
+        "reference_set_id": reference_set_id,
+        "reference_set_label": reference_set_label,
+        "reference_set_status": status,
+        "reference_set_complete": bool(resolution.complete),
+        "reference_set_missing_columns": ", ".join(resolution.missing_columns),
+        "reference_expected_rows": len(resolution.expected_ids),
+        "reference_matched_rows": len(resolution.matched_ids),
+        "category": f"reference_set: {reference_set_id}",
+        "label": reference_set_label,
+    }
+    rows.extend(
+        [
+            _metric_row(
+                descriptor=descriptor,
+                metric_id="reference_group_size",
+                metric_value=float(len(indices)),
+                category="reference collapse",
+                extra={
+                    **extra,
+                    "display_name": _reference_set_panel_title(
+                        metric_id="reference_group_size",
+                        reference_set_label=reference_set_label,
+                    ),
+                },
+            ),
+            _metric_row(
+                descriptor=descriptor,
+                metric_id="reference_group_pairwise_cosine_distance_median",
+                metric_value=distance_median,
+                category="reference collapse",
+                extra={
+                    **extra,
+                    "display_name": _reference_set_panel_title(
+                        metric_id="reference_group_pairwise_cosine_distance_median",
+                        reference_set_label=reference_set_label,
+                    ),
+                },
+            ),
+            _metric_row(
+                descriptor=descriptor,
+                metric_id="reference_group_pairwise_cosine_distance_iqr",
+                metric_value=distance_iqr,
+                category="reference collapse",
+                extra={
+                    **extra,
+                    "display_name": _reference_set_panel_title(
+                        metric_id="reference_group_pairwise_cosine_distance_iqr",
+                        reference_set_label=reference_set_label,
+                    ),
+                },
+            ),
+        ]
+    )
+    return 3
+
+
 def _reference_alignment_summary_table(
     context: WorkspaceContext,
     params: dict[str, Any],
@@ -603,6 +1085,7 @@ def _reference_alignment_summary_table(
             default=[],
         )
     ]
+    reference_set_ids = _configured_reference_set_ids(params)
     reference_label_column = str(_optional_param(params, "reference_label_column", default="usr_label__primary"))
     min_reference_group_size = int(_optional_param(params, "min_reference_group_size", default=2))
     rows: list[dict[str, object]] = []
@@ -647,7 +1130,7 @@ def _reference_alignment_summary_table(
                 ]
             )
             emitted_rows += 2
-        elif not reference_group_columns:
+        elif not reference_group_columns and not reference_set_ids:
             if not {"background_only", "ethanol", "ciprofloxacin"}.issubset(design_groups):
                 raise ContractViolationError(
                     "reference_alignment_summary requires background_only, ethanol, "
@@ -731,6 +1214,16 @@ def _reference_alignment_summary_table(
                     ]
                 )
                 emitted_rows += 3
+        for reference_set_id in reference_set_ids:
+            emitted_rows += _append_reference_set_rows(
+                rows,
+                context=context,
+                descriptor=candidate_sample.descriptor,
+                normalized=normalized,
+                candidate_rows=candidate_sample.rows,
+                reference_set_id=reference_set_id,
+                min_reference_group_size=min_reference_group_size,
+            )
         if emitted_rows == 0:
             raise ContractViolationError(
                 "reference_alignment_summary requires SpyP/SulA alignment rows or at least one "
@@ -740,7 +1233,22 @@ def _reference_alignment_summary_table(
         row.setdefault("reference_group_column", None)
         row.setdefault("reference_group", None)
         row.setdefault("reference_rows", None)
-    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
+        row.setdefault("reference_set_id", None)
+        row.setdefault("reference_set_label", None)
+        row.setdefault("reference_set_status", None)
+        row.setdefault("reference_set_complete", None)
+        row.setdefault("reference_set_missing_columns", "")
+        row.setdefault("reference_expected_rows", None)
+        row.setdefault("reference_matched_rows", None)
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {
+            "candidate_count": len(candidates),
+            "reference_set_count": len(reference_set_ids),
+            "rows": len(rows),
+        },
+    )
 
 
 def _context_pair_summary_table(
@@ -792,13 +1300,14 @@ def _candidate_decision_frontier_table(
 ) -> ScalarBuilderResult:
     health_scalar = str(_require_param(params, "health_scalar"))
     design_scalar = str(_require_param(params, "design_scalar"))
-    sigma35_scalar = str(_require_param(params, "sigma35_scalar"))
+    ordinal_scalar = str(_require_param(params, "ordinal_scalar"))
     context_scalar = str(_require_param(params, "context_scalar"))
     health_metric_id = str(_optional_param(params, "health_metric_id", default="effective_rank"))
     design_metric_id = str(
         _optional_param(params, "design_metric_id", default="design_family_balanced_separation_ratio")
     )
-    sigma35_metric_id = str(_optional_param(params, "sigma35_metric_id", default="sig35_ordinal_spearman"))
+    ordinal_metric_id = str(_optional_param(params, "ordinal_metric_id", default="ordinal_axis_spearman"))
+    ordinal_output_column = str(_optional_param(params, "ordinal_output_column", default=ordinal_metric_id))
     context_metric_id = str(_optional_param(params, "context_metric_id", default="context_self_cosine_median"))
     candidate_ids = [str(value) for value in _optional_param(params, "candidate_ids", default=[])]
     context_pairs = {
@@ -816,13 +1325,13 @@ def _candidate_decision_frontier_table(
 
     health_rows, health_inputs = _load_scalar_rows(context, scalar_id=health_scalar)
     design_rows, design_inputs = _load_scalar_rows(context, scalar_id=design_scalar)
-    sigma35_rows, sigma35_inputs = _load_scalar_rows(context, scalar_id=sigma35_scalar)
+    ordinal_rows, ordinal_inputs = _load_scalar_rows(context, scalar_id=ordinal_scalar)
     context_rows, context_inputs = _load_scalar_rows(context, scalar_id=context_scalar)
-    inputs = [*health_inputs, *design_inputs, *sigma35_inputs, *context_inputs]
+    inputs = [*health_inputs, *design_inputs, *ordinal_inputs, *context_inputs]
 
     health_map = _rows_by_candidate_and_metric(health_rows)
     design_map = _rows_by_candidate_and_metric(design_rows)
-    sigma35_map = _rows_by_candidate_and_metric(sigma35_rows)
+    ordinal_map = _rows_by_candidate_and_metric(ordinal_rows)
     context_map = _rows_by_candidate_and_metric(context_rows)
 
     ordered_candidate_ids = candidate_ids or list(health_map)
@@ -833,7 +1342,7 @@ def _candidate_decision_frontier_table(
             health_metrics.get(health_metric_id)
             or next(iter(health_metrics.values()), None)
             or next(iter(design_map.get(candidate_id, {}).values()), None)
-            or next(iter(sigma35_map.get(candidate_id, {}).values()), None)
+            or next(iter(ordinal_map.get(candidate_id, {}).values()), None)
         )
         if descriptor_source is None:
             raise ContractViolationError(f"candidate_decision_frontier is missing descriptor rows for {candidate_id!r}")
@@ -843,37 +1352,36 @@ def _candidate_decision_frontier_table(
         )
         health_metric_row = health_metrics.get(health_metric_id)
         design_metric_row = design_map.get(candidate_id, {}).get(design_metric_id)
-        sigma35_metric_row = sigma35_map.get(candidate_id, {}).get(sigma35_metric_id)
-        rows.append(
-            {
-                "candidate_id": candidate_id,
-                "candidate_label": descriptor_source["candidate_label"],
-                "candidate_family": descriptor_source["candidate_family"],
-                "candidate_model": descriptor_source["candidate_model"],
-                "candidate_scope": descriptor_source["candidate_scope"],
-                "candidate_order": index,
-                "selection_role": candidate_roles.get(candidate_id, "candidate"),
-                "frontier_label": annotation_labels.get(candidate_id, str(descriptor_source["candidate_label"])),
-                "health_status": str(descriptor_source.get("health_status") or "unknown"),
-                "collapse_flag": bool(descriptor_source.get("collapse_flag", False)),
-                "effective_rank": (
-                    float(health_metric_row["metric_value"]) if health_metric_row is not None else float("nan")
-                ),
-                "design_family_balanced_separation_ratio": (
-                    float(design_metric_row["metric_value"]) if design_metric_row is not None else float("nan")
-                ),
-                "sig35_ordinal_spearman": (
-                    float(sigma35_metric_row["metric_value"]) if sigma35_metric_row is not None else float("nan")
-                ),
-                "context_self_cosine_median": (
-                    float(context_metric_row["metric_value"]) if context_metric_row is not None else float("nan")
-                ),
-                "context_pair_id": context_pair_id,
-                "context_validation_status": "direct" if context_pair_id is not None else "not_applicable",
-                "x_display_name": "Balanced design-family separation ratio",
-                "y_display_name": "Sigma-35 ordinal Spearman",
-            }
-        )
+        ordinal_metric_row = ordinal_map.get(candidate_id, {}).get(ordinal_metric_id)
+        row = {
+            "candidate_id": candidate_id,
+            "candidate_label": descriptor_source["candidate_label"],
+            "candidate_family": descriptor_source["candidate_family"],
+            "candidate_model": descriptor_source["candidate_model"],
+            "candidate_scope": descriptor_source["candidate_scope"],
+            "candidate_order": index,
+            "selection_role": candidate_roles.get(candidate_id, "candidate"),
+            "frontier_label": annotation_labels.get(candidate_id, str(descriptor_source["candidate_label"])),
+            "health_status": str(descriptor_source.get("health_status") or "unknown"),
+            "collapse_flag": bool(descriptor_source.get("collapse_flag", False)),
+            "effective_rank": (
+                float(health_metric_row["metric_value"]) if health_metric_row is not None else float("nan")
+            ),
+            "design_family_balanced_separation_ratio": (
+                float(design_metric_row["metric_value"]) if design_metric_row is not None else float("nan")
+            ),
+            ordinal_output_column: (
+                float(ordinal_metric_row["metric_value"]) if ordinal_metric_row is not None else float("nan")
+            ),
+            "context_self_cosine_median": (
+                float(context_metric_row["metric_value"]) if context_metric_row is not None else float("nan")
+            ),
+            "context_pair_id": context_pair_id,
+            "context_validation_status": "direct" if context_pair_id is not None else "not_applicable",
+            "x_display_name": "Balanced design-family separation ratio",
+            "y_display_name": str(_optional_param(params, "ordinal_display_name", default="Ordinal-axis Spearman")),
+        }
+        rows.append(row)
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(rows), "rows": len(rows)}
 
 
@@ -977,7 +1485,8 @@ def _sample_metadata_indices(
 _PREASSAY_BUILDERS: dict[str, ScalarTableBuilder] = {
     "representation_health_summary": _representation_health_summary_table,
     "design_structure_summary": _design_structure_summary_table,
-    "sigma35_ordinal_audit": _sigma35_ordinal_audit_table,
+    "cohort_structure_summary": _cohort_structure_summary_table,
+    "ordinal_axis_audit": _ordinal_axis_audit_table,
     "context_robustness_summary": _context_robustness_summary_table,
     "context_pair_summary": _context_pair_summary_table,
     "reference_alignment_summary": _reference_alignment_summary_table,

@@ -618,8 +618,7 @@ def render_page_tabs_cell() -> str:
             _plot_review = runtime.plot_review
             default_tab = {
                 "plots": "Review",
-                "geometry_audit": "Geometry audit",
-                "comparison_audit": "Geometry audit",
+                "geometry_browser": "Geometry browser",
             }.get(_plot_review.default_surface, "Review")
             get_active_top_tab, set_active_top_tab = _support.mo.state(default_tab)
             return (default_tab, get_active_top_tab, set_active_top_tab)
@@ -632,7 +631,7 @@ def render_page_tabs_cell() -> str:
             page_tabs = _support.mo.ui.tabs(
                 {
                     "Review": plot_review_panel,
-                    "Geometry audit": geometry_panel,
+                    "Geometry browser": geometry_panel,
                 },
                 value=active_top_tab,
                 lazy=True,

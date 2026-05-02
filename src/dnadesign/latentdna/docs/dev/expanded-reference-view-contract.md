@@ -68,7 +68,7 @@ evidence surfaces.
 | --- | --- |
 | `projection_scatter`, `projection_grid` | Resolve selector-backed reference sets per panel, record expected/matched ids, draw small sets as callouts, and draw large sets as highlight-only overlays. |
 | `curve`, `curve_grid` | Scree/collapse curves should be emitted for every promoted geometry group that has a reducer. Missing reducers are a regeneration gap, not an implicit pass. |
-| `metric_panel_grid` | Reference alignment must not require only spyP/sulAp. It must emit collection-aware collapse metrics when `reference_group_columns` are configured. |
+| `metric_panel_grid` | Reference alignment must not require only spyP/sulAp. It must emit selector-backed collapse metrics when config-declared `reference_sets` are configured, while `reference_group_columns` remain a broad metadata-audit fallback. |
 | `xy_scatter_grid` | Strength/collapse scatter must facet or group by collection when strength scales differ. |
 | `distribution_grid` | Within/between reference-distance distributions should group by `source_family`, `selection_basis`, and collection. |
 | `heatmap_grid` | Pairwise reference-distance heatmaps should support full-set and per-collection subsets. |

@@ -450,6 +450,68 @@ _METRICS = [
         aggregation_level="candidate_summary",
     ),
     _metric(
+        "cohort_separation_ratio",
+        "Cohort separation ratio",
+        "Mean between-centroid cosine distance divided by mean within-centroid cosine distance for a "
+        "config-declared metadata cohort.",
+        metric_family="cohort_structure",
+        evidence_tier="primary",
+        unit="ratio",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "ordinal_axis_spearman",
+        "Ordinal-axis Spearman",
+        "Spearman correlation between configured ordinal-rank gaps and observed centroid distances.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="correlation",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "ordinal_axis_kendall",
+        "Ordinal-axis Kendall",
+        "Kendall tau correlation between configured ordinal-rank gaps and observed centroid distances.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="correlation",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "ordinal_axis_balanced_spearman",
+        "Balanced ordinal-axis Spearman",
+        "Spearman correlation between configured ordinal-rank gaps and observed centroid distances after "
+        "config-declared cohort balancing.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="correlation",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "ordinal_axis_within_group_mean_spearman",
+        "Within-group ordinal-axis Spearman",
+        "Mean within-group Spearman correlation between configured ordinal-rank gaps and observed centroid distances.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="correlation",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "ordinal_axis_label_permutation_pvalue",
+        "Ordinal-axis permutation p-value",
+        "Permutation p-value for the global ordinal-axis Spearman statistic under shuffled ordinal labels.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="p_value",
+        direction="lower_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
         "sig35_ordinal_spearman",
         "Sigma-35 ordinal Spearman",
         "Spearman correlation between expected Sigma-35 rank gaps and observed centroid distances.",
@@ -566,7 +628,7 @@ _METRICS = [
     _metric(
         "reference_group_size",
         "Reference group size",
-        "Number of labeled reference rows in a collection-aware reference group.",
+        "Number of labeled reference rows in a configured reference set or metadata reference group.",
         metric_family="reference_alignment",
         evidence_tier="appendix",
         unit="rows",
@@ -576,7 +638,10 @@ _METRICS = [
     _metric(
         "reference_group_pairwise_cosine_distance_median",
         "Reference group median distance",
-        "Median pairwise cosine distance within a labeled reference group after view-level normalization.",
+        (
+            "Median pairwise cosine distance within a configured reference set or metadata reference group "
+            "after view-level normalization."
+        ),
         metric_family="reference_alignment",
         evidence_tier="appendix",
         unit="distance",
@@ -588,7 +653,7 @@ _METRICS = [
         "Reference group distance IQR",
         (
             "Interquartile range of pairwise cosine distances within a labeled reference group "
-            "after view-level normalization."
+            "or configured reference set after view-level normalization."
         ),
         metric_family="reference_alignment",
         evidence_tier="appendix",

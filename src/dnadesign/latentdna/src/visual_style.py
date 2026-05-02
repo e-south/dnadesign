@@ -105,7 +105,7 @@ _SINGLE_ROW_LEGEND_PLOT_IDS = frozenset(
         "reference_alignment_summary",
         "representation_scree_diagnostic",
         "sigma35_stress_margin_gallery",
-        "appendix_geometry_audit",
+        "appendix_geometry_review",
         "appendix_umap_gallery",
     }
 )
@@ -116,7 +116,7 @@ _LOWERED_LEGEND_PLOT_IDS = frozenset(
         "reference_alignment_summary",
         "representation_scree_diagnostic",
         "sigma35_stress_margin_gallery",
-        "appendix_geometry_audit",
+        "appendix_geometry_review",
         "appendix_umap_gallery",
     }
 )
