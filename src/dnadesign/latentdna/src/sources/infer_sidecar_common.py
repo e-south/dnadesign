@@ -34,21 +34,42 @@ def empty_table(schema: pa.Schema) -> pa.Table:
     return pa.Table.from_arrays([pa.array([], type=field.type) for field in schema], schema=schema)
 
 
-def normalize_where(where: Mapping[str, object] | None) -> dict[str, set[str]]:
+WhereClauses = dict[str, set[object]]
+
+
+def normalize_where(where: Mapping[str, object] | None) -> WhereClauses:
     if not where:
         return {}
     if set(where) == {"column", "equals"}:
-        return {str(where["column"]): {str(where["equals"])}}
-    normalized: dict[str, set[str]] = {}
+        return {str(where["column"]): {where["equals"]}}
+    normalized: WhereClauses = {}
     for column, value in where.items():
         if isinstance(value, Mapping) and set(value) == {"equals"}:
-            normalized[str(column)] = {str(value["equals"])}
+            normalized[str(column)] = {value["equals"]}
             continue
         if isinstance(value, list | tuple | set):
-            normalized[str(column)] = {str(item) for item in value}
+            normalized[str(column)] = set(value)
             continue
-        normalized[str(column)] = {str(value)}
+        normalized[str(column)] = {value}
     return normalized
+
+
+def _where_value_set(
+    values: set[object],
+    *,
+    column_type: pa.DataType,
+    column: str,
+    source_label: str,
+) -> pa.Array:
+    ordered_values = sorted(values, key=lambda item: str(item))
+    if pa.types.is_string(column_type) or pa.types.is_large_string(column_type):
+        ordered_values = [str(value) for value in ordered_values]
+    try:
+        return pa.array(ordered_values, type=column_type)
+    except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError) as exc:
+        raise SourceResolutionError(
+            f"{source_label} where values for column {column!r} do not match {column_type}: {ordered_values!r}"
+        ) from exc
 
 
 def apply_where(table: pa.Table, where: Mapping[str, object] | None, *, source_label: str) -> pa.Table:
@@ -59,7 +80,15 @@ def apply_where(table: pa.Table, where: Mapping[str, object] | None, *, source_l
     for column, values in clauses.items():
         if column not in table.column_names:
             raise SourceResolutionError(f"{source_label} where column is missing: {column}")
-        column_mask = pc.is_in(table[column], value_set=pa.array(sorted(values), type=pa.string()))
+        column_mask = pc.is_in(
+            table[column],
+            value_set=_where_value_set(
+                values,
+                column_type=table.schema.field(column).type,
+                column=column,
+                source_label=source_label,
+            ),
+        )
         mask = column_mask if mask is None else pc.and_(mask, column_mask)
     assert mask is not None
     return table.filter(mask)
@@ -79,13 +108,15 @@ def rows_by_key(path: Path, *, key: str, wanted: set[str] | None = None) -> dict
     if not path.is_file():
         return {}
     rows: dict[str, dict[str, object]] = {}
-    for row in pq.read_table(path).to_pylist():
+    for row_index, row in enumerate(pq.read_table(path).to_pylist()):
         raw_key = row.get(key)
         if raw_key is None:
             continue
         row_key = str(raw_key)
         if wanted is not None and row_key not in wanted:
             continue
+        if row_key in rows:
+            raise SourceResolutionError(f"{path} contains duplicate {key!r} value {row_key!r} at row {row_index}")
         rows[row_key] = dict(row)
     return rows
 
@@ -129,5 +160,8 @@ def record_rows_by_id(dataset: Dataset, *, columns: list[str]) -> dict[str, dict
     rows: dict[str, dict[str, object]] = {}
     for batch in dataset.scan(columns=columns, include_overlays=True, include_deleted=False, batch_size=65536):
         for row in batch.to_pylist():
-            rows[str(row["id"])] = dict(row)
+            row_id = str(row["id"])
+            if row_id in rows:
+                raise SourceResolutionError(f"dataset {dataset.name} contains duplicate record id {row_id!r}")
+            rows[row_id] = dict(row)
     return rows

@@ -225,6 +225,22 @@ def test_stable_batch_schema_uses_later_non_null_metadata_values() -> None:
     assert schema.field("value").type == pa.list_(pa.float64())
 
 
+def test_rows_by_key_fails_fast_on_duplicate_identity_values(tmp_path: Path) -> None:
+    rows_path = tmp_path / "sequence_views.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "view_id": pa.array(["view_a", "view_a"], type=pa.string()),
+                "view_name": pa.array(["first", "second"], type=pa.string()),
+            }
+        ),
+        rows_path,
+    )
+
+    with pytest.raises(SourceResolutionError, match="duplicate 'view_id' value 'view_a'"):
+        infer_sidecar_common.rows_by_key(rows_path, key="view_id")
+
+
 def test_missing_feature_sidecar_files_expose_empty_planned_source(tmp_path: Path) -> None:
     usr_root, dataset, _sequence_id = _planned_dataset(tmp_path)
 
@@ -374,6 +390,88 @@ def test_feature_sidecar_source_preserves_alias_rows_that_share_vector_keys(tmp_
     assert schema["row_count"] == 2
     assert table.num_rows == 2
     assert table["feature_vector_key"].to_pylist() == [vector_key, vector_key]
+
+
+def test_feature_sidecar_numeric_where_uses_alias_column_type(tmp_path: Path) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    created_at = "2026-04-28T00:00:00+00:00"
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "alias_start_0",
+                    "view_id": "view_start_0",
+                    "view_name": "fixture_start_0",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": "fv_start_0",
+                    "forward_pass_key": "fp_start_0",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "window_mean",
+                    "pooling_start_0": 0,
+                    "pooling_end_0": 60,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_start_0",
+                    "created_at": created_at,
+                },
+                {
+                    "alias_id": "alias_start_10",
+                    "view_id": "view_start_10",
+                    "view_name": "fixture_start_10",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": "fv_start_10",
+                    "forward_pass_key": "fp_start_10",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "window_mean",
+                    "pooling_start_0": 10,
+                    "pooling_end_0": 70,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_start_10",
+                    "created_at": created_at,
+                },
+            ],
+            schema=infer_feature_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_aliases.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"feature_vector_key": "fv_start_0", "value": [0.1, 0.2], "created_at": created_at},
+                {"feature_vector_key": "fv_start_10", "value": [0.3, 0.4], "created_at": created_at},
+            ],
+            schema=infer_feature_sidecar_source._VECTOR_SCHEMA,
+        ),
+        derived_dir / "feature_vectors.parquet",
+    )
+
+    schema = infer_feature_sidecar_source.inspect_schema(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_start_0": 0},
+    )
+    table = infer_feature_sidecar_source.read_table(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_start_0": 0},
+        columns=["alias_id", "pooling_start_0", "value"],
+    )
+
+    assert schema["row_count"] == 1
+    assert table.to_pylist() == [{"alias_id": "alias_start_0", "pooling_start_0": 0, "value": [0.1, 0.2]}]
 
 
 def test_feature_sidecar_inspect_schema_reuses_alias_table_scan(tmp_path: Path, monkeypatch) -> None:
