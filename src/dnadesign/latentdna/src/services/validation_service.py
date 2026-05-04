@@ -146,6 +146,14 @@ def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
     return notebook_details
 
 
+def _source_required_columns(source) -> list[str]:
+    required_columns: list[str] = []
+    for column in [source.record_key, source.subject_key, source.context_key]:
+        if column is not None and column not in required_columns:
+            required_columns.append(column)
+    return required_columns
+
+
 def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     context = load_workspace_config(workspace)
     validate_plot_semantics_sidecars(context)
@@ -155,9 +163,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     for source_id in sorted(context.config.sources):
         source = context.require_source(source_id)
         resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
-        required_columns = [source.record_key, source.subject_key]
-        if source.context_key is not None:
-            required_columns.append(source.context_key)
+        required_columns = _source_required_columns(source)
         try:
             schema_info = inspect_source_schema(resolved)
         except Exception as exc:
