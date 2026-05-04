@@ -22,11 +22,6 @@ from ..visual_style import reference_annotation_label
 from .candidate_set_service import build_workspace_candidate_sets, candidate_set_view_ids
 from .view_shape_cache import ViewShapeCache
 
-_DEFAULT_GEOMETRY_ORDER = [
-    "intermediate_embedding_7b_anchor_60bp",
-    "intermediate_embedding_7b_full_context_anchor_mean",
-]
-
 _PREFERRED_HUES = [
     "design_family",
     "design_regulator_composition",
@@ -175,7 +170,7 @@ def _geometry_order(context, *, notebook_id: str | None) -> list[str]:
                 continue
             seen.add(view_id)
             resolved.append(view_id)
-    return resolved or list(_DEFAULT_GEOMETRY_ORDER)
+    return resolved or list(context.config.views)
 
 
 def _unique_in_order(values) -> list[str]:
@@ -591,12 +586,6 @@ def _default_compare_views(
     configured_compare = list(getattr(notebook, "default_compare_views", []) or []) if notebook is not None else []
     if len(configured_compare) == 2:
         configured_pairs.append((configured_compare[0], configured_compare[1]))
-    configured_pairs.extend(
-        [
-            ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_anchor_mean"),
-            ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_1kb"),
-        ]
-    )
     for left_view, right_view in configured_pairs:
         if left_view in view_ids and right_view in view_ids:
             return left_view, right_view
