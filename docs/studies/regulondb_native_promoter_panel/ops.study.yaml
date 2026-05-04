@@ -23,7 +23,7 @@ lifecycle:
     - latentdna_native_audit
   current_phase:
     strategy: explicit
-    id: native_full_infer_7b
+    id: latentdna_native_audit
 
 phases:
   - id: regulondb_source_inventory
@@ -51,15 +51,15 @@ phases:
     output_dataset: usr_regulondb_native_promoter_core60
     next_surface: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel/README.md
   - id: native_full_infer_7b
-    status: in_progress
+    status: complete
     output_dataset: infer_regulondb_native_promoter_views_7b
     next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
   - id: core60_infer_7b
-    status: planned
+    status: complete
     output_dataset: infer_regulondb_native_promoter_core60_views_7b
     next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
   - id: latentdna_native_audit
-    status: planned
+    status: in_progress
     next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
 
 artifacts:
@@ -466,7 +466,7 @@ preflight:
       - kind: command
         check_id: latentdna.workspace.deep.validates
         check_group: latentdna
-        summary: RegulonDB LatentDNA workspace validates with planned feature views.
+        summary: RegulonDB LatentDNA workspace validates against sidecar-backed native/full and core60 feature views.
         required: true
         surface: latentdna_validate_workspace
   next_scope:

@@ -1,12 +1,12 @@
 ## regulondb_native_promoter_panel
 
-- Last verified: 2026-04-30
+- Last verified: 2026-05-04
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
 - Study execution map: `pipeline.yaml`
 - USR root: `src/dnadesign/usr/datasets`
-- Lifecycle posture: inactive source-intake lane; local native USR and TSS-upstream core60 datasets are materialized, and the standard local Evo2 7B Infer sidecars are complete for the native/full and derived core60 lanes
+- Lifecycle posture: inactive source-intake lane; local native USR and TSS-upstream core60 datasets are materialized, the standard local Evo2 7B Infer sidecars are complete for the native/full and derived core60 lanes, and the current checked-in phase is the LatentDNA native/core60 audit
 
 ### Current Datasets
 
@@ -20,7 +20,7 @@
 
 ### Current Phase
 
-- Declared phase: `local_infer_complete_7b`
+- Declared phase: `latentdna_native_audit`
 - Source export status: local Cruncher superset export validated; export artifacts are not checked in
 - USR dataset status: `src/dnadesign/usr/datasets/usr_regulondb_native_promoters` is materialized locally and passes strict USR validation as of 2026-04-29
 - Sequence-view status: write mode now emits one `source_record` sequence view per retained native promoter sequence, plus mutable view semantics for `source_family`, `selection_basis`, `view_collections`, and `role_tags`
@@ -181,10 +181,11 @@ current completeness base.
   2026-04-30 local plan marks both checked-in 7B lanes `skip_complete`, with
   zero blocked lanes, zero missing products, zero missing vectors, and zero
   missing scalars.
-- LatentDNA: configured with a workspace and study binding. The workspace has
-  validated with RegulonDB metadata cohorts and planned native/core60 feature
-  source declarations. Refresh downstream snapshots/plots against the completed
-  Infer sidecars before treating LatentDNA feature deliverables as current.
+- LatentDNA: configured with a workspace and study binding. The workspace
+  validates against the completed native/full and core60 Infer sidecars, and
+  the local downstream snapshot now reports the primary decision deliverables
+  `representation_health_summary`, `native_core60_shift_summary`, and
+  `sigma_factor_structure_summary` as current.
 - Cluster: submit-ready runbooks exist, but no SCC submission is currently
   needed for the local RegulonDB 7B standard lanes because sidecars are
   complete.
@@ -194,13 +195,13 @@ current completeness base.
 
 This study now has a maintained source-intake record, a tested USR import
 script, a local validated native USR dataset, checked-in downstream contracts
-for Construct, Infer, Notify event resolution, and LatentDNA planned feature
+for Construct, Infer, Notify event resolution, and LatentDNA sidecar-backed feature
 consumption, plus local Evo2 7B sidecars for the standard native/full and
 derived core60 lanes.
 
-Record-backed evidence through 2026-04-30:
+Record-backed evidence through 2026-05-04:
 
-- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` previously reported `is_active_study=false` and `native_full_infer_7b`; the checked-in record now advances the local phase to `local_infer_complete_7b` based on sidecar inventory.
+- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` reports `is_active_study=false` and the checked-in phase `latentdna_native_audit` after the native/full and core60 Infer sidecars are complete.
 - The same status surface reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and reports the generated core60 dataset as present in the local canonical USR root.
 - `uv run usr validate usr_regulondb_native_promoters --strict` passes locally.
 - `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --format json` returned `records_total=3182`, `records_written=3182`, and `dry_run=false`.
@@ -225,7 +226,7 @@ Record-backed evidence through 2026-04-30:
   3,182 views.
 - `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json` reports `state=ok`, 13 ok checks, no missing checks, and no blockers when run from this checkout on 2026-04-30.
 - `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json` returns `status=ok`.
-- `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json` writes the local partial snapshot contract. It is valid for native metadata review; feature plots should be refreshed against the completed sidecars when the downstream analysis step is resumed.
+- `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json` writes the local workspace snapshot contract with the current primary LatentDNA deliverables and browser geometry inventory.
 
 Residual operational footgun:
 
@@ -247,6 +248,6 @@ Residual operational footgun:
   should become part of the official study quota. If yes, promote the additive
   config into a checked-in runbook; until then it remains dogfood evidence and
   a reusable config, not a default batch lane.
-- Refresh LatentDNA snapshots and plots against the completed native/full and
-  core60 sidecars.
+- Keep the LatentDNA snapshot and notebook controls refreshed after any new
+  sidecar, plot, or deliverable run.
 - Keep live RegulonDB 14.5, sigmulon, HT, prediction, and EcoCyc strata as explicit future reconciliation work rather than silently widening the current base table.

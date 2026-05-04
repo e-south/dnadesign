@@ -152,15 +152,14 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `configured_planned_features`
+- Current state: `local_feature_review_ready`
 - Entry artifact: native/full and later core60 7B vector and scalar feature surfaces
 - Workspace: `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel`
 - Binding: `docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml`
 - Route note: Native cohorts use `regulondb__*` fields. They must not derive
   DenseGen metadata or alias native sigma factors into `sig35_variant`.
-  Current feature views are declared as planned so workspace validation and the
-  partial workspace snapshot can run before Evo2 sidecars exist. The native/full
-  and core60 contracts both name intermediate embeddings, output-layer means,
-  and log-likelihood scalar diagnostics. The partial snapshot is metadata-valid
-  but should report core60 sources and decision deliverables as pending until
-  Construct and Infer outputs exist.
+  The native/full and core60 contracts both name intermediate embeddings,
+  output-layer means, and log-likelihood scalar diagnostics from Infer sidecars.
+  The current local snapshot is feature-backed and reports the primary
+  decision deliverables as current; future missing sidecars must be expressed
+  through explicit planned source roles, not hidden fallback behavior.
