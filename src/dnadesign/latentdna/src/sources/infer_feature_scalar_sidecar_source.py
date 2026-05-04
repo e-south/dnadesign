@@ -11,18 +11,12 @@ mean-per-token diagnostics.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import pyarrow as pa
-import pyarrow.parquet as pq
 
-from dnadesign.usr import sequence_views_path, view_semantics_path
-
-from ..contracts.errors import SourceResolutionError
-from ..io.parquet_io import read_schema
-from . import infer_sidecar_common, usr_source
+from . import infer_sidecar_join
 
 _FEATURE_SCALAR_ALIAS_RELATIVE_PATH = "_derived/infer/feature_scalar_aliases.parquet"
 _FEATURE_SCALAR_RELATIVE_PATH = "_derived/infer/feature_scalars.parquet"
@@ -60,18 +54,26 @@ _SCALAR_VALUE_FIELD_TYPES = {
     _SCALAR_COLUMN: pa.float64(),
     _SCALAR_CREATED_AT_COLUMN: pa.string(),
 }
-
-
-def dataset_dir(root: str, dataset: str, *, workspace_dir: Path) -> Path:
-    return infer_sidecar_common.dataset_dir(root, dataset, workspace_dir=workspace_dir)
+_CONTRACT = infer_sidecar_join.InferSidecarJoinContract(
+    source_label=_SOURCE_LABEL,
+    alias_role="infer_feature_scalar_aliases",
+    payload_role="infer_feature_scalars",
+    missing_payload_label="feature scalars",
+    alias_relative_path=_FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
+    payload_relative_path=_FEATURE_SCALAR_RELATIVE_PATH,
+    payload_key_column="feature_scalar_key",
+    payload_value_column=_SCALAR_COLUMN,
+    payload_created_at_column=_SCALAR_CREATED_AT_COLUMN,
+    alias_created_at_column=_ALIAS_CREATED_AT_COLUMN,
+    alias_schema=_ALIAS_SCHEMA,
+    payload_schema=_SCALAR_SCHEMA,
+    payload_value_field_types=_SCALAR_VALUE_FIELD_TYPES,
+    vector_columns=[],
+)
 
 
 def feature_scalar_aliases_path(root: str, dataset: str, *, workspace_dir: Path) -> Path:
-    return dataset_dir(root, dataset, workspace_dir=workspace_dir) / _FEATURE_SCALAR_ALIAS_RELATIVE_PATH
-
-
-def feature_scalars_path(root: str, dataset: str, *, workspace_dir: Path) -> Path:
-    return dataset_dir(root, dataset, workspace_dir=workspace_dir) / _FEATURE_SCALAR_RELATIVE_PATH
+    return infer_sidecar_join.alias_path(_CONTRACT, root, dataset, workspace_dir=workspace_dir)
 
 
 def _read_alias_table(
@@ -81,174 +83,21 @@ def _read_alias_table(
     workspace_dir: Path,
     where: Mapping[str, object] | None,
 ) -> pa.Table:
-    path = feature_scalar_aliases_path(root, dataset, workspace_dir=workspace_dir)
-    if not path.is_file():
-        table = infer_sidecar_common.empty_table(_ALIAS_SCHEMA)
-    else:
-        table = pq.read_table(path).cast(_ALIAS_SCHEMA)
-    return infer_sidecar_common.apply_where(table, where, source_label=_SOURCE_LABEL)
-
-
-@lru_cache(maxsize=16)
-def _scalar_key_set_for_path(path_text: str) -> set[str]:
-    path = Path(path_text)
-    if not path.is_file():
-        return set()
-    table = pq.read_table(path, columns=["feature_scalar_key"])
-    return {str(value) for value in table.column("feature_scalar_key").to_pylist() if value is not None}
-
-
-def _scalar_key_set(root: str, dataset: str, *, workspace_dir: Path) -> set[str]:
-    path = feature_scalars_path(root, dataset, workspace_dir=workspace_dir)
-    return _scalar_key_set_for_path(path.as_posix())
-
-
-def _alias_feature_scalar_keys(aliases: pa.Table, *, dataset: str) -> list[str]:
-    keys: list[str] = []
-    for index, raw_key in enumerate(aliases.column("feature_scalar_key").to_pylist()):
-        if raw_key is None or not str(raw_key).strip():
-            raise SourceResolutionError(
-                f"infer feature scalar sidecar alias row {index} in {dataset} has no feature_scalar_key"
-            )
-        keys.append(str(raw_key))
-    return keys
-
-
-def _assert_scalars_exist(
-    aliases: pa.Table,
-    *,
-    root: str,
-    dataset: str,
-    workspace_dir: Path,
-) -> None:
-    wanted = set(_alias_feature_scalar_keys(aliases, dataset=dataset))
-    if not wanted:
-        return
-    present = _scalar_key_set(root, dataset, workspace_dir=workspace_dir)
-    missing = sorted(wanted - present)
-    if missing:
-        preview = ", ".join(missing[:5])
-        raise SourceResolutionError(
-            f"infer feature scalar sidecar aliases reference missing feature scalars in {dataset}: {preview}"
-        )
-
-
-def _assert_feature_scalar_keys_exist(
-    keys: list[str],
-    *,
-    root: str,
-    dataset: str,
-    workspace_dir: Path,
-) -> None:
-    if not keys:
-        return
-    present = _scalar_key_set(root, dataset, workspace_dir=workspace_dir)
-    missing = sorted(set(keys) - present)
-    if missing:
-        preview = ", ".join(missing[:5])
-        raise SourceResolutionError(
-            f"infer feature scalar sidecar aliases reference missing feature scalars in {dataset}: {preview}"
-        )
-
-
-def _schema_field_types(root: str, dataset: str, *, workspace_dir: Path) -> dict[str, pa.DataType]:
-    ds = infer_sidecar_common.load_dataset(root, dataset, workspace_dir=workspace_dir)
-    field_types = {field.name: field.type for field in ds.schema()}
-    for field in _ALIAS_SCHEMA:
-        name = _ALIAS_CREATED_AT_COLUMN if field.name == "created_at" else field.name
-        field_types.setdefault(name, field.type)
-    for sidecar_path in [
-        feature_scalar_aliases_path(root, dataset, workspace_dir=workspace_dir),
-        sequence_views_path(ds),
-    ]:
-        if not sidecar_path.is_file():
-            continue
-        for field in read_schema(sidecar_path):
-            name = _ALIAS_CREATED_AT_COLUMN if field.name == "created_at" else field.name
-            field_types.setdefault(name, field.type)
-    semantics_path = view_semantics_path(ds)
-    if semantics_path.is_file():
-        for field in read_schema(semantics_path):
-            field_types.setdefault(field.name, field.type)
-    field_types[_SCALAR_COLUMN] = pa.float64()
-    field_types[_SCALAR_CREATED_AT_COLUMN] = pa.string()
-    return field_types
-
-
-def _schema_columns(
-    root: str,
-    dataset: str,
-    *,
-    workspace_dir: Path,
-    where: Mapping[str, object] | None,
-    aliases: pa.Table | None = None,
-) -> list[str]:
-    if aliases is None:
-        aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
-        _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
-    return list(_schema_field_types(root, dataset, workspace_dir=workspace_dir))
+    return infer_sidecar_join.read_alias_table(_CONTRACT, root, dataset, workspace_dir=workspace_dir, where=where)
 
 
 def inspect_schema(
     root: str, dataset: str, *, workspace_dir: Path, where: Mapping[str, object] | None
 ) -> dict[str, Any]:
     aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
-    feature_scalar_keys = _alias_feature_scalar_keys(aliases, dataset=dataset)
-    _assert_feature_scalar_keys_exist(feature_scalar_keys, root=root, dataset=dataset, workspace_dir=workspace_dir)
-    return {
-        "path": (dataset_dir(root, dataset, workspace_dir=workspace_dir) / "_derived/infer").as_posix(),
-        "row_count": len(feature_scalar_keys),
-        "columns": _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where, aliases=aliases),
-        "vector_columns": [],
-    }
-
-
-def _metadata_rows(
-    root: str,
-    dataset: str,
-    *,
-    workspace_dir: Path,
-    where: Mapping[str, object] | None,
-    columns: list[str] | None,
-) -> dict[str, list[dict[str, object]]]:
-    ds = infer_sidecar_common.load_dataset(root, dataset, workspace_dir=workspace_dir)
-    aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
-    _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
-    alias_rows = infer_sidecar_common.renamed_created_at_rows(
-        aliases,
-        created_at_column=_ALIAS_CREATED_AT_COLUMN,
+    return infer_sidecar_join.inspect_schema(
+        _CONTRACT,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        where=where,
+        aliases=aliases,
     )
-    if not alias_rows:
-        return {}
-    wanted_view_ids = {str(row.get("view_id") or "") for row in alias_rows if row.get("view_id")}
-    sequence_views = infer_sidecar_common.rows_by_key(sequence_views_path(ds), key="view_id", wanted=wanted_view_ids)
-    semantics = infer_sidecar_common.rows_by_key(view_semantics_path(ds), key="view_id", wanted=wanted_view_ids)
-    schema_columns = set(_schema_columns(root, dataset, workspace_dir=workspace_dir, where=where))
-    requested = set(columns or schema_columns)
-    requested.discard(_SCALAR_COLUMN)
-    requested.discard(_SCALAR_CREATED_AT_COLUMN)
-    sidecar_columns = set(alias_rows[0]) if alias_rows else set()
-    if sequence_views:
-        sidecar_columns.update(next(iter(sequence_views.values())))
-    if semantics:
-        sidecar_columns.update(next(iter(semantics.values())))
-    record_columns = sorted((requested - sidecar_columns) | {"id"})
-    record_columns = [column for column in record_columns if column in set(field.name for field in ds.schema())]
-    records = infer_sidecar_common.record_rows_by_id(ds, columns=record_columns)
-
-    rows: dict[str, list[dict[str, object]]] = {}
-    for alias_row in alias_rows:
-        sequence_id = str(alias_row["sequence_id"])
-        record = records.get(sequence_id)
-        if record is None:
-            raise SourceResolutionError(
-                f"infer feature scalar sidecar alias references missing source record {sequence_id!r} in {dataset}"
-            )
-        view_id = str(alias_row.get("view_id") or "")
-        payload = {**record, **(sequence_views.get(view_id) or {}), **(semantics.get(view_id) or {}), **alias_row}
-        feature_scalar_key = str(alias_row["feature_scalar_key"])
-        rows.setdefault(feature_scalar_key, []).append(payload)
-    return rows
 
 
 def iter_batches(
@@ -260,43 +109,15 @@ def iter_batches(
     columns: list[str] | None,
     batch_size: int = _BATCH_SIZE,
 ):
-    selected_columns = list(columns or _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where))
-    metadata = _metadata_rows(root, dataset, workspace_dir=workspace_dir, where=where, columns=selected_columns)
-    if not metadata:
-        return
-    metadata_schema_rows = {
-        f"{feature_key}#{index}": row for feature_key, rows in metadata.items() for index, row in enumerate(rows)
-    }
-    output_schema = infer_sidecar_common.stable_batch_schema(
-        selected_columns,
-        metadata_schema_rows,
-        field_types=_schema_field_types(root, dataset, workspace_dir=workspace_dir),
-        value_field_types=_SCALAR_VALUE_FIELD_TYPES,
+    yield from infer_sidecar_join.iter_batches(
+        _CONTRACT,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        where=where,
+        columns=columns,
+        batch_size=batch_size,
     )
-    scalar_path = feature_scalars_path(root, dataset, workspace_dir=workspace_dir)
-    wanted_keys = set(metadata)
-    scalar_columns = ["feature_scalar_key"]
-    if _SCALAR_COLUMN in selected_columns:
-        scalar_columns.append(_SCALAR_COLUMN)
-    if _SCALAR_CREATED_AT_COLUMN in selected_columns:
-        scalar_columns.append("created_at")
-    if not scalar_path.is_file():
-        return
-    for batch in pq.ParquetFile(scalar_path).iter_batches(columns=scalar_columns, batch_size=batch_size):
-        batch_rows = []
-        for scalar_row in batch.to_pylist():
-            key = str(scalar_row["feature_scalar_key"])
-            if key not in wanted_keys:
-                continue
-            for metadata_row in metadata[key]:
-                row = dict(metadata_row)
-                if _SCALAR_COLUMN in selected_columns:
-                    row[_SCALAR_COLUMN] = scalar_row[_SCALAR_COLUMN]
-                if _SCALAR_CREATED_AT_COLUMN in selected_columns:
-                    row[_SCALAR_CREATED_AT_COLUMN] = scalar_row.get("created_at")
-                batch_rows.append({column: row.get(column) for column in selected_columns})
-        if batch_rows:
-            yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
 
 
 def read_table(
@@ -307,17 +128,15 @@ def read_table(
     where: Mapping[str, object] | None,
     columns: list[str] | None,
 ) -> pa.Table:
-    batches = list(iter_batches(root, dataset, workspace_dir=workspace_dir, where=where, columns=columns))
-    if batches:
-        return pa.Table.from_batches(batches)
-    selected_columns = list(columns or _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where))
-    schema = infer_sidecar_common.stable_batch_schema(
-        selected_columns,
-        {},
-        field_types=_schema_field_types(root, dataset, workspace_dir=workspace_dir),
-        value_field_types=_SCALAR_VALUE_FIELD_TYPES,
+    return infer_sidecar_join.read_table(
+        _CONTRACT,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        where=where,
+        columns=columns,
+        batch_size=_BATCH_SIZE,
     )
-    return pa.Table.from_arrays([pa.array([], type=field.type) for field in schema], schema=schema)
 
 
 def source_provenance(
@@ -327,14 +146,4 @@ def source_provenance(
     workspace_dir: Path,
     columns: list[str] | None,
 ) -> list[dict[str, object]]:
-    entries = usr_source.source_provenance(root, dataset, workspace_dir=workspace_dir, columns=columns)
-    ds = infer_sidecar_common.load_dataset(root, dataset, workspace_dir=workspace_dir)
-    for path, role in [
-        (feature_scalar_aliases_path(root, dataset, workspace_dir=workspace_dir), "infer_feature_scalar_aliases"),
-        (feature_scalars_path(root, dataset, workspace_dir=workspace_dir), "infer_feature_scalars"),
-        (sequence_views_path(ds), "sequence_views"),
-        (view_semantics_path(ds), "view_semantics"),
-    ]:
-        if path.is_file():
-            entries.append({"kind": "file", "id": role, "path": path.as_posix(), "role": role})
-    return entries
+    return infer_sidecar_join.source_provenance(_CONTRACT, root, dataset, workspace_dir=workspace_dir, columns=columns)
