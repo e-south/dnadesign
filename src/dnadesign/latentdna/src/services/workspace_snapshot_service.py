@@ -89,7 +89,9 @@ def _model_families(context) -> list[str]:
         encoder = str(tags.get("encoder") or "").strip().lower()
         model = str(tags.get("model") or "").strip().lower()
         if encoder and model:
-            families.add(f"{encoder}_{model}")
+            families.add(model if model.startswith(f"{encoder}_") else f"{encoder}_{model}")
+        elif model:
+            families.add(model)
     return sorted(families)
 
 

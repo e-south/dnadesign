@@ -387,10 +387,19 @@ def _build_planned_outputs_state(
         )
         if dataset_id is not None
     }
+    completed_output_ids = {
+        str(phase.get("output_dataset") or "").strip()
+        for phase in study_context.phase_states
+        if str(phase.get("status") or "").strip() == "complete"
+    }
+    completed_output_ids.discard("")
     pending_outputs = [
         str(state["dataset"])
         for state in study_context.dataset_states
-        if state["declared_status"] != "present" and not state["exists"] and str(state["dataset"]) not in handoff_ids
+        if state["declared_status"] != "present"
+        and not state["exists"]
+        and str(state["dataset"]) not in handoff_ids
+        and str(state["dataset"]) not in completed_output_ids
     ]
     if pending_outputs:
         return {
