@@ -21,8 +21,11 @@ from dnadesign.infer.src.features.aliases import (
 )
 from dnadesign.latentdna.src.contracts.errors import SourceResolutionError
 from dnadesign.latentdna.src.io.parquet_io import read_table
-from dnadesign.latentdna.src.sources import infer_feature_scalar_sidecar_source, infer_feature_sidecar_source
-from dnadesign.latentdna.src.sources.infer_feature_sidecar_source import _stable_batch_schema
+from dnadesign.latentdna.src.sources import (
+    infer_feature_scalar_sidecar_source,
+    infer_feature_sidecar_source,
+    infer_sidecar_common,
+)
 from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 from dnadesign.usr import (
@@ -209,12 +212,13 @@ def _standard_metadata_sidecar_dataset(tmp_path: Path) -> tuple[Path, Dataset]:
 
 
 def test_stable_batch_schema_uses_later_non_null_metadata_values() -> None:
-    schema = _stable_batch_schema(
+    schema = infer_sidecar_common.stable_batch_schema(
         ["alias_id", "usr_label__primary", "value"],
         {
             "fv_a": {"alias_id": "alias_a", "usr_label__primary": None},
             "fv_b": {"alias_id": "alias_b", "usr_label__primary": "spyP"},
         },
+        value_field_types={"value": pa.list_(pa.float64())},
     )
 
     assert schema.field("usr_label__primary").type == pa.string()
