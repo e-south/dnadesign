@@ -8,6 +8,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.studies.families.promoter.analysis_surfaces import inspect_promoter_exploratory_analysis
@@ -346,6 +347,14 @@ def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> Non
         "core60_tss_upstream_7b_core60_mean_output_layer_features",
     ]
     assert snapshot["missing_decision_deliverables"] == []
+
+
+def test_promoter_latentdna_snapshot_validation_requires_study_binding(tmp_path: Path) -> None:
+    snapshot_path = _write_latentdna_snapshot_fixture(tmp_path)
+    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    with pytest.raises(ValueError, match="validated study binding"):
+        _validate_workspace_snapshot(binding=None, snapshot=snapshot)
 
 
 def test_inspect_promoter_latentdna_readiness_rejects_snapshot_schema_mismatch(tmp_path: Path) -> None:
