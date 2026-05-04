@@ -40,7 +40,7 @@ def _read_study_datasets(study_dir: Path) -> dict[str, dict[str, Any]]:
 def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, workspace_dir: Path) -> None:
     datasets = _read_study_datasets(study_dir)
     source_role_map = {
-        "anchor_60bp": "merged_anchor_source",
+        "merged_anchor_insert": "merged_anchor_source",
         "full_context_1kb": "construct_context",
     }
     for source_id, role in source_role_map.items():

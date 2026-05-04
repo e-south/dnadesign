@@ -142,7 +142,7 @@ def render_selector_cells() -> tuple[str, ...]:
                     row.get("context")
                     for row in _geometry.geometry_rows
                     if str(row.get("model")) == selected_model and str(row.get("family")) == selected_family
-                ) or ["anchor_60bp"]
+                ) or ["merged_anchor_insert_seq_mean"]
                 context_default = (
                     str(_geometry.geometry_control.get("default_context"))
                     if str(_geometry.geometry_control.get("default_context")) in context_values
@@ -151,7 +151,7 @@ def render_selector_cells() -> tuple[str, ...]:
                 _context_options = _support.labeled_options(
                     (
                         {
-                            "anchor_60bp": "60 bp anchor",
+                            "merged_anchor_insert_seq_mean": "Mixed-length anchor-source insert",
                             "full_context_1kb": "1 kb construct context",
                         }.get(value, value.replace("_", " ")),
                         value,

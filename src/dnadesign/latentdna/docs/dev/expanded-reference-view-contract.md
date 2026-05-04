@@ -11,9 +11,10 @@ larger reference inventory and from two candidate geometries to the completed
 ## Problem
 
 The old stress-study LatentDNA surface treated `spyp`, `sulAp`, and `J23105` as
-the only reference set, and it projected only the 60 bp anchor plus the forward
-1 kb anchor-mean view. That was enough for the first reference smoke check, but
-it is no longer enough for study status. Current study records include native
+the only reference set, and it projected only the merged anchor-source insert
+mean plus the forward 1 kb anchor-mean view. That was enough for the first
+reference smoke check, but it is no longer enough for study status. Current
+study records include native
 reference rows, Anderson iGEM rows, W-collection rows, Native MG1655 controls,
 and derived core60 rows.
 
@@ -48,7 +49,7 @@ manifest/control payload.
 
 The stress study should surface these 7B intermediate geometries:
 
-- 60 bp anchor sequence mean.
+- Mixed-length anchor-source insert sequence mean.
 - Forward 1 kb context sequence mean.
 - Forward 1 kb context anchor mean.
 - Reverse-complement 1 kb context sequence mean.

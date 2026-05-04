@@ -48,6 +48,7 @@ and narrow the package contract first.
 - [x] (2026-05-02 17:01Z) Added explicit handoff addendum for math/data-processing fidelity, plot-claim alignment, Marimo control discipline, and performance footguns so the next goal-tracked Codex run has non-negotiable acceptance gates rather than only plot-level intent.
 - [x] (2026-05-02 17:28Z) Slice 7: added a generic candidate X inventory ledger to workspace snapshots and catalogs, including candidate-set membership, source/dataset, row basis, model, feature family, modality, sequence scope, pooling, orientation, coordinate space, dimensions, materialization status, and freshness status. Planned views remain visible as planned without inspecting planned source payloads during status publication.
 - [x] (2026-05-02 18:07Z) Slice 8: promoted the candidate X ledger into generated notebook controls and switched notebook runtime shape summaries to the control-plane ledger/geometry rows instead of reopening `matrix.npy` files during Marimo startup. Stress runtime baseline over three runs was 0.1167s / 0.1024s / 0.0971s with 10 `np.load` calls per run; after the change it was 0.1061s / 0.0960s / 0.0979s with 0 `np.load` calls. cProfile still shows YAML config/semantics loading as the dominant startup cost, so further speed work should target pre-resolved notebook review metadata rather than matrix-shape inspection.
+- [x] (2026-05-02 18:42Z) Slice 9: hardened notebook control-plane assembly and Infer sidecar schema inspection. Direct stress controls-build baseline was 6.7704s / 5.4983s / 5.4861s with 45 `np.load` calls across 10 unique view matrices; RegulonDB was 0.1016s / 0.0763s / 0.0821s with 16 calls across 4 matrices. A shared view-shape cache first reduced this to one matrix open per materialized view, then manifest `stats.rows` / `stats.dims` removed matrix opens entirely for current artifacts. cProfile then showed duplicate Infer alias-table scans inside `inspect_schema`; reusing the first alias table for vector and scalar sidecars reduced direct stress controls builds to 5.3724s / 4.1354s / 4.0924s with 0 `np.load` calls, and RegulonDB to 0.0815s / 0.0571s / 0.0574s. Catalog-backed controls assembly, which is the normal notebook-generation path, measured 0.0277s / 0.0199s / 0.0200s with 0 `np.load` calls because it reuses the catalog candidate inventory.
 - [ ] (2026-05-02 16:01Z) Later slices remain for any OPAL export-facing decisions that require maintainer weighting policy or phenotype-backed active-learning promotion rules.
 
 ### Surprises & Discoveries
@@ -131,6 +132,28 @@ calls per startup before the control-plane change and 0 after it. The timing
 impact was small because YAML config and plot-semantics loading dominate this
 path, but the change removes a matrix-I/O dependency from notebook startup and
 keeps candidate-shape claims tied to the published ledger.
+
+Observation: generated notebook control assembly had the same shape-read risk
+one layer earlier. Candidate inventory, geometry controls, and candidate-set
+controls each reconstructed view shapes independently, and current view
+manifests already carried `stats.rows` and `stats.dims`.
+
+Evidence: instrumenting
+`build_workspace_notebook_controls_payload` showed 45 `np.load` calls across 10
+unique stress view matrices and 16 calls across 4 RegulonDB matrices before
+the cache/manifest pass. After the change, both workspaces build controls with
+0 `np.load` calls; direct stress controls builds remain dominated by freshness
+digests and source-schema inspection, while catalog-backed controls assembly
+is about 0.02s.
+
+Observation: Infer sidecar schema inspection read the same filtered alias table
+twice per `inspect_schema` call: once for row count/vector existence and again
+for column discovery.
+
+Evidence: regression tests now assert one alias-table read per vector or scalar
+Infer sidecar `inspect_schema` call. The post-change stress controls profile
+shows `_read_alias_table` calls down from 20 to 10 for the direct candidate
+inventory path.
 
 Observation: reference-collapse distances were being computed after normalizing
 the full candidate matrix and then normalizing each reference subset again.

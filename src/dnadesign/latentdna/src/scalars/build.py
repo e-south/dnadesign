@@ -1146,7 +1146,7 @@ def _candidate_descriptor(candidate_id: str) -> dict[str, object]:
     scope = (
         "full_context_1kb"
         if "full_context_1kb" in candidate_id
-        else "anchor_60bp"
+        else "merged_anchor_insert_seq_mean"
         if "anchor_60bp" in candidate_id
         else None
     )

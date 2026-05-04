@@ -12,9 +12,9 @@ Artifact IDs state:
 
 Canonical examples:
 
-- `intermediate_embedding_20b_anchor_60bp`
+- `intermediate_embedding_20b_merged_anchor_insert_seq_mean`
 - `intermediate_embedding_20b_full_context_1kb`
-- `pooled_logits_7b_anchor_60bp`
+- `pooled_logits_7b_merged_anchor_insert_seq_mean`
 - `design_centroid_margins`
 - `context_delta_distribution_intermediate_embedding_7b`
 - `representation_health_summary`

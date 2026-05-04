@@ -524,8 +524,8 @@ def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_templa
 
     config_payload = yaml.safe_load((workspace_dir / "config.yaml").read_text(encoding="utf-8"))
     expected_usr_root = Path(relpath(usr_root.resolve(), workspace_dir.resolve())).as_posix()
-    assert config_payload["sources"]["anchor_60bp"]["root"] == expected_usr_root
-    assert config_payload["sources"]["anchor_60bp"]["dataset"] == "promoter/test_anchor"
+    assert config_payload["sources"]["merged_anchor_insert"]["root"] == expected_usr_root
+    assert config_payload["sources"]["merged_anchor_insert"]["dataset"] == "promoter/test_anchor"
     assert config_payload["sources"]["full_context_1kb"]["root"] == expected_usr_root
     assert config_payload["sources"]["full_context_1kb"]["dataset"] == "promoter/test_contexts"
     assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
@@ -1256,7 +1256,7 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
                     "neighbor_backend": "auto",
                 },
                 "sources": {
-                    "anchor_60bp": {
+                    "merged_anchor_insert": {
                         "kind": "usr",
                         "root": usr_root.as_posix(),
                         "dataset": "promoter/demo_anchor_set",
@@ -1267,7 +1267,7 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
                 "metadata": {"include": ["usr_label__primary", "design_family", "sig35_variant"]},
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
-                        "source": "anchor_60bp",
+                        "source": "merged_anchor_insert",
                         "vector": {
                             "kind": "column",
                             "name": (
@@ -1280,7 +1280,7 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
                             "encoder": "evo2",
                             "model": "20b",
                             "family": "intermediate_embedding",
-                            "scope": "anchor_60bp",
+                            "scope": "merged_anchor_insert_seq_mean",
                         },
                     }
                 },
@@ -1336,8 +1336,8 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["workspace_id"] == "demo_latentdna"
-    assert payload["sources"]["anchor_60bp"]["dataset_id"] == "promoter/demo_anchor_set"
-    assert payload["sources"]["anchor_60bp"]["row_count"] == 2
+    assert payload["sources"]["merged_anchor_insert"]["dataset_id"] == "promoter/demo_anchor_set"
+    assert payload["sources"]["merged_anchor_insert"]["row_count"] == 2
     assert payload["model_families"] == ["evo2_20b"]
     assert payload["canonical_views"] == ["intermediate_embedding_20b_anchor_60bp"]
     assert payload["browser"]["default_geometry_ids"] == ["intermediate_embedding_20b_anchor_60bp"]

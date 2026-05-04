@@ -42,7 +42,8 @@ _DIRECT_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
     "pooled_logits": "Pooled logits",
     "output_layer_mean": "Output-layer mean",
-    "anchor_60bp": "60 bp anchor",
+    "anchor_60bp": "Anchor-source insert",
+    "merged_anchor_insert_seq_mean": "Mixed-length anchor-source insert",
     "full_context_1kb": "1 kb construct context",
     "native_source_record": "Native source record",
     "core60_tss_upstream": "Core60 TSS-upstream",
@@ -53,6 +54,7 @@ _DIRECT_LABELS = {
     "sig35_variant": "Sigma-35 variant",
     "sigma35_variant": "Sigma-35 variant",
     "spacer_length": "Spacer length",
+    "emitted_length_bp": "Emitted length (bp)",
     "design_family": "Design family",
     "style": "Design family",
     "background_only": "Background only",
@@ -71,12 +73,12 @@ _DIRECT_LABELS = {
     "J23105": "J23105",
     "evo2_7b": "Evo 2 7B",
     "evo2_20b": "Evo 2 20B",
-    "intermediate_embedding_7b_anchor_60bp": "Anchor 60 bp",
+    "intermediate_embedding_7b_anchor_60bp": "Anchor-source insert mean",
     "intermediate_embedding_7b_full_context_1kb": "1 kb seq mean",
     "intermediate_embedding_7b_full_context_anchor_mean": "1 kb anchor mean",
     "intermediate_embedding_7b_anchor_plus_full_context_concat": "Anchor + 1 kb concat",
     "intermediate_embedding_7b_anchor_plus_anchor_mean_concat": "Anchor + anchor-mean concat",
-    "pooled_logits_7b_anchor_60bp": "Anchor logits",
+    "pooled_logits_7b_anchor_60bp": "Anchor-source insert logits",
     "pooled_logits_7b_full_context_1kb": "1 kb logits",
     "context_self_cosine": "Context self-cosine",
     "context_shift_l2": "Context-shift L2 distance",
@@ -251,7 +253,7 @@ def humanize_label(value: object) -> str:
         normalized,
         flags=re.IGNORECASE,
     )
-    normalized = re.sub(r"\banchor 60 ?bp\b", "60 bp anchor", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\banchor 60 ?bp\b", "anchor-source insert mean", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\bfull context 1 ?kb\b",
         "1 kb construct context",
@@ -306,7 +308,7 @@ def humanize_candidate(candidate_key: str | Mapping[str, str]) -> str:
         normalized,
         flags=re.IGNORECASE,
     )
-    normalized = re.sub(r"\banchor 60 ?bp\b", "60 bp anchor", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\banchor 60 ?bp\b", "anchor-source insert mean", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\bfull context 1 ?kb\b",
         "1 kb construct context",

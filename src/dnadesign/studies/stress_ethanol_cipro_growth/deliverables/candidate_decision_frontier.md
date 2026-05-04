@@ -6,7 +6,7 @@ This synthesis plot summarizes the full pre-assay ladder without replacing it. I
 
 #### Plot details
 
-**Data.** Each point is one healthy study-facing candidate representation from the trimmed 7B inventory. The plot joins persisted summary tables for representation health, balanced design-family separation, Sigma-35 ordinal structure, and context robustness.
+**Data.** Each point is one healthy study-facing candidate representation from the trimmed 7B inventory. The visible plot joins persisted summary tables for representation health, balanced design-family separation, and Sigma-35 ordinal structure. Context rows are carried in the scalar artifact for provenance, but context retention is not encoded on the plotted axes or point size.
 
 **Preprocessing.** This figure does not recompute row-level geometry. It reuses the persisted scalar summaries, each of which already follows the shared contract of view-level standardization plus row L2 normalization before cosine-based metrics are formed.
 

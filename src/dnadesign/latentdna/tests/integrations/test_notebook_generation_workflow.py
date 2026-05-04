@@ -333,6 +333,8 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "comparison_scope_note" not in notebook_text
     assert 'runtime["' not in notebook_text
     assert "_controls = load_workspace_notebook_controls(CONTROL_PATH)" in notebook_text
+    assert "Sigma-35 organization, and context robustness" not in notebook_text
+    assert "_plot_scope_text = (" in notebook_text
     assert '_runtime_paths = _controls["runtime_paths"]' in notebook_text
     assert '_runtime_paths["workspace_relative_path"]' in notebook_text
     assert '_runtime_paths["output_relative_path"]' in notebook_text
@@ -360,7 +362,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "value=active_top_tab" in notebook_text
     assert "on_change=set_active_top_tab" in notebook_text
     assert "lazy=True" in notebook_text
-    assert "Review the current artifact set for representation health" in notebook_text
+    assert "Review the current artifact set: " in notebook_text
     assert "Point positions are fixed by the saved coordinates" in notebook_text
     assert "Jump list:" not in notebook_text
     assert "mo.accordion(" in notebook_text

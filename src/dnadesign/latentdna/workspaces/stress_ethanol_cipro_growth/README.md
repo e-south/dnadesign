@@ -20,13 +20,14 @@ This workspace holds the LatentDNA comparison surfaces for the active stress / e
 - Companion visuals: `sigma35_stress_margin_gallery`, `context_pair_summary`
 - Appendix support: `sigma35_centroid_distance_gallery`
 - Appendix surfaces: `design_centroid_margin_gallery`, `reference_alignment_summary`, `representation_scree_diagnostic`, `appendix_umap_gallery`
-- Current regenerated plots: all non-UMAP primary, companion, and appendix
-  surfaces are materialized; `appendix_umap_gallery` remains missing.
+- Current regenerated plots: primary, companion, and appendix surfaces,
+  including `appendix_umap_gallery`, are materialized from current code/config.
 - Reference-only probe: `outputs/plots/reference_strength_probe/` contains
   exploratory PCA scatter plots and Spearman summaries for the completed
   reference core60/context sidecars.
 - UMAP role: appendix orientation only
-- Browser geometry default: candidate grid with 60 bp anchor and 1 kb context anchor-mean panels
+- Browser geometry default: candidate grid with mixed-length anchor-source
+  insert means and 1 kb context anchor-mean panels
 
 Common commands:
 

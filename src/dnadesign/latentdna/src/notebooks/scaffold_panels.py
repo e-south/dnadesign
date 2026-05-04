@@ -14,12 +14,18 @@ def render_scope_note_cell() -> str:
         def _(runtime):
             _support = runtime.support
 
-            plot_scope_note = _support.mo.md(
-                (
-                    "Review the current artifact set for representation health, design structure, "
-                    "Sigma-35 organization, and context robustness."
-                )
+            _plot_titles = []
+            for _plot_section in runtime.plot_review.sections:
+                for _plot_card in _plot_section.get("cards", []):
+                    _plot_title = str(_plot_card.get("title") or _plot_card.get("plot_id") or "").strip()
+                    if _plot_title and _plot_title not in _plot_titles:
+                        _plot_titles.append(_plot_title)
+            _plot_scope_text = (
+                "Review the current artifact set: " + ", ".join(_plot_titles) + "."
+                if _plot_titles
+                else "Review the current artifact set."
             )
+            plot_scope_note = _support.mo.md(_plot_scope_text)
             geometry_scope_note = _support.mo.md(
                 (
                     "This tab is a projection browser for persisted geometry and metadata overlays. "

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import marimo as mo
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime_support
@@ -476,6 +477,29 @@ def test_available_hues_for_frames_intersects_support_across_visible_panels() ->
         preferred_hues=["design_family", "context_shift_l2"],
         hue_kinds={"design_family": "categorical", "context_shift_l2": "continuous"},
     ) == ["design_family", "context_shift_l2"]
+
+
+def test_available_hues_for_frames_accepts_array_backed_categorical_hues() -> None:
+    frames = [
+        pd.DataFrame({"regulondb__sigma_factor_set": [np.array(["sigma70"], dtype=object)]}),
+        pd.DataFrame({"regulondb__sigma_factor_set": [np.array(["sigma38", "sigma70"], dtype=object)]}),
+    ]
+
+    assert available_hues_for_frames(
+        frames,
+        preferred_hues=["regulondb__sigma_factor_set"],
+        hue_kinds={"regulondb__sigma_factor_set": "categorical"},
+    ) == ["regulondb__sigma_factor_set"]
+
+
+def test_normalize_categorical_hue_value_formats_array_backed_sets() -> None:
+    assert (
+        normalize_categorical_hue_value(
+            "regulondb__sigma_factor_set",
+            np.array(["sigma38", "sigma70"], dtype=object),
+        )
+        == "Sigma38 + Sigma70"
+    )
 
 
 def test_available_hues_for_frames_ignores_empty_panels_when_resolving_hues() -> None:

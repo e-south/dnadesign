@@ -98,7 +98,7 @@ Positive $m_{\mathrm{stress}}(x)$ values mean the row is closer to at least one 
 
 **Data.** The gallery uses the same declared f/e/d/c/b Sigma-35 ladder as the ordinal audit and restricts the visual to the study-facing 7B intermediate candidates.
 
-**Preprocessing.** Variant centroids are computed after view-level standardization and row L2 normalization on the sampled candidate rows used for the audit. The rendered matrix keeps only the configured f/e/d/c/b axis even when source/reference rows carry additional annotated Sigma-35 sequences. Distances are cosine distances between those normalized centroids.
+**Preprocessing.** Variant centroids are computed after view-level standardization and row L2 normalization on the full materialized candidate view for this companion heatmap. The rendered matrix keeps only the configured f/e/d/c/b axis even when source/reference rows carry additional annotated Sigma-35 sequences. Distances are cosine distances between those normalized centroids.
 
 **Definition.** For each variant \(g\),
 

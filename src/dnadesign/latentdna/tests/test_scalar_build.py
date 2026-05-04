@@ -2136,6 +2136,7 @@ def test_representation_health_summary_records_effective_rank_basis(tmp_path: Pa
 
     rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
     effective_rank = next(row for row in rows_table if row["metric_id"] == "effective_rank")
+    pc1_fraction = next(row for row in rows_table if row["metric_id"] == "pc1_variance_fraction")
 
     assert effective_rank["effective_rank_basis"] == "retained_pca_components"
     assert effective_rank["effective_rank_component_count"] == 4
@@ -2144,6 +2145,8 @@ def test_representation_health_summary_records_effective_rank_basis(tmp_path: Pa
     assert effective_rank["pca_fit_scope_kind"] == "sample_set"
     assert effective_rank["pca_fit_scope_id"] == "scorecard_sample_demo"
     assert effective_rank["explained_variance_captured"] == pytest.approx(0.95)
+    assert pc1_fraction["metric_value"] == pytest.approx(0.6 / 0.95)
+    assert pc1_fraction["explained_variance_captured"] == pytest.approx(0.95)
 
 
 def test_representation_health_summary_reports_planned_candidates_without_ranking(tmp_path: Path) -> None:

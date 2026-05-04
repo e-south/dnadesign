@@ -255,6 +255,12 @@ def test_projection_sig35_hue_keeps_context_derived_densegen_rows_categorical() 
     ]
 
 
+def test_projection_required_value_check_accepts_array_backed_categorical_columns() -> None:
+    frame = pd.DataFrame({"regulondb__sigma_factor_set": [np.array(["sigma38", "sigma70"], dtype=object)]})
+
+    assert projection_runtime._column_has_required_values(frame, "regulondb__sigma_factor_set")
+
+
 def test_render_projection_grid_draws_reference_stars_as_hue_independent_overlay(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
 

@@ -20,7 +20,7 @@ Key constraints:
 - row basis is explicit and may be a view, reduced view, sample, alignment, scalar table, or distance table artifact.
 - block order is stable and encoded in `features.parquet`.
 - alignment-backed block projection is explicit.
-- feature names use deterministic semantic prefixes such as `intermediate_embedding_20b_anchor_60bp_pc_001`.
+- feature names use deterministic semantic prefixes such as `intermediate_embedding_20b_merged_anchor_insert_seq_mean_pc_001`.
 - feature names must be unique across the full bundle; ambiguous ledgers fail fast.
 
 See also:

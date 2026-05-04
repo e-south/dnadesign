@@ -52,6 +52,6 @@ $$
 \left\|z^{\mathrm{anchor}} - z^{\mathrm{context}}\right\|_2.
 $$
 
-**Decision use.** Use this as the direct sanity check for whether the 1 kb anchor-mean path stays closer to the 60 bp anchor than whole-sequence 1 kb pooling on the same aligned rows.
+**Decision use.** Use this as the direct sanity check for whether the 1 kb anchor-mean path stays closer to the anchor-source insert representation than whole-sequence 1 kb pooling on the same aligned rows.
 
 **Limits.** Median summaries intentionally suppress subgroup shape and tails. Use the main context-robustness summary or the persisted row-level scalars when subgroup diagnostics are needed.

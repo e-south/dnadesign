@@ -25,12 +25,18 @@ sources:
     dataset: usr_regulondb_native_promoters
     record_key: id
     subject_key: id
+    sequence_scope: native_source_record
+    emitted_length_bp: 81
+    pooling_span_bp: full_sequence
   native_7b_seq_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
     dataset: usr_regulondb_native_promoters
     record_key: alias_id
     subject_key: id
+    sequence_scope: native_source_record_seq_mean
+    emitted_length_bp: 81
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -43,6 +49,9 @@ sources:
     dataset: usr_regulondb_native_promoters
     record_key: alias_id
     subject_key: id
+    sequence_scope: native_source_record_seq_mean
+    emitted_length_bp: 81
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -54,6 +63,9 @@ sources:
     dataset: usr_regulondb_native_promoters
     record_key: alias_id
     subject_key: id
+    sequence_scope: native_source_record_seq_mean
+    emitted_length_bp: 81
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -64,6 +76,9 @@ sources:
     dataset: usr_regulondb_native_promoters
     record_key: alias_id
     subject_key: id
+    sequence_scope: native_source_record_seq_mean
+    emitted_length_bp: 81
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -74,12 +89,24 @@ sources:
     dataset: usr_regulondb_native_promoter_core60
     record_key: id
     subject_key: id
+    sequence_scope: analysis_window
+    emitted_length_bp: 60
+    source_interval_length_bp: 60
+    pooling_span_bp: 60
+    focal_rule: tss_offset_60
+    window_selection_rule: upstream_of_focal
   core60_tss_upstream_7b_core60_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
     subject_key: alias_id
+    sequence_scope: core60_tss_upstream
+    emitted_length_bp: 60
+    source_interval_length_bp: 60
+    pooling_span_bp: 60
+    focal_rule: tss_offset_60
+    window_selection_rule: upstream_of_focal
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -92,6 +119,12 @@ sources:
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
     subject_key: alias_id
+    sequence_scope: core60_tss_upstream
+    emitted_length_bp: 60
+    source_interval_length_bp: 60
+    pooling_span_bp: 60
+    focal_rule: tss_offset_60
+    window_selection_rule: upstream_of_focal
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -103,6 +136,12 @@ sources:
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
     subject_key: alias_id
+    sequence_scope: core60_tss_upstream
+    emitted_length_bp: 60
+    source_interval_length_bp: 60
+    pooling_span_bp: 60
+    focal_rule: tss_offset_60
+    window_selection_rule: upstream_of_focal
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -113,6 +152,12 @@ sources:
     dataset: usr_regulondb_native_promoter_core60
     record_key: alias_id
     subject_key: alias_id
+    sequence_scope: core60_tss_upstream
+    emitted_length_bp: 60
+    source_interval_length_bp: 60
+    pooling_span_bp: 60
+    focal_rule: tss_offset_60
+    window_selection_rule: upstream_of_focal
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -120,6 +165,7 @@ sources:
 metadata:
   include:
     - alignment_parent_sequence_id
+    - emitted_length_bp
     - regulondb__sigma_factor_set
     - regulondb__sigma_factor_count
     - regulondb__confidence_level_set
@@ -129,6 +175,7 @@ metadata:
     - regulondb__source_strata_set
     - regulondb__primary_promoter_name
   derivations:
+    emitted_length_bp: {kind: copy, source: length}
     alignment_parent_sequence_id:
       kind: coalesce
       sources: [parent_sequence_id, id]
@@ -260,6 +307,7 @@ plots:
     category_column: label
     label_column: candidate_label
     value_column: metric_value
+    color_column: candidate_family
     direction_column: direction
     unit_column: unit
     sort_rule: panel_direction

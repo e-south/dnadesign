@@ -13,9 +13,9 @@ defaults:
     - png
   neighbor_backend: auto
 sources:
-  anchor_60bp:
+  merged_anchor_insert:
     kind: parquet
-    path: inputs/anchor_60bp.parquet
+    path: inputs/merged_anchor_insert.parquet
     record_key: id
     subject_key: id
   full_context_1kb:
@@ -59,12 +59,12 @@ alignments:
     right_on: [id]
 views:
   intermediate_embedding_20b_anchor_60bp:
-    source: anchor_60bp
+    source: merged_anchor_insert
     vector:
       kind: column
       name: infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
     coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
-    tags: {encoder: evo2, model: 20b, family: intermediate_embedding, scope: anchor_60bp}
+    tags: {encoder: evo2, model: 20b, family: intermediate_embedding, scope: merged_anchor_insert_seq_mean}
     role: hidden
   intermediate_embedding_20b_full_context_1kb:
     source: full_context_1kb
@@ -75,12 +75,12 @@ views:
     tags: {encoder: evo2, model: 20b, family: intermediate_embedding, scope: full_context_1kb}
     role: hidden
   intermediate_embedding_7b_anchor_60bp:
-    source: anchor_60bp
+    source: merged_anchor_insert
     vector:
       kind: column
       name: infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
-    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: anchor_60bp}
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: merged_anchor_insert_seq_mean}
     role: primary
   intermediate_embedding_7b_full_context_1kb:
     source: full_context_1kb
@@ -99,12 +99,12 @@ views:
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: full_context_anchor_mean}
     role: primary
   pooled_logits_20b_anchor_60bp:
-    source: anchor_60bp
+    source: merged_anchor_insert
     vector:
       kind: column
       name: infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean
     coordinate_space_id: evo2_20b_output_layer_mean
-    tags: {encoder: evo2, model: 20b, family: pooled_logits, scope: anchor_60bp}
+    tags: {encoder: evo2, model: 20b, family: pooled_logits, scope: merged_anchor_insert_seq_mean}
     role: hidden
   pooled_logits_20b_full_context_1kb:
     source: full_context_1kb
@@ -115,12 +115,12 @@ views:
     tags: {encoder: evo2, model: 20b, family: pooled_logits, scope: full_context_1kb}
     role: hidden
   pooled_logits_7b_anchor_60bp:
-    source: anchor_60bp
+    source: merged_anchor_insert
     vector:
       kind: column
       name: infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean
     coordinate_space_id: evo2_7b_output_layer_mean
-    tags: {encoder: evo2, model: 7b, family: pooled_logits, scope: anchor_60bp}
+    tags: {encoder: evo2, model: 7b, family: pooled_logits, scope: merged_anchor_insert_seq_mean}
     role: appendix
   pooled_logits_7b_full_context_1kb:
     source: full_context_1kb
@@ -141,52 +141,52 @@ candidate_sets:
       - pooled_logits_7b_full_context_1kb
       - intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
-      intermediate_embedding_7b_anchor_60bp: Evo 2 7B · 60 bp anchor · Intermediate block mean
-      pooled_logits_7b_anchor_60bp: Evo 2 7B · 60 bp anchor · Pooled logits
+      intermediate_embedding_7b_anchor_60bp: Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
+      pooled_logits_7b_anchor_60bp: Evo 2 7B · Mixed-length anchor-source insert · Pooled logits
       intermediate_embedding_7b_full_context_1kb: Evo 2 7B · 1 kb construct context · Intermediate block mean
       pooled_logits_7b_full_context_1kb: Evo 2 7B · 1 kb construct context · Pooled logits
       intermediate_embedding_7b_full_context_anchor_mean: Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
 landmarks:
   spyp:
-    source: anchor_60bp
+    source: merged_anchor_insert
     where: {column: usr_label__primary, equals: spyP}
     representation: {mode: centroid}
   sulap:
-    source: anchor_60bp
+    source: merged_anchor_insert
     where: {column: usr_label__primary, equals: sulAp}
     representation: {mode: centroid}
   j23105:
-    source: anchor_60bp
+    source: merged_anchor_insert
     where: {column: usr_label__primary, equals: J23105}
     representation: {mode: centroid}
 cohorts:
   design_family:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: design_family
   design_regulator_composition:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: design_regulator_composition
   sig35_variant:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: sig35_variant
   spacer_length:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: spacer_length
   campaign_prior:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: campaign_prior
   is_control:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: is_control
   source_class:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: source_class
 reference_sets:
   reference_spyp_sulap:
@@ -250,7 +250,7 @@ plots:
       - balanced_design_family_margins_intermediate_embedding_7b_full_context_1kb
       - balanced_design_family_margins_intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
-      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     x_column: synthetic_margin_ethanol_vs_background
@@ -297,7 +297,7 @@ plots:
     color_column: sig35_variant
     render_mode: violin_box
     panel_titles:
-      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     semantics_ref: plot_semantics/sigma35_margin_ladder_gallery.yaml
@@ -309,7 +309,7 @@ plots:
       - sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
       - sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
-      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     x_column: sig35_margin_f_vs_b
@@ -332,7 +332,7 @@ plots:
       - sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb
       - sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean
     panel_titles:
-      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
     row_column: row_variant
@@ -382,7 +382,7 @@ plots:
     size_range: [140, 260]
     label_column: frontier_label
     label_values:
-      - 60 bp anchor
+      - Anchor-source insert
       - 1 kb seq mean
       - 1 kb anchor mean
     semantics_ref: plot_semantics/candidate_decision_frontier.yaml
@@ -396,10 +396,10 @@ plots:
       - design_centroid_margins_pooled_logits_7b_anchor_60bp
       - design_centroid_margins_pooled_logits_7b_full_context_1kb
     panel_titles: &candidate_panel_titles
-      - Evo 2 7B · 60 bp anchor · Intermediate block mean
+      - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
-      - Evo 2 7B · 60 bp anchor · Pooled logits
+      - Evo 2 7B · Mixed-length anchor-source insert · Pooled logits
       - Evo 2 7B · 1 kb construct context · Pooled logits
     x_column: synthetic_margin_ethanol_vs_background
     y_column: synthetic_margin_cipro_vs_background
@@ -499,8 +499,8 @@ notebooks:
       - intermediate_embedding_7b_full_context_anchor_mean
     candidate_grid_views: *browser_geometry_order
     candidate_grid_panel_titles: &browser_candidate_panel_titles
-      - Evo 2 7B · 60 bp anchor · Intermediate block mean
-      - Evo 2 7B · 60 bp anchor · Pooled logits
+      - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
+      - Evo 2 7B · Mixed-length anchor-source insert · Pooled logits
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Pooled logits
       - Evo 2 7B · 1 kb context anchor mean · Intermediate block mean
@@ -532,7 +532,7 @@ recipes:
         params:
           scalar: dataset_overview_counts
           kind: dataset_overview
-          source_ids: [anchor_60bp, full_context_1kb]
+          source_ids: [merged_anchor_insert, full_context_1kb]
           reference_set_id: reference_spyp_sulap
       - &render_dataset_overview
         id: render_dataset_overview
@@ -929,7 +929,7 @@ recipes:
             - {candidate_id: intermediate_embedding_7b_full_context_1kb, pair_id: intermediate_embedding_7b_anchor_vs_context}
             - {candidate_id: intermediate_embedding_7b_full_context_anchor_mean, pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean}
           annotation_labels:
-            - {candidate_id: intermediate_embedding_7b_anchor_60bp, label: "60 bp anchor"}
+            - {candidate_id: intermediate_embedding_7b_anchor_60bp, label: "Anchor-source insert"}
             - {candidate_id: intermediate_embedding_7b_full_context_1kb, label: "1 kb seq mean"}
             - {candidate_id: intermediate_embedding_7b_full_context_anchor_mean, label: "1 kb anchor mean"}
       - &build_context_pair_summary_metrics
@@ -1137,7 +1137,7 @@ deliverables:
     summary: Shared denominator and trusted annotation inventory for the active promoter population.
     recipe: dataset_overview_recipe
     requires:
-      sources: [anchor_60bp, full_context_1kb]
+      sources: [merged_anchor_insert, full_context_1kb]
     outputs:
       plots: [dataset_overview]
     docs_refs: []

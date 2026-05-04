@@ -199,7 +199,12 @@ def _representation_health_summary_table(
         inputs.append(ScalarInputRef(kind="reducer", artifact_id=reducer_id, path=reducer_path))
         reducer_summary = read_json(reducer_path)
         explained = [float(value) for value in reducer_summary.get("explained_variance_ratio", [])]
-        pc1_fraction = float(explained[0]) if explained else float("nan")
+        explained_variance_captured = float(sum(explained))
+        pc1_fraction = (
+            float(explained[0]) / explained_variance_captured
+            if explained and explained_variance_captured > 0.0
+            else float("nan")
+        )
         distances = _cosine_distance_upper(candidate_sample.matrix)
         distance_median = float(np.median(distances)) if distances.size else float("nan")
         distance_iqr = (
@@ -219,7 +224,7 @@ def _representation_health_summary_table(
             "collapse_flag": health_status != "pass",
             "effective_rank_basis": "retained_pca_components",
             "effective_rank_component_count": len([value for value in explained if value > 0.0]),
-            "explained_variance_captured": float(sum(explained)),
+            "explained_variance_captured": explained_variance_captured,
             "pca_fit_rows": int(reducer_summary.get("fit_rows", 0) or 0),
             "pca_input_dims": int(reducer_summary.get("input_dims", 0) or 0),
             "pca_output_dims": int(reducer_summary.get("output_dims", len(explained)) or len(explained)),

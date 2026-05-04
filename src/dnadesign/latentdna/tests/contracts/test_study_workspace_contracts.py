@@ -239,7 +239,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     dataset_semantics = resolve_plot_semantics(context, plot_id="dataset_overview")
     assert "generation plan" in dataset_semantics.scope
     assert "shared denominator" in dataset_semantics.scope
-    assert "anchor_60bp" in " ".join(dataset_semantics.guardrails)
+    assert "merged anchor-source insert" in " ".join(dataset_semantics.guardrails)
     context_semantics = resolve_plot_semantics(context, plot_id="context_robustness_summary")
     assert "4,096-row design-family-stratified sample" in context_semantics.scope
     umap_semantics = resolve_plot_semantics(context, plot_id="appendix_umap_gallery")
@@ -414,6 +414,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         not in pre_assay_steps
     )
     assert "build_context_delta_distribution_intermediate_embedding_7b_anchor_mean" in pre_assay_steps
+    assert "build_context_delta_distribution_intermediate_embedding_7b_full_context" in pre_assay_steps
     assert "build_context_pair_summary_metrics" in pre_assay_steps
     assert "build_context_robustness_summary_metrics" in pre_assay_steps
     assert "build_reference_alignment_summary_metrics" in pre_assay_steps
@@ -447,6 +448,11 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert pre_assay_steps["build_candidate_decision_frontier_metrics"].params["ordinal_metric_id"] == (
         "sig35_ordinal_spearman"
     )
+    context_pair_params = pre_assay_steps["build_context_pair_summary_metrics"].params
+    assert [row["comparison_id"] for row in context_pair_params["comparisons"]] == [
+        "intermediate_embedding_7b_anchor_vs_anchor_mean",
+        "intermediate_embedding_7b_anchor_vs_full_context",
+    ]
     reference_params = pre_assay_steps["build_reference_alignment_summary_metrics"].params
     assert "reference_group_columns" not in reference_params
     assert reference_params["reference_sets"] == [

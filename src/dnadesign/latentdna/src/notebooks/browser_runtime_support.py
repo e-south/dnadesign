@@ -678,7 +678,7 @@ def display_hue_label(column: str) -> str:
         return humanize_display_text(column)
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
-        scope = "1 kb construct context" if "__template_1kb_" in column else "60 bp anchor"
+        scope = "1 kb construct context" if "__template_1kb_" in column else "anchor-source insert"
         return f"{model} log likelihood / token ({scope})"
     if column.startswith("cluster_label__"):
         return humanize_display_text(column.replace("cluster_label__", ""))
@@ -690,8 +690,11 @@ def display_hue_value(column: str | None, value: object) -> str:
 
 
 def normalize_categorical_hue_value(column: str | None, value: object) -> str:
-    if pd.isna(value):
+    if _is_missing_hue_value(value):
         return "NA"
+    listlike_text = _format_listlike_hue_value(value)
+    if listlike_text is not None:
+        return listlike_text
     if str(column or "").strip() == "sig35_variant":
         return normalize_sig35_hue_category(value)
     if str(column or "").strip() == "spacer_length":
@@ -811,10 +814,60 @@ def normalize_hue_kind(value: object) -> str | None:
     return None
 
 
+def _listlike_hue_values(value: object) -> list[object] | None:
+    if isinstance(value, np.ndarray):
+        return value.reshape(-1).tolist()
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if isinstance(value, (set, frozenset)):
+        return sorted(value, key=lambda item: str(item))
+    return None
+
+
+def _is_missing_hue_value(value: object) -> bool:
+    listlike = _listlike_hue_values(value)
+    if listlike is not None:
+        return not listlike or all(_is_missing_hue_value(item) for item in listlike)
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        return False
+    if isinstance(missing, (bool, np.bool_)):
+        return bool(missing)
+    return False
+
+
+def _format_hue_token(value: object) -> str:
+    text = str(value or "").strip()
+    sigma_match = re.fullmatch(r"sigma(\d+)", text, flags=re.IGNORECASE)
+    if sigma_match:
+        return f"Sigma{sigma_match.group(1)}"
+    return humanize_display_text(value)
+
+
+def _format_listlike_hue_value(value: object) -> str | None:
+    listlike = _listlike_hue_values(value)
+    if listlike is None:
+        return None
+    parts = [_format_hue_token(item) for item in listlike if not _is_missing_hue_value(item)]
+    compact_parts = [part for part in parts if part]
+    return " + ".join(compact_parts) if compact_parts else "NA"
+
+
 def _finite_non_null_series(frame: pd.DataFrame, column: str) -> pd.Series:
     if column not in frame.columns:
         return pd.Series(dtype=object)
-    return frame[column].replace([np.inf, -np.inf], np.nan).dropna()
+    series = frame[column]
+    if pd.api.types.is_numeric_dtype(series.dtype):
+        return series.replace([np.inf, -np.inf], np.nan).dropna()
+    mask = [not _is_missing_hue_value(value) for value in series.tolist()]
+    if not any(mask):
+        return pd.Series(dtype=series.dtype)
+    return series.loc[mask]
+
+
+def finite_non_null_hue_series(frame: pd.DataFrame, column: str) -> pd.Series:
+    return _finite_non_null_series(frame, column)
 
 
 def available_hues_for_frames(

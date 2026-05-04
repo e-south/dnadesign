@@ -13,18 +13,26 @@ defaults:
     - png
   neighbor_backend: auto
 sources:
-  anchor_60bp:
+  merged_anchor_insert:
     kind: usr
     root: ../../../usr/datasets
     dataset: usr_prom_eth_cip_anchor
     record_key: id
     subject_key: id
+    sequence_scope: source_insert
+    source_interval_length_bp: mixed
+    pooling_span_bp: full_sequence
+    window_selection_rule: mixed_length_anchor_handoff
   anchor_7b_seq_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    sequence_scope: merged_anchor_insert_seq_mean
+    source_interval_length_bp: mixed
+    pooling_span_bp: full_sequence
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -37,6 +45,10 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    sequence_scope: merged_anchor_insert_seq_mean
+    source_interval_length_bp: mixed
+    pooling_span_bp: full_sequence
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -48,6 +60,10 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    sequence_scope: merged_anchor_insert_seq_mean
+    source_interval_length_bp: mixed
+    pooling_span_bp: full_sequence
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -58,6 +74,10 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    sequence_scope: merged_anchor_insert_seq_mean
+    source_interval_length_bp: mixed
+    pooling_span_bp: full_sequence
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -69,6 +89,9 @@ sources:
     record_key: id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
   full_context_7b_forward_anchor_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
@@ -76,6 +99,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -89,6 +117,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -101,6 +134,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -112,6 +150,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -123,6 +166,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -136,6 +182,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -148,6 +197,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -159,6 +211,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -170,6 +225,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -183,6 +243,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -195,6 +260,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -206,6 +276,11 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_anchor_insert_mean
+    emitted_length_bp: 1000
+    source_interval_length_bp: mixed
+    pooling_span_bp: source_insert_length
+    window_selection_rule: mixed_length_anchor_handoff
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -217,6 +292,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -230,6 +308,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -242,6 +323,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -253,6 +337,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -263,18 +350,33 @@ sources:
     dataset: usr_promoter_references
     record_key: id
     subject_key: id
+    sequence_scope: native_source_record
+    source_interval_length_bp: source_dependent
+    pooling_span_bp: full_sequence
   reference_core60:
     kind: usr
     root: ../../../usr/datasets
     dataset: construct_prom_eth_cip_reference_core60
     record_key: id
     subject_key: id
+    sequence_scope: analysis_window
+    emitted_length_bp: 60
+    source_interval_length_bp: source_dependent
+    pooling_span_bp: 60
+    focal_rule: sigma70_minus35_minus10_annotation_pair_midpoint
+    window_selection_rule: motif_retention_optimized_60bp_window
   reference_core60_7b_core60_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    sequence_scope: reference_core60
+    emitted_length_bp: 60
+    source_interval_length_bp: source_dependent
+    pooling_span_bp: 60
+    focal_rule: sigma70_minus35_minus10_annotation_pair_midpoint
+    window_selection_rule: motif_retention_optimized_60bp_window
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -287,6 +389,12 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    sequence_scope: reference_core60
+    emitted_length_bp: 60
+    source_interval_length_bp: source_dependent
+    pooling_span_bp: 60
+    focal_rule: sigma70_minus35_minus10_annotation_pair_midpoint
+    window_selection_rule: motif_retention_optimized_60bp_window
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
@@ -298,6 +406,12 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    sequence_scope: reference_core60
+    emitted_length_bp: 60
+    source_interval_length_bp: source_dependent
+    pooling_span_bp: 60
+    focal_rule: sigma70_minus35_minus10_annotation_pair_midpoint
+    window_selection_rule: motif_retention_optimized_60bp_window
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
@@ -308,6 +422,12 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    sequence_scope: reference_core60
+    emitted_length_bp: 60
+    source_interval_length_bp: source_dependent
+    pooling_span_bp: 60
+    focal_rule: sigma70_minus35_minus10_annotation_pair_midpoint
+    window_selection_rule: motif_retention_optimized_60bp_window
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
@@ -319,6 +439,9 @@ sources:
     record_key: id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: template_context
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
   reference_context_7b_forward_anchor_mean_features:
     kind: infer_feature_sidecar
     root: ../../../usr/datasets
@@ -326,6 +449,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: reference_context_forward_anchor_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: 60
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -373,6 +499,9 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    sequence_scope: reference_context_forward_seq_mean
+    emitted_length_bp: 1000
+    pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
@@ -516,6 +645,7 @@ metadata:
     - source_class
     - is_control
     - campaign_prior
+    - emitted_length_bp
     - construct_template_id
     - source_family
     - selection_basis
@@ -528,7 +658,8 @@ metadata:
     - promoter_standard__strength_value
     - promoter_standard__strength_value_numeric
     - promoter_standard__strength_reference
-  derivations: {}
+  derivations:
+    emitted_length_bp: {kind: copy, source: length}
 alignments:
   intermediate_embedding_7b_anchor_to_full_context:
     left: intermediate_embedding_7b_full_context_1kb
@@ -557,7 +688,7 @@ views:
       kind: column
       name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
-    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: anchor_60bp}
+    tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: merged_anchor_insert_seq_mean}
     role: primary
   output_layer_mean_7b_anchor_60bp:
     source: anchor_7b_seq_mean_output_layer_features
@@ -565,7 +696,7 @@ views:
       kind: column
       name: value
     coordinate_space_id: evo2_7b_output_layer_mean
-    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: anchor_60bp}
+    tags: {encoder: evo2, model: 7b, family: output_layer_mean, scope: merged_anchor_insert_seq_mean}
     role: planned
   intermediate_embedding_7b_full_context_1kb:
     source: full_context_7b_forward_seq_mean_features
@@ -722,7 +853,7 @@ candidate_sets:
       - intermediate_embedding_7b_reverse_complement_context_1kb
       - intermediate_embedding_7b_reverse_complement_context_anchor_mean
     panel_titles:
-      intermediate_embedding_7b_anchor_60bp: 60 bp anchor
+      intermediate_embedding_7b_anchor_60bp: Anchor-source insert mean
       intermediate_embedding_7b_full_context_1kb: 1 kb sequence mean
       intermediate_embedding_7b_full_context_anchor_mean: 1 kb anchor mean
       intermediate_embedding_7b_reverse_complement_context_1kb: RC 1 kb sequence mean
@@ -757,45 +888,45 @@ candidate_sets:
       - output_layer_mean_7b_reference_context_reverse_complement_anchor_mean
 landmarks:
   spyp:
-    source: anchor_60bp
+    source: merged_anchor_insert
     where: {column: usr_label__primary, equals: spyp}
     representation: {mode: centroid}
   sulap:
-    source: anchor_60bp
+    source: merged_anchor_insert
     where: {column: usr_label__primary, equals: sulAp}
     representation: {mode: centroid}
   j23105:
-    source: anchor_60bp
+    source: merged_anchor_insert
     where: {column: usr_label__primary, equals: J23105}
     representation: {mode: centroid}
 cohorts:
   design_family:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: design_family
   design_regulator_composition:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: design_regulator_composition
   sig35_variant:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: sig35_variant
   spacer_length:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: spacer_length
   campaign_prior:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: campaign_prior
   is_control:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: is_control
   source_class:
     kind: promoter_metadata
-    source: anchor_60bp
+    source: merged_anchor_insert
     derive: source_class
 reference_sets:
   reference_scorecard_preserve_all:
@@ -906,6 +1037,7 @@ plots:
     category_column: label
     label_column: candidate_label
     value_column: metric_value
+    color_column: candidate_family
     direction_column: direction
     unit_column: unit
     sort_rule: panel_direction
@@ -942,7 +1074,7 @@ plots:
       - balanced_design_family_margins_intermediate_embedding_7b_reverse_complement_context_1kb
       - balanced_design_family_margins_intermediate_embedding_7b_reverse_complement_context_anchor_mean
     panel_titles: &candidate_panel_titles
-      - 60 bp anchor
+      - Anchor-source insert mean
       - 1 kb sequence mean
       - 1 kb anchor mean
       - RC 1 kb sequence mean
@@ -1068,7 +1200,7 @@ plots:
     size_range: [140, 260]
     label_column: frontier_label
     label_values:
-      - Anchor
+      - Anchor insert
       - 1 kb mean
       - 1 kb anchor
       - RC 1 kb mean
@@ -1209,7 +1341,7 @@ notebooks:
       - intermediate_embedding_7b_reverse_complement_context_1kb
       - intermediate_embedding_7b_reverse_complement_context_anchor_mean
     candidate_grid_panel_titles: &browser_candidate_panel_titles
-      - 60 bp anchor
+      - Anchor-source insert mean
       - 1 kb sequence mean
       - 1 kb anchor mean
       - RC 1 kb sequence mean
@@ -1251,7 +1383,7 @@ recipes:
         params:
           scalar: dataset_overview_counts
           kind: dataset_overview
-          source_ids: [anchor_60bp]
+          source_ids: [merged_anchor_insert]
           reference_set_id: reference_scorecard_preserve_all
       - &render_dataset_overview
         id: render_dataset_overview
@@ -1663,6 +1795,25 @@ recipes:
           where: {column: source_class, equals: densegen}
           table_sample_only: true
           seed: 17
+      - &context_delta_ie7_full_context
+        id: build_context_delta_distribution_intermediate_embedding_7b_full_context
+        op: scalar.build
+        depends_on: [build_alignment_intermediate_embedding_7b_anchor_to_full_context]
+        params:
+          scalar: context_delta_distribution_intermediate_embedding_7b_full_context
+          kind: alignment_metrics
+          alignment_id: intermediate_embedding_7b_anchor_to_full_context
+          left_view_id: intermediate_embedding_7b_full_context_1kb
+          right_view_id: intermediate_embedding_7b_anchor_60bp
+          metadata_view_id: intermediate_embedding_7b_full_context_1kb
+          left_margin_source: null
+          right_margin_source: null
+          margin_deltas: []
+          sample_size: 512
+          sample_group_column: design_family
+          where: {column: source_class, equals: densegen}
+          table_sample_only: true
+          seed: 17
       - &build_context_robustness_summary_metrics
         id: build_context_robustness_summary_metrics
         op: scalar.build
@@ -1732,7 +1883,7 @@ recipes:
             - {candidate_id: intermediate_embedding_7b_anchor_60bp, pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean}
             - {candidate_id: intermediate_embedding_7b_full_context_anchor_mean, pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean}
           annotation_labels:
-            - {candidate_id: intermediate_embedding_7b_anchor_60bp, label: "Anchor"}
+            - {candidate_id: intermediate_embedding_7b_anchor_60bp, label: "Anchor insert"}
             - {candidate_id: intermediate_embedding_7b_full_context_1kb, label: "1 kb mean"}
             - {candidate_id: intermediate_embedding_7b_full_context_anchor_mean, label: "1 kb anchor"}
             - {candidate_id: intermediate_embedding_7b_reverse_complement_context_1kb, label: "RC 1 kb mean"}
@@ -1742,11 +1893,13 @@ recipes:
         op: scalar.build
         depends_on:
           - build_context_delta_distribution_intermediate_embedding_7b_anchor_mean
+          - build_context_delta_distribution_intermediate_embedding_7b_full_context
         params:
           scalar: context_pair_summary_metrics
           kind: context_pair_summary
           comparisons:
             - {scalar_id: context_delta_distribution_intermediate_embedding_7b_anchor_mean, comparison_id: intermediate_embedding_7b_anchor_vs_anchor_mean, comparison_label: "1 kb anchor mean", comparison_role: context_anchor_mean}
+            - {scalar_id: context_delta_distribution_intermediate_embedding_7b_full_context, comparison_id: intermediate_embedding_7b_anchor_vs_full_context, comparison_label: "1 kb sequence mean", comparison_role: context_full_sequence_mean}
       - &render_representation_health_summary
         id: render_representation_health_summary
         op: plot.render
@@ -1890,6 +2043,7 @@ recipes:
       - *build_sigma35_centroid_distance_ie7_rev_context
       - *build_sigma35_centroid_distance_ie7_rev_anchor_mean
       - *context_delta_ie7_anchor_mean
+      - *context_delta_ie7_full_context
       - *build_context_robustness_summary_metrics
       - *build_context_pair_summary_metrics
       - *build_reference_alignment_summary_metrics
@@ -1970,7 +2124,7 @@ deliverables:
     summary: Shared denominator and trusted annotation inventory for the active promoter population.
     recipe: dataset_overview_recipe
     requires:
-      sources: [anchor_60bp, full_context_1kb]
+      sources: [merged_anchor_insert, full_context_1kb]
     outputs:
       plots: [dataset_overview]
     docs_refs:
@@ -2045,7 +2199,7 @@ deliverables:
   candidate_decision_frontier:
     title: Representation tradeoff
     section: Synthesis
-    question: Which healthy candidate best balances design structure, ordered Sigma-35 signal, and context retention?
+    question: Which healthy candidate best balances design structure and ordered Sigma-35 signal after the health and context checks?
     summary: Cross-panel synthesis of the pre-assay ladder for choosing a working X without relying on UMAP aesthetics.
     recipe: pre_assay_representation_triage_recipe
     requires:

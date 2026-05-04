@@ -35,6 +35,7 @@ from .browser_runtime_support import (
     continuous_hue_render_params,
     display_hue_label,
     draw_reference_labels,
+    finite_non_null_hue_series,
     load_table,
     load_view_rows,
     normalize_categorical_hue_series,
@@ -262,7 +263,7 @@ def _merge_required_joinable_column(
 def _column_has_required_values(frame: pd.DataFrame, column: str) -> bool:
     if column not in frame.columns:
         return False
-    series = frame[column].replace([np.inf, -np.inf], np.nan)
+    series = finite_non_null_hue_series(frame, column)
     if series.empty:
         return False
     if pd.api.types.is_object_dtype(series.dtype) or pd.api.types.is_string_dtype(series.dtype):

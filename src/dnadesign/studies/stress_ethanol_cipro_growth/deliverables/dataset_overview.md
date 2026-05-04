@@ -2,7 +2,7 @@
 
 The shared comparison set contains `157,164` promoters: `157,160` DenseGen synthetic promoters and `4` carried controls. This figure defines the denominator used by the downstream summaries and reports the cohort inventory shown here: provenance, generation plan, and Sigma-35 variant.
 
-The view name `anchor_60bp` still covers the dominant synthetic cohort. The carried controls are 35 bp, 165 bp, 200 bp, and 220 bp anchors.
+The merged anchor-source insert view intentionally carries mixed lengths: the dominant DenseGen cohort is 60 bp, while carried raw reference controls preserve their source insert lengths.
 
 ### dataset_overview | Dataset inventory by cohort dimension
 
