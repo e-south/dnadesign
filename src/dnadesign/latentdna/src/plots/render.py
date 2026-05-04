@@ -1084,6 +1084,16 @@ def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int) -> bo
     return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 4)
 
 
+_HORIZONTAL_GROUPED_METRIC_PLOT_IDS: frozenset[str] = frozenset(
+    {
+        "design_structure_summary",
+        "reference_alignment_summary",
+        "representation_health_summary",
+        "sigma35_ordinal_audit",
+    }
+)
+
+
 def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False) -> tuple[int, int]:
     if panel_count <= 1:
         return 1, 1
@@ -1109,6 +1119,17 @@ def _grid_figure_size(panel_count: int, *, square_panels: bool, prefer_single_ro
     panel_width = 3.55 if prefer_single_row and columns >= 4 else 4.15 if columns >= 4 else 4.3
     panel_height = 4.2 if square_panels and prefer_single_row else 4.35 if square_panels else 4.05
     return (panel_width * columns, panel_height * rows)
+
+
+def metric_panel_grid_layout(plot_id: str | None, panel_count: int) -> tuple[int, int, tuple[float, float]]:
+    square_panels = metric_panel_uses_square_axes(plot_id)
+    if plot_id == "representation_health_summary" and panel_count > 1:
+        return panel_count, 1, (9.2, max(4.0 * panel_count, 6.0))
+    rows, columns = _panel_grid_dimensions(panel_count)
+    figsize = _grid_figure_size(panel_count, square_panels=square_panels)
+    if plot_id == "representation_health_summary":
+        figsize = (figsize[0] + (1.45 * columns), figsize[1])
+    return rows, columns, figsize
 
 
 def _ordered_heatmap_axis_values(rows: list[dict[str, object]], column: str, configured_order: list[str]) -> list[str]:
@@ -1358,12 +1379,31 @@ def _short_candidate_model(value: object) -> str:
 def _short_candidate_scope(value: object) -> str:
     text = humanize_display_text(value)
     normalized = text.casefold()
-    if normalized == "60 bp anchor":
-        return "60 bp"
+    if normalized in {
+        "60 bp anchor",
+        "anchor-source insert",
+        "mixed-length anchor-source insert",
+        "anchor-source insert mean",
+    }:
+        return "anchor insert"
     if normalized == "1 kb construct context":
         return "1 kb ctx"
     if normalized == "1 kb context anchor mean":
         return "1 kb anchor mean"
+    if normalized == "reverse complement context 1 kb":
+        return "RC 1 kb ctx"
+    if normalized == "reverse complement context anchor mean":
+        return "RC 1 kb anchor mean"
+    if normalized == "reference core60":
+        return "ref core60"
+    if normalized == "reference context forward 1 kb":
+        return "ref forward 1 kb"
+    if normalized == "reference context forward anchor mean":
+        return "ref forward anchor mean"
+    if normalized == "reference context reverse complement 1 kb":
+        return "ref RC 1 kb"
+    if normalized == "reference context reverse complement anchor mean":
+        return "ref RC anchor mean"
     if normalized == "anchor + anchor-mean concat":
         return "anchor + anchor-mean"
     if normalized == "anchor + 1 kb context concat":
@@ -1374,12 +1414,31 @@ def _short_candidate_scope(value: object) -> str:
 def _compact_candidate_scope(value: object) -> str:
     text = humanize_display_text(value)
     normalized = text.casefold()
-    if normalized == "60 bp anchor":
-        return "60bp"
+    if normalized in {
+        "60 bp anchor",
+        "anchor-source insert",
+        "mixed-length anchor-source insert",
+        "anchor-source insert mean",
+    }:
+        return "anchor insert"
     if normalized == "1 kb construct context":
         return "1kb ctx"
     if normalized == "1 kb context anchor mean":
         return "1kb anchor mean"
+    if normalized == "reverse complement context 1 kb":
+        return "RC 1kb ctx"
+    if normalized == "reverse complement context anchor mean":
+        return "RC 1kb anchor"
+    if normalized == "reference core60":
+        return "ref core60"
+    if normalized == "reference context forward 1 kb":
+        return "ref fwd 1kb"
+    if normalized == "reference context forward anchor mean":
+        return "ref fwd anchor"
+    if normalized == "reference context reverse complement 1 kb":
+        return "ref RC 1kb"
+    if normalized == "reference context reverse complement anchor mean":
+        return "ref RC anchor"
     if normalized == "anchor + anchor-mean concat":
         return "anchor+anchor-mean"
     if normalized == "anchor + 1 kb context concat":
@@ -1875,6 +1934,167 @@ def _render_metric_panel(
     else:
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
     ci_enabled = spec.ci_lower_column is not None and spec.ci_upper_column is not None and ordered_rows
+    horizontal_grouped_metric = grouped_family_bars and spec.plot_id in _HORIZONTAL_GROUPED_METRIC_PLOT_IDS
+
+    if horizontal_grouped_metric:
+        family_order = ordered_categories([str(row["candidate_family"]) for row in ordered_rows])
+        group_keys = list(
+            dict.fromkeys(
+                (
+                    str(row["candidate_model"]),
+                    str(row["candidate_scope"]),
+                )
+                for row in ordered_rows
+            )
+        )
+        shared_scope = {
+            str(row.get("candidate_scope") or "").strip()
+            for row in ordered_rows
+            if str(row.get("candidate_scope") or "").strip()
+        }
+        include_scope = len(shared_scope) > 1
+        group_labels = [
+            _candidate_tick_label(
+                {
+                    "candidate_model": model,
+                    "candidate_scope": scope,
+                },
+                fallback_column=label_column,
+                include_family=False,
+                include_scope=include_scope,
+                multiline=False,
+            )
+            for model, scope in group_keys
+        ]
+        group_positions = np.arange(len(group_keys), dtype=float)
+        group_height = min(0.78, 0.32 * max(len(family_order), 1))
+        bar_height = group_height / max(len(family_order), 1)
+        offsets = np.linspace(
+            -(group_height / 2.0) + (bar_height / 2.0),
+            (group_height / 2.0) - (bar_height / 2.0),
+            max(len(family_order), 1),
+        )
+        bar_value_pairs: list[tuple[Any, float]] = []
+        errorbar_specs: list[tuple[float, float, float, float]] = []
+        missing_positions: list[float] = []
+        for family, offset in zip(family_order, offsets, strict=False):
+            family_rows = {
+                (str(row["candidate_model"]), str(row["candidate_scope"])): row
+                for row in ordered_rows
+                if str(row["candidate_family"]) == family
+            }
+            family_positions: list[float] = []
+            family_values: list[float] = []
+            family_ci_rows: list[dict[str, object]] = []
+            for group_position, group_key in zip(group_positions, group_keys, strict=False):
+                row = family_rows.get(group_key)
+                if row is None:
+                    continue
+                y_position = float(group_position + offset)
+                value = _coerce_finite_float(row.get(spec.value_column))
+                if value is None:
+                    missing_positions.append(y_position)
+                    continue
+                family_positions.append(y_position)
+                family_values.append(value)
+                family_ci_rows.append(row)
+            if not family_positions:
+                continue
+            family_bars = ax.barh(
+                family_positions,
+                family_values,
+                height=bar_height * 0.9,
+                color=color_map[family],
+                edgecolor="white",
+                linewidth=0.6,
+                alpha=0.92,
+            )
+            bar_value_pairs.extend(zip(family_bars, family_values, strict=True))
+            if ci_enabled:
+                for bar, row in zip(family_bars, family_ci_rows, strict=False):
+                    lower = _coerce_finite_float(row.get(spec.ci_lower_column))
+                    upper = _coerce_finite_float(row.get(spec.ci_upper_column))
+                    if lower is None or upper is None:
+                        continue
+                    errorbar_specs.append(
+                        (
+                            float(bar.get_y() + (bar.get_height() / 2.0)),
+                            float(row[spec.value_column]),
+                            float(lower),
+                            float(upper),
+                        )
+                    )
+        ax.set_yticks(group_positions, group_labels)
+        if group_positions.size:
+            ax.set_ylim(float(group_positions.min()) - 0.55, float(group_positions.max()) + 0.55)
+        ax.tick_params(axis="y", pad=6)
+        _style_metric_tick_labels(ax, label_count=max(len(group_labels), len(bar_value_pairs)), axis="y")
+        finite_values = [value for _, value in bar_value_pairs]
+        finite_value_array = np.asarray(finite_values, dtype=np.float64)
+        if spec.reference_line is not None:
+            ax.axvline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+        if finite_value_array.size and float(finite_value_array.min()) < 0.0 < float(finite_value_array.max()):
+            ax.axvline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
+        if errorbar_specs:
+            ys = np.asarray([item[0] for item in errorbar_specs], dtype=np.float64)
+            xs = np.asarray([item[1] for item in errorbar_specs], dtype=np.float64)
+            lowers = np.asarray([max(item[1] - item[2], 0.0) for item in errorbar_specs], dtype=np.float64)
+            uppers = np.asarray([max(item[3] - item[1], 0.0) for item in errorbar_specs], dtype=np.float64)
+            ax.errorbar(
+                xs,
+                ys,
+                xerr=np.vstack([lowers, uppers]),
+                fmt="none",
+                ecolor=SPINE_COLOR,
+                elinewidth=0.9,
+                capsize=2.0,
+                alpha=0.85,
+            )
+        ax.set_ylabel("")
+        ax.set_xlabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
+        ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
+        _apply_axes_style(ax, grid=True, square=square)
+        ax.margins(x=0.02, y=0.02)
+        if not finite_value_array.size:
+            _render_placeholder_panel(
+                ax,
+                panel_title=panel_title,
+                message="Metric unavailable",
+                detail="No finite values in this snapshot",
+                square=square,
+            )
+            return
+        span = float(finite_value_array.max() - finite_value_array.min())
+        offset = max(span * 0.03, 0.018) if span > 0 else 0.018
+        low = min(0.0, float(finite_value_array.min()))
+        high = max(0.0, float(finite_value_array.max()))
+        padding = max((high - low) * 0.1, 0.04)
+        ax.set_xlim(low - padding, high + padding)
+        missing_label_x = low + (padding * 0.6)
+        ax.invert_yaxis()
+        for bar, value in bar_value_pairs:
+            x_text = value + offset if value >= 0 else value - offset
+            ha = "left" if value >= 0 else "right"
+            ax.text(
+                x_text,
+                bar.get_y() + (bar.get_height() / 2.0),
+                f"{value:.3g}",
+                va="center",
+                ha=ha,
+                fontsize=9,
+                color=TEXT_COLOR,
+            )
+        for position in missing_positions:
+            ax.text(
+                missing_label_x,
+                float(position),
+                "NA",
+                va="center",
+                ha="left",
+                fontsize=8.5,
+                color=SPINE_COLOR,
+            )
+        return
 
     if horizontal_metric:
         positions = np.arange(len(ordered_rows), dtype=float)
@@ -2073,6 +2293,8 @@ def _render_metric_panel(
                         )
                     )
         ax.set_xticks(group_positions, group_labels)
+        if group_positions.size:
+            ax.set_xlim(float(group_positions.min()) - 0.55, float(group_positions.max()) + 0.55)
     else:
         positions = np.arange(len(ordered_rows), dtype=float)
         finite_positions: list[float] = []
@@ -2112,6 +2334,8 @@ def _render_metric_panel(
                     )
                 )
         ax.set_xticks(positions, labels)
+        if positions.size:
+            ax.set_xlim(float(positions.min()) - 0.55, float(positions.max()) + 0.55)
     ax.tick_params(axis="x", pad=6)
     tick_labels_for_count = group_labels if grouped_family_bars else labels
     tick_rotation = 32.0 if grouped_family_bars else 0.0
@@ -2772,7 +2996,7 @@ def render_plot_artifact(
                 )
             _apply_axes_style(axis, grid=True, square=square_count_panels)
         grid_legend_bottom_margin = 0.0
-        if categories and spec.color_column is not None:
+        if len(categories) > 1 and spec.color_column is not None:
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
                 plt,
@@ -2810,11 +3034,8 @@ def render_plot_artifact(
             raise ContractViolationError(f"metric_panel_grid columns are missing: {missing_columns}")
         resolved_spec = spec.model_copy(update={"value_column": resolved_value_column})
         panel_values = list(dict.fromkeys(str(row[spec.row_column]) for row in rows))
-        rows_count, columns = _panel_grid_dimensions(len(panel_values))
         square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
-        metric_figsize = _grid_figure_size(len(panel_values), square_panels=square_metric_panels)
-        if spec.plot_id == "representation_health_summary":
-            metric_figsize = (metric_figsize[0] + (1.45 * columns), metric_figsize[1])
+        rows_count, columns, metric_figsize = metric_panel_grid_layout(spec.plot_id, len(panel_values))
         fig, axes = plt.subplots(
             rows_count,
             columns,
@@ -2841,7 +3062,7 @@ def render_plot_artifact(
             )
         plot_metadata["metric_columns"] = panel_values
         grid_legend_bottom_margin = 0.0
-        if categories and spec.color_column is not None:
+        if len(categories) > 1 and spec.color_column is not None:
             grid_legend_bottom_margin = _add_figure_legends(
                 fig,
                 plt,

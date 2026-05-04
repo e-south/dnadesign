@@ -218,11 +218,11 @@ def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotati
             square=False,
         )
 
-        lower, upper = ax.get_ylim()
+        lower, upper = ax.get_xlim()
         assert upper > 1.0
         assert lower < 0.0
         assert any(text.get_text() == "NA" for text in ax.texts)
-        finite_text_positions = [text.get_position()[1] for text in ax.texts if text.get_text() != "NA"]
+        finite_text_positions = [text.get_position()[0] for text in ax.texts if text.get_text() != "NA"]
         assert finite_text_positions
         assert max(finite_text_positions) <= upper
     finally:
@@ -272,7 +272,7 @@ def test_render_metric_panel_uses_compact_candidate_tick_labels() -> None:
         )
 
         tick_labels = [label.get_text() for label in ax.get_yticklabels()]
-        assert tick_labels == ["7B 60bp Block", "20B 1kb ctx Logits"]
+        assert tick_labels == ["7B anchor insert Block", "20B 1kb ctx Logits"]
         assert float(ax.get_box_aspect()) == 1.0
     finally:
         plt.close(fig)

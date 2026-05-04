@@ -21,6 +21,7 @@ from ..plots.render import (
     _render_distribution_panel,
     _render_metric_panel,
     _render_placeholder_panel,
+    metric_panel_grid_layout,
 )
 from ..plots.render import (
     _grid_figure_size as static_grid_figure_size,
@@ -796,11 +797,8 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
     spec = spec.model_copy(update={"value_column": value_column})
 
     panel_values = list(dict.fromkeys(frame[spec.row_column].astype(str).tolist())) if spec.row_column else ["panel"]
-    rows_count, columns = static_panel_grid_dimensions(len(panel_values))
     square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
-    metric_figsize = static_grid_figure_size(len(panel_values), square_panels=square_metric_panels)
-    if spec.plot_id == "representation_health_summary":
-        metric_figsize = (metric_figsize[0] + (1.45 * columns), metric_figsize[1])
+    rows_count, columns, metric_figsize = metric_panel_grid_layout(spec.plot_id, len(panel_values))
     fig, axes = plt.subplots(
         rows_count,
         columns,
