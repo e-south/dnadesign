@@ -52,6 +52,7 @@ Current runtime limits:
 
 - `defaults.plot_formats` now controls which image files `plot render` writes; the current renderer supports `svg`, `pdf`, and `png`.
 - `defaults.memory_policy` now enforces workspace-wide warn/fail thresholds for heavy reduction, projection, neighbors, clustering, and export steps; callers must pass `--allow-memory-overage` to cross the fail threshold explicitly.
+- `view materialize` memory preflight estimates streaming batch memory plus a conservative resident-output allowance for disk-backed memmap pages; large materializations should not assume the destination matrix is free merely because it is file-backed.
 - `view derive` now covers the full current declared set, but reducer fitting is still PCA-only.
 - `view reduce` currently fits PCA only.
 - `scalar derive` currently supports `vector_norm`, `column_expression`, `select_columns`, `rename_columns`, and `join_tables`.
@@ -106,6 +107,10 @@ Current runtime limits:
   counts and dimensionality from this control-plane ledger, with geometry-control
   rows as a compatibility fallback, instead of opening view matrices during
   notebook startup.
+- Control-plane builders read materialized view shape from view manifest
+  `stats.rows` and `stats.dims` when present. Matrix header inspection is a
+  fallback for older artifacts, not the normal path for current generated
+  workspaces.
 - Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
   for ordered metadata axes. The axis contract lives in recipe params:
   `axis.column` selects the grouping column, exactly one of `axis.order_path` or
@@ -122,9 +127,16 @@ Current runtime limits:
   available for broad metadata audits, but named collections should live in
   `reference_sets` so selectors, labels, and notebook overlays share one
   contract.
+- Source declarations may carry static sequence semantics:
+  `sequence_scope`, `emitted_length_bp`, `source_interval_length_bp`,
+  `pooling_span_bp`, `focal_rule`, and `window_selection_rule`.
+  Deep validation checks declared fixed emitted lengths and Infer pooling spans
+  against observable source metadata. Mixed-length source-insert views are
+  allowed, but user-facing scope and panel labels must not claim fixed 60 bp
+  windows unless observed lengths are exactly 60 bp.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
 - `notebook generate` now refuses to overwrite or regenerate a notebook when the default deliverable has freshness drift; refresh the deliverable or its linked recipe first so the notebook remains a review surface over fresh artifacts.
-- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `anchor_60bp` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
+- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `merged_anchor_insert` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
 - `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
 - `validate workspace --deep` currently performs schema-only pressure checks against declared sources, views, cohorts, landmarks, and the bound study directory without loading embedding payloads.
 - `infer_feature_sidecar` sources expose canonical Infer outputs from

@@ -114,6 +114,20 @@ class SourceBase(StrictWorkspaceModel):
     where: dict[str, Any] | None = None
     metadata_include: list[str] | None = None
     vector_cache_policy: str | None = None
+    sequence_scope: str | None = None
+    emitted_length_bp: int | None = Field(default=None, gt=0)
+    source_interval_length_bp: int | str | None = None
+    pooling_span_bp: int | str | None = None
+    focal_rule: str | None = None
+    window_selection_rule: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_sequence_semantics(self) -> "SourceBase":
+        for field_name in ("source_interval_length_bp", "pooling_span_bp"):
+            value = getattr(self, field_name)
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(f"{field_name} must be positive when declared as an integer")
+        return self
 
 
 class USRSourceConfig(SourceBase):

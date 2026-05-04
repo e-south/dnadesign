@@ -21,6 +21,7 @@ from ..views.row_contracts import source_backed_view_row_contract
 from ..workspaces.loader import load_workspace_config
 from ..workspaces.paths import resolve_repo_path
 from ..workspaces.plot_semantics import validate_plot_semantics_sidecars
+from .semantic_validation_service import validate_workspace_sequence_semantics
 
 _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
     "design_family": {"densegen__plan", "usr_label__primary"},
@@ -290,6 +291,12 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             }
         )
 
+    sequence_semantic_details, sequence_semantic_warnings = validate_workspace_sequence_semantics(
+        context,
+        source_columns=source_columns,
+        source_schemas=source_schemas,
+    )
+
     metadata_derivation_details: list[dict[str, object]] = []
     for column_name, derivation in sorted(context.config.metadata.derivations.items()):
         detail: dict[str, object] = {"column": column_name, "kind": derivation.kind}
@@ -398,6 +405,8 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
         "source_details": source_details,
         "view_details": view_details,
         "metadata_derivation_details": metadata_derivation_details,
+        "sequence_semantic_details": sequence_semantic_details,
+        "warnings": sequence_semantic_warnings,
         "landmark_details": landmark_details,
         "cohort_details": cohort_details,
         "notebook_details": notebook_details,
