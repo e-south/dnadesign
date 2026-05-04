@@ -30,6 +30,7 @@ from ._status import merge_statuses
 
 ArtifactState = Literal["ok", "warning", "blocked"]
 _VIEW_MATERIALIZE_BATCH_ROWS = 2048
+_VIEW_MATERIALIZE_RESIDENT_OUTPUT_FACTOR = 2.25
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,13 +231,16 @@ def evaluate_materialize_preflight(
         raise
     batch_rows = min(rows, _VIEW_MATERIALIZE_BATCH_ROWS)
     batch_bytes = _matrix_bytes(batch_rows, dims, output_itemsize)
-    estimated_peak = max(batch_bytes * 2, 64 * 1024**2)
+    output_bytes = _matrix_bytes(rows, dims, output_itemsize)
+    resident_output_bytes = int(output_bytes * _VIEW_MATERIALIZE_RESIDENT_OUTPUT_FACTOR)
+    estimated_peak = max(resident_output_bytes + (batch_bytes * 2), 64 * 1024**2)
     notes = [
         "view materialize streams source vectors in fixed-size batches into a disk-backed memmap",
         f"batch size for the current contract is {_VIEW_MATERIALIZE_BATCH_ROWS} rows",
+        "disk-backed output pages can still become resident while the memmap is written",
     ]
     if rows > batch_rows:
-        notes.append("the destination matrix is disk-backed, so resident RAM should stay batch-bounded")
+        notes.append("estimated resident memory includes a conservative multiple of the output matrix size")
     return _build_preflight(
         context,
         operation="view materialize",

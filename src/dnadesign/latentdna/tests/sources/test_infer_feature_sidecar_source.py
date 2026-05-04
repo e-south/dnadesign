@@ -372,6 +372,28 @@ def test_feature_sidecar_source_preserves_alias_rows_that_share_vector_keys(tmp_
     assert table["feature_vector_key"].to_pylist() == [vector_key, vector_key]
 
 
+def test_feature_sidecar_inspect_schema_reuses_alias_table_scan(tmp_path: Path, monkeypatch) -> None:
+    usr_root, dataset = _standard_metadata_sidecar_dataset(tmp_path)
+    calls: list[str] = []
+    real_read_alias_table = infer_feature_sidecar_source._read_alias_table
+
+    def counted_read_alias_table(root, dataset_id, *, workspace_dir, where):
+        calls.append(str(dataset_id))
+        return real_read_alias_table(root, dataset_id, workspace_dir=workspace_dir, where=where)
+
+    monkeypatch.setattr(infer_feature_sidecar_source, "_read_alias_table", counted_read_alias_table)
+
+    schema = infer_feature_sidecar_source.inspect_schema(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_operation": "core60_mean"},
+    )
+
+    assert schema["row_count"] == 1
+    assert calls == [dataset.name]
+
+
 def test_feature_sidecar_alias_rows_without_vector_keys_fail_fast(tmp_path: Path) -> None:
     usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
     derived_dir = dataset.dir / "_derived" / "infer"
@@ -664,6 +686,28 @@ def test_feature_scalar_sidecar_source_preserves_alias_rows_that_share_scalar_ke
     assert schema["row_count"] == 2
     assert table.num_rows == 2
     assert table["feature_scalar_key"].to_pylist() == [scalar_key, scalar_key]
+
+
+def test_feature_scalar_sidecar_inspect_schema_reuses_alias_table_scan(tmp_path: Path, monkeypatch) -> None:
+    usr_root, dataset = _standard_metadata_sidecar_dataset(tmp_path)
+    calls: list[str] = []
+    real_read_alias_table = infer_feature_scalar_sidecar_source._read_alias_table
+
+    def counted_read_alias_table(root, dataset_id, *, workspace_dir, where):
+        calls.append(str(dataset_id))
+        return real_read_alias_table(root, dataset_id, workspace_dir=workspace_dir, where=where)
+
+    monkeypatch.setattr(infer_feature_scalar_sidecar_source, "_read_alias_table", counted_read_alias_table)
+
+    schema = infer_feature_scalar_sidecar_source.inspect_schema(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"scalar_kind": "log_likelihood__mean_per_token"},
+    )
+
+    assert schema["row_count"] == 1
+    assert calls == [dataset.name]
 
 
 def test_feature_scalar_sidecar_alias_rows_without_scalar_keys_fail_fast(tmp_path: Path) -> None:

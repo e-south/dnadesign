@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from dnadesign.latentdna.src.services import view_shape_cache
 from dnadesign.latentdna.src.services.candidate_inventory_service import build_candidate_inventory
 from dnadesign.latentdna.src.services.catalog_service import workspace_catalog
 from dnadesign.latentdna.src.services.notebook_controls_service import build_workspace_notebook_controls_payload
@@ -203,3 +207,23 @@ def test_candidate_inventory_is_published_in_notebook_controls(tmp_path) -> None
     assert controls.candidate_inventory[0].n_rows == 2
     assert controls.candidate_inventory[0].n_dims == 2
     assert controls.candidate_inventory[1].materialization_status == "planned"
+
+
+def test_candidate_inventory_uses_view_manifest_shape_without_loading_matrix(tmp_path, monkeypatch) -> None:
+    workspace_dir = _write_workspace(tmp_path)
+    materialize_view(workspace_dir, "embedding_anchor")
+    context = load_workspace_config(workspace_dir)
+    calls: list[Path] = []
+    real_load = np.load
+
+    def counted_load(path, *args, **kwargs):
+        calls.append(Path(path))
+        return real_load(path, *args, **kwargs)
+
+    monkeypatch.setattr(view_shape_cache.np, "load", counted_load)
+
+    rows = build_candidate_inventory(context)
+
+    assert {row["view_id"] for row in rows} == {"embedding_anchor", "output_anchor"}
+    assert {row["view_id"]: row["n_dims"] for row in rows}["embedding_anchor"] == 2
+    assert calls == []

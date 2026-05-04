@@ -172,6 +172,24 @@ def _assert_scalars_exist(
         )
 
 
+def _assert_feature_scalar_keys_exist(
+    keys: list[str],
+    *,
+    root: str,
+    dataset: str,
+    workspace_dir: Path,
+) -> None:
+    if not keys:
+        return
+    present = _scalar_key_set(root, dataset, workspace_dir=workspace_dir)
+    missing = sorted(set(keys) - present)
+    if missing:
+        preview = ", ".join(missing[:5])
+        raise SourceResolutionError(
+            f"infer feature scalar sidecar aliases reference missing feature scalars in {dataset}: {preview}"
+        )
+
+
 def _schema_field_types(root: str, dataset: str, *, workspace_dir: Path) -> dict[str, pa.DataType]:
     ds = _dataset(root, dataset, workspace_dir=workspace_dir)
     field_types = {field.name: field.type for field in ds.schema()}
@@ -196,9 +214,17 @@ def _schema_field_types(root: str, dataset: str, *, workspace_dir: Path) -> dict
     return field_types
 
 
-def _schema_columns(root: str, dataset: str, *, workspace_dir: Path, where: Mapping[str, object] | None) -> list[str]:
-    aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
-    _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
+def _schema_columns(
+    root: str,
+    dataset: str,
+    *,
+    workspace_dir: Path,
+    where: Mapping[str, object] | None,
+    aliases: pa.Table | None = None,
+) -> list[str]:
+    if aliases is None:
+        aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
+        _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
     return list(_schema_field_types(root, dataset, workspace_dir=workspace_dir))
 
 
@@ -206,11 +232,12 @@ def inspect_schema(
     root: str, dataset: str, *, workspace_dir: Path, where: Mapping[str, object] | None
 ) -> dict[str, Any]:
     aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
-    _assert_scalars_exist(aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
+    feature_scalar_keys = _alias_feature_scalar_keys(aliases, dataset=dataset)
+    _assert_feature_scalar_keys_exist(feature_scalar_keys, root=root, dataset=dataset, workspace_dir=workspace_dir)
     return {
         "path": (dataset_dir(root, dataset, workspace_dir=workspace_dir) / "_derived/infer").as_posix(),
-        "row_count": len(_alias_feature_scalar_keys(aliases, dataset=dataset)),
-        "columns": _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where),
+        "row_count": len(feature_scalar_keys),
+        "columns": _schema_columns(root, dataset, workspace_dir=workspace_dir, where=where, aliases=aliases),
         "vector_columns": [],
     }
 

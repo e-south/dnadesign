@@ -4,7 +4,6 @@ Geometry control assembly for workspace notebook surfaces.
 
 from __future__ import annotations
 
-import numpy as np
 import pyarrow.types as pa_types
 
 from ..contracts.notebook import (
@@ -21,6 +20,7 @@ from ..io.parquet_io import read_schema
 from ..labels import humanize_candidate
 from ..visual_style import reference_annotation_label
 from .candidate_set_service import build_workspace_candidate_sets, candidate_set_view_ids
+from .view_shape_cache import ViewShapeCache
 
 _DEFAULT_GEOMETRY_ORDER = [
     "intermediate_embedding_7b_anchor_60bp",
@@ -33,6 +33,7 @@ _PREFERRED_HUES = [
     "sig35_variant",
     "spacer_length",
     "source_class",
+    "emitted_length_bp",
     "is_control",
     "synthetic_margin_ethanol_vs_background",
     "synthetic_margin_cipro_vs_background",
@@ -46,6 +47,7 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "sig35_variant": "categorical",
     "spacer_length": "ordinal",
     "source_class": "categorical",
+    "emitted_length_bp": "continuous",
     "is_control": "binary",
     "synthetic_margin_ethanol_vs_background": "continuous",
     "synthetic_margin_cipro_vs_background": "continuous",
@@ -63,7 +65,7 @@ _FAMILY_LABELS = {
 }
 
 _SCOPE_LABELS = {
-    "anchor_60bp": "60 bp anchor",
+    "merged_anchor_insert_seq_mean": "Mixed-length anchor-source insert",
     "full_context_1kb": "1 kb construct context",
     "full_context_anchor_mean": "1 kb context anchor mean",
     "reverse_complement_context_anchor_mean": "1 kb reverse-complement context anchor mean",
@@ -203,12 +205,11 @@ def _preferred_hue_kind_defaults(context, *, notebook_id: str | None) -> dict[st
     }
 
 
-def _view_shape(context, view_id: str) -> tuple[int, int] | None:
-    matrix_path = context.output_root / "views" / view_id / "matrix.npy"
-    if not matrix_path.is_file():
+def _view_shape(view_id: str, *, shape_cache: ViewShapeCache) -> tuple[int, int] | None:
+    rows, dims = shape_cache.get(view_id)
+    if rows is None or dims is None:
         return None
-    matrix = np.load(matrix_path, mmap_mode="r")
-    return int(matrix.shape[0]), int(matrix.shape[1])
+    return rows, dims
 
 
 def _geometry_inventory(
@@ -216,6 +217,7 @@ def _geometry_inventory(
     *,
     projection_ids_by_view: dict[str, list[str]],
     geometry_order: list[str],
+    shape_cache: ViewShapeCache,
 ) -> list[WorkspaceNotebookGeometry]:
     geometries: list[WorkspaceNotebookGeometry] = []
     order = {view_id: index for index, view_id in enumerate(geometry_order)}
@@ -227,7 +229,7 @@ def _geometry_inventory(
         scope_name = str(tags.get("scope") or "")
         if role in {"hidden", "planned", "retired"}:
             continue
-        shape = _view_shape(context, view_id)
+        shape = _view_shape(view_id, shape_cache=shape_cache)
         view_dir = context.output_root / "views" / view_id
         geometries.append(
             WorkspaceNotebookGeometry(
@@ -626,7 +628,13 @@ def _default_layout_id(
     return "single_view"
 
 
-def build_workspace_geometry_controls(context, *, notebook_id: str | None = None) -> WorkspaceNotebookGeometryControls:
+def build_workspace_geometry_controls(
+    context,
+    *,
+    notebook_id: str | None = None,
+    shape_cache: ViewShapeCache | None = None,
+) -> WorkspaceNotebookGeometryControls:
+    shapes = shape_cache or ViewShapeCache(output_root=context.output_root)
     projection_ids_by_view = _projection_inventory(context)
     geometry_order = _geometry_order(context, notebook_id=notebook_id)
     preferred_hue_order = _preferred_hue_order(context, notebook_id=notebook_id)
@@ -635,12 +643,14 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         context,
         projection_ids_by_view=projection_ids_by_view,
         geometry_order=geometry_order,
+        shape_cache=shapes,
     )
     visible_view_ids = {row.view_id for row in geometries}
     candidate_sets = build_workspace_candidate_sets(
         context,
         notebook_id=notebook_id,
         visible_view_ids=visible_view_ids,
+        shape_cache=shapes,
     )
     joinable_tables, schemas_by_path = _table_inventory(
         context,
@@ -679,7 +689,7 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
     return WorkspaceNotebookGeometryControls(
         default_model=default_geometry.model if default_geometry is not None else "7b",
         default_family=default_geometry.family if default_geometry is not None else "intermediate_embedding",
-        default_context=default_geometry.context if default_geometry is not None else "anchor_60bp",
+        default_context=default_geometry.context if default_geometry is not None else "merged_anchor_insert_seq_mean",
         default_layout=_default_layout_id(context, layout_presets, notebook_id=notebook_id),
         default_reference_set=default_reference_set,
         default_compare_left=default_compare_left,

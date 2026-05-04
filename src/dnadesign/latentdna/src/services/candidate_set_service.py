@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from ..contracts.notebook import WorkspaceNotebookCandidateSet, WorkspaceNotebookCandidateView
 from ..labels import humanize_candidate
+from .view_shape_cache import ViewShapeCache
 
 
 def _normalized_role(value: object) -> str:
@@ -52,17 +51,8 @@ def candidate_set_view_ids(context, candidate_set_id: str) -> list[str]:
     return resolved
 
 
-def _view_shape(context, view_id: str) -> tuple[int | None, int | None]:
-    matrix_path = context.output_root / "views" / view_id / "matrix.npy"
-    if not matrix_path.is_file():
-        return None, None
-    try:
-        matrix = np.load(matrix_path, mmap_mode="r")
-    except Exception:
-        return None, None
-    if len(matrix.shape) < 2:
-        return int(matrix.shape[0]) if matrix.shape else None, None
-    return int(matrix.shape[0]), int(matrix.shape[1])
+def _view_shape(view_id: str, *, shape_cache: ViewShapeCache) -> tuple[int | None, int | None]:
+    return shape_cache.get(view_id)
 
 
 def _is_materialized(context, view_id: str) -> bool:
@@ -83,11 +73,17 @@ def _candidate_label(view_id: str, tags: dict[str, str]) -> str:
     return label or humanize_candidate(view_id)
 
 
-def _candidate_view_payload(context, *, candidate_set_id: str, view_id: str) -> WorkspaceNotebookCandidateView:
+def _candidate_view_payload(
+    context,
+    *,
+    candidate_set_id: str,
+    view_id: str,
+    shape_cache: ViewShapeCache,
+) -> WorkspaceNotebookCandidateView:
     view = context.require_view(view_id)
     role = _normalized_role(getattr(view, "role", None)) or None
     tags = _view_tags(view)
-    rows, dims = _view_shape(context, view_id)
+    rows, dims = _view_shape(view_id, shape_cache=shape_cache)
     candidate_set = context.config.candidate_sets[candidate_set_id]
     label = _candidate_label(view_id, tags)
     return WorkspaceNotebookCandidateView(
@@ -112,6 +108,7 @@ def build_workspace_candidate_sets(
     *,
     notebook_id: str | None = None,
     visible_view_ids: set[str] | None = None,
+    shape_cache: ViewShapeCache | None = None,
 ) -> list[WorkspaceNotebookCandidateSet]:
     notebook = None
     if notebook_id is not None:
@@ -124,6 +121,7 @@ def build_workspace_candidate_sets(
     configured_ids = list(getattr(notebook, "candidate_sets", []) or []) if notebook is not None else []
     candidate_set_ids = configured_ids or list(context.config.candidate_sets)
     visible = set(visible_view_ids or ())
+    shapes = shape_cache or ViewShapeCache(output_root=context.output_root)
     payloads: list[WorkspaceNotebookCandidateSet] = []
     for candidate_set_id in candidate_set_ids:
         if candidate_set_id not in context.config.candidate_sets:
@@ -131,7 +129,13 @@ def build_workspace_candidate_sets(
         candidate_set = context.config.candidate_sets[candidate_set_id]
         view_ids = candidate_set_view_ids(context, candidate_set_id)
         views = [
-            _candidate_view_payload(context, candidate_set_id=candidate_set_id, view_id=view_id) for view_id in view_ids
+            _candidate_view_payload(
+                context,
+                candidate_set_id=candidate_set_id,
+                view_id=view_id,
+                shape_cache=shapes,
+            )
+            for view_id in view_ids
         ]
         available_view_ids = [view_id for view_id in view_ids if not visible or view_id in visible]
         panel_titles_by_view = {view.view_id: view.panel_title for view in views}

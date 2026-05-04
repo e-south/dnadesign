@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-
 from dnadesign.usr import SequencesError
 
 from ..contracts.errors import SourceResolutionError
@@ -23,6 +21,7 @@ from ..workspaces.loader import WorkspaceContext
 from ._artifacts import artifact_exists
 from .candidate_set_service import candidate_set_view_ids
 from .freshness_service import FreshnessCache, evaluate_artifact_freshness
+from .view_shape_cache import ViewShape, ViewShapeCache
 
 _MISSING_SOURCE_MARKERS = ("not found", "not initialized")
 _NON_MATERIALIZED_VIEW_ROLES = {"hidden", "planned", "retired"}
@@ -59,23 +58,10 @@ def _source_row_count(context: WorkspaceContext, source_id: str, source: object)
         raise
 
 
-def _view_shape(context: WorkspaceContext, view_id: str) -> tuple[int | None, int | None]:
-    matrix_path = context.output_root / "views" / view_id / "matrix.npy"
-    if not matrix_path.is_file():
-        return None, None
-    try:
-        matrix = np.load(matrix_path, mmap_mode="r")
-    except Exception:
-        return None, None
-    if len(matrix.shape) < 2:
-        return int(matrix.shape[0]) if matrix.shape else None, None
-    return int(matrix.shape[0]), int(matrix.shape[1])
-
-
-def _materialization_status(context: WorkspaceContext, view_id: str, *, role: str) -> str:
+def _materialization_status(shape: ViewShape, *, role: str) -> str:
     if role in _NON_MATERIALIZED_VIEW_ROLES:
         return role
-    rows, dims = _view_shape(context, view_id)
+    rows, dims = shape
     if rows is not None and dims is not None:
         return "materialized"
     return "missing"
@@ -231,10 +217,19 @@ def _modality(source: object | None, view: object) -> str:
     return "vector"
 
 
+def _semantic_value(source: object | None, tags: dict[str, Any], field_name: str) -> object:
+    if field_name in tags:
+        return tags[field_name]
+    if source is None:
+        return None
+    return getattr(source, field_name, None)
+
+
 def build_candidate_inventory(
     context: WorkspaceContext,
     *,
     freshness_cache: FreshnessCache | None = None,
+    shape_cache: ViewShapeCache | None = None,
 ) -> list[dict[str, object]]:
     """Build one status row per configured candidate representation view."""
 
@@ -249,6 +244,7 @@ def build_candidate_inventory(
         candidate_sets=candidate_sets,
     )
     cache = freshness_cache or FreshnessCache()
+    shapes = shape_cache or ViewShapeCache(output_root=context.output_root)
     study_binding = getattr(context.config, "study_binding", None)
     study_id = str(getattr(study_binding, "study_id", None) or context.workspace_id)
     rows: list[dict[str, object]] = []
@@ -261,7 +257,8 @@ def build_candidate_inventory(
         where: dict[str, Any] = {}
         dataset: str | None = None
         source_rows: int | None = None
-        n_rows, n_dims = _view_shape(context, view_id)
+        shape = shapes.get(view_id)
+        n_rows, n_dims = shape
         if isinstance(view, SourceBackedViewConfig):
             source_id = view.source
             source = sources.get(source_id)
@@ -272,7 +269,7 @@ def build_candidate_inventory(
                 source_rows = _source_row_count(context, source_id, source)
         if n_rows is None:
             n_rows = source_rows if role not in _NON_MATERIALIZED_VIEW_ROLES else None
-        materialization_status = _materialization_status(context, view_id, role=role)
+        materialization_status = _materialization_status(shape, role=role)
         rows.append(
             {
                 "study_id": study_id,
@@ -284,7 +281,14 @@ def build_candidate_inventory(
                 "model_name": _model_name(tags=tags, where=where),
                 "feature_family": _feature_family(tags=tags, where=where, view=view),
                 "modality": _modality(source, view),
-                "sequence_scope": str(tags.get("scope") or "") or None,
+                "sequence_scope": (
+                    str(tags.get("scope") or _semantic_value(source, tags, "sequence_scope") or "") or None
+                ),
+                "emitted_length_bp": _semantic_value(source, tags, "emitted_length_bp"),
+                "source_interval_length_bp": _semantic_value(source, tags, "source_interval_length_bp"),
+                "pooling_span_bp": _semantic_value(source, tags, "pooling_span_bp"),
+                "focal_rule": _semantic_value(source, tags, "focal_rule"),
+                "window_selection_rule": _semantic_value(source, tags, "window_selection_rule"),
                 "pooling_operation": str(where.get("pooling_operation") or tags.get("pooling") or "") or None,
                 "orientation": str(where.get("orientation") or tags.get("orientation") or "") or None,
                 "coordinate_space_id": str(getattr(view, "coordinate_space_id", "") or "") or None,
