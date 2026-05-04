@@ -689,7 +689,7 @@ def test_notebook_controls_surface_configured_hues_backed_by_view_rows(tmp_path:
     }
 
 
-def test_notebook_controls_reuse_materialized_view_shape_reads(tmp_path: Path, monkeypatch) -> None:
+def test_notebook_controls_reuse_manifest_view_shape_reads(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     _write_workspace_config(workspace_dir)
@@ -702,22 +702,22 @@ def test_notebook_controls_reuse_materialized_view_shape_reads(tmp_path: Path, m
         view_dir / "rows.parquet",
         index=False,
     )
-    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
-    matrix_path = view_dir / "matrix.npy"
-    calls: list[Path] = []
-    real_load = np.load
-
-    def counted_load(path, *args, **kwargs):
-        calls.append(Path(path))
-        return real_load(path, *args, **kwargs)
-
-    monkeypatch.setattr(np, "load", counted_load)
+    (view_dir / "matrix.npy").write_bytes(b"notebook controls must not inspect matrix payload bytes")
+    _write_artifact_manifest(
+        view_dir,
+        artifact_kind="view_matrix",
+        artifact_id=view_id,
+        stats={"rows": 2, "dims": 2},
+    )
 
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
 
     assert [row.view_id for row in controls.candidate_inventory] == [view_id]
     assert [row.view_id for row in controls.geometry_controls.geometries] == [view_id]
-    assert calls == [matrix_path]
+    assert controls.candidate_inventory[0].n_rows == 2
+    assert controls.candidate_inventory[0].n_dims == 2
+    assert controls.geometry_controls.geometries[0].rows == 2
+    assert controls.geometry_controls.geometries[0].dims == 2
 
 
 def test_notebook_controls_ignore_legacy_scalar_tables_without_manifest_bindings(tmp_path: Path) -> None:

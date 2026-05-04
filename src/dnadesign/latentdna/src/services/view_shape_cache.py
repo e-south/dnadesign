@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
-
 from ..io.json_io import read_json
 
 ViewShape = tuple[int | None, int | None]
@@ -37,21 +35,9 @@ def _manifest_shape(output_root: Path, view_id: str) -> ViewShape | None:
 
 
 def read_view_shape(output_root: Path, view_id: str) -> ViewShape:
-    """Return the row and dimension count for a materialized view matrix."""
+    """Return manifest-declared row and dimension counts for a view matrix."""
 
-    manifest_shape = _manifest_shape(output_root, view_id)
-    if manifest_shape is not None:
-        return manifest_shape
-    matrix_path = output_root / "views" / view_id / "matrix.npy"
-    if not matrix_path.is_file():
-        return None, None
-    try:
-        matrix = np.load(matrix_path, mmap_mode="r")
-    except Exception:
-        return None, None
-    if len(matrix.shape) < 2:
-        return int(matrix.shape[0]) if matrix.shape else None, None
-    return int(matrix.shape[0]), int(matrix.shape[1])
+    return _manifest_shape(output_root, view_id) or (None, None)
 
 
 @dataclass

@@ -37,9 +37,9 @@ Interpretation:
 - generated notebook runtime startup no longer opens view `matrix.npy` files for
   row-count or dimensionality text; those values come from the published
   `candidate_inventory` ledger and geometry-control rows
-- direct notebook control-plane assembly now reads current view shapes from view
-  manifest `stats.rows` / `stats.dims`, with `np.load(..., mmap_mode="r")` only
-  as a legacy fallback for artifacts without manifest shape stats
+- direct notebook control-plane assembly reads current view shapes only from
+  view manifest `stats.rows` / `stats.dims`; artifacts without manifest shape
+  stats are treated as missing shape metadata instead of opening `matrix.npy`
 - the May 2, 2026 live controls-build pressure run measured
   `stress_ethanol_cipro_growth` at 6.7704s / 5.4983s / 5.4861s with 45
   `np.load` calls before the shape-cache and manifest-stats pass, and 5.3724s /
