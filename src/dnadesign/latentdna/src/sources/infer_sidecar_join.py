@@ -63,7 +63,8 @@ def read_alias_table(
 
 
 @lru_cache(maxsize=32)
-def _payload_key_set_for_path(path_text: str, key_column: str) -> set[str]:
+def _payload_key_set_for_path(path_text: str, key_column: str, mtime_ns: int, size: int) -> set[str]:
+    del mtime_ns, size
     path = Path(path_text)
     if not path.is_file():
         return set()
@@ -79,7 +80,10 @@ def _payload_key_set(
     workspace_dir: Path,
 ) -> set[str]:
     path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
-    return _payload_key_set_for_path(path.as_posix(), contract.payload_key_column)
+    if not path.is_file():
+        return set()
+    stat = path.stat()
+    return _payload_key_set_for_path(path.as_posix(), contract.payload_key_column, stat.st_mtime_ns, stat.st_size)
 
 
 def alias_payload_keys(contract: InferSidecarJoinContract, aliases: pa.Table, *, dataset: str) -> list[str]:
@@ -168,6 +172,35 @@ def schema_columns(
     return list(schema_field_types(contract, root, dataset, workspace_dir=workspace_dir))
 
 
+def selected_columns(
+    contract: InferSidecarJoinContract,
+    root: str,
+    dataset: str,
+    *,
+    workspace_dir: Path,
+    where: Mapping[str, object] | None,
+    columns: list[str] | None,
+    aliases: pa.Table | None = None,
+) -> list[str]:
+    available_columns = schema_columns(
+        contract,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        where=where,
+        aliases=aliases,
+    )
+    if columns is None:
+        return available_columns
+    available = set(available_columns)
+    missing = [column for column in columns if column not in available]
+    if missing:
+        raise SourceResolutionError(
+            f"{contract.source_label} requested columns are unavailable in {dataset}: {', '.join(missing)}"
+        )
+    return list(columns)
+
+
 def inspect_schema(
     contract: InferSidecarJoinContract,
     root: str,
@@ -202,9 +235,14 @@ def metadata_rows(
     workspace_dir: Path,
     where: Mapping[str, object] | None,
     columns: list[str] | None,
+    aliases: pa.Table | None = None,
 ) -> dict[str, list[dict[str, object]]]:
     ds = infer_sidecar_common.load_dataset(root, dataset, workspace_dir=workspace_dir)
-    aliases = read_alias_table(contract, root, dataset, workspace_dir=workspace_dir, where=where)
+    aliases = (
+        aliases
+        if aliases is not None
+        else read_alias_table(contract, root, dataset, workspace_dir=workspace_dir, where=where)
+    )
     assert_payloads_exist(contract, aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
     alias_rows = infer_sidecar_common.renamed_created_at_rows(
         aliases,
@@ -256,11 +294,25 @@ def iter_batches(
     columns: list[str] | None,
     batch_size: int,
 ):
-    selected_columns = list(
-        columns or schema_columns(contract, root, dataset, workspace_dir=workspace_dir, where=where)
+    aliases = read_alias_table(contract, root, dataset, workspace_dir=workspace_dir, where=where)
+    assert_payloads_exist(contract, aliases, root=root, dataset=dataset, workspace_dir=workspace_dir)
+    selected = selected_columns(
+        contract,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        where=where,
+        columns=columns,
+        aliases=aliases,
     )
     metadata = metadata_rows(
-        contract, root, dataset, workspace_dir=workspace_dir, where=where, columns=selected_columns
+        contract,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        where=where,
+        columns=selected,
+        aliases=aliases,
     )
     if not metadata:
         return
@@ -268,7 +320,7 @@ def iter_batches(
         f"{payload_key}#{index}": row for payload_key, rows in metadata.items() for index, row in enumerate(rows)
     }
     output_schema = infer_sidecar_common.stable_batch_schema(
-        selected_columns,
+        selected,
         metadata_schema_rows,
         field_types=schema_field_types(contract, root, dataset, workspace_dir=workspace_dir),
         value_field_types=contract.payload_value_field_types,
@@ -276,9 +328,9 @@ def iter_batches(
     payload_table_path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
     wanted_keys = set(metadata)
     payload_columns = [contract.payload_key_column]
-    if contract.payload_value_column in selected_columns:
+    if contract.payload_value_column in selected:
         payload_columns.append(contract.payload_value_column)
-    if contract.payload_created_at_column in selected_columns:
+    if contract.payload_created_at_column in selected:
         payload_columns.append("created_at")
     if not payload_table_path.is_file():
         return
@@ -290,11 +342,11 @@ def iter_batches(
                 continue
             for metadata_row in metadata[key]:
                 row = dict(metadata_row)
-                if contract.payload_value_column in selected_columns:
+                if contract.payload_value_column in selected:
                     row[contract.payload_value_column] = payload_row[contract.payload_value_column]
-                if contract.payload_created_at_column in selected_columns:
+                if contract.payload_created_at_column in selected:
                     row[contract.payload_created_at_column] = payload_row.get("created_at")
-                batch_rows.append({column: row.get(column) for column in selected_columns})
+                batch_rows.append({column: row.get(column) for column in selected})
         if batch_rows:
             yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
 
@@ -322,11 +374,9 @@ def read_table(
     )
     if batches:
         return pa.Table.from_batches(batches)
-    selected_columns = list(
-        columns or schema_columns(contract, root, dataset, workspace_dir=workspace_dir, where=where)
-    )
+    selected = selected_columns(contract, root, dataset, workspace_dir=workspace_dir, where=where, columns=columns)
     schema = infer_sidecar_common.stable_batch_schema(
-        selected_columns,
+        selected,
         {},
         field_types=schema_field_types(contract, root, dataset, workspace_dir=workspace_dir),
         value_field_types=contract.payload_value_field_types,

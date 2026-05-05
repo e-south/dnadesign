@@ -538,6 +538,92 @@ def test_feature_sidecar_alias_rows_without_vector_keys_fail_fast(tmp_path: Path
         )
 
 
+def test_feature_sidecar_payload_key_cache_tracks_payload_file_fingerprint(tmp_path: Path) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    created_at = "2026-04-28T00:00:00+00:00"
+    vector_key = "fv_late"
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "alias_late",
+                    "view_id": "view_late",
+                    "view_name": "fixture_late",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": vector_key,
+                    "forward_pass_key": "fp_late",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "seq_mean",
+                    "pooling_start_0": None,
+                    "pooling_end_0": None,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_late",
+                    "created_at": created_at,
+                }
+            ],
+            schema=infer_feature_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_aliases.parquet",
+    )
+
+    with pytest.raises(SourceResolutionError, match="missing feature vectors"):
+        infer_feature_sidecar_source.inspect_schema(
+            usr_root.as_posix(),
+            dataset.name,
+            workspace_dir=tmp_path,
+            where=None,
+        )
+
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"feature_vector_key": vector_key, "value": [0.1, 0.2], "created_at": created_at}],
+            schema=infer_feature_sidecar_source._VECTOR_SCHEMA,
+        ),
+        derived_dir / "feature_vectors.parquet",
+    )
+
+    schema = infer_feature_sidecar_source.inspect_schema(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where=None,
+    )
+
+    assert schema["row_count"] == 1
+
+
+def test_feature_sidecar_source_rejects_unknown_requested_columns_before_dataset_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    usr_root, dataset = _standard_metadata_sidecar_dataset(tmp_path)
+    scanned_records = False
+
+    def fail_if_scanned(*args, **kwargs):
+        nonlocal scanned_records
+        scanned_records = True
+        raise AssertionError("dataset records should not be scanned for unknown requested columns")
+
+    monkeypatch.setattr(infer_sidecar_common, "record_rows_by_id", fail_if_scanned)
+
+    with pytest.raises(SourceResolutionError, match="requested columns are unavailable.*does_not_exist"):
+        infer_feature_sidecar_source.read_table(
+            usr_root.as_posix(),
+            dataset.name,
+            workspace_dir=tmp_path,
+            where={"pooling_operation": "core60_mean"},
+            columns=["alias_id", "does_not_exist"],
+        )
+
+    assert scanned_records is False
+
+
 def test_feature_sidecar_source_carries_reference_strength_metadata_into_materialized_rows(
     tmp_path: Path,
 ) -> None:
