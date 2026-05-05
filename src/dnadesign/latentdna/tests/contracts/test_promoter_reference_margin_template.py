@@ -26,15 +26,15 @@ def test_template_tracks_canonical_views_and_pre_assay_deliverables() -> None:
         "intermediate_embedding_7b_anchor_60bp",
         "intermediate_embedding_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
-        "pooled_logits_7b_anchor_60bp",
-        "pooled_logits_7b_full_context_1kb",
+        "output_layer_mean_7b_anchor_60bp",
+        "output_layer_mean_7b_full_context_1kb",
     }
     assert payload["views"]["intermediate_embedding_7b_full_context_anchor_mean"]["role"] == "primary"
     assert payload["candidate_sets"]["five_view_7b_triage"]["views"] == [
         "intermediate_embedding_7b_anchor_60bp",
-        "pooled_logits_7b_anchor_60bp",
+        "output_layer_mean_7b_anchor_60bp",
         "intermediate_embedding_7b_full_context_1kb",
-        "pooled_logits_7b_full_context_1kb",
+        "output_layer_mean_7b_full_context_1kb",
         "intermediate_embedding_7b_full_context_anchor_mean",
     ]
     assert list(payload["deliverables"]) == [
@@ -83,7 +83,7 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
     assert set(payload["alignments"]) == {
         "intermediate_embedding_7b_anchor_to_full_context",
         "intermediate_embedding_7b_anchor_to_anchor_mean",
-        "pooled_logits_7b_anchor_to_full_context",
+        "output_layer_mean_7b_anchor_to_full_context",
     }
     assert all("semantics_ref" in plot for plot in payload["plots"].values())
 
@@ -143,8 +143,8 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
         "design_centroid_margins_intermediate_embedding_7b_anchor_60bp",
         "design_centroid_margins_intermediate_embedding_7b_full_context_anchor_mean",
         "design_centroid_margins_intermediate_embedding_7b_full_context_1kb",
-        "design_centroid_margins_pooled_logits_7b_anchor_60bp",
-        "design_centroid_margins_pooled_logits_7b_full_context_1kb",
+        "design_centroid_margins_output_layer_mean_7b_anchor_60bp",
+        "design_centroid_margins_output_layer_mean_7b_full_context_1kb",
     ]
     assert payload["plots"]["reference_alignment_summary"]["kind"] == "metric_panel_grid"
     assert payload["plots"]["reference_alignment_summary"]["visibility_tier"] == "appendix"
@@ -154,8 +154,8 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
         "pca_intermediate_embedding_7b_anchor_60bp",
         "pca_intermediate_embedding_7b_full_context_anchor_mean",
         "pca_intermediate_embedding_7b_full_context_1kb",
-        "pca_pooled_logits_7b_anchor_60bp",
-        "pca_pooled_logits_7b_full_context_1kb",
+        "pca_output_layer_mean_7b_anchor_60bp",
+        "pca_output_layer_mean_7b_full_context_1kb",
     ]
     assert payload["plots"]["context_pair_summary"]["visibility_tier"] == "primary"
     assert payload["plots"]["context_pair_summary"]["scalar"] == "context_pair_summary_metrics"
@@ -177,8 +177,8 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
         "umap_intermediate_embedding_7b_anchor_60bp",
         "umap_intermediate_embedding_7b_full_context_anchor_mean",
         "umap_intermediate_embedding_7b_full_context_1kb",
-        "umap_pooled_logits_7b_anchor_60bp",
-        "umap_pooled_logits_7b_full_context_1kb",
+        "umap_output_layer_mean_7b_anchor_60bp",
+        "umap_output_layer_mean_7b_full_context_1kb",
     ]
 
     assert payload["deliverables"]["representation_health_summary"]["outputs"]["plots"] == [

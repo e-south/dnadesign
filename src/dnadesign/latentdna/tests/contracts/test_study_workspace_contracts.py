@@ -419,7 +419,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "build_context_robustness_summary_metrics" in pre_assay_steps
     assert "build_reference_alignment_summary_metrics" in pre_assay_steps
     assert "build_candidate_decision_frontier_metrics" in pre_assay_steps
-    assert "build_context_delta_distribution_pooled_logits_7b" not in pre_assay_steps
+    assert "build_context_delta_distribution_output_layer_mean_7b" not in pre_assay_steps
     assert all(
         step.params.get("kind")
         not in {

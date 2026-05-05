@@ -2,7 +2,7 @@ plot_id: candidate_decision_frontier
 question: Which candidate best balances design structure and ordered Sigma-35 signal after the health and context checks?
 decision_role: primary
 encoding: Single-panel representation tradeoff plot over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects retained-component effective rank, and each point is directly labeled.
-scope: The healthy 7B study-facing candidates summarized from the persisted health, design-structure, and Sigma-35 scalar tables. Context rows are joined for provenance in the scalar artifact, but context retention is not a visible encoding in this two-axis plot. Gate-failed pooled-logit candidates are adjudicated in the preceding health gate rather than repeated here.
+scope: The healthy 7B study-facing candidates summarized from the persisted health, design-structure, and Sigma-35 scalar tables. Context rows are joined for provenance in the scalar artifact, but context retention is not a visible encoding in this two-axis plot. Gate-failed output-layer-mean candidates are adjudicated in the preceding health gate rather than repeated here.
 guardrails:
   - Read this figure as a synthesis of the healthy-candidate review path, not a replacement for the health gate or the direct context comparison.
   - Read the row-level bridge plots before treating small point-to-point differences as meaningful.

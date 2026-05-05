@@ -72,7 +72,7 @@
 - Current reference plot outputs include the official
   `reference_alignment_summary` appendix plot and an exploratory
   `reference_strength_probe` over the completed reference sidecars.
-- The active comparison is 7B construct-insert `seq_mean` anchors versus 7B forward 1 kb context `anchor_mean`. Concat is not part of the current Infer or LatentDNA plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, and reverse-complement context anchor mean remain planned for the main merged handoffs. Reference core60 and reference-context 7B sidecars now exist, but remain diagnostic until a downstream review explicitly promotes them into the decision geometry. Mean-pooled output-layer logits and log-likelihoods are collected diagnostics, not current decision geometry.
+- The active comparison is 7B construct-insert `seq_mean` anchors versus 7B forward 1 kb context `anchor_mean`. Concat is not part of the current Infer or LatentDNA plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, and reverse-complement context anchor mean remain planned for the main merged handoffs. Reference core60 and reference-context 7B sidecars now exist, but remain diagnostic until a downstream review explicitly promotes them into the decision geometry. Output-layer mean vectors and log-likelihoods are collected diagnostics, not current decision geometry.
 - Reference alignment remains diagnostic. Native references are biological controls; `analysis_window` reference rows are analysis-only comparability views, not corrected native promoters.
 
 ### Reference-view branch
@@ -137,7 +137,7 @@
   log-likelihood total and mean-per-token diagnostics. Main merged handoff
   scalar sources are still mostly unfilled; reference core60 and reference
   context scalar sources now resolve locally from generated Infer sidecars.
-- Planned sidecar sources for mean-pooled output-layer logits, forward
+- Planned sidecar sources for output-layer mean vectors, forward
   full-context sequence mean, reverse-complement full-context sequence mean, and
   reverse-complement context anchor mean still depend on the remaining main
   merged handoff Infer batches. Reference core60 and reference context feature
@@ -182,7 +182,7 @@
   log-likelihood scalar specs under the full collection plan. The three
   reference lanes are complete; the remaining missing work is in the main merged
   anchor/context lanes.
-  Vector counts include both intermediate embeddings and mean-pooled output-layer logits.
+  Vector counts include both intermediate embeddings and output-layer mean vectors.
   Log-likelihoods are tracked separately through `_derived/infer/feature_scalar_aliases.parquet` and
   `_derived/infer/feature_scalars.parquet`. The reusable main vectors are the canonical sidecar rows
   for `157164` anchor construct-insert intermediate vectors and `157164` forward-context anchor-mean
@@ -318,6 +318,6 @@
   corresponding audit JSONs under
   `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/audit/`.
 - Treat sidecar-backed 7B intermediate embeddings as the active candidate `X` blocks. Mean-pooled
-  output-layer logits and log-likelihoods are collected by Infer for diagnostics/QC, but they are not
+  output-layer mean vectors and log-likelihoods are collected by Infer for diagnostics/QC, but they are not
   active LatentDNA geometry defaults.
 - Do not use UMAP aesthetics, reference-neighbor artifacts, or geodesic pilots as the primary comparison rule

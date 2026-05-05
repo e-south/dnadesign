@@ -86,11 +86,11 @@ def test_agreement_summary_grid_preserves_panel_inventory() -> None:
             "kind": "agreement_summary_grid",
             "agreements": [
                 "context_geometry_agreement_intermediate_embedding_20b",
-                "context_geometry_agreement_pooled_logits_20b",
+                "context_geometry_agreement_output_layer_mean_20b",
             ],
             "panel_titles": [
                 "intermediate_embedding 20b",
-                "pooled_logits 20b",
+                "output_layer_mean 20b",
             ],
         }
     )
@@ -122,9 +122,9 @@ def test_agreement_summary_grid_preserves_panel_inventory() -> None:
     assert spec.kind == "agreement_summary_grid"
     assert spec.agreement_ids == [
         "context_geometry_agreement_intermediate_embedding_20b",
-        "context_geometry_agreement_pooled_logits_20b",
+        "context_geometry_agreement_output_layer_mean_20b",
     ]
-    assert spec.panel_titles == ["intermediate_embedding 20b", "pooled_logits 20b"]
+    assert spec.panel_titles == ["intermediate_embedding 20b", "output_layer_mean 20b"]
 
 
 def test_categorical_count_accepts_panelled_count_plots() -> None:
@@ -237,7 +237,7 @@ def test_distribution_grid_accepts_explicit_metric_inventory() -> None:
             "kind": "distribution_grid",
             "scalars": [
                 "context_geometry_metrics_intermediate_embedding_20b",
-                "context_geometry_metrics_pooled_logits_20b",
+                "context_geometry_metrics_output_layer_mean_20b",
             ],
             "metric_columns": [
                 "context_self_cosine",
@@ -277,7 +277,7 @@ def test_distribution_grid_accepts_explicit_metric_inventory() -> None:
     assert spec.kind == "distribution_grid"
     assert spec.scalar_ids == [
         "context_geometry_metrics_intermediate_embedding_20b",
-        "context_geometry_metrics_pooled_logits_20b",
+        "context_geometry_metrics_output_layer_mean_20b",
     ]
     assert spec.metric_columns == [
         "context_self_cosine",

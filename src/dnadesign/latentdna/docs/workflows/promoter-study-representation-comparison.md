@@ -30,7 +30,7 @@ sidecar-backed geometry is narrower than the future target set: the current
 usable features are 7B construct-insert `seq_mean` anchors and 7B forward
 realized-context `anchor_mean` features. Forward context `seq_mean`,
 reverse-complement context features, reference `analysis_window` features,
-mean-pooled output-layer logits, and log-likelihood scalar diagnostics are not
+output-layer mean vectors, and log-likelihood scalar diagnostics are not
 treated as current decision geometry until their canonical vector or scalar
 sidecars are present.
 
