@@ -10,19 +10,13 @@ import re
 import pyarrow as pa
 
 from ..contracts.errors import ContractViolationError
+from ..contracts.promoter_metadata import REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS
 from ..contracts.workspace import PromoterMetadataCohortConfig
 from ..metadata.derivations import derive_metadata_value
 from ..workspaces.loader import WorkspaceContext
 
 _SIG35_PATTERN = re.compile(r"__sig35[=_]([A-Za-z0-9]+)")
 _CONTROL_LABELS = {"spyp", "sulap", "soxsp", "j23105", "spy_p", "sul_ap", "sox_sp"}
-_REGULONDB_NATIVE_PROMOTER_DERIVATIONS = {
-    "regulondb__sigma_factor_set",
-    "regulondb__regulator_composition",
-    "regulondb__box_pattern",
-    "regulondb__confidence_level_set",
-    "regulondb__metadata_completeness_class",
-}
 
 
 def _normalize_text(value: object) -> str | None:
@@ -390,7 +384,7 @@ def _source_class(row: dict[str, object]) -> str:
 
 
 def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: WorkspaceContext | None = None) -> object:
-    if derive in _REGULONDB_NATIVE_PROMOTER_DERIVATIONS:
+    if derive in REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS:
         if derive not in row:
             raise ContractViolationError(f"native RegulonDB promoter metadata column is missing: {derive}")
         return row[derive]
@@ -425,7 +419,7 @@ def _promoter_metadata_columns(
             field_type = pa.int64()
         elif config.derive == "is_control":
             field_type = pa.bool_()
-        elif config.derive not in _REGULONDB_NATIVE_PROMOTER_DERIVATIONS:
+        elif config.derive not in REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS:
             field_type = pa.string()
         arrays[cohort_id] = pa.array(values, type=field_type)
     return arrays

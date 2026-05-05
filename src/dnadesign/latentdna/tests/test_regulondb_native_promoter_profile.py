@@ -7,6 +7,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from dnadesign.latentdna.src.contracts.promoter_metadata import REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS
 from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.services.validation_service import validate_workspace
 from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
@@ -35,6 +36,7 @@ def test_native_regulondb_promoter_cohorts_materialize_without_densegen_or_sig35
                     [["sigma70"], ["sigma38", "sigma70"]],
                     type=pa.list_(pa.string()),
                 ),
+                "regulondb__sigma_factor_count": [1, 2],
                 "regulondb__regulator_composition": ["activator", "mixed"],
                 "regulondb__box_pattern": ["-35/-10", "-10_only"],
                 "regulondb__confidence_level_set": pa.array(
@@ -42,6 +44,11 @@ def test_native_regulondb_promoter_cohorts_materialize_without_densegen_or_sig35
                     type=pa.list_(pa.string()),
                 ),
                 "regulondb__metadata_completeness_class": ["complete", "partial"],
+                "regulondb__source_strata_set": pa.array(
+                    [["regulondb_13_promoter_set"], ["regulondb_11_promoter_set"]],
+                    type=pa.list_(pa.string()),
+                ),
+                "regulondb__primary_promoter_name": ["pA", "pB"],
             }
         ),
         source_path,
@@ -74,6 +81,10 @@ cohorts:
     kind: promoter_metadata
     source: native_full
     derive: regulondb__sigma_factor_set
+  regulondb__sigma_factor_count:
+    kind: promoter_metadata
+    source: native_full
+    derive: regulondb__sigma_factor_count
   regulondb__regulator_composition:
     kind: promoter_metadata
     source: native_full
@@ -90,6 +101,14 @@ cohorts:
     kind: promoter_metadata
     source: native_full
     derive: regulondb__metadata_completeness_class
+  regulondb__source_strata_set:
+    kind: promoter_metadata
+    source: native_full
+    derive: regulondb__source_strata_set
+  regulondb__primary_promoter_name:
+    kind: promoter_metadata
+    source: native_full
+    derive: regulondb__primary_promoter_name
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -109,20 +128,16 @@ cohorts:
     rows = read_table(artifact_dir / "rows.parquet")
     assert "sig35_variant" not in rows.column_names
     assert "regulondb__sigma_factor_set" in rows.column_names
+    assert "regulondb__source_strata_set" in rows.column_names
     assert rows.column("regulondb__regulator_composition").to_pylist() == ["activator", "mixed"]
+    assert rows.column("regulondb__primary_promoter_name").to_pylist() == ["pA", "pB"]
     validation = validate_workspace(workspace_dir, deep=True)
     assert validation["status"] == "ok"
     assert {
         detail["derive"]
         for detail in validation["cohort_details"]
         if detail["source"] == "native_full" and detail["kind"] == "promoter_metadata"
-    } == {
-        "regulondb__sigma_factor_set",
-        "regulondb__regulator_composition",
-        "regulondb__box_pattern",
-        "regulondb__confidence_level_set",
-        "regulondb__metadata_completeness_class",
-    }
+    } == set(REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS)
 
 
 def test_live_regulondb_workspace_declares_representation_health_review_path() -> None:

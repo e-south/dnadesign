@@ -8,39 +8,10 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from ..contracts.errors import ContractViolationError
+from ..contracts.promoter_metadata import PROMOTER_METADATA_INPUT_COLUMNS
 from ..contracts.workspace import PromoterMetadataCohortConfig
 from ..reference_sets import reference_set_required_columns
 from ..workspaces.loader import WorkspaceContext
-
-_PROMOTER_METADATA_INPUT_COLUMNS = (
-    "densegen__plan",
-    "densegen__required_regulators",
-    "densegen__used_tfbs_detail",
-    "source_family",
-    "selection_basis",
-    "view_collections",
-    "role_tags",
-    "usr_label__primary",
-    "template_id",
-    "construct__template_id",
-    "seq_annot__sequence_region_start_0",
-    "seq_annot__sequence_region_end_0",
-    "seq_annot__features",
-    "derived__target_length",
-    "derived__features_retained",
-    "promoter_standard__collection_id",
-    "promoter_standard__promoter_id",
-    "promoter_standard__display_name",
-    "promoter_standard__strength_metric",
-    "promoter_standard__strength_value",
-    "promoter_standard__strength_value_numeric",
-    "promoter_standard__strength_reference",
-    "regulondb__sigma_factor_set",
-    "regulondb__regulator_composition",
-    "regulondb__box_pattern",
-    "regulondb__confidence_level_set",
-    "regulondb__metadata_completeness_class",
-)
 
 
 def _unique_nonempty(values: Iterable[str | None]) -> list[str]:
@@ -147,7 +118,7 @@ def source_backed_view_row_contract(
                 *metadata_dependency_columns,
                 *requested_metadata,
                 *reference_columns,
-                *_PROMOTER_METADATA_INPUT_COLUMNS,
+                *PROMOTER_METADATA_INPUT_COLUMNS,
                 source.context_key,
             ]
         )

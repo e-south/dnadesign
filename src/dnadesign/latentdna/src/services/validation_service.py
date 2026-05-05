@@ -13,6 +13,7 @@ from dnadesign.usr import SequencesError
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls
+from ..contracts.promoter_metadata import PROMOTER_METADATA_ANY_COLUMN_GROUPS, PROMOTER_METADATA_REQUIRED_COLUMNS
 from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
@@ -23,32 +24,6 @@ from ..workspaces.paths import resolve_repo_path
 from ..workspaces.plot_semantics import validate_plot_semantics_sidecars
 from .semantic_validation_service import validate_workspace_sequence_semantics
 
-_PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
-    "design_family": {"densegen__plan", "usr_label__primary"},
-    "design_regulator_composition": {
-        "densegen__plan",
-        "densegen__required_regulators",
-        "usr_label__primary",
-    },
-    "sig35_variant": {"usr_label__primary"},
-    "spacer_length": {"densegen__used_tfbs_detail", "usr_label__primary"},
-    "campaign_prior": {"densegen__plan", "usr_label__primary"},
-    "is_control": {"densegen__plan", "usr_label__primary"},
-    "source_class": {"densegen__plan", "usr_label__primary"},
-    "regulondb__sigma_factor_set": {"regulondb__sigma_factor_set"},
-    "regulondb__regulator_composition": {"regulondb__regulator_composition"},
-    "regulondb__box_pattern": {"regulondb__box_pattern"},
-    "regulondb__confidence_level_set": {"regulondb__confidence_level_set"},
-    "regulondb__metadata_completeness_class": {"regulondb__metadata_completeness_class"},
-}
-_PROMOTER_METADATA_ANY_COLUMN_GROUPS: dict[str, tuple[set[str], ...]] = {
-    "sig35_variant": (
-        {"densegen__plan"},
-        {"densegen__used_tfbs_detail"},
-        {"seq_annot__features"},
-        {"sequence", "derived__features_retained"},
-    ),
-}
 _NON_MATERIALIZABLE_VIEW_ROLES = {"planned", "retired"}
 _OPTIONAL_SOURCE_ROLES = {"planned", "retired"}
 _MISSING_SOURCE_MARKERS = ("not found", "not initialized")
@@ -364,12 +339,12 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             )
             continue
         assert isinstance(cohort, PromoterMetadataCohortConfig)
-        missing = sorted(_PROMOTER_METADATA_REQUIRED_COLUMNS[cohort.derive] - source_columns[cohort.source])
+        missing = sorted(PROMOTER_METADATA_REQUIRED_COLUMNS[cohort.derive] - source_columns[cohort.source])
         if missing:
             raise WorkspaceValidationError(
                 f"cohort {cohort_id} promoter metadata inputs are missing from source {cohort.source}: {missing}"
             )
-        any_groups = _PROMOTER_METADATA_ANY_COLUMN_GROUPS.get(cohort.derive, ())
+        any_groups = PROMOTER_METADATA_ANY_COLUMN_GROUPS.get(cohort.derive, ())
         if any_groups and not any(group.issubset(source_columns[cohort.source]) for group in any_groups):
             rendered_groups = ["{" + ", ".join(sorted(group)) + "}" for group in any_groups]
             raise WorkspaceValidationError(

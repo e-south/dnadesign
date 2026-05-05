@@ -6,10 +6,11 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .notebook import NotebookConfig
 from .plot import PlotConfig
+from .promoter_metadata import PROMOTER_METADATA_DERIVATIONS
 
 Identifier = Annotated[str, Field(min_length=1)]
 NonEmptyText = Annotated[str, Field(min_length=1)]
@@ -327,20 +328,15 @@ class ColumnCohortConfig(StrictWorkspaceModel):
 class PromoterMetadataCohortConfig(StrictWorkspaceModel):
     kind: Literal["promoter_metadata"]
     source: str
-    derive: Literal[
-        "design_family",
-        "design_regulator_composition",
-        "sig35_variant",
-        "spacer_length",
-        "campaign_prior",
-        "is_control",
-        "source_class",
-        "regulondb__sigma_factor_set",
-        "regulondb__regulator_composition",
-        "regulondb__box_pattern",
-        "regulondb__confidence_level_set",
-        "regulondb__metadata_completeness_class",
-    ]
+    derive: str
+
+    @field_validator("derive")
+    @classmethod
+    def _validate_derive(cls, value: str) -> str:
+        if value not in PROMOTER_METADATA_DERIVATIONS:
+            supported = ", ".join(PROMOTER_METADATA_DERIVATIONS)
+            raise ValueError(f"unsupported promoter metadata derivation {value!r}; expected one of: {supported}")
+        return value
 
 
 CohortConfig = Annotated[ColumnCohortConfig | PromoterMetadataCohortConfig, Field(discriminator="kind")]
