@@ -1,7 +1,7 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-02
+**Last verified:** 2026-05-04
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
@@ -45,7 +45,7 @@ Implemented schema slices:
 - Reference sets: optional display `label`, explicit id lists, plus
   selector-backed membership through `where` selectors over row metadata;
   selectors support `equals`, `in_values`, and non-null membership checks.
-- Study binding: optional read-only link to one checked-in dnadesign study record through explicit `study_id` and `docs_root` fields, plus readiness vocabulary used by status surfaces
+- Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the promoter-study status record under `docs/studies/<study-id>` and must contain `campaign.yaml`, `datasets.yaml`, `ops.study.yaml`, and `status.md`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
 - Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
 Current runtime limits:
@@ -83,7 +83,7 @@ Current runtime limits:
   source table's `right_key` and copy one `value_column`, failing by default
   on null keys, duplicate right keys, or missing matches.
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
-- `notebook generate` currently emits one workspace notebook surface per declared `notebooks.<id>`, with `notebooks.<id>.default_deliverable` selecting the initial catalog focus while all plot, run, and manifest browsing stays read-only.
+- `notebook generate` currently emits one workspace notebook surface per declared `notebooks.<id>`, with `notebooks.<id>.default_deliverable` selecting the initial catalog focus while all plot, run, and manifest browsing stays read-only. `notebook smoke` runs both import smoke and `marimo check` so generated notebooks must remain valid marimo DAGs.
 - Notebook controls expose both `reference_labels` for small static callout
   sets and `reference_sets` for selector-backed all/collection/subset modes.
   Reference sets may use `where` for OR-style selector membership and
@@ -118,6 +118,12 @@ Current runtime limits:
   incompatible labels, and `axis.metric_ids` may map the generic outputs onto a
   study-facing metric vocabulary. This keeps study terms such as Sigma-35 in
   workspace config rather than package-level builder selection.
+- `representation_health_summary` computes pairwise cosine-distance summaries
+  after the shared standardize/L2-normalize geometry contract. The builder
+  evaluates all pairs up to `pairwise_max_rows` rows, defaulting to 4096, and
+  otherwise uses a deterministic row sample with `pairwise_seed` so metric
+  generation is bounded and reproducible instead of accidentally allocating an
+  unbounded dense all-pairs matrix.
 - Pre-assay reference-collapse recipes use `reference_alignment_summary` with
   config-declared `reference_sets` when the analysis needs named landmark or
   standard collections. The builder emits group size, median pairwise cosine
@@ -136,7 +142,7 @@ Current runtime limits:
   windows unless observed lengths are exactly 60 bp.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
 - `notebook generate` now refuses to overwrite or regenerate a notebook when the default deliverable has freshness drift; refresh the deliverable or its linked recipe first so the notebook remains a review surface over fresh artifacts.
-- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `merged_anchor_insert` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block.
+- `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `merged_anchor_insert` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block with separate record-plane and deliverable-doc roots.
 - `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
 - `validate workspace --deep` currently performs schema-only pressure checks against declared sources, views, cohorts, landmarks, and the bound study directory without loading embedding payloads.
 - `infer_feature_sidecar` sources expose canonical Infer outputs from
