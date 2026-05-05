@@ -21,6 +21,26 @@ from dnadesign.latentdna.src.scalars.common import _normalized_geometry_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 _PROMOTER_METADATA_HANDLER = "dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value"
+_STRESS_RETENTION_AXES = [
+    {
+        "axis_id": "design_family",
+        "column": "design_family",
+        "metric_id": "design_family_retention_correlation",
+        "exclude_values": ["control"],
+    },
+    {
+        "axis_id": "design_regulator_composition",
+        "column": "design_regulator_composition",
+        "metric_id": "design_regulator_composition_retention_correlation",
+        "exclude_values": ["control"],
+    },
+    {
+        "axis_id": "sigma35",
+        "column": "sig35_variant",
+        "metric_id": "sig35_variant_retention_correlation",
+        "exclude_values": ["control"],
+    },
+]
 
 
 def _write_source(path: Path, rows: list[dict[str, object]]) -> None:
@@ -661,6 +681,7 @@ def test_context_robustness_summary_projects_alignment_metadata_for_retention_me
         builder_kind="context_robustness_summary",
         params={
             "sample_size": 0,
+            "retention_axes": _STRESS_RETENTION_AXES,
             "pairs": [
                 {
                     "pair_id": "anchor_vs_context",
@@ -856,6 +877,7 @@ def test_context_robustness_summary_skips_only_degenerate_axes(tmp_path: Path) -
         builder_kind="context_robustness_summary",
         params={
             "sample_size": 0,
+            "retention_axes": _STRESS_RETENTION_AXES,
             "pairs": [
                 {
                     "pair_id": "anchor_vs_context",
@@ -932,6 +954,7 @@ def test_context_robustness_summary_skips_fully_degenerate_retention_axes(tmp_pa
         builder_kind="context_robustness_summary",
         params={
             "sample_size": 0,
+            "retention_axes": _STRESS_RETENTION_AXES,
             "pairs": [
                 {
                     "pair_id": "anchor_vs_context",
@@ -2077,7 +2100,7 @@ def test_ordinal_axis_audit_supports_numeric_rank_metadata_without_sig35_columns
     assert all(row["ordinal_order_source"] == "strength" for row in rows_table)
 
 
-def test_sigma35_centroid_distance_includes_annotated_unranked_variants(tmp_path: Path) -> None:
+def test_axis_centroid_distance_includes_unranked_axis_values(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     _write_margin_workspace_config(workspace_dir)
@@ -2148,20 +2171,24 @@ def test_sigma35_centroid_distance_includes_annotated_unranked_variants(tmp_path
     artifact = build_scalar_artifact(
         context,
         scalar_id="sigma35_centroid_distance_metrics",
-        builder_kind="sigma35_centroid_distance",
+        builder_kind="axis_centroid_distance",
         params={
             "candidates": [{"view_id": "degenerate_view"}],
-            "sig35_order_path": "study_inputs/sig35_order.yaml",
+            "axis": {
+                "axis_id": "sigma35",
+                "column": "sig35_variant",
+                "order_path": "study_inputs/sig35_order.yaml",
+            },
         },
     )
 
     rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
     labels = {row["row_variant"] for row in rows_table} | {row["column_variant"] for row in rows_table}
 
-    assert "ACCGCG (annotated, unranked)" in labels
+    assert "ACCGCG (unranked)" in labels
     assert any(
-        row["row_variant"] == "ACCGCG (annotated, unranked)"
-        and row["column_variant"] == "ACCGCG (annotated, unranked)"
+        row["row_variant"] == "ACCGCG (unranked)"
+        and row["column_variant"] == "ACCGCG (unranked)"
         and row["metric_value"] == pytest.approx(0.0, abs=1e-6)
         for row in rows_table
     )

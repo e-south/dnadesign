@@ -7,10 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import yaml
 
 from ..contracts.errors import ContractViolationError, MissingArtifactError
-from ..geometry.cohorts import centroid_map, group_indices, ordinal_gap_and_distance_vectors
 from ..geometry.preprocessing import standardize_and_l2_normalize
 from ..labels import humanize_candidate
 from ..metrics.definitions import resolve_metric_definition
@@ -299,99 +297,3 @@ def _load_view_scope_table(
         ScalarInputRef(kind=input_kind, artifact_id=str(artifact_id), path=artifact_path),
     ]
     return np.asarray(matrix, dtype=np.float32), rows_table.to_pylist(), inputs
-
-
-def _load_sig35_order(context: WorkspaceContext, *, relative_path: str) -> dict[str, object]:
-    path = _workspace_input_path(context, relative_path)
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(payload, dict):
-        raise ContractViolationError("sig35 order config must decode to a mapping")
-    order = payload.get("order")
-    if not isinstance(order, list) or not order:
-        raise ContractViolationError("sig35 order config requires a non-empty order list")
-    ranks: dict[str, int] = {}
-    sequences: dict[str, str] = {}
-    for entry in order:
-        if not isinstance(entry, dict):
-            raise ContractViolationError("sig35 order entries must be mappings")
-        variant_id = str(entry.get("variant_id") or "").strip().lower()
-        if not variant_id:
-            raise ContractViolationError("sig35 order entries require variant_id")
-        rank = int(entry.get("rank"))
-        ranks[variant_id] = rank
-        sequence = str(entry.get("sequence") or "").strip().upper()
-        if sequence:
-            sequences[variant_id] = sequence
-    return {
-        "path": path,
-        "source": str(payload.get("source") or "").strip(),
-        "exploratory": bool(payload.get("exploratory", False)),
-        "ranks": ranks,
-        "sequences": sequences,
-    }
-
-
-def _sig35_global_statistics(
-    matrix: np.ndarray,
-    rows: list[dict[str, object]],
-    *,
-    ranks: dict[str, int],
-    group_column: str = "sig35_variant",
-) -> tuple[float, float]:
-    groups = group_indices(rows, column=group_column, exclude_values={"control"}, allowed_values=set(ranks))
-    if len(groups) < 3:
-        return float("nan"), float("nan")
-    centroids = centroid_map(matrix, groups)
-    if len(centroids) < 3:
-        return float("nan"), float("nan")
-    gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=ranks)
-    if gaps.size == 0:
-        return float("nan"), float("nan")
-    return _spearman_correlation(gaps, distances), _kendall_tau(gaps, distances)
-
-
-def _sig35_statistics_from_groups(
-    matrix: np.ndarray,
-    groups: dict[str, list[int]],
-    *,
-    ranks: dict[str, int],
-) -> tuple[float, float]:
-    if len(groups) < 3:
-        return float("nan"), float("nan")
-    centroids = centroid_map(matrix, groups)
-    if len(centroids) < 3:
-        return float("nan"), float("nan")
-    gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=ranks)
-    if gaps.size == 0:
-        return float("nan"), float("nan")
-    return _spearman_correlation(gaps, distances), _kendall_tau(gaps, distances)
-
-
-def _sig35_mean_statistic_within_groups(
-    matrix: np.ndarray,
-    rows: list[dict[str, object]],
-    *,
-    outer_column: str,
-    ranks: dict[str, int],
-) -> float:
-    outer_groups = group_indices(rows, column=outer_column, exclude_values={"control"})
-    return _sig35_mean_statistic_from_outer_groups(matrix, rows, outer_groups=outer_groups, ranks=ranks)
-
-
-def _sig35_mean_statistic_from_outer_groups(
-    matrix: np.ndarray,
-    rows: list[dict[str, object]],
-    *,
-    outer_groups: dict[str, list[int]],
-    ranks: dict[str, int],
-) -> float:
-    statistics: list[float] = []
-    for _, outer_indices in outer_groups.items():
-        outer_rows = [rows[index] for index in outer_indices]
-        outer_matrix = matrix[np.asarray(outer_indices, dtype=np.int64)]
-        spearman, _ = _sig35_global_statistics(outer_matrix, outer_rows, ranks=ranks)
-        if np.isfinite(spearman):
-            statistics.append(float(spearman))
-    if not statistics:
-        return float("nan")
-    return float(np.mean(np.asarray(statistics, dtype=np.float64)))

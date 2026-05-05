@@ -9,7 +9,7 @@ def test_preassay_builder_registry_tracks_active_summary_kinds() -> None:
         "representation_health_summary",
         "design_structure_summary",
         "ordinal_axis_audit",
-        "sigma35_centroid_distance",
+        "axis_centroid_distance",
         "context_robustness_summary",
         "reference_alignment_summary",
     }

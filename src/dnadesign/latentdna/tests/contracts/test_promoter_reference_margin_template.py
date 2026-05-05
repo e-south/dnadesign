@@ -226,7 +226,21 @@ def test_template_uses_background_relative_internal_margins_and_declared_sig35_o
     assert ordinal_axis_params["axis"]["column"] == "sig35_variant"
     assert ordinal_axis_params["axis"]["order_path"] == "inputs/sig35_order.yaml"
     assert ordinal_axis_params["axis"]["metric_ids"]["spearman"] == "sig35_ordinal_spearman"
-    assert pre_assay_steps["build_design_structure_summary_metrics"]["params"]["balance_columns"] == [
+    centroid_distance_params = pre_assay_steps["build_sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp"][
+        "params"
+    ]
+    assert centroid_distance_params["kind"] == "axis_centroid_distance"
+    assert centroid_distance_params["axis"]["axis_id"] == "sigma35"
+    assert centroid_distance_params["axis"]["column"] == "sig35_variant"
+    assert centroid_distance_params["axis"]["order_path"] == "inputs/sig35_order.yaml"
+    design_structure_params = pre_assay_steps["build_design_structure_summary_metrics"]["params"]
+    assert design_structure_params["balanced_axis"]["balance_columns"] == [
+        "sig35_variant",
+        "spacer_length",
+    ]
+    assert [axis["column"] for axis in design_structure_params["axes"]] == [
+        "design_family",
+        "design_regulator_composition",
         "sig35_variant",
         "spacer_length",
     ]

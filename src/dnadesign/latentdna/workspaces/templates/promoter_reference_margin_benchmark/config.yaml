@@ -822,7 +822,19 @@ recipes:
           kind: design_structure_summary
           bootstrap_iterations: 100
           seed: 17
-          balance_columns: [sig35_variant, spacer_length]
+          axes:
+            - {axis_id: design_family, column: design_family, metric_id: design_family_separation_ratio, label: Design-family separation ratio, exclude_values: [control]}
+            - {axis_id: design_regulator_composition, column: design_regulator_composition, metric_id: design_regulator_composition_separation_ratio, label: Regulator-composition separation ratio, exclude_values: [control]}
+            - {axis_id: sigma35, column: sig35_variant, metric_id: sig35_variant_separation_ratio, label: Sigma-35 separation ratio, exclude_values: [control]}
+            - {axis_id: spacer_length, column: spacer_length, metric_id: spacer_length_separation_ratio, label: Spacer-length separation ratio}
+          balanced_axis:
+            axis_id: design_family
+            column: design_family
+            metric_id: design_family_balanced_separation_ratio
+            label: Balanced design-family separation ratio
+            required_group_values: [background_only, ethanol, ciprofloxacin, ethanol_ciprofloxacin]
+            exclude_values: [control]
+            balance_columns: [sig35_variant, spacer_length]
           candidates:
             - {view_id: intermediate_embedding_7b_anchor_60bp, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_60bp}
             - {view_id: output_layer_mean_7b_anchor_60bp, sample_id: scorecard_sample_output_layer_mean_7b_anchor_60bp}
@@ -870,8 +882,13 @@ recipes:
         op: scalar.build
         params:
           scalar: sigma35_centroid_distance_intermediate_embedding_7b_anchor_60bp
-          kind: sigma35_centroid_distance
-          sig35_order_path: inputs/sig35_order.yaml
+          kind: axis_centroid_distance
+          axis: &template_sigma35_centroid_distance_axis
+            axis_id: sigma35
+            label: Sigma-35 variant
+            column: sig35_variant
+            order_path: inputs/sig35_order.yaml
+            exclude_values: [control]
           candidates:
             - {view_id: intermediate_embedding_7b_anchor_60bp}
       - &build_sigma35_centroid_distance_ie7_full
@@ -879,8 +896,8 @@ recipes:
         op: scalar.build
         params:
           scalar: sigma35_centroid_distance_intermediate_embedding_7b_full_context_1kb
-          kind: sigma35_centroid_distance
-          sig35_order_path: inputs/sig35_order.yaml
+          kind: axis_centroid_distance
+          axis: *template_sigma35_centroid_distance_axis
           candidates:
             - {view_id: intermediate_embedding_7b_full_context_1kb}
       - &build_sigma35_centroid_distance_ie7_anchor_mean
@@ -888,8 +905,8 @@ recipes:
         op: scalar.build
         params:
           scalar: sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean
-          kind: sigma35_centroid_distance
-          sig35_order_path: inputs/sig35_order.yaml
+          kind: axis_centroid_distance
+          axis: *template_sigma35_centroid_distance_axis
           candidates:
             - {view_id: intermediate_embedding_7b_full_context_anchor_mean}
       - &context_delta_ie7_anchor_mean
@@ -943,6 +960,10 @@ recipes:
           sample_size: 4096
           sample_group_column: design_family
           seed: 17
+          retention_axes:
+            - {axis_id: design_family, column: design_family, metric_id: design_family_retention_correlation, label: Design-family retention, exclude_values: [control]}
+            - {axis_id: design_regulator_composition, column: design_regulator_composition, metric_id: design_regulator_composition_retention_correlation, label: Regulator-composition retention, exclude_values: [control]}
+            - {axis_id: sigma35, column: sig35_variant, metric_id: sig35_variant_retention_correlation, label: Sigma-35 retention, exclude_values: [control]}
           pairs:
             - {pair_id: intermediate_embedding_7b_anchor_vs_context, label: "7B intermediate: anchor vs 1 kb seq mean", alignment_id: intermediate_embedding_7b_anchor_to_full_context, anchor_view_id: intermediate_embedding_7b_anchor_60bp, context_view_id: intermediate_embedding_7b_full_context_1kb}
             - {pair_id: intermediate_embedding_7b_anchor_vs_anchor_mean, label: "7B intermediate: anchor vs context anchor mean", alignment_id: intermediate_embedding_7b_anchor_to_anchor_mean, anchor_view_id: intermediate_embedding_7b_anchor_60bp, context_view_id: intermediate_embedding_7b_full_context_anchor_mean}

@@ -1,4 +1,4 @@
-"""Pre-assay scalar builders for promoter representation triage."""
+"""Pre-assay scalar builders for representation triage."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from ..geometry.preprocessing import try_l2_normalize_vector
 from ..io.json_io import read_json
 from ..io.parquet_io import write_table
 from ..labels import humanize_label
+from ..metadata_axes import AxisStyle, axis_display_text, axis_style_map_from_config
 from ..reference_sets import resolve_reference_set_rows
 from ..workspaces.loader import WorkspaceContext
 from .common import (
@@ -34,7 +35,6 @@ from .common import (
     _cosine_distance_upper_from_normalized,
     _effective_rank,
     _kendall_tau,
-    _load_sig35_order,
     _load_view_scope_table,
     _metric_row,
     _normalized_geometry_rows,
@@ -98,6 +98,15 @@ class _OrdinalAxis:
     input_ref: ScalarInputRef | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _CohortMetricAxis:
+    axis_id: str
+    column: str
+    metric_id: str
+    exclude_values: set[str]
+    display_name: str | None = None
+
+
 _REPRESENTATION_HEALTH_METRIC_IDS = (
     "effective_rank",
     "pc1_variance_fraction",
@@ -113,6 +122,32 @@ _ORDINAL_AXIS_DEFAULT_METRIC_IDS = {
 }
 
 _ORDINAL_AXIS_DEFAULT_WITHIN_GROUP_METRIC_ID = "ordinal_axis_within_group_mean_spearman"
+
+
+def _cohort_metric_axes(params: dict[str, Any], *, key: str, builder_kind: str) -> list[_CohortMetricAxis]:
+    raw_axes = params.get(key)
+    if not isinstance(raw_axes, list) or not raw_axes:
+        raise ContractViolationError(f"{builder_kind} requires a non-empty {key!r} axis list")
+    axes: list[_CohortMetricAxis] = []
+    for index, raw_axis in enumerate(raw_axes):
+        if not isinstance(raw_axis, dict):
+            raise ContractViolationError(f"{builder_kind} {key}[{index}] must be a mapping")
+        column = str(raw_axis.get("column") or "").strip()
+        metric_id = str(raw_axis.get("metric_id") or "").strip()
+        if not column or not metric_id:
+            raise ContractViolationError(f"{builder_kind} {key}[{index}] requires column and metric_id")
+        axis_id = str(raw_axis.get("axis_id") or column).strip()
+        display_name = str(raw_axis.get("display_name") or raw_axis.get("label") or "").strip() or None
+        axes.append(
+            _CohortMetricAxis(
+                axis_id=axis_id,
+                column=column,
+                metric_id=metric_id,
+                exclude_values={str(value) for value in raw_axis.get("exclude_values", [])},
+                display_name=display_name,
+            )
+        )
+    return axes
 
 
 def _load_candidate_sample(
@@ -339,28 +374,21 @@ def _design_structure_summary_table(
     candidates = [dict(value) for value in _require_param(params, "candidates")]
     bootstrap_iterations = int(_optional_param(params, "bootstrap_iterations", default=200))
     seed = int(_optional_param(params, "seed", default=context.config.defaults.random_seed))
-    balance_columns = [
-        str(value) for value in _optional_param(params, "balance_columns", default=["sig35_variant", "spacer_length"])
-    ]
+    axes = _cohort_metric_axes(params, key="axes", builder_kind="design_structure_summary")
+    balanced_axis = _optional_param(params, "balanced_axis", default=None)
+    if balanced_axis is not None and not isinstance(balanced_axis, dict):
+        raise ContractViolationError("design_structure_summary balanced_axis must be a mapping when provided")
+    balanced_axis = dict(balanced_axis or {})
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
-    synthetic_design_families = {"background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin"}
-    metric_specs = [
-        ("design_family", "design_family_separation_ratio", {"control"}),
-        ("design_regulator_composition", "design_regulator_composition_separation_ratio", {"control"}),
-        ("sig35_variant", "sig35_variant_separation_ratio", {"control"}),
-        ("spacer_length", "spacer_length_separation_ratio", None),
-    ]
     for offset, candidate in enumerate(candidates):
         rng = np.random.default_rng(seed + offset)
         candidate_sample = _load_candidate_sample(context, candidate)
         inputs.extend(candidate_sample.inputs)
         normalized = _normalized_geometry_rows(candidate_sample.matrix)
-        metric_values: dict[str, float] = {}
-        for column, metric_id, exclude_values in metric_specs:
-            groups = group_indices(candidate_sample.rows, column=column, exclude_values=exclude_values)
+        for axis in axes:
+            groups = group_indices(candidate_sample.rows, column=axis.column, exclude_values=axis.exclude_values)
             value = separation_ratio_from_groups(normalized, groups)
-            metric_values[metric_id] = value
             ci_lower, ci_upper = bootstrap_ci(
                 lambda groups=groups, rng=rng: separation_ratio_from_groups(
                     normalized,
@@ -371,52 +399,83 @@ def _design_structure_summary_table(
             rows.append(
                 _metric_row(
                     descriptor=candidate_sample.descriptor,
-                    metric_id=metric_id,
+                    metric_id=axis.metric_id,
                     metric_value=value,
                     ci_lower=ci_lower,
                     ci_upper=ci_upper,
+                    category=axis.axis_id,
+                    extra={
+                        "cohort_axis_id": axis.axis_id,
+                        "cohort_column": axis.column,
+                        **({"display_name": axis.display_name} if axis.display_name is not None else {}),
+                    },
                 )
             )
 
-        balanced_groups = balanced_group_indices(
-            candidate_sample.rows,
-            group_column="design_family",
-            balance_columns=balance_columns,
-            required_group_values=synthetic_design_families,
-            exclude_group_values={"control"},
-            rng=rng,
-        )
-        balanced_value = separation_ratio_from_groups(normalized, balanced_groups)
-        metric_values["design_family_balanced_separation_ratio"] = balanced_value
-        ci_lower, ci_upper = bootstrap_ci(
-            lambda rng=rng: separation_ratio_from_groups(
-                normalized,
-                balanced_group_indices(
-                    candidate_sample.rows,
-                    group_column="design_family",
-                    balance_columns=balance_columns,
-                    required_group_values=synthetic_design_families,
-                    exclude_group_values={"control"},
-                    rng=rng,
-                ),
-            ),
-            iterations=bootstrap_iterations,
-        )
-        rows.append(
-            _metric_row(
-                descriptor=candidate_sample.descriptor,
-                metric_id="design_family_balanced_separation_ratio",
-                metric_value=balanced_value,
-                ci_lower=ci_lower,
-                ci_upper=ci_upper,
-                extra={
-                    "spacer_length_dominates_design_family": bool(
-                        metric_values.get("spacer_length_separation_ratio", float("-inf")) > balanced_value
-                    )
-                },
+        if balanced_axis:
+            balanced_column = str(_require_param(balanced_axis, "column"))
+            balanced_metric_id = str(_require_param(balanced_axis, "metric_id"))
+            balance_columns = [str(value) for value in _require_param(balanced_axis, "balance_columns")]
+            balanced_groups = balanced_group_indices(
+                candidate_sample.rows,
+                group_column=balanced_column,
+                balance_columns=balance_columns,
+                required_group_values={
+                    str(value) for value in _optional_param(balanced_axis, "required_group_values", default=[])
+                }
+                or None,
+                exclude_group_values={
+                    str(value) for value in _optional_param(balanced_axis, "exclude_values", default=[])
+                }
+                or None,
+                rng=rng,
             )
-        )
-    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
+            balanced_value = separation_ratio_from_groups(normalized, balanced_groups)
+            ci_lower, ci_upper = bootstrap_ci(
+                lambda rng=rng: separation_ratio_from_groups(
+                    normalized,
+                    balanced_group_indices(
+                        candidate_sample.rows,
+                        group_column=balanced_column,
+                        balance_columns=balance_columns,
+                        required_group_values={
+                            str(value) for value in _optional_param(balanced_axis, "required_group_values", default=[])
+                        }
+                        or None,
+                        exclude_group_values={
+                            str(value) for value in _optional_param(balanced_axis, "exclude_values", default=[])
+                        }
+                        or None,
+                        rng=rng,
+                    ),
+                ),
+                iterations=bootstrap_iterations,
+            )
+            display_name = str(
+                _optional_param(balanced_axis, "display_name", default=_optional_param(balanced_axis, "label")) or ""
+            ).strip()
+            rows.append(
+                _metric_row(
+                    descriptor=candidate_sample.descriptor,
+                    metric_id=balanced_metric_id,
+                    metric_value=balanced_value,
+                    ci_lower=ci_lower,
+                    ci_upper=ci_upper,
+                    category=str(_optional_param(balanced_axis, "axis_id", default=balanced_column) or balanced_column),
+                    extra={
+                        "cohort_axis_id": str(
+                            _optional_param(balanced_axis, "axis_id", default=balanced_column) or balanced_column
+                        ),
+                        "cohort_column": balanced_column,
+                        **({"display_name": display_name} if display_name else {}),
+                    },
+                )
+            )
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {"candidate_count": len(candidates), "axis_count": len(axes) + int(bool(balanced_axis)), "rows": len(rows)},
+    )
 
 
 def _cohort_structure_summary_table(
@@ -672,6 +731,23 @@ def _ordinal_axis_extra(axis: _OrdinalAxis) -> dict[str, object]:
     }
 
 
+def _axis_style_for_column(context: WorkspaceContext, column: str) -> AxisStyle | None:
+    return axis_style_map_from_config(context.config).get(column)
+
+
+def _axis_metric_label(
+    context: WorkspaceContext,
+    *,
+    column: str,
+    metric_id: str,
+    axis_config: dict[str, Any],
+) -> str | None:
+    configured = dict(_optional_param(axis_config, "metric_labels", default={}) or {})
+    style = _axis_style_for_column(context, column)
+    labels = {**(style.metric_labels if style is not None else {}), **{str(k): str(v) for k, v in configured.items()}}
+    return labels.get(metric_id)
+
+
 def _ordinal_axis_audit_table(
     context: WorkspaceContext,
     params: dict[str, Any],
@@ -697,6 +773,12 @@ def _ordinal_axis_audit_table(
         if axis.input_ref is not None and axis.input_ref not in inputs:
             inputs.append(axis.input_ref)
         axis_extra = _ordinal_axis_extra(axis)
+
+        def metric_label(metric_id: str) -> str | None:
+            return _axis_metric_label(context, column=axis.column, metric_id=metric_id, axis_config=axis_config)
+
+        spearman_display_name = metric_label(metric_ids["spearman"])
+        kendall_display_name = metric_label(metric_ids["kendall"])
         global_spearman, global_kendall = _ordinal_global_statistics(normalized, candidate_sample.rows, axis=axis)
         global_groups = group_indices(
             candidate_sample.rows,
@@ -719,7 +801,10 @@ def _ordinal_axis_audit_table(
                 metric_value=global_spearman,
                 ci_lower=ci_lower,
                 ci_upper=ci_upper,
-                extra=axis_extra,
+                extra={
+                    **axis_extra,
+                    **({"display_name": spearman_display_name} if spearman_display_name else {}),
+                },
             )
         )
         rows.append(
@@ -727,7 +812,10 @@ def _ordinal_axis_audit_table(
                 descriptor=candidate_sample.descriptor,
                 metric_id=metric_ids["kendall"],
                 metric_value=global_kendall,
-                extra=axis_extra,
+                extra={
+                    **axis_extra,
+                    **({"display_name": kendall_display_name} if kendall_display_name else {}),
+                },
             )
         )
 
@@ -759,7 +847,14 @@ def _ordinal_axis_audit_table(
                 metric_value=balanced_spearman,
                 ci_lower=ci_lower,
                 ci_upper=ci_upper,
-                extra=axis_extra,
+                extra={
+                    **axis_extra,
+                    **(
+                        {"display_name": metric_label(metric_ids["balanced_spearman"])}
+                        if metric_label(metric_ids["balanced_spearman"])
+                        else {}
+                    ),
+                },
             )
         )
 
@@ -806,6 +901,7 @@ def _ordinal_axis_audit_table(
                     extra={
                         **axis_extra,
                         "ordinal_within_group_column": outer_column,
+                        **({"display_name": metric_label(metric_id)} if metric_label(metric_id) else {}),
                     },
                 )
             )
@@ -834,7 +930,14 @@ def _ordinal_axis_audit_table(
                 descriptor=candidate_sample.descriptor,
                 metric_id=metric_ids["permutation_pvalue"],
                 metric_value=permutation_pvalue,
-                extra=axis_extra,
+                extra={
+                    **axis_extra,
+                    **(
+                        {"display_name": metric_label(metric_ids["permutation_pvalue"])}
+                        if metric_label(metric_ids["permutation_pvalue"])
+                        else {}
+                    ),
+                },
             )
         )
     return (
@@ -859,11 +962,7 @@ def _context_robustness_summary_table(
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
     skipped_metric_ids: list[str] = []
-    axes = [
-        ("design_family", "design_family_retention_correlation", {"control"}),
-        ("design_regulator_composition", "design_regulator_composition_retention_correlation", {"control"}),
-        ("sig35_variant", "sig35_variant_retention_correlation", {"control"}),
-    ]
+    axes = _cohort_metric_axes(params, key="retention_axes", builder_kind="context_robustness_summary")
     for offset, pair in enumerate(pairs):
         alignment_id = str(_require_param(pair, "alignment_id"))
         left_view_id = str(_require_param(pair, "anchor_view_id"))
@@ -911,19 +1010,31 @@ def _context_robustness_summary_table(
                 metric_value=float(np.median(self_cosine)),
             )
         )
-        for column, metric_id, exclude_values in axes:
+        for axis in axes:
             anchor_vector, context_vector = aligned_cohort_distance_vectors(
                 left_norm,
                 right_norm,
                 metadata_rows,
-                column=column,
-                exclude_values=exclude_values,
+                column=axis.column,
+                exclude_values=axis.exclude_values,
             )
             if anchor_vector.size == 0 or context_vector.size == 0:
-                skipped_metric_ids.append(metric_id)
+                skipped_metric_ids.append(axis.metric_id)
                 continue
             retention = _pearson_correlation(anchor_vector, context_vector)
-            rows.append(_metric_row(descriptor=descriptor, metric_id=metric_id, metric_value=retention))
+            rows.append(
+                _metric_row(
+                    descriptor=descriptor,
+                    metric_id=axis.metric_id,
+                    metric_value=retention,
+                    category=axis.axis_id,
+                    extra={
+                        "cohort_axis_id": axis.axis_id,
+                        "cohort_column": axis.column,
+                        **({"display_name": axis.display_name} if axis.display_name is not None else {}),
+                    },
+                )
+            )
     return (
         pa.Table.from_pylist(rows),
         inputs,
@@ -1406,56 +1517,55 @@ def _candidate_decision_frontier_table(
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(rows), "rows": len(rows)}
 
 
-def _sigma35_centroid_distance_table(
+def _axis_centroid_distance_table(
     context: WorkspaceContext,
     params: dict[str, Any],
 ) -> ScalarBuilderResult:
     candidates = [dict(value) for value in _require_param(params, "candidates")]
-    sig35_order_path = str(_require_param(params, "sig35_order_path"))
+    axis_config = dict(_require_param(params, "axis"))
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
-    order_config = _load_sig35_order(context, relative_path=sig35_order_path)
-    inputs.append(ScalarInputRef(kind="workspace_input", artifact_id="sig35_order", path=order_config["path"]))
-    ranks = dict(order_config["ranks"])
-    sequences = dict(order_config["sequences"])
     for candidate in candidates:
         candidate_sample = _load_candidate_sample(context, candidate)
         inputs.extend(candidate_sample.inputs)
         normalized = _normalized_geometry_rows(candidate_sample.matrix)
+        axis = _resolve_ordinal_axis(context, axis=axis_config, rows=candidate_sample.rows)
+        if axis.input_ref is not None and axis.input_ref not in inputs:
+            inputs.append(axis.input_ref)
+        style = _axis_style_for_column(context, axis.column)
         groups = group_indices(
             candidate_sample.rows,
-            column="sig35_variant",
-            exclude_values={"control"},
+            column=axis.column,
+            exclude_values=axis.exclude_values,
         )
-        unranked_variants = sorted(set(groups) - set(ranks), key=str.casefold)
-        ordered_variants = [
-            variant for variant, _ in sorted(ranks.items(), key=lambda item: int(item[1])) if variant in groups
+        unranked_values = sorted(set(groups) - set(axis.ranks), key=str.casefold)
+        ordered_values = [
+            value for value, _ in sorted(axis.ranks.items(), key=lambda item: float(item[1])) if value in groups
         ]
-        ordered_variants.extend(unranked_variants)
-        variant_labels = {
-            variant: f"{sequences[variant]} ({variant})"
-            for variant in ordered_variants
-            if variant in sequences and sequences[variant]
+        ordered_values.extend(unranked_values)
+        value_labels = {
+            value: (
+                f"{axis_display_text(style, value)} (unranked)"
+                if value in unranked_values
+                else axis_display_text(style, value)
+            )
+            for value in ordered_values
         }
-        variant_labels.update(
-            {
-                variant: f"{variant} (annotated, unranked)" if variant in unranked_variants else f"variant {variant}"
-                for variant in ordered_variants
-                if variant not in variant_labels
-            }
-        )
         centroids = centroid_map(normalized, groups)
-        for row_variant in ordered_variants:
-            for column_variant in ordered_variants:
+        for row_value in ordered_values:
+            for column_value in ordered_values:
                 value = float("nan")
-                if row_variant in centroids and column_variant in centroids:
-                    value = 1.0 - float(np.dot(centroids[row_variant], centroids[column_variant]))
+                if row_value in centroids and column_value in centroids:
+                    value = 1.0 - float(np.dot(centroids[row_value], centroids[column_value]))
                 rows.append(
                     {
                         **candidate_sample.descriptor,
-                        "row_variant": variant_labels[row_variant],
-                        "column_variant": variant_labels[column_variant],
+                        "row_axis_value": row_value,
+                        "column_axis_value": column_value,
+                        "row_variant": value_labels[row_value],
+                        "column_variant": value_labels[column_value],
                         "metric_value": value,
+                        **_ordinal_axis_extra(axis),
                     }
                 )
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidates), "rows": len(rows)}
@@ -1512,7 +1622,7 @@ _PREASSAY_BUILDERS: dict[str, ScalarTableBuilder] = {
     "context_pair_summary": _context_pair_summary_table,
     "reference_alignment_summary": _reference_alignment_summary_table,
     "candidate_decision_frontier": _candidate_decision_frontier_table,
-    "sigma35_centroid_distance": _sigma35_centroid_distance_table,
+    "axis_centroid_distance": _axis_centroid_distance_table,
 }
 
 PREASSAY_BUILDER_KINDS = frozenset(_PREASSAY_BUILDERS)

@@ -1271,6 +1271,7 @@ def _representation_scorecard_table(
     ethanol_values: set[str],
     cipro_values: set[str],
     dual_values: set[str],
+    neighbor_label_enrichments: list[dict[str, str]] | None = None,
 ) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object]]:
     validate_metric_registry()
     output_rows: list[dict[str, object]] = []
@@ -1434,18 +1435,24 @@ def _representation_scorecard_table(
                 raise ContractViolationError(
                     f"neighbor artifact {neighbors_id!r} row count does not match its neighbor index matrix"
                 )
-            candidate_metrics["knn_design_family_enrichment_delta"] = _neighbor_label_enrichment(
-                rows_table,
-                indices,
-                label_column="design_family",
-            )
-            if "sig35_variant" not in rows_table.column_names:
-                raise ContractViolationError("neighbor rows are missing canonical sigma axis 'sig35_variant'")
-            candidate_metrics["knn_sig35_enrichment_delta"] = _neighbor_label_enrichment(
-                rows_table,
-                indices,
-                label_column="sig35_variant",
-            )
+            enrichment_specs = neighbor_label_enrichments or [
+                {
+                    "label_column": "design_family",
+                    "metric_name": "knn_design_family_enrichment_delta",
+                }
+            ]
+            for enrichment_spec in enrichment_specs:
+                enrichment_label_column = str(_require_param(enrichment_spec, "label_column"))
+                enrichment_metric_name = str(_require_param(enrichment_spec, "metric_name", "metric_id"))
+                if enrichment_label_column not in rows_table.column_names:
+                    raise ContractViolationError(
+                        f"neighbor rows are missing configured label enrichment column {enrichment_label_column!r}"
+                    )
+                candidate_metrics[enrichment_metric_name] = _neighbor_label_enrichment(
+                    rows_table,
+                    indices,
+                    label_column=enrichment_label_column,
+                )
             candidate_metrics.update(
                 _reference_neighbor_metrics(
                     rows_table.to_pylist(),
@@ -1839,6 +1846,10 @@ def build_scalar_artifact(
             dual_values={
                 str(value) for value in _optional_param(params, "dual_values", default=["ethanol_ciprofloxacin"])
             },
+            neighbor_label_enrichments=[
+                {str(key): str(value) for key, value in dict(item).items()}
+                for item in _optional_param(params, "neighbor_label_enrichments", default=[])
+            ],
         )
         write_table(table, artifact_dir / "table.parquet")
         return BuiltScalarArtifact(

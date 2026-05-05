@@ -88,6 +88,8 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
     assert controls.geometry_controls.default_layout == "candidate_grid"
+    candidate_grid_layout = next(row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid")
+    assert candidate_grid_layout.view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     assert [row.candidate_set_id for row in controls.geometry_controls.candidate_sets] == [
         "first_class_intermediate_7b",
         "expanded_reference_intermediate_7b",
@@ -409,6 +411,9 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     centroid_distance_anchor_mean = pre_assay_steps[
         "build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean"
     ]
+    assert centroid_distance_anchor.params["kind"] == "axis_centroid_distance"
+    assert centroid_distance_anchor.params["axis"]["axis_id"] == "sigma35"
+    assert centroid_distance_anchor.params["axis"]["column"] == "sig35_variant"
     assert "sample_id" not in centroid_distance_anchor.params
     assert "sample_id" not in centroid_distance_anchor_mean.params
     assert (
