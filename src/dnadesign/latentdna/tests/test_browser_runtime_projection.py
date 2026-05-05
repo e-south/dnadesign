@@ -13,6 +13,63 @@ import pytest
 
 from dnadesign.latentdna.src.notebooks import browser_runtime_projection as projection_runtime
 
+SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
+SIGMA35_AXIS_STYLES = {
+    "sig35_variant": {
+        "axis_id": "sigma35",
+        "column": "sig35_variant",
+        "label": "Sigma-35 variant",
+        "kind": "categorical",
+        "category_order": ["f", "e", "d", "c", "b", "control"],
+        "display_labels": {
+            "f": "TTGACA (f)",
+            "e": "TAGACA (e)",
+            "d": "TTTACA (d)",
+            "c": "TTGTGA (c)",
+            "b": "CTGACA (b)",
+            "control": "Control",
+        },
+        "category_colors": {
+            "f": "#B2182B",
+            "e": "#D6604D",
+            "d": "#F4A582",
+            "c": "#92C5DE",
+            "b": "#2166AC",
+            "control": "#7F8894",
+        },
+        "noncanonical_bucket": SIGMA35_NONCANONICAL_BUCKET,
+        "noncanonical_label": "Reference/other",
+        "include_noncanonical_in_legend": False,
+        "canonical_row_match": "any",
+        "canonical_row_selectors": [
+            {"column": "source_class", "in_values": ["densegen"]},
+            {"column": "source_family", "in_values": ["densegen_generated"]},
+        ],
+    }
+}
+REGULATOR_AXIS_STYLES = {
+    "design_regulator_composition": {
+        "axis_id": "regulator_composition",
+        "column": "design_regulator_composition",
+        "label": "Reg. comp.",
+        "kind": "categorical",
+        "category_order": [
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA",
+            "sig35=b",
+            "cpxR_MANWWHTTTAM",
+            "control",
+            "lexA_CTGTATAWAWWHACA",
+        ],
+        "display_labels": {
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA": "BaeR+LexA",
+            "cpxR_MANWWHTTTAM": "CpxR",
+            "lexA_CTGTATAWAWWHACA": "LexA",
+            "sig35=b": "Bg",
+            "control": "Ctrl",
+        },
+    }
+}
+
 
 def _panel_offsets(fig) -> list[tuple[float, float]]:
     offsets: list[tuple[float, float]] = []
@@ -124,6 +181,36 @@ def test_render_projection_grid_suppresses_degenerate_continuous_colorbar(monkey
         plt.close(fig)
 
 
+def test_render_projection_grid_renders_full_population_for_large_browser_frames(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    row_count = 30_001
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(row_count, dtype=float),
+            "y": np.arange(row_count, dtype=float),
+        }
+    )
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "demo", "projection_id": "umap_demo", "title": "Demo"}],
+        frames=[frame],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        offsets = _panel_offsets(fig)
+        assert len(offsets) == row_count
+        assert offsets[0] == (0.0, 0.0)
+        assert offsets[-1] == (float(row_count - 1), float(row_count - 1))
+    finally:
+        plt.close(fig)
+
+
 def test_render_projection_grid_compacts_regulator_composition_legend(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
 
@@ -151,6 +238,7 @@ def test_render_projection_grid_compacts_regulator_composition_legend(monkeypatc
         reference_labels=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=REGULATOR_AXIS_STYLES,
     )
 
     try:
@@ -184,6 +272,7 @@ def test_render_projection_grid_orders_sig35_legend_by_strength(monkeypatch, tmp
         reference_labels=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=SIGMA35_AXIS_STYLES,
     )
 
     try:
@@ -221,6 +310,7 @@ def test_render_projection_grid_keeps_reference_sig35_rows_neutral_and_out_of_le
         reference_labels=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=SIGMA35_AXIS_STYLES,
     )
 
     try:
@@ -245,13 +335,13 @@ def test_projection_sig35_hue_keeps_context_derived_densegen_rows_categorical() 
         }
     )
 
-    series = projection_runtime._categorical_hue_series(frame, "sig35_variant")
+    series = projection_runtime._categorical_hue_series(frame, "sig35_variant", axis_styles=SIGMA35_AXIS_STYLES)
 
     assert series.tolist() == [
         "f",
         "b",
-        projection_runtime.NONCANONICAL_SIG35_CATEGORY,
-        projection_runtime.NONCANONICAL_SIG35_CATEGORY,
+        SIGMA35_NONCANONICAL_BUCKET,
+        SIGMA35_NONCANONICAL_BUCKET,
     ]
 
 
@@ -284,6 +374,7 @@ def test_render_projection_grid_draws_reference_stars_as_hue_independent_overlay
         reference_labels=["J23105_core60", "W1_core60"],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=SIGMA35_AXIS_STYLES,
     )
 
     try:

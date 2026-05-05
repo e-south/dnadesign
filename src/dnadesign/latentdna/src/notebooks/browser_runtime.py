@@ -93,6 +93,7 @@ class BrowserCatalog:
 
 @dataclass(frozen=True)
 class BrowserGeometry:
+    axis_styles: dict[str, dict[str, object]]
     candidate_sets: list[dict[str, object]]
     compare_left_default: str
     compare_metrics: dict[str, object]
@@ -655,6 +656,11 @@ def build_workspace_browser_runtime(
     preferred_hues = [str(item) for item in geometry_control.get("preferred_hues", []) if isinstance(item, str)]
     row_metadata_hues = [str(item) for item in geometry_control.get("row_metadata_hues", []) if isinstance(item, str)]
     configured_hue_kinds = geometry_control.get("hue_kinds", {})
+    axis_styles = {
+        str(column): style
+        for column, style in dict(geometry_control.get("axis_styles", {}) or {}).items()
+        if isinstance(style, dict)
+    }
     reference_labels = [str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)]
     reference_sets = [
         row
@@ -740,11 +746,13 @@ def build_workspace_browser_runtime(
         render_plot_review_surface,
         output_root=output_root,
         workspace_dir=workspace_dir,
+        axis_styles=axis_styles,
     )
     render_projection_grid_for_workspace = partial(
         render_projection_grid,
         output_root=output_root,
         workspace_dir=workspace_dir,
+        axis_styles=axis_styles,
     )
     compare_pair_payload_for_output = partial(compare_pair_payload, output_root=output_root)
     plot_review = _plot_review_sections(
@@ -781,6 +789,7 @@ def build_workspace_browser_runtime(
             section_names=section_names,
         ),
         geometry=BrowserGeometry(
+            axis_styles=axis_styles,
             candidate_sets=candidate_sets,
             compare_left_default=str(geometry_control.get("default_compare_left") or ""),
             compare_metrics=compare_metrics if isinstance(compare_metrics, dict) else {},
@@ -811,8 +820,8 @@ def build_workspace_browser_runtime(
         support=BrowserSupport(
             available_hues_for_frames=available_hues_for_frames,
             candidate_hue_columns=candidate_hue_columns,
-            category_color_map=category_color_map,
-            display_hue_label=display_hue_label,
+            category_color_map=partial(category_color_map, axis_styles=axis_styles),
+            display_hue_label=partial(display_hue_label, axis_styles=axis_styles),
             json=json,
             key_value_table=key_value_table,
             load_json=load_json,

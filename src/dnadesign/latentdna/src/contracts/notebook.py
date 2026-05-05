@@ -30,6 +30,7 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     geometry_order: list[str] = Field(default_factory=list)
     candidate_grid_views: list[str] = Field(default_factory=list)
     candidate_grid_panel_titles: list[str] = Field(default_factory=list)
+    show_missing_projection_placeholders: bool = False
     preferred_hues: list[str] = Field(default_factory=list)
     preferred_hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
     default_layout: str | None = None
@@ -110,6 +111,25 @@ class WorkspaceNotebookCompareMetrics(StrictNotebookModel):
     knn_k: int
 
 
+class WorkspaceNotebookAxisStyle(StrictNotebookModel):
+    axis_id: str
+    column: str
+    label: str | None = None
+    kind: HueKind | None = None
+    category_order: list[str] = Field(default_factory=list)
+    display_labels: dict[str, str] = Field(default_factory=dict)
+    compact_display_labels: dict[str, str] = Field(default_factory=dict)
+    category_colors: dict[str, str] = Field(default_factory=dict)
+    ordinal_subset: list[str] = Field(default_factory=list)
+    metric_labels: dict[str, str] = Field(default_factory=dict)
+    noncanonical_bucket: str | None = None
+    noncanonical_label: str | None = None
+    include_noncanonical_in_legend: bool = False
+    canonical_row_selectors: list[dict[str, object]] = Field(default_factory=list)
+    canonical_row_match: str = "any"
+    canonical_values: list[str] = Field(default_factory=list)
+
+
 class WorkspaceNotebookCandidateView(StrictNotebookModel):
     view_id: str
     label: str
@@ -148,6 +168,7 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     preferred_hues: list[str]
     row_metadata_hues: list[str] = Field(default_factory=list)
     hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
+    axis_styles: dict[str, WorkspaceNotebookAxisStyle] = Field(default_factory=dict)
     joinable_tables: list[WorkspaceNotebookTableRef]
     layout_presets: list[WorkspaceNotebookLayoutPreset]
     comparison_bases: list[WorkspaceNotebookComparisonBasis]

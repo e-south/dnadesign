@@ -12,6 +12,63 @@ from dnadesign.latentdna.src.notebooks import browser_runtime_plot_review as plo
 from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime_support
 from dnadesign.latentdna.src.notebooks.browser_runtime_plot_review import render_plot_review_surface
 
+SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
+SIGMA35_AXIS_STYLES = {
+    "sig35_variant": {
+        "axis_id": "sigma35",
+        "column": "sig35_variant",
+        "label": "Sigma-35 variant",
+        "kind": "categorical",
+        "category_order": ["f", "e", "d", "c", "b", "control"],
+        "display_labels": {
+            "f": "TTGACA (f)",
+            "e": "TAGACA (e)",
+            "d": "TTTACA (d)",
+            "c": "TTGTGA (c)",
+            "b": "CTGACA (b)",
+            "control": "Control",
+        },
+        "category_colors": {
+            "f": "#B2182B",
+            "e": "#D6604D",
+            "d": "#F4A582",
+            "c": "#92C5DE",
+            "b": "#2166AC",
+            "control": "#7F8894",
+        },
+        "noncanonical_bucket": SIGMA35_NONCANONICAL_BUCKET,
+        "noncanonical_label": "Reference/other",
+        "include_noncanonical_in_legend": False,
+        "canonical_row_match": "any",
+        "canonical_row_selectors": [
+            {"column": "source_class", "in_values": ["densegen"]},
+            {"column": "source_family", "in_values": ["densegen_generated"]},
+        ],
+    }
+}
+REGULATOR_AXIS_STYLES = {
+    "design_regulator_composition": {
+        "axis_id": "regulator_composition",
+        "column": "design_regulator_composition",
+        "label": "Reg. comp.",
+        "kind": "categorical",
+        "category_order": [
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA",
+            "sig35=b",
+            "cpxR_MANWWHTTTAM",
+            "control",
+            "lexA_CTGTATAWAWWHACA",
+        ],
+        "display_labels": {
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA": "BaeR+LexA",
+            "cpxR_MANWWHTTTAM": "CpxR",
+            "lexA_CTGTATAWAWWHACA": "LexA",
+            "sig35=b": "Bg",
+            "control": "Ctrl",
+        },
+    }
+}
+
 
 def _decode_svg_markup(rendered: mo.Html) -> str:
     match = re.search(r"data:image/svg\+xml;base64,([^']+)", rendered.text)
@@ -178,6 +235,7 @@ def test_render_plot_review_surface_compacts_regulator_composition_legend(monkey
         joinable_tables=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=REGULATOR_AXIS_STYLES,
     )
 
     assert isinstance(rendered, mo.Html)
@@ -216,6 +274,7 @@ def test_render_plot_review_surface_orders_sig35_legend_by_strength(monkeypatch,
         joinable_tables=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=SIGMA35_AXIS_STYLES,
     )
 
     try:
@@ -243,13 +302,13 @@ def test_plot_review_sig35_hue_keeps_context_derived_densegen_rows_categorical()
         }
     )
 
-    series = plot_review_runtime._categorical_hue_series(frame, "sig35_variant")
+    series = plot_review_runtime._categorical_hue_series(frame, "sig35_variant", axis_styles=SIGMA35_AXIS_STYLES)
 
     assert series.tolist() == [
         "f",
         "b",
-        plot_review_runtime.NONCANONICAL_SIG35_CATEGORY,
-        plot_review_runtime.NONCANONICAL_SIG35_CATEGORY,
+        SIGMA35_NONCANONICAL_BUCKET,
+        SIGMA35_NONCANONICAL_BUCKET,
     ]
 
 
@@ -331,6 +390,8 @@ def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_
             "metric_columns": ["sig35_margin_f_vs_b"],
             "color_column": "sig35_variant",
             "render_mode": "violin_box",
+            "single_row_panels": True,
+            "square_panels": True,
         },
         frames=frames,
         hue_column=None,
@@ -338,6 +399,7 @@ def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_
         joinable_tables=[],
         output_root=tmp_path,
         workspace_dir=tmp_path,
+        axis_styles=SIGMA35_AXIS_STYLES,
     )
 
     try:

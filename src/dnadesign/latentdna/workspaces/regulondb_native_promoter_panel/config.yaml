@@ -383,14 +383,10 @@ notebooks:
       - output_layer_mean_7b_core60_tss_upstream
     candidate_grid_views:
       - intermediate_embedding_7b_native_source_record_seq_mean
-      - output_layer_mean_7b_native_source_record_seq_mean
       - intermediate_embedding_7b_core60_tss_upstream
-      - output_layer_mean_7b_core60_tss_upstream
     candidate_grid_panel_titles:
       - Native source-record intermediate
-      - Native source-record output layer
       - Core60 TSS-upstream intermediate
-      - Core60 TSS-upstream output layer
     preferred_hues:
       - regulondb__sigma_factor_set
       - regulondb__confidence_level_set

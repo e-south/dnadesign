@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from ..contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
+from ..metadata_axes import axis_display_text, axis_style_map_from_payload
 from ..plots.render import (
     _category_color_map as static_category_color_map,
 )
@@ -30,15 +31,10 @@ from ..plots.render import (
     _panel_grid_dimensions as static_panel_grid_dimensions,
 )
 from ..visual_style import (
-    NONCANONICAL_SIG35_CATEGORY,
     TEXT_COLOR,
     compact_candidate_title,
-    display_category_text,
     humanize_display_text,
-    is_sig35_legend_category,
     legend_layout,
-    normalize_sig35_hue_category_for_row,
-    ordered_categories,
     wrap_plot_title,
 )
 from ..visual_style import scatter_style as shared_scatter_style
@@ -47,6 +43,7 @@ from .browser_runtime_support import (
     category_color_map as notebook_category_color_map,
 )
 from .browser_runtime_support import (
+    category_values_for_legend,
     classify_hue_series,
     continuous_hue_render_params,
     display_hue_label,
@@ -64,9 +61,6 @@ _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
     {
         "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
-        "sigma35_margin_ladder_gallery",
-        "sigma35_stress_margin_gallery",
-        "sigma35_centroid_distance_gallery",
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     }
@@ -167,7 +161,9 @@ def load_plot_review_frames(
     return []
 
 
-def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int) -> bool:
+def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int, *, configured: object = None) -> bool:
+    if configured is not None:
+        return bool(configured) and 1 < panel_count <= 4
     return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 4)
 
 
@@ -261,36 +257,32 @@ def _continuous_hue_params(frames: list[pd.DataFrame], hue_column: str) -> dict[
     return continuous_hue_render_params(hue_column, combined)
 
 
-def _categorical_hue_values(frames: list[pd.DataFrame], hue_column: str) -> list[str]:
-    categories = ordered_categories(
-        {
-            str(value)
-            for frame in frames
-            if hue_column in frame.columns
-            for value in _categorical_hue_series(frame, hue_column).unique()
-        },
-        column=hue_column,
-    )
-    if hue_column == "sig35_variant":
-        return [category for category in categories if is_sig35_legend_category(category)]
-    return categories
+def _categorical_hue_values(
+    frames: list[pd.DataFrame],
+    hue_column: str,
+    *,
+    axis_styles: dict[str, object] | None = None,
+) -> list[str]:
+    categories = [
+        str(value)
+        for frame in frames
+        if hue_column in frame.columns
+        for value in _categorical_hue_series(frame, hue_column, axis_styles=axis_styles).unique()
+    ]
+    return category_values_for_legend(categories, column=hue_column, axis_styles=axis_styles)
 
 
-def _categorical_hue_series(frame: pd.DataFrame, hue_column: str) -> pd.Series:
-    hue_series = normalize_categorical_hue_series(hue_column, frame[hue_column])
-    if hue_column != "sig35_variant":
-        return hue_series
-    discriminator_columns = [column for column in ("source_class", "source_family") if column in frame.columns]
-    if not discriminator_columns:
-        return hue_series
-    discriminator_frame = frame[discriminator_columns]
-    return pd.Series(
-        [
-            normalize_sig35_hue_category_for_row(row, value)
-            for row, value in zip(discriminator_frame.to_dict("records"), frame[hue_column], strict=False)
-        ],
-        index=frame.index,
-        dtype="object",
+def _categorical_hue_series(
+    frame: pd.DataFrame,
+    hue_column: str,
+    *,
+    axis_styles: dict[str, object] | None = None,
+) -> pd.Series:
+    return normalize_categorical_hue_series(
+        hue_column,
+        frame[hue_column],
+        axis_styles=axis_styles,
+        rows=frame.to_dict("records"),
     )
 
 
@@ -306,6 +298,7 @@ def render_plot_review_surface(
     *,
     frames: list[pd.DataFrame],
     hue_column: str | None,
+    axis_styles: dict[str, object] | None = None,
     reference_labels: list[str],
     reference_set_id: str | None = None,
     joinable_tables: list[dict[str, object]],
@@ -335,6 +328,7 @@ def render_plot_review_surface(
         prefer_single_row = _prefer_single_row_panel_layout(
             str(resolved_plot_spec.get("plot_id") or ""),
             len(list(resolved_plot_spec.get("projection_ids", []))),
+            configured=resolved_plot_spec.get("single_row_panels"),
         )
         panel_specs = [
             {
@@ -354,6 +348,7 @@ def render_plot_review_surface(
             plot_id=str(resolved_plot_spec.get("plot_id") or ""),
             hue_column=hue_column,
             hue_kinds=_configured_hue_kinds(resolved_plot_spec),
+            axis_styles=axis_styles,
             joinable_tables=joinable_tables,
             reference_labels=resolved_reference_labels,
             reference_match_column=reference_match_column,
@@ -369,6 +364,7 @@ def render_plot_review_surface(
             resolved_plot_spec,
             frames=frames,
             hue_column=hue_column,
+            axis_styles=axis_styles,
             reference_labels=resolved_reference_labels,
             reference_match_column=reference_match_column,
             reference_display_labels=reference_display_labels,
@@ -391,6 +387,7 @@ def _render_scatter_grid(
     *,
     frames: list[pd.DataFrame],
     hue_column: str | None,
+    axis_styles: dict[str, object] | None,
     reference_labels: list[str],
     reference_match_column: str,
     reference_display_labels: dict[str, str],
@@ -418,9 +415,12 @@ def _render_scatter_grid(
         hue_kind = classify_hue_series(hue_series, configured_kind=hue_kinds.get(effective_hue))
 
     category_values = (
-        _categorical_hue_values(resolved_frames, effective_hue) if hue_kind != "continuous" and effective_hue else []
+        _categorical_hue_values(resolved_frames, effective_hue, axis_styles=axis_styles)
+        if hue_kind != "continuous" and effective_hue
+        else []
     )
-    category_map = notebook_category_color_map(category_values, column=effective_hue)
+    category_map = notebook_category_color_map(category_values, column=effective_hue, axis_styles=axis_styles)
+    style = axis_style_map_from_payload(axis_styles).get(str(effective_hue)) if effective_hue is not None else None
     numeric_vmin, numeric_vmax = (
         _shared_numeric_bounds(resolved_frames, effective_hue)
         if hue_kind == "continuous" and effective_hue
@@ -437,7 +437,11 @@ def _render_scatter_grid(
 
     panel_count = len(resolved_frames)
     plot_id = str(plot_spec.get("plot_id") or "")
-    prefer_single_row = _prefer_single_row_panel_layout(str(plot_spec.get("plot_id") or ""), panel_count)
+    prefer_single_row = _prefer_single_row_panel_layout(
+        str(plot_spec.get("plot_id") or ""),
+        panel_count,
+        configured=plot_spec.get("single_row_panels"),
+    )
     rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=prefer_single_row)
     fig, axes = plt.subplots(
         rows,
@@ -591,7 +595,7 @@ def _render_scatter_grid(
                     rasterized=point_style.rasterized,
                 )
         else:
-            hue_values = _categorical_hue_series(finite_frame, effective_hue)
+            hue_values = _categorical_hue_series(finite_frame, effective_hue, axis_styles=axis_styles)
             plotted_mask = pd.Series(False, index=finite_frame.index)
             if collapsed_panel:
                 centroid_x = float(x_values[0])
@@ -602,7 +606,7 @@ def _render_scatter_grid(
                     [centroid_y],
                     c=category_map.get(
                         collapsed_category,
-                        "#9AA5B1" if collapsed_category == NONCANONICAL_SIG35_CATEGORY else "#111111",
+                        "#111111",
                     ),
                     s=max(point_style.point_size * 18.0, 90.0),
                     alpha=0.92,
@@ -638,13 +642,13 @@ def _render_scatter_grid(
                         edgecolors=point_style.edgecolors,
                         rasterized=point_style.rasterized,
                     )
-                if effective_hue == "sig35_variant":
-                    noncanonical_mask = (~plotted_mask) & (hue_values == NONCANONICAL_SIG35_CATEGORY)
+                if style is not None and style.noncanonical_bucket is not None:
+                    noncanonical_mask = (~plotted_mask) & (hue_values == style.noncanonical_bucket)
                     if noncanonical_mask.any():
                         ax.scatter(
                             finite_frame.loc[noncanonical_mask, x_column].to_numpy(dtype=float),
                             finite_frame.loc[noncanonical_mask, y_column].to_numpy(dtype=float),
-                            c="#9AA5B1",
+                            c=category_map.get(style.noncanonical_bucket, "#9AA5B1"),
                             s=point_style.point_size,
                             alpha=max(point_style.alpha * 0.55, 0.08),
                             linewidths=point_style.linewidths,
@@ -687,11 +691,13 @@ def _render_scatter_grid(
     label_right_padding_px = 12.0
     colorbar_bottom = 0.0
     if category_values and effective_hue is not None:
-        legend_labels = [display_category_text(category, column=effective_hue) for category in category_values]
+        legend_labels = [
+            axis_display_text(style, category) if style is not None else humanize_display_text(category)
+            for category in category_values
+        ]
         dense_legend_plot_ids = {
             "balanced_design_family_margin_gallery",
             "design_centroid_margin_gallery",
-            "sigma35_stress_margin_gallery",
         }
         layout = legend_layout(
             legend_labels,
@@ -735,13 +741,13 @@ def _render_scatter_grid(
 
     top_margin = max(0.8, 0.96 - (0.042 * max(max_title_lines - 1, 0)))
     fig.subplots_adjust(
-        left=0.11 if plot_id in {"balanced_design_family_margin_gallery", "sigma35_stress_margin_gallery"} else 0.09,
+        left=0.11 if plot_id == "balanced_design_family_margin_gallery" else 0.09,
         right=0.98,
         top=top_margin,
         bottom=bottom_margin,
         wspace=(
             0.34
-            if plot_id in {"balanced_design_family_margin_gallery", "sigma35_stress_margin_gallery"} and panel_count > 1
+            if plot_id == "balanced_design_family_margin_gallery" and panel_count > 1
             else 0.31
             if plot_id == "design_centroid_margin_gallery" and panel_count > 1
             else 0.24
@@ -759,7 +765,7 @@ def _render_scatter_grid(
             cax=fig.add_axes([colorbar_left, colorbar_bottom, colorbar_width, 0.028]),
             orientation="horizontal",
         )
-        colorbar.set_label(display_hue_label(effective_hue), fontsize=11.5, color=TEXT_COLOR)
+        colorbar.set_label(display_hue_label(effective_hue, axis_styles=axis_styles), fontsize=11.5, color=TEXT_COLOR)
         colorbar.ax.tick_params(labelsize=11.5, colors=TEXT_COLOR)
         colorbar.ax.xaxis.set_label_position("bottom")
         colorbar.ax.xaxis.set_ticks_position("bottom")
@@ -822,7 +828,7 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
         )
     legend_bottom = 0.0
     if categories and spec.color_column is not None:
-        legend_labels = [display_category_text(category, column=spec.color_column) for category in categories]
+        legend_labels = [humanize_display_text(category) for category in categories]
         layout = legend_layout(
             legend_labels,
             plot_id=spec.plot_id,
@@ -933,9 +939,13 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
             fallback_message="The selected plot has no numeric distributions to render.",
         )
 
-    prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(panel_entries))
+    prefer_single_row = _prefer_single_row_panel_layout(
+        spec.plot_id,
+        len(panel_entries),
+        configured=getattr(spec, "single_row_panels", None),
+    )
     rows_count, columns = static_panel_grid_dimensions(len(panel_entries), prefer_single_row=prefer_single_row)
-    square_distribution_panels = spec.plot_id == "sigma35_margin_ladder_gallery"
+    square_distribution_panels = bool(getattr(spec, "square_panels", False))
     fig, axes = plt.subplots(
         rows_count,
         columns,

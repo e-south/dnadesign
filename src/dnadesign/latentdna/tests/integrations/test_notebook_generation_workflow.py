@@ -363,7 +363,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "mo.state(default_tab)" not in notebook_text
     assert "value=active_top_tab" not in notebook_text
     assert "on_change=set_active_top_tab" not in notebook_text
-    assert "lazy=True" in notebook_text
+    assert "lazy=True" not in notebook_text
     assert "Review the current artifact set: " in notebook_text
     assert "Point positions are fixed by the saved coordinates" in notebook_text
     assert "Jump list:" not in notebook_text

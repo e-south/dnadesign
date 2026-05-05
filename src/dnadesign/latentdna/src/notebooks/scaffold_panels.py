@@ -101,7 +101,7 @@ def render_plot_review_cell() -> str:
 
 
         @app.cell
-        def _(runtime, selected_plot_card):
+        def _(runtime, selected_plot_card, surface_selector):
             _renderers = runtime.renderers
             _support = runtime.support
 
@@ -109,7 +109,11 @@ def render_plot_review_cell() -> str:
             available_plot_hues = []
             plot_hue_selector = None
             plot_reference_selector = None
-            if selected_plot_card is not None and bool(selected_plot_card.get("live_render")):
+            if (
+                str(surface_selector.value) == "plots"
+                and selected_plot_card is not None
+                and bool(selected_plot_card.get("live_render"))
+            ):
                 _plot_spec = dict(selected_plot_card.get("plot_spec") or {})
                 active_plot_frames = _renderers.load_plot_review_frames(
                     _plot_spec,
@@ -179,11 +183,14 @@ def render_plot_review_cell() -> str:
             plot_selector,
             runtime,
             selected_plot_card,
+            surface_selector,
         ):
             _renderers = runtime.renderers
             _support = runtime.support
 
-            if not plot_review_cards:
+            if str(surface_selector.value) != "plots":
+                plot_review_panel = _support.mo.md("")
+            elif not plot_review_cards:
                 plot_review_panel = _support.mo.vstack(
                     [
                         plot_scope_note,
@@ -316,9 +323,7 @@ def render_plot_review_cell() -> str:
                             _accordion_sections[_section_title] = _support.mo.md(str(_active_card[_field_name]))
                 _section_blocks.append(_plot_surface)
                 if _accordion_sections:
-                    _section_blocks.append(
-                        _support.mo.accordion(_accordion_sections, lazy=True)
-                    )
+                    _section_blocks.append(_support.mo.accordion(_accordion_sections))
 
                 plot_review_panel = _support.mo.vstack(_section_blocks, gap=0.4)
             return (plot_review_panel,)
@@ -418,33 +423,34 @@ def render_geometry_frames_cell() -> str:
     return dedent(
         """\
         @app.cell
-        def _(panel_specs, runtime):
+        def _(panel_specs, runtime, surface_selector):
             _geometry = runtime.geometry
             _renderers = runtime.renderers
             _support = runtime.support
 
             projection_frames = []
-            for spec in panel_specs:
-                _view_id = str(spec.get("view_id") or "")
-                _projection_id = str(spec.get("projection_id") or "")
-                if not _projection_id:
-                    projection_frames.append(_support.pd.DataFrame())
-                    continue
-                try:
-                    frame = _renderers.load_projection_frame(
-                        _view_id or None,
-                        _projection_id,
-                        _geometry.joinable_tables,
-                        required_columns=[
-                            *_geometry.preferred_hues,
-                            *_geometry.reference_required_columns,
-                        ],
-                        strict_required_columns=False,
-                    )
-                except ValueError as exc:
-                    frame = _support.pd.DataFrame()
-                    frame.attrs["load_error"] = str(exc)
-                projection_frames.append(frame)
+            if str(surface_selector.value) == "geometry_browser":
+                for spec in panel_specs:
+                    _view_id = str(spec.get("view_id") or "")
+                    _projection_id = str(spec.get("projection_id") or "")
+                    if not _projection_id:
+                        projection_frames.append(_support.pd.DataFrame())
+                        continue
+                    try:
+                        frame = _renderers.load_projection_frame(
+                            _view_id or None,
+                            _projection_id,
+                            _geometry.joinable_tables,
+                            required_columns=[
+                                *_geometry.preferred_hues,
+                                *_geometry.reference_required_columns,
+                            ],
+                            strict_required_columns=False,
+                        )
+                    except ValueError as exc:
+                        frame = _support.pd.DataFrame()
+                        frame.attrs["load_error"] = str(exc)
+                    projection_frames.append(frame)
             available_hues = _support.available_hues_for_frames(
                 projection_frames,
                 preferred_hues=_geometry.preferred_hues,
@@ -519,92 +525,101 @@ def render_geometry_panel_cell() -> str:
             runtime,
             selected_geometry,
             selected_layout,
+            surface_selector,
         ):
             _geometry = runtime.geometry
             _identity = runtime.identity
             _renderers = runtime.renderers
             _support = runtime.support
 
-            requested_hue = str(hue_selector.value)
-            effective_hue = requested_hue if requested_hue in available_hues else ""
-            geometry_plot = _renderers.render_projection_grid(
-                panel_specs,
-                frames=projection_frames,
-                hue_column=effective_hue or None,
-                hue_kinds=_geometry.hue_kinds,
-                joinable_tables=_geometry.joinable_tables,
-                reference_labels=_geometry.reference_labels,
-                reference_set_id=str(geometry_reference_selector.value),
-            )
-            _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
-            if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
-                _control_widgets.extend([geometry_selector, projection_selector])
+            if str(surface_selector.value) != "geometry_browser":
+                geometry_panel = _support.mo.md("")
             else:
-                _control_widgets.append(projection_selector)
-            _control_widgets.extend([hue_selector, geometry_reference_selector])
-            _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
-            _accordion_sections = {
-                "Selection": _support.mo.md(
-                    "\\n".join(
-                        [
-                            f"- **Layout:** {_layout_label}",
-                            f"- **Panels:** {len(panel_specs)}",
-                            f"- **Hue:** {_support.display_hue_label(effective_hue) if effective_hue else 'None'}",
-                            *(
-                                [f"- **Geometry:** {str(selected_geometry.get('label') or '')}"]
-                                if selected_geometry is not None
-                                else []
-                            ),
-                            *(
-                                [f"- **Rows:** {int(selected_geometry.get('rows')):,}"]
-                                if selected_geometry is not None and selected_geometry.get("rows") is not None
-                                else []
-                            ),
-                            *(
-                                [f"- **Dimensions:** {int(selected_geometry.get('dims')):,}"]
-                                if selected_geometry is not None and selected_geometry.get("dims") is not None
-                                else []
-                            ),
-                            *(
-                                [f"- **Role:** `{str(selected_geometry.get('role') or 'primary')}`"]
-                                if selected_geometry is not None and str(selected_geometry.get("role") or "").strip()
-                                else []
-                            ),
-                        ]
+                requested_hue = str(hue_selector.value)
+                effective_hue = requested_hue if requested_hue in available_hues else ""
+                geometry_plot = _renderers.render_projection_grid(
+                    panel_specs,
+                    frames=projection_frames,
+                    hue_column=effective_hue or None,
+                    hue_kinds=_geometry.hue_kinds,
+                    joinable_tables=_geometry.joinable_tables,
+                    reference_labels=_geometry.reference_labels,
+                    reference_set_id=str(geometry_reference_selector.value),
+                )
+                _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
+                if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
+                    _control_widgets.extend([geometry_selector, projection_selector])
+                else:
+                    _control_widgets.append(projection_selector)
+                _control_widgets.extend([hue_selector, geometry_reference_selector])
+                _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
+                _accordion_sections = {
+                    "Selection": _support.mo.md(
+                        "\\n".join(
+                            [
+                                f"- **Layout:** {_layout_label}",
+                                f"- **Panels:** {len(panel_specs)}",
+                                f"- **Hue:** {_support.display_hue_label(effective_hue) if effective_hue else 'None'}",
+                                *(
+                                    [f"- **Geometry:** {str(selected_geometry.get('label') or '')}"]
+                                    if selected_geometry is not None
+                                    else []
+                                ),
+                                *(
+                                    [f"- **Rows:** {int(selected_geometry.get('rows')):,}"]
+                                    if selected_geometry is not None and selected_geometry.get("rows") is not None
+                                    else []
+                                ),
+                                *(
+                                    [f"- **Dimensions:** {int(selected_geometry.get('dims')):,}"]
+                                    if selected_geometry is not None and selected_geometry.get("dims") is not None
+                                    else []
+                                ),
+                                *(
+                                    [f"- **Role:** `{str(selected_geometry.get('role') or 'primary')}`"]
+                                    if (
+                                        selected_geometry is not None
+                                        and str(selected_geometry.get("role") or "").strip()
+                                    )
+                                    else []
+                                ),
+                            ]
+                        )
                     )
+                }
+                _population_lines = []
+                for _panel_spec in panel_specs:
+                    _projection_id = str(_panel_spec.get("projection_id") or "")
+                    if not _projection_id:
+                        continue
+                    _projection_manifest_path = _identity.output_root / "projections" / _projection_id / "manifest.json"
+                    _projection_manifest = _support.load_json(_projection_manifest_path)
+                    _manifest_stats = _projection_manifest.get("stats")
+                    _stats = _manifest_stats if isinstance(_manifest_stats, dict) else {}
+                    _projected_rows = _stats.get("projected_rows", _stats.get("rows"))
+                    _population_rows = _stats.get("population_rows", _projected_rows)
+                    _is_full_population = bool(_stats.get("is_full_population", _projected_rows == _population_rows))
+                    if _projected_rows is None:
+                        continue
+                    _population_note = (
+                        f"{int(_projected_rows):,} rows, full population"
+                        if _is_full_population
+                        else f"{int(_projected_rows):,} projected rows from {int(_population_rows):,}"
+                    )
+                    _population_lines.append(
+                        f"- **{str(_panel_spec.get('title') or _projection_id)}:** {_population_note}"
+                    )
+                if _population_lines:
+                    _accordion_sections["Projection population"] = _support.mo.md("\\n".join(_population_lines))
+                geometry_panel = _support.mo.vstack(
+                    [
+                        geometry_scope_note,
+                        _support.mo.hstack(_control_widgets, justify="start", align="end", wrap=True, gap=0.28),
+                        geometry_plot,
+                        _support.mo.accordion(_accordion_sections),
+                    ],
+                    gap=0.35,
                 )
-            }
-            _population_lines = []
-            for _panel_spec in panel_specs:
-                _projection_id = str(_panel_spec.get("projection_id") or "")
-                if not _projection_id:
-                    continue
-                _projection_manifest_path = _identity.output_root / "projections" / _projection_id / "manifest.json"
-                _projection_manifest = _support.load_json(_projection_manifest_path)
-                _manifest_stats = _projection_manifest.get("stats")
-                _stats = _manifest_stats if isinstance(_manifest_stats, dict) else {}
-                _projected_rows = _stats.get("projected_rows", _stats.get("rows"))
-                _population_rows = _stats.get("population_rows", _projected_rows)
-                _is_full_population = bool(_stats.get("is_full_population", _projected_rows == _population_rows))
-                if _projected_rows is None:
-                    continue
-                _population_note = (
-                    f"{int(_projected_rows):,} rows, full population"
-                    if _is_full_population
-                    else f"{int(_projected_rows):,} projected rows from {int(_population_rows):,}"
-                )
-                _population_lines.append(f"- **{str(_panel_spec.get('title') or _projection_id)}:** {_population_note}")
-            if _population_lines:
-                _accordion_sections["Projection population"] = _support.mo.md("\\n".join(_population_lines))
-            geometry_panel = _support.mo.vstack(
-                [
-                    geometry_scope_note,
-                    _support.mo.hstack(_control_widgets, justify="start", align="end", wrap=True, gap=0.28),
-                    geometry_plot,
-                    _support.mo.accordion(_accordion_sections, lazy=True),
-                ],
-                gap=0.35,
-            )
             return (geometry_panel,)
         """
     )

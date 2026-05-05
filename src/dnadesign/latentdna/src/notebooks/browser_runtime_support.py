@@ -18,6 +18,15 @@ import pyarrow.parquet as pq
 from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..labels import humanize_column_name
+from ..metadata_axes import (
+    axis_color_map,
+    axis_display_label,
+    axis_display_text,
+    axis_style_map_from_payload,
+    legend_categories,
+    normalize_axis_category,
+    ordered_categories_for_axis,
+)
 from ..reference_sets import reference_set_required_columns, resolve_reference_set_rows
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
@@ -29,14 +38,10 @@ from ..visual_style import (
     PLOT_LEGEND_FONT_SIZE,
     PLOT_TICK_FONT_SIZE,
     PLOT_TITLE_FONT_SIZE,
+    PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
-    categorical_color_map,
-    display_category_text,
     humanize_display_text,
-    is_sig35_legend_category,
-    normalize_sig35_hue_category,
-    ordered_categories,
     reference_annotation_label,
 )
 from ..visual_style import scatter_style as shared_scatter_style
@@ -113,15 +118,13 @@ def _manifest_attention_warning(manifest: dict[str, object], *, artifact_kind: s
     return f"{artifact_kind} `{artifact_id}` is rendered from an attention-state artifact."
 
 
-def load_table(
+def _load_table_uncached(
     path: Path,
     *,
     require_fresh_manifest: bool = False,
     allowed_statuses: set[str] | None = None,
     columns: list[str] | None = None,
 ) -> pd.DataFrame:
-    if not path.is_file():
-        return pd.DataFrame()
     manifest: dict[str, object] | None = None
     artifact_kind = ""
     artifact_id = ""
@@ -144,6 +147,72 @@ def load_table(
             warning = _manifest_attention_warning(manifest, artifact_kind=artifact_kind, artifact_id=artifact_id)
             if warning:
                 frame.attrs["artifact_warning"] = warning
+    return frame
+
+
+def _cache_token(path: Path) -> tuple[int, int]:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return 0, 0
+    return int(stat.st_mtime_ns), int(stat.st_size)
+
+
+def _manifest_cache_identity(path: Path) -> tuple[str, int, int]:
+    metadata = _table_artifact_metadata(path)
+    if metadata is None:
+        return "", 0, 0
+    artifact_dir, _, _ = metadata
+    manifest_path = artifact_dir / "manifest.json"
+    mtime_ns, size = _cache_token(manifest_path)
+    return str(manifest_path), mtime_ns, size
+
+
+@lru_cache(maxsize=64)
+def _cached_parquet_table(
+    path_text: str,
+    path_mtime_ns: int,
+    path_size: int,
+    manifest_path_text: str,
+    manifest_mtime_ns: int,
+    manifest_size: int,
+    require_fresh_manifest: bool,
+    allowed_statuses_key: tuple[str, ...],
+    columns_key: tuple[str, ...],
+) -> pd.DataFrame:
+    del path_mtime_ns, path_size, manifest_path_text, manifest_mtime_ns, manifest_size
+    return _load_table_uncached(
+        Path(path_text),
+        require_fresh_manifest=require_fresh_manifest,
+        allowed_statuses=set(allowed_statuses_key) if allowed_statuses_key else None,
+        columns=list(columns_key) if columns_key else None,
+    )
+
+
+def load_table(
+    path: Path,
+    *,
+    require_fresh_manifest: bool = False,
+    allowed_statuses: set[str] | None = None,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    if not path.is_file():
+        return pd.DataFrame()
+    path_mtime_ns, path_size = _cache_token(path)
+    manifest_path_text, manifest_mtime_ns, manifest_size = _manifest_cache_identity(path)
+    cached = _cached_parquet_table(
+        str(path),
+        path_mtime_ns,
+        path_size,
+        manifest_path_text,
+        manifest_mtime_ns,
+        manifest_size,
+        require_fresh_manifest,
+        tuple(sorted(str(status) for status in (allowed_statuses or []))),
+        tuple(columns or ()),
+    )
+    frame = cached.copy()
+    frame.attrs = dict(cached.attrs)
     return frame
 
 
@@ -368,9 +437,16 @@ def resolve_reference_annotation(
     }
 
 
-def display_hue_label(column: str) -> str:
-    if column == "design_regulator_composition":
-        return "Reg. comp."
+def _axis_style(axis_styles: dict[str, object] | None, column: str | None):
+    if column is None:
+        return None
+    return axis_style_map_from_payload(axis_styles).get(str(column))
+
+
+def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = None) -> str:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return axis_display_label(style, column)
     if column == "log_likelihood_per_token_7b":
         return "7B log likelihood / token"
     if column == "log_likelihood_per_token_20b":
@@ -386,34 +462,50 @@ def display_hue_label(column: str) -> str:
     return humanize_column_name(column)
 
 
-def display_hue_value(column: str | None, value: object) -> str:
-    return display_category_text(value, column=column)
+def display_hue_value(column: str | None, value: object, *, axis_styles: dict[str, object] | None = None) -> str:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return axis_display_text(style, value)
+    return humanize_display_text(value)
 
 
-def normalize_categorical_hue_value(column: str | None, value: object) -> str:
+def normalize_categorical_hue_value(
+    column: str | None,
+    value: object,
+    *,
+    axis_styles: dict[str, object] | None = None,
+    row: dict[str, object] | None = None,
+) -> str:
+    style = _axis_style(axis_styles, column)
     if _is_missing_hue_value(value):
+        if style is not None and style.noncanonical_bucket is not None:
+            return style.noncanonical_bucket
         return "NA"
     listlike_text = _format_listlike_hue_value(value)
     if listlike_text is not None:
         return listlike_text
-    if str(column or "").strip() == "sig35_variant":
-        return normalize_sig35_hue_category(value)
-    if str(column or "").strip() == "spacer_length":
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError):
-            numeric = None
-        if numeric is not None and np.isfinite(numeric):
-            return str(int(numeric)) if numeric.is_integer() else f"{numeric:g}"
-    if str(column or "").strip() == "design_regulator_composition":
-        normalized = display_hue_value(column, value)
-        return normalized or "NA"
+    if style is not None:
+        return normalize_axis_category(style, value, row=row)
     text = str(value)
     return text if text.strip() else "NA"
 
 
-def normalize_categorical_hue_series(column: str | None, values: pd.Series) -> pd.Series:
-    return values.map(lambda value: normalize_categorical_hue_value(column, value)).astype(str)
+def normalize_categorical_hue_series(
+    column: str | None,
+    values: pd.Series,
+    *,
+    axis_styles: dict[str, object] | None = None,
+    rows: list[dict[str, object]] | None = None,
+) -> pd.Series:
+    if rows is None:
+        return values.map(lambda value: normalize_categorical_hue_value(column, value, axis_styles=axis_styles)).astype(
+            str
+        )
+    normalized = [
+        normalize_categorical_hue_value(column, value, axis_styles=axis_styles, row=row)
+        for value, row in zip(values.tolist(), rows, strict=False)
+    ]
+    return pd.Series(normalized, index=values.index, dtype="object")
 
 
 def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str] | None:
@@ -665,10 +757,29 @@ def scatter_style(row_count: int) -> tuple[float, float]:
     return style.point_size, style.alpha
 
 
-def category_color_map(categories: list[str], *, column: str | None = None) -> dict[str, str]:
-    if str(column or "").strip() == "sig35_variant":
-        categories = [category for category in categories if is_sig35_legend_category(category)]
-    return categorical_color_map(ordered_categories(categories, column=column), column=column)
+def category_color_map(
+    categories: list[str],
+    *,
+    column: str | None = None,
+    axis_styles: dict[str, object] | None = None,
+) -> dict[str, str]:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        ordered = legend_categories(style, categories)
+        return axis_color_map(style, ordered, fallback_palette=PUBLICATION_PALETTE)
+    return axis_color_map(None, ordered_categories_for_axis(None, categories), fallback_palette=PUBLICATION_PALETTE)
+
+
+def category_values_for_legend(
+    categories: list[str],
+    *,
+    column: str | None = None,
+    axis_styles: dict[str, object] | None = None,
+) -> list[str]:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return legend_categories(style, categories)
+    return ordered_categories_for_axis(None, categories)
 
 
 def table_from_records(

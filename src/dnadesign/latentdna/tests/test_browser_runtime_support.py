@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime_support
 from dnadesign.latentdna.src.notebooks import rendering as notebook_rendering
 from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     available_hues_for_frames,
@@ -34,7 +35,90 @@ from dnadesign.latentdna.src.notebooks.rendering import (
     resolve_plot_render_asset,
     select_plot_render_path,
 )
-from dnadesign.latentdna.src.visual_style import NONCANONICAL_SIG35_CATEGORY, wrap_plot_title
+from dnadesign.latentdna.src.visual_style import wrap_plot_title
+
+SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
+SIGMA35_AXIS_STYLES = {
+    "sig35_variant": {
+        "axis_id": "sigma35",
+        "column": "sig35_variant",
+        "label": "Sigma-35 variant",
+        "kind": "categorical",
+        "category_order": ["f", "e", "d", "c", "b", "control"],
+        "display_labels": {
+            "f": "TTGACA (f)",
+            "e": "TAGACA (e)",
+            "d": "TTTACA (d)",
+            "c": "TTGTGA (c)",
+            "b": "CTGACA (b)",
+            "control": "Control",
+        },
+        "category_colors": {
+            "f": "#B2182B",
+            "e": "#D6604D",
+            "d": "#F4A582",
+            "c": "#92C5DE",
+            "b": "#2166AC",
+            "control": "#7F8894",
+        },
+        "noncanonical_bucket": SIGMA35_NONCANONICAL_BUCKET,
+        "noncanonical_label": "Reference/other",
+        "include_noncanonical_in_legend": False,
+        "canonical_row_match": "any",
+        "canonical_row_selectors": [
+            {"column": "source_class", "in_values": ["densegen"]},
+            {"column": "source_family", "in_values": ["densegen_generated"]},
+        ],
+    }
+}
+SPACER_AXIS_STYLES = {
+    "spacer_length": {
+        "axis_id": "spacer_length",
+        "column": "spacer_length",
+        "label": "Spacer length",
+        "kind": "ordinal",
+        "category_order": ["16", "17", "18"],
+        "category_colors": {"16": "#2C7BB6", "17": "#FEE090", "18": "#D73027"},
+    }
+}
+DESIGN_FAMILY_AXIS_STYLES = {
+    "design_family": {
+        "axis_id": "design_family",
+        "column": "design_family",
+        "label": "Design family",
+        "kind": "categorical",
+        "category_order": ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin", "control"],
+        "category_colors": {
+            "background_only": "#56B4E9",
+            "ethanol": "#E69F00",
+            "ciprofloxacin": "#009E73",
+            "ethanol_ciprofloxacin": "#CC79A7",
+            "control": "#111111",
+        },
+    }
+}
+REGULATOR_AXIS_STYLES = {
+    "design_regulator_composition": {
+        "axis_id": "regulator_composition",
+        "column": "design_regulator_composition",
+        "label": "Reg. comp.",
+        "kind": "categorical",
+        "category_order": [
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA",
+            "sig35=b",
+            "cpxR_MANWWHTTTAM",
+            "control",
+            "lexA_CTGTATAWAWWHACA",
+        ],
+        "display_labels": {
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA": "BaeR+LexA",
+            "cpxR_MANWWHTTTAM": "CpxR",
+            "lexA_CTGTATAWAWWHACA": "LexA",
+            "sig35=b": "Bg",
+            "control": "Ctrl",
+        },
+    }
+}
 
 
 def test_select_plot_render_path_prefers_svg_assets(tmp_path: Path) -> None:
@@ -46,6 +130,32 @@ def test_select_plot_render_path_prefers_svg_assets(tmp_path: Path) -> None:
     pdf_path.write_bytes(b"%PDF-1.4")
 
     assert select_plot_render_path([png_path, pdf_path, svg_path]) == svg_path
+
+
+def test_load_table_reuses_cached_parquet_payloads(monkeypatch, tmp_path: Path) -> None:
+    table_path = tmp_path / "coords.parquet"
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        table_path,
+        index=False,
+    )
+    if hasattr(runtime_support, "_cached_parquet_table"):
+        runtime_support._cached_parquet_table.cache_clear()
+    read_calls: list[Path] = []
+    original_read_parquet = runtime_support.pd.read_parquet
+
+    def counting_read_parquet(path, *args, **kwargs):
+        read_calls.append(Path(path))
+        return original_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(runtime_support.pd, "read_parquet", counting_read_parquet)
+
+    first = runtime_support.load_table(table_path)
+    second = runtime_support.load_table(table_path)
+
+    assert len(read_calls) == 1
+    assert first is not second
+    first["scratch"] = 1
+    assert "scratch" not in second.columns
 
 
 def test_resolve_plot_render_asset_uses_raster_fallback_for_large_svg(tmp_path: Path) -> None:
@@ -158,7 +268,11 @@ def test_render_plot_asset_does_not_read_oversize_raster_without_pdf(tmp_path: P
 
 
 def test_category_color_map_prefers_stable_semantic_colors() -> None:
-    color_map = category_color_map(["ethanol", "ciprofloxacin", "background_only", "ethanol_ciprofloxacin", "control"])
+    color_map = category_color_map(
+        ["ethanol", "ciprofloxacin", "background_only", "ethanol_ciprofloxacin", "control"],
+        column="design_family",
+        axis_styles=DESIGN_FAMILY_AXIS_STYLES,
+    )
 
     assert color_map["background_only"] == "#56B4E9"
     assert color_map["ethanol"] == "#E69F00"
@@ -168,9 +282,14 @@ def test_category_color_map_prefers_stable_semantic_colors() -> None:
 
 
 def test_category_color_map_orders_sig35_variant_by_reverse_alphabetical_strength() -> None:
-    color_map = category_color_map(["b", "f", "d", "control"], column="sig35_variant")
+    color_map = category_color_map(
+        ["b", "f", "d", "control"],
+        column="sig35_variant",
+        axis_styles=SIGMA35_AXIS_STYLES,
+    )
 
-    assert list(color_map) == ["f", "d", "b", "control"]
+    assert list(color_map)[:4] == ["f", "d", "b", "control"]
+    assert color_map[SIGMA35_NONCANONICAL_BUCKET] == "#9AA5B1"
     assert color_map["f"] == "#B2182B"
     assert color_map["d"] == "#F4A582"
     assert color_map["b"] == "#2166AC"
@@ -178,7 +297,7 @@ def test_category_color_map_orders_sig35_variant_by_reverse_alphabetical_strengt
 
 
 def test_category_color_map_orders_spacer_length_from_cool_to_warm() -> None:
-    color_map = category_color_map(["18", "16", "17"], column="spacer_length")
+    color_map = category_color_map(["18", "16", "17"], column="spacer_length", axis_styles=SPACER_AXIS_STYLES)
 
     assert list(color_map) == ["16", "17", "18"]
     assert color_map["16"] == "#2C7BB6"
@@ -231,22 +350,42 @@ def test_resolve_join_keys_supports_construct_anchor_id_to_id_orientation() -> N
 
 
 def test_display_hue_label_and_value_compact_design_regulator_composition() -> None:
-    assert display_hue_label("design_regulator_composition") == "Reg. comp."
-    assert display_hue_value("design_regulator_composition", "cpxR_MANWWHTTTAM+lexA_CTGTATAWAWWHACA") == "CpxR+LexA"
-    assert display_hue_value("design_regulator_composition", "sig35=b") == "Bg"
-    assert display_hue_value("design_regulator_composition", "control") == "Ctrl"
-    assert normalize_categorical_hue_value("design_regulator_composition", float("nan")) == "NA"
+    assert display_hue_label("design_regulator_composition", axis_styles=REGULATOR_AXIS_STYLES) == "Reg. comp."
+    assert (
+        display_hue_value(
+            "design_regulator_composition",
+            "cpxR_MANWWHTTTAM",
+            axis_styles=REGULATOR_AXIS_STYLES,
+        )
+        == "CpxR"
+    )
+    assert display_hue_value("design_regulator_composition", "sig35=b", axis_styles=REGULATOR_AXIS_STYLES) == "Bg"
+    assert display_hue_value("design_regulator_composition", "control", axis_styles=REGULATOR_AXIS_STYLES) == "Ctrl"
+    assert (
+        normalize_categorical_hue_value(
+            "design_regulator_composition",
+            float("nan"),
+            axis_styles=REGULATOR_AXIS_STYLES,
+        )
+        == "NA"
+    )
 
 
 def test_display_hue_value_formats_sig35_variant_for_legends() -> None:
-    assert display_hue_value("sig35_variant", "f") == "TTGACA (f)"
-    assert display_hue_value("sig35_variant", "control") == "Control"
+    assert display_hue_value("sig35_variant", "f", axis_styles=SIGMA35_AXIS_STYLES) == "TTGACA (f)"
+    assert display_hue_value("sig35_variant", "control", axis_styles=SIGMA35_AXIS_STYLES) == "Control"
 
 
 def test_sig35_hue_normalization_keeps_reference_variants_out_of_densegen_legend() -> None:
-    assert normalize_categorical_hue_value("sig35_variant", "TTTACA") == NONCANONICAL_SIG35_CATEGORY
-    assert normalize_categorical_hue_value("sig35_variant", "ACCGCG") == NONCANONICAL_SIG35_CATEGORY
-    assert normalize_categorical_hue_value("sig35_variant", "f") == "f"
+    assert (
+        normalize_categorical_hue_value("sig35_variant", "TTTACA", axis_styles=SIGMA35_AXIS_STYLES)
+        == SIGMA35_NONCANONICAL_BUCKET
+    )
+    assert (
+        normalize_categorical_hue_value("sig35_variant", "ACCGCG", axis_styles=SIGMA35_AXIS_STYLES)
+        == SIGMA35_NONCANONICAL_BUCKET
+    )
+    assert normalize_categorical_hue_value("sig35_variant", "f", axis_styles=SIGMA35_AXIS_STYLES) == "f"
 
 
 def test_reference_display_label_strips_core60_context_suffixes() -> None:
@@ -364,6 +503,35 @@ def test_render_math_markdown_normalizes_common_latex_inequalities() -> None:
     assert isinstance(rendered, mo.Html)
     assert "Math expression" in rendered.text
     assert "fell back to plain text" not in rendered.text
+
+
+def test_render_math_markdown_normalizes_latex_norm_delimiters() -> None:
+    rendered = render_math_markdown(
+        """
+        Pairwise shift uses
+        $$
+        \\lVert \\hat{x_i} - \\hat{y_i} \\rVert_2.
+        $$
+        """
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "Math expression" in rendered.text
+    assert "Pairwise shift uses" in rendered.text
+
+
+def test_render_math_markdown_falls_back_for_unsupported_mathtext() -> None:
+    rendered = render_math_markdown(
+        """
+        Unsupported display math
+        $$
+        \\not_a_mathtext_command{x}
+        $$
+        """
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "not_a_mathtext_command" in rendered.text
 
 
 def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:

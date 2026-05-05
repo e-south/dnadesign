@@ -132,6 +132,23 @@ def _write_workspace_config(workspace_dir: Path) -> None:
     )
 
 
+def _write_projection_artifact(context, *, projection_id: str, view_id: str) -> None:
+    projection_dir = context.output_root / "projections" / projection_id
+    projection_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        projection_dir / "coords.parquet",
+        index=False,
+    )
+    _write_artifact_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id=projection_id,
+        inputs=[{"kind": "view_matrix", "id": view_id}],
+        params={"projection_role": "primary", "default_rank": 10},
+        stats={"rows": 2, "projected_rows": 2, "population_rows": 2, "is_full_population": True},
+    )
+
+
 def test_notebook_controls_sort_projection_ids_by_role_then_full_population(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -260,6 +277,16 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
 
     context = load_workspace_config(workspace_dir)
+    _write_projection_artifact(
+        context,
+        projection_id="umap_output_layer_anchor",
+        view_id="output_layer_mean_7b_anchor_60bp",
+    )
+    _write_projection_artifact(
+        context,
+        projection_id="umap_intermediate_anchor",
+        view_id="intermediate_embedding_7b_anchor_60bp",
+    )
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
@@ -270,6 +297,98 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
     assert controls.geometry_controls.default_layout == "candidate_grid"
     assert controls.geometry_controls.default_compare_left == "output_layer_mean_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_anchor_60bp"
+
+
+def test_notebook_controls_candidate_grid_defaults_to_projected_views(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["intermediate_embedding_7b_context_1kb"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "demo_context_space",
+        "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "context_1kb"},
+    }
+    config["views"]["output_layer_mean_7b_anchor_60bp"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "demo_output_layer_mean",
+        "tags": {"model": "7b", "family": "output_layer_mean", "scope": "anchor_60bp"},
+    }
+    config["candidate_sets"] = {
+        "all_materialized_x": {
+            "label": "All materialized X",
+            "views": [
+                "intermediate_embedding_7b_anchor_60bp",
+                "intermediate_embedding_7b_context_1kb",
+                "output_layer_mean_7b_anchor_60bp",
+            ],
+            "panel_titles": {
+                "intermediate_embedding_7b_anchor_60bp": "Anchor intermediate",
+                "intermediate_embedding_7b_context_1kb": "Context intermediate",
+                "output_layer_mean_7b_anchor_60bp": "Output-layer mean",
+            },
+        }
+    }
+    config["notebooks"]["latent_geometry_browser"]["candidate_sets"] = ["all_materialized_x"]
+    config["notebooks"]["latent_geometry_browser"]["default_candidate_set"] = "all_materialized_x"
+    config["notebooks"]["latent_geometry_browser"]["candidate_grid_views"] = [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_context_1kb",
+        "output_layer_mean_7b_anchor_60bp",
+    ]
+    config["notebooks"]["latent_geometry_browser"]["candidate_grid_panel_titles"] = [
+        "Anchor intermediate",
+        "Context intermediate",
+        "Output-layer mean",
+    ]
+    config["notebooks"]["latent_geometry_browser"]["default_layout"] = "candidate_grid"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    for view_id in config["views"]:
+        view_dir = context.output_root / "views" / view_id
+        view_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"id": ["row0", "row1"], "subject_id": ["row0", "row1"]}).to_parquet(
+            view_dir / "rows.parquet",
+            index=False,
+        )
+        np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+    for projection_id, view_id in [
+        ("umap_anchor", "intermediate_embedding_7b_anchor_60bp"),
+        ("umap_context", "intermediate_embedding_7b_context_1kb"),
+    ]:
+        projection_dir = context.output_root / "projections" / projection_id
+        projection_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+            projection_dir / "coords.parquet",
+            index=False,
+        )
+        _write_artifact_manifest(
+            projection_dir,
+            artifact_kind="projection",
+            artifact_id=projection_id,
+            inputs=[{"kind": "view_matrix", "id": view_id}],
+            params={"projection_role": "primary", "default_rank": 10},
+            stats={"rows": 2, "projected_rows": 2, "population_rows": 2, "is_full_population": True},
+        )
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert [row.view_id for row in controls.candidate_inventory] == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_context_1kb",
+        "output_layer_mean_7b_anchor_60bp",
+    ]
+    candidate_grid = next(row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid")
+    assert candidate_grid.view_ids == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_context_1kb",
+    ]
+    assert candidate_grid.panel_titles == ["Anchor intermediate", "Context intermediate"]
+    assert controls.geometry_controls.default_layout == "candidate_grid"
 
 
 def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Path) -> None:
@@ -303,6 +422,16 @@ def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Pa
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
 
     context = load_workspace_config(workspace_dir)
+    _write_projection_artifact(
+        context,
+        projection_id="umap_output_layer_anchor",
+        view_id="output_layer_mean_7b_anchor_60bp",
+    )
+    _write_projection_artifact(
+        context,
+        projection_id="umap_intermediate_anchor",
+        view_id="intermediate_embedding_7b_anchor_60bp",
+    )
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]

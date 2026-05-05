@@ -12,16 +12,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..metadata_axes import axis_display_text, axis_style_map_from_payload
 from ..visual_style import (
-    NONCANONICAL_SIG35_CATEGORY,
     PUBLICATION_PALETTE,
     TEXT_COLOR,
     compact_candidate_title,
-    display_category_text,
-    is_sig35_legend_category,
     legend_layout,
-    normalize_sig35_hue_category_for_row,
-    ordered_categories,
     wrap_plot_title,
 )
 from ..visual_style import (
@@ -31,6 +27,7 @@ from .browser_runtime_support import (
     available_hues_for_frames,
     candidate_join_keys,
     category_color_map,
+    category_values_for_legend,
     classify_hue_series,
     continuous_hue_render_params,
     display_hue_label,
@@ -271,21 +268,17 @@ def _column_has_required_values(frame: pd.DataFrame, column: str) -> bool:
     return bool(series.notna().any())
 
 
-def _categorical_hue_series(frame: pd.DataFrame, hue_column: str) -> pd.Series:
-    hue_series = normalize_categorical_hue_series(hue_column, frame[hue_column])
-    if hue_column != "sig35_variant":
-        return hue_series
-    discriminator_columns = [column for column in ("source_class", "source_family") if column in frame.columns]
-    if not discriminator_columns:
-        return hue_series
-    discriminator_frame = frame[discriminator_columns]
-    return pd.Series(
-        [
-            normalize_sig35_hue_category_for_row(row, value)
-            for row, value in zip(discriminator_frame.to_dict("records"), frame[hue_column], strict=False)
-        ],
-        index=frame.index,
-        dtype="object",
+def _categorical_hue_series(
+    frame: pd.DataFrame,
+    hue_column: str,
+    *,
+    axis_styles: dict[str, object] | None = None,
+) -> pd.Series:
+    return normalize_categorical_hue_series(
+        hue_column,
+        frame[hue_column],
+        axis_styles=axis_styles,
+        rows=frame.to_dict("records"),
     )
 
 
@@ -477,6 +470,7 @@ def render_projection_grid(
     plot_id: str | None = None,
     hue_column: str | None,
     hue_kinds: dict[str, str] | None,
+    axis_styles: dict[str, object] | None = None,
     joinable_tables: list[dict[str, object]],
     reference_labels: list[str],
     output_root: Path,
@@ -578,18 +572,19 @@ def render_projection_grid(
             effective_hue = None
             hue_kind = None
 
-    category_values = ordered_categories(
-        {
-            str(value)
-            for frame in resolved_frames
-            if effective_hue is not None and treat_as_categorical and effective_hue in frame.columns
-            for value in _categorical_hue_series(frame, effective_hue).unique()
-        },
+    raw_category_values = [
+        str(value)
+        for frame in resolved_frames
+        if effective_hue is not None and treat_as_categorical and effective_hue in frame.columns
+        for value in _categorical_hue_series(frame, effective_hue, axis_styles=axis_styles).unique()
+    ]
+    category_values = category_values_for_legend(
+        raw_category_values,
         column=effective_hue,
+        axis_styles=axis_styles,
     )
-    if effective_hue == "sig35_variant":
-        category_values = [category for category in category_values if is_sig35_legend_category(category)]
-    category_map = category_color_map(category_values, column=effective_hue)
+    category_map = category_color_map(category_values, column=effective_hue, axis_styles=axis_styles)
+    style = axis_style_map_from_payload(axis_styles).get(str(effective_hue)) if effective_hue is not None else None
 
     scatter_artist = None
     max_title_lines = 1
@@ -644,7 +639,7 @@ def render_projection_grid(
                 rasterized=point_style.rasterized,
             )
         else:
-            hue_series = _categorical_hue_series(frame, effective_hue)
+            hue_series = _categorical_hue_series(frame, effective_hue, axis_styles=axis_styles)
             plotted_mask = pd.Series(False, index=frame.index)
             for category in category_values:
                 mask = hue_series == category
@@ -662,13 +657,13 @@ def render_projection_grid(
                     rasterized=point_style.rasterized,
                     label=category,
                 )
-            if effective_hue == "sig35_variant":
-                noncanonical_mask = (~plotted_mask) & (hue_series == NONCANONICAL_SIG35_CATEGORY)
+            if style is not None and style.noncanonical_bucket is not None:
+                noncanonical_mask = (~plotted_mask) & (hue_series == style.noncanonical_bucket)
                 if noncanonical_mask.any():
                     ax.scatter(
                         frame.loc[noncanonical_mask, "x"].to_numpy(dtype=float),
                         frame.loc[noncanonical_mask, "y"].to_numpy(dtype=float),
-                        c="#9AA5B1",
+                        c=category_map.get(style.noncanonical_bucket, "#9AA5B1"),
                         s=point_style.point_size,
                         alpha=max(point_style.alpha * 0.55, 0.08),
                         linewidths=point_style.linewidths,
@@ -689,7 +684,9 @@ def render_projection_grid(
 
     bottom_margin = 0.085
     if category_values and effective_hue is not None:
-        legend_labels = [display_category_text(category, column=effective_hue) for category in category_values]
+        legend_labels = [
+            axis_display_text(style, category) if style is not None else str(category) for category in category_values
+        ]
         layout = legend_layout(
             legend_labels,
             plot_id=plot_id,
@@ -768,7 +765,7 @@ def render_projection_grid(
             orientation="horizontal",
         )
         colorbar.ax.tick_params(labelsize=10.5, colors=TEXT_COLOR)
-        colorbar.set_label(display_hue_label(effective_hue), fontsize=11.5, color=TEXT_COLOR)
+        colorbar.set_label(display_hue_label(effective_hue, axis_styles=axis_styles), fontsize=11.5, color=TEXT_COLOR)
         colorbar.ax.xaxis.set_label_position("bottom")
         colorbar.ax.xaxis.set_ticks_position("bottom")
 

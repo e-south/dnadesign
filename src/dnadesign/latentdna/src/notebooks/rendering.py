@@ -39,6 +39,8 @@ _MATH_IMAGE_STYLE = "display: block; max-width: 100%; height: auto;"
 _MATH_COMMAND_NORMALIZATIONS = (
     (r"\\le\b", r"\\leq"),
     (r"\\ge\b", r"\\geq"),
+    (r"\\lVert(?![A-Za-z])", r"\\Vert"),
+    (r"\\rVert(?![A-Za-z])", r"\\Vert"),
 )
 
 
@@ -275,7 +277,12 @@ def render_math_markdown(text: str):
         if prose:
             parts.append(mo.md(prose))
         formula = match.group(1).strip()
-        svg_bytes = _render_math_svg_bytes(formula)
+        try:
+            svg_bytes = _render_math_svg_bytes(formula)
+        except ValueError:
+            parts.append(mo.md(f"```text\n{formula}\n```"))
+            cursor = match.end()
+            continue
         if svg_bytes:
             svg_markup = _transparent_math_svg_markup(svg_bytes.decode("utf-8"))
             parts.append(
