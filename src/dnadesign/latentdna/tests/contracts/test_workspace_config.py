@@ -957,6 +957,76 @@ study_binding:
         load_workspace_config(workspace_dir)
 
 
+def test_load_workspace_config_rejects_docs_ref_path_traversal(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    docs_root = tmp_path / "study_docs"
+    docs_root.mkdir()
+    (docs_root / "study.yaml").write_text("study_id: demo_study\n", encoding="utf-8")
+    (docs_root / "deliverables").mkdir()
+    (docs_root / "deliverables" / "review.md").write_text("# Review\n", encoding="utf-8")
+    (tmp_path / "outside.md").write_text("# Outside\n", encoding="utf-8")
+    (workspace_dir / "config.yaml").write_text(
+        f"""
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {{model: demo}}
+    role: primary
+recipes:
+  review_recipe:
+    steps:
+      - id: materialize_view
+        op: view.materialize
+        params:
+          view: z20_60
+deliverables:
+  review_bundle:
+    title: Demo deliverable
+    section: Review
+    question: Does the demo deliverable validate?
+    summary: Minimal deliverable fixture for docs-ref validation.
+    recipe: review_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      views: [z20_60]
+    docs_refs: [study:demo_study/../outside]
+    acceptance_checks: []
+study_binding:
+  study_id: demo_study
+  docs_root: {docs_root.as_posix()}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="stay under the study docs root"):
+        load_workspace_config(workspace_dir)
+
+
 def test_load_workspace_config_rejects_noncanonical_output_root_location(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

@@ -20,6 +20,7 @@ from ..contracts.workspace import (
     SourceBackedViewConfig,
     WorkspaceConfig,
 )
+from ..studies.docs_refs import resolve_docs_ref_path
 from .paths import resolve_repo_path
 
 
@@ -416,22 +417,20 @@ def _validate_deliverable(config: WorkspaceConfig, deliverable_id: str, delivera
         if not ids:
             raise WorkspaceValidationError(f"deliverable {deliverable_id} declares an empty {category!r} list")
 
-    if not deliverable.docs_refs and config.study_binding is not None:
-        pass
     for docs_ref in deliverable.docs_refs:
-        prefix = f"study:{config.study_binding.study_id}/" if config.study_binding is not None else None
-        if prefix is None:
+        if config.study_binding is None:
             raise WorkspaceValidationError(f"deliverable {deliverable_id} uses docs_refs without study_binding")
-        if not docs_ref.startswith(prefix):
-            raise WorkspaceValidationError(
-                f"deliverable {deliverable_id} docs_ref must start with {prefix!r}: {docs_ref}"
+        try:
+            resolve_docs_ref_path(
+                study_id=config.study_binding.study_id,
+                docs_root=config.study_binding.docs_root,
+                docs_ref=docs_ref,
+                workspace_id=config.workspace.id,
             )
-        docs_root = resolve_repo_path(config.study_binding.docs_root)
-        relative_ref = docs_ref.removeprefix(prefix)
-        if not ((docs_root / f"{relative_ref}.md").is_file() or (docs_root / f"{relative_ref}.yaml").is_file()):
+        except WorkspaceValidationError as exc:
             raise WorkspaceValidationError(
-                f"deliverable {deliverable_id} docs_ref path does not exist under {docs_root}: {relative_ref}"
-            )
+                f"deliverable {deliverable_id} has invalid docs_ref {docs_ref!r}: {exc}"
+            ) from exc
 
     config_sections = {
         "sources": config.sources,
