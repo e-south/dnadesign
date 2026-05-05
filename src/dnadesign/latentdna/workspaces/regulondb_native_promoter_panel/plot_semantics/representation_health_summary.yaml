@@ -18,7 +18,7 @@ math_md: |
   p_i = \frac{\lambda_i}{\sum_j \lambda_j}.
   $$
   PC1 variance fraction reports $\lambda_1 / \sum_j \lambda_j$.
-  The cosine-distance panels summarize median and interquartile range over normalized candidate rows.
+  The cosine-distance panels summarize median and interquartile range over all normalized candidate-row pairs when the scorecard sample is at or below the configured pairwise row cap; larger samples are deterministically row-sampled before pairwise distances are computed.
 rationale_md: Filters out collapsed native/core60 or output-layer spaces before comparing sigma-factor structure or native-to-core60 shifts.
 limitations_md: The retained PCA spectrum is a reduced diagnostic, not the full original feature rank. Healthy representation geometry may still encode sequence length, metadata completeness, or other nuisance factors.
 failure_modes_md: Missing sidecars, stale reducers, or row-basis mismatches can make the health gate misleading; validate the workspace before using this plot.

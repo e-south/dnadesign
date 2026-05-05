@@ -482,6 +482,8 @@ recipes:
             effective_rank_min: 2.0
             pc1_fraction_max: 0.80
             pairwise_distance_iqr_min: 0.01
+          pairwise_max_rows: 4096
+          pairwise_seed: 17
           candidates:
             - {view_id: intermediate_embedding_7b_native_source_record_seq_mean, sample_id: scorecard_sample_intermediate_embedding_7b_native_source_record_seq_mean, reducer_id: pca_intermediate_embedding_7b_native_source_record_seq_mean}
             - {view_id: output_layer_mean_7b_native_source_record_seq_mean, sample_id: scorecard_sample_output_layer_mean_7b_native_source_record_seq_mean, reducer_id: pca_output_layer_mean_7b_native_source_record_seq_mean}

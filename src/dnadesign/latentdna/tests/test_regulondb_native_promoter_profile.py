@@ -182,6 +182,8 @@ def test_live_regulondb_workspace_declares_representation_health_review_path() -
     assert "materialize_native_source_record_output_layer" in recipe_steps
     assert "materialize_core60_tss_upstream_output_layer" in recipe_steps
     assert "build_representation_health_summary_metrics" in recipe_steps
+    assert recipe_steps["build_representation_health_summary_metrics"].params["pairwise_max_rows"] == 4096
+    assert recipe_steps["build_representation_health_summary_metrics"].params["pairwise_seed"] == 17
     assert "build_sigma_factor_structure_summary_metrics" in recipe_steps
     assert "build_native_core60_shift_summary_metrics" in recipe_steps
     assert "render_representation_health_summary" in recipe_steps

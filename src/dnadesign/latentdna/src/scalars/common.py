@@ -35,6 +35,18 @@ class BuiltScalarArtifact:
     stats: dict[str, object]
 
 
+@dataclass(frozen=True, slots=True)
+class PairwiseDistanceSummary:
+    median: float
+    iqr: float
+    source_rows: int
+    evaluated_rows: int
+    pair_count: int
+    max_rows: int
+    seed: int
+    method: str
+
+
 def _require_param(params: dict[str, Any], key: str) -> Any:
     if key not in params:
         raise ContractViolationError(f"scalar.build requires param {key!r}")
@@ -149,9 +161,36 @@ def _kendall_tau(left: np.ndarray, right: np.ndarray) -> float:
     return float((concordant - discordant) / denominator)
 
 
-def _cosine_distance_upper(matrix: np.ndarray) -> np.ndarray:
+def _pairwise_cosine_distance_summary(
+    matrix: np.ndarray,
+    *,
+    max_rows: int = 4096,
+    seed: int = 17,
+) -> PairwiseDistanceSummary:
+    if max_rows < 2:
+        raise ContractViolationError("pairwise cosine distance summaries require max_rows >= 2")
     normalized = _normalized_geometry_rows(matrix)
-    return _cosine_distance_upper_from_normalized(normalized)
+    source_rows = int(normalized.shape[0])
+    if source_rows > max_rows:
+        rng = np.random.default_rng(seed)
+        indices = np.sort(rng.choice(source_rows, size=max_rows, replace=False))
+        normalized = np.ascontiguousarray(normalized[indices])
+        method = "seeded_row_sample_all_pairs"
+    else:
+        method = "exact_all_pairs"
+    distances = _cosine_distance_upper_from_normalized(normalized)
+    median = float(np.median(distances)) if distances.size else float("nan")
+    iqr = float(np.percentile(distances, 75.0) - np.percentile(distances, 25.0)) if distances.size else float("nan")
+    return PairwiseDistanceSummary(
+        median=median,
+        iqr=iqr,
+        source_rows=source_rows,
+        evaluated_rows=int(normalized.shape[0]),
+        pair_count=int(distances.size),
+        max_rows=max_rows,
+        seed=seed,
+        method=method,
+    )
 
 
 def _cosine_distance_upper_from_normalized(normalized: np.ndarray) -> np.ndarray:

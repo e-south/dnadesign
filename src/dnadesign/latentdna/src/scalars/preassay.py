@@ -31,7 +31,6 @@ from .common import (
     BuiltScalarArtifact,
     ScalarInputRef,
     _candidate_descriptor_from_view,
-    _cosine_distance_upper,
     _cosine_distance_upper_from_normalized,
     _effective_rank,
     _kendall_tau,
@@ -40,6 +39,7 @@ from .common import (
     _metric_row,
     _normalized_geometry_rows,
     _optional_param,
+    _pairwise_cosine_distance_summary,
     _pearson_correlation,
     _reducer_summary_path,
     _require_param,
@@ -189,6 +189,8 @@ def _representation_health_summary_table(
     collapse_rules = {
         str(key): float(value) for key, value in dict(_optional_param(params, "collapse_rules", default={})).items()
     }
+    pairwise_max_rows = int(_optional_param(params, "pairwise_max_rows", default=4096))
+    pairwise_seed = int(_optional_param(params, "pairwise_seed", default=17))
     rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
     for candidate in candidates:
@@ -205,17 +207,17 @@ def _representation_health_summary_table(
             if explained and explained_variance_captured > 0.0
             else float("nan")
         )
-        distances = _cosine_distance_upper(candidate_sample.matrix)
-        distance_median = float(np.median(distances)) if distances.size else float("nan")
-        distance_iqr = (
-            float(np.percentile(distances, 75.0) - np.percentile(distances, 25.0)) if distances.size else float("nan")
+        distance_summary = _pairwise_cosine_distance_summary(
+            candidate_sample.matrix,
+            max_rows=pairwise_max_rows,
+            seed=pairwise_seed,
         )
         effective_rank = _effective_rank(explained)
         failures = sum(
             [
                 effective_rank < float(collapse_rules.get("effective_rank_min", 2.0)),
                 pc1_fraction > float(collapse_rules.get("pc1_fraction_max", 0.80)),
-                distance_iqr < float(collapse_rules.get("pairwise_distance_iqr_min", 0.01)),
+                distance_summary.iqr < float(collapse_rules.get("pairwise_distance_iqr_min", 0.01)),
             ]
         )
         health_status = "fail" if failures >= 2 else "warn" if failures == 1 else "pass"
@@ -231,6 +233,12 @@ def _representation_health_summary_table(
             "pca_fit_scope_kind": str(reducer_summary.get("scope_kind") or ""),
             "pca_fit_scope_id": str(reducer_summary.get("scope_id") or ""),
             "pca_method": str(reducer_summary.get("pca_method") or reducer_summary.get("method") or ""),
+            "pairwise_distance_method": distance_summary.method,
+            "pairwise_distance_source_rows": distance_summary.source_rows,
+            "pairwise_distance_evaluated_rows": distance_summary.evaluated_rows,
+            "pairwise_distance_pair_count": distance_summary.pair_count,
+            "pairwise_distance_max_rows": distance_summary.max_rows,
+            "pairwise_distance_seed": distance_summary.seed,
             "candidate_status": "materialized",
             "candidate_materialized": True,
             "omitted_from_ranking": False,
@@ -253,13 +261,13 @@ def _representation_health_summary_table(
                 _metric_row(
                     descriptor=candidate_sample.descriptor,
                     metric_id="pairwise_cosine_distance_median",
-                    metric_value=distance_median,
+                    metric_value=distance_summary.median,
                     extra=extra,
                 ),
                 _metric_row(
                     descriptor=candidate_sample.descriptor,
                     metric_id="pairwise_cosine_distance_iqr",
-                    metric_value=distance_iqr,
+                    metric_value=distance_summary.iqr,
                     extra=extra,
                 ),
             ]
@@ -282,6 +290,12 @@ def _representation_health_summary_table(
             "pca_fit_scope_kind": "",
             "pca_fit_scope_id": "",
             "pca_method": "",
+            "pairwise_distance_method": "unavailable",
+            "pairwise_distance_source_rows": 0,
+            "pairwise_distance_evaluated_rows": 0,
+            "pairwise_distance_pair_count": 0,
+            "pairwise_distance_max_rows": pairwise_max_rows,
+            "pairwise_distance_seed": pairwise_seed,
             "candidate_status": status,
             "candidate_materialized": False,
             "omitted_from_ranking": True,
@@ -304,6 +318,7 @@ def _representation_health_summary_table(
             "candidate_count": len(candidates) + len(omitted_candidates),
             "ranked_candidate_count": len(candidates),
             "omitted_candidate_count": len(omitted_candidates),
+            "pairwise_max_rows": pairwise_max_rows,
             "rows": len(rows),
         },
     )

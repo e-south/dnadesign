@@ -85,6 +85,11 @@ $$
 
 Cosine, centroid, margin, and cosine-distance calculations operate on
 \(z_i\).
+Representation-health pairwise distance summaries use all row pairs when the
+candidate sample has at most `pairwise_max_rows` rows, currently defaulting to
+4096. Larger samples use a deterministic row sample keyed by `pairwise_seed`
+before computing all pairs in that sampled set, and the scalar output records
+the evaluated row count, pair count, seed, and method.
 
 Study builders use the collapse-tolerant normalization path from
 `standardize_and_l2_normalize(..., zero_variance_policy="drop_or_zero",

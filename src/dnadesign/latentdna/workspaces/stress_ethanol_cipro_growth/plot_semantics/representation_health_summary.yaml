@@ -20,7 +20,7 @@ math_md: |
   $$
   \frac{\lambda_1}{\sum_j \lambda_j}.
   $$
-  The other two panels report the median pairwise cosine distance and its interquartile range after the shared standardize-then-normalize contract.
+  The other two panels report the median pairwise cosine distance and its interquartile range after the shared standardize-then-normalize contract. They use all row pairs up to the configured pairwise row cap and a deterministic row sample above that cap.
 rationale_md: Filters out collapsed or near-degenerate spaces before the study compares design structure or ordered Sigma-35 signal.
 limitations_md: Reducer summaries are sample-based and low-dimensional; the current candidate reducers fit roughly 2k sampled rows and retain 16 PCA components, so the effective rank is a retained-component diagnostic rather than the full 4096-dimensional spectrum.
 failure_modes_md: A space can pass health checks while still encoding nuisance structure such as spacer length or context dilution.

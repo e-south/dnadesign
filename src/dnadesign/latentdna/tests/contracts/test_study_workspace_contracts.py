@@ -373,6 +373,8 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" not in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
     representation_health_step = pre_assay_steps["build_representation_health_summary_metrics"]
+    assert representation_health_step.params["pairwise_max_rows"] == 4096
+    assert representation_health_step.params["pairwise_seed"] == 17
     omitted_candidate_ids = {row["view_id"] for row in representation_health_step.params.get("omitted_candidates", [])}
     assert omitted_candidate_ids == {
         "output_layer_mean_7b_anchor_60bp",

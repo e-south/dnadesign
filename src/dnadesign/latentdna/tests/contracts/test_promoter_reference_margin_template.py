@@ -245,6 +245,9 @@ def test_template_recipes_are_self_materializing() -> None:
     assert "build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean" in pre_assay_steps
     assert "build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean" in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
+    representation_health_params = pre_assay_steps["build_representation_health_summary_metrics"]["params"]
+    assert representation_health_params["pairwise_max_rows"] == 4096
+    assert representation_health_params["pairwise_seed"] == 17
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
     stress_margin_anchor = pre_assay_steps["build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp"]
