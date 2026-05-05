@@ -5,6 +5,8 @@ Workspace notebook scaffold services for latentdna.
 from __future__ import annotations
 
 import runpy
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -303,6 +305,7 @@ def _notebook_smoke_status(payload: dict[str, object]) -> str:
         "notebook_exists",
         "control_plane_loads",
         "imports_resolve",
+        "marimo_check_passes",
         "plot_catalog_loads",
     )
     if any(not bool(checks.get(name)) for name in blocking_checks):
@@ -450,6 +453,7 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
                 "notebook_exists": notebook_path.is_file(),
                 "control_plane_loads": controls_path.is_file(),
                 "imports_resolve": False,
+                "marimo_check_passes": False,
                 "plot_catalog_loads": False,
                 "default_deliverable_ready": default_deliverable_status == "ok",
                 "static_links_resolve": False,
@@ -545,6 +549,7 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
         "notebook_exists": notebook_path.is_file(),
         "control_plane_loads": False,
         "imports_resolve": False,
+        "marimo_check_passes": False,
         "plot_catalog_loads": False,
         "default_deliverable_ready": False,
         "static_links_resolve": False,
@@ -559,6 +564,16 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
             checks["imports_resolve"] = True
         except Exception as exc:  # pragma: no cover - surfaced in health payload
             warnings.append(f"imports_resolve failed: {exc}")
+        marimo_check = subprocess.run(
+            [sys.executable, "-m", "marimo", "check", notebook_path.as_posix()],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        checks["marimo_check_passes"] = marimo_check.returncode == 0
+        if not checks["marimo_check_passes"]:
+            detail = (marimo_check.stderr or marimo_check.stdout or "").strip()
+            warnings.append(f"marimo_check_passes failed: {detail or 'marimo check returned nonzero'}")
     if controls_path.is_file():
         try:
             controls = WorkspaceNotebookControls.model_validate(read_json(controls_path))

@@ -245,6 +245,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert smoke_payload["status"] == "error"
     assert smoke_payload["checks"]["notebook_exists"] is True
     assert smoke_payload["checks"]["control_plane_loads"] is True
+    assert smoke_payload["checks"]["marimo_check_passes"] is True
     assert smoke_payload["checks"]["default_deliverable_ready"] is False
 
     inspect_health_result = _RUNNER.invoke(
@@ -255,6 +256,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     inspect_health_payload = json.loads(inspect_health_result.stdout)
     assert inspect_health_payload["data"]["health"]["status"] == "error"
     assert inspect_health_payload["data"]["health"]["checks"]["notebook_exists"] is True
+    assert inspect_health_payload["data"]["health"]["checks"]["marimo_check_passes"] is True
 
     status_before = _RUNNER.invoke(
         app,
@@ -411,6 +413,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert health_after.exit_code == 0, health_after.stdout
     health_after_payload = json.loads(health_after.stdout)
     assert health_after_payload["data"]["health"]["status"] == "ok"
+    assert health_after_payload["data"]["health"]["checks"]["marimo_check_passes"] is True
 
     export_path = workspace_dir / "atlas_review.html"
     export_result = subprocess.run(
@@ -533,6 +536,7 @@ def test_notebook_smoke_uses_live_default_deliverable_status(tmp_path: Path, mon
     assert smoke_result.exit_code != 0, smoke_result.stdout
     smoke_payload = json.loads(smoke_result.stdout)
     assert smoke_payload["status"] == "error"
+    assert smoke_payload["checks"]["marimo_check_passes"] is True
     assert smoke_payload["checks"]["default_deliverable_ready"] is False
     assert "plot freshness requires attention" in "".join(smoke_payload["warnings"])
 
