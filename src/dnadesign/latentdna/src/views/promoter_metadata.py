@@ -182,6 +182,10 @@ def _sig35_variant_from_feature_detail(row: dict[str, object]) -> str | None:
 
 
 def _used_tfbs_detail_entries(value: object) -> list[dict[str, object]]:
+    return _coerce_list_of_dict_entries(value, field_name="densegen__used_tfbs_detail")
+
+
+def _coerce_list_of_dict_entries(value: object, *, field_name: str) -> list[dict[str, object]]:
     if value is None:
         return []
     if hasattr(value, "as_py"):
@@ -193,19 +197,19 @@ def _used_tfbs_detail_entries(value: object) -> list[dict[str, object]]:
         try:
             value = json.loads(text)
         except json.JSONDecodeError as exc:  # pragma: no cover - malformed payloads are caught by callers
-            raise ContractViolationError("densegen__used_tfbs_detail must be valid JSON when encoded as text") from exc
+            raise ContractViolationError(f"{field_name} must be valid JSON when encoded as text") from exc
     if not isinstance(value, list) and hasattr(value, "tolist"):
         converted = value.tolist()
         if isinstance(converted, list):
             value = converted
     if not isinstance(value, list):
-        raise ContractViolationError("densegen__used_tfbs_detail must decode to a list of dict entries")
+        raise ContractViolationError(f"{field_name} must decode to a list of dict entries")
     entries: list[dict[str, object]] = []
     for item in value:
         if hasattr(item, "as_py"):
             item = item.as_py()
         if not isinstance(item, dict):
-            raise ContractViolationError("densegen__used_tfbs_detail entries must be dictionaries")
+            raise ContractViolationError(f"{field_name} entries must be dictionaries")
         entries.append(dict(item))
     return entries
 
@@ -281,32 +285,7 @@ def _seq_annot_feature_entries(value: object) -> list[dict[str, object]]:
 
 
 def _generic_feature_entries(value: object, *, field_name: str) -> list[dict[str, object]]:
-    if value is None:
-        return []
-    if hasattr(value, "as_py"):
-        value = value.as_py()
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return []
-        try:
-            value = json.loads(text)
-        except json.JSONDecodeError as exc:  # pragma: no cover - malformed payloads are caught by callers
-            raise ContractViolationError(f"{field_name} must be valid JSON when encoded as text") from exc
-    if not isinstance(value, list) and hasattr(value, "tolist"):
-        converted = value.tolist()
-        if isinstance(converted, list):
-            value = converted
-    if not isinstance(value, list):
-        raise ContractViolationError(f"{field_name} must decode to a list of dict entries")
-    entries: list[dict[str, object]] = []
-    for item in value:
-        if hasattr(item, "as_py"):
-            item = item.as_py()
-        if not isinstance(item, dict):
-            raise ContractViolationError(f"{field_name} entries must be dictionaries")
-        entries.append(dict(item))
-    return entries
+    return _coerce_list_of_dict_entries(value, field_name=field_name)
 
 
 def _feature_sequence_from_qualifiers(feature: dict[str, object]) -> str | None:
