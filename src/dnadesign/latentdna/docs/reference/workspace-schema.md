@@ -1,11 +1,15 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-04
+**Last verified:** 2026-05-05
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
 `outputs/plots`, `outputs/notebooks`, `outputs/exports`, and `outputs/runs`.
+LatentDNA core contracts are sequence-family agnostic: promoter labels,
+RegulonDB annotations, stress-study design axes, or any future biological
+sequence-family semantics must enter through workspace configuration, not
+package-level defaults.
 
 Core sections:
 
@@ -78,12 +82,32 @@ Current runtime limits:
   larger promoter-standard collections can be represented without dense static
   labels.
 - `metadata.derivations` supports row-local `copy`, `regex_capture`,
-  `map_values`, `coalesce`, and `constant`, plus cross-source `lookup`.
+  `map_values`, `coalesce`, and `constant`, row-backed `annotation`, plus
+  cross-source `lookup`. `annotation` derivations declare `source: row`, a
+  handler path, a study-specific `derive` value, `required_columns`,
+  optional `any_required_column_groups`, `missing_policy`, and optional
+  `value_type`. Promoter and RegulonDB-specific annotations are explicit
+  workspace derivations; generic row contracts do not infer them from column
+  names.
   Lookup derivations join a materialized source row's `left_key` to a declared
   source table's `right_key` and copy one `value_column`, failing by default
   on null keys, duplicate right keys, or missing matches.
+- Source declarations may add `metadata_include` for source-local row
+  metadata. By default those columns append to workspace-level
+  `metadata.include`; set `metadata_include_mode: replace` when a source is a
+  reference or diagnostic surface with its own explicit metadata boundary and
+  should not inherit study-specific annotation derivations from the workspace
+  default list.
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
-- `notebook generate` currently emits one workspace notebook surface per declared `notebooks.<id>`, with `notebooks.<id>.default_deliverable` selecting the initial catalog focus while all plot, run, and manifest browsing stays read-only. `notebook smoke` runs both import smoke and `marimo check` so generated notebooks must remain valid marimo DAGs.
+- `notebook generate` currently emits one read-only workspace notebook app per
+  declared `notebooks.<id>`. The app has one expressive surface selected by an
+  artifact-group dropdown rather than top-level review/geometry tabs. Controls
+  are data-driven from `controls.json`: persisted plot artifact, candidate-set
+  or grid/single mode, model, representation family, context, view, projection,
+  hue, and reference overlay. Plot and geometry accordions render in the same
+  selected surface so interpretation is not hidden behind tab state.
+  `notebook smoke` runs both import smoke and `marimo check` so generated
+  notebooks must remain valid marimo DAGs.
 - Notebook controls expose both `reference_labels` for small static callout
   sets and `reference_sets` for selector-backed all/collection/subset modes.
   Reference sets may use `where` for OR-style selector membership and
@@ -111,6 +135,10 @@ Current runtime limits:
   `stats.rows` and `stats.dims`. Current generated workspaces must surface
   missing shape stats as unknown control-plane metadata rather than inspecting
   matrix files during notebook bootstrap.
+- Pre-assay `scalar.build` recipes use explicit metadata dimensions for
+  `dataset_overview`; package code does not supply promoter-specific default
+  dimensions. Recipes that need source class, design family, Sigma-35, or other
+  study axes must declare those columns and their category order in params.
 - Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
   for ordered metadata axes. The axis contract lives in recipe params:
   `axis.column` selects the grouping column, exactly one of `axis.order_path` or
@@ -144,7 +172,12 @@ Current runtime limits:
 - `notebook generate` now refuses to overwrite or regenerate a notebook when the default deliverable has freshness drift; refresh the deliverable or its linked recipe first so the notebook remains a review surface over fresh artifacts.
 - `workspace init --from-study-dir` currently hydrates the checked-in promoter-study pre-assay template by binding `merged_anchor_insert` to the study's merged-anchor dataset, `full_context_1kb` to the construct-context dataset, and writing a typed `study_binding` block with separate record-plane and deliverable-doc roots.
 - `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
-- `validate workspace --deep` currently performs schema-only pressure checks against declared sources, views, cohorts, landmarks, and the bound study directory without loading embedding payloads.
+- `validate workspace --deep` currently performs schema-only pressure checks
+  against declared sources, metadata derivation inputs, views, cohorts,
+  landmarks, notebooks, and the bound study directory without loading embedding
+  payloads. If a source-backed view asks for a derived metadata column, deep
+  validation fails unless the derivation and required input columns are
+  declared explicitly.
 - `infer_feature_sidecar` sources expose canonical Infer outputs from
   `<usr-dataset>/_derived/infer/feature_aliases.parquet` joined to
   `feature_vectors.parquet`, `_views/sequence_views.parquet`, mutable

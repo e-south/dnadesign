@@ -5,7 +5,7 @@
 **Surface role:** downstream-analysis
 **Owner-boundary:** latentdna
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-28
+**Last verified:** 2026-05-05
 **Registry-id:** latentdna.promoter-study.representation-comparison
 **Entry artifact:** usr_prom_eth_cip_anchor, construct_prom_eth_cip_context, usr_promoter_references, construct_prom_eth_cip_reference_core60, and construct_prom_eth_cip_reference_contexts
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
@@ -16,13 +16,14 @@ landmark, and dataset-overview plots. Embedding-bearing views must come from
 `_derived/infer/feature_aliases.parquet` joined to `feature_vectors.parquet`
 and the dataset-local sequence-view sidecars; LatentDNA no longer depends on
 USR row-overlay embedding columns for the active 7B study surfaces.
-Sigma-35 metadata is source-backed, not ladder-hardcoded: workspace metadata derives
-`sig35_variant` from DenseGen plan tokens, DenseGen fixed-element details, USR
-`seq_annot` `-35` features, or Construct retained-feature bounds. Annotated
-unranked hexamers are kept in source inventory and eligible plots; only
-ordinal-rank statistics restrict themselves to the explicit b-f order file.
-The package-level scalar primitive is the generic `ordinal_axis_audit`; this
-workspace config maps that generic axis audit onto Sigma-35 metric names.
+Sigma-35 metadata is a study-configured annotation derivation, not a LatentDNA
+package default: this workspace explicitly derives `sig35_variant` from
+DenseGen plan tokens, DenseGen fixed-element details, USR `seq_annot` `-35`
+features, or Construct retained-feature bounds. Annotated unranked hexamers
+are kept in source inventory and eligible plots; only ordinal-rank statistics
+restrict themselves to the explicit b-f order file. The package-level scalar
+primitive is the generic `ordinal_axis_audit`; this workspace config maps that
+generic axis audit onto Sigma-35 metric names.
 
 The active contract is still pre-assay representation triage: choose a plausible
 mean-pooled Evo2 feature space \(X\) for later supervised modeling. Available
@@ -69,8 +70,13 @@ selector, label, overlay, and missing-status contract.
 ### Notebook role
 
 - `latent_geometry_browser` stays a single notebook artifact.
-- `Plots` is the primary surface for reviewing persisted plots in scientific order.
-- Plot-level interpretation belongs in the study deliverable markdown, not in this workflow doc.
+- The generated Marimo app has one dropdown-driven surface, not separate review
+  and geometry tabs.
+- Grid mode is the default for multi-view candidate sets, while single-view
+  geometry remains a first-class control.
+- Plot-level and view-level accordions render in the selected surface. Their
+  interpretation belongs in the study deliverable markdown, not in this
+  workflow doc.
 
 ### Shared Geometry Contract
 
@@ -122,11 +128,20 @@ mean, reverse-complement full-context sequence mean, reverse-complement context
 anchor mean, reference core60 `analysis_window`, and reference forward and
 reverse-complement contexts. The reference sources select zero feature aliases
 until Infer writes the canonical sidecars for
-`infer_prom_eth_cip_reference_views_7b`. Output-layer mean vectors are declared
-as planned vector views. Log-likelihood total and mean-per-token values are
-tracked by Infer scalar sidecars and remain diagnostic/QC surfaces, not active
-LatentDNA geometry defaults. 20B and concat surfaces are not active in this
+`infer_prom_eth_cip_reference_views_7b`. Stress-study output-layer mean vectors
+and log-likelihood total or mean-per-token values remain planned or diagnostic
+until their sidecars are materialized and the workspace config promotes them to
+current decision geometry. 20B and concat surfaces are not active in this
 workspace contract.
+
+### RegulonDB note
+
+The separate `regulondb_native_promoter_panel` workspace uses the same generic
+LatentDNA machinery. Its core60 source is a TSS-upstream `[0,60)` analysis
+window from native 81 bp records, not a -10/-35 centered promoter box window.
+RegulonDB sigma-factor, confidence, and completeness labels are native row
+metadata or explicit lookup derivations; they are not aliases for
+`sig35_variant`.
 
 ### Sequence-View Plot Contract
 
