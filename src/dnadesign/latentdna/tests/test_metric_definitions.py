@@ -11,6 +11,7 @@ def test_metric_registry_uses_comparison_metadata_and_drops_selection_state() ->
     assert overlap.direction == "higher_is_better"
     assert overlap.unit == "fraction"
     assert overlap.aggregation_level == "pair"
+    assert not hasattr(overlap, "math_definition")
     assert "|N_a ∩ N_b| / k" in overlap.mathematical_definition
 
     jaccard = resolve_metric_definition("neighbor_set_jaccard")

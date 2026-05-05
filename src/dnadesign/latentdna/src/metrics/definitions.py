@@ -21,10 +21,6 @@ class MetricDefinition:
     definition_version: str = "2026-04-17"
 
     @property
-    def math_definition(self) -> str:
-        return self.mathematical_definition
-
-    @property
     def higher_is_better(self) -> bool | None:
         if self.direction == "higher_is_better":
             return True

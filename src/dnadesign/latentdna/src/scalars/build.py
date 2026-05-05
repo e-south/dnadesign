@@ -24,6 +24,7 @@ from ..sources.resolver import inspect_source_schema, read_records_table, resolv
 from ..views.promoter_metadata import _promoter_metadata_value
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
+from .classification_metrics import binary_metrics, dual_joint_margin
 from .common import (
     BuiltScalarArtifact,
     ScalarInputRef,
@@ -478,16 +479,16 @@ def _similarity_margin_table(
         "wildtype_margin_ethanol_vs_control",
         "wildtype_margin_cipro_vs_control",
     }.issubset(table.column_names):
-        dual_joint_margin = np.minimum(
+        wildtype_dual_margin = dual_joint_margin(
             np.asarray(table["wildtype_margin_ethanol_vs_control"].to_pylist(), dtype=np.float32),
             np.asarray(table["wildtype_margin_cipro_vs_control"].to_pylist(), dtype=np.float32),
         )
-        table = _replace_or_append_column(table, "dual_joint_margin", dual_joint_margin)
+        table = _replace_or_append_column(table, "dual_joint_margin", wildtype_dual_margin)
     if {
         "synthetic_margin_ethanol_vs_background",
         "synthetic_margin_cipro_vs_background",
     }.issubset(table.column_names):
-        synthetic_dual_margin = np.minimum(
+        synthetic_dual_margin = dual_joint_margin(
             np.asarray(table["synthetic_margin_ethanol_vs_background"].to_pylist(), dtype=np.float32),
             np.asarray(table["synthetic_margin_cipro_vs_background"].to_pylist(), dtype=np.float32),
         )
@@ -1070,52 +1071,6 @@ def _join_view_columns_table(
     return joined, inputs, {"source_count": len(sources), "join_keys": key_columns}
 
 
-def _average_precision(labels: np.ndarray, scores: np.ndarray) -> float:
-    order = np.argsort(scores, kind="stable")[::-1]
-    sorted_labels = labels[order]
-    positives = int(np.sum(sorted_labels))
-    if positives == 0:
-        return float("nan")
-    tp = np.cumsum(sorted_labels, dtype=np.float64)
-    fp = np.cumsum(1 - sorted_labels, dtype=np.float64)
-    precision = tp / np.maximum(tp + fp, 1.0)
-    recall = tp / float(positives)
-    recall_prev = np.concatenate(([0.0], recall[:-1]))
-    return float(np.sum((recall - recall_prev) * precision, dtype=np.float64))
-
-
-def _roc_auc(labels: np.ndarray, scores: np.ndarray) -> float:
-    positives = int(np.sum(labels))
-    negatives = int(labels.size - positives)
-    if positives == 0 or negatives == 0:
-        return float("nan")
-    order = np.argsort(scores, kind="stable")
-    ranks = np.empty_like(order, dtype=np.float64)
-    ranks[order] = np.arange(1, labels.size + 1, dtype=np.float64)
-    positive_rank_sum = float(np.sum(ranks[labels == 1], dtype=np.float64))
-    return float((positive_rank_sum - (positives * (positives + 1) / 2.0)) / (positives * negatives))
-
-
-def _binary_metrics(
-    *,
-    rows: list[dict[str, Any]],
-    label_column: str,
-    positive_values: set[str],
-    score_values: np.ndarray,
-) -> dict[str, float]:
-    labels = np.asarray([1 if str(row.get(label_column)) in positive_values else 0 for row in rows], dtype=np.int8)
-    return {
-        "auroc": _roc_auc(labels, score_values),
-        "auprc": _average_precision(labels, score_values),
-    }
-
-
-def _dual_joint_margin(left_scores: np.ndarray, right_scores: np.ndarray) -> np.ndarray:
-    if left_scores.shape != right_scores.shape:
-        raise ContractViolationError("dual joint margin requires aligned score vectors")
-    return np.minimum(left_scores, right_scores)
-
-
 def _neighbor_label_enrichment(rows_table: pa.Table, indices: np.ndarray, *, label_column: str) -> float:
     if label_column not in rows_table.column_names:
         raise ContractViolationError(f"neighbor rows are missing label column {label_column!r}")
@@ -1343,39 +1298,39 @@ def _representation_scorecard_table(
             cipro_scores = np.asarray(
                 [float(row["wildtype_margin_cipro_vs_control"]) for row in rows], dtype=np.float64
             )
-            candidate_metrics["wildtype_margin_ethanol_auroc"] = _binary_metrics(
+            candidate_metrics["wildtype_margin_ethanol_auroc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=ethanol_values,
                 score_values=ethanol_scores,
             )["auroc"]
-            candidate_metrics["wildtype_margin_ethanol_auprc"] = _binary_metrics(
+            candidate_metrics["wildtype_margin_ethanol_auprc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=ethanol_values,
                 score_values=ethanol_scores,
             )["auprc"]
-            candidate_metrics["wildtype_margin_cipro_auroc"] = _binary_metrics(
+            candidate_metrics["wildtype_margin_cipro_auroc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=cipro_values,
                 score_values=cipro_scores,
             )["auroc"]
-            candidate_metrics["wildtype_margin_cipro_auprc"] = _binary_metrics(
+            candidate_metrics["wildtype_margin_cipro_auprc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=cipro_values,
                 score_values=cipro_scores,
             )["auprc"]
             if dual_values:
-                dual_scores = _dual_joint_margin(ethanol_scores, cipro_scores)
-                candidate_metrics["wildtype_margin_dual_joint_auroc"] = _binary_metrics(
+                dual_scores = dual_joint_margin(ethanol_scores, cipro_scores)
+                candidate_metrics["wildtype_margin_dual_joint_auroc"] = binary_metrics(
                     rows=rows,
                     label_column=label_column,
                     positive_values=dual_values,
                     score_values=dual_scores,
                 )["auroc"]
-                candidate_metrics["wildtype_margin_dual_joint_auprc"] = _binary_metrics(
+                candidate_metrics["wildtype_margin_dual_joint_auprc"] = binary_metrics(
                     rows=rows,
                     label_column=label_column,
                     positive_values=dual_values,
@@ -1393,39 +1348,39 @@ def _representation_scorecard_table(
             cipro_scores = np.asarray(
                 [float(row["synthetic_margin_cipro_vs_background"]) for row in rows], dtype=np.float64
             )
-            candidate_metrics["synthetic_margin_ethanol_auroc"] = _binary_metrics(
+            candidate_metrics["synthetic_margin_ethanol_auroc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=ethanol_values,
                 score_values=ethanol_scores,
             )["auroc"]
-            candidate_metrics["synthetic_margin_ethanol_auprc"] = _binary_metrics(
+            candidate_metrics["synthetic_margin_ethanol_auprc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=ethanol_values,
                 score_values=ethanol_scores,
             )["auprc"]
-            candidate_metrics["synthetic_margin_cipro_auroc"] = _binary_metrics(
+            candidate_metrics["synthetic_margin_cipro_auroc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=cipro_values,
                 score_values=cipro_scores,
             )["auroc"]
-            candidate_metrics["synthetic_margin_cipro_auprc"] = _binary_metrics(
+            candidate_metrics["synthetic_margin_cipro_auprc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=cipro_values,
                 score_values=cipro_scores,
             )["auprc"]
             if dual_values:
-                dual_scores = _dual_joint_margin(ethanol_scores, cipro_scores)
-                candidate_metrics["synthetic_margin_dual_joint_auroc"] = _binary_metrics(
+                dual_scores = dual_joint_margin(ethanol_scores, cipro_scores)
+                candidate_metrics["synthetic_margin_dual_joint_auroc"] = binary_metrics(
                     rows=rows,
                     label_column=label_column,
                     positive_values=dual_values,
                     score_values=dual_scores,
                 )["auroc"]
-                candidate_metrics["synthetic_margin_dual_joint_auprc"] = _binary_metrics(
+                candidate_metrics["synthetic_margin_dual_joint_auprc"] = binary_metrics(
                     rows=rows,
                     label_column=label_column,
                     positive_values=dual_values,
@@ -1442,25 +1397,25 @@ def _representation_scorecard_table(
                 raise ContractViolationError(f"view {scalar_view_id} is missing score column {scalar_column!r}")
             rows = table.to_pylist()
             scores = np.asarray([float(row[scalar_column]) for row in rows], dtype=np.float64)
-            candidate_metrics["scalar_ethanol_auroc"] = _binary_metrics(
+            candidate_metrics["scalar_ethanol_auroc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=ethanol_values,
                 score_values=scores,
             )["auroc"]
-            candidate_metrics["scalar_ethanol_auprc"] = _binary_metrics(
+            candidate_metrics["scalar_ethanol_auprc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=ethanol_values,
                 score_values=scores,
             )["auprc"]
-            candidate_metrics["scalar_cipro_auroc"] = _binary_metrics(
+            candidate_metrics["scalar_cipro_auroc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=cipro_values,
                 score_values=scores,
             )["auroc"]
-            candidate_metrics["scalar_cipro_auprc"] = _binary_metrics(
+            candidate_metrics["scalar_cipro_auprc"] = binary_metrics(
                 rows=rows,
                 label_column=label_column,
                 positive_values=cipro_values,
