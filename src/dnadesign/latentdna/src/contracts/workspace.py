@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .notebook import NotebookConfig
 from .plot import PlotConfig
 from .promoter_metadata import PROMOTER_METADATA_DERIVATIONS
+from .representations import validate_representation_family_tags, validate_representation_identity
 
 Identifier = Annotated[str, Field(min_length=1)]
 NonEmptyText = Annotated[str, Field(min_length=1)]
@@ -222,12 +223,24 @@ class SourceBackedViewConfig(StrictWorkspaceModel):
     tags: dict[str, Any] = Field(default_factory=dict)
     role: str | None = None
 
+    @model_validator(mode="after")
+    def _validate_representation_family(self) -> "SourceBackedViewConfig":
+        validate_representation_identity(self.coordinate_space_id, owner="source-backed view coordinate_space_id")
+        validate_representation_family_tags(self.tags, owner="source-backed view")
+        return self
+
 
 class DerivedViewConfig(StrictWorkspaceModel):
     derive: ViewDeriveSpec
     coordinate_space_id: str
     tags: dict[str, Any] = Field(default_factory=dict)
     role: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_representation_family(self) -> "DerivedViewConfig":
+        validate_representation_identity(self.coordinate_space_id, owner="derived view coordinate_space_id")
+        validate_representation_family_tags(self.tags, owner="derived view")
+        return self
 
 
 ViewConfig = SourceBackedViewConfig | DerivedViewConfig
@@ -431,6 +444,7 @@ class CandidateSetConfig(StrictWorkspaceModel):
     def _validate_membership_rule(self) -> "CandidateSetConfig":
         if not self.views and not self.include_tags:
             raise ValueError("candidate_sets must declare views or include_tags")
+        validate_representation_family_tags(self.include_tags, owner="candidate set")
         return self
 
 

@@ -957,6 +957,157 @@ study_binding:
         load_workspace_config(workspace_dir)
 
 
+def test_load_workspace_config_rejects_retired_output_logit_family(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  old_output_surface:
+    source: anchor60
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: 7b, family: pooled_logits}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="retired representation family"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_output_logit_coordinate_space(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  output_layer_mean_7b_anchor_60bp:
+    source: anchor60
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_pooled_logits
+    tags: {model: 7b, family: output_layer_mean}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="retired representation term"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_output_logit_view_id(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  pooled_logits_7b_anchor_60bp:
+    source: anchor60
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: 7b, family: output_layer_mean}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="retired representation term"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_family_candidate_selector(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+candidate_sets:
+  old_outputs:
+    label: Old outputs
+    include_tags: {family: pooled_logits}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="retired representation family"):
+        load_workspace_config(workspace_dir)
+
+
 def test_load_workspace_config_rejects_docs_ref_path_traversal(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

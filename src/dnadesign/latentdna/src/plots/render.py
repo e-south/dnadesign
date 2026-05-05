@@ -1451,8 +1451,8 @@ def _short_candidate_family(value: object) -> str:
     normalized = text.casefold()
     if normalized == "intermediate block mean":
         return "Block"
-    if normalized == "pooled logits":
-        return "Logits"
+    if normalized == "output-layer mean":
+        return "Output"
     return text
 
 

@@ -1093,8 +1093,8 @@ def _candidate_descriptor(candidate_id: str) -> dict[str, object]:
     family = "unknown"
     if "intermediate_embedding" in candidate_id:
         family = "intermediate_embedding"
-    elif "pooled_logits" in candidate_id:
-        family = "pooled_logits"
+    elif "output_layer_mean" in candidate_id:
+        family = "output_layer_mean"
     elif candidate_id.startswith("log_likelihood_per_token_"):
         family = "log_likelihood"
     model = "20b" if "_20b_" in candidate_id else "7b" if "_7b_" in candidate_id else None

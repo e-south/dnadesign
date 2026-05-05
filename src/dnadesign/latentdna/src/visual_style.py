@@ -496,7 +496,7 @@ def compact_candidate_title(value: object) -> str:
             "evo 2",
             "anchor",
             "context",
-            "pooled logits",
+            "output-layer mean",
             "intermediate block",
             "intermediate embedding",
             "concat",
@@ -515,7 +515,7 @@ def compact_candidate_title(value: object) -> str:
         (r"\bAnchor \+ 1\s*Kb Context Concat\b", "anchor + 1 kb ctx"),
         (r"\bIntermediate Block Mean\b", "Block"),
         (r"\bIntermediate Embedding\b", "Block"),
-        (r"\bPooled Logits\b", "Logits"),
+        (r"\bOutput[- ]Layer Mean\b", "Output"),
     ]
     for pattern, replacement in replacements:
         compact = re.sub(pattern, replacement, compact, flags=re.IGNORECASE)

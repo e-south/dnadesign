@@ -763,7 +763,7 @@ def test_enrich_projection_frame_limits_candidate_metric_tables_to_active_view(t
     )
     _write_scalar_table(
         tmp_path,
-        "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+        "design_centroid_margins_output_layer_mean_20b_anchor_60bp",
         pd.DataFrame(
             {
                 "id": ["anchor_1", "anchor_2"],
@@ -773,7 +773,7 @@ def test_enrich_projection_frame_limits_candidate_metric_tables_to_active_view(t
     )
     _write_view_rows(
         tmp_path,
-        "pooled_logits_20b_anchor_60bp",
+        "output_layer_mean_20b_anchor_60bp",
         pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
     )
 
@@ -787,13 +787,13 @@ def test_enrich_projection_frame_limits_candidate_metric_tables_to_active_view(t
                 "columns": ["id", "synthetic_margin_ethanol_vs_background"],
             },
             {
-                "artifact_id": "design_centroid_margins_pooled_logits_20b_anchor_60bp",
-                "relative_path": "scalars/design_centroid_margins_pooled_logits_20b_anchor_60bp/table.parquet",
+                "artifact_id": "design_centroid_margins_output_layer_mean_20b_anchor_60bp",
+                "relative_path": "scalars/design_centroid_margins_output_layer_mean_20b_anchor_60bp/table.parquet",
                 "columns": ["id", "synthetic_margin_ethanol_vs_background"],
             },
         ],
         output_root=tmp_path,
-        view_id="pooled_logits_20b_anchor_60bp",
+        view_id="output_layer_mean_20b_anchor_60bp",
         required_columns=["synthetic_margin_ethanol_vs_background"],
     )
 
@@ -916,7 +916,7 @@ def test_enrich_projection_frame_rejects_required_column_when_joined_values_are_
 def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_path: Path) -> None:
     _write_scalar_table(
         tmp_path,
-        "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+        "design_centroid_margins_output_layer_mean_20b_anchor_60bp",
         pd.DataFrame(
             {
                 "id": ["anchor_1", "anchor_2"],
@@ -926,7 +926,7 @@ def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_p
     )
     _write_scalar_table(
         tmp_path,
-        "context_delta_distribution_pooled_logits_20b_anchor_60bp",
+        "context_delta_distribution_output_layer_mean_20b_anchor_60bp",
         pd.DataFrame(
             {
                 "id": ["anchor_1", "anchor_2"],
@@ -936,7 +936,7 @@ def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_p
     )
     _write_view_rows(
         tmp_path,
-        "pooled_logits_20b_anchor_60bp",
+        "output_layer_mean_20b_anchor_60bp",
         pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
     )
 
@@ -947,18 +947,20 @@ def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_p
             frame,
             [
                 {
-                    "artifact_id": "design_centroid_margins_pooled_logits_20b_anchor_60bp",
-                    "relative_path": "scalars/design_centroid_margins_pooled_logits_20b_anchor_60bp/table.parquet",
+                    "artifact_id": "design_centroid_margins_output_layer_mean_20b_anchor_60bp",
+                    "relative_path": "scalars/design_centroid_margins_output_layer_mean_20b_anchor_60bp/table.parquet",
                     "columns": ["id", "synthetic_margin_ethanol_vs_background"],
                 },
                 {
-                    "artifact_id": "context_delta_distribution_pooled_logits_20b_anchor_60bp",
-                    "relative_path": "scalars/context_delta_distribution_pooled_logits_20b_anchor_60bp/table.parquet",
+                    "artifact_id": "context_delta_distribution_output_layer_mean_20b_anchor_60bp",
+                    "relative_path": (
+                        "scalars/context_delta_distribution_output_layer_mean_20b_anchor_60bp/table.parquet"
+                    ),
                     "columns": ["id", "synthetic_margin_ethanol_vs_background"],
                 },
             ],
             output_root=tmp_path,
-            view_id="pooled_logits_20b_anchor_60bp",
+            view_id="output_layer_mean_20b_anchor_60bp",
             required_columns=["synthetic_margin_ethanol_vs_background"],
         )
 
@@ -966,7 +968,7 @@ def test_enrich_projection_frame_rejects_ambiguous_required_column_sources(tmp_p
 def test_enrich_projection_frame_skips_ambiguous_optional_columns_in_non_strict_mode(tmp_path: Path) -> None:
     _write_scalar_table(
         tmp_path,
-        "design_centroid_margins_pooled_logits_20b_anchor_60bp",
+        "design_centroid_margins_output_layer_mean_20b_anchor_60bp",
         pd.DataFrame(
             {
                 "id": ["anchor_1", "anchor_2"],
@@ -976,7 +978,7 @@ def test_enrich_projection_frame_skips_ambiguous_optional_columns_in_non_strict_
     )
     _write_scalar_table(
         tmp_path,
-        "sigma35_stress_margins_pooled_logits_20b_anchor_60bp",
+        "sigma35_stress_margins_output_layer_mean_20b_anchor_60bp",
         pd.DataFrame(
             {
                 "id": ["anchor_1", "anchor_2"],
@@ -986,7 +988,7 @@ def test_enrich_projection_frame_skips_ambiguous_optional_columns_in_non_strict_
     )
     _write_view_rows(
         tmp_path,
-        "pooled_logits_20b_anchor_60bp",
+        "output_layer_mean_20b_anchor_60bp",
         pd.DataFrame({"id": ["anchor_1", "anchor_2"]}),
     )
 
@@ -995,18 +997,18 @@ def test_enrich_projection_frame_skips_ambiguous_optional_columns_in_non_strict_
         frame,
         [
             {
-                "artifact_id": "design_centroid_margins_pooled_logits_20b_anchor_60bp",
-                "relative_path": "scalars/design_centroid_margins_pooled_logits_20b_anchor_60bp/table.parquet",
+                "artifact_id": "design_centroid_margins_output_layer_mean_20b_anchor_60bp",
+                "relative_path": "scalars/design_centroid_margins_output_layer_mean_20b_anchor_60bp/table.parquet",
                 "columns": ["id", "synthetic_margin_ethanol_vs_background"],
             },
             {
-                "artifact_id": "sigma35_stress_margins_pooled_logits_20b_anchor_60bp",
-                "relative_path": "scalars/sigma35_stress_margins_pooled_logits_20b_anchor_60bp/table.parquet",
+                "artifact_id": "sigma35_stress_margins_output_layer_mean_20b_anchor_60bp",
+                "relative_path": "scalars/sigma35_stress_margins_output_layer_mean_20b_anchor_60bp/table.parquet",
                 "columns": ["id", "synthetic_margin_ethanol_vs_background"],
             },
         ],
         output_root=tmp_path,
-        view_id="pooled_logits_20b_anchor_60bp",
+        view_id="output_layer_mean_20b_anchor_60bp",
         required_columns=["synthetic_margin_ethanol_vs_background"],
         strict_required_columns=False,
     )

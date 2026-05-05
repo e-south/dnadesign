@@ -234,27 +234,27 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
     _write_workspace_config(workspace_dir)
     config_path = workspace_dir / "config.yaml"
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    config["views"]["pooled_logits_7b_anchor_60bp"] = {
+    config["views"]["output_layer_mean_7b_anchor_60bp"] = {
         "source": "anchor_60bp",
         "vector": {"kind": "column", "name": "embedding"},
         "coordinate_space_id": "demo_space",
-        "tags": {"model": "7b", "family": "pooled_logits", "scope": "anchor_60bp"},
+        "tags": {"model": "7b", "family": "output_layer_mean", "scope": "anchor_60bp"},
     }
     config["notebooks"]["latent_geometry_browser"]["geometry_order"] = [
-        "pooled_logits_7b_anchor_60bp",
+        "output_layer_mean_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
     ]
     config["notebooks"]["latent_geometry_browser"]["candidate_grid_views"] = [
-        "pooled_logits_7b_anchor_60bp",
+        "output_layer_mean_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
     ]
     config["notebooks"]["latent_geometry_browser"]["candidate_grid_panel_titles"] = [
-        "Pooled logits",
+        "Output-layer mean",
         "Intermediate",
     ]
     config["notebooks"]["latent_geometry_browser"]["default_layout"] = "candidate_grid"
     config["notebooks"]["latent_geometry_browser"]["default_compare_views"] = [
-        "pooled_logits_7b_anchor_60bp",
+        "output_layer_mean_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
     ]
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
@@ -264,11 +264,11 @@ def test_notebook_controls_use_workspace_notebook_geometry_order_and_default_com
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
     assert geometry_ids == [
-        "pooled_logits_7b_anchor_60bp",
+        "output_layer_mean_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
     ]
     assert controls.geometry_controls.default_layout == "candidate_grid"
-    assert controls.geometry_controls.default_compare_left == "pooled_logits_7b_anchor_60bp"
+    assert controls.geometry_controls.default_compare_left == "output_layer_mean_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_anchor_60bp"
 
 
@@ -278,22 +278,22 @@ def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Pa
     _write_workspace_config(workspace_dir)
     config_path = workspace_dir / "config.yaml"
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    config["views"]["pooled_logits_7b_anchor_60bp"] = {
+    config["views"]["output_layer_mean_7b_anchor_60bp"] = {
         "source": "anchor_60bp",
         "vector": {"kind": "column", "name": "embedding"},
-        "coordinate_space_id": "demo_logits",
-        "tags": {"model": "7b", "family": "pooled_logits", "scope": "anchor_60bp"},
+        "coordinate_space_id": "demo_output_layer_mean",
+        "tags": {"model": "7b", "family": "output_layer_mean", "scope": "anchor_60bp"},
     }
     config["candidate_sets"] = {
         "two_view_x": {
             "label": "Two-view X",
             "description": "Fixture candidate set.",
             "views": [
-                "pooled_logits_7b_anchor_60bp",
+                "output_layer_mean_7b_anchor_60bp",
                 "intermediate_embedding_7b_anchor_60bp",
             ],
             "panel_titles": {
-                "pooled_logits_7b_anchor_60bp": "Pooled logits",
+                "output_layer_mean_7b_anchor_60bp": "Output-layer mean",
                 "intermediate_embedding_7b_anchor_60bp": "Intermediate",
             },
         }
@@ -307,7 +307,7 @@ def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Pa
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
     assert geometry_ids == [
-        "pooled_logits_7b_anchor_60bp",
+        "output_layer_mean_7b_anchor_60bp",
         "intermediate_embedding_7b_anchor_60bp",
     ]
     assert controls.geometry_controls.default_layout == "candidate_set__two_view_x"
@@ -315,7 +315,7 @@ def test_notebook_controls_resolve_candidate_sets_as_layout_presets(tmp_path: Pa
     assert candidate_set.candidate_set_id == "two_view_x"
     assert candidate_set.view_ids == geometry_ids
     assert candidate_set.available_view_ids == geometry_ids
-    assert candidate_set.panel_titles == ["Pooled logits", "Intermediate"]
+    assert candidate_set.panel_titles == ["Output-layer mean", "Intermediate"]
     assert [row.status for row in candidate_set.views] == ["missing", "missing"]
     assert {preset.id for preset in controls.geometry_controls.layout_presets} >= {"candidate_set__two_view_x"}
 

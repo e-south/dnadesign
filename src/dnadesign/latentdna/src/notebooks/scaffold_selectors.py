@@ -112,7 +112,6 @@ def render_selector_cells() -> tuple[str, ...]:
                     (
                         {
                             "intermediate_embedding": "Intermediate block mean",
-                            "pooled_logits": "Pooled logits",
                             "output_layer_mean": "Output-layer mean",
                         }.get(value, value.replace("_", " ")),
                         value,

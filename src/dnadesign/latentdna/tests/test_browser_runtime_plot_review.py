@@ -108,7 +108,7 @@ def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scal
                 "display_name": ["Effective rank", "Effective rank"],
                 "direction": ["higher_is_better", "higher_is_better"],
                 "unit": ["dims", "dims"],
-                "candidate_family": ["intermediate_embedding", "pooled_logits"],
+                "candidate_family": ["intermediate_embedding", "output_layer_mean"],
                 "candidate_model": ["20b", "20b"],
                 "candidate_scope": ["anchor_60bp", "full_context_1kb"],
                 "candidate_label": ["candidate_a", "candidate_b"],
@@ -436,7 +436,7 @@ def test_render_plot_review_surface_preserves_context_distribution_family_titles
             "kind": "distribution_grid",
             "scalar_ids": [
                 "context_delta_distribution_intermediate_embedding_7b",
-                "context_delta_distribution_pooled_logits_7b",
+                "context_delta_distribution_output_layer_mean_7b",
             ],
             "value_column": "score",
             "metric_columns": ["score"],
@@ -452,7 +452,7 @@ def test_render_plot_review_surface_preserves_context_distribution_family_titles
     try:
         titles = [" ".join(axis.get_title().split()) for axis in fig.axes]
         assert any("Intermediate Block Mean Evo 2 7B" in title for title in titles)
-        assert any("Pooled Logits Evo 2 7B" in title for title in titles)
+        assert any("Output Layer Mean Evo 2 7B" in title for title in titles)
     finally:
         plt.close(fig)
 

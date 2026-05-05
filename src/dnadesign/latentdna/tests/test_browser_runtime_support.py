@@ -464,13 +464,13 @@ def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> N
 
 
 def test_key_value_table_formats_summary_values() -> None:
-    table = key_value_table([("Deliverables", 7), ("Families", ["intermediate_embedding", "pooled_logits"])])
+    table = key_value_table([("Deliverables", 7), ("Families", ["intermediate_embedding", "output_layer_mean"])])
 
     assert isinstance(table, mo.ui.table)
     frame = table.data.drop(columns=["_marimo_row_id"])
     assert frame.to_dict(orient="records") == [
         {"Field": "Deliverables", "Value": 7},
-        {"Field": "Families", "Value": ["intermediate_embedding", "pooled_logits"]},
+        {"Field": "Families", "Value": ["intermediate_embedding", "output_layer_mean"]},
     ]
 
 

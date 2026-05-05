@@ -55,7 +55,6 @@ _DEFAULT_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
-    "pooled_logits": "Pooled logits",
     "output_layer_mean": "Output-layer mean",
 }
 

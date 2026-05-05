@@ -197,7 +197,7 @@ def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotati
             "candidate_label": "candidate_c",
             "candidate_model": "evo2_20b",
             "candidate_scope": "anchor_60bp",
-            "candidate_family": "pooled_logits",
+            "candidate_family": "output_layer_mean",
             "direction": "higher_is_better",
             "unit": "ratio",
             "metric_value": 0.67,
@@ -251,7 +251,7 @@ def test_render_metric_panel_uses_compact_candidate_tick_labels() -> None:
             "candidate_label": "candidate_b",
             "candidate_model": "evo2_20b",
             "candidate_scope": "full_context_1kb",
-            "candidate_family": "pooled_logits",
+            "candidate_family": "output_layer_mean",
             "health_status": "warn",
             "direction": "higher_is_better",
             "unit": "dims",
@@ -272,7 +272,7 @@ def test_render_metric_panel_uses_compact_candidate_tick_labels() -> None:
         )
 
         tick_labels = [label.get_text() for label in ax.get_yticklabels()]
-        assert tick_labels == ["7B anchor insert Block", "20B 1kb ctx Logits"]
+        assert tick_labels == ["7B anchor insert Block", "20B 1kb ctx Output"]
         assert float(ax.get_box_aspect()) == 1.0
     finally:
         plt.close(fig)
@@ -299,7 +299,7 @@ def test_render_metric_panel_uses_placeholder_when_all_values_are_missing() -> N
             "candidate_label": "candidate_b",
             "candidate_model": "evo2_20b",
             "candidate_scope": "full_context_1kb",
-            "candidate_family": "pooled_logits",
+            "candidate_family": "output_layer_mean",
             "direction": "higher_is_better",
             "unit": "ratio",
             "metric_value": math.nan,
@@ -349,7 +349,7 @@ def test_render_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> No
             "candidate_label": "candidate_b",
             "candidate_model": "evo2_7b",
             "candidate_scope": "anchor_vs_context",
-            "candidate_family": "pooled_logits",
+            "candidate_family": "output_layer_mean",
             "direction": "higher_is_better",
             "unit": "cosine",
             "metric_value": 0.8,
@@ -373,7 +373,7 @@ def test_render_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> No
             "candidate_label": "candidate_d",
             "candidate_model": "evo2_20b",
             "candidate_scope": "anchor_vs_context",
-            "candidate_family": "pooled_logits",
+            "candidate_family": "output_layer_mean",
             "direction": "higher_is_better",
             "unit": "cosine",
             "metric_value": 0.04,
@@ -593,7 +593,7 @@ def test_draw_resolved_annotations_highlights_all_reference_rows_when_labels_are
 
 
 def test_derived_panel_label_humanizes_context_delta_distribution_ids() -> None:
-    assert _derived_panel_label("context_delta_distribution_pooled_logits_7b") == "Pooled Logits Evo 2 7B"
+    assert _derived_panel_label("context_delta_distribution_output_layer_mean_7b") == "Output Layer Mean Evo 2 7B"
 
 
 def test_wrap_plot_title_respects_explicit_max_lines() -> None:
@@ -657,7 +657,7 @@ def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_t
             "candidate_label": "candidate_b",
             "candidate_model": "evo2_20b",
             "candidate_scope": "full_context_1kb",
-            "candidate_family": "pooled_logits",
+            "candidate_family": "output_layer_mean",
             "direction": "higher_is_better",
             "unit": "cosine distance",
             "metric_value": 0.05,

@@ -11,6 +11,7 @@ from ..contracts.errors import CoordinateSpaceError, WorkspaceValidationError
 from ..contracts.ids import validate_identifier
 from ..contracts.notebook import NotebookConfig, WorkspaceNotebookConfig
 from ..contracts.recipe import SUPPORTED_RECIPE_OPS, expected_step_artifacts, topological_step_order
+from ..contracts.representations import validate_representation_identity
 from ..contracts.workspace import (
     AcceptanceCheckConfig,
     DeliverableConfig,
@@ -61,6 +62,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
         validate_identifier(source_id, label="source id")
     for view_id in config.views:
         validate_identifier(view_id, label="view id")
+        _validate_representation_identity(view_id, owner="view id")
     for alignment_id in config.alignments:
         validate_identifier(alignment_id, label="alignment id")
     for scalar_id in config.scalars:
@@ -182,6 +184,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
 
     for candidate_set_id, candidate_set in config.candidate_sets.items():
         validate_identifier(candidate_set_id, label="candidate_set id")
+        _validate_representation_identity(candidate_set_id, owner="candidate_set id")
         for view_id in candidate_set.views:
             validate_identifier(view_id, label=f"candidate_set {candidate_set_id} view")
             if view_id not in config.views:
@@ -265,6 +268,13 @@ def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
         topological_step_order(recipe.steps)
     except ValueError as exc:
         raise WorkspaceValidationError(f"recipe {recipe_id} contains a cycle") from exc
+
+
+def _validate_representation_identity(value: str, *, owner: str) -> None:
+    try:
+        validate_representation_identity(value, owner=owner)
+    except ValueError as exc:
+        raise WorkspaceValidationError(str(exc)) from exc
 
 
 def _validate_notebook(config: WorkspaceConfig, notebook_id: str, notebook: NotebookConfig) -> None:

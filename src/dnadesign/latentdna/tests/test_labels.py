@@ -7,8 +7,8 @@ from dnadesign.latentdna.src.labels import humanize_candidate, humanize_label, h
 
 def test_humanize_label_preserves_required_public_labels() -> None:
     assert humanize_label("intermediate_embedding") == "Intermediate block mean"
-    assert humanize_label("pooled_logits") == "Pooled logits"
     assert humanize_label("output_layer_mean") == "Output-layer mean"
+    assert humanize_label("output_layer_mean_7b_anchor_60bp") == "Anchor-source insert output-layer mean"
     assert humanize_label("anchor_60bp") == "Anchor-source insert"
     assert humanize_label("merged_anchor_insert_seq_mean") == "Mixed-length anchor-source insert"
     assert humanize_label("full_context_1kb") == "1 kb construct context"

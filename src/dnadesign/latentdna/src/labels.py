@@ -40,7 +40,6 @@ _DIRECT_LABELS = {
     "reference_core60_pca_scree": "Reference core60 PCA scree",
     "representation_scree_diagnostic": "PCA variance decay",
     "intermediate_embedding": "Intermediate block mean",
-    "pooled_logits": "Pooled logits",
     "output_layer_mean": "Output-layer mean",
     "anchor_60bp": "Anchor-source insert",
     "merged_anchor_insert_seq_mean": "Mixed-length anchor-source insert",
@@ -78,8 +77,8 @@ _DIRECT_LABELS = {
     "intermediate_embedding_7b_full_context_anchor_mean": "1 kb anchor mean",
     "intermediate_embedding_7b_anchor_plus_full_context_concat": "Anchor + 1 kb concat",
     "intermediate_embedding_7b_anchor_plus_anchor_mean_concat": "Anchor + anchor-mean concat",
-    "pooled_logits_7b_anchor_60bp": "Anchor-source insert logits",
-    "pooled_logits_7b_full_context_1kb": "1 kb logits",
+    "output_layer_mean_7b_anchor_60bp": "Anchor-source insert output-layer mean",
+    "output_layer_mean_7b_full_context_1kb": "1 kb output-layer mean",
     "context_self_cosine": "Context self-cosine",
     "context_shift_l2": "Context-shift L2 distance",
     "context_self_cosine_median": "Median context self-cosine",
@@ -228,18 +227,10 @@ def _title_token(token: str) -> str:
     return token.capitalize()
 
 
-def humanize_label(value: object) -> str:
-    direct = _direct_label(value)
-    if direct is not None:
-        return direct
-
-    text = _normalize_key(value)
-    if not text:
-        return ""
-
+def _apply_common_phrase_rewrites(text: str) -> str:
     normalized = text.replace("_", " ")
     normalized = re.sub(r"\bintermediate embedding\b", "Intermediate block mean", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"\bpooled logits\b", "Pooled logits", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\boutput[- ]layer mean\b", "Output-layer mean", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\bfull context anchor mean\b", "1 kb context anchor mean", normalized, flags=re.IGNORECASE)
     normalized = re.sub(
         r"\banchor plus anchor mean concat\b",
@@ -260,6 +251,19 @@ def humanize_label(value: object) -> str:
         normalized,
         flags=re.IGNORECASE,
     )
+    return normalized
+
+
+def humanize_label(value: object) -> str:
+    direct = _direct_label(value)
+    if direct is not None:
+        return direct
+
+    text = _normalize_key(value)
+    if not text:
+        return ""
+
+    normalized = _apply_common_phrase_rewrites(text)
     normalized = re.sub(r"\bevo2 20b\b", "Evo 2 20B", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\bevo2 7b\b", "Evo 2 7B", normalized, flags=re.IGNORECASE)
     direct = _direct_label(normalized)
@@ -292,29 +296,7 @@ def humanize_candidate(candidate_key: str | Mapping[str, str]) -> str:
     direct = _direct_label(text)
     if direct is not None:
         return direct
-    normalized = text.replace("_", " ")
-    normalized = re.sub(r"\bintermediate embedding\b", "Intermediate block mean", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"\bpooled logits\b", "Pooled logits", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"\bfull context anchor mean\b", "1 kb context anchor mean", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(
-        r"\banchor plus anchor mean concat\b",
-        "Anchor + anchor-mean concat",
-        normalized,
-        flags=re.IGNORECASE,
-    )
-    normalized = re.sub(
-        r"\banchor plus full context concat\b",
-        "Anchor + 1 kb context concat",
-        normalized,
-        flags=re.IGNORECASE,
-    )
-    normalized = re.sub(r"\banchor 60 ?bp\b", "anchor-source insert mean", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(
-        r"\bfull context 1 ?kb\b",
-        "1 kb construct context",
-        normalized,
-        flags=re.IGNORECASE,
-    )
+    normalized = _apply_common_phrase_rewrites(text)
     normalized = re.sub(r"\b20b\b", "Evo 2 20B", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\b7b\b", "Evo 2 7B", normalized, flags=re.IGNORECASE)
     return humanize_label(normalized)
