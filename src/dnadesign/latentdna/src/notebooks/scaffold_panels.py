@@ -28,7 +28,7 @@ def render_scope_note_cell() -> str:
             plot_scope_note = _support.mo.md(_plot_scope_text)
             geometry_scope_note = _support.mo.md(
                 (
-                    "This tab is a projection browser for persisted geometry and metadata overlays. "
+                    "This surface is a projection browser for persisted geometry and metadata overlays. "
                     "Point positions are fixed by the saved coordinates, so hue changes only recolor the same geometry."
                 )
             )
@@ -320,22 +320,7 @@ def render_plot_review_cell() -> str:
                         _support.mo.accordion(_accordion_sections, lazy=True)
                     )
 
-                _grid_blocks = [
-                    plot_scope_note,
-                ]
-                if _selectors:
-                    _grid_blocks.append(
-                        _support.mo.hstack(_selectors, justify="start", align="end", wrap=True, gap=0.28)
-                    )
-                _grid_blocks.append(_plot_surface)
-                plot_review_panel = _support.mo.ui.tabs(
-                    {
-                        "Grid": _support.mo.vstack(_grid_blocks, gap=0.35),
-                        "Explore": _support.mo.vstack(_section_blocks, gap=0.4),
-                    },
-                    value="Grid",
-                    lazy=True,
-                )
+                plot_review_panel = _support.mo.vstack(_section_blocks, gap=0.4)
             return (plot_review_panel,)
         """
     )
@@ -349,6 +334,7 @@ def render_geometry_resolution_cell() -> str:
             context_selector,
             geometry_selector,
             layout_selector,
+            projection_selector,
             runtime,
             selected_family,
             selected_model,
@@ -358,6 +344,7 @@ def render_geometry_resolution_cell() -> str:
             _selected_context = str(context_selector.value)
             _selected_view_id = str(geometry_selector.value)
             _selected_layout_id = str(layout_selector.value)
+            _selected_projection_id = str(projection_selector.value)
             selected_layout = next(
                 (
                     row
@@ -370,7 +357,12 @@ def render_geometry_resolution_cell() -> str:
             panel_specs = []
             if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
                 if selected_geometry is not None:
-                    _projection_id = next(iter(selected_geometry.get("projection_ids", [])), "")
+                    _projection_ids = [str(item) for item in selected_geometry.get("projection_ids", [])]
+                    _projection_id = (
+                        _selected_projection_id
+                        if _selected_projection_id in _projection_ids
+                        else next(iter(_projection_ids), "")
+                    )
                     panel_specs = [
                         {
                             "view_id": _selected_view_id,
@@ -522,6 +514,7 @@ def render_geometry_panel_cell() -> str:
             layout_selector,
             model_selector,
             panel_specs,
+            projection_selector,
             projection_frames,
             runtime,
             selected_geometry,
@@ -545,7 +538,9 @@ def render_geometry_panel_cell() -> str:
             )
             _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
             if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
-                _control_widgets.append(geometry_selector)
+                _control_widgets.extend([geometry_selector, projection_selector])
+            else:
+                _control_widgets.append(projection_selector)
             _control_widgets.extend([hue_selector, geometry_reference_selector])
             _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
             _accordion_sections = {
@@ -615,35 +610,46 @@ def render_geometry_panel_cell() -> str:
     )
 
 
-def render_page_tabs_cell() -> str:
+def render_browser_surface_cell() -> str:
     return dedent(
         """\
         @app.cell
         def _(runtime):
             _support = runtime.support
             _plot_review = runtime.plot_review
-            default_tab = {
-                "plots": "Review",
-                "geometry_browser": "Geometry browser",
-            }.get(_plot_review.default_surface, "Review")
-            get_active_top_tab, set_active_top_tab = _support.mo.state(default_tab)
-            return (default_tab, get_active_top_tab, set_active_top_tab)
+            surface_options = {
+                "Persisted plots": "plots",
+                "Projection browser": "geometry_browser",
+            }
+            default_surface = (
+                _plot_review.default_surface
+                if _plot_review.default_surface in set(surface_options.values())
+                else "plots"
+            )
+            surface_selector = _support.mo.ui.dropdown(
+                options=surface_options,
+                value=(
+                    _support.option_key_for_value(surface_options, default_surface)
+                    or next(iter(surface_options))
+                ),
+                label="Artifact group",
+            )
+            return (surface_selector,)
 
 
         @app.cell
-        def _(geometry_panel, get_active_top_tab, plot_review_panel, runtime, set_active_top_tab):
+        def _(geometry_panel, plot_review_panel, runtime, surface_selector):
             _support = runtime.support
-            active_top_tab = get_active_top_tab() or "Review"
-            page_tabs = _support.mo.ui.tabs(
-                {
-                    "Review": plot_review_panel,
-                    "Geometry browser": geometry_panel,
-                },
-                value=active_top_tab,
-                lazy=True,
-                on_change=set_active_top_tab,
+            selected_surface = str(surface_selector.value)
+            selected_panel = geometry_panel if selected_surface == "geometry_browser" else plot_review_panel
+            browser_surface = _support.mo.vstack(
+                [
+                    _support.mo.hstack([surface_selector], justify="start", align="end", wrap=True, gap=0.28),
+                    selected_panel,
+                ],
+                gap=0.35,
             )
-            return (page_tabs,)
+            return (browser_surface,)
         """
     )
 
@@ -652,8 +658,8 @@ def render_page_display_cell() -> str:
     return dedent(
         """\
         @app.cell
-        def _(page_tabs):
-            page_tabs
+        def _(browser_surface):
+            browser_surface
             return
         """
     )

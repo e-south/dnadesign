@@ -613,6 +613,9 @@ def _default_layout_id(
     candidate_preset_id = f"candidate_set__{default_candidate_set}" if default_candidate_set else ""
     if candidate_preset_id in available:
         return candidate_preset_id
+    for preset in presets:
+        if preset.mode == "fixed_grid" and len(preset.view_ids) > 1:
+            return preset.id
     return "single_view"
 
 

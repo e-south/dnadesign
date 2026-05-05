@@ -85,7 +85,7 @@ def render_selector_cells() -> tuple[str, ...]:
                         _support.option_key_for_value(_geometry.layout_options, _geometry.layout_default)
                         or next(iter(_geometry.layout_options))
                     ),
-                    label="Layout",
+                    label="Candidate set / mode",
                 )
                 return (layout_selector, model_selector)
             """
@@ -204,6 +204,34 @@ def render_selector_cells() -> tuple[str, ...]:
                     full_width=True,
                 )
                 return (geometry_selector,)
+            """
+        ),
+        dedent(
+            """\
+            @app.cell
+            def _(geometry_selector, runtime):
+                _geometry = runtime.geometry
+                _support = runtime.support
+
+                _selected_geometry = _geometry.geometry_rows_by_id.get(str(geometry_selector.value))
+                projection_ids = [
+                    str(projection_id)
+                    for projection_id in (_selected_geometry or {}).get("projection_ids", [])
+                    if str(projection_id).strip()
+                ]
+                projection_options = _support.labeled_options(
+                    (projection_id.replace("_", " "), projection_id)
+                    for projection_id in projection_ids
+                )
+                empty_projection_options = {"Default projection": ""}
+                projection_selector = _support.mo.ui.dropdown(
+                    options=projection_options or empty_projection_options,
+                    value=next(iter(projection_options or empty_projection_options)),
+                    label="Projection",
+                    searchable=True,
+                    full_width=True,
+                )
+                return (projection_selector,)
             """
         ),
         dedent(

@@ -349,20 +349,20 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert 'label="Model"' in notebook_text
     assert 'label="Family"' in notebook_text
     assert 'label="Context"' in notebook_text
-    assert 'label="Layout"' in notebook_text
+    assert 'label="Candidate set / mode"' in notebook_text
     assert 'label="Geometry"' in notebook_text
+    assert 'label="Projection"' in notebook_text
     assert 'label="Hue"' in notebook_text
-    assert notebook_text.count("searchable=True") == 1
+    assert notebook_text.count("searchable=True") == 2
     assert "on_change=set_requested_hue" in notebook_text
     assert 'label="Left geometry"' not in notebook_text
     assert 'label="Right geometry"' not in notebook_text
-    assert "Plots" not in notebook_text
-    assert "Geometry browser" in notebook_text
-    assert '"Geometry browser": geometry_panel' in notebook_text
-    assert "Review" in notebook_text
-    assert "mo.state(default_tab)" in notebook_text
-    assert "value=active_top_tab" in notebook_text
-    assert "on_change=set_active_top_tab" in notebook_text
+    assert "Artifact group" in notebook_text
+    assert "Projection browser" in notebook_text
+    assert '"Geometry browser": geometry_panel' not in notebook_text
+    assert "mo.state(default_tab)" not in notebook_text
+    assert "value=active_top_tab" not in notebook_text
+    assert "on_change=set_active_top_tab" not in notebook_text
     assert "lazy=True" in notebook_text
     assert "Review the current artifact set: " in notebook_text
     assert "Point positions are fixed by the saved coordinates" in notebook_text
