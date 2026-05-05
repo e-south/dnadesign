@@ -17,7 +17,8 @@ defaults:
     require_override_above_fail: true
 study_binding:
   study_id: regulondb_native_promoter_panel
-  docs_root: src/dnadesign/studies/regulondb_native_promoter_panel
+  record_root: docs/studies/regulondb_native_promoter_panel
+  deliverable_docs_root: src/dnadesign/studies/regulondb_native_promoter_panel
 sources:
   native_records:
     kind: usr

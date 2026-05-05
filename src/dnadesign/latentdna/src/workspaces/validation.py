@@ -22,6 +22,11 @@ from ..contracts.workspace import (
     WorkspaceConfig,
 )
 from ..studies.docs_refs import resolve_docs_ref_path
+from ..studies.study_binding import (
+    REQUIRED_STUDY_DELIVERABLE_DOC_FILES,
+    REQUIRED_STUDY_RECORD_FILES,
+    missing_required_files,
+)
 from .paths import resolve_repo_path
 
 
@@ -239,12 +244,24 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
             plot_owners[plot_id] = deliverable_id
 
     if config.study_binding is not None:
-        docs_root = resolve_repo_path(config.study_binding.docs_root)
-        study_yaml = docs_root / "study.yaml"
-        if not docs_root.is_dir():
-            raise WorkspaceValidationError(f"study docs_root does not exist: {docs_root}")
-        if not study_yaml.is_file():
-            raise WorkspaceValidationError(f"study docs_root is missing study.yaml: {docs_root}")
+        record_root = resolve_repo_path(config.study_binding.record_root)
+        missing_record_files = missing_required_files(record_root, REQUIRED_STUDY_RECORD_FILES)
+        if not record_root.is_dir():
+            raise WorkspaceValidationError(f"study record_root does not exist: {record_root}")
+        if missing_record_files:
+            raise WorkspaceValidationError(
+                "study record_root is missing required checked-in record files: "
+                f"{record_root} ({', '.join(sorted(missing_record_files))})"
+            )
+        deliverable_docs_root = resolve_repo_path(config.study_binding.deliverable_docs_root)
+        missing_docs_files = missing_required_files(deliverable_docs_root, REQUIRED_STUDY_DELIVERABLE_DOC_FILES)
+        if not deliverable_docs_root.is_dir():
+            raise WorkspaceValidationError(f"study deliverable_docs_root does not exist: {deliverable_docs_root}")
+        if missing_docs_files:
+            raise WorkspaceValidationError(
+                "study deliverable_docs_root is missing required files: "
+                f"{deliverable_docs_root} ({', '.join(sorted(missing_docs_files))})"
+            )
 
 
 def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
@@ -433,7 +450,7 @@ def _validate_deliverable(config: WorkspaceConfig, deliverable_id: str, delivera
         try:
             resolve_docs_ref_path(
                 study_id=config.study_binding.study_id,
-                docs_root=config.study_binding.docs_root,
+                deliverable_docs_root=config.study_binding.deliverable_docs_root,
                 docs_ref=docs_ref,
                 workspace_id=config.workspace.id,
             )

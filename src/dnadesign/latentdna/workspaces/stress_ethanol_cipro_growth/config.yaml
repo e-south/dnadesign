@@ -2246,4 +2246,5 @@ deliverables:
     acceptance_checks: []
 study_binding:
   study_id: stress_ethanol_cipro_growth
-  docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth
+  record_root: docs/studies/stress_ethanol_cipro_growth
+  deliverable_docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth

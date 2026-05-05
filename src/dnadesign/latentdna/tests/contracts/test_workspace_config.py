@@ -957,6 +957,36 @@ study_binding:
         load_workspace_config(workspace_dir)
 
 
+def test_load_workspace_config_rejects_legacy_study_binding_docs_root(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+study_binding:
+  study_id: stress_ethanol_cipro_growth
+  docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        load_workspace_config(workspace_dir)
+
+
 def test_load_workspace_config_rejects_retired_output_logit_family(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -1111,11 +1141,16 @@ candidate_sets:
 def test_load_workspace_config_rejects_docs_ref_path_traversal(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
-    docs_root = tmp_path / "study_docs"
-    docs_root.mkdir()
-    (docs_root / "study.yaml").write_text("study_id: demo_study\n", encoding="utf-8")
-    (docs_root / "deliverables").mkdir()
-    (docs_root / "deliverables" / "review.md").write_text("# Review\n", encoding="utf-8")
+    record_root = tmp_path / "docs" / "studies" / "demo_study"
+    record_root.mkdir(parents=True)
+    for file_name in ("campaign.yaml", "datasets.yaml", "ops.study.yaml"):
+        (record_root / file_name).write_text("version: 1\n", encoding="utf-8")
+    (record_root / "status.md").write_text("## Demo\n", encoding="utf-8")
+    deliverable_docs_root = tmp_path / "study_docs"
+    deliverable_docs_root.mkdir()
+    (deliverable_docs_root / "study.yaml").write_text("study_id: demo_study\n", encoding="utf-8")
+    (deliverable_docs_root / "deliverables").mkdir()
+    (deliverable_docs_root / "deliverables" / "review.md").write_text("# Review\n", encoding="utf-8")
     (tmp_path / "outside.md").write_text("# Outside\n", encoding="utf-8")
     (workspace_dir / "config.yaml").write_text(
         f"""
@@ -1168,7 +1203,8 @@ deliverables:
     acceptance_checks: []
 study_binding:
   study_id: demo_study
-  docs_root: {docs_root.as_posix()}
+  record_root: {record_root.as_posix()}
+  deliverable_docs_root: {deliverable_docs_root.as_posix()}
         """.strip()
         + "\n",
         encoding="utf-8",

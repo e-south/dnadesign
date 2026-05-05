@@ -31,13 +31,13 @@ def _relative_docs_ref(prefix: str, docs_ref: str, *, workspace_id: str) -> str:
 def resolve_docs_ref_path(
     *,
     study_id: str,
-    docs_root: str | Path,
+    deliverable_docs_root: str | Path,
     docs_ref: str,
     workspace_id: str,
 ) -> dict[str, str]:
     prefix = f"study:{study_id}/"
     relative_ref = _relative_docs_ref(prefix, docs_ref, workspace_id=workspace_id)
-    resolved_docs_root = resolve_repo_path(docs_root)
+    resolved_docs_root = resolve_repo_path(deliverable_docs_root)
     for suffix in _DOCS_REF_SUFFIXES:
         candidate = (resolved_docs_root / f"{relative_ref}{suffix}").resolve()
         if resolved_docs_root not in candidate.parents:
@@ -57,7 +57,7 @@ def resolve_docs_ref(context: WorkspaceContext, docs_ref: str) -> dict[str, str]
         raise WorkspaceValidationError(f"deliverable docs_ref requires study_binding: {docs_ref}")
     return resolve_docs_ref_path(
         study_id=binding.study_id,
-        docs_root=binding.docs_root,
+        deliverable_docs_root=binding.deliverable_docs_root,
         docs_ref=docs_ref,
         workspace_id=context.workspace_id,
     )

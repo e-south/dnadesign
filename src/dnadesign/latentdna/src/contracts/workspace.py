@@ -490,7 +490,8 @@ class DeliverableConfig(StrictWorkspaceModel):
 
 class StudyBindingConfig(StrictWorkspaceModel):
     study_id: NonEmptyText
-    docs_root: NonEmptyText
+    record_root: NonEmptyText
+    deliverable_docs_root: NonEmptyText
     readiness_vocabulary: list[Literal["missing", "attention", "ok"]] = Field(default_factory=list)
 
 

@@ -18,6 +18,11 @@ from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConf
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..sources.resolver import inspect_source_schema, resolve_source
+from ..studies.study_binding import (
+    REQUIRED_STUDY_DELIVERABLE_DOC_FILES,
+    REQUIRED_STUDY_RECORD_FILES,
+    missing_required_files,
+)
 from ..views.row_contracts import source_backed_view_row_contract
 from ..workspaces.loader import load_workspace_config
 from ..workspaces.paths import resolve_repo_path
@@ -362,17 +367,26 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
 
     study_binding = None
     if context.config.study_binding is not None:
-        docs_root = resolve_repo_path(context.config.study_binding.docs_root)
-        required_files = ["study.yaml"]
-        missing = [name for name in required_files if not (docs_root / name).exists()]
-        if missing:
+        record_root = resolve_repo_path(context.config.study_binding.record_root)
+        missing_record_files = missing_required_files(record_root, REQUIRED_STUDY_RECORD_FILES)
+        if missing_record_files:
             raise WorkspaceValidationError(
-                f"study docs_root is missing required files: {docs_root} ({', '.join(sorted(missing))})"
+                "study record_root is missing required checked-in record files: "
+                f"{record_root} ({', '.join(sorted(missing_record_files))})"
+            )
+        deliverable_docs_root = resolve_repo_path(context.config.study_binding.deliverable_docs_root)
+        missing_docs_files = missing_required_files(deliverable_docs_root, REQUIRED_STUDY_DELIVERABLE_DOC_FILES)
+        if missing_docs_files:
+            raise WorkspaceValidationError(
+                "study deliverable_docs_root is missing required files: "
+                f"{deliverable_docs_root} ({', '.join(sorted(missing_docs_files))})"
             )
         study_binding = {
             "study_id": context.config.study_binding.study_id,
-            "docs_root": docs_root.as_posix(),
-            "required_files": required_files,
+            "record_root": record_root.as_posix(),
+            "deliverable_docs_root": deliverable_docs_root.as_posix(),
+            "record_required_files": list(REQUIRED_STUDY_RECORD_FILES),
+            "deliverable_docs_required_files": list(REQUIRED_STUDY_DELIVERABLE_DOC_FILES),
         }
 
     notebook_details = _deep_validate_notebook_artifacts(context)

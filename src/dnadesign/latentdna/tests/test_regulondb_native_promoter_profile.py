@@ -147,6 +147,11 @@ def test_live_regulondb_workspace_declares_representation_health_review_path() -
     notebook = context.config.notebooks["latent_geometry_browser"]
     recipe_steps = {step.id: step for step in context.config.recipes["regulondb_review_recipe"].steps}
 
+    assert context.config.study_binding is not None
+    assert context.config.study_binding.record_root == "docs/studies/regulondb_native_promoter_panel"
+    assert context.config.study_binding.deliverable_docs_root == (
+        "src/dnadesign/studies/regulondb_native_promoter_panel"
+    )
     assert notebook.default_deliverable == "representation_health_summary"
     assert notebook.ordered_plots[:5] == [
         "representation_health_summary",

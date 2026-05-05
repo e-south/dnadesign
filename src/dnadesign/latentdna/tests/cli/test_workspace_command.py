@@ -529,7 +529,10 @@ def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_templa
     assert config_payload["sources"]["full_context_1kb"]["root"] == expected_usr_root
     assert config_payload["sources"]["full_context_1kb"]["dataset"] == "promoter/test_contexts"
     assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
-    assert config_payload["study_binding"]["docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
+    assert config_payload["study_binding"]["record_root"] == study_dir.resolve().as_posix()
+    assert (
+        config_payload["study_binding"]["deliverable_docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
+    )
 
 
 def test_workspace_show_reports_workspace_summary(tmp_path: Path) -> None:
