@@ -63,7 +63,7 @@ def test_resolve_plot_render_asset_uses_raster_fallback_for_large_svg(tmp_path: 
     assert "inline notebook rendering" in notice
 
 
-def test_resolve_plot_render_asset_reports_missing_raster_fallback(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_reports_missing_alternate(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     svg_path.write_bytes(b"x" * (MAX_INLINE_SVG_BYTES + 1))
 
@@ -71,10 +71,10 @@ def test_resolve_plot_render_asset_reports_missing_raster_fallback(tmp_path: Pat
 
     assert render_path is None
     assert notice is not None
-    assert "no raster or pdf fallback" in notice.lower()
+    assert "no raster or pdf alternate" in notice.lower()
 
 
-def test_resolve_plot_render_asset_prefers_pdf_for_large_inline_asset(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_uses_small_raster_for_large_inline_svg(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     png_path = tmp_path / "plot.png"
     svg_path.write_bytes(b"x" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
@@ -88,7 +88,7 @@ def test_resolve_plot_render_asset_prefers_pdf_for_large_inline_asset(tmp_path: 
     assert "large for inline notebook rendering" in notice
 
 
-def test_resolve_plot_render_asset_uses_pdf_fallback_when_raster_is_missing(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_uses_pdf_alternate_when_raster_is_missing(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     pdf_path = tmp_path / "plot.pdf"
     svg_path.write_bytes(b"x" * (MAX_INLINE_SVG_BYTES + 1))
@@ -99,6 +99,62 @@ def test_resolve_plot_render_asset_uses_pdf_fallback_when_raster_is_missing(tmp_
     assert render_path == pdf_path
     assert notice is not None
     assert "plot.pdf" in notice
+
+
+def test_resolve_plot_render_asset_skips_oversize_raster_alternate(tmp_path: Path) -> None:
+    svg_path = tmp_path / "plot.svg"
+    png_path = tmp_path / "plot.png"
+    pdf_path = tmp_path / "plot.pdf"
+    svg_path.write_bytes(b"x" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+    pdf_path.write_bytes(b"%PDF-1.4")
+
+    render_path, notice = resolve_plot_render_asset(svg_path)
+
+    assert render_path == pdf_path
+    assert notice is not None
+    assert "plot.pdf" in notice
+
+
+def test_resolve_plot_render_asset_uses_pdf_for_oversize_raster(tmp_path: Path) -> None:
+    png_path = tmp_path / "plot.png"
+    pdf_path = tmp_path / "plot.pdf"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+    pdf_path.write_bytes(b"%PDF-1.4")
+
+    render_path, notice = resolve_plot_render_asset(png_path)
+
+    assert render_path == pdf_path
+    assert notice is not None
+    assert "plot.png" in notice
+    assert "plot.pdf" in notice
+    assert "inline notebook asset limit" in notice
+
+
+def test_resolve_plot_render_asset_refuses_oversize_raster_without_pdf(tmp_path: Path) -> None:
+    png_path = tmp_path / "plot.png"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+
+    render_path, notice = resolve_plot_render_asset(png_path)
+
+    assert render_path is None
+    assert notice is not None
+    assert "no pdf alternate" in notice.lower()
+
+
+def test_render_plot_asset_does_not_read_oversize_raster_without_pdf(tmp_path: Path, monkeypatch) -> None:
+    png_path = tmp_path / "plot.png"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+
+    def _fail_read_bytes(_path: Path) -> bytes:
+        raise AssertionError("oversize raster should not be read into notebook memory")
+
+    monkeypatch.setattr(Path, "read_bytes", _fail_read_bytes)
+
+    rendered = render_plot_asset(png_path, workspace_dir=tmp_path, alt_text="large raster")
+
+    assert "plot.png" in rendered.text
+    assert "data:image/png;base64" not in rendered.text
 
 
 def test_category_color_map_prefers_stable_semantic_colors() -> None:

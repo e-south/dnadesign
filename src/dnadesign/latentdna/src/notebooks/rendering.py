@@ -123,11 +123,23 @@ def select_plot_render_path(plot_files: Iterable[Path]) -> Path | None:
     return existing_paths[0] if existing_paths else None
 
 
-def _fallback_plot_render_path(path: Path) -> Path | None:
-    for suffix in (*PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf"):
+def _is_same_path(left: Path, right: Path) -> bool:
+    try:
+        return left.resolve() == right.resolve()
+    except OSError:
+        return left == right
+
+
+def _alternate_plot_render_path(path: Path) -> Path | None:
+    for suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
         candidate = path.with_suffix(suffix)
-        if candidate.is_file():
+        if _is_same_path(candidate, path) or not candidate.is_file():
+            continue
+        if candidate.stat().st_size <= MAX_INLINE_NOTEBOOK_ASSET_BYTES:
             return candidate
+    pdf_candidate = path.with_suffix(".pdf")
+    if not _is_same_path(pdf_candidate, path) and pdf_candidate.is_file():
+        return pdf_candidate
     return None
 
 
@@ -135,37 +147,47 @@ def resolve_plot_render_asset(path: Path) -> tuple[Path | None, str | None]:
     if not path.is_file():
         return None, f"Plot asset is missing: `{path.name}`."
     asset_size = path.stat().st_size
-    if path.suffix.lower() == ".svg" and asset_size > MAX_INLINE_NOTEBOOK_ASSET_BYTES:
-        fallback_path = _fallback_plot_render_path(path)
-        if fallback_path is not None:
+    suffix = path.suffix.lower()
+    if suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
+        if asset_size <= MAX_INLINE_NOTEBOOK_ASSET_BYTES:
+            return path, None
+        alternate_path = _alternate_plot_render_path(path)
+        if alternate_path is not None:
             return (
-                fallback_path,
+                alternate_path,
                 (
-                    f"Displaying `{fallback_path.name}` because `{path.name}` is large for inline notebook "
+                    f"Displaying `{alternate_path.name}` because `{path.name}` exceeds the inline notebook "
+                    f"asset limit ({asset_size:,} bytes)."
+                ),
+            )
+        return (
+            None,
+            (
+                f"`{path.name}` exceeds the inline notebook asset limit ({asset_size:,} bytes) "
+                "and no PDF alternate is available."
+            ),
+        )
+    if suffix == ".svg":
+        if asset_size <= MAX_INLINE_NOTEBOOK_ASSET_BYTES:
+            return path, None
+        alternate_path = _alternate_plot_render_path(path)
+        if alternate_path is not None:
+            return (
+                alternate_path,
+                (
+                    f"Displaying `{alternate_path.name}` because `{path.name}` is large for inline notebook "
                     f"rendering ({asset_size:,} bytes)."
                 ),
             )
-    if path.suffix.lower() != ".svg":
-        return path, None
-    svg_size = asset_size
-    if svg_size <= MAX_INLINE_SVG_BYTES:
-        return path, None
-    fallback_path = _fallback_plot_render_path(path)
-    if fallback_path is not None:
+        limit_name = "inline SVG" if asset_size > MAX_INLINE_SVG_BYTES else "inline notebook asset"
         return (
-            fallback_path,
+            None,
             (
-                f"Displaying `{fallback_path.name}` because `{path.name}` exceeds the inline notebook "
-                f"limit ({svg_size:,} bytes)."
+                f"`{path.name}` exceeds the {limit_name} limit ({asset_size:,} bytes) "
+                "and no raster or PDF alternate is available."
             ),
         )
-    return (
-        None,
-        (
-            f"`{path.name}` exceeds the inline notebook limit ({svg_size:,} bytes) "
-            "and no raster or PDF fallback is available."
-        ),
-    )
+    return path, None
 
 
 def render_plot_asset(path: Path, *, workspace_dir: Path, alt_text: str | None = None):
