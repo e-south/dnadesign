@@ -14,12 +14,47 @@ from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.views.materialize import _derived_metadata_array, materialize_view_artifact
 from dnadesign.latentdna.src.views.promoter_metadata import (
-    _promoter_metadata_columns,
     _sig35_variant,
     _source_class,
     _spacer_length,
 )
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
+
+_PROMOTER_METADATA_HANDLER = "dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value"
+
+
+def _annotation_derivation(
+    derive: str,
+    *,
+    required_columns: list[str],
+    any_required_column_groups: list[list[str]] | None = None,
+    value_type: str = "string",
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "kind": "annotation",
+        "source": "row",
+        "handler": _PROMOTER_METADATA_HANDLER,
+        "derive": derive,
+        "required_columns": required_columns,
+        "missing_policy": "error",
+        "value_type": value_type,
+    }
+    if any_required_column_groups:
+        payload["any_required_column_groups"] = any_required_column_groups
+    return payload
+
+
+def _sig35_derivation() -> dict[str, object]:
+    return _annotation_derivation(
+        "sig35_variant",
+        required_columns=["usr_label__primary"],
+        any_required_column_groups=[
+            ["densegen__plan"],
+            ["densegen__used_tfbs_detail"],
+            ["seq_annot__features"],
+            ["sequence", "derived__features_retained"],
+        ],
+    )
 
 
 def test_materialize_view_emits_sig35_variant_without_sigma70_alias(tmp_path: Path) -> None:
@@ -67,7 +102,19 @@ def test_materialize_view_emits_sig35_variant_without_sigma70_alias(tmp_path: Pa
                         "construct_template_id",
                         "design_family",
                         "sig35_variant",
-                    ]
+                    ],
+                    "derivations": {
+                        "construct_template_id": {
+                            "kind": "coalesce",
+                            "sources": ["construct_template_id", "template_id", "construct__template_id"],
+                            "value_type": "string",
+                        },
+                        "design_family": _annotation_derivation(
+                            "design_family",
+                            required_columns=["densegen__plan", "usr_label__primary"],
+                        ),
+                        "sig35_variant": _sig35_derivation(),
+                    },
                 },
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
@@ -76,18 +123,6 @@ def test_materialize_view_emits_sig35_variant_without_sigma70_alias(tmp_path: Pa
                         "coordinate_space_id": "demo_space",
                         "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
                     }
-                },
-                "cohorts": {
-                    "design_family": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "design_family",
-                    },
-                    "sig35_variant": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "sig35_variant",
-                    },
                 },
             },
             sort_keys=False,
@@ -142,20 +177,16 @@ def test_materialize_view_rejects_synthetic_rows_without_sig35_token(tmp_path: P
                         "subject_key": "subject_id",
                     }
                 },
-                "metadata": {"include": ["sig35_variant"]},
+                "metadata": {
+                    "include": ["sig35_variant"],
+                    "derivations": {"sig35_variant": _sig35_derivation()},
+                },
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
                         "source": "anchor_60bp",
                         "vector": {"kind": "column", "name": "embedding"},
                         "coordinate_space_id": "demo_space",
                         "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
-                    }
-                },
-                "cohorts": {
-                    "sig35_variant": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "sig35_variant",
                     }
                 },
             },
@@ -528,20 +559,25 @@ def test_materialize_view_canonicalizes_design_regulator_composition(tmp_path: P
                         "subject_key": "subject_id",
                     }
                 },
-                "metadata": {"include": ["design_regulator_composition"]},
+                "metadata": {
+                    "include": ["design_regulator_composition"],
+                    "derivations": {
+                        "design_regulator_composition": _annotation_derivation(
+                            "design_regulator_composition",
+                            required_columns=[
+                                "densegen__plan",
+                                "densegen__required_regulators",
+                                "usr_label__primary",
+                            ],
+                        )
+                    },
+                },
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
                         "source": "anchor_60bp",
                         "vector": {"kind": "column", "name": "embedding"},
                         "coordinate_space_id": "demo_space",
                         "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
-                    }
-                },
-                "cohorts": {
-                    "design_regulator_composition": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "design_regulator_composition",
                     }
                 },
             },
@@ -602,20 +638,16 @@ def test_materialize_view_includes_source_scoped_metadata_columns(tmp_path: Path
                         "metadata_include": ["anchor_logp"],
                     }
                 },
-                "metadata": {"include": ["sig35_variant"]},
+                "metadata": {
+                    "include": ["sig35_variant"],
+                    "derivations": {"sig35_variant": _sig35_derivation()},
+                },
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
                         "source": "anchor_60bp",
                         "vector": {"kind": "column", "name": "embedding"},
                         "coordinate_space_id": "demo_space",
                         "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
-                    }
-                },
-                "cohorts": {
-                    "sig35_variant": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "sig35_variant",
                     }
                 },
             },
@@ -631,7 +663,70 @@ def test_materialize_view_includes_source_scoped_metadata_columns(tmp_path: Path
     assert rows == [{"id": "row_a", "subject_id": "row_a", "anchor_logp": -1.5, "sig35_variant": "b"}]
 
 
-def test_materialize_view_includes_source_promoter_cohorts_without_metadata_include(tmp_path: Path) -> None:
+def test_materialize_view_can_replace_workspace_metadata_per_source(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["row_a"], type=pa.string()),
+                "subject_id": pa.array(["row_a"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0]], type=pa.list_(pa.float32())),
+                "anchor_logp": pa.array([-1.5], type=pa.float64()),
+            }
+        ),
+        inputs_dir / "records.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "source_metadata_replace_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "reference_view": {
+                        "kind": "parquet",
+                        "path": "inputs/records.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                        "metadata_include": ["anchor_logp"],
+                        "metadata_include_mode": "replace",
+                    }
+                },
+                "metadata": {
+                    "include": ["sig35_variant"],
+                    "derivations": {"sig35_variant": _sig35_derivation()},
+                },
+                "views": {
+                    "intermediate_embedding_reference": {
+                        "source": "reference_view",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                        "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "reference"},
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="intermediate_embedding_reference")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert rows == [{"id": "row_a", "subject_id": "row_a", "anchor_logp": -1.5}]
+
+
+def test_materialize_view_includes_explicit_annotation_metadata(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     inputs_dir = workspace_dir / "inputs"
@@ -671,20 +766,22 @@ def test_materialize_view_includes_source_promoter_cohorts_without_metadata_incl
                         "subject_key": "subject_id",
                     }
                 },
-                "metadata": {"include": []},
+                "metadata": {
+                    "include": ["spacer_length"],
+                    "derivations": {
+                        "spacer_length": _annotation_derivation(
+                            "spacer_length",
+                            required_columns=["densegen__plan", "densegen__used_tfbs_detail", "usr_label__primary"],
+                            value_type="int64",
+                        )
+                    },
+                },
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
                         "source": "anchor_60bp",
                         "vector": {"kind": "column", "name": "embedding"},
                         "coordinate_space_id": "demo_space",
                         "tags": {"model": "20b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
-                    }
-                },
-                "cohorts": {
-                    "spacer_length": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "spacer_length",
                     }
                 },
             },
@@ -721,26 +818,27 @@ sources:
     path: inputs/records.parquet
     record_key: id
     subject_key: id
+metadata:
+  derivations:
+    spacer_length:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: spacer_length
+      required_columns: [densegen__plan, densegen__used_tfbs_detail, usr_label__primary]
+      missing_policy: error
+      value_type: int64
 views: {}
-cohorts:
-  spacer_length:
-    kind: promoter_metadata
-    source: anchor_60bp
-    derive: spacer_length
         """.strip()
         + "\n",
         encoding="utf-8",
     )
     context = load_workspace_config(workspace_dir)
 
-    arrays = _promoter_metadata_columns(
-        [{"densegen__used_tfbs_detail": None}],
-        context=context,
-        configs=[("spacer_length", context.config.cohorts["spacer_length"])],
-    )
+    array = _derived_metadata_array(context, [{"densegen__used_tfbs_detail": None}], column_name="spacer_length")
 
-    assert arrays["spacer_length"].type == pa.int64()
-    assert arrays["spacer_length"].to_pylist() == [None]
+    assert array.type == pa.int64()
+    assert array.to_pylist() == [None]
 
 
 def test_construct_template_id_derivation_uses_stable_string_type_for_all_null_batch(
@@ -759,6 +857,12 @@ defaults:
   plot_formats: [svg]
   neighbor_backend: auto
 sources: {}
+metadata:
+  derivations:
+    construct_template_id:
+      kind: coalesce
+      sources: [construct_template_id, template_id, construct__template_id]
+      value_type: string
 views: {}
         """.strip()
         + "\n",
@@ -772,7 +876,7 @@ views: {}
     assert array.to_pylist() == [None]
 
 
-def test_materialize_view_ignores_promoter_metadata_cohorts_from_other_sources(tmp_path: Path) -> None:
+def test_materialize_view_does_not_auto_include_unrequested_annotation_derivations(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     inputs_dir = workspace_dir / "inputs"
@@ -829,20 +933,22 @@ def test_materialize_view_ignores_promoter_metadata_cohorts_from_other_sources(t
                         "subject_key": "subject_id",
                     },
                 },
-                "metadata": {"include": []},
+                "metadata": {
+                    "include": [],
+                    "derivations": {
+                        "spacer_length": _annotation_derivation(
+                            "spacer_length",
+                            required_columns=["densegen__plan", "densegen__used_tfbs_detail", "usr_label__primary"],
+                            value_type="int64",
+                        )
+                    },
+                },
                 "views": {
                     "control_embedding": {
                         "source": "controls",
                         "vector": {"kind": "column", "name": "embedding"},
                         "coordinate_space_id": "demo_space",
                         "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "anchor_60bp"},
-                    }
-                },
-                "cohorts": {
-                    "spacer_length": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor_60bp",
-                        "derive": "spacer_length",
                     }
                 },
             },

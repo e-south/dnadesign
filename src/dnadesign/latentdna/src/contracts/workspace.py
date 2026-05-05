@@ -10,13 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .notebook import NotebookConfig
 from .plot import PlotConfig
-from .promoter_metadata import PROMOTER_METADATA_DERIVATIONS
 from .representations import validate_representation_family_tags, validate_representation_identity
 
 Identifier = Annotated[str, Field(min_length=1)]
 NonEmptyText = Annotated[str, Field(min_length=1)]
 AggregationMode = Literal["error", "first", "mean", "medoid"]
 AlignmentKeyBasis = Literal["record_key", "subject_key"]
+MetadataValueType = Literal["infer", "string", "int64", "float64", "bool"]
 
 
 class StrictWorkspaceModel(BaseModel):
@@ -53,6 +53,7 @@ class MemoryPolicyConfig(StrictWorkspaceModel):
 class MetadataCopyDerivationConfig(StrictWorkspaceModel):
     kind: Literal["copy"]
     source: str
+    value_type: MetadataValueType | None = None
 
 
 class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
@@ -62,6 +63,7 @@ class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
     group: int = 1
     default: str | None = None
     normalize: Literal["lower", "upper"] | None = None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataMapValuesDerivationConfig(StrictWorkspaceModel):
@@ -69,17 +71,20 @@ class MetadataMapValuesDerivationConfig(StrictWorkspaceModel):
     source: str
     mapping: dict[str, str] = Field(min_length=1)
     default: str | None = None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataCoalesceDerivationConfig(StrictWorkspaceModel):
     kind: Literal["coalesce"]
     sources: list[str] = Field(min_length=1)
     default: str | None = None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataConstantDerivationConfig(StrictWorkspaceModel):
     kind: Literal["constant"]
     value: str | int | float | bool | None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataLookupDerivationConfig(StrictWorkspaceModel):
@@ -91,13 +96,43 @@ class MetadataLookupDerivationConfig(StrictWorkspaceModel):
     missing_policy: Literal["error", "null"] = "error"
 
 
+class MetadataAnnotationDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["annotation"]
+    source: Literal["row"] = "row"
+    handler: NonEmptyText
+    derive: NonEmptyText
+    required_columns: list[str] = Field(min_length=1)
+    any_required_column_groups: list[list[str]] = Field(default_factory=list)
+    missing_policy: Literal["error", "null"] = "error"
+    value_type: MetadataValueType | None = None
+
+    @field_validator("handler")
+    @classmethod
+    def _validate_handler_path(cls, value: str) -> str:
+        if ":" not in value:
+            raise ValueError("annotation metadata derivation handler must use 'module:function' syntax")
+        module_name, function_name = value.split(":", 1)
+        if not module_name.strip() or not function_name.strip():
+            raise ValueError("annotation metadata derivation handler must include module and function")
+        return value
+
+    @field_validator("any_required_column_groups")
+    @classmethod
+    def _validate_any_required_groups(cls, value: list[list[str]]) -> list[list[str]]:
+        empty_groups = [index for index, group in enumerate(value) if not group]
+        if empty_groups:
+            raise ValueError("annotation metadata derivation any_required_column_groups cannot contain empty groups")
+        return value
+
+
 MetadataDerivationConfig = Annotated[
     MetadataCopyDerivationConfig
     | MetadataRegexCaptureDerivationConfig
     | MetadataMapValuesDerivationConfig
     | MetadataCoalesceDerivationConfig
     | MetadataConstantDerivationConfig
-    | MetadataLookupDerivationConfig,
+    | MetadataLookupDerivationConfig
+    | MetadataAnnotationDerivationConfig,
     Field(discriminator="kind"),
 ]
 
@@ -115,6 +150,7 @@ class SourceBase(StrictWorkspaceModel):
     role: str | None = None
     where: dict[str, Any] | None = None
     metadata_include: list[str] | None = None
+    metadata_include_mode: Literal["append", "replace"] = "append"
     vector_cache_policy: str | None = None
     sequence_scope: str | None = None
     emitted_length_bp: int | None = Field(default=None, gt=0)
@@ -338,21 +374,7 @@ class ColumnCohortConfig(StrictWorkspaceModel):
     column: str
 
 
-class PromoterMetadataCohortConfig(StrictWorkspaceModel):
-    kind: Literal["promoter_metadata"]
-    source: str
-    derive: str
-
-    @field_validator("derive")
-    @classmethod
-    def _validate_derive(cls, value: str) -> str:
-        if value not in PROMOTER_METADATA_DERIVATIONS:
-            supported = ", ".join(PROMOTER_METADATA_DERIVATIONS)
-            raise ValueError(f"unsupported promoter metadata derivation {value!r}; expected one of: {supported}")
-        return value
-
-
-CohortConfig = Annotated[ColumnCohortConfig | PromoterMetadataCohortConfig, Field(discriminator="kind")]
+CohortConfig = ColumnCohortConfig
 
 
 class ReducedViewExportBlockConfig(StrictWorkspaceModel):

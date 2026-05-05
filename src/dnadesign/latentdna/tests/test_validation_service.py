@@ -478,6 +478,17 @@ sources:
     subject_key: id
 metadata:
   include: [sig35_variant]
+  derivations:
+    sig35_variant:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: sig35_variant
+      required_columns: [usr_label__primary]
+      any_required_column_groups:
+        - [seq_annot__features]
+      missing_policy: error
+      value_type: string
 views:
   z7_60:
     source: anchor60
@@ -487,11 +498,6 @@ views:
     coordinate_space_id: demo_space
     tags: {model: demo}
     role: planned
-cohorts:
-  sig35_variant:
-    kind: promoter_metadata
-    source: anchor60
-    derive: sig35_variant
         """.strip()
         + "\n",
         encoding="utf-8",

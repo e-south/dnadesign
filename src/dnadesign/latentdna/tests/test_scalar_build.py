@@ -20,6 +20,8 @@ from dnadesign.latentdna.src.scalars.build import (
 from dnadesign.latentdna.src.scalars.common import _normalized_geometry_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
+_PROMOTER_METADATA_HANDLER = "dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value"
+
 
 def _write_source(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,11 +62,92 @@ def _write_workspace_config(
                         "subject_key": context_subject_key,
                     },
                 },
+                "metadata": {
+                    "derivations": {
+                        "design_family": {
+                            "kind": "annotation",
+                            "source": "row",
+                            "handler": _PROMOTER_METADATA_HANDLER,
+                            "derive": "design_family",
+                            "required_columns": ["densegen__plan", "usr_label__primary"],
+                            "missing_policy": "error",
+                            "value_type": "string",
+                        },
+                        "sig35_variant": {
+                            "kind": "annotation",
+                            "source": "row",
+                            "handler": _PROMOTER_METADATA_HANDLER,
+                            "derive": "sig35_variant",
+                            "required_columns": ["usr_label__primary"],
+                            "any_required_column_groups": [
+                                ["densegen__plan"],
+                                ["densegen__used_tfbs_detail"],
+                                ["seq_annot__features"],
+                                ["sequence", "derived__features_retained"],
+                            ],
+                            "missing_policy": "error",
+                            "value_type": "string",
+                        },
+                        "source_class": {
+                            "kind": "annotation",
+                            "source": "row",
+                            "handler": _PROMOTER_METADATA_HANDLER,
+                            "derive": "source_class",
+                            "required_columns": ["usr_label__primary"],
+                            "any_required_column_groups": [
+                                ["densegen__plan"],
+                                ["source_family"],
+                                ["promoter_standard__collection_id"],
+                            ],
+                            "missing_policy": "error",
+                            "value_type": "string",
+                        },
+                    }
+                },
             },
             sort_keys=False,
         ),
         encoding="utf-8",
     )
+
+
+def _dataset_overview_params(*, source_ids: list[str]) -> dict[str, object]:
+    return {
+        "source_ids": source_ids,
+        "dimensions": [
+            {
+                "dimension": "provenance",
+                "label": "Provenance",
+                "column": "source_class",
+                "category_order": ["densegen", "manual_or_wildtype"],
+            },
+            {
+                "dimension": "generation_plan",
+                "label": "Generation plan",
+                "column": "design_family",
+                "category_order": [
+                    "background_only",
+                    "ethanol",
+                    "ciprofloxacin",
+                    "ethanol_ciprofloxacin",
+                    "control",
+                ],
+            },
+            {
+                "dimension": "sig35_variant",
+                "label": "Sigma-35 variant",
+                "column": "sig35_variant",
+                "category_order": ["f", "e", "d", "c", "b", "control"],
+                "category_labels": {
+                    "f": "Variant f",
+                    "e": "Variant e",
+                    "d": "Variant d",
+                    "c": "Variant c",
+                    "b": "Variant b",
+                },
+            },
+        ],
+    }
 
 
 def _write_margin_workspace_config(workspace_dir: Path) -> None:
@@ -359,7 +442,7 @@ def test_dataset_overview_builds_dimension_panels_with_shared_denominator(tmp_pa
         context,
         scalar_id="dataset_overview_counts",
         builder_kind="dataset_overview",
-        params={"source_ids": ["anchor_60bp", "full_context_1kb"]},
+        params=_dataset_overview_params(source_ids=["anchor_60bp", "full_context_1kb"]),
     )
 
     table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
@@ -435,7 +518,7 @@ def test_dataset_overview_includes_annotated_sigma35_categories_outside_named_la
         context,
         scalar_id="dataset_overview_counts",
         builder_kind="dataset_overview",
-        params={"source_ids": ["anchor_60bp", "full_context_1kb"]},
+        params=_dataset_overview_params(source_ids=["anchor_60bp", "full_context_1kb"]),
     )
 
     table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
@@ -468,7 +551,7 @@ def test_dataset_overview_rejects_mismatched_partitions_across_sources(tmp_path:
             context,
             scalar_id="dataset_overview_counts",
             builder_kind="dataset_overview",
-            params={"source_ids": ["anchor_60bp", "full_context_1kb"]},
+            params=_dataset_overview_params(source_ids=["anchor_60bp", "full_context_1kb"]),
         )
 
 
@@ -501,7 +584,7 @@ def test_dataset_overview_accepts_aligned_subject_populations_with_distinct_reco
         context,
         scalar_id="dataset_overview_counts",
         builder_kind="dataset_overview",
-        params={"source_ids": ["anchor_60bp", "full_context_1kb"]},
+        params=_dataset_overview_params(source_ids=["anchor_60bp", "full_context_1kb"]),
     )
 
     table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()

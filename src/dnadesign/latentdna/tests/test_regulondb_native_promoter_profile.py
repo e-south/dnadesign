@@ -69,6 +69,16 @@ sources:
     path: inputs/native_promoters.parquet
     record_key: id
     subject_key: subject_id
+metadata:
+  include:
+    - regulondb__sigma_factor_set
+    - regulondb__sigma_factor_count
+    - regulondb__regulator_composition
+    - regulondb__box_pattern
+    - regulondb__confidence_level_set
+    - regulondb__metadata_completeness_class
+    - regulondb__source_strata_set
+    - regulondb__primary_promoter_name
 views:
   native_full_7b:
     source: native_full
@@ -76,39 +86,6 @@ views:
       kind: column
       name: embedding
     coordinate_space_id: evo2_7b_native_full
-cohorts:
-  regulondb__sigma_factor_set:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__sigma_factor_set
-  regulondb__sigma_factor_count:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__sigma_factor_count
-  regulondb__regulator_composition:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__regulator_composition
-  regulondb__box_pattern:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__box_pattern
-  regulondb__confidence_level_set:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__confidence_level_set
-  regulondb__metadata_completeness_class:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__metadata_completeness_class
-  regulondb__source_strata_set:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__source_strata_set
-  regulondb__primary_promoter_name:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__primary_promoter_name
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -133,11 +110,7 @@ cohorts:
     assert rows.column("regulondb__primary_promoter_name").to_pylist() == ["pA", "pB"]
     validation = validate_workspace(workspace_dir, deep=True)
     assert validation["status"] == "ok"
-    assert {
-        detail["derive"]
-        for detail in validation["cohort_details"]
-        if detail["source"] == "native_full" and detail["kind"] == "promoter_metadata"
-    } == set(REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS)
+    assert set(REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS).issubset(set(rows.column_names))
 
 
 def test_live_regulondb_workspace_declares_representation_health_review_path() -> None:

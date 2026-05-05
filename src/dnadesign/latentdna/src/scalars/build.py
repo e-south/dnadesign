@@ -19,9 +19,10 @@ from ..io.json_io import read_json, write_json
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_table, write_table
 from ..labels import humanize_label
+from ..metadata.derivations import derive_metadata_value
 from ..metrics.definitions import resolve_metric_definition, validate_metric_registry
 from ..sources.resolver import inspect_source_schema, read_records_table, resolve_source
-from ..views.promoter_metadata import _promoter_metadata_value
+from ..views.row_contracts import derivation_dependency_columns
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
 from .classification_metrics import binary_metrics, dual_joint_margin
@@ -1554,37 +1555,69 @@ def build_scalar_artifact(
         if not source_ids:
             raise ContractViolationError("dataset_overview requires at least one source")
 
-        def _dataset_category_label(dimension: str, category: str) -> str:
-            if dimension == "sig35_variant" and category != "control":
-                return f"Variant {category}"
+        raw_dimensions = params.get("dimensions")
+        if not isinstance(raw_dimensions, list) or not raw_dimensions:
+            raise ContractViolationError("dataset_overview requires configured dimensions")
+
+        def _category_order(raw_order: object) -> list[tuple[str, int]]:
+            if not isinstance(raw_order, list):
+                return []
+            ordered: list[tuple[str, int]] = []
+            for index, item in enumerate(raw_order, start=1):
+                if isinstance(item, dict):
+                    category = str(item.get("category") or item.get("value") or "").strip()
+                    order = int(item.get("order", index))
+                else:
+                    category = str(item).strip()
+                    order = index
+                if category:
+                    ordered.append((category, order))
+            return ordered
+
+        dimension_specs: list[dict[str, object]] = []
+        for raw_dimension in raw_dimensions:
+            if not isinstance(raw_dimension, dict):
+                raise ContractViolationError("dataset_overview dimensions must be mapping objects")
+            dimension = str(raw_dimension.get("dimension") or raw_dimension.get("id") or "").strip()
+            column = str(raw_dimension.get("column") or "").strip()
+            if not dimension or not column:
+                raise ContractViolationError("dataset_overview dimensions must declare dimension and column")
+            dimension_specs.append(
+                {
+                    "dimension": dimension,
+                    "label": str(raw_dimension.get("label") or humanize_label(dimension)).strip(),
+                    "column": column,
+                    "category_order": _category_order(raw_dimension.get("category_order", [])),
+                    "category_labels": {
+                        str(key): str(value)
+                        for key, value in dict(raw_dimension.get("category_labels", {}) or {}).items()
+                    },
+                }
+            )
+
+        dimension_columns = [str(spec["column"]) for spec in dimension_specs]
+
+        def _dataset_category_label(spec: dict[str, object], category: str) -> str:
+            labels = spec.get("category_labels", {})
+            if isinstance(labels, dict) and category in labels:
+                return str(labels[category])
             return humanize_label(category)
 
-        dimension_specs = [
-            (
-                "provenance",
-                "Provenance",
-                "source_class",
-                [("densegen", 1), ("manual_or_wildtype", 2)],
-            ),
-            (
-                "generation_plan",
-                "Generation plan",
-                "design_family",
-                [
-                    ("background_only", 1),
-                    ("ethanol", 2),
-                    ("ciprofloxacin", 3),
-                    ("ethanol_ciprofloxacin", 4),
-                    ("control", 5),
-                ],
-            ),
-            (
-                "sig35_variant",
-                "Sigma-35 variant",
-                "sig35_variant",
-                [("f", 1), ("e", 2), ("d", 3), ("c", 4), ("b", 5), ("control", 6)],
-            ),
-        ]
+        def _metadata_value(row: dict[str, object], column: str) -> object:
+            if column in row:
+                return row[column]
+            derivation = (context.config.metadata.derivations or {}).get(column)
+            if derivation is None:
+                raise ContractViolationError(
+                    f"dataset_overview dimension column {column!r} is missing and has no metadata derivation"
+                )
+            if derivation.kind == "lookup":
+                raise ContractViolationError(
+                    f"dataset_overview dimension column {column!r} uses a lookup derivation; "
+                    "materialize a row table or use a source-native column instead"
+                )
+            return derive_metadata_value(row, derivation)
+
         output_rows: list[dict[str, object]] = []
         inputs: list[ScalarInputRef] = []
         canonical_subject_keys: set[object] | None = None
@@ -1595,18 +1628,23 @@ def build_scalar_artifact(
             resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
             available_columns = set(inspect_source_schema(resolved)["columns"])
             population_key = source.subject_key or source.record_key
+            dependency_columns, missing_dependency_columns = derivation_dependency_columns(
+                context,
+                columns=dimension_columns,
+                available_columns=available_columns,
+            )
+            if missing_dependency_columns:
+                raise ContractViolationError(
+                    f"dataset_overview metadata derivation inputs are missing from source "
+                    f"{source_id!r}: {missing_dependency_columns}"
+                )
             required_columns = list(
                 dict.fromkeys(
                     [
                         source.record_key,
                         population_key,
-                        "usr_label__primary",
-                        "sequence",
-                        "densegen__plan",
-                        "densegen__required_regulators",
-                        "densegen__used_tfbs_detail",
-                        "seq_annot__features",
-                        "derived__features_retained",
+                        *dimension_columns,
+                        *dependency_columns,
                     ]
                 )
             )
@@ -1630,8 +1668,8 @@ def build_scalar_artifact(
                         "the canonical source row set"
                     )
             source_counts = {
-                dimension: Counter(str(_promoter_metadata_value(row, derive=derive_name)) for row in row_dicts)
-                for dimension, _, derive_name, _ in dimension_specs
+                str(spec["dimension"]): Counter(str(_metadata_value(row, str(spec["column"]))) for row in row_dicts)
+                for spec in dimension_specs
             }
             if not canonical_counts:
                 canonical_counts = source_counts
@@ -1644,8 +1682,11 @@ def build_scalar_artifact(
                     )
 
         assert denominator is not None
-        for dimension, dimension_label, _, category_order in dimension_specs:
+        for spec in dimension_specs:
+            dimension = str(spec["dimension"])
             counts = canonical_counts[dimension]
+            category_order = spec["category_order"]
+            assert isinstance(category_order, list)
             ordered_categories = _ordered_dataset_overview_categories(counts, category_order)
             dimension_total = sum(int(counts.get(category, 0)) for category, _ in ordered_categories)
             if dimension_total != denominator:
@@ -1658,9 +1699,9 @@ def build_scalar_artifact(
                 output_rows.append(
                     {
                         "dimension": dimension,
-                        "dimension_label": dimension_label,
+                        "dimension_label": str(spec["label"]),
                         "category": category,
-                        "category_label": _dataset_category_label(dimension, category),
+                        "category_label": _dataset_category_label(spec, category),
                         "count": count,
                         "denominator": denominator,
                         "fraction": fraction,

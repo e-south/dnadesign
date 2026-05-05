@@ -371,6 +371,20 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    metadata_include: &reference_core60_metadata
+      - emitted_length_bp
+      - source_family
+      - selection_basis
+      - view_collections
+      - role_tags
+      - promoter_standard__collection_id
+      - promoter_standard__promoter_id
+      - promoter_standard__display_name
+      - promoter_standard__strength_metric
+      - promoter_standard__strength_value
+      - promoter_standard__strength_value_numeric
+      - promoter_standard__strength_reference
+    metadata_include_mode: replace
     sequence_scope: reference_core60
     emitted_length_bp: 60
     source_interval_length_bp: source_dependent
@@ -389,6 +403,8 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    metadata_include: *reference_core60_metadata
+    metadata_include_mode: replace
     sequence_scope: reference_core60
     emitted_length_bp: 60
     source_interval_length_bp: source_dependent
@@ -406,6 +422,8 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    metadata_include: *reference_core60_metadata
+    metadata_include_mode: replace
     sequence_scope: reference_core60
     emitted_length_bp: 60
     source_interval_length_bp: source_dependent
@@ -422,6 +440,8 @@ sources:
     dataset: construct_prom_eth_cip_reference_core60
     record_key: alias_id
     subject_key: id
+    metadata_include: *reference_core60_metadata
+    metadata_include_mode: replace
     sequence_scope: reference_core60
     emitted_length_bp: 60
     source_interval_length_bp: source_dependent
@@ -659,7 +679,76 @@ metadata:
     - promoter_standard__strength_value_numeric
     - promoter_standard__strength_reference
   derivations:
-    emitted_length_bp: {kind: copy, source: length}
+    emitted_length_bp: {kind: copy, source: length, value_type: int64}
+    construct_template_id:
+      kind: coalesce
+      sources: [construct_template_id, template_id, construct__template_id]
+      value_type: string
+    design_family:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: design_family
+      required_columns: [densegen__plan, usr_label__primary]
+      missing_policy: error
+      value_type: string
+    design_regulator_composition:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: design_regulator_composition
+      required_columns: [densegen__plan, densegen__required_regulators, usr_label__primary]
+      missing_policy: error
+      value_type: string
+    sig35_variant:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: sig35_variant
+      required_columns: [usr_label__primary]
+      any_required_column_groups:
+        - [densegen__plan]
+        - [densegen__used_tfbs_detail]
+        - [seq_annot__features]
+        - [sequence, derived__features_retained]
+      missing_policy: error
+      value_type: string
+    spacer_length:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: spacer_length
+      required_columns: [densegen__plan, densegen__used_tfbs_detail, usr_label__primary]
+      missing_policy: error
+      value_type: int64
+    campaign_prior:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: campaign_prior
+      required_columns: [densegen__plan, usr_label__primary]
+      missing_policy: error
+      value_type: string
+    is_control:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: is_control
+      required_columns: [densegen__plan, usr_label__primary]
+      missing_policy: error
+      value_type: bool
+    source_class:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: source_class
+      required_columns: [usr_label__primary]
+      any_required_column_groups:
+        - [densegen__plan]
+        - [source_family]
+        - [promoter_standard__collection_id]
+      missing_policy: error
+      value_type: string
 alignments:
   intermediate_embedding_7b_anchor_to_full_context:
     left: intermediate_embedding_7b_full_context_1kb
@@ -899,35 +988,6 @@ landmarks:
     source: merged_anchor_insert
     where: {column: usr_label__primary, equals: J23105}
     representation: {mode: centroid}
-cohorts:
-  design_family:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: design_family
-  design_regulator_composition:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: design_regulator_composition
-  sig35_variant:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: sig35_variant
-  spacer_length:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: spacer_length
-  campaign_prior:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: campaign_prior
-  is_control:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: is_control
-  source_class:
-    kind: promoter_metadata
-    source: merged_anchor_insert
-    derive: source_class
 reference_sets:
   reference_scorecard_preserve_all:
     label: Scorecard preserved rows
@@ -1385,6 +1445,25 @@ recipes:
           kind: dataset_overview
           source_ids: [merged_anchor_insert]
           reference_set_id: reference_scorecard_preserve_all
+          dimensions:
+            - dimension: provenance
+              label: Provenance
+              column: source_class
+              category_order: [densegen, manual_or_wildtype]
+            - dimension: generation_plan
+              label: Generation plan
+              column: design_family
+              category_order: [background_only, ethanol, ciprofloxacin, ethanol_ciprofloxacin, control]
+            - dimension: sig35_variant
+              label: Sigma-35 variant
+              column: sig35_variant
+              category_order: [f, e, d, c, b, control]
+              category_labels:
+                f: Variant f
+                e: Variant e
+                d: Variant d
+                c: Variant c
+                b: Variant b
       - &render_dataset_overview
         id: render_dataset_overview
         op: plot.render

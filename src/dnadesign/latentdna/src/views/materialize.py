@@ -11,7 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import ContractViolationError
-from ..contracts.workspace import MetadataLookupDerivationConfig, PromoterMetadataCohortConfig
+from ..contracts.workspace import MetadataLookupDerivationConfig
 from ..io.matrix_io import read_matrix, write_matrix
 from ..io.parquet_io import read_table, write_table
 from ..metadata.derivations import derive_metadata_value
@@ -25,7 +25,6 @@ from ..sources.resolver import (
     resolve_source,
 )
 from ..workspaces.loader import WorkspaceContext
-from .promoter_metadata import _construct_template_id, _promoter_metadata_columns
 from .row_contracts import source_backed_view_row_contract
 
 _MATERIALIZE_BATCH_SIZE = 2048
@@ -52,8 +51,6 @@ def _derived_metadata_value(
     *,
     column_name: str,
 ) -> object:
-    if column_name == "construct_template_id":
-        return _construct_template_id(row)
     derivation = (context.config.metadata.derivations or {}).get(column_name)
     if derivation is not None:
         if isinstance(derivation, MetadataLookupDerivationConfig):
@@ -64,14 +61,31 @@ def _derived_metadata_value(
     raise ContractViolationError(f"metadata column {column_name!r} is requested but no derivation is configured")
 
 
+def _metadata_value_arrow_type(value_type: str | None) -> pa.DataType | None:
+    if value_type is None or value_type == "infer":
+        return None
+    if value_type == "string":
+        return pa.string()
+    if value_type == "int64":
+        return pa.int64()
+    if value_type == "float64":
+        return pa.float64()
+    if value_type == "bool":
+        return pa.bool_()
+    raise ContractViolationError(f"unsupported metadata derivation value_type: {value_type!r}")
+
+
 def _derived_metadata_array(
     context: WorkspaceContext,
     rows: list[dict[str, object]],
     *,
     column_name: str,
 ) -> pa.Array:
+    derivation = (context.config.metadata.derivations or {}).get(column_name)
+    if derivation is None:
+        raise ContractViolationError(f"metadata column {column_name!r} is requested but no derivation is configured")
     values = [_derived_metadata_value(context, row, column_name=column_name) for row in rows]
-    field_type = pa.string() if column_name == "construct_template_id" else None
+    field_type = _metadata_value_arrow_type(getattr(derivation, "value_type", None))
     return pa.array(values, type=field_type)
 
 
@@ -302,12 +316,6 @@ def _materialize_tabular_vector_artifact(
         source=source,
         available_columns=available_columns,
     )
-    promoter_cohorts = [
-        (cohort_id, cohort)
-        for cohort_id, cohort in context.config.cohorts.items()
-        if isinstance(cohort, PromoterMetadataCohortConfig) and cohort_id in set(row_contract.derived_row_columns)
-    ]
-    promoter_cohort_ids = set(row_contract.promoter_cohort_ids)
     columns = [*row_contract.processing_row_columns, vector_column]
     processing_row_columns = row_contract.processing_row_columns
     output_row_columns = row_contract.output_row_columns
@@ -378,11 +386,7 @@ def _materialize_tabular_vector_artifact(
             processing_rows_batch = batch.select(processing_row_columns)
             row_dicts = processing_rows_batch.to_pylist()
             rows_batch = batch.select(output_row_columns)
-            for derived_column in [
-                column
-                for column in derived_row_columns
-                if column not in promoter_cohort_ids and column not in rows_batch.column_names
-            ]:
+            for derived_column in [column for column in derived_row_columns if column not in rows_batch.column_names]:
                 derivation = (context.config.metadata.derivations or {}).get(derived_column)
                 if isinstance(derivation, MetadataLookupDerivationConfig):
                     rows_batch = rows_batch.append_column(
@@ -400,15 +404,6 @@ def _materialize_tabular_vector_artifact(
                     derived_column,
                     _derived_metadata_array(context, row_dicts, column_name=derived_column),
                 )
-            if promoter_cohorts:
-                for cohort_id, array in _promoter_metadata_columns(
-                    row_dicts,
-                    context=context,
-                    configs=promoter_cohorts,
-                ).items():
-                    if cohort_id in rows_batch.column_names:
-                        continue
-                    rows_batch = rows_batch.append_column(cohort_id, array)
             if row_writer is None:
                 row_writer = pq.ParquetWriter(rows_path, rows_batch.schema)
             row_writer.write_batch(rows_batch)

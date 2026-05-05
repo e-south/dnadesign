@@ -346,6 +346,9 @@ def test_view_freshness_detects_row_column_drift_from_workspace_config(tmp_path:
             {
                 "id": ["row_a"],
                 "subject_id": ["row_a"],
+                "usr_label__primary": ["row_a"],
+                "densegen__plan": ["ethanol__sig35=b"],
+                "densegen__used_tfbs_detail": ['[{"part_kind":"fixed_element","spacer_length":17}]'],
                 "embedding": [[0.1, 0.2]],
             }
         ),
@@ -369,6 +372,15 @@ sources:
     subject_key: subject_id
 metadata:
   include: [spacer_length]
+  derivations:
+    spacer_length:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: spacer_length
+      required_columns: [densegen__plan, densegen__used_tfbs_detail, usr_label__primary]
+      missing_policy: error
+      value_type: int64
 views:
   demo_view:
     source: anchor_60bp
@@ -376,11 +388,6 @@ views:
       kind: column
       name: embedding
     coordinate_space_id: demo_space
-cohorts:
-  spacer_length:
-    kind: promoter_metadata
-    source: anchor_60bp
-    derive: spacer_length
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -561,7 +568,7 @@ views:
     assert freshness["known"] is True
 
 
-def test_view_freshness_ignores_promoter_metadata_cohorts_from_other_sources(tmp_path: Path) -> None:
+def test_view_freshness_scopes_metadata_requirements_to_materialized_source(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     anchor_path = workspace_dir / "inputs" / "anchor.parquet"
@@ -619,11 +626,6 @@ views:
       kind: column
       name: embedding
     coordinate_space_id: demo_space
-cohorts:
-  spacer_length:
-    kind: promoter_metadata
-    source: anchor_60bp
-    derive: spacer_length
         """.strip()
         + "\n",
         encoding="utf-8",

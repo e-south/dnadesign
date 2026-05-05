@@ -7,13 +7,8 @@ from __future__ import annotations
 import json
 import re
 
-import pyarrow as pa
-
 from ..contracts.errors import ContractViolationError
 from ..contracts.promoter_metadata import REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS
-from ..contracts.workspace import PromoterMetadataCohortConfig
-from ..metadata.derivations import derive_metadata_value
-from ..workspaces.loader import WorkspaceContext
 
 _SIG35_PATTERN = re.compile(r"__sig35[=_]([A-Za-z0-9]+)")
 _CONTROL_LABELS = {"spyp", "sulap", "soxsp", "j23105", "spy_p", "sul_ap", "sox_sp"}
@@ -121,24 +116,7 @@ def _design_regulator_composition(row: dict[str, object]) -> str:
     return "unknown"
 
 
-def _configured_derivation_value(
-    context: WorkspaceContext,
-    row: dict[str, object],
-    *,
-    column_name: str,
-) -> object:
-    derivation = (context.config.metadata.derivations or {}).get(column_name)
-    if derivation is None:
-        return None
-    return derive_metadata_value(row, derivation)
-
-
-def _sig35_variant(row: dict[str, object], *, context: WorkspaceContext | None = None) -> str:
-    if context is not None:
-        configured = _configured_derivation_value(context, row, column_name="sig35_variant")
-        if configured is not None:
-            text = _normalize_text(configured)
-            return "unknown" if text is None else text.lower()
+def _sig35_variant(row: dict[str, object]) -> str:
     plan = _normalize_text(row.get("densegen__plan")) or ""
     match = _SIG35_PATTERN.search(plan)
     if match is not None:
@@ -383,7 +361,7 @@ def _source_class(row: dict[str, object]) -> str:
     return "manual_or_wildtype" if _is_control_row(row) else "densegen"
 
 
-def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: WorkspaceContext | None = None) -> object:
+def derive_promoter_metadata_value(row: dict[str, object], *, derive: str) -> object:
     if derive in REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS:
         if derive not in row:
             raise ContractViolationError(f"native RegulonDB promoter metadata column is missing: {derive}")
@@ -393,7 +371,7 @@ def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: Wo
     if derive == "design_regulator_composition":
         return _design_regulator_composition(row)
     if derive == "sig35_variant":
-        return _sig35_variant(row, context=context)
+        return _sig35_variant(row)
     if derive == "spacer_length":
         return _spacer_length(row)
     if derive == "campaign_prior":
@@ -403,23 +381,3 @@ def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: Wo
     if derive == "source_class":
         return _source_class(row)
     raise ContractViolationError(f"unsupported promoter metadata derivation: {derive}")
-
-
-def _promoter_metadata_columns(
-    rows: list[dict[str, object]],
-    *,
-    context: WorkspaceContext,
-    configs: list[tuple[str, PromoterMetadataCohortConfig]],
-) -> dict[str, pa.Array]:
-    arrays: dict[str, pa.Array] = {}
-    for cohort_id, config in configs:
-        values = [_promoter_metadata_value(row, derive=config.derive, context=context) for row in rows]
-        field_type = None
-        if config.derive == "spacer_length":
-            field_type = pa.int64()
-        elif config.derive == "is_control":
-            field_type = pa.bool_()
-        elif config.derive not in REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS:
-            field_type = pa.string()
-        arrays[cohort_id] = pa.array(values, type=field_type)
-    return arrays

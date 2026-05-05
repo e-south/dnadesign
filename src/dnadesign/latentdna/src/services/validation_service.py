@@ -13,8 +13,7 @@ from dnadesign.usr import SequencesError
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls
-from ..contracts.promoter_metadata import PROMOTER_METADATA_ANY_COLUMN_GROUPS, PROMOTER_METADATA_REQUIRED_COLUMNS
-from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
+from ..contracts.workspace import ColumnCohortConfig, SourceBackedViewConfig
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..sources.resolver import inspect_source_schema, resolve_source
@@ -207,6 +206,15 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                 )
             if view.vector.kind == "column":
                 view_detail["vector_column"] = view.vector.name
+            try:
+                row_contract = source_backed_view_row_contract(
+                    context,
+                    source_id=view.source,
+                    source=source,
+                    available_columns=columns,
+                )
+            except Exception as exc:
+                raise WorkspaceValidationError(f"view {view_id} row-column contract is invalid: {exc}") from exc
             view_dir = context.output_root / "views" / view_id
             rows_path = view_dir / "rows.parquet"
             matrix_path = view_dir / "matrix.npy"
@@ -229,15 +237,6 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                         f"{view_id} ({materialized_row_count} materialized vs {expected_row_count} source rows)"
                     )
                 materialized_columns = {field.name for field in read_schema(rows_path)}
-                try:
-                    row_contract = source_backed_view_row_contract(
-                        context,
-                        source_id=view.source,
-                        source=source,
-                        available_columns=columns,
-                    )
-                except Exception as exc:
-                    raise WorkspaceValidationError(f"view {view_id} row-column contract is invalid: {exc}") from exc
                 required_materialized_columns = set(row_contract.materialized_row_columns)
                 missing_materialized_columns = sorted(
                     column for column in required_materialized_columns if column not in materialized_columns
@@ -307,6 +306,18 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                     "missing_policy": derivation.missing_policy,
                 }
             )
+        elif derivation.kind == "annotation":
+            detail.update(
+                {
+                    "source": derivation.source,
+                    "derive": derivation.derive,
+                    "handler": derivation.handler,
+                    "required_columns": list(derivation.required_columns),
+                    "any_required_column_groups": [list(group) for group in derivation.any_required_column_groups],
+                    "missing_policy": derivation.missing_policy,
+                    "value_type": derivation.value_type,
+                }
+            )
         metadata_derivation_details.append(detail)
 
     landmark_details: list[dict[str, object]] = []
@@ -329,39 +340,18 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     cohort_details: list[dict[str, object]] = []
     for cohort_id in sorted(context.config.cohorts):
         cohort = context.require_cohort(cohort_id)
-        if isinstance(cohort, ColumnCohortConfig):
-            if cohort.column not in source_columns[cohort.source]:
-                raise WorkspaceValidationError(
-                    f"cohort {cohort_id} column is missing from source {cohort.source}: {cohort.column}"
-                )
-            cohort_details.append(
-                {
-                    "cohort_id": cohort_id,
-                    "source": cohort.source,
-                    "kind": cohort.kind,
-                    "column": cohort.column,
-                }
-            )
-            continue
-        assert isinstance(cohort, PromoterMetadataCohortConfig)
-        missing = sorted(PROMOTER_METADATA_REQUIRED_COLUMNS[cohort.derive] - source_columns[cohort.source])
-        if missing:
+        if not isinstance(cohort, ColumnCohortConfig):
+            raise WorkspaceValidationError(f"cohort {cohort_id} uses unsupported cohort kind {cohort.kind!r}")
+        if cohort.column not in source_columns[cohort.source]:
             raise WorkspaceValidationError(
-                f"cohort {cohort_id} promoter metadata inputs are missing from source {cohort.source}: {missing}"
-            )
-        any_groups = PROMOTER_METADATA_ANY_COLUMN_GROUPS.get(cohort.derive, ())
-        if any_groups and not any(group.issubset(source_columns[cohort.source]) for group in any_groups):
-            rendered_groups = ["{" + ", ".join(sorted(group)) + "}" for group in any_groups]
-            raise WorkspaceValidationError(
-                f"cohort {cohort_id} promoter metadata inputs require at least one of "
-                f"{rendered_groups} in source {cohort.source}"
+                f"cohort {cohort_id} column is missing from source {cohort.source}: {cohort.column}"
             )
         cohort_details.append(
             {
                 "cohort_id": cohort_id,
                 "source": cohort.source,
                 "kind": cohort.kind,
-                "derive": cohort.derive,
+                "column": cohort.column,
             }
         )
 
