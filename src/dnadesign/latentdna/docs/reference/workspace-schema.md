@@ -104,13 +104,13 @@ Current runtime limits:
   decision geometry.
 - Notebook controls also publish the shared `candidate_inventory` ledger used
   by workspace snapshots and catalogs. The generated Marimo runtime reads row
-  counts and dimensionality from this control-plane ledger, with geometry-control
-  rows as a compatibility fallback, instead of opening view matrices during
-  notebook startup.
+  counts and dimensionality from this control-plane ledger first, then from
+  explicit geometry-control rows when the inventory has not been embedded,
+  instead of opening view matrices during notebook startup.
 - Control-plane builders read materialized view shape from view manifest
-  `stats.rows` and `stats.dims` when present. Matrix header inspection is a
-  fallback for older artifacts, not the normal path for current generated
-  workspaces.
+  `stats.rows` and `stats.dims`. Current generated workspaces must surface
+  missing shape stats as unknown control-plane metadata rather than inspecting
+  matrix files during notebook bootstrap.
 - Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
   for ordered metadata axes. The axis contract lives in recipe params:
   `axis.column` selects the grouping column, exactly one of `axis.order_path` or

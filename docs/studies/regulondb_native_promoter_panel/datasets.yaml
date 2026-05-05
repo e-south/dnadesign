@@ -47,19 +47,20 @@ datasets:
     dataset: infer_regulondb_native_promoter_views_7b
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
-    status: planned
+    status: local_complete
     lifecycle: shared_handoff
     owner_tool: infer
     onboard_mode: create_new
     authority: shared
     notes: >-
-      Planned Evo2 7B native/full promoter feature surface. The checked-in Infer
-      config consumes `source_record` sequence views from
+      Complete local Evo2 7B native/full promoter feature surface. The
+      checked-in Infer config consumes `source_record` sequence views from
       `usr_regulondb_native_promoters` with `seq_mean` pooling and writes
       canonical intermediate-embedding, output-layer-mean, and log-likelihood
       scalar sidecars under the source dataset's `_derived/infer` directory.
-      The local completion inventory currently reports all vectors/scalars
-      missing because no Evo2 batch has run.
+      As of the 2026-05-04 checked-in status record, the standard native/full
+      lane is complete locally and `ops runbook fill-infer` plans zero
+      RegulonDB GPU submissions from this checkout.
     sync:
       enabled: false
       remote_name: n/a
@@ -101,18 +102,22 @@ datasets:
     dataset: infer_regulondb_native_promoter_core60_views_7b
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
-    status: planned
+    status: local_complete
     lifecycle: shared_handoff
     owner_tool: infer
     onboard_mode: create_new
     authority: shared
     notes: >-
-      Planned Evo2 7B feature surface for the Construct-derived TSS-upstream
-      core60 dataset. The checked-in Infer config consumes `analysis_window`
-      sequence views from `usr_regulondb_native_promoter_core60` with
-      `core60_mean` pooling and writes the same intermediate-embedding,
-      output-layer-mean, and log-likelihood scalar sidecars as the native/full
-      lane under that dataset's `_derived/infer` directory.
+      Complete local Evo2 7B feature surface for the Construct-derived
+      TSS-upstream core60 dataset. The checked-in Infer config consumes
+      `analysis_window` sequence views from
+      `usr_regulondb_native_promoter_core60` with `core60_mean` pooling and
+      writes the same intermediate-embedding, output-layer-mean, and
+      log-likelihood scalar sidecars as the native/full lane under that
+      dataset's `_derived/infer` directory. The payload sidecars contain fewer
+      physical rows than alias rows when duplicate 60 bp windows are reused;
+      view-level alias identities preserve the full 3,182 sequence-view
+      support.
     sync:
       enabled: false
       remote_name: n/a

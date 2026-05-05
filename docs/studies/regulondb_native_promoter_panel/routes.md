@@ -1,6 +1,6 @@
 ## regulondb_native_promoter_panel Routes
 
-**Last verified:** 2026-04-29
+**Last verified:** 2026-05-04
 
 Use this page after the checked-in study status establishes the current phase.
 This study remains inactive for production execution, but downstream
@@ -83,7 +83,7 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `configured_preflight_ready`
+- Current state: `local_complete`
 - Entry artifact: `usr_regulondb_native_promoters`
 - Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoters`
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml`
@@ -91,8 +91,8 @@ must not be used as automatic sequence deduplication rules.
 - Route note: This lane extracts native `source_record` views with
   `seq_mean` pooling and requests the intermediate block mean, output-layer
   mean, mean-per-token log likelihood, and total log likelihood sidecars.
-  Local preflight validates the config, resolves the Notify event path, and
-  reports all vectors/scalars missing as expected before Evo2 batch execution.
+  Local preflight validates the config, resolves the Notify event path, and the
+  current completion inventory reports zero missing vectors/scalars.
 
 ### Construct Native/Core60/Context
 
@@ -118,7 +118,7 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `configured_preflight_ready`
+- Current state: `local_complete`
 - Entry artifact: `usr_regulondb_native_promoter_core60`
 - Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoter_core60`
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml`
@@ -127,6 +127,8 @@ must not be used as automatic sequence deduplication rules.
   `core60_mean` pooling from the materialized core60 dataset. It
   requests the same intermediate block mean, output-layer mean, mean-per-token
   log likelihood, and total log likelihood sidecars as the native/full lane.
+  The current completion inventory reports zero missing vectors/scalars; alias
+  rows remain view-level while duplicate physical 60 bp payload rows are reused.
 
 ### Fill Remaining Infer
 
