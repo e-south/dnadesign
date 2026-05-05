@@ -49,6 +49,9 @@ Implemented schema slices:
 - Reference sets: optional display `label`, explicit id lists, plus
   selector-backed membership through `where` selectors over row metadata;
   selectors support `equals`, `in_values`, and non-null membership checks.
+- Metadata axes: optional `metadata.axes.<id>` declarations bind one metadata
+  column to display, ordering, color, ordinal-subset, noncanonical-bucket, and
+  metric-label semantics used by plot, notebook, and scalar review surfaces.
 - Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the promoter-study status record under `docs/studies/<study-id>` and must contain `campaign.yaml`, `datasets.yaml`, `ops.study.yaml`, and `status.md`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
 - Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
@@ -98,6 +101,15 @@ Current runtime limits:
   reference or diagnostic surface with its own explicit metadata boundary and
   should not inherit study-specific annotation derivations from the workspace
   default list.
+- `metadata.axes` is the runtime styling contract for categorical, binary, or
+  ordinal metadata columns. Each axis declares `column`, optional `label`,
+  optional `kind`, `category_order`, `display_labels`,
+  `compact_display_labels`, `category_colors`, `ordinal_subset`,
+  `metric_labels`, and an optional `noncanonical_policy`. A noncanonical policy
+  can provide a hidden or visible bucket plus row selectors that define when a
+  category value is canonical. Core plot and notebook code uses this resolved
+  axis metadata; it does not infer Sigma-35, promoter, RegulonDB, or other
+  study vocabulary from column names.
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
 - `notebook generate` currently emits one read-only workspace notebook app per
   declared `notebooks.<id>`. The app has one expressive surface selected by an
@@ -125,7 +137,13 @@ Current runtime limits:
   labels only. Candidate sets carry each view's role, materialization state, row
   count, dimensionality, and availability so planned output-layer or other
   diagnostic representations can stay visible without being promoted to current
-  decision geometry.
+  decision geometry. Fixed-grid notebook presets include only views with at
+  least one usable projection artifact by default. Set
+  `notebooks.<id>.show_missing_projection_placeholders: true` only when a
+  workspace intentionally wants blank missing-projection panels. The
+  `candidate_inventory` and candidate-set metadata still list materialized
+  output-layer or other non-projected representations for health and alignment
+  review.
 - Notebook controls also publish the shared `candidate_inventory` ledger used
   by workspace snapshots and catalogs. The generated Marimo runtime reads row
   counts and dimensionality from this control-plane ledger first, then from
@@ -139,6 +157,15 @@ Current runtime limits:
   `dataset_overview`; package code does not supply promoter-specific default
   dimensions. Recipes that need source class, design family, Sigma-35, or other
   study axes must declare those columns and their category order in params.
+- `design_structure_summary` and `context_robustness_summary` are axis-driven:
+  workspaces declare `axes` or `retention_axes` entries with `axis_id`,
+  `column`, `metric_id`, optional `label`, and optional `exclude_values`.
+  The builders do not add design-family, spacer-length, Sigma-35, or other
+  cohort metrics unless the recipe declares them.
+- Representation scorecards do not add Sigma-35 or other promoter-specific
+  neighbor-enrichment metrics by default. Workspaces that need label-enrichment
+  summaries declare `neighbor_label_enrichments` params, and study-facing metric
+  names live in scalar params or `metadata.axes.<id>.metric_labels`.
 - Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
   for ordered metadata axes. The axis contract lives in recipe params:
   `axis.column` selects the grouping column, exactly one of `axis.order_path` or
@@ -146,6 +173,10 @@ Current runtime limits:
   incompatible labels, and `axis.metric_ids` may map the generic outputs onto a
   study-facing metric vocabulary. This keeps study terms such as Sigma-35 in
   workspace config rather than package-level builder selection.
+- Centroid-distance heatmaps over ordered or partially ordered categories use
+  `axis_centroid_distance` with the same `axis` contract. Ranked values are
+  ordered by `axis.order_path` or `axis.rank_column`; unranked observed values
+  remain visible after the ranked values instead of being silently dropped.
 - `representation_health_summary` computes pairwise cosine-distance summaries
   after the shared standardize/L2-normalize geometry contract. The builder
   evaluates all pairs up to `pairwise_max_rows` rows, defaulting to 4096, and

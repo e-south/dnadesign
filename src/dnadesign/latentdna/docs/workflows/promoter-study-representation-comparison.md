@@ -22,8 +22,14 @@ DenseGen plan tokens, DenseGen fixed-element details, USR `seq_annot` `-35`
 features, or Construct retained-feature bounds. Annotated unranked hexamers
 are kept in source inventory and eligible plots; only ordinal-rank statistics
 restrict themselves to the explicit b-f order file. The package-level scalar
-primitive is the generic `ordinal_axis_audit`; this workspace config maps that
-generic axis audit onto Sigma-35 metric names.
+primitives are the generic `ordinal_axis_audit` and `axis_centroid_distance`;
+this workspace config maps those axis builders onto Sigma-35 metric names and
+heatmap labels.
+Sigma-35 display labels, color order, the ordinal subset, and the
+reference/other noncanonical bucket are declared under `metadata.axes` in the
+stress workspace config. The notebook and renderer consume those resolved axis
+styles from `controls.json` or the workspace config; they do not contain
+Sigma-35 column-name branches.
 
 The active contract is still pre-assay representation triage: choose a plausible
 mean-pooled Evo2 feature space \(X\) for later supervised modeling. Available
@@ -74,6 +80,10 @@ selector, label, overlay, and missing-status contract.
   and geometry tabs.
 - Grid mode is the default for multi-view candidate sets, while single-view
   geometry remains a first-class control.
+- Grid presets show only views with persisted projection artifacts by default.
+  Planned or materialized views without UMAP/projection outputs remain visible
+  in candidate inventory, health, and alignment summaries rather than appearing
+  as blank projection-browser panels.
 - Plot-level and view-level accordions render in the selected surface. Their
   interpretation belongs in the study deliverable markdown, not in this
   workflow doc.
@@ -141,7 +151,10 @@ LatentDNA machinery. Its core60 source is a TSS-upstream `[0,60)` analysis
 window from native 81 bp records, not a -10/-35 centered promoter box window.
 RegulonDB sigma-factor, confidence, and completeness labels are native row
 metadata or explicit lookup derivations; they are not aliases for
-`sig35_variant`.
+`sig35_variant`. Output-layer mean views are materialized representation
+summaries and stay in candidate inventory, representation-health metrics, and
+native/core60 alignment summaries. They are not default projection-browser
+panels unless a real output-layer projection artifact is fit and validated.
 
 ### Sequence-View Plot Contract
 
