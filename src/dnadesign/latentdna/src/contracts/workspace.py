@@ -17,6 +17,7 @@ NonEmptyText = Annotated[str, Field(min_length=1)]
 AggregationMode = Literal["error", "first", "mean", "medoid"]
 AlignmentKeyBasis = Literal["record_key", "subject_key"]
 MetadataValueType = Literal["infer", "string", "int64", "float64", "bool"]
+MetadataAxisKind = Literal["categorical", "binary", "continuous", "ordinal"]
 
 
 class StrictWorkspaceModel(BaseModel):
@@ -137,9 +138,45 @@ MetadataDerivationConfig = Annotated[
 ]
 
 
+class MetadataAxisRowSelectorConfig(StrictWorkspaceModel):
+    column: NonEmptyText
+    equals: str | int | float | bool | None = None
+    in_values: list[str | int | float | bool] = Field(default_factory=list)
+    non_null: bool = False
+
+    @model_validator(mode="after")
+    def _validate_selector(self) -> "MetadataAxisRowSelectorConfig":
+        if self.equals is None and not self.in_values and not self.non_null:
+            raise ValueError("metadata axis row selector requires equals, in_values, or non_null")
+        return self
+
+
+class MetadataAxisNoncanonicalPolicyConfig(StrictWorkspaceModel):
+    bucket: NonEmptyText = "__latentdna_noncanonical__"
+    label: NonEmptyText = "Other"
+    include_in_legend: bool = False
+    canonical_values: list[str] = Field(default_factory=list)
+    canonical_row_selectors: list[MetadataAxisRowSelectorConfig] = Field(default_factory=list)
+    canonical_row_match: Literal["any", "all"] = "any"
+
+
+class MetadataAxisConfig(StrictWorkspaceModel):
+    column: NonEmptyText
+    label: NonEmptyText | None = None
+    kind: MetadataAxisKind | None = None
+    category_order: list[str] = Field(default_factory=list)
+    display_labels: dict[str, str] = Field(default_factory=dict)
+    compact_display_labels: dict[str, str] = Field(default_factory=dict)
+    category_colors: dict[str, str] = Field(default_factory=dict)
+    noncanonical_policy: MetadataAxisNoncanonicalPolicyConfig | None = None
+    ordinal_subset: list[str] = Field(default_factory=list)
+    metric_labels: dict[str, str] = Field(default_factory=dict)
+
+
 class MetadataSection(StrictWorkspaceModel):
     include: list[str] = Field(default_factory=list)
     derivations: dict[str, MetadataDerivationConfig] = Field(default_factory=dict)
+    axes: dict[str, MetadataAxisConfig] = Field(default_factory=dict)
 
 
 class SourceBase(StrictWorkspaceModel):

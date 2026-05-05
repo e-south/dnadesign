@@ -11,27 +11,13 @@ _REFERENCE_NEIGHBOR_CENSORED_RANK_LABEL = resolve_metric_definition(
     "reference_neighbor_topk_censored_rank_median"
 ).display_name
 _GEOMETRY_DISTANCE_CORRELATION_LABEL = resolve_metric_definition("geometry_distance_correlation").display_name
-_SIG35_VARIANT_SEQUENCE_BY_ID = {
-    "a": "CCCGGG",
-    "b": "CTGACA",
-    "c": "TTGTGA",
-    "d": "TTTACA",
-    "e": "TAGACA",
-    "f": "TTGACA",
-}
-_SIG35_VARIANT_LABEL_BY_ID = {
-    variant_id: f"{sequence} ({variant_id})" for variant_id, sequence in _SIG35_VARIANT_SEQUENCE_BY_ID.items()
-}
 
 _DIRECT_LABELS = {
     "appendix_umap_gallery": "UMAP gallery",
     "candidate_decision_frontier": "Representation tradeoff",
-    "sigma35_stress_margin_gallery": "Sigma-35 vs stress-family margins",
     "dataset_overview": "Dataset inventory by cohort dimension",
     "representation_health_summary": "Representation health summary",
     "design_structure_summary": "Design-structure summary",
-    "sigma35_ordinal_audit": "Sigma-35 ordinal audit",
-    "sigma35_centroid_distance_gallery": "Sigma-35 centroid-distance gallery",
     "context_robustness_summary": "Context robustness summary",
     "context_pair_summary": "Anchor vs 1 kb anchor-mean context shift",
     "design_centroid_margin_gallery": "Design-family margin scatter",
@@ -50,8 +36,6 @@ _DIRECT_LABELS = {
     "anchor + anchor-mean concat": "Anchor + anchor-mean concat",
     "anchor + 1 kb context concat": "Anchor + 1 kb context concat",
     "anchor_vs_context": "Anchor vs 1 kb context",
-    "sig35_variant": "Sigma-35 variant",
-    "sigma35_variant": "Sigma-35 variant",
     "spacer_length": "Spacer length",
     "emitted_length_bp": "Emitted length (bp)",
     "design_family": "Design family",
@@ -91,7 +75,6 @@ _DIRECT_LABELS = {
     "design_family_separation_ratio": "Design-family separation ratio",
     "design_family_balanced_separation_ratio": "Balanced design-family separation ratio",
     "design_regulator_composition_separation_ratio": "Regulator-composition separation ratio",
-    "sig35_variant_separation_ratio": "Sigma-35 separation ratio",
     "spacer_length_separation_ratio": "Spacer-length separation ratio",
     "cohort_separation_ratio": "Cohort separation ratio",
     "ordinal_axis_spearman": "Ordinal-axis Spearman",
@@ -99,31 +82,18 @@ _DIRECT_LABELS = {
     "ordinal_axis_balanced_spearman": "Balanced ordinal-axis Spearman",
     "ordinal_axis_within_group_mean_spearman": "Within-group ordinal-axis Spearman",
     "ordinal_axis_label_permutation_pvalue": "Ordinal-axis permutation p-value",
-    "sig35_ordinal_spearman": "Sigma-35 ordinal Spearman",
-    "sig35_ordinal_kendall": "Sigma-35 ordinal Kendall",
-    "sig35_balanced_ordinal_spearman": "Balanced Sigma-35 ordinal Spearman",
-    "sig35_within_family_mean_spearman": "Within-family Sigma-35 Spearman",
-    "sig35_label_permutation_pvalue": "Sigma-35 permutation p-value",
     "design_family_retention_correlation": "Design-family retention",
     "design_regulator_composition_retention_correlation": "Regulator-composition retention",
-    "sig35_variant_retention_correlation": "Sigma-35 retention",
     "reference_alignment_ethanol_background_relative": "Ethanol reference alignment",
     "reference_alignment_cipro_background_relative": "Ciprofloxacin reference alignment",
     "synthetic_margin_ethanol_vs_background": "Design-centroid ethanol margin",
     "synthetic_margin_cipro_vs_background": "Design-centroid ciprofloxacin margin",
     "synthetic_margin_dual_vs_background": "Design-centroid dual margin",
     "synthetic_best_stress_margin": "Best stress-family margin",
-    "sig35_margin_f_vs_b": "Sigma-35 F-vs-B margin",
     "context_margin_delta_ethanol": "Δ ethanol margin",
     "context_margin_delta_cipro": "Δ ciprofloxacin margin",
     "generation_plan": "Generation plan",
     "provenance": "Provenance",
-    "variant a": _SIG35_VARIANT_LABEL_BY_ID["a"],
-    "variant b": _SIG35_VARIANT_LABEL_BY_ID["b"],
-    "variant c": _SIG35_VARIANT_LABEL_BY_ID["c"],
-    "variant d": _SIG35_VARIANT_LABEL_BY_ID["d"],
-    "variant e": _SIG35_VARIANT_LABEL_BY_ID["e"],
-    "variant f": _SIG35_VARIANT_LABEL_BY_ID["f"],
     "neighbor_overlap_fraction": "Neighbor-overlap fraction",
     "geometry_distance_correlation": _GEOMETRY_DISTANCE_CORRELATION_LABEL,
     "pairwise distance correlation": _GEOMETRY_DISTANCE_CORRELATION_LABEL,
@@ -176,19 +146,6 @@ _TOKEN_LABELS = {
     "sulap": "sulAp",
     "j23105": "J23105",
 }
-
-
-def sigma35_variant_display(value: object) -> str | None:
-    text = _normalize_key(value)
-    if not text:
-        return None
-    lowered = text.casefold()
-    if lowered in _SIG35_VARIANT_LABEL_BY_ID:
-        return _SIG35_VARIANT_LABEL_BY_ID[lowered]
-    match = re.fullmatch(r"variant\s+([a-z])", lowered)
-    if match is None:
-        return None
-    return _SIG35_VARIANT_LABEL_BY_ID.get(match.group(1))
 
 
 def _normalize_key(value: object) -> str:

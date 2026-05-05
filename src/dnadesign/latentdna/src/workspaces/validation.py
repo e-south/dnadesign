@@ -93,6 +93,10 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
             raise WorkspaceValidationError(
                 f"metadata derivation {column_name!r} lookup references unknown source {derivation.source!r}"
             )
+    for axis_id, axis in config.metadata.axes.items():
+        validate_identifier(axis_id, label="metadata axis id")
+        if not axis.column.strip():
+            raise WorkspaceValidationError(f"metadata axis {axis_id!r} must declare a non-empty column")
 
     for alignment_id, alignment in config.alignments.items():
         if alignment.left not in config.views and alignment.left not in config.sources:

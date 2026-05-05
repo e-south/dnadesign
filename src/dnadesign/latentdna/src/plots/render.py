@@ -19,12 +19,20 @@ from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..contracts.plot_semantics import PlotSemantics
 from ..labels import humanize_candidate
+from ..metadata_axes import (
+    AxisStyle,
+    axis_color_map,
+    axis_display_text,
+    axis_style_map_from_config,
+    legend_categories,
+    normalize_axis_category,
+    ordered_categories_for_axis,
+)
 from ..reference_sets import resolve_reference_set_rows
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
     DEFAULT_PLOT_PNG_DPI,
     GRID_COLOR,
-    NONCANONICAL_SIG35_CATEGORY,
     PANEL_BACKGROUND_COLOR,
     PLOT_FONT_FAMILY,
     PLOT_LABEL_FONT_SIZE,
@@ -35,14 +43,9 @@ from ..visual_style import (
     SPINE_COLOR,
     TEXT_COLOR,
     ZERO_LINE_COLOR,
-    categorical_color_map,
     compact_candidate_title,
-    display_category_text,
     humanize_display_text,
-    is_sig35_legend_category,
     legend_layout,
-    normalize_sig35_hue_category_for_row,
-    ordered_categories,
     reference_annotation_label,
     scatter_style,
     wrap_plot_title,
@@ -50,14 +53,10 @@ from ..visual_style import (
 from ..workspaces.loader import WorkspaceContext
 
 _SHAPE_MARKERS = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h"]
-_SIG35_ORDINAL_AUDIT_CATEGORY_KEYS = frozenset({"f", "e", "d", "c", "b"})
 _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
     {
         "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
-        "sigma35_margin_ladder_gallery",
-        "sigma35_stress_margin_gallery",
-        "sigma35_centroid_distance_gallery",
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     }
@@ -125,22 +124,64 @@ def _hue_display_label(spec: ResolvedPlotSpec, column: str | None) -> str:
     return humanize_display_text(column)
 
 
-def _row_sig35_plot_category(row: dict[str, object], column: str) -> str:
-    return normalize_sig35_hue_category_for_row(row, row[column])
+def _axis_style(axis_styles: dict[str, AxisStyle] | None, column: str | None) -> AxisStyle | None:
+    if column is None:
+        return None
+    return (axis_styles or {}).get(str(column))
 
 
-def _is_sig35_ordinal_audit_category(value: object) -> bool:
-    return str(value or "").strip().lower().replace(" ", "_") in _SIG35_ORDINAL_AUDIT_CATEGORY_KEYS
+def _axis_category_value(
+    row: dict[str, object],
+    column: str,
+    *,
+    axis_styles: dict[str, AxisStyle] | None = None,
+) -> str:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return normalize_axis_category(style, row[column], row=row)
+    return _category_key(row[column])
 
 
-def _continuous_color_encoding(rows: list[dict], spec: ResolvedPlotSpec) -> dict[str, object] | None:
+def _axis_categories(
+    values: list[str],
+    *,
+    column: str | None,
+    axis_styles: dict[str, AxisStyle] | None = None,
+    legend_only: bool = False,
+) -> list[str]:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return legend_categories(style, values) if legend_only else ordered_categories_for_axis(style, values)
+    return ordered_categories_for_axis(None, values)
+
+
+def _axis_category_label(
+    value: object,
+    *,
+    column: str | None,
+    axis_styles: dict[str, AxisStyle] | None = None,
+    compact: bool = False,
+) -> str:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return axis_display_text(style, value, compact=compact)
+    return humanize_display_text(value)
+
+
+def _continuous_color_encoding(
+    rows: list[dict],
+    spec: ResolvedPlotSpec,
+    *,
+    axis_styles: dict[str, AxisStyle] | None = None,
+) -> dict[str, object] | None:
     column = spec.color_column
     hue_type = _hue_option_type(spec, column)
     if hue_type in {"categorical", "binary", "ordinal"}:
         return None
     if hue_type == "continuous":
         return _continuous_scatter_encoding(rows, column)
-    if str(column or "").strip() in {"spacer_length", "sig35_variant", "sigma35_variant"}:
+    style = _axis_style(axis_styles, column)
+    if style is not None and style.kind in {"categorical", "binary", "ordinal"}:
         return None
     return _continuous_scatter_encoding(rows, column)
 
@@ -160,23 +201,25 @@ def _add_continuous_colorbar(fig: Any, ax: Any, *, spec: ResolvedPlotSpec, color
     colorbar.set_label(label, fontsize=11, color=TEXT_COLOR)
 
 
-def _category_color_map(row_groups: list[list[dict]], column: str | None) -> tuple[dict[str, str], list[str]]:
+def _category_color_map(
+    row_groups: list[list[dict]],
+    column: str | None,
+    *,
+    axis_styles: dict[str, AxisStyle] | None = None,
+) -> tuple[dict[str, str], list[str]]:
     if column is None:
         return {}, []
     flattened = [row for rows in row_groups for row in rows]
     if flattened and column not in flattened[0]:
         raise ContractViolationError(f"plot color column is missing: {column!r}")
-    if column == "sig35_variant":
-        values = [_row_sig35_plot_category(row, column) for row in flattened]
-        categories = ordered_categories(
-            (value for value in values if is_sig35_legend_category(value)),
-            column=column,
-        )
-        color_map = categorical_color_map(categories, column=column)
-        color_map[NONCANONICAL_SIG35_CATEGORY] = "#9AA5B1"
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        values = [_axis_category_value(row, column, axis_styles=axis_styles) for row in flattened]
+        categories = _axis_categories(values, column=column, axis_styles=axis_styles, legend_only=True)
+        color_map = axis_color_map(style, categories, fallback_palette=PUBLICATION_PALETTE)
         return color_map, categories
-    categories = ordered_categories((_category_key(row[column]) for row in flattened), column=column)
-    color_map = categorical_color_map(categories, column=column)
+    categories = ordered_categories_for_axis(None, [_category_key(row[column]) for row in flattened])
+    color_map = axis_color_map(None, categories, fallback_palette=PUBLICATION_PALETTE)
     return color_map, categories
 
 
@@ -185,16 +228,17 @@ def _color_series(
     column: str | None,
     *,
     color_map: dict[str, str] | None = None,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> tuple[list[str], list[str]]:
     if column is None:
         return [PUBLICATION_PALETTE[0]] * len(rows), []
     if rows and column not in rows[0]:
         raise ContractViolationError(f"plot color column is missing: {column!r}")
-    resolved_map = color_map or _category_color_map([rows], column)[0]
-    categories = ordered_categories(resolved_map, column=column)
-    if column == "sig35_variant":
-        return [resolved_map.get(_row_sig35_plot_category(row, column), "#9AA5B1") for row in rows], categories
-    return [resolved_map[_category_key(row[column])] for row in rows], categories
+    resolved_map = color_map or _category_color_map([rows], column, axis_styles=axis_styles)[0]
+    categories = _axis_categories(list(resolved_map), column=column, axis_styles=axis_styles)
+    return [
+        resolved_map.get(_axis_category_value(row, column, axis_styles=axis_styles), "#9AA5B1") for row in rows
+    ], categories
 
 
 def _continuous_scatter_encoding(rows: list[dict], column: str | None) -> dict[str, object] | None:
@@ -435,6 +479,7 @@ def _legend_handles(
     color_map: dict[str, str],
     *,
     column: str | None = None,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> list[Any]:
     return [
         plt.Line2D(
@@ -446,7 +491,7 @@ def _legend_handles(
             color=color_map[category],
             markeredgecolor="white",
             markeredgewidth=0.35,
-            label=display_category_text(category, column=column),
+            label=_axis_category_label(category, column=column, axis_styles=axis_styles),
         )
         for category in categories
     ]
@@ -483,6 +528,7 @@ def _scatter_points(
     point_sizes: np.ndarray | None = None,
     alpha: float,
     continuous_color: dict[str, object] | None = None,
+    axis_styles: dict[str, AxisStyle] | None = None,
     rasterized: bool = False,
     edgecolors: str = "white",
     linewidths: float = 0.25,
@@ -518,7 +564,12 @@ def _scatter_points(
                     rasterized=rasterized,
                 )
         else:
-            colors, _ = _color_series(rows, color_column, color_map=color_map if color_map else None)
+            colors, _ = _color_series(
+                rows,
+                color_column,
+                color_map=color_map if color_map else None,
+                axis_styles=axis_styles,
+            )
             ax.scatter(
                 [float(row[resolved_x]) for row in rows],
                 [float(row[resolved_y]) for row in rows],
@@ -569,7 +620,12 @@ def _scatter_points(
                     rasterized=rasterized,
                 )
         else:
-            colors, _ = _color_series(group_rows, color_column, color_map=color_map if color_map else None)
+            colors, _ = _color_series(
+                group_rows,
+                color_column,
+                color_map=color_map if color_map else None,
+                axis_styles=axis_styles,
+            )
             ax.scatter(
                 [float(row[resolved_x]) for row in group_rows],
                 [float(row[resolved_y]) for row in group_rows],
@@ -593,11 +649,12 @@ def _add_axis_legends(
     shape_categories: list[str],
     shape_map: dict[str, str],
     shape_title: str | None,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> None:
     color_legend = None
     if color_categories and color_title is not None:
         color_legend = ax.legend(
-            handles=_legend_handles(plt, color_categories, color_map, column=color_title),
+            handles=_legend_handles(plt, color_categories, color_map, column=color_title, axis_styles=axis_styles),
             frameon=False,
             loc="upper left",
         )
@@ -625,10 +682,13 @@ def _add_figure_legends(
     shape_map: dict[str, str],
     shape_title: str | None,
     single_row: bool | None = True,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> float:
     legend_specs: list[list[Any]] = []
     if color_categories and color_title is not None:
-        legend_specs.append(_legend_handles(plt, color_categories, color_map, column=color_title))
+        legend_specs.append(
+            _legend_handles(plt, color_categories, color_map, column=color_title, axis_styles=axis_styles)
+        )
     if shape_categories and shape_title is not None:
         legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
     if not legend_specs:
@@ -637,7 +697,6 @@ def _add_figure_legends(
     lowered_plot_ids = {
         "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
-        "sigma35_stress_margin_gallery",
         "appendix_umap_gallery",
     }
     legend_y = 0.008 if plot_id in lowered_plot_ids else 0.012
@@ -679,10 +738,13 @@ def _add_side_figure_legends(
     shape_categories: list[str],
     shape_map: dict[str, str],
     shape_title: str | None,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> float:
     legend_specs: list[list[Any]] = []
     if color_categories and color_title is not None:
-        legend_specs.append(_legend_handles(plt, color_categories, color_map, column=color_title))
+        legend_specs.append(
+            _legend_handles(plt, color_categories, color_map, column=color_title, axis_styles=axis_styles)
+        )
     if shape_categories and shape_title is not None:
         legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
     if not legend_specs:
@@ -716,7 +778,7 @@ def _tight_layout_kwargs(
         "h_pad": 1.4,
         "w_pad": 0.95,
     }
-    if spec.plot_id in {"balanced_design_family_margin_gallery", "sigma35_stress_margin_gallery"}:
+    if spec.plot_id == "balanced_design_family_margin_gallery":
         kwargs["w_pad"] = 1.38
     if spec.plot_id == "design_centroid_margin_gallery":
         kwargs["w_pad"] = 1.18
@@ -1080,7 +1142,9 @@ def _agreement_summary_metrics(summary: dict[str, object]) -> list[tuple[str, fl
     return metrics
 
 
-def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int) -> bool:
+def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int, *, configured: object = None) -> bool:
+    if configured is not None:
+        return bool(configured) and 1 < panel_count <= 4
     return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 4)
 
 
@@ -1089,7 +1153,6 @@ _HORIZONTAL_GROUPED_METRIC_PLOT_IDS: frozenset[str] = frozenset(
         "design_structure_summary",
         "reference_alignment_summary",
         "representation_health_summary",
-        "sigma35_ordinal_audit",
     }
 )
 
@@ -1178,7 +1241,6 @@ def _heatmap_color_params(
     grids: list[np.ndarray],
     *,
     color_scale: str | None,
-    plot_id: str | None = None,
 ) -> tuple[str, object]:
     from matplotlib import colors as mcolors
 
@@ -1198,12 +1260,6 @@ def _heatmap_color_params(
     maximum = float(np.max(finite))
     if minimum == maximum:
         maximum = minimum + 1e-6
-    if str(plot_id or "").strip() == "sigma35_centroid_distance_gallery":
-        sea_green = mcolors.LinearSegmentedColormap.from_list(
-            "sea_green_seq",
-            ["#EFF8F4", "#A8DCCB", "#2E8B57"],
-        )
-        return sea_green, mcolors.Normalize(vmin=minimum, vmax=maximum)
     return "cividis", mcolors.Normalize(vmin=minimum, vmax=maximum)
 
 
@@ -1223,24 +1279,23 @@ def _render_heatmap_panel(
     y_axis_label: str | None = None,
     show_y_tick_labels: bool = True,
     show_y_axis_label: bool = True,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> None:
     grid = np.asarray(grid, dtype=np.float32)
     image = ax.imshow(grid, cmap=cmap, norm=norm, aspect="equal" if square_cells else "auto")
-    x_tick_labels = (
-        [_compact_sig35_axis_key_label(value) for value in column_values]
-        if square_cells and str(column_column) == "column_variant"
-        else [humanize_display_text(value) for value in column_values]
-    )
-    y_tick_labels = (
-        [_compact_sig35_tick_label(value) for value in row_values]
-        if square_cells and str(row_column) == "row_variant"
-        else [humanize_display_text(value) for value in row_values]
-    )
+    x_tick_labels = [
+        _axis_category_label(value, column=column_column, axis_styles=axis_styles, compact=square_cells)
+        for value in column_values
+    ]
+    y_tick_labels = [
+        _axis_category_label(value, column=row_column, axis_styles=axis_styles, compact=square_cells)
+        for value in row_values
+    ]
     ax.set_xticks(
         range(len(column_values)),
         x_tick_labels,
-        rotation=0 if square_cells and str(column_column) == "column_variant" else 30,
-        ha="center" if square_cells and str(column_column) == "column_variant" else "right",
+        rotation=0 if square_cells else 30,
+        ha="center" if square_cells else "right",
     )
     if show_y_tick_labels:
         ax.set_yticks(range(len(row_values)), y_tick_labels)
@@ -1275,9 +1330,9 @@ def _render_heatmap_panel(
                 fontsize=9.2,
             )
     _apply_axes_style(ax, grid=False)
-    if square_cells and str(column_column) == "column_variant":
+    if square_cells:
         _style_compact_category_tick_labels(ax, axis="x")
-    if square_cells and str(row_column) == "row_variant" and show_y_tick_labels:
+    if square_cells and show_y_tick_labels:
         _style_compact_category_tick_labels(ax, axis="y")
     return image
 
@@ -1304,23 +1359,6 @@ def _scatter_axis_label(
 
 def _wrapped_tick_label(value: object, *, width: int = 16, max_lines: int | None = None) -> str:
     return wrap_plot_title(humanize_display_text(str(value)), width=width, max_lines=max_lines)
-
-
-def _compact_sig35_tick_label(value: object) -> str:
-    display = display_category_text(value, column="sig35_variant")
-    match = re.fullmatch(r"([A-Za-z]+)\s+\(([A-Za-z0-9]+)\)", display)
-    if match is None:
-        match = re.fullmatch(r"([A-Za-z0-9]+)\s+\(([A-Za-z]+)\)", str(value or "").strip())
-    if match is None:
-        return display
-    sequence, variant = match.groups()
-    if len(sequence) < 5 or len(variant) > 4:
-        return display
-    return f"{variant}\n{sequence.upper()}"
-
-
-def _compact_sig35_axis_key_label(value: object) -> str:
-    return _compact_sig35_tick_label(value).split("\n", 1)[0]
 
 
 def _style_compact_category_tick_labels(ax: Any, *, axis: str = "x", font_size: float = 9.2) -> None:
@@ -1529,6 +1567,7 @@ def _render_xy_panel(
     panel_title: str,
     color_map: dict[str, str],
     shape_map: dict[str, str],
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> dict[str, object]:
     finite_rows = [
         row
@@ -1568,7 +1607,12 @@ def _render_xy_panel(
     y_span = float(np.ptp(np.asarray(y_values, dtype=np.float64))) if y_values else 0.0
     collapsed_panel = x_span <= 1e-12 and y_span <= 1e-12
     render_mode = spec.render_mode or "points"
-    colors, _ = _color_series(finite_rows, spec.color_column, color_map=color_map if color_map else None)
+    colors, _ = _color_series(
+        finite_rows,
+        spec.color_column,
+        color_map=color_map if color_map else None,
+        axis_styles=axis_styles,
+    )
     if collapsed_panel:
         centroid_x = x_values[0] if x_values else 0.0
         centroid_y = y_values[0] if y_values else 0.0
@@ -1631,6 +1675,7 @@ def _render_xy_panel(
             shape_map=shape_map,
             point_size=point_style.point_size,
             alpha=point_style.alpha,
+            axis_styles=axis_styles,
             rasterized=point_style.rasterized,
             edgecolors=point_style.edgecolors,
             linewidths=point_style.linewidths,
@@ -1712,11 +1757,14 @@ def _render_distribution_panel(
     square: bool = False,
     x_axis_label: str | None = None,
     y_axis_label: str | None = None,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> None:
-    if render_mode == "violin_box" and color_column == "sig35_variant":
-        rows = [row for row in rows if _is_sig35_ordinal_audit_category(row.get(color_column))]
+    style = _axis_style(axis_styles, color_column)
+    if render_mode == "violin_box" and color_column is not None and style is not None and style.ordinal_subset:
+        allowed = {str(value) for value in style.ordinal_subset}
+        rows = [row for row in rows if normalize_axis_category(style, row.get(color_column), row=row) in allowed]
         if not rows:
-            raise ContractViolationError("Sigma-35 ordinal distribution requires at least one f/e/d/c/b row")
+            raise ContractViolationError("ordinal distribution requires at least one row in the configured subset")
     values = np.asarray([float(row[metric_column]) for row in rows], dtype=np.float32)
     bin_count = max(5, min(30, int(np.sqrt(values.size)) + 1))
     boxplot_kwargs = {
@@ -1775,10 +1823,18 @@ def _render_distribution_panel(
         else:
             if rows and color_column not in rows[0]:
                 raise ContractViolationError(f"distribution color column is missing: {color_column!r}")
-            categories = ordered_categories((str(row[color_column]) for row in rows), column=color_column)
+            categories = _axis_categories(
+                [_axis_category_value(row, color_column, axis_styles=axis_styles) for row in rows],
+                column=color_column,
+                axis_styles=axis_styles,
+            )
             grouped_values = [
                 np.asarray(
-                    [float(row[metric_column]) for row in rows if str(row[color_column]) == category],
+                    [
+                        float(row[metric_column])
+                        for row in rows
+                        if _axis_category_value(row, color_column, axis_styles=axis_styles) == category
+                    ],
                     dtype=np.float32,
                 )
                 for category in categories
@@ -1791,13 +1847,11 @@ def _render_distribution_panel(
             ax.set_xticks(
                 range(1, len(categories) + 1),
                 [
-                    _compact_sig35_tick_label(category)
-                    if color_column == "sig35_variant"
-                    else display_category_text(category, column=color_column)
+                    _axis_category_label(category, column=color_column, axis_styles=axis_styles, compact=True)
                     for category in categories
                 ],
-                rotation=0 if color_column == "sig35_variant" else 25,
-                ha="center" if color_column == "sig35_variant" else "right",
+                rotation=0 if style is not None and style.compact_display_labels else 25,
+                ha="center" if style is not None and style.compact_display_labels else "right",
             )
         ax.set_ylabel(
             _resolved_axis_label(
@@ -1839,7 +1893,7 @@ def _render_distribution_panel(
     )
     ax.set_title(wrap_plot_title(panel_title, width=24), pad=8)
     _apply_axes_style(ax, grid=True, square=square)
-    if render_mode == "violin_box" and color_column == "sig35_variant":
+    if render_mode == "violin_box" and style is not None and style.compact_display_labels:
         _style_compact_category_tick_labels(ax, axis="x")
 
 
@@ -1904,6 +1958,7 @@ def _render_metric_panel(
     panel_title: str,
     color_map: dict[str, str],
     square: bool = False,
+    axis_styles: dict[str, AxisStyle] | None = None,
 ) -> None:
     if spec.value_column is None:
         raise ContractViolationError("metric_panel_grid rendering requires value_column")
@@ -1930,14 +1985,16 @@ def _render_metric_panel(
     if spec.color_column is not None:
         if ordered_rows and spec.color_column not in ordered_rows[0]:
             raise ContractViolationError(f"metric_panel_grid color column is missing: {spec.color_column!r}")
-        bar_colors = [color_map[str(row[spec.color_column])] for row in ordered_rows]
+        bar_colors = [
+            color_map[_axis_category_value(row, spec.color_column, axis_styles=axis_styles)] for row in ordered_rows
+        ]
     else:
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
     ci_enabled = spec.ci_lower_column is not None and spec.ci_upper_column is not None and ordered_rows
     horizontal_grouped_metric = grouped_family_bars and spec.plot_id in _HORIZONTAL_GROUPED_METRIC_PLOT_IDS
 
     if horizontal_grouped_metric:
-        family_order = ordered_categories([str(row["candidate_family"]) for row in ordered_rows])
+        family_order = ordered_categories_for_axis(None, [str(row["candidate_family"]) for row in ordered_rows])
         group_keys = list(
             dict.fromkeys(
                 (
@@ -2208,7 +2265,7 @@ def _render_metric_panel(
     errorbar_specs: list[tuple[float, float, float, float]] = []
     missing_positions: list[float] = []
     if grouped_family_bars:
-        family_order = ordered_categories([str(row["candidate_family"]) for row in ordered_rows])
+        family_order = ordered_categories_for_axis(None, [str(row["candidate_family"]) for row in ordered_rows])
         group_keys = list(
             dict.fromkeys(
                 (
@@ -2488,6 +2545,7 @@ def render_plot_artifact(
     output_dir: Path,
     semantics: PlotSemantics,
 ) -> tuple[Path, list[str], dict[str, object]]:
+    axis_styles = axis_style_map_from_config(context.config)
     if spec.kind not in SUPPORTED_PLOT_KINDS:
         raise ContractViolationError(f"unsupported plot kind: {spec.kind}")
     if spec.kind in {"projection_scatter", "projection_grid"} and not spec.projection_ids:
@@ -2552,7 +2610,7 @@ def render_plot_artifact(
             row_order=list(spec.row_order or []),
             column_order=list(spec.column_order or []),
         )
-        cmap, norm = _heatmap_color_params([grid], color_scale=spec.color_scale, plot_id=spec.plot_id)
+        cmap, norm = _heatmap_color_params([grid], color_scale=spec.color_scale)
         fig, ax = plt.subplots(figsize=(2.2 + 1.35 * len(column_values), 1.7 + 1.05 * len(row_values)))
         image = _render_heatmap_panel(
             ax,
@@ -2564,9 +2622,10 @@ def render_plot_artifact(
             title=spec.plot_id,
             cmap=cmap,
             norm=norm,
-            square_cells=spec.plot_id == "sigma35_centroid_distance_gallery",
+            square_cells=bool(spec.square_panels),
             x_axis_label=spec.x_axis_label,
             y_axis_label=spec.y_axis_label,
+            axis_styles=axis_styles,
         )
         colorbar = fig.colorbar(
             image,
@@ -2600,8 +2659,12 @@ def render_plot_artifact(
                 )
             )
         grids = [grid for _, grid, _, _ in heatmap_tables]
-        cmap, norm = _heatmap_color_params(grids, color_scale=spec.color_scale, plot_id=spec.plot_id)
-        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(heatmap_tables))
+        cmap, norm = _heatmap_color_params(grids, color_scale=spec.color_scale)
+        prefer_single_row = _prefer_single_row_panel_layout(
+            spec.plot_id,
+            len(heatmap_tables),
+            configured=spec.single_row_panels,
+        )
         rows_count, columns = _panel_grid_dimensions(len(heatmap_tables), prefer_single_row=prefer_single_row)
         max_row_count = max(len(row_values) for _, _, row_values, _ in heatmap_tables)
         max_column_count = max(len(column_values) for _, _, _, column_values in heatmap_tables)
@@ -2610,7 +2673,7 @@ def render_plot_artifact(
                 max(9.6, (2.9 * columns) + 0.6),
                 max(3.25, (2.55 * rows_count) + 0.12),
             )
-            if spec.plot_id == "sigma35_centroid_distance_gallery"
+            if spec.square_panels
             else (
                 max(4.2, 1.9 + (1.15 * max_column_count)) * columns,
                 max(4.1, 1.6 + (0.9 * max_row_count)) * rows_count,
@@ -2644,14 +2707,15 @@ def render_plot_artifact(
                 title=panel_title,
                 cmap=cmap,
                 norm=norm,
-                square_cells=spec.plot_id == "sigma35_centroid_distance_gallery",
+                square_cells=bool(spec.square_panels),
                 x_axis_label=spec.x_axis_label,
                 y_axis_label=spec.y_axis_label,
-                show_y_tick_labels=not (spec.plot_id == "sigma35_centroid_distance_gallery" and panel_index > 0),
-                show_y_axis_label=not (spec.plot_id == "sigma35_centroid_distance_gallery" and panel_index > 0),
+                show_y_tick_labels=not (spec.hide_repeated_y_axis and panel_index > 0),
+                show_y_axis_label=not (spec.hide_repeated_y_axis and panel_index > 0),
+                axis_styles=axis_styles,
             )
         assert image is not None
-        if spec.plot_id == "sigma35_centroid_distance_gallery":
+        if spec.square_panels:
             fig.subplots_adjust(left=0.07, right=0.875, wspace=0.18, bottom=0.18, top=0.79)
             colorbar = fig.colorbar(
                 image,
@@ -2687,9 +2751,11 @@ def render_plot_artifact(
 
         rows = _table_rows(table_path)
         fig, ax = plt.subplots(figsize=_grid_figure_size(1, square_panels=True))
-        color_encoding = _continuous_color_encoding(rows, spec)
+        color_encoding = _continuous_color_encoding(rows, spec, axis_styles=axis_styles)
         color_map, categories = (
-            ({}, []) if color_encoding is not None else _category_color_map([rows], spec.color_column)
+            ({}, [])
+            if color_encoding is not None
+            else _category_color_map([rows], spec.color_column, axis_styles=axis_styles)
         )
         effective_shape_column = _effective_shape_column(spec)
         shape_map, shape_categories = _shape_marker_map([rows], effective_shape_column)
@@ -2729,6 +2795,7 @@ def render_plot_artifact(
                 point_sizes=point_sizes,
                 alpha=point_style.alpha,
                 continuous_color=color_encoding,
+                axis_styles=axis_styles,
                 rasterized=point_style.rasterized,
                 edgecolors=point_style.edgecolors,
                 linewidths=point_style.linewidths,
@@ -2821,6 +2888,7 @@ def render_plot_artifact(
                 shape_categories=shape_categories,
                 shape_map=shape_map,
                 shape_title=effective_shape_column,
+                axis_styles=axis_styles,
             )
     elif spec.kind in {"xy_scatter_grid", "paired_xy_scatter_grid"}:
         scalar_tables: list[tuple[str, list[dict[str, object]], str, str]] = []
@@ -2836,7 +2904,11 @@ def render_plot_artifact(
                 value_column=spec.value_column,
             )
             scalar_tables.append((scalar_id, _table_rows(table_path), resolved_x, resolved_y))
-        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(scalar_tables))
+        prefer_single_row = _prefer_single_row_panel_layout(
+            spec.plot_id,
+            len(scalar_tables),
+            configured=spec.single_row_panels,
+        )
         rows_count, columns = _panel_grid_dimensions(len(scalar_tables), prefer_single_row=prefer_single_row)
         fig, axes = plt.subplots(
             rows_count,
@@ -2844,7 +2916,11 @@ def render_plot_artifact(
             figsize=_grid_figure_size(len(scalar_tables), square_panels=True, prefer_single_row=prefer_single_row),
             squeeze=False,
         )
-        color_map, categories = _category_color_map([rows for _, rows, _, _ in scalar_tables], spec.color_column)
+        color_map, categories = _category_color_map(
+            [rows for _, rows, _, _ in scalar_tables],
+            spec.color_column,
+            axis_styles=axis_styles,
+        )
         effective_shape_column = _effective_shape_column(spec)
         shape_map, shape_categories = _shape_marker_map(
             [rows for _, rows, _, _ in scalar_tables],
@@ -2869,6 +2945,7 @@ def render_plot_artifact(
                 panel_title=panel_title,
                 color_map=color_map,
                 shape_map=shape_map,
+                axis_styles=axis_styles,
             )
             plot_metadata.setdefault("reference_panels", {})[scalar_id] = annotation_state
         grid_legend_bottom_margin = 0.0
@@ -2883,6 +2960,7 @@ def render_plot_artifact(
                 shape_categories=shape_categories,
                 shape_map=shape_map,
                 shape_title=effective_shape_column,
+                axis_styles=axis_styles,
             )
     elif spec.kind == "categorical_count":
         assert spec.scalar_id is not None
@@ -2920,7 +2998,7 @@ def render_plot_artifact(
             ),
             squeeze=False,
         )
-        color_map, categories = _category_color_map([rows], spec.color_column)
+        color_map, categories = _category_color_map([rows], spec.color_column, axis_styles=axis_styles)
         for axis in axes.ravel()[len(panel_values) :]:
             axis.axis("off")
         for axis, panel_value in zip(axes.ravel(), panel_values, strict=False):
@@ -2934,7 +3012,10 @@ def render_plot_artifact(
             if spec.color_column is not None:
                 if spec.color_column not in panel_rows[0]:
                     raise ContractViolationError(f"categorical_count color column is missing: {spec.color_column!r}")
-                bar_colors = [color_map[str(row[spec.color_column])] for row in panel_rows]
+                bar_colors = [
+                    color_map[_axis_category_value(row, spec.color_column, axis_styles=axis_styles)]
+                    for row in panel_rows
+                ]
             else:
                 bar_colors = [PUBLICATION_PALETTE[0]] * len(panel_rows)
             values = [float(row[spec.value_column]) for row in panel_rows]
@@ -3007,6 +3088,7 @@ def render_plot_artifact(
                 shape_categories=[],
                 shape_map={},
                 shape_title=None,
+                axis_styles=axis_styles,
             )
     elif spec.kind == "metric_panel_grid":
         assert spec.scalar_id is not None
@@ -3042,7 +3124,7 @@ def render_plot_artifact(
             figsize=metric_figsize,
             squeeze=False,
         )
-        color_map, categories = _category_color_map([rows], spec.color_column)
+        color_map, categories = _category_color_map([rows], spec.color_column, axis_styles=axis_styles)
         panel_rows_by_value = {
             panel_value: [row for row in rows if str(row[spec.row_column]) == panel_value]
             for panel_value in panel_values
@@ -3059,6 +3141,7 @@ def render_plot_artifact(
                 panel_title=panel_title,
                 color_map=color_map,
                 square=square_metric_panels,
+                axis_styles=axis_styles,
             )
         plot_metadata["metric_columns"] = panel_values
         grid_legend_bottom_margin = 0.0
@@ -3073,6 +3156,7 @@ def render_plot_artifact(
                 shape_categories=[],
                 shape_map={},
                 shape_title=None,
+                axis_styles=axis_styles,
             )
     elif spec.kind == "distribution":
         artifact_kind, artifact_id, table_path = _table_artifact_path(context, spec)
@@ -3101,6 +3185,7 @@ def render_plot_artifact(
             square=False,
             x_axis_label=spec.x_axis_label,
             y_axis_label=spec.y_axis_label,
+            axis_styles=axis_styles,
         )
     elif spec.kind == "distribution_grid":
         scalar_tables: list[tuple[str, list[dict[str, object]], str]] = []
@@ -3136,9 +3221,13 @@ def render_plot_artifact(
                     f"distribution_grid value column is missing or non-numeric: {metric_column!r}"
                 )
             scalar_tables.append((scalar_id, rows, metric_column))
-        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(scalar_tables))
+        prefer_single_row = _prefer_single_row_panel_layout(
+            spec.plot_id,
+            len(scalar_tables),
+            configured=spec.single_row_panels,
+        )
         rows_count, columns = _panel_grid_dimensions(len(scalar_tables), prefer_single_row=prefer_single_row)
-        square_distribution_panels = spec.plot_id == "sigma35_margin_ladder_gallery"
+        square_distribution_panels = bool(spec.square_panels)
         fig, axes = plt.subplots(
             rows_count,
             columns,
@@ -3170,6 +3259,7 @@ def render_plot_artifact(
                 square=square_distribution_panels,
                 x_axis_label=spec.x_axis_label,
                 y_axis_label=spec.y_axis_label,
+                axis_styles=axis_styles,
             )
         if configured_metric_columns:
             plot_metadata["metric_columns"] = configured_metric_columns
@@ -3194,7 +3284,11 @@ def render_plot_artifact(
             if not reducer_path.exists():
                 raise MissingArtifactError(f"reducer artifact is missing for curve rendering: {reducer_id}")
             reducer_summaries.append((reducer_id, json.loads(reducer_path.read_text(encoding="utf-8"))))
-        prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(reducer_summaries))
+        prefer_single_row = _prefer_single_row_panel_layout(
+            spec.plot_id,
+            len(reducer_summaries),
+            configured=spec.single_row_panels,
+        )
         rows_count, columns = _panel_grid_dimensions(
             len(reducer_summaries),
             prefer_single_row=prefer_single_row,
@@ -3370,9 +3464,11 @@ def render_plot_artifact(
             projection_tables.append(_table_rows(projection_path))
         if spec.kind == "projection_scatter":
             rows = projection_tables[0]
-            color_encoding = _continuous_color_encoding(rows, spec)
+            color_encoding = _continuous_color_encoding(rows, spec, axis_styles=axis_styles)
             color_map, categories = (
-                ({}, []) if color_encoding is not None else _category_color_map([rows], spec.color_column)
+                ({}, [])
+                if color_encoding is not None
+                else _category_color_map([rows], spec.color_column, axis_styles=axis_styles)
             )
             effective_shape_column = _effective_shape_column(spec)
             shape_map, shape_categories = _shape_marker_map([rows], effective_shape_column)
@@ -3390,6 +3486,7 @@ def render_plot_artifact(
                 point_size=point_style.point_size,
                 alpha=point_style.alpha,
                 continuous_color=color_encoding,
+                axis_styles=axis_styles,
                 rasterized=point_style.rasterized,
                 edgecolors=point_style.edgecolors,
                 linewidths=point_style.linewidths,
@@ -3428,6 +3525,7 @@ def render_plot_artifact(
                         shape_categories=shape_categories,
                         shape_map=shape_map,
                         shape_title=effective_shape_column,
+                        axis_styles=axis_styles,
                     )
                 else:
                     grid_legend_bottom_margin = _add_figure_legends(
@@ -3441,9 +3539,14 @@ def render_plot_artifact(
                         shape_map=shape_map,
                         shape_title=effective_shape_column,
                         single_row=False,
+                        axis_styles=axis_styles,
                     )
         else:
-            prefer_single_row = _prefer_single_row_panel_layout(spec.plot_id, len(projection_tables))
+            prefer_single_row = _prefer_single_row_panel_layout(
+                spec.plot_id,
+                len(projection_tables),
+                configured=spec.single_row_panels,
+            )
             rows_count, columns = _panel_grid_dimensions(
                 len(projection_tables),
                 prefer_single_row=prefer_single_row,
@@ -3458,7 +3561,7 @@ def render_plot_artifact(
                 ),
                 squeeze=False,
             )
-            color_map, categories = _category_color_map(projection_tables, spec.color_column)
+            color_map, categories = _category_color_map(projection_tables, spec.color_column, axis_styles=axis_styles)
             effective_shape_column = _effective_shape_column(spec)
             shape_map, shape_categories = _shape_marker_map(projection_tables, effective_shape_column)
             titles = spec.panel_titles or list(spec.projection_ids)
@@ -3483,6 +3586,7 @@ def render_plot_artifact(
                     shape_map=shape_map,
                     point_size=point_style.point_size,
                     alpha=point_style.alpha,
+                    axis_styles=axis_styles,
                     rasterized=point_style.rasterized,
                     edgecolors=point_style.edgecolors,
                     linewidths=point_style.linewidths,
@@ -3520,6 +3624,7 @@ def render_plot_artifact(
                 shape_categories=shape_categories,
                 shape_map=shape_map,
                 shape_title=effective_shape_column,
+                axis_styles=axis_styles,
             )
     grid_legend_bottom_margin = float(locals().get("grid_legend_bottom_margin", 0.0))
     grid_legend_right_margin = float(locals().get("grid_legend_right_margin", 0.0))

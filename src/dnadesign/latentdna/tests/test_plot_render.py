@@ -6,9 +6,11 @@ from types import SimpleNamespace
 import matplotlib.pyplot as plt
 
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec
+from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
 from dnadesign.latentdna.src.plots.render import (
     _add_figure_legends,
     _add_side_figure_legends,
+    _axis_category_value,
     _category_color_map,
     _category_key,
     _continuous_color_encoding,
@@ -21,9 +23,68 @@ from dnadesign.latentdna.src.plots.render import (
     _render_distribution_panel,
     _render_heatmap_panel,
     _render_metric_panel,
-    _row_sig35_plot_category,
 )
 from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
+
+SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
+SIGMA35_AXIS_STYLES = axis_style_map_from_payload(
+    {
+        "sig35_variant": {
+            "axis_id": "sigma35",
+            "column": "sig35_variant",
+            "label": "Sigma-35 variant",
+            "kind": "categorical",
+            "category_order": ["f", "e", "d", "c", "b", "control"],
+            "ordinal_subset": ["f", "e", "d", "c", "b"],
+            "display_labels": {
+                "f": "TTGACA (f)",
+                "e": "TAGACA (e)",
+                "d": "TTTACA (d)",
+                "c": "TTGTGA (c)",
+                "b": "CTGACA (b)",
+                "control": "Control",
+            },
+            "compact_display_labels": {
+                "f": "f\nTTGACA",
+                "e": "e\nTAGACA",
+                "d": "d\nTTTACA",
+                "c": "c\nTTGTGA",
+                "b": "b\nCTGACA",
+                "control": "Control",
+            },
+            "category_colors": {
+                "f": "#B2182B",
+                "e": "#D6604D",
+                "d": "#F4A582",
+                "c": "#92C5DE",
+                "b": "#2166AC",
+                "control": "#7F8894",
+            },
+            "noncanonical_bucket": SIGMA35_NONCANONICAL_BUCKET,
+            "noncanonical_label": "Reference/other",
+            "include_noncanonical_in_legend": False,
+            "canonical_row_match": "any",
+            "canonical_row_selectors": [
+                {"column": "source_class", "in_values": ["densegen"]},
+                {"column": "source_family", "in_values": ["densegen_generated"]},
+            ],
+        }
+    }
+)
+SIGMA35_HEATMAP_AXIS_STYLES = axis_style_map_from_payload(
+    {
+        "row_variant": {
+            "axis_id": "row_variant",
+            "column": "row_variant",
+            "compact_display_labels": {"TTGACA (f)": "f\nTTGACA", "CTGACA (b)": "b\nCTGACA"},
+        },
+        "column_variant": {
+            "axis_id": "column_variant",
+            "column": "column_variant",
+            "compact_display_labels": {"TTGACA (f)": "f", "CTGACA (b)": "b"},
+        },
+    }
+)
 
 
 def _metric_spec(*, plot_id: str, color_column: str | None) -> ResolvedPlotSpec:
@@ -63,28 +124,30 @@ def test_category_key_compacts_list_values_for_categorical_legends() -> None:
     assert set(color_map) == set(categories)
 
 
-def test_static_sig35_hue_keeps_context_derived_densegen_rows_categorical() -> None:
+def test_axis_style_hue_keeps_context_derived_densegen_rows_categorical() -> None:
     assert (
-        _row_sig35_plot_category(
+        _axis_category_value(
             {
                 "sig35_variant": "f",
                 "source_family": "construct_derived",
                 "source_class": "densegen",
             },
             "sig35_variant",
+            axis_styles=SIGMA35_AXIS_STYLES,
         )
         == "f"
     )
     assert (
-        _row_sig35_plot_category(
+        _axis_category_value(
             {
                 "sig35_variant": "f",
                 "source_family": "construct_derived",
                 "source_class": "construct_derived",
             },
             "sig35_variant",
+            axis_styles=SIGMA35_AXIS_STYLES,
         )
-        == "__latentdna_noncanonical_sig35__"
+        == SIGMA35_NONCANONICAL_BUCKET
     )
 
 
@@ -419,6 +482,7 @@ def test_render_distribution_panel_orders_sig35_categories_by_strength_and_uses_
             render_mode="violin_box",
             panel_title="Sigma-35 ladder",
             square=False,
+            axis_styles=SIGMA35_AXIS_STYLES,
         )
 
         tick_labels = [label.get_text() for label in ax.get_xticklabels()]
@@ -452,6 +516,7 @@ def test_render_distribution_panel_preserves_explicit_math_axis_label() -> None:
             panel_title="Sigma-35 ladder",
             square=False,
             y_axis_label=label,
+            axis_styles=SIGMA35_AXIS_STYLES,
         )
 
         assert ax.get_ylabel() == label
@@ -529,6 +594,7 @@ def test_render_heatmap_panel_compacts_sigma35_tick_labels_for_dense_grids() -> 
             cmap="viridis",
             norm=None,
             square_cells=True,
+            axis_styles=SIGMA35_HEATMAP_AXIS_STYLES,
         )
 
         assert image is not None

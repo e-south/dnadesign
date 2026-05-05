@@ -55,6 +55,9 @@ class PlotBaseConfig(StrictPlotModel):
     x_axis_label: str | None = None
     y_axis_label: str | None = None
     colorbar_label: str | None = None
+    single_row_panels: bool = False
+    square_panels: bool = False
+    hide_repeated_y_axis: bool = False
 
     @model_validator(mode="after")
     def _validate_hue_defaults(self) -> "PlotBaseConfig":
@@ -450,5 +453,8 @@ class ResolvedPlotSpec(StrictPlotModel):
     x_axis_label: str | None = None
     y_axis_label: str | None = None
     colorbar_label: str | None = None
+    single_row_panels: bool = False
+    square_panels: bool = False
+    hide_repeated_y_axis: bool = False
     config_id: Identifier | None = None
     semantics_ref: str | None = None

@@ -12,8 +12,8 @@ def test_humanize_label_preserves_required_public_labels() -> None:
     assert humanize_label("anchor_60bp") == "Anchor-source insert"
     assert humanize_label("merged_anchor_insert_seq_mean") == "Mixed-length anchor-source insert"
     assert humanize_label("full_context_1kb") == "1 kb construct context"
-    assert humanize_label("sig35_variant") == "Sigma-35 variant"
-    assert humanize_label("variant f") == "TTGACA (f)"
+    assert humanize_label("sig35_variant") == "SIG35 Variant"
+    assert humanize_label("variant f") == "Variant F"
 
 
 def test_humanize_plot_title_removes_public_appendix_language() -> None:

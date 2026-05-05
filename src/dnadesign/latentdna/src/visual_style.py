@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from math import ceil
 from textwrap import wrap
 
-from .labels import humanize_label, sigma35_variant_display
+from .labels import humanize_label
 
 TEXT_COLOR = "#16202A"
 GRID_COLOR = "#D5DCE4"
@@ -84,19 +84,7 @@ _SEMANTIC_CATEGORY_PRIORITY = {
     "whole_sequence_context": 10,
 }
 
-_SIG35_VARIANT_STRENGTH_ORDER = ["f", "e", "d", "c", "b", "a"]
-_SIG35_VARIANT_PRIORITY = {variant: index for index, variant in enumerate(_SIG35_VARIANT_STRENGTH_ORDER)}
-_SIG35_LEGEND_CATEGORY_KEYS = frozenset({"f", "e", "d", "c", "b", "control"})
-NONCANONICAL_SIG35_CATEGORY = "__latentdna_noncanonical_sig35__"
-_SIG35_VARIANT_COLORS = {
-    "f": "#B2182B",
-    "e": "#D6604D",
-    "d": "#F4A582",
-    "c": "#92C5DE",
-    "b": "#2166AC",
-    "a": "#053061",
-}
-_SIG35_VARIANT_NEUTRAL_COLOR = "#7F8894"
+_DEFAULT_CATEGORY_NEUTRAL_COLOR = "#7F8894"
 _SPACER_LENGTH_COLOR_STOPS = ("#2C7BB6", "#ABD9E9", "#FEE090", "#F46D43", "#D73027")
 _SINGLE_ROW_LEGEND_PLOT_IDS = frozenset(
     {
@@ -104,7 +92,6 @@ _SINGLE_ROW_LEGEND_PLOT_IDS = frozenset(
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
-        "sigma35_stress_margin_gallery",
         "appendix_geometry_review",
         "appendix_umap_gallery",
     }
@@ -115,7 +102,6 @@ _LOWERED_LEGEND_PLOT_IDS = frozenset(
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
-        "sigma35_stress_margin_gallery",
         "appendix_geometry_review",
         "appendix_umap_gallery",
     }
@@ -156,35 +142,6 @@ def normalize_category_key(value: object) -> str:
     return str(value or "").strip().lower().replace(" ", "_")
 
 
-def is_sig35_legend_category(value: object) -> bool:
-    return normalize_category_key(value) in _SIG35_LEGEND_CATEGORY_KEYS
-
-
-def normalize_sig35_hue_category(value: object) -> str:
-    normalized = normalize_category_key(value)
-    if normalized in _SIG35_LEGEND_CATEGORY_KEYS:
-        return normalized
-    if normalized in {"", "na", "n/a", "none", "unknown"}:
-        return NONCANONICAL_SIG35_CATEGORY
-    return NONCANONICAL_SIG35_CATEGORY
-
-
-def is_densegen_sig35_row(row: object) -> bool:
-    if not isinstance(row, dict):
-        return True
-    if "source_class" in row:
-        return normalize_category_key(row.get("source_class")) == "densegen"
-    if "source_family" in row:
-        return normalize_category_key(row.get("source_family")) == "densegen_generated"
-    return True
-
-
-def normalize_sig35_hue_category_for_row(row: object, value: object) -> str:
-    if not is_densegen_sig35_row(row):
-        return NONCANONICAL_SIG35_CATEGORY
-    return normalize_sig35_hue_category(value)
-
-
 def reference_annotation_label(value: object) -> str:
     text = " ".join(str(value or "").split()).strip()
     if not text:
@@ -197,20 +154,6 @@ def reference_annotation_label(value: object) -> str:
         "sulap": "sulAp",
         "j23105": "J23105",
     }.get(normalized, text)
-
-
-def _sig35_variant_sort_key(value: object) -> tuple[int, str]:
-    text = str(value)
-    normalized = normalize_category_key(text)
-    if normalized == NONCANONICAL_SIG35_CATEGORY:
-        return len(_SIG35_VARIANT_PRIORITY) + 2, text.casefold()
-    if normalized in _SIG35_VARIANT_PRIORITY:
-        return _SIG35_VARIANT_PRIORITY[normalized], text.casefold()
-    if normalized == "control":
-        return len(_SIG35_VARIANT_PRIORITY), text.casefold()
-    if normalized in {"unknown", "na", "n/a"}:
-        return len(_SIG35_VARIANT_PRIORITY) + 1, text.casefold()
-    return len(_SIG35_VARIANT_PRIORITY) + 2, text.casefold()
 
 
 def _numeric_category_value(value: object) -> float | None:
@@ -289,8 +232,6 @@ def _color_ramp(color_stops: tuple[str, ...], count: int) -> list[str]:
 
 def ordered_categories(values: Iterable[str], *, column: str | None = None) -> list[str]:
     unique = sorted({str(value) for value in values})
-    if str(column or "").strip() == "sig35_variant":
-        return sorted(unique, key=_sig35_variant_sort_key)
     if str(column or "").strip() == "spacer_length":
         return sorted(unique, key=_spacer_length_sort_key)
     return sorted(
@@ -313,19 +254,11 @@ def categorical_color_map(categories: Iterable[str], *, column: str | None = Non
             )
         }
         for category in non_numeric_categories:
-            color_map[category] = _SIG35_VARIANT_NEUTRAL_COLOR
+            color_map[category] = _DEFAULT_CATEGORY_NEUTRAL_COLOR
         return color_map
     color_map: dict[str, str] = {}
     fallback_index = 0
     for category in ordered:
-        normalized_category = normalize_category_key(category)
-        if str(column or "").strip() == "sig35_variant":
-            if normalized_category in _SIG35_VARIANT_COLORS:
-                color_map[category] = _SIG35_VARIANT_COLORS[normalized_category]
-                continue
-            if normalized_category in {"control", "unknown", "na", "n/a"}:
-                color_map[category] = _SIG35_VARIANT_NEUTRAL_COLOR
-                continue
         semantic_color = _SEMANTIC_CATEGORY_COLORS.get(normalize_category_key(category))
         if semantic_color is not None:
             color_map[category] = semantic_color
@@ -366,8 +299,6 @@ def _canonical_regulator_token(value: object) -> str | None:
     if not text:
         return None
     lowered = text.lower()
-    if lowered.startswith("sig35="):
-        return "background"
     if lowered in {"background", "background_only", "control"}:
         return lowered
     token = text.split("_", 1)[0].strip()
@@ -415,19 +346,6 @@ def display_category_text(value: object, *, column: str | None = None) -> str:
         return formatted or humanize_display_text(value)
     if normalized_column == "design_regulator_composition":
         return compact_design_regulator_composition(value)
-    if normalized_column == "sig35_variant":
-        text = str(value or "").strip()
-        normalized = normalize_category_key(text)
-        if normalized == NONCANONICAL_SIG35_CATEGORY:
-            return "Reference/other"
-        if normalized in {"", "na", "n/a"}:
-            return "NA"
-        if normalized in {"control", "unknown"}:
-            return humanize_display_text(text)
-        resolved = sigma35_variant_display(text)
-        if resolved is not None:
-            return resolved
-        return humanize_label(f"variant {text}")
     return humanize_display_text(value)
 
 
