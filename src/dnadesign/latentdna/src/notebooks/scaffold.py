@@ -11,11 +11,12 @@ from .scaffold_selectors import render_bootstrap_cell, render_selector_cells, re
 
 
 def _marimo_version() -> str:
-    try:
-        import marimo as _marimo
-    except Exception:
-        return "unknown"
-    return getattr(_marimo, "__version__", "unknown")
+    import marimo as _marimo
+
+    version = getattr(_marimo, "__version__", None)
+    if not isinstance(version, str) or not version:
+        raise RuntimeError("marimo import succeeded but __version__ is not available")
+    return version
 
 
 def _render_header() -> str:

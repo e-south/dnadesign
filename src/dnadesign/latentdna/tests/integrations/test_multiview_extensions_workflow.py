@@ -307,6 +307,36 @@ def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
     assert "bundle_norm_value" in renamed_table.column_names
 
 
+def test_matrix_bundle_source_rejects_ambiguous_matrix_payloads(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    bundle_dir = tmp_path / "bundle_source"
+    _write_matrix_bundle(bundle_dir)
+    np.savez(bundle_dir / "matrix.npz", matrix=np.ones((3, 4), dtype=np.float32))
+    context_path = tmp_path / "inputs" / "context.parquet"
+    _write_parquet(
+        context_path,
+        [
+            {
+                "id": "ctx_01",
+                "subject_id": "subject_01",
+                "context_id": "a",
+                "label": "spyP",
+                "embedding_context": [1.0, 0.0],
+            }
+        ],
+    )
+    _write_workspace_config(workspace_dir, bundle_dir, context_path)
+
+    result = _RUNNER.invoke(
+        app,
+        ["inspect", "source", "bundle_source", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert result.exit_code != 0
+    assert "ambiguous matrix payloads" in result.stdout
+
+
 def test_concatenate_rejects_non_unique_reference_join_keys() -> None:
     reference_rows = pa.Table.from_pylist(
         [

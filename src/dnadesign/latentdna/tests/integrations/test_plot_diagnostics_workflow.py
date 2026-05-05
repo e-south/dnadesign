@@ -341,6 +341,58 @@ def test_distance_distribution_and_agreement_summary_plots(tmp_path: Path) -> No
     assert agreement_manifest["params"]["agreement_id"] == "primary_vs_primary"
 
 
+def test_distance_scoring_fails_fast_when_landmark_selector_matches_no_rows(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "subject_id": "subject_01",
+                "usr_label__primary": "control",
+                "densegen__plan": "plan_a",
+                "embedding_anchor": [0.0, 0.0],
+            },
+            {
+                "id": "anchor_02",
+                "subject_id": "subject_02",
+                "usr_label__primary": "sample",
+                "densegen__plan": "plan_b",
+                "embedding_anchor": [1.0, 1.0],
+            },
+        ],
+    )
+    _write_workspace_config(workspace_dir, usr_root)
+
+    view_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert view_result.exit_code == 0, view_result.stdout
+
+    distance_result = _RUNNER.invoke(
+        app,
+        [
+            "distance",
+            "score",
+            "primary_landmark_distances",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--view",
+            "z20_60",
+            "--landmark",
+            "spy_p",
+            "--json",
+        ],
+    )
+
+    assert distance_result.exit_code != 0
+    assert "landmark spy_p matched no rows" in distance_result.stdout
+
+
 def test_plot_render_rejects_mixed_named_and_inline_specs(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
