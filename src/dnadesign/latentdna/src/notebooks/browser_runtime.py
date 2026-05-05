@@ -41,13 +41,11 @@ from .browser_runtime_support import (
     notebook_theme,
     option_key_for_value,
     read_text,
-    render_math_markdown,
-    render_plot_asset,
-    select_plot_render_path,
     style_notebook_axes,
     table_from_records,
     unique_in_order,
 )
+from .rendering import render_math_markdown, render_plot_asset, select_plot_render_path
 
 __all__ = ["build_workspace_browser_runtime", "load_workspace_notebook_controls", "resolve_plot_doc_block"]
 

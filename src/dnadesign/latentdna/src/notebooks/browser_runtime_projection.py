@@ -39,12 +39,12 @@ from .browser_runtime_support import (
     load_table,
     load_view_rows,
     normalize_categorical_hue_series,
-    render_matplotlib_figure,
     resolve_join_keys,
     resolve_reference_annotation,
     style_notebook_axes,
     style_notebook_legend,
 )
+from .rendering import render_matplotlib_figure
 
 
 def _error_frame(message: str) -> pd.DataFrame:

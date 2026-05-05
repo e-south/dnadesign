@@ -54,11 +54,11 @@ from .browser_runtime_support import (
     load_artifact_manifest,
     load_table,
     normalize_categorical_hue_series,
-    render_matplotlib_figure,
     resolve_reference_annotation,
     style_notebook_axes,
     style_notebook_legend,
 )
+from .rendering import render_matplotlib_figure
 
 _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
     {

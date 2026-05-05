@@ -24,9 +24,9 @@ from .browser_runtime_support import (
     load_table,
     load_view_matrix,
     load_view_rows,
-    render_matplotlib_figure,
     style_notebook_axes,
 )
+from .rendering import render_matplotlib_figure
 
 
 def deterministic_take(length: int, max_rows: int) -> np.ndarray:

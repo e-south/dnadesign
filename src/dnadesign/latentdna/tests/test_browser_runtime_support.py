@@ -6,10 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime_support
+from dnadesign.latentdna.src.notebooks import rendering as notebook_rendering
 from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
-    MAX_INLINE_NOTEBOOK_ASSET_BYTES,
-    MAX_INLINE_SVG_BYTES,
     available_hues_for_frames,
     candidate_hue_columns,
     category_color_map,
@@ -24,13 +22,17 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     normalize_categorical_hue_value,
     normalize_hue_kind,
     notebook_theme,
+    resolve_join_keys,
+    table_from_records,
+)
+from dnadesign.latentdna.src.notebooks.rendering import (
+    MAX_INLINE_NOTEBOOK_ASSET_BYTES,
+    MAX_INLINE_SVG_BYTES,
     render_math_markdown,
     render_matplotlib_figure,
     render_plot_asset,
-    resolve_join_keys,
     resolve_plot_render_asset,
     select_plot_render_path,
-    table_from_records,
 )
 from dnadesign.latentdna.src.visual_style import NONCANONICAL_SIG35_CATEGORY, wrap_plot_title
 
@@ -220,7 +222,7 @@ def test_table_from_records_uses_marimo_native_table_widget() -> None:
 
 
 def test_render_matplotlib_figure_prefers_inline_svg_in_app_run_mode(monkeypatch) -> None:
-    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+    monkeypatch.setattr(notebook_rendering.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
 
     fig, ax = plt.subplots()
     ax.plot([0, 1], [1, 0])
@@ -274,8 +276,7 @@ def test_render_plot_asset_prefers_png_for_large_svg_with_raster_fallback(tmp_pa
 
     assert isinstance(rendered, mo.Html)
     assert "data:image/png;base64," in rendered.text
-    assert "inline notebook rendering" not in rendered.text
-    assert "plot.png" not in rendered.text
+    assert "Displaying `plot.png` because `plot.svg` is large for inline notebook rendering" in rendered.text
 
 
 def test_render_math_markdown_emits_equation_images_for_display_math() -> None:
