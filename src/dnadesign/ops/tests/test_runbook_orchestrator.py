@@ -1080,6 +1080,18 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
                 "missing_scalars": 2,
                 "stale_vectors": 0,
                 "stale_scalars": 0,
+                "shard_plan": {
+                    "schema_version": "infer_feature_shard_ledger_v1",
+                    "shard_size_views": 50000,
+                    "shard_count": 1,
+                    "pending_view_estimate": 2,
+                    "pending_vector_keys": 3,
+                    "pending_scalar_keys": 2,
+                    "runtime_fingerprint_key": "fingerprint-test",
+                    "ledger_relative_path": "_derived/infer/checkpoints/infer_sequence_view/ledger.json",
+                    "commit_policy": "temp_validate_promote",
+                    "resume_policy": "skip_committed_retry_failed",
+                },
             },
         ),
     )
@@ -1111,6 +1123,11 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
     assert lane.action == "run"
     assert lane.missing_vectors == 3
     assert lane.missing_scalars == 2
+    assert lane.as_dict()["completion"][0]["shard_plan"]["shard_count"] == 1
+    assert (
+        lane.as_dict()["completion"][0]["shard_plan"]["ledger_relative_path"]
+        == "_derived/infer/checkpoints/infer_sequence_view/ledger.json"
+    )
     assert lane.audit_json_path == workspace_root / "outputs" / "logs" / "ops" / "audit" / (
         "infer_sequence_view.fill-infer.json"
     )
@@ -1161,6 +1178,141 @@ def test_infer_fill_blocks_missing_sequence_products_before_batch_plan(
     assert executed.ok is False
     assert executed.executed is False
     assert "infer_missing_products: lane blocked: missing sequence products block submit" in executed.errors
+
+
+def test_infer_fill_plans_multi_shard_lanes_when_durable_shard_plan_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dnadesign.ops.orchestrator.infer_fill as infer_fill
+
+    workspace_root = tmp_path / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    runbook_path = tmp_path / "infer.yaml"
+    runbook_path.write_text(
+        yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_multi_shard")),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "plan_sequence_view_feature_inventory_completion_from_config",
+        lambda _config: (
+            {
+                "required_views": 314558,
+                "required_vectors": 629116,
+                "required_scalars": 314558,
+                "missing_products": 0,
+                "missing_vectors": 629116,
+                "missing_scalars": 314558,
+                "stale_vectors": 0,
+                "stale_scalars": 0,
+                "shard_plan": {
+                    "schema_version": "infer_feature_shard_ledger_v1",
+                    "shard_size_views": 50000,
+                    "shard_count": 7,
+                    "pending_view_estimate": 314558,
+                    "pending_vector_keys": 629116,
+                    "pending_scalar_keys": 314558,
+                    "runtime_fingerprint_key": "fingerprint-test",
+                    "ledger_relative_path": "_derived/infer/checkpoints/context_forward/ledger.json",
+                    "commit_policy": "temp_validate_promote",
+                    "resume_policy": "skip_committed_retry_failed",
+                },
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "resolve_active_job_resolution",
+        lambda **_kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.SKIPPED,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.NO_MATCH,
+                degraded=False,
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "build_batch_plan",
+        lambda **_kwargs: SimpleNamespace(submit_commands=("notify", "infer"), as_dict=lambda: {"fake": True}),
+    )
+
+    fill_plan = build_infer_fill_plan(repo_root=tmp_path, runbook_paths=(runbook_path,))
+
+    assert fill_plan.aggregate_submit_commands == 2
+    assert fill_plan.lanes[0].action == "run"
+    assert "missing or stale vectors/scalars remain" in fill_plan.lanes[0].reasons
+
+
+def test_infer_fill_plans_stale_sidecar_repair_when_durable_shard_plan_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dnadesign.ops.orchestrator.infer_fill as infer_fill
+
+    workspace_root = tmp_path / "workspace"
+    _write_sequence_view_infer_config(workspace_root / "config.yaml")
+    runbook_path = tmp_path / "infer.yaml"
+    runbook_path.write_text(
+        yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_stale_repair")),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "plan_sequence_view_feature_inventory_completion_from_config",
+        lambda _config: (
+            {
+                "required_views": 10,
+                "required_vectors": 20,
+                "required_scalars": 20,
+                "missing_products": 0,
+                "missing_vectors": 0,
+                "missing_scalars": 0,
+                "stale_vectors": 20,
+                "stale_scalars": 20,
+                "shard_plan": {
+                    "schema_version": "infer_feature_shard_ledger_v1",
+                    "shard_size_views": 50000,
+                    "shard_count": 1,
+                    "pending_view_estimate": 10,
+                    "pending_vector_keys": 20,
+                    "pending_scalar_keys": 20,
+                    "runtime_fingerprint_key": "fingerprint-test",
+                    "ledger_relative_path": "_derived/infer/checkpoints/infer_stale_repair/ledger.json",
+                    "commit_policy": "temp_validate_promote",
+                    "resume_policy": "skip_committed_retry_failed",
+                },
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "resolve_active_job_resolution",
+        lambda **_kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.SKIPPED,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.NO_MATCH,
+                degraded=False,
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        infer_fill,
+        "build_batch_plan",
+        lambda **_kwargs: SimpleNamespace(submit_commands=("notify", "infer"), as_dict=lambda: {"fake": True}),
+    )
+
+    fill_plan = build_infer_fill_plan(repo_root=tmp_path, runbook_paths=(runbook_path,))
+
+    assert fill_plan.aggregate_submit_commands == 2
+    assert fill_plan.lanes[0].action == "run"
+    assert fill_plan.lanes[0].stale_vectors == 20
+    assert fill_plan.lanes[0].stale_scalars == 20
 
 
 def test_infer_fill_skips_infer_runbooks_without_sequence_view_inventory(

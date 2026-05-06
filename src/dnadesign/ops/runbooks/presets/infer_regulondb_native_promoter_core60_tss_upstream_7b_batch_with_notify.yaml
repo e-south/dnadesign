@@ -14,9 +14,9 @@ runbook:
   notify:
     tool: infer
     policy: infer
-    profile: ../../../infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/core60_tss_upstream_7b/profile.json
-    cursor: ../../../infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/core60_tss_upstream_7b/cursor
-    spool_dir: ../../../infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/core60_tss_upstream_7b/spool
+    profile: ../../../infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/sequence_views_core60_tss_upstream_7b/profile.json
+    cursor: ../../../infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/sequence_views_core60_tss_upstream_7b/cursor
+    spool_dir: ../../../infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/sequence_views_core60_tss_upstream_7b/spool
     webhook_env: NOTIFY_WEBHOOK
     qsub_template: docs/bu-scc/jobs/notify-watch.qsub
     smoke: dry

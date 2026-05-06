@@ -123,7 +123,7 @@ artifacts:
     ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/native_full_7b/profile.json
   notify_core60_profile_7b:
     artifact_type: file
-    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/core60_tss_upstream_7b/profile.json
+    ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/sequence_views_core60_tss_upstream_7b/profile.json
   latentdna_binding:
     artifact_type: file
     ref: manifest:latentdna_binding.yaml

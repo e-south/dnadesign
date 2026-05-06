@@ -184,11 +184,23 @@ uv run ops runbook fill-infer --study-dir docs/studies/<study-id> --submit
 The command is a control-plane wrapper around ordinary Infer runbooks. It reads
 study `execution_surfaces` or repeated `--runbook <path>` inputs, runs the
 Infer sequence-view completion inventory for each lane, skips complete lanes,
-blocks lanes with missing sequence products or stale feature sidecars, and
-plans or executes only lanes with missing vectors/scalars. It does not merge
+blocks lanes with missing sequence products or missing durability metadata, and
+plans or executes only lanes with missing vectors/scalars or stale sidecars that
+must be repaired under the current runtime fingerprint. It does not merge
 runbooks or event streams: Notify remains one watcher per lane, and each
 executed lane writes its audit JSON under
 `<workspace-root>/outputs/logs/ops/audit/<runbook-id>.fill-infer.json`.
+
+For sequence-view feature backfills, the completion inventory also emits a
+`shard_plan` with shard count, pending vector/scalar key counts, runtime
+fingerprint key, checkpoint ledger path, and the
+`temp_validate_promote`/`skip_committed_retry_failed` durability policy.
+Broad multi-shard lanes require that durability policy before SGE plan
+rendering. The Infer runner commits sidecar payloads at shard boundaries,
+validates persisted vector/scalar keys, updates the checkpoint ledger atomically,
+and emits `infer_feature_bundle_shard_commit` events before final bundle
+completion. A rerun treats current-fingerprint payloads as reusable and
+recomputes missing or stale raw-case/fingerprintless sidecars.
 
 For workstation planning without a scheduler, add
 `--no-discover-active-jobs --allow-unknown-active-jobs --allow-missing-qstat`.
@@ -402,7 +414,7 @@ uv run ops runbook execute \
 31. Notify DenseGen progress semantics use workspace-session counters (`rows_written_session`, `run_quota`, and `fingerprint.rows`) and default heartbeat cadence is 1800 seconds (`progress_heartbeat_seconds`) unless explicitly overridden.
 32. Notify workflows resolve a TLS CA bundle from `SSL_CERT_FILE` or known system CA paths and pass it explicitly to notify setup/orchestration commands; when no readable CA bundle is resolvable, planning fails fast before submit.
 33. DenseGen preflight runs `usr-overlay-guard` with explicit thresholds from its overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance.
-34. Sequence-view Infer preflight does not render `usr-overlay-guard`: those jobs write sidecar features under `_derived/infer/`, not row-overlay parts. It renders `infer validate sequence-view-completion` instead and blocks missing source products or stale feature sidecars before SGE submit.
+34. Sequence-view Infer preflight does not render `usr-overlay-guard`: those jobs write sidecar features under `_derived/infer/`, not row-overlay parts. It renders `infer validate sequence-view-completion` instead, blocks missing source products, and requires shard-level durability metadata before SGE submit.
 35. `densegen.overlay_guard.overlay_namespace` must match `^[a-z][a-z0-9_]*$` so runbook contracts remain compatible with USR overlay namespace rules.
 36. Legacy row-writeback Infer runbooks remain explicit direct-runbook surfaces. The study-level `fill-infer` primitive skips non-sequence-view Infer runbooks before SGE plan rendering, so old USR/write-back shapes do not enter the intelligent fill queue.
 37. `usr-overlay-guard` and `usr-records-part-guard` are explicit about degraded mode: tools that do not emit overlay parts or records-part files return `guard_status=skipped` with a reason (no silent fallback).
