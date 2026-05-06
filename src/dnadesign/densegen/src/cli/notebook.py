@@ -785,7 +785,7 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
         env = dict(os.environ)
         env.setdefault("MARIMO_SKIP_UPDATE_CHECK", "1")
         if mode == "run" and should_open_browser and sys.platform == "darwin":
-            env.setdefault("BROWSER", "open")
+            env["BROWSER"] = "open"
 
         run_kwargs = {
             "command": command,
