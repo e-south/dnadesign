@@ -35,6 +35,7 @@ SUPPORTED_PLOT_KINDS: frozenset[str] = frozenset(
 SQUARE_METRIC_PANEL_PLOT_IDS: frozenset[str] = frozenset(
     {
         "context_robustness_summary",
+        "representation_health_summary",
     }
 )
 

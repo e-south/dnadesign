@@ -19,6 +19,7 @@ from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..labels import humanize_column_name
 from ..metadata_axes import (
+    AxisStyle,
     axis_color_map,
     axis_display_label,
     axis_display_text,
@@ -477,6 +478,15 @@ def normalize_categorical_hue_value(
     row: dict[str, object] | None = None,
 ) -> str:
     style = _axis_style(axis_styles, column)
+    return _normalize_categorical_hue_value_with_style(style, value, row=row)
+
+
+def _normalize_categorical_hue_value_with_style(
+    style: AxisStyle | None,
+    value: object,
+    *,
+    row: dict[str, object] | None = None,
+) -> str:
     if _is_missing_hue_value(value):
         if style is not None and style.noncanonical_bucket is not None:
             return style.noncanonical_bucket
@@ -490,22 +500,74 @@ def normalize_categorical_hue_value(
     return text if text.strip() else "NA"
 
 
+def _normalize_categorical_values_without_row_context(
+    values: pd.Series,
+    *,
+    style: AxisStyle | None,
+) -> pd.Series:
+    try:
+        unique_values = pd.unique(values)
+        normalized_by_value = {
+            value: _normalize_categorical_hue_value_with_style(style, value) for value in unique_values
+        }
+        normalized = values.map(normalized_by_value)
+        missing = normalized.isna()
+        if bool(missing.any()):
+            normalized.loc[missing] = values.loc[missing].map(
+                lambda value: _normalize_categorical_hue_value_with_style(style, value)
+            )
+        return normalized.astype(str)
+    except TypeError:
+        return values.map(lambda value: _normalize_categorical_hue_value_with_style(style, value)).astype(str)
+
+
+def _selector_match_mask(frame: pd.DataFrame, selector: dict[str, object]) -> pd.Series | None:
+    column = str(selector.get("column") or "").strip()
+    if not column or column not in frame.columns:
+        return None
+    value_text = frame[column].astype(str)
+    if selector.get("equals") is not None:
+        return value_text == str(selector.get("equals"))
+    in_values = selector.get("in_values") or []
+    if in_values:
+        return value_text.isin({str(item) for item in in_values})
+    if bool(selector.get("non_null", False)):
+        return frame[column].notna() & frame[column].astype(str).str.strip().ne("")
+    return pd.Series(False, index=frame.index)
+
+
+def _canonical_scope_mask(frame: pd.DataFrame, *, style: AxisStyle) -> pd.Series:
+    selector_masks = [
+        mask
+        for selector in style.canonical_row_selectors
+        if (mask := _selector_match_mask(frame, selector)) is not None
+    ]
+    if not selector_masks:
+        return pd.Series(True, index=frame.index)
+    stacked = pd.concat(selector_masks, axis=1)
+    if style.canonical_row_match == "all":
+        return stacked.all(axis=1)
+    return stacked.any(axis=1)
+
+
 def normalize_categorical_hue_series(
     column: str | None,
     values: pd.Series,
     *,
     axis_styles: dict[str, object] | None = None,
-    rows: list[dict[str, object]] | None = None,
+    frame: pd.DataFrame | None = None,
 ) -> pd.Series:
-    if rows is None:
-        return values.map(lambda value: normalize_categorical_hue_value(column, value, axis_styles=axis_styles)).astype(
-            str
-        )
-    normalized = [
-        normalize_categorical_hue_value(column, value, axis_styles=axis_styles, row=row)
-        for value, row in zip(values.tolist(), rows, strict=False)
-    ]
-    return pd.Series(normalized, index=values.index, dtype="object")
+    style = _axis_style(axis_styles, column)
+    normalized = _normalize_categorical_values_without_row_context(values, style=style)
+    if frame is None or style is None or style.noncanonical_bucket is None or not style.canonical_row_selectors:
+        return normalized
+    scoped_frame = frame.reindex(values.index)
+    scope_mask = _canonical_scope_mask(scoped_frame, style=style)
+    if bool(scope_mask.all()):
+        return normalized
+    missing_mask = values.map(_is_missing_hue_value)
+    normalized.loc[(~scope_mask) & (~missing_mask)] = style.noncanonical_bucket
+    return normalized
 
 
 def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str] | None:

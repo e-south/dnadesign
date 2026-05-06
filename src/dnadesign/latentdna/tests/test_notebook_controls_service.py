@@ -18,6 +18,7 @@ from dnadesign.latentdna.src.services.notebook_controls_service import (
     _plot_controls,
     build_workspace_notebook_controls_payload,
 )
+from dnadesign.latentdna.src.services.notebook_service import _ordered_plot_study_doc_subsection_warnings
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
@@ -200,6 +201,29 @@ def test_notebook_controls_sort_projection_ids_by_role_then_full_population(tmp_
         row for row in controls.geometry_controls.geometries if row.view_id == "intermediate_embedding_7b_anchor_60bp"
     )
     assert geometry.projection_ids == ["umap_anchor", "audit_umap_anchor"]
+
+
+def test_notebook_smoke_warns_on_missing_plot_specific_study_doc_subsection(monkeypatch) -> None:
+    context = SimpleNamespace(
+        config=SimpleNamespace(
+            deliverables={
+                "demo_bundle": SimpleNamespace(
+                    docs_refs=["study:demo_study/deliverables/demo_bundle"],
+                    outputs={"plots": ["demo_plot"]},
+                )
+            }
+        )
+    )
+    notebook = SimpleNamespace(default_deliverable="demo_bundle", ordered_plots=["demo_plot"])
+
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.services.notebook_service.read_docs_ref",
+        lambda *_args, **_kwargs: {"content": "# Demo bundle\n\nGeneral deliverable notes."},
+    )
+
+    warnings = _ordered_plot_study_doc_subsection_warnings(context, notebook=notebook)
+
+    assert warnings == ["missing plot-specific study-doc subsection for `demo_plot`"]
 
 
 def test_notebook_controls_keep_attention_projection_visible_for_geometry_browser(tmp_path: Path) -> None:

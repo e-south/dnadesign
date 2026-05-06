@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import marimo as mo
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from dnadesign.latentdna.src.notebooks import browser_runtime_plot_review as plot_review_runtime
@@ -20,12 +21,21 @@ SIGMA35_AXIS_STYLES = {
         "label": "Sigma-35 variant",
         "kind": "categorical",
         "category_order": ["f", "e", "d", "c", "b", "control"],
+        "ordinal_subset": ["f", "e", "d", "c", "b"],
         "display_labels": {
             "f": "TTGACA (f)",
             "e": "TAGACA (e)",
             "d": "TTTACA (d)",
             "c": "TTGTGA (c)",
             "b": "CTGACA (b)",
+            "control": "Control",
+        },
+        "compact_display_labels": {
+            "f": "f\nTTGACA",
+            "e": "e\nTAGACA",
+            "d": "d\nTTTACA",
+            "c": "c\nTTGTGA",
+            "b": "b\nCTGACA",
             "control": "Control",
         },
         "category_colors": {
@@ -112,10 +122,62 @@ def test_render_plot_review_surface_supports_semantic_xy_columns(monkeypatch, tm
     assert "design_centroid_margin_gallery" in rendered.text
 
 
+def test_render_plot_review_surface_rasterizes_large_hue_panels_without_sampling(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    monkeypatch.setattr(plot_review_runtime, "should_rasterize_scatter", lambda row_count: row_count > 3)
+    captured: dict[str, object] = {}
+
+    def fake_raster(ax, *, x_values, y_values, hue_values, category_order, **kwargs):
+        del y_values, kwargs
+        captured["row_count"] = len(x_values)
+        captured["hue_values"] = list(hue_values)
+        captured["category_order"] = list(category_order)
+        ax.imshow(np.zeros((2, 2, 4)), extent=(-0.1, 1.1, -0.1, 1.1), origin="lower")
+
+    monkeypatch.setattr(plot_review_runtime, "draw_categorical_raster_scatter", fake_raster)
+
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 0.25, 0.5, 0.75, 1.0],
+            "y": [1.0, 0.75, 0.5, 0.25, 0.0],
+            "design_family": ["ethanol", "cipro", "ethanol", "background_only", "cipro"],
+        }
+    )
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "design_centroid_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "x",
+            "y_column": "y",
+            "panel_titles": ["Full population"],
+            "hue_options": [
+                {"column": "design_family", "label": "Design family", "type": "categorical"},
+            ],
+        },
+        frames=[frame],
+        hue_column="design_family",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert captured["row_count"] == len(frame)
+        assert captured["hue_values"] == frame["design_family"].tolist()
+        assert set(captured["category_order"]) == {"ethanol", "cipro", "background_only"}
+        assert len(fig.axes[0].images) == 1
+    finally:
+        plt.close(fig)
+
+
 def test_render_plot_review_surface_uses_placeholder_for_scatter_panels_without_finite_values(
     monkeypatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
     frames = [
         pd.DataFrame(
             {
@@ -145,10 +207,12 @@ def test_render_plot_review_surface_uses_placeholder_for_scatter_panels_without_
         workspace_dir=tmp_path,
     )
 
-    assert isinstance(rendered, mo.Html)
-    svg_markup = _decode_svg_markup(rendered)
-    assert "Margins unavailable" in svg_markup
-    assert "No finite values in this snapshot" in svg_markup
+    try:
+        figure_text = "\n".join(text.get_text() for axis in rendered.axes for text in axis.texts)
+        assert "Margins unavailable" in figure_text
+        assert "No finite values in this snapshot" in figure_text
+    finally:
+        plt.close(rendered)
 
 
 def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scalar_rows(
@@ -201,7 +265,7 @@ def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scal
 
 
 def test_render_plot_review_surface_compacts_regulator_composition_legend(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
     frames = [
         pd.DataFrame(
             {
@@ -238,11 +302,13 @@ def test_render_plot_review_surface_compacts_regulator_composition_legend(monkey
         axis_styles=REGULATOR_AXIS_STYLES,
     )
 
-    assert isinstance(rendered, mo.Html)
-    svg_markup = _decode_svg_markup(rendered)
-    for label in ("BaeR+LexA", "Bg", "CpxR", "Ctrl", "LexA"):
-        assert label in svg_markup
-    assert svg_markup.count("<!-- Bg -->") == 1
+    try:
+        legend_texts = [text.get_text() for legend in rendered.legends for text in legend.get_texts()]
+        for label in ("BaeR+LexA", "Bg", "CpxR", "Ctrl", "LexA"):
+            assert label in legend_texts
+        assert legend_texts.count("Bg") == 1
+    finally:
+        plt.close(rendered)
 
 
 def test_render_plot_review_surface_orders_sig35_legend_by_strength(monkeypatch, tmp_path: Path) -> None:
@@ -360,20 +426,20 @@ def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_
     frames = [
         pd.DataFrame(
             {
-                "sig35_margin_f_vs_b": [0.8, 0.55, 0.22, -0.15],
-                "sig35_variant": ["f", "e", "d", "b"],
+                "sig35_margin_f_vs_b": [0.8, 0.55, 0.22, -0.15, 0.11],
+                "sig35_variant": ["f", "e", "d", "b", "TTGACA"],
             }
         ),
         pd.DataFrame(
             {
-                "sig35_margin_f_vs_b": [0.62, 0.41, 0.08, -0.24],
-                "sig35_variant": ["f", "e", "d", "b"],
+                "sig35_margin_f_vs_b": [0.62, 0.41, 0.08, -0.24, 0.03],
+                "sig35_variant": ["f", "e", "d", "b", "reference"],
             }
         ),
         pd.DataFrame(
             {
-                "sig35_margin_f_vs_b": [0.93, 0.68, 0.33, -0.09],
-                "sig35_variant": ["f", "e", "d", "b"],
+                "sig35_margin_f_vs_b": [0.93, 0.68, 0.33, -0.09, 0.02],
+                "sig35_variant": ["f", "e", "d", "b", "control"],
             }
         ),
     ]
@@ -409,6 +475,12 @@ def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_
         assert max(position.y0 for position in axis_positions) - min(position.y0 for position in axis_positions) < 0.02
         for axis in fig.axes:
             assert abs(float(axis.get_box_aspect()) - 1.0) < 0.05
+            assert [label.get_text() for label in axis.get_xticklabels()] == [
+                "f\nTTGACA",
+                "e\nTAGACA",
+                "d\nTTTACA",
+                "b\nCTGACA",
+            ]
     finally:
         plt.close(fig)
 
@@ -453,7 +525,7 @@ def test_render_plot_review_surface_supports_categorical_count_grid(monkeypatch,
 
 
 def test_render_plot_review_surface_does_not_leak_debug_distribution_scalar_ids(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
     frames = [
         pd.DataFrame(
             {
@@ -478,11 +550,20 @@ def test_render_plot_review_surface_does_not_leak_debug_distribution_scalar_ids(
         workspace_dir=tmp_path,
     )
 
-    assert isinstance(rendered, mo.Html)
-    svg_markup = _decode_svg_markup(rendered)
-    assert "debug_distribution_demo" not in svg_markup
-    assert "debug distribution demo" not in svg_markup.lower()
-    assert "Score" in svg_markup
+    try:
+        figure_text = "\n".join(
+            [
+                *(axis.get_title() for axis in rendered.axes),
+                *(axis.get_xlabel() for axis in rendered.axes),
+                *(axis.get_ylabel() for axis in rendered.axes),
+                *(text.get_text() for axis in rendered.axes for text in axis.texts),
+            ]
+        )
+        assert "debug_distribution_demo" not in figure_text
+        assert "debug distribution demo" not in figure_text.lower()
+        assert "Score" in figure_text
+    finally:
+        plt.close(rendered)
 
 
 def test_render_plot_review_surface_preserves_context_distribution_family_titles(monkeypatch, tmp_path: Path) -> None:
@@ -887,7 +968,7 @@ def test_render_plot_review_surface_places_continuous_colorbar_below_design_cent
         plt.close(fig)
 
 
-def test_render_plot_review_surface_uses_single_row_for_dataset_overview_three_panels(
+def test_render_plot_review_surface_uses_vertical_layout_for_dataset_overview_three_panels(
     monkeypatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
@@ -940,7 +1021,7 @@ def test_render_plot_review_surface_uses_single_row_for_dataset_overview_three_p
 
     try:
         panel_axes = fig.axes[:3]
-        assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 1
+        assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 3
     finally:
         plt.close(fig)
 

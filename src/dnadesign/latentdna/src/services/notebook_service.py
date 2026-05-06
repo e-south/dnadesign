@@ -17,11 +17,13 @@ from ..contracts.notebook import WorkspaceNotebookConfig, WorkspaceNotebookContr
 from ..contracts.result import CommandResult
 from ..io.json_io import read_json, write_json
 from ..io.manifest_io import write_manifest
+from ..notebooks.browser_runtime import _parse_deliverable_markdown
 from ..notebooks.browser_runtime_plot_review import load_plot_review_frames
 from ..notebooks.scaffold import render_workspace_notebook
 from ..plots.recipes import resolve_plot_spec
 from ..runs.recorder import record_audit
 from ..sources.provenance import source_provenance_digest
+from ..studies.docs_refs import read_docs_ref
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
 from ._artifact_inputs import artifact_input_from_manifest
@@ -213,6 +215,45 @@ def _ordered_plot_owner_deliverables(context, *, notebook: WorkspaceNotebookConf
     return owners
 
 
+def _ordered_plot_study_doc_subsection_warnings(context, *, notebook: WorkspaceNotebookConfig) -> list[str]:
+    plot_ids = _notebook_plot_ids(context, notebook)
+    warnings: list[str] = []
+    for plot_id in plot_ids:
+        owner_deliverables = [
+            deliverable
+            for deliverable in context.config.deliverables.values()
+            if plot_id in deliverable.outputs.get("plots", [])
+        ]
+        docs_refs = [
+            docs_ref
+            for deliverable in owner_deliverables
+            for docs_ref in getattr(deliverable, "docs_refs", [])
+            if str(docs_ref).strip()
+        ]
+        if not docs_refs:
+            continue
+        covered = False
+        read_errors: list[str] = []
+        for docs_ref in docs_refs:
+            try:
+                docs_payload = read_docs_ref(context, str(docs_ref))
+            except Exception as exc:
+                read_errors.append(f"{docs_ref}: {exc}")
+                continue
+            parsed = _parse_deliverable_markdown(str(docs_payload.get("content") or ""))
+            plot_sections = parsed.get("plot_sections", {})
+            if isinstance(plot_sections, dict) and plot_id in plot_sections:
+                covered = True
+                break
+        if covered:
+            continue
+        if read_errors:
+            warnings.append(f"study-doc subsection check failed for `{plot_id}`: " + "; ".join(read_errors))
+        else:
+            warnings.append(f"missing plot-specific study-doc subsection for `{plot_id}`")
+    return warnings
+
+
 def _load_catalog_payload(context) -> dict[str, object]:
     from .catalog_service import workspace_catalog_from_context
 
@@ -310,7 +351,12 @@ def _notebook_smoke_status(payload: dict[str, object]) -> str:
     )
     if any(not bool(checks.get(name)) for name in blocking_checks):
         return "error"
-    degraded_checks = ("default_deliverable_ready", "static_links_resolve", "ordered_plot_live_inputs_ready")
+    degraded_checks = (
+        "default_deliverable_ready",
+        "study_doc_subsections_resolve",
+        "static_links_resolve",
+        "ordered_plot_live_inputs_ready",
+    )
     if any(not bool(checks.get(name)) for name in degraded_checks):
         return "attention"
     return "ok"
@@ -456,6 +502,7 @@ def generate_notebook(workspace: str | Path, notebook_id: str, *, force: bool = 
                 "marimo_check_passes": False,
                 "plot_catalog_loads": False,
                 "default_deliverable_ready": default_deliverable_status == "ok",
+                "study_doc_subsections_resolve": False,
                 "static_links_resolve": False,
                 "ordered_plot_live_inputs_ready": False,
             },
@@ -552,6 +599,7 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
         "marimo_check_passes": False,
         "plot_catalog_loads": False,
         "default_deliverable_ready": False,
+        "study_doc_subsections_resolve": False,
         "static_links_resolve": False,
         "ordered_plot_live_inputs_ready": False,
     }
@@ -594,6 +642,9 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
     checks["default_deliverable_ready"] = default_deliverable_status == "ok"
     if not checks["default_deliverable_ready"]:
         warnings.append("default_deliverable_ready failed: " + " | ".join(default_deliverable_reasons))
+    study_doc_warnings = _ordered_plot_study_doc_subsection_warnings(context, notebook=notebook)
+    checks["study_doc_subsections_resolve"] = not study_doc_warnings
+    warnings.extend(study_doc_warnings)
     output_paths = _notebook_plot_output_paths(context, notebook)
     checks["static_links_resolve"] = bool(output_paths) and all(path.is_file() for path in output_paths)
     if controls is not None:

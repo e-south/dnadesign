@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
+from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.metrics.definitions import METRIC_DEFINITIONS, resolve_metric_definition
+from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
 def test_metric_registry_uses_comparison_metadata_and_drops_selection_state() -> None:
@@ -33,3 +39,35 @@ def test_metric_registry_uses_comparison_metadata_and_drops_selection_state() ->
     distance_correlation = resolve_metric_definition("geometry_distance_correlation")
     assert distance_correlation.display_name == "Pairwise distance Spearman correlation"
     assert "Spearman correlation" in distance_correlation.mathematical_definition
+
+
+def test_global_metric_registry_does_not_ship_sigma35_study_vocabulary() -> None:
+    forbidden_tokens = ("sig35", "sigma35", "sigma-35", "sigma 35")
+    offenders = {
+        metric_id: [
+            field
+            for field in (
+                metric_id,
+                definition.display_name,
+                definition.mathematical_definition,
+                definition.metric_family,
+            )
+            if any(token in field.casefold() for token in forbidden_tokens)
+        ]
+        for metric_id, definition in METRIC_DEFINITIONS.items()
+    }
+    offenders = {metric_id: hits for metric_id, hits in offenders.items() if hits}
+
+    assert offenders == {}
+    with pytest.raises(ContractViolationError, match="no metric definition is registered"):
+        resolve_metric_definition("sig35_ordinal_spearman")
+
+
+def test_stress_workspace_declares_sigma35_metric_vocabulary() -> None:
+    context = load_workspace_config(Path("src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth"))
+
+    definition = resolve_metric_definition("sig35_ordinal_spearman", config=context.config)
+
+    assert definition.display_name == "Sigma-35 ordinal Spearman"
+    assert "configured Sigma-35 rank gaps" in definition.mathematical_definition
+    assert definition.metric_family == "ordinal_structure"

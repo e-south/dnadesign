@@ -1273,7 +1273,8 @@ def _representation_scorecard_table(
     dual_values: set[str],
     neighbor_label_enrichments: list[dict[str, str]] | None = None,
 ) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object]]:
-    validate_metric_registry()
+    config = getattr(context, "config", None)
+    validate_metric_registry(config)
     output_rows: list[dict[str, object]] = []
     inputs: list[ScalarInputRef] = []
     seen_inputs: set[tuple[str, str, str]] = set()
@@ -1510,7 +1511,7 @@ def _representation_scorecard_table(
             candidate_metrics["effective_rank"] = _effective_rank(explained_ratio)
 
         for metric_name, metric_value in sorted(candidate_metrics.items()):
-            definition = resolve_metric_definition(metric_name)
+            definition = resolve_metric_definition(metric_name, config=config)
             output_rows.append(
                 {
                     "candidate_id": candidate_id,

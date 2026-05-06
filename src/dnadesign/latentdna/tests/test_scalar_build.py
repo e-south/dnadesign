@@ -41,6 +41,102 @@ _STRESS_RETENTION_AXES = [
         "exclude_values": ["control"],
     },
 ]
+_STRESS_METRIC_DEFINITIONS = {
+    "sig35_variant_separation_ratio": {
+        "display_name": "Sigma-35 separation ratio",
+        "mathematical_definition": (
+            "Mean between-centroid cosine distance divided by mean within-centroid cosine distance "
+            "for configured Sigma-35 cohorts."
+        ),
+        "metric_family": "cohort_structure",
+        "evidence_tier": "primary",
+        "unit": "ratio",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_ordinal_spearman": {
+        "display_name": "Sigma-35 ordinal Spearman",
+        "mathematical_definition": (
+            "Spearman correlation between configured Sigma-35 rank gaps and observed centroid cosine-distance gaps."
+        ),
+        "metric_family": "ordinal_structure",
+        "evidence_tier": "primary",
+        "unit": "correlation",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_ordinal_kendall": {
+        "display_name": "Sigma-35 ordinal Kendall",
+        "mathematical_definition": (
+            "Kendall tau correlation between configured Sigma-35 rank gaps and observed centroid cosine-distance gaps."
+        ),
+        "metric_family": "ordinal_structure",
+        "evidence_tier": "primary",
+        "unit": "correlation",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_balanced_ordinal_spearman": {
+        "display_name": "Balanced Sigma-35 ordinal Spearman",
+        "mathematical_definition": (
+            "Spearman correlation between configured Sigma-35 rank gaps and observed centroid cosine-distance gaps "
+            "after config-declared cohort balancing."
+        ),
+        "metric_family": "ordinal_structure",
+        "evidence_tier": "primary",
+        "unit": "correlation",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_within_family_mean_spearman": {
+        "display_name": "Within-family Sigma-35 Spearman",
+        "mathematical_definition": (
+            "Mean within-design-family Spearman correlation between configured Sigma-35 rank gaps and "
+            "observed centroid cosine-distance gaps."
+        ),
+        "metric_family": "ordinal_structure",
+        "evidence_tier": "primary",
+        "unit": "correlation",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_within_regulator_mean_spearman": {
+        "display_name": "Within-regulator Sigma-35 Spearman",
+        "mathematical_definition": (
+            "Mean within-regulator-composition Spearman correlation between configured Sigma-35 rank gaps and "
+            "observed centroid cosine-distance gaps."
+        ),
+        "metric_family": "ordinal_structure",
+        "evidence_tier": "primary",
+        "unit": "correlation",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_label_permutation_pvalue": {
+        "display_name": "Sigma-35 permutation p-value",
+        "mathematical_definition": (
+            "Two-sided permutation p-value for the global Sigma-35 ordinal Spearman statistic under shuffled "
+            "configured Sigma-35 ranks."
+        ),
+        "metric_family": "ordinal_structure",
+        "evidence_tier": "primary",
+        "unit": "p_value",
+        "direction": "lower_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+    "sig35_variant_retention_correlation": {
+        "display_name": "Sigma-35 retention",
+        "mathematical_definition": (
+            "Pearson correlation between aligned anchor and context centroid-distance vectors for configured "
+            "Sigma-35 cohorts."
+        ),
+        "metric_family": "context_stability",
+        "evidence_tier": "primary",
+        "unit": "correlation",
+        "direction": "higher_is_better",
+        "aggregation_level": "candidate_summary",
+    },
+}
 
 
 def _write_source(path: Path, rows: list[dict[str, object]]) -> None:
@@ -223,6 +319,7 @@ def _write_margin_workspace_config(workspace_dir: Path) -> None:
                         ],
                     },
                 },
+                "metric_definitions": _STRESS_METRIC_DEFINITIONS,
             },
             sort_keys=False,
         ),
@@ -369,6 +466,7 @@ def _write_context_robustness_workspace(
                         "right_aggregation": "error",
                     }
                 },
+                "metric_definitions": _STRESS_METRIC_DEFINITIONS,
             },
             sort_keys=False,
         ),

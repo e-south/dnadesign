@@ -34,6 +34,15 @@ _PLOT_ASSET_MEDIA_STYLE = (
     f"display: block; width: auto; height: auto; max-width: 100%; flex: 0 1 auto; "
     f"border-radius: 14px; background: {PANEL_BACKGROUND_COLOR};"
 )
+_PLOT_ASSET_MEDIA_STYLE_MAP = {
+    "display": "block",
+    "width": "auto",
+    "height": "auto",
+    "max-width": "100%",
+    "flex": "0 1 auto",
+    "border-radius": "14px",
+    "background": PANEL_BACKGROUND_COLOR,
+}
 _MATH_BLOCK_STYLE = "padding: 0.1rem 0 0.25rem 0;"
 _MATH_IMAGE_STYLE = "display: block; max-width: 100%; height: auto;"
 _MATH_COMMAND_NORMALIZATIONS = (
@@ -55,22 +64,38 @@ def _image_data_uri(image_bytes: bytes, *, suffix: str) -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
-def _inline_plot_image(image_bytes: bytes, *, suffix: str, alt: str) -> mo.Html:
+def _wrap_plot_image(image_markup: str, *, alt: str) -> mo.Html:
     return mo.Html(
         (
             '<div class="latentdna-plot-asset" role="img" aria-label="'
             + escape(alt)
             + '" style="'
             + escape(_PLOT_ASSET_WRAPPER_STYLE)
-            + '"><img src="'
+            + '">'
+            + image_markup
+            + "</div>"
+        )
+    )
+
+
+def _inline_plot_image(image_bytes: bytes, *, suffix: str, alt: str) -> mo.Html:
+    return _wrap_plot_image(
+        (
+            '<img src="'
             + _image_data_uri(image_bytes, suffix=suffix)
             + '" alt="'
             + escape(alt)
             + '" style="'
             + escape(_PLOT_ASSET_MEDIA_STYLE)
-            + '" /></div>'
-        )
+            + '" />'
+        ),
+        alt=alt,
     )
+
+
+def _marimo_plot_image(src, *, alt: str) -> mo.Html:
+    rendered = mo.image(src, alt=alt, style=_PLOT_ASSET_MEDIA_STYLE_MAP)
+    return _wrap_plot_image(str(rendered.text), alt=alt)
 
 
 def _svg_data_uri(svg_markup: str) -> str:
@@ -110,9 +135,27 @@ def fig_to_svg(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent g
     )
 
 
+def fig_to_png_image(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent geometry plot"):
+    buf = BytesIO()
+    fig.patch.set_facecolor(PANEL_BACKGROUND_COLOR)
+    fig.patch.set_alpha(1.0)
+    fig.savefig(
+        buf,
+        format="png",
+        dpi=int(dpi),
+        bbox_inches="tight",
+        pad_inches=0.05,
+        facecolor=fig.get_facecolor(),
+        edgecolor="none",
+    )
+    plt.close(fig)
+    buf.seek(0)
+    return _marimo_plot_image(buf, alt=alt)
+
+
 def render_matplotlib_figure(fig, *, alt: str = "latent geometry plot"):
     if mo.app_meta().mode == "run":
-        return fig_to_svg(fig, alt=alt)
+        return fig_to_png_image(fig, alt=alt)
     return mo.mpl.interactive(fig)
 
 
@@ -137,8 +180,7 @@ def _alternate_plot_render_path(path: Path) -> Path | None:
         candidate = path.with_suffix(suffix)
         if _is_same_path(candidate, path) or not candidate.is_file():
             continue
-        if candidate.stat().st_size <= MAX_INLINE_NOTEBOOK_ASSET_BYTES:
-            return candidate
+        return candidate
     pdf_candidate = path.with_suffix(".pdf")
     if not _is_same_path(pdf_candidate, path) and pdf_candidate.is_file():
         return pdf_candidate
@@ -151,24 +193,7 @@ def resolve_plot_render_asset(path: Path) -> tuple[Path | None, str | None]:
     asset_size = path.stat().st_size
     suffix = path.suffix.lower()
     if suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
-        if asset_size <= MAX_INLINE_NOTEBOOK_ASSET_BYTES:
-            return path, None
-        alternate_path = _alternate_plot_render_path(path)
-        if alternate_path is not None:
-            return (
-                alternate_path,
-                (
-                    f"Displaying `{alternate_path.name}` because `{path.name}` exceeds the inline notebook "
-                    f"asset limit ({asset_size:,} bytes)."
-                ),
-            )
-        return (
-            None,
-            (
-                f"`{path.name}` exceeds the inline notebook asset limit ({asset_size:,} bytes) "
-                "and no PDF alternate is available."
-            ),
-        )
+        return path, None
     if suffix == ".svg":
         if asset_size <= MAX_INLINE_NOTEBOOK_ASSET_BYTES:
             return path, None
@@ -222,7 +247,7 @@ def render_plot_asset(path: Path, *, workspace_dir: Path, alt_text: str | None =
             },
         )
     elif suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
-        rendered = _inline_plot_image(render_path.read_bytes(), suffix=suffix, alt=alt)
+        rendered = _marimo_plot_image(render_path, alt=alt)
     else:
         rendered = mo.md(f"`{render_path.relative_to(workspace_dir).as_posix()}`")
     if notice:

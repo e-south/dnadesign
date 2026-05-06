@@ -282,24 +282,28 @@ def _representation_health_summary_table(
         rows.extend(
             [
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id="effective_rank",
                     metric_value=effective_rank,
                     extra=extra,
                 ),
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id="pc1_variance_fraction",
                     metric_value=pc1_fraction,
                     extra=extra,
                 ),
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id="pairwise_cosine_distance_median",
                     metric_value=distance_summary.median,
                     extra=extra,
                 ),
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id="pairwise_cosine_distance_iqr",
                     metric_value=distance_summary.iqr,
@@ -338,6 +342,7 @@ def _representation_health_summary_table(
         }
         rows.extend(
             _metric_row(
+                context=context,
                 descriptor=descriptor,
                 metric_id=metric_id,
                 metric_value=float("nan"),
@@ -398,6 +403,7 @@ def _design_structure_summary_table(
             )
             rows.append(
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id=axis.metric_id,
                     metric_value=value,
@@ -456,6 +462,7 @@ def _design_structure_summary_table(
             ).strip()
             rows.append(
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id=balanced_metric_id,
                     metric_value=balanced_value,
@@ -510,6 +517,7 @@ def _cohort_structure_summary_table(
                 skipped_axes.append(axis_id)
             rows.append(
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id="cohort_separation_ratio",
                     metric_value=separation_ratio_from_groups(normalized, groups),
@@ -796,6 +804,7 @@ def _ordinal_axis_audit_table(
         )
         rows.append(
             _metric_row(
+                context=context,
                 descriptor=candidate_sample.descriptor,
                 metric_id=metric_ids["spearman"],
                 metric_value=global_spearman,
@@ -809,6 +818,7 @@ def _ordinal_axis_audit_table(
         )
         rows.append(
             _metric_row(
+                context=context,
                 descriptor=candidate_sample.descriptor,
                 metric_id=metric_ids["kendall"],
                 metric_value=global_kendall,
@@ -842,6 +852,7 @@ def _ordinal_axis_audit_table(
         )
         rows.append(
             _metric_row(
+                context=context,
                 descriptor=candidate_sample.descriptor,
                 metric_id=metric_ids["balanced_spearman"],
                 metric_value=balanced_spearman,
@@ -893,6 +904,7 @@ def _ordinal_axis_audit_table(
             )
             rows.append(
                 _metric_row(
+                    context=context,
                     descriptor=candidate_sample.descriptor,
                     metric_id=metric_id,
                     metric_value=within_mean,
@@ -927,6 +939,7 @@ def _ordinal_axis_audit_table(
         )
         rows.append(
             _metric_row(
+                context=context,
                 descriptor=candidate_sample.descriptor,
                 metric_id=metric_ids["permutation_pvalue"],
                 metric_value=permutation_pvalue,
@@ -1005,6 +1018,7 @@ def _context_robustness_summary_table(
         self_cosine = np.asarray(np.sum(left_norm * right_norm, axis=1), dtype=np.float64)
         rows.append(
             _metric_row(
+                context=context,
                 descriptor=descriptor,
                 metric_id="context_self_cosine_median",
                 metric_value=float(np.median(self_cosine)),
@@ -1024,6 +1038,7 @@ def _context_robustness_summary_table(
             retention = _pearson_correlation(anchor_vector, context_vector)
             rows.append(
                 _metric_row(
+                    context=context,
                     descriptor=descriptor,
                     metric_id=axis.metric_id,
                     metric_value=retention,
@@ -1161,6 +1176,7 @@ def _append_reference_set_rows(
     rows.extend(
         [
             _metric_row(
+                context=context,
                 descriptor=descriptor,
                 metric_id="reference_group_size",
                 metric_value=float(len(indices)),
@@ -1174,6 +1190,7 @@ def _append_reference_set_rows(
                 },
             ),
             _metric_row(
+                context=context,
                 descriptor=descriptor,
                 metric_id="reference_group_pairwise_cosine_distance_median",
                 metric_value=distance_median,
@@ -1187,6 +1204,7 @@ def _append_reference_set_rows(
                 },
             ),
             _metric_row(
+                context=context,
                 descriptor=descriptor,
                 metric_id="reference_group_pairwise_cosine_distance_iqr",
                 metric_value=distance_iqr,
@@ -1250,11 +1268,13 @@ def _reference_alignment_summary_table(
             rows.extend(
                 [
                     _metric_row(
+                        context=context,
                         descriptor=candidate_sample.descriptor,
                         metric_id="reference_alignment_ethanol_background_relative",
                         metric_value=ethanol_alignment,
                     ),
                     _metric_row(
+                        context=context,
                         descriptor=candidate_sample.descriptor,
                         metric_id="reference_alignment_cipro_background_relative",
                         metric_value=cipro_alignment,
@@ -1302,6 +1322,7 @@ def _reference_alignment_summary_table(
                 rows.extend(
                     [
                         _metric_row(
+                            context=context,
                             descriptor=candidate_sample.descriptor,
                             metric_id="reference_group_size",
                             metric_value=float(len(indices)),
@@ -1316,6 +1337,7 @@ def _reference_alignment_summary_table(
                             },
                         ),
                         _metric_row(
+                            context=context,
                             descriptor=candidate_sample.descriptor,
                             metric_id="reference_group_pairwise_cosine_distance_median",
                             metric_value=distance_median,
@@ -1330,6 +1352,7 @@ def _reference_alignment_summary_table(
                             },
                         ),
                         _metric_row(
+                            context=context,
                             descriptor=candidate_sample.descriptor,
                             metric_id="reference_group_pairwise_cosine_distance_iqr",
                             metric_value=distance_iqr,
@@ -1410,6 +1433,7 @@ def _context_pair_summary_table(
             metric_value = float(np.median(np.asarray(values, dtype=np.float64))) if values else float("nan")
             rows.append(
                 _metric_row(
+                    context=context,
                     descriptor={
                         "comparison_id": comparison_id,
                         "comparison_label": comparison_label,

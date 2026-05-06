@@ -2,9 +2,10 @@ plot_id: representation_health_summary
 question: Which candidate Evo2 spaces are healthy enough to survive pre-assay triage?
 decision_role: gate
 encoding: Candidate-by-metric bar panels for effective rank, PC1 variance fraction, median pairwise cosine distance, and pairwise cosine-distance spread, read directly from the metric values rather than a pass/fail hue.
-scope: Candidate reducer summaries and sampled candidate rows used for representation-health diagnostics.
+scope: First-class intermediate-embedding and output-layer mean candidate reducer summaries plus sampled candidate rows used for representation-health diagnostics; reference rows remain controls inside preserved samples, not separate effective-rank cohorts.
 guardrails:
   - Higher retained effective rank means variance is spread across more retained PCA components.
+  - Reference rows are controls for sampling and overlays, not independent representation-health candidates.
   - Candidate choice still depends on design structure and context robustness.
 caption: Representation-health gate across the canonical candidate inventory.
 alt_text: Bar-panel summary comparing effective rank, PC1 variance fraction, and cosine-distance spread for each candidate representation without pass/fail color coding.

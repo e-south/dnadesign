@@ -18,6 +18,7 @@ Core sections:
 - `defaults`
 - `sources`
 - `metadata`
+- `metric_definitions`
 - `alignments`
 - `views`
 - `scalars`
@@ -52,6 +53,11 @@ Implemented schema slices:
 - Metadata axes: optional `metadata.axes.<id>` declarations bind one metadata
   column to display, ordering, color, ordinal-subset, noncanonical-bucket, and
   metric-label semantics used by plot, notebook, and scalar review surfaces.
+- Metric definitions: optional `metric_definitions.<metric_id>` declarations
+  define workspace-owned metric ids with display name, mathematical
+  definition, metric family, evidence tier, unit, direction, aggregation level,
+  and optional task id. Workspaces use this for study-facing metric vocabulary
+  that is not part of the LatentDNA global registry.
 - Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the promoter-study status record under `docs/studies/<study-id>` and must contain `campaign.yaml`, `datasets.yaml`, `ops.study.yaml`, and `status.md`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
 - Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
@@ -110,6 +116,12 @@ Current runtime limits:
   category value is canonical. Core plot and notebook code uses this resolved
   axis metadata; it does not infer Sigma-35, promoter, RegulonDB, or other
   study vocabulary from column names.
+- `metric_definitions` is the metric-vocabulary contract for study-owned
+  scalar ids. The global metric registry contains only package-level generic
+  metrics. If a recipe emits a workspace-specific metric id such as a named
+  biological axis score, that id must be declared in `metric_definitions`.
+  Workspace definitions cannot override global metric ids; use axis
+  `metric_labels` or plot labels for presentation changes to generic metrics.
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
 - `notebook generate` currently emits one read-only workspace notebook app per
   declared `notebooks.<id>`. The app has one expressive surface selected by an
@@ -165,14 +177,16 @@ Current runtime limits:
 - Representation scorecards do not add Sigma-35 or other promoter-specific
   neighbor-enrichment metrics by default. Workspaces that need label-enrichment
   summaries declare `neighbor_label_enrichments` params, and study-facing metric
-  names live in scalar params or `metadata.axes.<id>.metric_labels`.
+  names live in scalar params plus `metric_definitions`; display-only axis
+  labels live in `metadata.axes.<id>.metric_labels`.
 - Pre-assay `scalar.build` recipes use the generic `ordinal_axis_audit` builder
   for ordered metadata axes. The axis contract lives in recipe params:
   `axis.column` selects the grouping column, exactly one of `axis.order_path` or
   `axis.rank_column` supplies ranks, `axis.exclude_values` removes controls or
   incompatible labels, and `axis.metric_ids` may map the generic outputs onto a
-  study-facing metric vocabulary. This keeps study terms such as Sigma-35 in
-  workspace config rather than package-level builder selection.
+  study-facing metric vocabulary. Any mapped metric id outside the global
+  registry must have a `metric_definitions` entry, keeping study terms such as
+  Sigma-35 in workspace config rather than package-level builder selection.
 - Centroid-distance heatmaps over ordered or partially ordered categories use
   `axis_centroid_distance` with the same `axis` contract. Ranked values are
   ordered by `axis.order_path` or `axis.rank_column`; unranked observed values

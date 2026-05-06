@@ -356,6 +356,13 @@ plots:
     default_hue: regulondb__sigma_factor_set
     hue_options:
       - {column: regulondb__sigma_factor_set, label: Sigma factor set, type: categorical}
+      - {column: regulondb__confidence_level_set, label: Confidence level, type: categorical}
+      - {column: regulondb__metadata_completeness_class, label: Metadata completeness, type: categorical}
+      - {column: regulondb__regulator_composition, label: Regulator composition, type: categorical}
+      - {column: regulondb__box_pattern, label: Box pattern, type: categorical}
+      - {column: regulondb__source_strata_set, label: Source strata, type: categorical}
+      - {column: regulondb__sigma_factor_count, label: Sigma factor count, type: ordinal}
+      - {column: emitted_length_bp, label: Emitted length, type: ordinal}
     semantics_ref: plot_semantics/sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean.yaml
   sigma_umap_intermediate_embedding_7b_core60_tss_upstream:
     kind: projection_scatter
@@ -365,6 +372,13 @@ plots:
     default_hue: regulondb__sigma_factor_set
     hue_options:
       - {column: regulondb__sigma_factor_set, label: Sigma factor set, type: categorical}
+      - {column: regulondb__confidence_level_set, label: Confidence level, type: categorical}
+      - {column: regulondb__metadata_completeness_class, label: Metadata completeness, type: categorical}
+      - {column: regulondb__regulator_composition, label: Regulator composition, type: categorical}
+      - {column: regulondb__box_pattern, label: Box pattern, type: categorical}
+      - {column: regulondb__source_strata_set, label: Source strata, type: categorical}
+      - {column: regulondb__sigma_factor_count, label: Sigma factor count, type: ordinal}
+      - {column: emitted_length_bp, label: Emitted length, type: ordinal}
     semantics_ref: plot_semantics/sigma_umap_intermediate_embedding_7b_core60_tss_upstream.yaml
 notebooks:
   latent_geometry_browser:

@@ -6,7 +6,7 @@ Candidate spaces are screened for collapse with effective rank, PC1 variance fra
 
 #### Plot details
 
-**Data.** Each candidate summary combines a stratified candidate sample with the persisted PCA reducer summary for that same sampled view. The current candidate reducers fit roughly 2k sampled rows and retain 16 PCA components.
+**Data.** Each candidate summary combines a stratified candidate sample with the persisted PCA reducer summary for that same sampled view. The current candidate reducers fit roughly 2k sampled rows and retain 16 PCA components. The direct comparison includes the five first-class intermediate embeddings and the five matching output-layer mean views; reference rows remain controls inside preserved samples rather than independent effective-rank cohorts.
 
 **Preprocessing.** Pairwise cosine metrics use view-level standardization followed by row L2 normalization. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0` so degenerate spaces stay finite and are exposed by the health gate. PCA-derived metrics come from the stored reducer summaries on the sampled rows.
 

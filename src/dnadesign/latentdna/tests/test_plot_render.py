@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
 
-from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec
+from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
 from dnadesign.latentdna.src.plots.render import (
     _add_figure_legends,
@@ -745,3 +745,7 @@ def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_t
         assert ax.get_xlabel().count("\n") <= 1
     finally:
         plt.close(fig)
+
+
+def test_representation_health_summary_declares_square_metric_panels() -> None:
+    assert metric_panel_uses_square_axes("representation_health_summary")

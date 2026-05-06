@@ -15,6 +15,12 @@ Screen native source-record and TSS-upstream core60 RegulonDB promoter represent
 - `representation_health_summary`
 - `latent_geometry_browser`
 
+### representation_health_summary | Representation Health Summary
+
+#### Plot details
+
+Square metric panels compare native and TSS-upstream core60 intermediate-embedding and output-layer mean views on retained-PCA effective rank, PC1 variance fraction, and sampled pairwise cosine-distance spread. Reference controls are not promoted to independent representation-health cohorts here.
+
 ## Interpretation
 
 Read the metric panels as a collapse and richness check. Higher effective rank and broader pairwise cosine-distance spread indicate that a representation preserves more usable variation in the retained PCA diagnostic. This plot does not prove sigma-factor separation; it decides which representation views are worth carrying into native/core60 shift and sigma-structure summaries.

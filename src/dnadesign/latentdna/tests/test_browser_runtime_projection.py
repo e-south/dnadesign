@@ -211,6 +211,43 @@ def test_render_projection_grid_renders_full_population_for_large_browser_frames
         plt.close(fig)
 
 
+def test_render_projection_grid_rasterizes_very_large_frames_without_sampling(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    monkeypatch.setattr(projection_runtime, "should_rasterize_scatter", lambda row_count: row_count > 3)
+    captured: dict[str, int] = {}
+
+    def fake_raster(ax, *, x_values, y_values, color, **kwargs):
+        del y_values, color, kwargs
+        captured["row_count"] = len(x_values)
+        ax.imshow(np.zeros((2, 2, 4)), extent=(-0.1, 1.1, -0.1, 1.1), origin="lower")
+
+    monkeypatch.setattr(projection_runtime, "draw_single_color_raster_scatter", fake_raster)
+    row_count = 5
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(row_count, dtype=float),
+            "y": np.arange(row_count, dtype=float),
+        }
+    )
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "demo", "projection_id": "umap_demo", "title": "Demo"}],
+        frames=[frame],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert captured["row_count"] == row_count
+        assert len(fig.axes[0].images) == 1
+    finally:
+        plt.close(fig)
+
+
 def test_render_projection_grid_compacts_regulator_composition_legend(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
 

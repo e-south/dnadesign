@@ -55,6 +55,12 @@ from .browser_runtime_support import (
     style_notebook_axes,
     style_notebook_legend,
 )
+from .raster_scatter import (
+    draw_categorical_raster_scatter,
+    draw_continuous_raster_scatter,
+    draw_single_color_raster_scatter,
+    should_rasterize_scatter,
+)
 from .rendering import render_matplotlib_figure
 
 _SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
@@ -282,7 +288,7 @@ def _categorical_hue_series(
         hue_column,
         frame[hue_column],
         axis_styles=axis_styles,
-        rows=frame.to_dict("records"),
+        frame=frame,
     )
 
 
@@ -372,11 +378,26 @@ def render_plot_review_surface(
             alt_text=plot_alt_text,
         )
     if kind == "categorical_count":
-        return _render_categorical_count_grid(resolved_plot_spec, frames=frames, alt_text=plot_alt_text)
+        return _render_categorical_count_grid(
+            resolved_plot_spec,
+            frames=frames,
+            alt_text=plot_alt_text,
+            axis_styles=axis_styles,
+        )
     if kind == "metric_panel_grid":
-        return _render_metric_grid(resolved_plot_spec, frames=frames, alt_text=plot_alt_text)
+        return _render_metric_grid(
+            resolved_plot_spec,
+            frames=frames,
+            alt_text=plot_alt_text,
+            axis_styles=axis_styles,
+        )
     if kind == "distribution_grid":
-        return _render_distribution_grid(resolved_plot_spec, frames=frames, alt_text=plot_alt_text)
+        return _render_distribution_grid(
+            resolved_plot_spec,
+            frames=frames,
+            alt_text=plot_alt_text,
+            axis_styles=axis_styles,
+        )
     if kind == "curve_grid":
         return _render_curve_grid(resolved_plot_spec, output_root=output_root, alt_text=plot_alt_text)
     return mo.callout("The selected plot does not support live notebook rendering.", kind="warn")
@@ -509,6 +530,7 @@ def _render_scatter_grid(
         x_span = float(np.ptp(np.asarray(x_values, dtype=np.float64))) if x_values.size else 0.0
         y_span = float(np.ptp(np.asarray(y_values, dtype=np.float64))) if y_values.size else 0.0
         collapsed_panel = x_span <= 1e-12 and y_span <= 1e-12
+        rasterize_panel = should_rasterize_scatter(len(finite_frame)) and not collapsed_panel
         if effective_hue is None or effective_hue not in frame.columns:
             if collapsed_panel:
                 centroid_x = float(x_values[0])
@@ -534,6 +556,14 @@ def _render_scatter_grid(
                     va="top",
                     fontsize=9.0,
                     color="#5C6874",
+                )
+            elif rasterize_panel:
+                draw_single_color_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    color="#0072B2",
+                    point_alpha=point_style.alpha,
                 )
             else:
                 ax.scatter(
@@ -580,20 +610,33 @@ def _render_scatter_grid(
                     color="#5C6874",
                 )
             elif valid.any():
-                scatter_artist = ax.scatter(
-                    finite_frame.loc[valid, x_column].to_numpy(dtype=float),
-                    finite_frame.loc[valid, y_column].to_numpy(dtype=float),
-                    c=hue_values.loc[valid].to_numpy(dtype=float),
-                    cmap=str(continuous_params["cmap"]),
-                    norm=continuous_params["norm"],
-                    vmin=None if continuous_params["norm"] is not None else continuous_params["vmin"],
-                    vmax=None if continuous_params["norm"] is not None else continuous_params["vmax"],
-                    s=point_style.point_size,
-                    alpha=point_style.alpha,
-                    linewidths=point_style.linewidths,
-                    edgecolors=point_style.edgecolors,
-                    rasterized=point_style.rasterized,
-                )
+                if rasterize_panel:
+                    scatter_artist = draw_continuous_raster_scatter(
+                        ax,
+                        x_values=x_values,
+                        y_values=y_values,
+                        hue_values=hue_values.to_numpy(dtype=float),
+                        cmap=str(continuous_params["cmap"]),
+                        norm=continuous_params["norm"],
+                        vmin=continuous_params["vmin"],
+                        vmax=continuous_params["vmax"],
+                        point_alpha=point_style.alpha,
+                    )
+                else:
+                    scatter_artist = ax.scatter(
+                        finite_frame.loc[valid, x_column].to_numpy(dtype=float),
+                        finite_frame.loc[valid, y_column].to_numpy(dtype=float),
+                        c=hue_values.loc[valid].to_numpy(dtype=float),
+                        cmap=str(continuous_params["cmap"]),
+                        norm=continuous_params["norm"],
+                        vmin=None if continuous_params["norm"] is not None else continuous_params["vmin"],
+                        vmax=None if continuous_params["norm"] is not None else continuous_params["vmax"],
+                        s=point_style.point_size,
+                        alpha=point_style.alpha,
+                        linewidths=point_style.linewidths,
+                        edgecolors=point_style.edgecolors,
+                        rasterized=point_style.rasterized,
+                    )
         else:
             hue_values = _categorical_hue_series(finite_frame, effective_hue, axis_styles=axis_styles)
             plotted_mask = pd.Series(False, index=finite_frame.index)
@@ -625,6 +668,29 @@ def _render_scatter_grid(
                     va="top",
                     fontsize=9.0,
                     color="#5C6874",
+                )
+            elif rasterize_panel:
+                raster_categories = list(category_values)
+                raster_category_colors = dict(category_map)
+                raster_alpha_multipliers: dict[str, float] = {}
+                if style is not None and style.noncanonical_bucket is not None:
+                    noncanonical_category = str(style.noncanonical_bucket)
+                    if (
+                        bool((hue_values == noncanonical_category).any())
+                        and noncanonical_category not in raster_categories
+                    ):
+                        raster_categories.append(noncanonical_category)
+                    raster_category_colors.setdefault(noncanonical_category, "#9AA5B1")
+                    raster_alpha_multipliers[noncanonical_category] = 0.55
+                draw_categorical_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    hue_values=hue_values.to_numpy(dtype=str),
+                    category_order=raster_categories,
+                    category_colors=raster_category_colors,
+                    category_alpha_multipliers=raster_alpha_multipliers,
+                    point_alpha=point_style.alpha,
                 )
             else:
                 for category in category_values:
@@ -788,7 +854,13 @@ def _render_scatter_grid(
     return render_matplotlib_figure(fig, alt=alt_text)
 
 
-def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFrame], alt_text: str):
+def _render_metric_grid(
+    plot_spec: dict[str, object],
+    *,
+    frames: list[pd.DataFrame],
+    alt_text: str,
+    axis_styles: dict[str, object] | None,
+):
     if not frames or frames[0].empty:
         return _callout_from_frame_errors(
             frames,
@@ -801,6 +873,7 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
     if value_column is None:
         value_column = "metric_value" if "metric_value" in frame.columns else "row_count"
     spec = spec.model_copy(update={"value_column": value_column})
+    resolved_axis_styles = axis_style_map_from_payload(axis_styles)
 
     panel_values = list(dict.fromkeys(frame[spec.row_column].astype(str).tolist())) if spec.row_column else ["panel"]
     square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
@@ -812,7 +885,7 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
         squeeze=False,
     )
     records = frame.to_dict(orient="records")
-    color_map, categories = static_category_color_map([records], spec.color_column)
+    color_map, categories = static_category_color_map([records], spec.color_column, axis_styles=resolved_axis_styles)
     for axis in axes.ravel()[len(panel_values) :]:
         axis.set_axis_off()
     for axis, panel_value in zip(axes.ravel(), panel_values, strict=False):
@@ -825,6 +898,7 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
             panel_title=panel_title,
             color_map=color_map,
             square=square_metric_panels,
+            axis_styles=resolved_axis_styles,
         )
     legend_bottom = 0.0
     if categories and spec.color_column is not None:
@@ -869,7 +943,13 @@ def _render_metric_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFra
     return render_matplotlib_figure(fig, alt=alt_text)
 
 
-def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFrame], alt_text: str):
+def _render_distribution_grid(
+    plot_spec: dict[str, object],
+    *,
+    frames: list[pd.DataFrame],
+    alt_text: str,
+    axis_styles: dict[str, object] | None,
+):
     if not frames or not any(not frame.empty for frame in frames):
         return _callout_from_frame_errors(
             frames,
@@ -877,6 +957,7 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
         )
 
     spec = ResolvedPlotSpec.model_validate(plot_spec)
+    resolved_axis_styles = axis_style_map_from_payload(axis_styles)
     metric_columns = list(spec.metric_columns or [])
     panel_entries: list[tuple[str, pd.DataFrame | None, str | None, str | None]] = []
     panel_titles = list(spec.panel_titles or [])
@@ -978,6 +1059,7 @@ def _render_distribution_grid(plot_spec: dict[str, object], *, frames: list[pd.D
             square=square_distribution_panels,
             x_axis_label=spec.x_axis_label,
             y_axis_label=spec.y_axis_label,
+            axis_styles=resolved_axis_styles,
         )
     fig.tight_layout(pad=0.95, h_pad=1.4, w_pad=0.95)
     return render_matplotlib_figure(fig, alt=alt_text)
@@ -1049,7 +1131,13 @@ def _render_curve_grid(plot_spec: dict[str, object], *, output_root: Path, alt_t
     return render_matplotlib_figure(fig, alt=alt_text)
 
 
-def _render_categorical_count_grid(plot_spec: dict[str, object], *, frames: list[pd.DataFrame], alt_text: str):
+def _render_categorical_count_grid(
+    plot_spec: dict[str, object],
+    *,
+    frames: list[pd.DataFrame],
+    alt_text: str,
+    axis_styles: dict[str, object] | None,
+):
     if not frames or frames[0].empty:
         return _callout_from_frame_errors(
             frames,
@@ -1071,7 +1159,7 @@ def _render_categorical_count_grid(plot_spec: dict[str, object], *, frames: list
     else:
         panel_values = [str(plot_spec.get("plot_id") or "panel")]
 
-    square_count_panels = spec.plot_id == "dataset_overview"
+    square_count_panels = bool(getattr(spec, "square_panels", False))
     if square_count_panels and len(panel_values) <= 3:
         rows_count, columns = 1, len(panel_values)
     elif len(panel_values) <= 3 and not square_count_panels:

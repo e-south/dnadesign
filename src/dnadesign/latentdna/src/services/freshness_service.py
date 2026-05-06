@@ -10,6 +10,8 @@ from pathlib import Path
 from ..contracts.errors import ContractViolationError
 from ..contracts.workspace import DerivedViewConfig, SourceBackedViewConfig
 from ..io.json_io import read_json
+from ..io.parquet_io import read_table
+from ..metrics.definitions import metric_definition_digests
 from ..sources.provenance import (
     OVERLAY_INVENTORY_DIGEST_MODE,
     OVERLAY_LEDGER_PAYLOAD_DIGEST_MODE,
@@ -282,6 +284,101 @@ def _notebook_health_freshness_reasons(
     return [f"notebook health requires attention for notebook:{artifact_id}: {detail}"], True
 
 
+def _scalar_metric_definition_freshness_reasons(
+    context: WorkspaceContext,
+    *,
+    artifact_id: str,
+    manifest: dict[str, object],
+    manifest_path: Path,
+) -> tuple[list[str], bool]:
+    table_path = manifest_path.parent / "table.parquet"
+    if not table_path.is_file():
+        return [], True
+    try:
+        table = read_table(table_path)
+    except Exception as exc:
+        return [f"freshness unknown: could not read scalar table for scalar_table:{artifact_id}: {exc}"], False
+    if "metric_id" not in table.column_names:
+        return [], True
+    metric_ids = {
+        str(value).strip() for value in table["metric_id"].to_pylist() if value is not None and str(value).strip()
+    }
+    if not metric_ids:
+        return [], True
+    params = manifest.get("params")
+    if not isinstance(params, dict):
+        return [f"freshness unknown: scalar manifest lacks params for scalar_table:{artifact_id}"], False
+    recorded = params.get("metric_definition_digests")
+    if not isinstance(recorded, dict):
+        return [
+            f"stale scalar metric definition provenance for scalar_table:{artifact_id}: "
+            "missing metric_definition_digests"
+        ], True
+    try:
+        current = metric_definition_digests(metric_ids, config=context.config)
+    except ContractViolationError as exc:
+        return [f"stale scalar metric definition for scalar_table:{artifact_id}: {exc}"], True
+
+    reasons: list[str] = []
+    for metric_id in sorted(metric_ids):
+        if str(recorded.get(metric_id) or "") != current[metric_id]:
+            reasons.append(f"stale scalar metric definition for scalar_table:{artifact_id}: {metric_id}")
+    extra_recorded_ids = sorted(str(metric_id) for metric_id in set(recorded) - metric_ids)
+    if extra_recorded_ids:
+        reasons.append(
+            f"stale scalar metric definition provenance for scalar_table:{artifact_id}: "
+            f"extra metric ids {extra_recorded_ids}"
+        )
+    return reasons, True
+
+
+def _scalar_build_recipe_freshness_reasons(
+    context: WorkspaceContext,
+    *,
+    artifact_id: str,
+    manifest: dict[str, object],
+) -> tuple[list[str], bool]:
+    if not all(hasattr(context, attribute) for attribute in ("config",)):
+        return [], True
+
+    expected_params: list[tuple[str, dict[str, object]]] = []
+    for recipe_id, recipe in context.config.recipes.items():
+        for step in recipe.steps:
+            if step.op != "scalar.build":
+                continue
+            step_params = dict(step.params)
+            step_scalar = str(step_params.get("scalar_id") or step_params.get("scalar") or "").strip()
+            if step_scalar != artifact_id:
+                continue
+            builder_kind = str(step_params.get("kind") or "").strip()
+            if not builder_kind:
+                return [
+                    f"freshness unknown: scalar.build recipe step {recipe_id}.{step.id} "
+                    f"lacks kind for scalar_table:{artifact_id}"
+                ], False
+            builder_params = {
+                key: value for key, value in step_params.items() if key not in {"scalar_id", "scalar", "kind"}
+            }
+            expected_params.append((f"{recipe_id}.{step.id}", {"builder_kind": builder_kind, **builder_params}))
+
+    if not expected_params:
+        return [], True
+
+    recorded_params = manifest.get("params")
+    if not isinstance(recorded_params, dict):
+        return [f"freshness unknown: scalar manifest lacks params for scalar_table:{artifact_id}"], False
+
+    recorded_build_params = {key: value for key, value in recorded_params.items() if key != "metric_definition_digests"}
+    if any(recorded_build_params == expected for _, expected in expected_params):
+        return [], True
+
+    expected_locations = ", ".join(location for location, _ in expected_params)
+    return [
+        f"stale scalar build config for scalar_table:{artifact_id}: "
+        f"manifest params do not match current recipe step(s) {expected_locations}"
+    ], True
+
+
 def evaluate_artifact_freshness(
     context: WorkspaceContext,
     *,
@@ -444,6 +541,32 @@ def evaluate_manifest_freshness(
 
     if reasons:
         return {"status": "attention", "reason": reasons[0], "known": known, "reasons": reasons}
+    if artifact_kind == "scalar_table":
+        scalar_config_reasons, scalar_config_known = _scalar_build_recipe_freshness_reasons(
+            context,
+            artifact_id=artifact_id,
+            manifest=manifest,
+        )
+        if scalar_config_reasons:
+            return {
+                "status": "attention",
+                "reason": scalar_config_reasons[0],
+                "known": scalar_config_known,
+                "reasons": scalar_config_reasons,
+            }
+        scalar_reasons, scalar_known = _scalar_metric_definition_freshness_reasons(
+            context,
+            artifact_id=artifact_id,
+            manifest=manifest,
+            manifest_path=manifest_path,
+        )
+        if scalar_reasons:
+            return {
+                "status": "attention",
+                "reason": scalar_reasons[0],
+                "known": scalar_known,
+                "reasons": scalar_reasons,
+            }
     if artifact_kind == "view":
         view_reasons, view_known = _view_config_freshness_reasons(
             context,

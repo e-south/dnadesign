@@ -14,6 +14,12 @@ Check whether RegulonDB sigma-factor set metadata has projection-independent str
 
 - `sigma_factor_structure_summary`
 
+### sigma_factor_structure_summary | Sigma-Factor Structure Summary
+
+#### Plot details
+
+Metric panels summarize projection-independent sigma-factor cohort structure for native and core60 intermediate embeddings plus output-layer means. Rare sigma-factor sets below the configured group-size threshold are excluded rather than forced into unstable centroid comparisons.
+
 ## Interpretation
 
 The separation ratio compares mean between-cohort centroid distance to mean within-cohort centroid distance. Higher values indicate that sigma-factor set labels are more separated under the configured representation. Rare sigma-factor sets below the configured minimum group size are excluded from the metric rather than forced into noisy centroids.

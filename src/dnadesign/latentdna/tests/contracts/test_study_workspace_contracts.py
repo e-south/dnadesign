@@ -24,6 +24,10 @@ def _live_workspace() -> Path:
     return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "stress_ethanol_cipro_growth"
 
 
+def _regulondb_workspace() -> Path:
+    return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "regulondb_native_promoter_panel"
+
+
 def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
 
@@ -126,6 +130,82 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "reference_w_collection",
         "reference_w_collection_core60",
     }
+
+
+def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
+    workspace = _regulondb_workspace()
+    context = load_workspace_config(workspace)
+    notebook = context.require_notebook("latent_geometry_browser")
+    ordered_plot_ids = set(notebook.ordered_plots)
+    covered_plot_ids: set[str] = set()
+
+    assert context.config.study_binding is not None
+    docs_root = _repo_root() / context.config.study_binding.deliverable_docs_root
+    for deliverable in context.config.deliverables.values():
+        if not ordered_plot_ids.intersection(deliverable.outputs.get("plots", [])):
+            continue
+        for docs_ref in deliverable.docs_refs:
+            relative_ref = docs_ref.removeprefix(f"study:{context.config.study_binding.study_id}/")
+            markdown_path = docs_root / f"{relative_ref}.md"
+            if markdown_path.is_file():
+                parsed = _parse_deliverable_markdown(markdown_path.read_text(encoding="utf-8"))
+                covered_plot_ids.update(parsed["plot_sections"])
+
+    assert ordered_plot_ids.issubset(covered_plot_ids)
+
+
+def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
+    context = load_workspace_config(_regulondb_workspace())
+    expected_hues = [
+        "regulondb__sigma_factor_set",
+        "regulondb__confidence_level_set",
+        "regulondb__metadata_completeness_class",
+        "regulondb__regulator_composition",
+        "regulondb__box_pattern",
+        "regulondb__source_strata_set",
+        "regulondb__sigma_factor_count",
+        "emitted_length_bp",
+    ]
+    for plot_id in [
+        "sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean",
+        "sigma_umap_intermediate_embedding_7b_core60_tss_upstream",
+    ]:
+        plot = context.config.plots[plot_id]
+        assert plot.default_hue == "regulondb__sigma_factor_set"
+        assert [option.column for option in plot.hue_options] == expected_hues
+        assert plot.hue_options[-2].type == "ordinal"
+        assert plot.hue_options[-1].type == "ordinal"
+
+
+def test_live_study_representation_health_compares_first_class_intermediate_and_output_layer_views() -> None:
+    context = load_workspace_config(_live_workspace())
+    recipe = context.config.recipes["pre_assay_representation_triage_recipe"]
+    health_step = next(step for step in recipe.steps if step.id == "build_representation_health_summary_metrics")
+    candidates = {str(row["view_id"]) for row in health_step.params["candidates"]}
+    omitted = {str(row["view_id"]) for row in health_step.params.get("omitted_candidates", [])}
+
+    expected_first_class_output_views = {
+        "output_layer_mean_7b_anchor_60bp",
+        "output_layer_mean_7b_full_context_1kb",
+        "output_layer_mean_7b_full_context_anchor_mean",
+        "output_layer_mean_7b_reverse_complement_context_1kb",
+        "output_layer_mean_7b_reverse_complement_context_anchor_mean",
+    }
+    assert expected_first_class_output_views.issubset(candidates)
+    assert not expected_first_class_output_views.intersection(omitted)
+    assert all("reference" not in view_id for view_id in candidates)
+    assert all("reference" not in view_id for view_id in omitted)
+
+
+def test_live_study_reference_context_sources_do_not_inherit_promoter_metadata_derivations() -> None:
+    context = load_workspace_config(_live_workspace())
+    source_ids = [source_id for source_id in context.config.sources if source_id.startswith("reference_context_7b_")]
+
+    assert source_ids
+    for source_id in source_ids:
+        source = context.config.sources[source_id]
+        assert source.metadata_include_mode == "replace"
+        assert source.metadata_include == []
 
 
 def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> None:
@@ -377,19 +457,21 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     representation_health_step = pre_assay_steps["build_representation_health_summary_metrics"]
     assert representation_health_step.params["pairwise_max_rows"] == 4096
     assert representation_health_step.params["pairwise_seed"] == 17
-    omitted_candidate_ids = {row["view_id"] for row in representation_health_step.params.get("omitted_candidates", [])}
-    assert omitted_candidate_ids == {
+    first_class_output_ids = {
         "output_layer_mean_7b_anchor_60bp",
         "output_layer_mean_7b_full_context_1kb",
         "output_layer_mean_7b_full_context_anchor_mean",
         "output_layer_mean_7b_reverse_complement_context_1kb",
         "output_layer_mean_7b_reverse_complement_context_anchor_mean",
-        "output_layer_mean_7b_reference_core60",
-        "output_layer_mean_7b_reference_context_forward_1kb",
-        "output_layer_mean_7b_reference_context_forward_anchor_mean",
-        "output_layer_mean_7b_reference_context_reverse_complement_1kb",
-        "output_layer_mean_7b_reference_context_reverse_complement_anchor_mean",
     }
+    representation_health_candidates = {row["view_id"] for row in representation_health_step.params["candidates"]}
+    omitted_candidate_ids = {row["view_id"] for row in representation_health_step.params.get("omitted_candidates", [])}
+    assert first_class_output_ids.issubset(representation_health_candidates)
+    assert omitted_candidate_ids == set()
+    for view_id in first_class_output_ids:
+        assert f"materialize_{view_id}" in pre_assay_steps
+        assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert f"reduce_pca_{view_id}" in pre_assay_steps
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
     stress_margin_anchor = pre_assay_steps["build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp"]

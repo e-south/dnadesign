@@ -229,6 +229,7 @@ def _candidate_descriptor_from_view(
 
 def _metric_row(
     *,
+    context: WorkspaceContext | None = None,
     descriptor: dict[str, object],
     metric_id: str,
     metric_value: float,
@@ -237,7 +238,7 @@ def _metric_row(
     ci_upper: float | None = None,
     extra: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    definition = resolve_metric_definition(metric_id)
+    definition = resolve_metric_definition(metric_id, config=context.config if context is not None else None)
     row = {
         **descriptor,
         "metric_id": definition.metric_id,

@@ -24,7 +24,9 @@ are kept in source inventory and eligible plots; only ordinal-rank statistics
 restrict themselves to the explicit b-f order file. The package-level scalar
 primitives are the generic `ordinal_axis_audit` and `axis_centroid_distance`;
 this workspace config maps those axis builders onto Sigma-35 metric names and
-heatmap labels.
+heatmap labels. The Sigma-35 metric ids are declared under workspace
+`metric_definitions`; the global LatentDNA metric registry does not ship those
+study-specific names or mathematical definitions.
 Sigma-35 display labels, color order, the ordinal subset, and the
 reference/other noncanonical bucket are declared under `metadata.axes` in the
 stress workspace config. The notebook and renderer consume those resolved axis
@@ -39,7 +41,10 @@ realized-context `anchor_mean` features. Forward context `seq_mean`,
 reverse-complement context features, reference `analysis_window` features,
 output-layer mean vectors, and log-likelihood scalar diagnostics are not
 treated as current decision geometry until their canonical vector or scalar
-sidecars are present.
+sidecars are present and explicitly promoted. The five first-class output-layer
+mean views are included in representation-health diagnostics so effective-rank
+and cosine-distance spread can be compared beside the intermediate embeddings,
+but they do not enter projection grids without projection artifacts.
 
 ### Gate
 
@@ -139,10 +144,10 @@ anchor mean, reference core60 `analysis_window`, and reference forward and
 reverse-complement contexts. The reference sources select zero feature aliases
 until Infer writes the canonical sidecars for
 `infer_prom_eth_cip_reference_views_7b`. Stress-study output-layer mean vectors
-and log-likelihood total or mean-per-token values remain planned or diagnostic
-until their sidecars are materialized and the workspace config promotes them to
-current decision geometry. 20B and concat surfaces are not active in this
-workspace contract.
+are diagnostic representation-health candidates, not current decision geometry.
+Log-likelihood total or mean-per-token values remain planned diagnostics until
+their scalar sidecars are materialized and promoted by config. 20B and concat
+surfaces are not active in this workspace contract.
 
 ### RegulonDB note
 

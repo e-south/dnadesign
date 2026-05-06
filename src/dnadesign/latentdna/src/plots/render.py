@@ -2979,7 +2979,7 @@ def render_plot_artifact(
             if spec.panel_column is not None
             else [None]
         )
-        square_count_panels = spec.plot_id == "dataset_overview"
+        square_count_panels = bool(getattr(spec, "square_panels", False))
         if square_count_panels and len(panel_values) <= 3:
             rows_count, columns = 1, len(panel_values)
         elif len(panel_values) <= 2:

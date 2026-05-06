@@ -18,6 +18,7 @@ AggregationMode = Literal["error", "first", "mean", "medoid"]
 AlignmentKeyBasis = Literal["record_key", "subject_key"]
 MetadataValueType = Literal["infer", "string", "int64", "float64", "bool"]
 MetadataAxisKind = Literal["categorical", "binary", "continuous", "ordinal"]
+MetricDirection = Literal["higher_is_better", "lower_is_better", "descriptive"]
 
 
 class StrictWorkspaceModel(BaseModel):
@@ -177,6 +178,18 @@ class MetadataSection(StrictWorkspaceModel):
     include: list[str] = Field(default_factory=list)
     derivations: dict[str, MetadataDerivationConfig] = Field(default_factory=dict)
     axes: dict[str, MetadataAxisConfig] = Field(default_factory=dict)
+
+
+class MetricDefinitionConfig(StrictWorkspaceModel):
+    display_name: NonEmptyText
+    mathematical_definition: NonEmptyText
+    metric_family: NonEmptyText
+    evidence_tier: NonEmptyText
+    unit: NonEmptyText
+    direction: MetricDirection
+    aggregation_level: NonEmptyText
+    task_id: str | None = None
+    definition_version: NonEmptyText = "workspace_config.v1"
 
 
 class SourceBase(StrictWorkspaceModel):
@@ -560,6 +573,7 @@ class WorkspaceConfig(StrictWorkspaceModel):
     defaults: DefaultsSection
     sources: dict[str, SourceConfig]
     metadata: MetadataSection = Field(default_factory=MetadataSection)
+    metric_definitions: dict[str, MetricDefinitionConfig] = Field(default_factory=dict)
     alignments: dict[str, AlignmentConfig] = Field(default_factory=dict)
     views: dict[str, ViewConfig] = Field(default_factory=dict)
     scalars: dict[str, ScalarConfig] = Field(default_factory=dict)

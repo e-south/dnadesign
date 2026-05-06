@@ -41,6 +41,12 @@ from .browser_runtime_support import (
     style_notebook_axes,
     style_notebook_legend,
 )
+from .raster_scatter import (
+    draw_categorical_raster_scatter,
+    draw_continuous_raster_scatter,
+    draw_single_color_raster_scatter,
+    should_rasterize_scatter,
+)
 from .rendering import render_matplotlib_figure
 
 
@@ -278,7 +284,7 @@ def _categorical_hue_series(
         hue_column,
         frame[hue_column],
         axis_styles=axis_styles,
-        rows=frame.to_dict("records"),
+        frame=frame,
     )
 
 
@@ -609,67 +615,123 @@ def render_projection_grid(
             _render_projection_placeholder(ax, panel_title=wrapped_title, message="Projection missing")
             continue
 
-        point_style = shared_scatter_style(len(frame))
+        x_values = pd.to_numeric(frame["x"], errors="coerce").to_numpy(dtype=float)
+        y_values = pd.to_numeric(frame["y"], errors="coerce").to_numpy(dtype=float)
+        finite_xy = np.isfinite(x_values) & np.isfinite(y_values)
+        if not bool(np.any(finite_xy)):
+            _render_projection_placeholder(ax, panel_title=wrapped_title, message="Projection has no finite points")
+            continue
+        plot_frame = frame.loc[finite_xy].copy()
+        x_values = x_values[finite_xy]
+        y_values = y_values[finite_xy]
+        point_style = shared_scatter_style(len(plot_frame))
+        rasterize_panel = should_rasterize_scatter(len(plot_frame))
         if effective_hue is None or effective_hue not in frame.columns:
-            ax.scatter(
-                frame["x"].to_numpy(dtype=float),
-                frame["y"].to_numpy(dtype=float),
-                c=PUBLICATION_PALETTE[0],
-                s=point_style.point_size,
-                alpha=point_style.alpha,
-                linewidths=point_style.linewidths,
-                edgecolors=point_style.edgecolors,
-                rasterized=point_style.rasterized,
-            )
-        elif hue_kind == "continuous":
-            hue_series = pd.to_numeric(frame[effective_hue], errors="coerce")
-            valid = hue_series.notna()
-            scatter_artist = ax.scatter(
-                frame.loc[valid, "x"].to_numpy(dtype=float),
-                frame.loc[valid, "y"].to_numpy(dtype=float),
-                c=hue_series.loc[valid].to_numpy(dtype=float),
-                cmap=str(continuous_params["cmap"]),
-                norm=continuous_params["norm"],
-                vmin=None if continuous_params["norm"] is not None else continuous_params["vmin"],
-                vmax=None if continuous_params["norm"] is not None else continuous_params["vmax"],
-                s=point_style.point_size,
-                alpha=point_style.alpha,
-                linewidths=point_style.linewidths,
-                edgecolors=point_style.edgecolors,
-                rasterized=point_style.rasterized,
-            )
-        else:
-            hue_series = _categorical_hue_series(frame, effective_hue, axis_styles=axis_styles)
-            plotted_mask = pd.Series(False, index=frame.index)
-            for category in category_values:
-                mask = hue_series == category
-                if not mask.any():
-                    continue
-                plotted_mask |= mask
+            if rasterize_panel:
+                draw_single_color_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    color=PUBLICATION_PALETTE[0],
+                    point_alpha=point_style.alpha,
+                )
+            else:
                 ax.scatter(
-                    frame.loc[mask, "x"].to_numpy(dtype=float),
-                    frame.loc[mask, "y"].to_numpy(dtype=float),
-                    c=category_map[category],
+                    x_values,
+                    y_values,
+                    c=PUBLICATION_PALETTE[0],
                     s=point_style.point_size,
                     alpha=point_style.alpha,
                     linewidths=point_style.linewidths,
                     edgecolors=point_style.edgecolors,
                     rasterized=point_style.rasterized,
-                    label=category,
                 )
-            if style is not None and style.noncanonical_bucket is not None:
-                noncanonical_mask = (~plotted_mask) & (hue_series == style.noncanonical_bucket)
-                if noncanonical_mask.any():
+        elif hue_kind == "continuous":
+            hue_series = pd.to_numeric(plot_frame[effective_hue], errors="coerce")
+            valid = hue_series.notna()
+            if rasterize_panel and valid.any():
+                scatter_artist = draw_continuous_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    hue_values=hue_series.to_numpy(dtype=float),
+                    cmap=str(continuous_params["cmap"]),
+                    norm=continuous_params["norm"],
+                    vmin=continuous_params["vmin"],
+                    vmax=continuous_params["vmax"],
+                    point_alpha=point_style.alpha,
+                )
+            else:
+                scatter_artist = ax.scatter(
+                    plot_frame.loc[valid, "x"].to_numpy(dtype=float),
+                    plot_frame.loc[valid, "y"].to_numpy(dtype=float),
+                    c=hue_series.loc[valid].to_numpy(dtype=float),
+                    cmap=str(continuous_params["cmap"]),
+                    norm=continuous_params["norm"],
+                    vmin=None if continuous_params["norm"] is not None else continuous_params["vmin"],
+                    vmax=None if continuous_params["norm"] is not None else continuous_params["vmax"],
+                    s=point_style.point_size,
+                    alpha=point_style.alpha,
+                    linewidths=point_style.linewidths,
+                    edgecolors=point_style.edgecolors,
+                    rasterized=point_style.rasterized,
+                )
+        else:
+            hue_series = _categorical_hue_series(plot_frame, effective_hue, axis_styles=axis_styles)
+            if rasterize_panel:
+                raster_categories = list(category_values)
+                raster_category_colors = dict(category_map)
+                raster_alpha_multipliers: dict[str, float] = {}
+                if style is not None and style.noncanonical_bucket is not None:
+                    noncanonical_category = str(style.noncanonical_bucket)
+                    if (
+                        bool((hue_series == noncanonical_category).any())
+                        and noncanonical_category not in raster_categories
+                    ):
+                        raster_categories.append(noncanonical_category)
+                    raster_category_colors.setdefault(noncanonical_category, "#9AA5B1")
+                    raster_alpha_multipliers[noncanonical_category] = 0.55
+                draw_categorical_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    hue_values=hue_series.to_numpy(dtype=str),
+                    category_order=raster_categories,
+                    category_colors=raster_category_colors,
+                    category_alpha_multipliers=raster_alpha_multipliers,
+                    point_alpha=point_style.alpha,
+                )
+            else:
+                plotted_mask = pd.Series(False, index=plot_frame.index)
+                for category in category_values:
+                    mask = hue_series == category
+                    if not mask.any():
+                        continue
+                    plotted_mask |= mask
                     ax.scatter(
-                        frame.loc[noncanonical_mask, "x"].to_numpy(dtype=float),
-                        frame.loc[noncanonical_mask, "y"].to_numpy(dtype=float),
-                        c=category_map.get(style.noncanonical_bucket, "#9AA5B1"),
+                        plot_frame.loc[mask, "x"].to_numpy(dtype=float),
+                        plot_frame.loc[mask, "y"].to_numpy(dtype=float),
+                        c=category_map[category],
                         s=point_style.point_size,
-                        alpha=max(point_style.alpha * 0.55, 0.08),
+                        alpha=point_style.alpha,
                         linewidths=point_style.linewidths,
                         edgecolors=point_style.edgecolors,
                         rasterized=point_style.rasterized,
+                        label=category,
                     )
+                if style is not None and style.noncanonical_bucket is not None:
+                    noncanonical_mask = (~plotted_mask) & (hue_series == style.noncanonical_bucket)
+                    if noncanonical_mask.any():
+                        ax.scatter(
+                            plot_frame.loc[noncanonical_mask, "x"].to_numpy(dtype=float),
+                            plot_frame.loc[noncanonical_mask, "y"].to_numpy(dtype=float),
+                            c=category_map.get(style.noncanonical_bucket, "#9AA5B1"),
+                            s=point_style.point_size,
+                            alpha=max(point_style.alpha * 0.55, 0.08),
+                            linewidths=point_style.linewidths,
+                            edgecolors=point_style.edgecolors,
+                            rasterized=point_style.rasterized,
+                        )
 
         ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
         if artifact_warning:

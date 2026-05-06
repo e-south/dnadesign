@@ -14,6 +14,12 @@ Compare each native RegulonDB promoter source record to its derived TSS-upstream
 
 - `native_core60_shift_summary`
 
+### native_core60_shift_summary | Native/Core60 Shift Summary
+
+#### Plot details
+
+Metric panels compare paired native versus core60 row shifts for both 7B intermediate embeddings and 7B output-layer means. The plot is representation-family agnostic: native/core60 alignment metrics come from configured paired views, not promoter-box centering assumptions.
+
 ## Interpretation
 
 Higher paired self-cosine and lower L2 shift mean the native and core60 products preserve similar rowwise geometry in that representation family. A large shift means downstream comparisons should keep native and core60 views separate.

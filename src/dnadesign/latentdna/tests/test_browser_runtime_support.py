@@ -211,7 +211,7 @@ def test_resolve_plot_render_asset_uses_pdf_alternate_when_raster_is_missing(tmp
     assert "plot.pdf" in notice
 
 
-def test_resolve_plot_render_asset_skips_oversize_raster_alternate(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_uses_raster_alternate_even_when_large(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     png_path = tmp_path / "plot.png"
     pdf_path = tmp_path / "plot.pdf"
@@ -221,50 +221,40 @@ def test_resolve_plot_render_asset_skips_oversize_raster_alternate(tmp_path: Pat
 
     render_path, notice = resolve_plot_render_asset(svg_path)
 
-    assert render_path == pdf_path
-    assert notice is not None
-    assert "plot.pdf" in notice
-
-
-def test_resolve_plot_render_asset_uses_pdf_for_oversize_raster(tmp_path: Path) -> None:
-    png_path = tmp_path / "plot.png"
-    pdf_path = tmp_path / "plot.pdf"
-    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
-    pdf_path.write_bytes(b"%PDF-1.4")
-
-    render_path, notice = resolve_plot_render_asset(png_path)
-
-    assert render_path == pdf_path
+    assert render_path == png_path
     assert notice is not None
     assert "plot.png" in notice
-    assert "plot.pdf" in notice
-    assert "inline notebook asset limit" in notice
 
 
-def test_resolve_plot_render_asset_refuses_oversize_raster_without_pdf(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_accepts_large_raster_assets(tmp_path: Path) -> None:
     png_path = tmp_path / "plot.png"
     png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
 
     render_path, notice = resolve_plot_render_asset(png_path)
 
-    assert render_path is None
-    assert notice is not None
-    assert "no pdf alternate" in notice.lower()
+    assert render_path == png_path
+    assert notice is None
 
 
-def test_render_plot_asset_does_not_read_oversize_raster_without_pdf(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_plot_render_asset_keeps_large_raster_without_pdf(tmp_path: Path) -> None:
     png_path = tmp_path / "plot.png"
     png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
 
-    def _fail_read_bytes(_path: Path) -> bytes:
-        raise AssertionError("oversize raster should not be read into notebook memory")
+    render_path, notice = resolve_plot_render_asset(png_path)
 
-    monkeypatch.setattr(Path, "read_bytes", _fail_read_bytes)
+    assert render_path == png_path
+    assert notice is None
+
+
+def test_render_plot_asset_uses_marimo_image_for_large_raster_without_pdf(tmp_path: Path) -> None:
+    png_path = tmp_path / "plot.png"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
 
     rendered = render_plot_asset(png_path, workspace_dir=tmp_path, alt_text="large raster")
 
-    assert "plot.png" in rendered.text
-    assert "data:image/png;base64" not in rendered.text
+    assert "large raster" in rendered.text
+    assert "<img" in rendered.text
+    assert "latentdna-plot-asset" in rendered.text
 
 
 def test_category_color_map_prefers_stable_semantic_colors() -> None:
@@ -416,7 +406,7 @@ def test_table_from_records_uses_marimo_native_table_widget() -> None:
     assert isinstance(table, mo.ui.table)
 
 
-def test_render_matplotlib_figure_prefers_inline_svg_in_app_run_mode(monkeypatch) -> None:
+def test_render_matplotlib_figure_prefers_raster_image_in_app_run_mode(monkeypatch) -> None:
     monkeypatch.setattr(notebook_rendering.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
 
     fig, ax = plt.subplots()
@@ -426,7 +416,8 @@ def test_render_matplotlib_figure_prefers_inline_svg_in_app_run_mode(monkeypatch
 
     assert isinstance(rendered, mo.Html)
     assert "run mode figure" in rendered.text
-    assert "data:image/svg+xml;base64," in rendered.text
+    assert "<img" in rendered.text
+    assert "image/png" in rendered.text
     assert "overflow-x: auto" in rendered.text
     assert "max-width: 100%" in rendered.text
 
@@ -456,7 +447,7 @@ def test_render_plot_asset_uses_plot_alt_text_for_raster_assets(tmp_path: Path) 
 
     assert isinstance(rendered, mo.Html)
     assert "Context robustness summary" in rendered.text
-    assert "data:image/png;base64," in rendered.text
+    assert "<img" in rendered.text
     assert "overflow-x: auto" in rendered.text
     assert "max-width: 100%" in rendered.text
 
@@ -470,7 +461,7 @@ def test_render_plot_asset_prefers_png_for_large_svg_with_raster_fallback(tmp_pa
     rendered = render_plot_asset(svg_path, workspace_dir=tmp_path, alt_text="UMAP gallery")
 
     assert isinstance(rendered, mo.Html)
-    assert "data:image/png;base64," in rendered.text
+    assert "<img" in rendered.text
     assert "Displaying `plot.png` because `plot.svg` is large for inline notebook rendering" in rendered.text
 
 
