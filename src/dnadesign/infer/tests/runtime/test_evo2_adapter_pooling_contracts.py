@@ -59,6 +59,25 @@ class _Model:
         return (["ACGTAA"], [0.5])
 
 
+class _AxisSwappedLogitsModel(_Model):
+    def __call__(
+        self,
+        x: torch.Tensor,
+        *,
+        return_embeddings: bool = False,
+        layer_names: list[str] | None = None,
+    ) -> tuple[Any, Any]:
+        self.forward_calls += 1
+        batch, length = x.shape
+        logits = torch.arange(batch * 4 * length, dtype=torch.float32).reshape(batch, 4, length).to(x.device)
+        if not return_embeddings:
+            return (logits,), None
+        assert layer_names is not None and len(layer_names) == 1
+        self.embedding_layers.append(layer_names[0])
+        embeddings = torch.arange(batch * 3 * length, dtype=torch.float32).reshape(batch, 3, length).to(x.device)
+        return logits, {layer_names[0]: embeddings}
+
+
 class _TorchModule:
     def __init__(self, blocks: tuple[int, ...] = (0, 1, 20, 26, 31)) -> None:
         self._blocks = blocks
@@ -185,6 +204,22 @@ def test_logits_rejects_pool_dim_zero_that_consumes_batch_axis() -> None:
             pool={"method": "mean", "dim": 0},
             fmt="tensor",
         )
+
+
+def test_logits_rejects_tensor_layout_that_does_not_match_token_axis() -> None:
+    adapter = _adapter()
+    adapter.model = _AxisSwappedLogitsModel()
+
+    with pytest.raises(CapabilityError, match="logits tensor layout"):
+        adapter.logits(["ACGTA", "TGCAT"], fmt="tensor")
+
+
+def test_logits_and_embedding_rejects_tensor_layout_that_does_not_match_token_axis() -> None:
+    adapter = _adapter()
+    adapter.model = _AxisSwappedLogitsModel()
+
+    with pytest.raises(CapabilityError, match="tensor layout"):
+        adapter.logits_and_embedding(["ACGTA", "TGCAT"], layer="mid", fmt="tensor")
 
 
 def test_log_likelihood_reduction_sum_and_mean_map_directly_to_evo2_api() -> None:

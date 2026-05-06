@@ -13,10 +13,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.infer.src.features import completion_planner
 from dnadesign.infer.src.features.aliases import (
+    feature_alias_path,
     persist_feature_alias_rows,
     persist_feature_scalar_rows,
     persist_feature_vector_rows,
@@ -92,6 +95,9 @@ def test_sequence_view_completion_planner_reports_missing_vectors(tmp_path: Path
     assert plan.missing_vectors == 2
     assert plan.by_product_kind == {"analysis_window": 1}
     assert plan.by_pooling_operation == {"core60_mean": 1}
+    assert plan.shard_plan.shard_count == 1
+    assert plan.shard_plan.runtime_fingerprint_key
+    assert plan.shard_plan.ledger_relative_path == "_derived/infer/checkpoints/reference_views/ledger.json"
 
 
 def test_sequence_view_completion_planner_reports_missing_scalars(tmp_path: Path) -> None:
@@ -116,6 +122,7 @@ def test_sequence_view_completion_planner_reports_missing_scalars(tmp_path: Path
     assert plan.required_scalars == 2
     assert plan.reusable_scalars == 0
     assert plan.missing_scalars == 2
+    assert plan.shard_plan.pending_scalar_keys == 2
 
 
 def test_sequence_view_completion_planner_reports_missing_products(tmp_path: Path) -> None:
@@ -297,6 +304,7 @@ def test_sequence_view_completion_planner_reuses_persisted_feature_vectors(tmp_p
     assert plan.reusable_vectors == 2
     assert plan.persisted_vector_reusable == 2
     assert plan.missing_vectors == 0
+    assert plan.shard_plan.shard_count == 0
 
 
 def test_sequence_view_completion_planner_reuses_persisted_feature_scalars(tmp_path: Path) -> None:
@@ -508,3 +516,92 @@ def test_sequence_view_inventory_completion_reuses_aliases_and_reports_stale_pay
     assert plan.missing_vectors == 0
     assert plan.existing_aliases == 2
     assert plan.by_pooling_operation == {"core60_mean": 1}
+    assert plan.shard_plan.pending_vector_keys == 1
+    assert plan.shard_plan.shard_count == 1
+    assert plan.shard_plan.runtime_fingerprint_key
+
+
+def test_sequence_view_inventory_completion_quarantines_legacy_aliases_without_runtime_fingerprint(
+    tmp_path: Path,
+) -> None:
+    usr_root, dataset = _dataset_with_sequence_view(tmp_path)
+    bundle = _bundle(usr_root, dataset)
+    records = load_sequence_view_input_records(bundle=bundle)
+    contexts = resolve_sequence_view_contexts(records=records)
+    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id="evo2_7b")
+    selector = resolve_intermediate_selector(model_id="evo2_7b", intermediate_block=bundle.intermediate_block)
+    specs = _sequence_view_feature_vector_specs(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        selector=selector.intermediate_selector,
+    )
+    legacy_alias_rows = []
+    for row in _sequence_view_feature_alias_rows(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        selector=selector.intermediate_selector,
+        model_id="evo2_7b",
+    ):
+        payload = dict(row)
+        payload.pop("_dataset_root")
+        payload.pop("_dataset_id")
+        legacy_alias_rows.append(payload)
+    legacy_schema = pa.schema(
+        [
+            pa.field("alias_id", pa.string()),
+            pa.field("view_id", pa.string()),
+            pa.field("view_name", pa.string()),
+            pa.field("sequence_id", pa.string()),
+            pa.field("feature_vector_key", pa.string()),
+            pa.field("forward_pass_key", pa.string()),
+            pa.field("provider", pa.string()),
+            pa.field("model_name", pa.string()),
+            pa.field("model_revision", pa.string()),
+            pa.field("layer_name", pa.string()),
+            pa.field("representation_kind", pa.string()),
+            pa.field("pooling_operation", pa.string()),
+            pa.field("pooling_start_0", pa.int64()),
+            pa.field("pooling_end_0", pa.int64()),
+            pa.field("orientation", pa.string()),
+            pa.field("source_dataset_id", pa.string()),
+            pa.field("feature_request_digest", pa.string()),
+            pa.field("created_at", pa.string()),
+        ]
+    )
+    alias_path = feature_alias_path(dataset_root=usr_root, dataset_id=dataset)
+    alias_path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(
+        pa.table(
+            {
+                field.name: pa.array([row.get(field.name) for row in legacy_alias_rows], type=field.type)
+                for field in legacy_schema
+            },
+            schema=legacy_schema,
+        ),
+        alias_path,
+    )
+    persist_feature_vector_rows(
+        [
+            {
+                "_dataset_root": spec["dataset_root"],
+                "_dataset_id": spec["dataset_id"],
+                "feature_vector_key": spec["feature_vector_key"],
+                "value": [1.0, 2.0],
+                "created_at": metadata_rows[int(spec["row_index"])]["timestamp"],
+            }
+            for spec in specs
+        ]
+    )
+
+    plan = plan_sequence_view_feature_inventory_completion(
+        bundle=bundle,
+        model_id="evo2_7b",
+        job_id="reference_views",
+    )
+
+    assert plan.required_vectors == 2
+    assert plan.reusable_vectors == 0
+    assert plan.stale_vectors == 2
+    assert plan.missing_vectors == 0

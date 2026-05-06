@@ -109,6 +109,26 @@ def _pool_batched_tensor(
     return pooled
 
 
+def _validate_batched_sequence_tensor(
+    tensor: torch.Tensor,
+    *,
+    tokens: torch.Tensor,
+    tensor_name: str,
+) -> torch.Tensor:
+    if not torch.is_tensor(tensor):
+        raise CapabilityError(f"Evo2 {tensor_name} output must be a torch.Tensor.")
+    if tensor.ndim != 3:
+        raise CapabilityError(f"Evo2 {tensor_name} tensor layout must be [B, L, *]; got rank {tensor.ndim}.")
+    expected_batch, expected_length = int(tokens.size(0)), int(tokens.size(1))
+    observed_batch, observed_length = int(tensor.size(0)), int(tensor.size(1))
+    if observed_batch != expected_batch or observed_length != expected_length:
+        raise CapabilityError(
+            f"Evo2 {tensor_name} tensor layout must be [B, L, *]; "
+            f"tokens=[{expected_batch}, {expected_length}] output=[{observed_batch}, {observed_length}, *]."
+        )
+    return tensor
+
+
 class Evo2Adapter:
     """
     Thin adapter around Evo 2 models.
@@ -357,7 +377,7 @@ class Evo2Adapter:
         def _forward_logits(x: torch.Tensor) -> torch.Tensor:
             outputs, _ = self.model(x)
             try:
-                return outputs[0]  # [B, L, V]
+                return _validate_batched_sequence_tensor(outputs[0], tokens=x, tensor_name="logits")  # [B, L, V]
             except Exception as e:
                 raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
 
@@ -394,7 +414,13 @@ class Evo2Adapter:
                 logits_batch = outputs
             if resolved_layer not in embeddings:
                 raise CapabilityError(f"Embedding layer '{resolved_layer}' not found in Evo2 response.")
-            return logits_batch, embeddings[resolved_layer]
+            logits_batch = _validate_batched_sequence_tensor(logits_batch, tokens=x, tensor_name="logits")
+            embedding_batch = _validate_batched_sequence_tensor(
+                embeddings[resolved_layer],
+                tokens=x,
+                tensor_name="embedding",
+            )
+            return logits_batch, embedding_batch
 
         logits_by_input, embeddings_by_input = self._run_dual_extract_batches_by_length(
             tokens=tokens,
@@ -447,7 +473,11 @@ class Evo2Adapter:
             _, embeddings = self.model(x, return_embeddings=True, layer_names=[resolved_layer])
             if resolved_layer not in embeddings:
                 raise CapabilityError(f"Embedding layer '{resolved_layer}' not found in Evo2 response.")
-            return embeddings[resolved_layer]  # [B, L, D]
+            return _validate_batched_sequence_tensor(
+                embeddings[resolved_layer],
+                tokens=x,
+                tensor_name="embedding",
+            )  # [B, L, D]
 
         embeddings_by_input = self._run_extract_batches_by_length(
             tokens=tokens,

@@ -26,6 +26,7 @@ from .aliases import (
     load_feature_scalar_keys,
     load_feature_vector_keys,
 )
+from .cache_keys import DNA_SEQUENCE_CASE_POLICY, build_runtime_fingerprint, compute_runtime_fingerprint_key
 from .contracts import SequenceFeatureBundleConfig
 from .execution import (
     _sequence_view_feature_scalar_specs,
@@ -38,12 +39,32 @@ from .sequence_views import (
     load_sequence_view_input_records_with_status,
     resolve_sequence_view_contexts,
 )
+from .shard_ledger import (
+    DEFAULT_FEATURE_SHARD_SIZE_VIEWS,
+    SHARD_COMMIT_POLICY,
+    SHARD_LEDGER_SCHEMA_VERSION,
+    SHARD_RESUME_POLICY,
+)
 
 
 @dataclass(frozen=True)
 class FeatureCompletionCommands:
     construct_completion: list[str] = field(default_factory=list)
     infer_backfill: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class FeatureShardPlan:
+    schema_version: str = SHARD_LEDGER_SCHEMA_VERSION
+    shard_size_views: int = DEFAULT_FEATURE_SHARD_SIZE_VIEWS
+    shard_count: int = 0
+    pending_view_estimate: int = 0
+    pending_vector_keys: int = 0
+    pending_scalar_keys: int = 0
+    runtime_fingerprint_key: str = ""
+    ledger_relative_path: str = ""
+    commit_policy: str = SHARD_COMMIT_POLICY
+    resume_policy: str = SHARD_RESUME_POLICY
 
 
 @dataclass(frozen=True)
@@ -72,11 +93,36 @@ class FeatureCompletionPlan:
     by_pooling_operation: dict[str, int]
     missing_product_selectors: list[dict[str, object]] = field(default_factory=list)
     commands: FeatureCompletionCommands = field(default_factory=FeatureCompletionCommands)
+    shard_plan: FeatureShardPlan = field(default_factory=FeatureShardPlan)
 
     def to_dict(self) -> dict[str, object]:
         payload = asdict(self)
         payload["commands"] = asdict(self.commands)
         return payload
+
+
+def _build_shard_plan(
+    *,
+    bundle_id: str,
+    required_views: int,
+    pending_vector_keys: int,
+    pending_scalar_keys: int,
+    runtime_fingerprint_key: str = "",
+    shard_size_views: int = DEFAULT_FEATURE_SHARD_SIZE_VIEWS,
+) -> FeatureShardPlan:
+    shard_size = max(1, int(shard_size_views))
+    pending_keys = max(0, int(pending_vector_keys)) + max(0, int(pending_scalar_keys))
+    pending_view_estimate = max(0, int(required_views)) if pending_keys else 0
+    shard_count = (pending_view_estimate + shard_size - 1) // shard_size if pending_view_estimate else 0
+    return FeatureShardPlan(
+        shard_size_views=shard_size,
+        shard_count=shard_count,
+        pending_view_estimate=pending_view_estimate,
+        pending_vector_keys=max(0, int(pending_vector_keys)),
+        pending_scalar_keys=max(0, int(pending_scalar_keys)),
+        runtime_fingerprint_key=str(runtime_fingerprint_key),
+        ledger_relative_path=f"_derived/infer/checkpoints/{bundle_id}/ledger.json",
+    )
 
 
 def _dataset_label(
@@ -224,12 +270,20 @@ def _apply_payload_state(
     *,
     slot: tuple[object, ...],
     has_payload: bool,
+    has_current_runtime_contract: bool = True,
 ) -> None:
     current = state_by_slot.get(slot)
-    if has_payload:
+    if has_payload and has_current_runtime_contract:
         state_by_slot[slot] = "reusable"
     elif current is None:
         state_by_slot[slot] = "stale"
+
+
+def _alias_row_has_current_runtime_contract(row: dict[str, object], *, expected_runtime_fingerprint_key: str) -> bool:
+    return (
+        str(row.get("runtime_fingerprint_key") or "") == expected_runtime_fingerprint_key
+        and str(row.get("sequence_case_policy") or "") == DNA_SEQUENCE_CASE_POLICY
+    )
 
 
 def plan_sequence_view_feature_inventory_completion(
@@ -239,6 +293,7 @@ def plan_sequence_view_feature_inventory_completion(
     job_id: str,
     bundle_id: str | None = None,
     infer_command: str | None = None,
+    runtime_fingerprint: dict[str, object] | None = None,
 ) -> FeatureCompletionPlan:
     """Plan completion from sequence-view and alias inventories only.
 
@@ -250,6 +305,8 @@ def plan_sequence_view_feature_inventory_completion(
     """
 
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
+    expected_runtime_fingerprint = runtime_fingerprint or build_runtime_fingerprint(model_name=model_id)
+    expected_runtime_fingerprint_key = compute_runtime_fingerprint_key(expected_runtime_fingerprint)
     vector_representations = _vector_representation_specs(bundle=bundle, selector=selector.intermediate_selector)
     scalar_kinds = _scalar_kind_specs(bundle=bundle)
 
@@ -353,7 +410,15 @@ def plan_sequence_view_feature_inventory_completion(
             if identity not in expected_vectors:
                 continue
             key = str(row.get("feature_vector_key") or "")
-            _apply_payload_state(state_by_slot, slot=identity, has_payload=key in payload_keys)
+            _apply_payload_state(
+                state_by_slot,
+                slot=identity,
+                has_payload=key in payload_keys,
+                has_current_runtime_contract=_alias_row_has_current_runtime_contract(
+                    row,
+                    expected_runtime_fingerprint_key=expected_runtime_fingerprint_key,
+                ),
+            )
         reusable_vectors += sum(1 for state in state_by_slot.values() if state == "reusable")
         stale_vectors += sum(1 for state in state_by_slot.values() if state == "stale")
 
@@ -379,7 +444,15 @@ def plan_sequence_view_feature_inventory_completion(
             if identity not in expected_scalars:
                 continue
             key = str(row.get("feature_scalar_key") or "")
-            _apply_payload_state(state_by_slot, slot=identity, has_payload=key in payload_keys)
+            _apply_payload_state(
+                state_by_slot,
+                slot=identity,
+                has_payload=key in payload_keys,
+                has_current_runtime_contract=_alias_row_has_current_runtime_contract(
+                    row,
+                    expected_runtime_fingerprint_key=expected_runtime_fingerprint_key,
+                ),
+            )
         reusable_scalars += sum(1 for state in state_by_slot.values() if state == "reusable")
         stale_scalars += sum(1 for state in state_by_slot.values() if state == "stale")
 
@@ -417,6 +490,13 @@ def plan_sequence_view_feature_inventory_completion(
         by_pooling_operation=dict(sorted(pooling_counts.items())),
         missing_product_selectors=missing_product_selectors,
         commands=commands,
+        shard_plan=_build_shard_plan(
+            bundle_id=bundle_id or job_id,
+            required_views=required_views,
+            pending_vector_keys=missing_vectors + stale_vectors,
+            pending_scalar_keys=missing_scalars + stale_scalars,
+            runtime_fingerprint_key=expected_runtime_fingerprint_key,
+        ),
     )
 
 
@@ -471,7 +551,10 @@ def plan_sequence_view_feature_completion(
     job_id: str,
     bundle_id: str | None = None,
     infer_command: str | None = None,
+    runtime_fingerprint: dict[str, object] | None = None,
 ) -> FeatureCompletionPlan:
+    resolved_runtime_fingerprint = runtime_fingerprint or build_runtime_fingerprint(model_name=model_id)
+    runtime_fingerprint_key = compute_runtime_fingerprint_key(resolved_runtime_fingerprint)
     load_result = load_sequence_view_input_records_with_status(bundle=bundle)
     records = load_result.records
     missing_product_selectors = [item.as_dict() for item in load_result.missing_products]
@@ -481,6 +564,7 @@ def plan_sequence_view_feature_completion(
         bundle=bundle,
         model_id=model_id,
         include_feature_request_digest=False,
+        runtime_fingerprint=resolved_runtime_fingerprint,
     )
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
     specs = _sequence_view_feature_vector_specs(
@@ -554,6 +638,13 @@ def plan_sequence_view_feature_completion(
         by_pooling_operation=dict(sorted(pooling_counts.items())),
         missing_product_selectors=missing_product_selectors,
         commands=commands,
+        shard_plan=_build_shard_plan(
+            bundle_id=bundle_id or job_id,
+            required_views=len(contexts),
+            pending_vector_keys=missing,
+            pending_scalar_keys=missing_scalars,
+            runtime_fingerprint_key=runtime_fingerprint_key,
+        ),
     )
 
 

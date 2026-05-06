@@ -7,6 +7,15 @@ Use this page when you need a deterministic SCC GPU environment build for infer.
 
 For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/install.md).
 
+### DNA input contract
+
+Before running Evo2 lanes, verify that every persisted biological DNA source
+product intended for model input is uppercase A/C/G/T. Evo2 tokenizes uppercase
+and lowercase bases as different symbols. Infer canonicalizes incoming DNA
+strings to uppercase before adapter calls, but sidecars generated before this
+contract from lowercase or mixed-case source records can contain collapsed
+geometry and invalid rank diagnostics. Regenerate those sidecars.
+
 ### Assumptions
 
 - Linux `x86_64` host with CUDA modules available.

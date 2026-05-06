@@ -28,6 +28,7 @@ from dnadesign.infer.src.features.aliases import (
     FEATURE_ALIAS_RELATIVE_PATH,
     FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
     FEATURE_SCALAR_RELATIVE_PATH,
+    FEATURE_VECTOR_RELATIVE_PATH,
 )
 from dnadesign.infer.src.features.context import resolve_sequence_contexts
 from dnadesign.infer.src.features.execution import (
@@ -41,6 +42,7 @@ from dnadesign.infer.src.features.execution import (
     execute_feature_bundle,
     feature_metadata_output_ids,
 )
+from dnadesign.infer.src.features.shard_ledger import SHARD_STATUS_COMMITTED, load_shard_ledger
 from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 
@@ -222,6 +224,8 @@ def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(mo
             "metadata__provider_name",
             "metadata__provider_version",
             "metadata__resolved_length",
+            "metadata__runtime_fingerprint_key",
+            "metadata__sequence_case_policy",
             "metadata__sequence_id",
             "metadata__template_id",
             "metadata__timestamp",
@@ -243,6 +247,8 @@ def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(mo
     assert out["metadata__pooling_modes"] == [["seq_mean"]]
     assert out["metadata__intermediate_selector"] == ["block26_mlp_out"]
     assert out["metadata__forward_pass_key"][0]
+    assert out["metadata__runtime_fingerprint_key"][0]
+    assert out["metadata__sequence_case_policy"] == ["upper_acgt"]
     assert out["metadata__feature_vector_key"][0]
 
 
@@ -1032,6 +1038,83 @@ def test_run_extract_job_feature_bundle_sequence_views_emit_sparse_progress_even
     assert progress_events[0]["args"]["required_vector_keys"] == 4
     assert progress_events[0]["args"]["required_scalar_keys"] == 0
     assert complete_events[-1]["args"]["contexts_completed"] == 2
+
+
+def test_run_extract_job_feature_bundle_sequence_views_commits_checkpoint_shards_during_execution(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer shard commit test")
+    sequences = ["ACGT" * 15, "TGCA" * 15, "GATT" * 15]
+    add_result = dataset.add_sequences(sequences, bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=sequence_id,
+                view_name=f"view_{index}",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            )
+            for index, sequence_id in enumerate(add_result.ids)
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna", batch_size=1)
+    job = JobConfig(
+        id="reference_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "analysis_window"},
+                    "pooling": {"operation": "core60_mean"},
+                },
+            ],
+        },
+        io={"checkpoint": {"enabled": True, "every_n": 1}},
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    events = [json.loads(line) for line in dataset.events_path.read_text(encoding="utf-8").splitlines()]
+    actions = [event["action"] for event in events]
+    shard_commit_events = [event for event in events if event["action"] == "infer_feature_bundle_shard_commit"]
+    complete_events = [event for event in events if event["action"] == "infer_feature_bundle_complete"]
+    assert len(shard_commit_events) == 3
+    assert actions.index("infer_feature_bundle_shard_commit") < actions.index("infer_feature_bundle_complete")
+    assert complete_events[-1]["args"]["contexts_completed"] == 3
+    assert {event["args"]["contexts_committed"] for event in shard_commit_events} == {1}
+    assert {event["args"]["committed_vector_keys"] for event in shard_commit_events} == {2}
+    assert {event["args"]["committed_scalar_keys"] for event in shard_commit_events} == {2}
+
+    ledger = load_shard_ledger(dataset.dir / "_derived/infer/checkpoints/reference_view_bundle/ledger.json")
+    assert ledger.shard_count == 3
+    assert {entry.status for entry in ledger.shards} == {SHARD_STATUS_COMMITTED}
+    assert [entry.committed_views for entry in ledger.shards] == [1, 1, 1]
+    assert [entry.expected_vector_keys for entry in ledger.shards] == [2, 2, 2]
+    assert [entry.expected_scalar_keys for entry in ledger.shards] == [2, 2, 2]
+    assert [entry.committed_vector_keys for entry in ledger.shards] == [2, 2, 2]
+    assert [entry.committed_scalar_keys for entry in ledger.shards] == [2, 2, 2]
+    assert (dataset.dir / FEATURE_VECTOR_RELATIVE_PATH).exists()
+    assert (dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).exists()
 
 
 def test_run_extract_job_feature_bundle_sequence_view_resume_skips_completed_vector_families(

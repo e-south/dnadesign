@@ -115,6 +115,8 @@ Structured bundle metadata is persisted as additional infer out ids such as:
 - `metadata__context_id`
 - `metadata__template_id`
 - `metadata__intermediate_selector`
+- `metadata__runtime_fingerprint_key`
+- `metadata__sequence_case_policy`
 - `metadata__feature_request_digest`
 
 ### Resume and digest behavior

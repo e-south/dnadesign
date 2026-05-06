@@ -578,7 +578,6 @@ def test_run_extract_job_usr_write_back_does_not_duplicate_final_call(monkeypatc
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "dnadesign.infer.src.engine._get_adapter",
         lambda _model: SimpleNamespace(log_likelihood=lambda chunk, **_kwargs: [float(i) for i, _ in enumerate(chunk)]),
@@ -763,8 +762,6 @@ def test_run_extract_job_usr_resume_skips_completed_rows_from_overlay(tmp_path: 
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
-
     adapter_calls = {"count": 0}
 
     class _Adapter:
@@ -834,8 +831,6 @@ def test_run_extract_job_usr_resume_reads_completed_rows_from_overlay_parts(tmp_
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
-
     adapter_calls = {"count": 0}
 
     class _Adapter:
@@ -888,7 +883,6 @@ def test_run_extract_job_usr_resume_does_not_load_adapter_when_all_rows_are_comp
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
 
     class _Adapter:
         @staticmethod
@@ -945,8 +939,6 @@ def test_run_extract_job_usr_resume_recovers_after_interrupted_partial_write(
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
-
     interrupted_calls = {"count": 0}
 
     class _InterruptingAdapter:
@@ -1050,8 +1042,6 @@ def test_run_extract_job_usr_subset_outputs_backfill_only_missing_target_columns
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
-
     observed: dict[str, list[list[str]]] = {"sum": [], "mean": [], "logits": []}
 
     class _Adapter:
@@ -1192,7 +1182,6 @@ def test_run_extract_job_usr_subset_overwrite_preserves_unrelated_infer_columns(
         "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
         lambda **_kwargs: (seqs, ids, ds),
     )
-    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
 
     class _Adapter:
         @staticmethod
