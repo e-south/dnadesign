@@ -40,6 +40,8 @@ _ALIAS_SCHEMA = pa.schema(
         pa.field("orientation", pa.string()),
         pa.field("source_dataset_id", pa.string()),
         pa.field("feature_request_digest", pa.string()),
+        pa.field("runtime_fingerprint_key", pa.string()),
+        pa.field("sequence_case_policy", pa.string()),
         pa.field("created_at", pa.string()),
     ]
 )

@@ -58,7 +58,13 @@ def read_alias_table(
     if not path.is_file():
         table = infer_sidecar_common.empty_table(contract.alias_schema)
     else:
-        table = pq.read_table(path).cast(contract.alias_schema)
+        try:
+            table = pq.read_table(path).cast(contract.alias_schema)
+        except (pa.ArrowInvalid, pa.ArrowTypeError, ValueError) as exc:
+            raise SourceResolutionError(
+                f"{contract.source_label} alias table in {dataset} does not match the current Infer sidecar "
+                "schema; regenerate canonical sidecars with runtime_fingerprint_key and sequence_case_policy."
+            ) from exc
     return infer_sidecar_common.apply_where(table, where, source_label=contract.source_label)
 
 

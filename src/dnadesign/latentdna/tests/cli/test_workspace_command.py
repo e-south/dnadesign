@@ -30,6 +30,7 @@ from dnadesign.infer.src.features.aliases import (
     persist_feature_scalar_rows,
     persist_feature_vector_rows,
 )
+from dnadesign.infer.src.features.cache_keys import DNA_SEQUENCE_CASE_POLICY
 from dnadesign.latentdna.src.cli import app
 from dnadesign.usr import (
     Dataset,
@@ -42,6 +43,13 @@ from dnadesign.usr import (
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 
 _RUNNER = CliRunner()
+
+
+def _runtime_contract_fields() -> dict[str, str]:
+    return {
+        "runtime_fingerprint_key": "runtime_fingerprint_fixture",
+        "sequence_case_policy": DNA_SEQUENCE_CASE_POLICY,
+    }
 
 
 def _build_overlay_usr_sources(tmp_path: Path) -> Path:
@@ -152,6 +160,7 @@ def _build_infer_feature_sidecar_usr_source(tmp_path: Path) -> tuple[Path, str]:
                 "orientation": "forward",
                 "source_dataset_id": dataset.name,
                 "feature_request_digest": "digest_fixture",
+                **_runtime_contract_fields(),
                 "created_at": created_at,
             }
         ]
@@ -184,6 +193,7 @@ def _build_infer_feature_sidecar_usr_source(tmp_path: Path) -> tuple[Path, str]:
                 "orientation": "forward",
                 "source_dataset_id": dataset.name,
                 "feature_request_digest": "digest_fixture",
+                **_runtime_contract_fields(),
                 "created_at": created_at,
             }
         ]

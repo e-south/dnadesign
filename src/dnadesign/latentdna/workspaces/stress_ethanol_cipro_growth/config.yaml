@@ -1581,6 +1581,7 @@ notebooks:
       - 1 kb anchor mean
       - RC 1 kb sequence mean
       - RC 1 kb anchor mean
+    show_missing_projection_placeholders: true
     preferred_hues:
       - sig35_variant
       - spacer_length

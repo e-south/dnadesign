@@ -19,6 +19,7 @@ from dnadesign.infer.src.features.aliases import (
     persist_feature_scalar_rows,
     persist_feature_vector_rows,
 )
+from dnadesign.infer.src.features.cache_keys import DNA_SEQUENCE_CASE_POLICY
 from dnadesign.latentdna.src.contracts.errors import SourceResolutionError
 from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.sources import (
@@ -36,6 +37,13 @@ from dnadesign.usr import (
     write_sequence_views,
     write_view_semantics,
 )
+
+
+def _runtime_contract_fields() -> dict[str, str]:
+    return {
+        "runtime_fingerprint_key": "runtime_fingerprint_fixture",
+        "sequence_case_policy": DNA_SEQUENCE_CASE_POLICY,
+    }
 
 
 def _planned_dataset(tmp_path: Path) -> tuple[Path, Dataset, str]:
@@ -150,6 +158,7 @@ def _standard_metadata_sidecar_dataset(tmp_path: Path) -> tuple[Path, Dataset]:
                 "orientation": "forward",
                 "source_dataset_id": dataset.name,
                 "feature_request_digest": "digest_j23105_core60",
+                **_runtime_contract_fields(),
                 "created_at": created_at,
             }
         ]
@@ -182,6 +191,7 @@ def _standard_metadata_sidecar_dataset(tmp_path: Path) -> tuple[Path, Dataset]:
                 "orientation": "forward",
                 "source_dataset_id": dataset.name,
                 "feature_request_digest": "digest_j23105_core60",
+                **_runtime_contract_fields(),
                 "created_at": created_at,
             }
         ]
@@ -295,9 +305,11 @@ def test_alias_rows_without_feature_vectors_fail_fast(tmp_path: Path) -> None:
                     "orientation": "forward",
                     "source_dataset_id": dataset.name,
                     "feature_request_digest": "digest",
+                    **_runtime_contract_fields(),
                     "created_at": "2026-04-28T00:00:00+00:00",
                 }
-            ]
+            ],
+            schema=infer_feature_sidecar_source._ALIAS_SCHEMA,
         ),
         derived_dir / "feature_aliases.parquet",
     )
