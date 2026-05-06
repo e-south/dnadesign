@@ -283,7 +283,7 @@ def _canonical_usr_sequence(record: PromoterRecord) -> str:
     sequence = str(record.sequence or "").upper().replace("U", "T")
     if not sequence or set(sequence) - _STRICT_DNA:
         raise SchemaError(f"RegulonDB promoter {record.promoter_id!r} has invalid strict DNA sequence.")
-    return sequence.lower()
+    return sequence
 
 
 def _sha256_text(value: str) -> str:

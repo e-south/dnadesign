@@ -91,7 +91,7 @@ def test_build_import_plan_collapses_duplicate_sequences_and_keeps_sig35_out(tmp
 
     plan = native.build_import_plan(export_dir=export_dir, usr_root=usr_root)
 
-    expected_sequence = "aatataatggttgaca"
+    expected_sequence = "AATATAATGGTTGACA"
     assert len(plan.base_rows) == 1
     assert plan.base_rows[0]["id"] == compute_id("dna", expected_sequence)
     assert plan.base_rows[0]["bio_type"] == "dna"
@@ -107,6 +107,21 @@ def test_build_import_plan_collapses_duplicate_sequences_and_keeps_sig35_out(tmp
     assert overlay["regulondb__has_minus35_box"] is True
     assert overlay["regulondb__regulator_composition"] == "activator"
     assert len(plan.relation_rows["source_rows"]) == 2
+
+
+def test_build_import_plan_hard_uppercases_regulondb_model_input_sequences(tmp_path: Path) -> None:
+    export_dir = _write_export(
+        tmp_path,
+        [
+            _payload(promoter_id="PM0001", sequence="aaTATAATggTTGACA"),
+        ],
+    )
+    usr_root = _tmp_usr_root(tmp_path)
+
+    plan = native.build_import_plan(export_dir=export_dir, usr_root=usr_root)
+
+    assert plan.base_rows[0]["sequence"] == "AATATAATGGTTGACA"
+    assert plan.base_rows[0]["id"] == compute_id("dna", "AATATAATGGTTGACA")
 
 
 def test_build_import_plan_deduplicates_aliases_but_preserves_source_rows(tmp_path: Path) -> None:

@@ -260,7 +260,7 @@ def test_plan_strips_primer_flanks_and_normalizes_reference_labels(tmp_path: Pat
 
     assert [row.label for row in plan.promoters] == ["soxSp", "spyp"]
     by_label = {row.label: row for row in plan.promoters}
-    assert by_label["spyp"].sequence == SPYP_INSERT.lower()
+    assert by_label["spyp"].sequence == SPYP_INSERT
     assert by_label["spyp"].source_interval_start_0 == 12
     assert by_label["spyp"].source_interval_end_0 == 72
     labels = [feature["label"] for feature in by_label["spyp"].seq_annot_features]
@@ -307,8 +307,8 @@ def test_write_promoter_reference_dataset_uses_projected_rows_and_modern_overlay
     records = pq.read_table(dataset.records_path).to_pylist()
     labels = {row["usr_label__primary"] for row in records}
     assert labels == {"J23105", "spyp"}
-    assert {row["sequence"] for row in records} == {SPYP_INSERT.lower(), J23105.lower()}
-    assert all(row["sequence"] != ("G" * 12 + SPYP_INSERT + "C" * 8).lower() for row in records)
+    assert {row["sequence"] for row in records} == {SPYP_INSERT, J23105}
+    assert all(row["sequence"] != "G" * 12 + SPYP_INSERT + "C" * 8 for row in records)
     assert {row["construct_seed__label"] for row in records} == {"J23105", "spyp"}
 
     seq_annot = pq.read_table(overlay_path(dataset.dir, "seq_annot")).to_pylist()
@@ -363,7 +363,7 @@ def test_synthetic_standards_refresh_j23105_and_write_strength_overlay(tmp_path:
     assert sorted(row.label for row in plan.promoters) == ["J23103", "J23105", "T7A1", "W9", "spyp"]
     assert "J23112" not in {row.label for row in plan.promoters}
     by_label = {row.label: row for row in plan.promoters}
-    assert by_label["J23105"].sequence == J23105.lower()
+    assert by_label["J23105"].sequence == J23105
     assert by_label["J23105"].standard_metadata is not None
     assert by_label["J23105"].standard_metadata.strength_value == "0.24"
     assert by_label["W9"].standard_metadata is not None
@@ -388,7 +388,7 @@ def test_synthetic_standards_refresh_j23105_and_write_strength_overlay(tmp_path:
 
     seq_annot = pq.read_table(overlay_path(dataset.dir, "seq_annot")).to_pylist()
     assert len(seq_annot) == 5
-    j23105_annot = next(row for row in seq_annot if row["id"] == compute_id("dna", J23105.lower()))
+    j23105_annot = next(row for row in seq_annot if row["id"] == compute_id("dna", J23105))
     j23105_labels = [feature["label"] for feature in j23105_annot["seq_annot__features"]]
     assert j23105_labels == ["J23105", "-35", "-10"]
 

@@ -8,6 +8,17 @@
 - USR root: `src/dnadesign/usr/datasets`
 - Lifecycle posture: inactive source-intake lane; local native USR and TSS-upstream core60 datasets are materialized, the standard local Evo2 7B Infer sidecars are complete for the native/full and derived core60 lanes, and the current checked-in phase is the LatentDNA native/core60 audit
 
+### Evo2 DNA case incident
+
+- On 2026-05-05, a cross-study GPU sentinel audit showed that Evo2 treats
+  lowercase and uppercase DNA as distinct tokenizer symbols. Lowercase native
+  RegulonDB promoter records therefore invalidate any rank, projection, or
+  nearest-neighbor diagnostics derived from those model inputs.
+- RegulonDB USR and Construct DNA model inputs are now canonicalized to
+  uppercase A/C/G/T before Evo2 adapter calls and feature-key construction.
+  Existing `_derived/infer` sidecars generated from lowercase records must be
+  regenerated, not reused.
+
 ### Current Datasets
 
 - Native promoter source: `usr_regulondb_native_promoters` (`local validated`, generated/untracked)

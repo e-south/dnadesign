@@ -9,6 +9,17 @@
 - Snapshot posture: current
 - Preflight posture: available; the remaining main 7B Infer batch is submitted with Notify watchers, and feature-completion advisories remain until those queued GPU jobs finish.
 
+### Evo2 DNA case incident
+
+- On 2026-05-05, a GPU sentinel audit showed that Evo2 treats lowercase and
+  uppercase DNA as distinct tokenizer symbols. Lowercase and mixed-case
+  promoter-reference and context inputs caused collapsed reference geometry and
+  invalid rank diagnostics.
+- Study DNA model inputs are now canonicalized to uppercase A/C/G/T before
+  Evo2 adapter calls and feature-key construction. Lowercase/mixed-case USR or
+  Construct products must still be refreshed to uppercase; old `_derived/infer`
+  sidecars from those inputs must not be reused.
+
 ### Current datasets
 
 - DenseGen anchor source: `densegen_prom_eth_cip_source` (`present`, shared source)

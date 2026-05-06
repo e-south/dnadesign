@@ -219,7 +219,7 @@ def _normalize_sequence(sequence: str) -> str:
     normalized = "".join(ch for ch in str(sequence).upper().replace("U", "T") if ch.isalpha())
     if not normalized or set(normalized) - _STRICT_DNA:
         raise SchemaError("Promoter reference sequences must be strict A/C/G/T DNA.")
-    return normalized.lower()
+    return normalized
 
 
 def _dedupe_aliases(values: Iterable[str | None], *, primary: str) -> tuple[str, ...]:
@@ -675,7 +675,7 @@ def _load_legacy_j23105(usr_root: Path, *, legacy_dataset: str) -> tuple[LegacyR
         if (
             label == J23105_LABEL
             or str(row.get("id") or "") == expected_id
-            or sequence == J23105_SEQUENCE.lower()
+            or sequence == J23105_SEQUENCE
             or any(alias == "Anderson_J23105" for alias in aliases)
         ):
             return (
@@ -809,7 +809,7 @@ def _base_rows(plan: PromoterReferencePlan, *, created_at: str) -> list[dict[str
             {
                 "id": promoter.id,
                 "bio_type": "dna",
-                "sequence": promoter.sequence.lower(),
+                "sequence": promoter.sequence,
                 "alphabet": "dna_4",
                 "source": promoter.base_source,
                 "created_at": created_at,
@@ -820,7 +820,7 @@ def _base_rows(plan: PromoterReferencePlan, *, created_at: str) -> list[dict[str
             {
                 "id": reference.id,
                 "bio_type": "dna",
-                "sequence": reference.sequence.lower(),
+                "sequence": reference.sequence,
                 "alphabet": "dna_4",
                 "source": f"legacy_usr:{reference.source_dataset}",
                 "created_at": created_at,

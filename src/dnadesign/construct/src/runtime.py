@@ -228,7 +228,7 @@ def _resolve_usr_root(base_dir: Path, value: str | None, *, label: str) -> Path:
 
 
 def _ensure_dna_text(text: str, *, label: str) -> str:
-    seq = str(text or "").strip()
+    seq = str(text or "").strip().upper()
     if not seq:
         raise ValidationError(f"{label} cannot be empty.")
     try:
@@ -244,7 +244,7 @@ def _alphabet_for_sequence(sequence: str) -> str:
 
 
 def _reverse_complement(sequence: str) -> str:
-    return reverse_complement(sequence)
+    return reverse_complement(sequence).upper()
 
 
 def _guard_replaced_sequence(part: PartConfig) -> str | None:
