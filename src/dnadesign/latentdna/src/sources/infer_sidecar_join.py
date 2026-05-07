@@ -290,6 +290,24 @@ def metadata_rows(
     return rows
 
 
+def _iter_metadata_only_batches(
+    *,
+    selected: list[str],
+    metadata: dict[str, list[dict[str, object]]],
+    output_schema: pa.Schema,
+    batch_size: int,
+):
+    batch_rows: list[dict[str, object]] = []
+    for rows in metadata.values():
+        for metadata_row in rows:
+            batch_rows.append({column: metadata_row.get(column) for column in selected})
+            if len(batch_rows) >= batch_size:
+                yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
+                batch_rows = []
+    if batch_rows:
+        yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
+
+
 def iter_batches(
     contract: InferSidecarJoinContract,
     root: str,
@@ -331,6 +349,16 @@ def iter_batches(
         field_types=schema_field_types(contract, root, dataset, workspace_dir=workspace_dir),
         value_field_types=contract.payload_value_field_types,
     )
+    needs_payload_scan = contract.payload_value_column in selected or contract.payload_created_at_column in selected
+    if not needs_payload_scan:
+        yield from _iter_metadata_only_batches(
+            selected=selected,
+            metadata=metadata,
+            output_schema=output_schema,
+            batch_size=batch_size,
+        )
+        return
+
     payload_table_path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
     wanted_keys = set(metadata)
     payload_columns = [contract.payload_key_column]

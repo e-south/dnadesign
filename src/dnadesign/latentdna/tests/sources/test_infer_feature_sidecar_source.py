@@ -636,6 +636,70 @@ def test_feature_sidecar_source_rejects_unknown_requested_columns_before_dataset
     assert scanned_records is False
 
 
+def test_feature_sidecar_metadata_only_reads_do_not_scan_vector_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    usr_root, dataset = _standard_metadata_sidecar_dataset(tmp_path)
+
+    real_parquet_file = infer_feature_sidecar_source.infer_sidecar_join.pq.ParquetFile
+
+    def fail_payload_scan(path, *args, **kwargs):
+        if Path(path).name == "feature_vectors.parquet":
+            raise AssertionError("metadata-only sidecar reads should not scan feature vector payload rows")
+        return real_parquet_file(path, *args, **kwargs)
+
+    monkeypatch.setattr(infer_feature_sidecar_source.infer_sidecar_join.pq, "ParquetFile", fail_payload_scan)
+
+    table = infer_feature_sidecar_source.read_table(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_operation": "core60_mean"},
+        columns=["alias_id", "pooling_start_0", "pooling_end_0", "product_kind"],
+    )
+
+    assert table.to_pylist() == [
+        {
+            "alias_id": table["alias_id"].to_pylist()[0],
+            "pooling_start_0": 0,
+            "pooling_end_0": 60,
+            "product_kind": "analysis_window",
+        }
+    ]
+
+
+def test_feature_scalar_sidecar_metadata_only_reads_do_not_scan_scalar_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    usr_root, dataset = _standard_metadata_sidecar_dataset(tmp_path)
+
+    real_parquet_file = infer_feature_scalar_sidecar_source.infer_sidecar_join.pq.ParquetFile
+
+    def fail_payload_scan(path, *args, **kwargs):
+        if Path(path).name == "feature_scalars.parquet":
+            raise AssertionError("metadata-only sidecar reads should not scan feature scalar payload rows")
+        return real_parquet_file(path, *args, **kwargs)
+
+    monkeypatch.setattr(infer_feature_scalar_sidecar_source.infer_sidecar_join.pq, "ParquetFile", fail_payload_scan)
+
+    table = infer_feature_scalar_sidecar_source.read_table(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"scalar_kind": "log_likelihood__mean_per_token"},
+        columns=["alias_id", "scalar_kind", "orientation", "product_kind"],
+    )
+
+    assert table.to_pylist() == [
+        {
+            "alias_id": table["alias_id"].to_pylist()[0],
+            "scalar_kind": "log_likelihood__mean_per_token",
+            "orientation": "forward",
+            "product_kind": "analysis_window",
+        }
+    ]
+
+
 def test_feature_sidecar_source_carries_reference_strength_metadata_into_materialized_rows(
     tmp_path: Path,
 ) -> None:
