@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-04-30
+  last_verified: 2026-05-07
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
   densegen:
@@ -62,7 +62,7 @@ study_pipeline:
       sequence_views_main_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml
       sequence_views_reference_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference.evo2_7b.yaml
     batch_readiness:
-      last_checked: 2026-04-30
+      last_checked: 2026-05-07
       runtime_target: BU SCC SGE Blackwell lane
       notify_secret_contract:
         env_file_example: $HOME/.config/dnadesign/notify/env/study_stress_ethanol_cipro.env
@@ -91,20 +91,30 @@ study_pipeline:
           - notify profile smoke passed in dry-run mode
       live_submit_shape:
         per_lane: one notify watcher qsub plus one infer GPU qsub
-        remaining_main_lane_fanout: 6 qsub commands
+        remaining_main_lane_fanout: 0 qsub commands
+        complete_main_lanes: 3
         complete_reference_lanes: 3
         advisor: prefer array_or_dependency_chain for multi-lane fanout after verify gates
       latest_fill_infer_snapshot:
-        checked: 2026-04-30
-        runnable_lanes: 3
-        skip_complete_lanes: 3
+        checked: 2026-05-07
+        lanes_total: 9
+        runnable_lanes: 0
+        blocked_lanes: 0
+        skip_complete_lanes: 6
         skip_unsupported_lanes: 3
         missing_products: 0
-        missing_vectors: 1258462
-        missing_scalars: 943674
+        missing_vectors: 0
+        missing_scalars: 0
+        stale_vectors: 0
+        stale_scalars: 0
+        reusable_vectors: 1573270
+        reusable_scalars: 943962
       latest_live_submit:
+        status: historical_pre_completion_submit
+        current: false
         submitted_at: 2026-04-30T15:21:07-04:00
         command: uv run ops runbook fill-infer --study-dir docs/studies/stress_ethanol_cipro_growth --repo-root . --submit --command-timeout-seconds 900
+        note: This records the SCC submit that produced the current sidecars; use latest_completion_snapshot for current missing/stale counts.
         submit_summary:
           aggregate_submit_commands: 6
           runnable_lanes: 3
@@ -142,6 +152,22 @@ study_pipeline:
             gpu_job_id: "4697089"
             audit_json: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/audit/study_stress_ethanol_cipro_infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.fill-infer.json
             config: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
+      latest_completion_snapshot:
+        checked: 2026-05-07T10:38:00-04:00
+        source: local post-pull status after BU SCC `cluster` sync
+        outcome: supported Evo2 7B sequence-view sidecars complete
+        fill_infer_no_submit:
+          ok: true
+          lanes_total: 9
+          runnable_lanes: 0
+          blocked_lanes: 0
+          skip_complete_lanes: 6
+          skip_unsupported_lanes: 3
+          missing_products: 0
+          missing_vectors: 0
+          missing_scalars: 0
+          stale_vectors: 0
+          stale_scalars: 0
     quota_deduplication:
       last_checked: 2026-04-30
       verdict: expected_semantic_overlap_no_fidelity_blocker
@@ -188,29 +214,18 @@ study_pipeline:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
     latest_materialization:
-      checked: 2026-05-02
-      deep_validation: ok
-      regenerated_deliverables:
+      checked: 2026-05-07
+      workspace_snapshot_state: attention
+      deep_validation: pending_after_scc_infer_sync
+      ok_decision_deliverables: []
+      pending_decision_deliverables:
         - dataset_overview
-        - appendix_geometry_review
-        - appendix_umap_gallery
-      regenerated_recipe_outputs:
-        - dataset_overview
-        - representation_health_summary
         - design_structure_summary
-        - balanced_design_family_margin_gallery
         - sigma35_ordinal_audit
-        - sigma35_margin_ladder_gallery
-        - sigma35_stress_margin_gallery
-        - sigma35_centroid_distance_gallery
         - context_robustness_summary
-        - context_pair_summary
         - candidate_decision_frontier
-        - design_centroid_margin_gallery
-        - reference_alignment_summary
-        - representation_scree_diagnostic
-      still_missing:
-        - appendix_umap_gallery
+      browser_default_geometry_count: 10
+      note: The workspace sees the expanded 7B sidecar-backed geometry inventory, but deliverables must be regenerated from the current canonical sidecars before LatentDNA status is ok.
       reference_strength_probe:
         status: exploratory_generated
         root: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_strength_probe
