@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -13,10 +14,15 @@ import numpy as np
 import pyarrow as pa
 
 from ..contracts.errors import ContractViolationError, MemoryPreflightError, MissingArtifactError
-from ..contracts.workspace import ReducedViewExportBlockConfig, TableColumnsExportBlockConfig
+from ..contracts.workspace import (
+    InferFeatureSidecarSourceConfig,
+    ReducedViewExportBlockConfig,
+    TableColumnsExportBlockConfig,
+)
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_row_count
 from ..neighbors.backends.approximate import approximate_backend_available
+from ..sources import infer_feature_sidecar_source
 from ..sources.resolver import (
     inspect_source_schema,
     iter_records_batches,
@@ -572,7 +578,69 @@ def _artifact_matrix_metadata(path: Path) -> tuple[int, int, str, int]:
 
 
 def _source_vector_dims(resolved, *, vector_column: str) -> int:
+    if isinstance(resolved.source, InferFeatureSidecarSourceConfig):
+        payload_path = infer_feature_sidecar_source.feature_vectors_path(
+            resolved.source.root,
+            resolved.source.dataset,
+            workspace_dir=resolved.workspace_dir,
+        )
+        stat = payload_path.stat() if payload_path.is_file() else None
+        where = resolved.source.where or {}
+        dimension_where = tuple(
+            sorted(
+                (str(key), str(value))
+                for key, value in where.items()
+                if key in {"layer_name", "model_name", "model_revision", "representation_kind"}
+            )
+        )
+        return _cached_infer_sidecar_vector_dims(
+            resolved.workspace_dir.as_posix(),
+            resolved.source.root,
+            resolved.source.dataset,
+            vector_column,
+            dimension_where,
+            0 if stat is None else stat.st_mtime_ns,
+            0 if stat is None else stat.st_size,
+        )
     for batch in iter_records_batches(resolved, columns=[vector_column], batch_size=1):
+        column = batch.column(vector_column)
+        if pa.types.is_fixed_size_list(column.type):
+            return int(column.type.list_size)
+        for scalar in column:
+            value = scalar.as_py() if hasattr(scalar, "as_py") else scalar
+            if value is None:
+                raise MemoryPreflightError(
+                    f"source vector column {vector_column!r} contains null rows and cannot be materialized"
+                )
+            if hasattr(value, "tolist"):
+                value = value.tolist()
+            if not isinstance(value, list | tuple):
+                raise MemoryPreflightError(
+                    f"source vector column {vector_column!r} must contain list-like rows for materialization"
+                )
+            return len(value)
+    raise MemoryPreflightError(f"source vector column {vector_column!r} produced no rows for memory preflight")
+
+
+@lru_cache(maxsize=64)
+def _cached_infer_sidecar_vector_dims(
+    workspace_dir: str,
+    root: str,
+    dataset: str,
+    vector_column: str,
+    dimension_where: tuple[tuple[str, str], ...],
+    payload_mtime_ns: int,
+    payload_size: int,
+) -> int:
+    del payload_mtime_ns, payload_size
+    for batch in infer_feature_sidecar_source.iter_batches(
+        root,
+        dataset,
+        workspace_dir=Path(workspace_dir),
+        where=dict(dimension_where),
+        columns=[vector_column],
+        batch_size=1,
+    ):
         column = batch.column(vector_column)
         if pa.types.is_fixed_size_list(column.type):
             return int(column.type.list_size)

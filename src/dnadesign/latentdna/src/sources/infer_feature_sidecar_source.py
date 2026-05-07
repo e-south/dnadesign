@@ -80,6 +80,10 @@ def feature_aliases_path(root: str, dataset: str, *, workspace_dir: Path) -> Pat
     return infer_sidecar_join.alias_path(_CONTRACT, root, dataset, workspace_dir=workspace_dir)
 
 
+def feature_vectors_path(root: str, dataset: str, *, workspace_dir: Path) -> Path:
+    return infer_sidecar_join.payload_path(_CONTRACT, root, dataset, workspace_dir=workspace_dir)
+
+
 def _read_alias_table(
     root: str,
     dataset: str,
@@ -120,6 +124,24 @@ def iter_batches(
         workspace_dir=workspace_dir,
         where=where,
         columns=columns,
+        batch_size=batch_size,
+    )
+
+
+def iter_grouped_batches(
+    root: str,
+    dataset: str,
+    *,
+    workspace_dir: Path,
+    requests: list[infer_sidecar_join.SidecarBatchRequest],
+    batch_size: int = _BATCH_SIZE,
+):
+    yield from infer_sidecar_join.iter_grouped_batches(
+        _CONTRACT,
+        root,
+        dataset,
+        workspace_dir=workspace_dir,
+        requests=requests,
         batch_size=batch_size,
     )
 

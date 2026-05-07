@@ -4,6 +4,8 @@ View materialization helpers for latentdna.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -11,10 +13,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import ContractViolationError
-from ..contracts.workspace import MetadataLookupDerivationConfig
+from ..contracts.workspace import InferFeatureSidecarSourceConfig, MetadataLookupDerivationConfig
 from ..io.matrix_io import read_matrix, write_matrix
 from ..io.parquet_io import read_table, write_table
 from ..metadata.derivations import derive_metadata_value
+from ..sources import infer_feature_sidecar_source, infer_sidecar_join
 from ..sources.resolver import (
     ResolvedSource,
     inspect_source_schema,
@@ -28,6 +31,43 @@ from ..workspaces.loader import WorkspaceContext
 from .row_contracts import source_backed_view_row_contract
 
 _MATERIALIZE_BATCH_SIZE = 2048
+
+
+@dataclass(frozen=True, slots=True)
+class _TabularVectorMaterializationPlan:
+    view_id: str
+    source_id: str
+    source: object
+    vector_column: str
+    artifact_dir: Path
+    row_count: int
+    row_contract: object
+    processing_row_columns: list[str]
+    output_row_columns: list[str]
+    derived_row_columns: list[str]
+
+
+@dataclass(slots=True)
+class _TabularVectorMaterializationState:
+    seen_record_keys: set[tuple[object, ...]]
+    seen_subject_keys: set[tuple[object, ...]]
+    row_writer: pq.ParquetWriter | None
+    matrix: np.memmap | None
+    dims: int | None
+    write_offset: int
+    lookup_cache: dict[tuple[str, str, str, str], tuple[dict[object, object], pa.DataType]]
+
+
+def _new_tabular_vector_state() -> _TabularVectorMaterializationState:
+    return _TabularVectorMaterializationState(
+        seen_record_keys=set(),
+        seen_subject_keys=set(),
+        row_writer=None,
+        matrix=None,
+        dims=None,
+        write_offset=0,
+        lookup_cache={},
+    )
 
 
 def _reraise_missing_vector_column(
@@ -323,115 +363,243 @@ def _materialize_tabular_vector_artifact(
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     row_count = int(source_schema["row_count"])
-    rows_path = artifact_dir / "rows.parquet"
-    matrix_path = artifact_dir / "matrix.npy"
-    seen_record_keys: set[tuple[object, ...]] = set()
-    seen_subject_keys: set[tuple[object, ...]] = set()
-    row_writer: pq.ParquetWriter | None = None
-    matrix: np.memmap | None = None
-    dims: int | None = None
-    write_offset = 0
-    lookup_cache: dict[tuple[str, str, str, str], tuple[dict[object, object], pa.DataType]] = {}
-
+    plan = _TabularVectorMaterializationPlan(
+        view_id=view_id,
+        source_id=view.source,
+        source=source,
+        vector_column=vector_column,
+        artifact_dir=artifact_dir,
+        row_count=row_count,
+        row_contract=row_contract,
+        processing_row_columns=processing_row_columns,
+        output_row_columns=output_row_columns,
+        derived_row_columns=derived_row_columns,
+    )
     try:
-        for batch in iter_records_batches(resolved, columns=columns, batch_size=_MATERIALIZE_BATCH_SIZE):
-            _assert_unique_keys(
-                seen_record_keys,
-                batch,
-                key_names=[source.record_key],
-                label=f"source {view.source} record_key",
-            )
-            if source.context_key:
-                _assert_unique_keys(
-                    seen_subject_keys,
-                    batch,
-                    key_names=[source.subject_key, source.context_key],
-                    label=f"source {view.source} (subject_key, context_key)",
-                )
-            else:
-                _assert_unique_keys(
-                    seen_subject_keys,
-                    batch,
-                    key_names=[source.subject_key],
-                    label=f"source {view.source} subject_key",
-                )
-
-            matrix_chunk = _matrix_from_vector_column(
-                batch.column(vector_column),
-                dtype=context.analysis_dtype,
-                label=view_id,
-            )
-            if dims is None:
-                dims = int(matrix_chunk.shape[1])
-                matrix = np.lib.format.open_memmap(
-                    matrix_path,
-                    mode="w+",
-                    dtype=np.dtype(context.analysis_dtype),
-                    shape=(row_count, dims),
-                )
-            elif matrix_chunk.shape[1] != dims:
-                raise ContractViolationError(
-                    "view "
-                    f"{view_id} vector column changed dimensionality within one source: "
-                    f"{dims} vs {matrix_chunk.shape[1]}"
-                )
-
-            next_offset = write_offset + matrix_chunk.shape[0]
-            if matrix is None or next_offset > row_count:
-                raise ContractViolationError(
-                    f"view {view_id} materialized more rows than expected: {next_offset} > {row_count}"
-                )
-            matrix[write_offset:next_offset] = matrix_chunk
-
-            processing_rows_batch = batch.select(processing_row_columns)
-            row_dicts = processing_rows_batch.to_pylist()
-            rows_batch = batch.select(output_row_columns)
-            for derived_column in [column for column in derived_row_columns if column not in rows_batch.column_names]:
-                derivation = (context.config.metadata.derivations or {}).get(derived_column)
-                if isinstance(derivation, MetadataLookupDerivationConfig):
-                    rows_batch = rows_batch.append_column(
-                        derived_column,
-                        _lookup_metadata_array(
-                            context,
-                            row_dicts,
-                            column_name=derived_column,
-                            derivation=derivation,
-                            lookup_cache=lookup_cache,
-                        ),
-                    )
-                    continue
-                rows_batch = rows_batch.append_column(
-                    derived_column,
-                    _derived_metadata_array(context, row_dicts, column_name=derived_column),
-                )
-            if row_writer is None:
-                row_writer = pq.ParquetWriter(rows_path, rows_batch.schema)
-            row_writer.write_batch(rows_batch)
-            write_offset = next_offset
+        return _write_tabular_vector_artifact_from_batches(
+            context,
+            plan=plan,
+            batches=iter_records_batches(resolved, columns=columns, batch_size=_MATERIALIZE_BATCH_SIZE),
+        )
     except Exception as exc:
         _reraise_missing_vector_column(exc, view_id=view_id, source_id=view.source, vector_column=vector_column)
         raise
-    finally:
-        if row_writer is not None:
-            row_writer.close()
-        if matrix is not None:
-            matrix.flush()
-            del matrix
 
-    if dims is None:
-        raise ContractViolationError(f"view {view_id} source produced no rows")
-    if write_offset != row_count:
+
+def _write_tabular_vector_artifact_from_batches(
+    context: WorkspaceContext,
+    *,
+    plan: _TabularVectorMaterializationPlan,
+    batches: Iterable[pa.RecordBatch],
+) -> tuple[Path, int, int, str, list[str], list[str]]:
+    plan.artifact_dir.mkdir(parents=True, exist_ok=True)
+    state = _new_tabular_vector_state()
+    try:
+        for batch in batches:
+            _write_tabular_vector_batch(context, plan=plan, state=state, batch=batch)
+    finally:
+        _close_tabular_vector_state(state)
+
+    return _finalize_tabular_vector_result(plan, state)
+
+
+def _write_tabular_vector_batch(
+    context: WorkspaceContext,
+    *,
+    plan: _TabularVectorMaterializationPlan,
+    state: _TabularVectorMaterializationState,
+    batch: pa.RecordBatch,
+) -> None:
+    source = plan.source
+    _assert_unique_keys(
+        state.seen_record_keys,
+        batch,
+        key_names=[source.record_key],
+        label=f"source {plan.source_id} record_key",
+    )
+    if source.context_key:
+        _assert_unique_keys(
+            state.seen_subject_keys,
+            batch,
+            key_names=[source.subject_key, source.context_key],
+            label=f"source {plan.source_id} (subject_key, context_key)",
+        )
+    else:
+        _assert_unique_keys(
+            state.seen_subject_keys,
+            batch,
+            key_names=[source.subject_key],
+            label=f"source {plan.source_id} subject_key",
+        )
+
+    matrix_chunk = _matrix_from_vector_column(
+        batch.column(plan.vector_column),
+        dtype=context.analysis_dtype,
+        label=plan.view_id,
+    )
+    if state.dims is None:
+        state.dims = int(matrix_chunk.shape[1])
+        state.matrix = np.lib.format.open_memmap(
+            plan.artifact_dir / "matrix.npy",
+            mode="w+",
+            dtype=np.dtype(context.analysis_dtype),
+            shape=(plan.row_count, state.dims),
+        )
+    elif matrix_chunk.shape[1] != state.dims:
         raise ContractViolationError(
-            f"view {view_id} materialized {write_offset} rows but source schema reported {row_count}"
+            "view "
+            f"{plan.view_id} vector column changed dimensionality within one source: "
+            f"{state.dims} vs {matrix_chunk.shape[1]}"
+        )
+
+    next_offset = state.write_offset + matrix_chunk.shape[0]
+    if state.matrix is None or next_offset > plan.row_count:
+        raise ContractViolationError(
+            f"view {plan.view_id} materialized more rows than expected: {next_offset} > {plan.row_count}"
+        )
+    state.matrix[state.write_offset : next_offset] = matrix_chunk
+
+    processing_rows_batch = batch.select(plan.processing_row_columns)
+    row_dicts = processing_rows_batch.to_pylist()
+    rows_batch = batch.select(plan.output_row_columns)
+    for derived_column in [column for column in plan.derived_row_columns if column not in rows_batch.column_names]:
+        derivation = (context.config.metadata.derivations or {}).get(derived_column)
+        if isinstance(derivation, MetadataLookupDerivationConfig):
+            rows_batch = rows_batch.append_column(
+                derived_column,
+                _lookup_metadata_array(
+                    context,
+                    row_dicts,
+                    column_name=derived_column,
+                    derivation=derivation,
+                    lookup_cache=state.lookup_cache,
+                ),
+            )
+            continue
+        rows_batch = rows_batch.append_column(
+            derived_column,
+            _derived_metadata_array(context, row_dicts, column_name=derived_column),
+        )
+    if state.row_writer is None:
+        state.row_writer = pq.ParquetWriter(plan.artifact_dir / "rows.parquet", rows_batch.schema)
+    state.row_writer.write_batch(rows_batch)
+    state.write_offset = next_offset
+
+
+def _close_tabular_vector_state(state: _TabularVectorMaterializationState) -> None:
+    if state.row_writer is not None:
+        state.row_writer.close()
+        state.row_writer = None
+    if state.matrix is not None:
+        state.matrix.flush()
+        del state.matrix
+        state.matrix = None
+
+
+def _finalize_tabular_vector_result(
+    plan: _TabularVectorMaterializationPlan,
+    state: _TabularVectorMaterializationState,
+) -> tuple[Path, int, int, str, list[str], list[str]]:
+    if state.dims is None:
+        raise ContractViolationError(f"view {plan.view_id} source produced no rows")
+    if state.write_offset != plan.row_count:
+        raise ContractViolationError(
+            f"view {plan.view_id} materialized {state.write_offset} rows but source schema reported {plan.row_count}"
         )
     return (
-        artifact_dir,
-        row_count,
-        dims,
-        source.record_key,
-        row_contract.materialized_row_columns,
-        processing_row_columns,
+        plan.artifact_dir,
+        plan.row_count,
+        state.dims,
+        plan.source.record_key,
+        plan.row_contract.materialized_row_columns,
+        plan.processing_row_columns,
     )
+
+
+def materialize_grouped_infer_sidecar_view_artifacts(
+    context: WorkspaceContext,
+    *,
+    view_ids: list[str],
+    artifact_dirs: dict[str, Path],
+) -> dict[str, tuple[Path, int, int, str, list[str], list[str]]]:
+    if not view_ids:
+        return {}
+    plans: dict[str, _TabularVectorMaterializationPlan] = {}
+    requests: list[infer_sidecar_join.SidecarBatchRequest] = []
+    root: str | None = None
+    dataset: str | None = None
+    for view_id in view_ids:
+        view = context.require_source_view(view_id)
+        source = context.require_source(view.source)
+        if not isinstance(source, InferFeatureSidecarSourceConfig):
+            raise ContractViolationError(f"view {view_id} source is not an Infer feature sidecar")
+        if view.vector.kind != "column":
+            raise ContractViolationError(f"view {view_id} vector must be a sidecar value column")
+        if root is None:
+            root = source.root
+            dataset = source.dataset
+        elif root != source.root or dataset != source.dataset:
+            raise ContractViolationError("grouped Infer sidecar materialization requires one root/dataset")
+        resolved = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
+        try:
+            source_schema = inspect_source_schema(resolved)
+        except Exception as exc:
+            _reraise_missing_vector_column(exc, view_id=view_id, source_id=view.source, vector_column=view.vector.name)
+            raise
+        available_columns = set(source_schema["columns"])
+        if view.vector.name not in available_columns:
+            raise ContractViolationError(
+                f"view {view_id} vector column is missing from source {view.source}: {view.vector.name}"
+            )
+        row_contract = source_backed_view_row_contract(
+            context,
+            source_id=view.source,
+            source=source,
+            available_columns=available_columns,
+        )
+        processing_row_columns = row_contract.processing_row_columns
+        output_row_columns = row_contract.output_row_columns
+        derived_row_columns = row_contract.derived_row_columns
+        columns = [*processing_row_columns, view.vector.name]
+        plans[view_id] = _TabularVectorMaterializationPlan(
+            view_id=view_id,
+            source_id=view.source,
+            source=source,
+            vector_column=view.vector.name,
+            artifact_dir=artifact_dirs[view_id],
+            row_count=int(source_schema["row_count"]),
+            row_contract=row_contract,
+            processing_row_columns=processing_row_columns,
+            output_row_columns=output_row_columns,
+            derived_row_columns=derived_row_columns,
+        )
+        requests.append(
+            infer_sidecar_join.SidecarBatchRequest(
+                request_id=view_id,
+                where=source.where,
+                columns=columns,
+            )
+        )
+    assert root is not None
+    assert dataset is not None
+
+    for plan in plans.values():
+        plan.artifact_dir.mkdir(parents=True, exist_ok=True)
+    states = {view_id: _new_tabular_vector_state() for view_id in view_ids}
+    try:
+        for grouped in infer_feature_sidecar_source.iter_grouped_batches(
+            root,
+            dataset,
+            workspace_dir=context.workspace_dir,
+            requests=requests,
+            batch_size=_MATERIALIZE_BATCH_SIZE,
+        ):
+            for view_id, batch in grouped.items():
+                _write_tabular_vector_batch(context, plan=plans[view_id], state=states[view_id], batch=batch)
+    finally:
+        for state in states.values():
+            _close_tabular_vector_state(state)
+    return {view_id: _finalize_tabular_vector_result(plans[view_id], states[view_id]) for view_id in view_ids}
 
 
 def materialize_view_artifact(
