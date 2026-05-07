@@ -177,6 +177,39 @@ def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
         assert plot.hue_options[-1].type == "ordinal"
 
 
+def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
+    requirements = {
+        (_live_workspace(), "appendix_umap_gallery"): ["scatter", "fixed coordinates"],
+        (_live_workspace(), "design_centroid_margin_gallery"): ["x-axis", "y-axis"],
+        (_regulondb_workspace(), "sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean"): [
+            "projection",
+            "scatter",
+        ],
+        (_regulondb_workspace(), "sigma_umap_intermediate_embedding_7b_core60_tss_upstream"): [
+            "projection",
+            "scatter",
+        ],
+    }
+
+    for (workspace, plot_id), phrases in requirements.items():
+        context = load_workspace_config(workspace)
+        semantics = resolve_plot_semantics(context, plot_id=plot_id)
+        visible_text = "\n".join(
+            [
+                semantics.encoding,
+                semantics.caption,
+                semantics.alt_text,
+                semantics.preprocessing_md,
+                semantics.math_md,
+                semantics.limitations_md,
+                semantics.failure_modes_md,
+            ]
+        ).lower()
+
+        for phrase in phrases:
+            assert phrase in visible_text, f"{plot_id} semantics should mention {phrase!r}"
+
+
 def test_live_study_representation_health_compares_first_class_intermediate_and_output_layer_views() -> None:
     context = load_workspace_config(_live_workspace())
     recipe = context.config.recipes["pre_assay_representation_triage_recipe"]

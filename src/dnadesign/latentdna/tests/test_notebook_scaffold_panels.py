@@ -27,3 +27,10 @@ def test_browser_surface_panels_do_not_eagerly_render_inactive_surface() -> None
     assert "surface_selector" in geometry_panel_cell
     assert 'str(surface_selector.value) != "geometry_browser"' in geometry_panel_cell
     assert "lazy=True" not in geometry_panel_cell
+
+
+def test_projection_selector_is_only_rendered_when_it_controls_single_view_layout() -> None:
+    geometry_panel_cell = render_geometry_panel_cell()
+
+    assert "_control_widgets.extend([geometry_selector, projection_selector])" in geometry_panel_cell
+    assert "_control_widgets.append(projection_selector)" not in geometry_panel_cell

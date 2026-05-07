@@ -1,13 +1,13 @@
 plot_id: design_centroid_margin_gallery
 question: How does the full promoter population shift relative to ethanol, ciprofloxacin, and background centroids in each candidate space?
 decision_role: appendix
-encoding: Multi-panel scatter gallery of background-relative ethanol and ciprofloxacin centroid margins across the candidate inventory.
+encoding: Multi-panel scatter gallery of background-relative ethanol and ciprofloxacin centroid margins across the candidate inventory; the x-axis is ethanol-vs-background margin and the y-axis is ciprofloxacin-vs-background margin.
 scope: The shared promoter population, including study controls and leakage-safe cohort margins.
 guardrails:
   - Use this gallery for study-internal orientation across the full promoter population.
   - Judge candidate ranking from the design-structure and Sigma-35 summaries first.
 caption: Internal design-centroid margin gallery across the candidate inventory.
-alt_text: Scatter-panel gallery showing background-relative ethanol and ciprofloxacin centroid margins for the full promoter population in each candidate representation.
+alt_text: Scatter-panel gallery showing background-relative ethanol and ciprofloxacin centroid margins for the full promoter population in each candidate representation, with ethanol-vs-background margin on the x-axis and ciprofloxacin-vs-background margin on the y-axis.
 preprocessing_md: Margins are computed after view-level standardization and row L2 normalization, using leave-one-out centroids for rows that belong to the target or control cohorts.
 math_md: |
   The two plotted margins are

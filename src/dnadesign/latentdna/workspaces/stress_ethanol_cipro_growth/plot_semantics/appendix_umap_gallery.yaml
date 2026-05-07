@@ -1,12 +1,12 @@
 plot_id: appendix_umap_gallery
 question: How does the shared promoter population distribute in the persisted UMAP for each candidate space?
 decision_role: appendix
-encoding: Multi-panel persisted UMAP gallery with hue-only recoloring across the canonical candidate inventory.
+encoding: Multi-panel persisted UMAP scatter gallery with hue-only recoloring across the canonical candidate inventory.
 scope: Persisted projection artifacts for the shared promoter population.
 guardrails:
   - Use the persisted layout for orientation only. Candidate ranking stays on the scalar summaries.
   - Hue changes recolor fixed coordinates. They do not change the fit.
-caption: Appendix UMAP orientation gallery for the canonical candidate inventory.
+caption: Appendix UMAP scatter orientation gallery for the canonical candidate inventory.
 alt_text: Multi-panel UMAP projection gallery for the shared promoter population across the candidate representation spaces, with fixed coordinates and metadata recoloring.
 preprocessing_md: Uses persisted projection artifacts and their recorded fit metadata. UMAP uses the stored view matrices unless the projection manifest says otherwise.
 math_md: |
