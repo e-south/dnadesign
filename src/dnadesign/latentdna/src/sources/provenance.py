@@ -9,9 +9,9 @@ from typing import Mapping
 
 from dnadesign.usr import (
     OVERLAY_DIGEST_LEDGER_FILENAME,
+    OVERLAY_PART_PREFIX,
     build_overlay_digest_ledger,
 )
-from dnadesign.usr.src.overlays import OVERLAY_PART_PREFIX
 
 from ..io.hashing import sha256_path, sha256_payload
 

@@ -21,7 +21,7 @@ from .alignment_service import build_alignment
 from .cluster_service import fit_cluster
 from .distance_service import score_distance
 from .enrichment_service import score_enrichment
-from .export_service import export_matrix, export_table
+from .export_service import export_anndata, export_matrix, export_table
 from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 from .neighbors_service import fit_neighbors
 from .notebook_service import generate_notebook
@@ -379,6 +379,23 @@ def _export_table_step(
     )
 
 
+def _export_anndata_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    return export_anndata(
+        workspace,
+        str(_require_param(params, "export_id", "export")),
+        projection_ids=_list_param(params, "projection_ids", "projections", "projection"),
+        neighbor_ids=_list_param(params, "neighbor_ids", "neighbors", "neighbor"),
+        allow_memory_overage=allow_memory_overage,
+        force=force,
+    )
+
+
 def _build_snapshot_step(
     workspace: str | Path,
     params: dict[str, Any],
@@ -401,6 +418,7 @@ STEP_EXECUTORS: dict[str, Callable[..., CommandResult]] = {
     "cluster.fit": _fit_cluster_step,
     "distance.score": _score_distance_step,
     "enrich.score": _score_enrichment_step,
+    "export.anndata": _export_anndata_step,
     "export.matrix": _export_matrix_step,
     "export.table": _export_table_step,
     "neighbors.fit": _fit_neighbors_step,

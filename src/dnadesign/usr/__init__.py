@@ -59,6 +59,7 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "overlay_metadata": (".src.overlays", "overlay_metadata"),
     "overlay_parts": (".src.overlays", "overlay_parts"),
     "overlay_schema": (".src.overlays", "overlay_schema"),
+    "OVERLAY_PART_PREFIX": (".src.overlays", "OVERLAY_PART_PREFIX"),
     "OVERLAY_DIGEST_LEDGER_FILENAME": (".src.overlays.support.digest_ledger", "OVERLAY_DIGEST_LEDGER_FILENAME"),
     "OVERLAY_DIGEST_LEDGER_SCHEMA_VERSION": (
         ".src.overlays.support.digest_ledger",

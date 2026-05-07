@@ -42,7 +42,9 @@ Implemented schema slices:
 - Candidate sets: named, study-agnostic groups of view ids or tag-selected views for notebook layouts and representation status surfaces
 - Plots: named artifact-driven recipes for `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `xy_scatter`, `distribution`, `curve`, `correspondence_heatmap`, and `agreement_summary`
 - Cohorts: named `kind: column` metadata groupings over declared sources
-- Exports: config-declared reducer/table block bundles for `export matrix`, including explicit alignment-backed block projection onto an `alignment_set` row basis
+- Exports: config-declared reducer/table block bundles for `export matrix`,
+  `export table`, and `export anndata`, including explicit alignment-backed
+  block projection onto an `alignment_set` row basis
 - Snapshots: ad hoc `snapshot build` materialization from declared sources into workspace-owned key ledgers plus metadata companions
 - Notebooks: config-backed `workspace` marimo apps that load the persisted workspace catalog, artifact manifests, and the notebook control-plane payload under `outputs/notebooks/<id>/controls.json`
 - Recipes: thin DAGs over the currently implemented primitive command set
@@ -70,7 +72,12 @@ Current runtime limits:
 - `view reduce` currently fits PCA only.
 - `scalar derive` currently supports `vector_norm`, `column_expression`, `select_columns`, `rename_columns`, and `join_tables`.
 - `sample build` currently supports `all`, `random`, `stratified`, `explicit_ids`, `union`, and `intersection`, plus optional `reference_set` preservation for view-backed samples. Reference-set preservation may use explicit ids or selector-backed row membership.
-- `export matrix` and `export table` currently support `reduced_view` and `table_columns` blocks, plus optional block-level `alignment` projection onto an explicit aligned row basis.
+- `export matrix`, `export table`, and `export anndata` currently support
+  `reduced_view` and `table_columns` blocks, plus optional block-level
+  `alignment` projection onto an explicit aligned row basis. AnnData exports
+  can additionally include explicitly requested projection artifacts in `obsm`
+  and neighbor distance artifacts in `obsp` when their row ledgers match the
+  export basis exactly.
 - Landmark distance scoring is implemented against source-backed views.
 - `enrich score` currently supports landmark-neighborhood summaries over `kind: column` cohorts only.
 - `neighbors fit` currently supports `euclidean` and `cosine` metrics over explicit full-view, sample, alignment, or precomputed `reduced_view` scopes; reduced views are already scope-fixed and cannot be re-scoped with `sample` or `alignment`.
