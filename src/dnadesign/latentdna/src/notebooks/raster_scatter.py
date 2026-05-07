@@ -38,6 +38,15 @@ def _data_extent(
     return x_min - x_pad, x_max + x_pad, y_min - y_pad, y_max + y_pad
 
 
+def scatter_data_extent(
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    *,
+    pad_fraction: float = 0.04,
+) -> tuple[float, float, float, float]:
+    return _data_extent(x_values, y_values, pad_fraction=pad_fraction)
+
+
 def _flat_pixel_indices(
     x_values: np.ndarray,
     y_values: np.ndarray,

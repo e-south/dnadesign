@@ -86,6 +86,16 @@ def _decode_svg_markup(rendered: mo.Html) -> str:
     return base64.b64decode(match.group(1)).decode("utf-8")
 
 
+def _legend_clears_panel_axes(fig) -> bool:
+    fig.canvas.draw()
+    if not fig.legends:
+        return True
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = fig.legends[0].get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    panel_y0 = min(axis.get_position().y0 for axis in fig.axes if axis.axison)
+    return bool(legend_bbox.y1 < panel_y0)
+
+
 def test_render_plot_review_surface_supports_semantic_xy_columns(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
     frames = [
@@ -170,6 +180,88 @@ def test_render_plot_review_surface_rasterizes_large_hue_panels_without_sampling
         assert captured["hue_values"] == frame["design_family"].tolist()
         assert set(captured["category_order"]) == {"ethanol", "cipro", "background_only"}
         assert len(fig.axes[0].images) == 1
+    finally:
+        plt.close(fig)
+
+
+def test_render_plot_review_surface_keeps_missing_continuous_hue_rows_visible(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0, 2.0, 3.0],
+            "y": [3.0, 2.0, 1.0, 0.0],
+            "context_shift_l2": [0.1, np.nan, 0.8, np.nan],
+        }
+    )
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "context_shift_scatter",
+            "kind": "xy_scatter_grid",
+            "x_column": "x",
+            "y_column": "y",
+            "panel_titles": ["Full population"],
+            "hue_options": [
+                {"column": "context_shift_l2", "label": "Context shift", "type": "continuous"},
+            ],
+        },
+        frames=[frame],
+        hue_column="context_shift_l2",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        offsets = []
+        for collection in fig.axes[0].collections:
+            collection_offsets = np.asarray(collection.get_offsets())
+            if collection_offsets.size == 0:
+                continue
+            offsets.extend((float(x), float(y)) for x, y in collection_offsets.tolist())
+        assert sorted(offsets) == [(0.0, 3.0), (1.0, 2.0), (2.0, 1.0), (3.0, 0.0)]
+    finally:
+        plt.close(fig)
+
+
+def test_render_plot_review_surface_rasterized_continuous_hue_keeps_full_extent(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    monkeypatch.setattr(plot_review_runtime, "should_rasterize_scatter", lambda row_count: row_count > 3)
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(5, dtype=float),
+            "y": np.arange(5, dtype=float),
+            "context_shift_l2": [np.nan, 0.1, 0.8, 0.4, np.nan],
+        }
+    )
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "context_shift_scatter",
+            "kind": "xy_scatter_grid",
+            "x_column": "x",
+            "y_column": "y",
+            "panel_titles": ["Full population"],
+            "hue_options": [
+                {"column": "context_shift_l2", "label": "Context shift", "type": "continuous"},
+            ],
+        },
+        frames=[frame],
+        hue_column="context_shift_l2",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        x_min, x_max = fig.axes[0].get_xlim()
+        y_min, y_max = fig.axes[0].get_ylim()
+        assert x_min < 0.0
+        assert x_max > 4.0
+        assert y_min < 0.0
+        assert y_max > 4.0
     finally:
         plt.close(fig)
 
@@ -915,6 +1007,44 @@ def test_render_plot_review_surface_keeps_seven_panel_candidate_gallery_within_t
         panel_axes = fig.axes[:7]
         assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 2
         assert fig.axes[7].axison is False
+    finally:
+        plt.close(fig)
+
+
+def test_render_plot_review_surface_keeps_legend_clear_of_multi_panel_gallery(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame(
+            {
+                "x": np.arange(30, dtype=float),
+                "y": np.arange(30, dtype=float),
+                "design_family": ["background_only", "ethanol", "cipro", "dual", "control"] * 6,
+            }
+        )
+        for _ in range(7)
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "design_centroid_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "x",
+            "y_column": "y",
+            "panel_titles": [f"Panel {index}" for index in range(7)],
+            "hue_options": [
+                {"column": "design_family", "label": "Design family", "type": "categorical"},
+            ],
+        },
+        frames=frames,
+        hue_column="design_family",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert _legend_clears_panel_axes(fig)
     finally:
         plt.close(fig)
 

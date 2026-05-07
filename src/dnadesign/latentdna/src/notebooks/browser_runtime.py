@@ -333,6 +333,23 @@ def _resolve_plot_review_render_mode(
     return True, None
 
 
+def _markdown_heading_level(line: str) -> int | None:
+    hash_count = len(line) - len(line.lstrip("#"))
+    if hash_count == 0 or hash_count > 6:
+        return None
+    if len(line) <= hash_count or line[hash_count] != " ":
+        return None
+    return hash_count
+
+
+def _next_heading_at_or_above(lines: list[str], start: int, level: int) -> int:
+    for index in range(start + 1, len(lines)):
+        heading_level = _markdown_heading_level(lines[index])
+        if heading_level is not None and heading_level <= level:
+            return index
+    return len(lines)
+
+
 def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
     lines = markdown.splitlines()
     summary_lines: list[str] = []
@@ -343,14 +360,15 @@ def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
         index = first_h1 + 1
         while index < len(lines):
             line = lines[index]
-            if line.startswith("## "):
+            heading_level = _markdown_heading_level(line)
+            if heading_level is not None and heading_level <= 2:
                 break
             summary_lines.append(line)
             index += 1
 
-    heading_indices = [index for index, line in enumerate(lines) if line.startswith("### ")]
-    heading_indices.append(len(lines))
-    for start, end in zip(heading_indices, heading_indices[1:], strict=False):
+    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 3]
+    for start in heading_indices:
+        end = _next_heading_at_or_above(lines, start, 3)
         heading = lines[start][4:].strip()
         if "|" not in heading:
             continue
@@ -368,12 +386,12 @@ def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
 
 def _extract_plot_details(markdown: str) -> str:
     lines = markdown.splitlines()
-    heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
+    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 4]
     if not heading_indices:
         return ""
 
-    heading_indices.append(len(lines))
-    for start, end in zip(heading_indices, heading_indices[1:], strict=False):
+    for start in heading_indices:
+        end = _next_heading_at_or_above(lines, start, 4)
         title = lines[start][5:].strip()
         if title.casefold() != "plot details":
             continue
@@ -383,14 +401,14 @@ def _extract_plot_details(markdown: str) -> str:
 
 def _strip_plot_details(markdown: str) -> str:
     lines = markdown.splitlines()
-    heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
+    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 4]
     if not heading_indices:
         return markdown.strip()
 
-    heading_indices.append(len(lines))
     kept_blocks: list[str] = []
     cursor = 0
-    for start, end in zip(heading_indices[:-1], heading_indices[1:], strict=False):
+    for start in heading_indices:
+        end = _next_heading_at_or_above(lines, start, 4)
         if cursor < start:
             kept_blocks.append("\n".join(lines[cursor:start]).strip())
         title = lines[start][5:].strip()

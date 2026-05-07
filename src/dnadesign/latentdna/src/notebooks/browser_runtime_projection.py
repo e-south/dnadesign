@@ -31,6 +31,7 @@ from .browser_runtime_support import (
     classify_hue_series,
     continuous_hue_render_params,
     display_hue_label,
+    draw_missing_hue_background,
     draw_reference_labels,
     finite_non_null_hue_series,
     load_table,
@@ -45,6 +46,7 @@ from .raster_scatter import (
     draw_categorical_raster_scatter,
     draw_continuous_raster_scatter,
     draw_single_color_raster_scatter,
+    scatter_data_extent,
     should_rasterize_scatter,
 )
 from .rendering import render_matplotlib_figure
@@ -649,12 +651,22 @@ def render_projection_grid(
         elif hue_kind == "continuous":
             hue_series = pd.to_numeric(plot_frame[effective_hue], errors="coerce")
             valid = hue_series.notna()
+            missing = ~valid
+            if missing.any():
+                draw_missing_hue_background(
+                    ax,
+                    x_values=plot_frame.loc[missing, "x"].to_numpy(dtype=float),
+                    y_values=plot_frame.loc[missing, "y"].to_numpy(dtype=float),
+                    point_style=point_style,
+                    rasterize_panel=rasterize_panel,
+                    raster_renderer=draw_single_color_raster_scatter,
+                )
             if rasterize_panel and valid.any():
                 scatter_artist = draw_continuous_raster_scatter(
                     ax,
-                    x_values=x_values,
-                    y_values=y_values,
-                    hue_values=hue_series.to_numpy(dtype=float),
+                    x_values=plot_frame.loc[valid, "x"].to_numpy(dtype=float),
+                    y_values=plot_frame.loc[valid, "y"].to_numpy(dtype=float),
+                    hue_values=hue_series.loc[valid].to_numpy(dtype=float),
                     cmap=str(continuous_params["cmap"]),
                     norm=continuous_params["norm"],
                     vmin=continuous_params["vmin"],
@@ -738,6 +750,10 @@ def render_projection_grid(
             _render_projection_attention_badge(ax)
         ax.set_xlabel("Projection 1")
         ax.set_ylabel("Projection 2")
+        if rasterize_panel:
+            x_min, x_max, y_min, y_max = scatter_data_extent(x_values, y_values)
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
         ax.margins(x=0.06, y=0.06)
         style_notebook_axes(ax, grid=True, square=True)
 

@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
 
 from dnadesign.latentdna.src.notebooks import browser_runtime_projection as projection_runtime
 
@@ -79,6 +81,16 @@ def _panel_offsets(fig) -> list[tuple[float, float]]:
             continue
         offsets.extend((float(x), float(y)) for x, y in collection_offsets.tolist())
     return sorted(offsets)
+
+
+def _legend_clears_panel_axes(fig) -> bool:
+    fig.canvas.draw()
+    if not fig.legends:
+        return True
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = fig.legends[0].get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    panel_y0 = min(axis.get_position().y0 for axis in fig.axes if axis.axison)
+    return bool(legend_bbox.y1 < panel_y0)
 
 
 def _write_manifest(
@@ -244,6 +256,110 @@ def test_render_projection_grid_rasterizes_very_large_frames_without_sampling(mo
     try:
         assert captured["row_count"] == row_count
         assert len(fig.axes[0].images) == 1
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_keeps_missing_continuous_hue_rows_visible(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0, 2.0, 3.0],
+            "y": [3.0, 2.0, 1.0, 0.0],
+            "context_shift_l2": [0.1, np.nan, 0.8, np.nan],
+        }
+    )
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "demo", "projection_id": "umap_demo", "title": "Demo"}],
+        frames=[frame],
+        hue_column="context_shift_l2",
+        hue_kinds={"context_shift_l2": "continuous"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert _panel_offsets(fig) == [(0.0, 3.0), (1.0, 2.0), (2.0, 1.0), (3.0, 0.0)]
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_rasterizes_missing_continuous_hue_background(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    monkeypatch.setattr(projection_runtime, "should_rasterize_scatter", lambda row_count: row_count > 3)
+    captured: dict[str, int] = {}
+
+    def fake_background(ax, *, x_values, y_values, color, **kwargs):
+        del y_values, color, kwargs
+        captured["background_count"] = len(x_values)
+        ax.imshow(np.zeros((2, 2, 4)), extent=(-0.1, 4.1, -0.1, 4.1), origin="lower")
+
+    def fake_continuous(ax, *, x_values, y_values, hue_values, **kwargs):
+        del y_values, kwargs
+        captured["colored_count"] = len(x_values)
+        captured["colored_hue_count"] = len(hue_values)
+        ax.imshow(np.zeros((2, 2, 4)), extent=(-0.1, 4.1, -0.1, 4.1), origin="lower")
+        return ScalarMappable(norm=Normalize(vmin=0.0, vmax=1.0), cmap="viridis")
+
+    monkeypatch.setattr(projection_runtime, "draw_single_color_raster_scatter", fake_background)
+    monkeypatch.setattr(projection_runtime, "draw_continuous_raster_scatter", fake_continuous)
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(5, dtype=float),
+            "y": np.arange(5, dtype=float),
+            "context_shift_l2": [0.1, np.nan, 0.8, np.nan, 0.4],
+        }
+    )
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "demo", "projection_id": "umap_demo", "title": "Demo"}],
+        frames=[frame],
+        hue_column="context_shift_l2",
+        hue_kinds={"context_shift_l2": "continuous"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert captured == {"background_count": 2, "colored_count": 3, "colored_hue_count": 3}
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_rasterized_continuous_hue_keeps_full_extent(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    monkeypatch.setattr(projection_runtime, "should_rasterize_scatter", lambda row_count: row_count > 3)
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(5, dtype=float),
+            "y": np.arange(5, dtype=float),
+            "context_shift_l2": [np.nan, 0.1, 0.8, 0.4, np.nan],
+        }
+    )
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "demo", "projection_id": "umap_demo", "title": "Demo"}],
+        frames=[frame],
+        hue_column="context_shift_l2",
+        hue_kinds={"context_shift_l2": "continuous"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        x_min, x_max = fig.axes[0].get_xlim()
+        y_min, y_max = fig.axes[0].get_ylim()
+        assert x_min < 0.0
+        assert x_max > 4.0
+        assert y_min < 0.0
+        assert y_max > 4.0
     finally:
         plt.close(fig)
 
@@ -487,6 +603,37 @@ def test_render_projection_grid_handles_seven_panel_gallery_without_axis_zip_fai
         panel_axes = fig.axes[:7]
         assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 2
         assert fig.axes[7].axison is False
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_keeps_legend_clear_of_multi_panel_gallery(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(30, dtype=float),
+            "y": np.arange(30, dtype=float),
+            "design_family": ["background_only", "ethanol", "cipro", "dual", "control"] * 6,
+        }
+    )
+    panel_specs = [
+        {"view_id": f"view_{index}", "projection_id": f"proj_{index}", "title": f"Panel {index}"} for index in range(7)
+    ]
+
+    fig = projection_runtime.render_projection_grid(
+        panel_specs,
+        frames=[frame for _ in range(7)],
+        plot_id="appendix_umap_gallery",
+        hue_column="design_family",
+        hue_kinds={"design_family": "categorical"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert _legend_clears_panel_axes(fig)
     finally:
         plt.close(fig)
 

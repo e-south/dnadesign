@@ -819,6 +819,44 @@ def scatter_style(row_count: int) -> tuple[float, float]:
     return style.point_size, style.alpha
 
 
+MISSING_HUE_BACKGROUND_COLOR = "#CBD5E1"
+
+
+def draw_missing_hue_background(
+    ax,
+    *,
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    point_style,
+    rasterize_panel: bool,
+    raster_renderer,
+) -> None:
+    """Draw rows that lack the selected continuous hue without dropping the cloud."""
+    if len(x_values) == 0:
+        return
+    alpha = max(float(point_style.alpha) * 0.64, 0.10)
+    if rasterize_panel:
+        raster_renderer(
+            ax,
+            x_values=x_values,
+            y_values=y_values,
+            color=MISSING_HUE_BACKGROUND_COLOR,
+            point_alpha=alpha,
+        )
+        return
+    ax.scatter(
+        x_values,
+        y_values,
+        c=MISSING_HUE_BACKGROUND_COLOR,
+        s=point_style.point_size,
+        alpha=alpha,
+        linewidths=0.0,
+        edgecolors="none",
+        rasterized=point_style.rasterized,
+        zorder=0.8,
+    )
+
+
 def category_color_map(
     categories: list[str],
     *,

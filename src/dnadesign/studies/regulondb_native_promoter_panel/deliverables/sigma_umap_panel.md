@@ -20,13 +20,13 @@ Review native RegulonDB promoter records and TSS-upstream core60 windows in the 
 
 #### Plot details
 
-Exploratory UMAP over the native source-record intermediate embedding. The notebook hue dropdown exposes configured RegulonDB metadata overlays so the same fixed geometry can be audited by sigma-factor set, confidence level, metadata completeness, and emitted length when those columns are present.
+Exploratory UMAP over the native source-record intermediate embedding with a fixed sigma-factor overlay. The persisted plot keeps the UMAP geometry and sigma coloring fixed; use the LatentDNA projection browser when reviewing alternate RegulonDB metadata hues on the same fixed geometry.
 
 ### sigma_umap_intermediate_embedding_7b_core60_tss_upstream | Core60 Sigma UMAP
 
 #### Plot details
 
-Exploratory UMAP over the TSS-upstream core60 intermediate embedding. The panel uses the same hue contract as the native UMAP so reviewers can compare metadata organization without treating UMAP separation as the decision metric.
+Exploratory UMAP over the TSS-upstream core60 intermediate embedding with a fixed sigma-factor overlay copied from the parent native promoter record. The panel uses the same fixed geometry and coloring contract as the native UMAP so reviewers can compare metadata organization without treating UMAP separation as the decision metric.
 
 ## Interpretation
 

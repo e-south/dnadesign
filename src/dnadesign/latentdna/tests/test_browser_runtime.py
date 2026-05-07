@@ -87,6 +87,33 @@ Use this panel to screen out collapsed candidate spaces before comparing design 
     assert block["plot_details_md"] == "**Data.** Candidate summary details."
 
 
+def test_resolve_plot_doc_block_stops_plot_section_at_parent_heading() -> None:
+    markdown = """# Sigma-factor UMAP panel
+
+Short deliverable summary.
+
+### native_umap | Native UMAP
+
+#### Plot details
+
+Native UMAP details.
+
+## Interpretation
+
+Shared interpretation for all plots, not one plot's details.
+"""
+
+    parsed = _parse_deliverable_markdown(markdown)
+    block = resolve_plot_doc_block(
+        plot_id="native_umap",
+        deliverable_summary="Fallback summary.",
+        parsed_markdown=parsed,
+    )
+
+    assert block["plot_details_md"] == "Native UMAP details."
+    assert "Shared interpretation" not in block["plot_details_md"]
+
+
 def test_resolve_plot_doc_block_warns_when_subsection_is_missing() -> None:
     markdown = """# Context robustness summary
 

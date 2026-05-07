@@ -47,6 +47,7 @@ from .browser_runtime_support import (
     classify_hue_series,
     continuous_hue_render_params,
     display_hue_label,
+    draw_missing_hue_background,
     draw_reference_labels,
     load_artifact_manifest,
     load_table,
@@ -59,6 +60,7 @@ from .raster_scatter import (
     draw_categorical_raster_scatter,
     draw_continuous_raster_scatter,
     draw_single_color_raster_scatter,
+    scatter_data_extent,
     should_rasterize_scatter,
 )
 from .rendering import render_matplotlib_figure
@@ -609,20 +611,30 @@ def _render_scatter_grid(
                     fontsize=9.0,
                     color="#5C6874",
                 )
-            elif valid.any():
-                if rasterize_panel:
+            else:
+                missing = ~valid
+                if missing.any():
+                    draw_missing_hue_background(
+                        ax,
+                        x_values=finite_frame.loc[missing, x_column].to_numpy(dtype=float),
+                        y_values=finite_frame.loc[missing, y_column].to_numpy(dtype=float),
+                        point_style=point_style,
+                        rasterize_panel=rasterize_panel,
+                        raster_renderer=draw_single_color_raster_scatter,
+                    )
+                if rasterize_panel and valid.any():
                     scatter_artist = draw_continuous_raster_scatter(
                         ax,
-                        x_values=x_values,
-                        y_values=y_values,
-                        hue_values=hue_values.to_numpy(dtype=float),
+                        x_values=finite_frame.loc[valid, x_column].to_numpy(dtype=float),
+                        y_values=finite_frame.loc[valid, y_column].to_numpy(dtype=float),
+                        hue_values=hue_values.loc[valid].to_numpy(dtype=float),
                         cmap=str(continuous_params["cmap"]),
                         norm=continuous_params["norm"],
                         vmin=continuous_params["vmin"],
                         vmax=continuous_params["vmax"],
                         point_alpha=point_style.alpha,
                     )
-                else:
+                elif valid.any():
                     scatter_artist = ax.scatter(
                         finite_frame.loc[valid, x_column].to_numpy(dtype=float),
                         finite_frame.loc[valid, y_column].to_numpy(dtype=float),
@@ -750,6 +762,10 @@ def _render_scatter_grid(
                 max_lines=2,
             )
         )
+        if rasterize_panel:
+            x_min, x_max, y_min, y_max = scatter_data_extent(x_values, y_values)
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
         style_notebook_axes(ax, grid=True, square=True)
         annotation_frames.append(finite_frame)
 

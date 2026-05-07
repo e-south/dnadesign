@@ -177,6 +177,22 @@ def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
         assert plot.hue_options[-1].type == "ordinal"
 
 
+def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:
+    doc = (
+        _repo_root()
+        / "src"
+        / "dnadesign"
+        / "studies"
+        / "regulondb_native_promoter_panel"
+        / "deliverables"
+        / "sigma_umap_panel.md"
+    ).read_text(encoding="utf-8")
+
+    assert "notebook hue dropdown" not in doc
+    assert "fixed sigma-factor overlay" in doc
+    assert "fixed geometry" in doc
+
+
 def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
     requirements = {
         (_live_workspace(), "appendix_umap_gallery"): ["scatter", "fixed coordinates"],
