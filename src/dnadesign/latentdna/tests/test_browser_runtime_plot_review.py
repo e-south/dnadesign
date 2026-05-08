@@ -8,6 +8,7 @@ import marimo as mo
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.latentdna.src.notebooks import browser_runtime_plot_review as plot_review_runtime
 from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime_support
@@ -850,13 +851,7 @@ def test_render_plot_review_surface_passes_selected_reference_set_to_projection_
     monkeypatch.setattr(
         plot_review_runtime,
         "resolve_reference_annotation",
-        lambda *args, **kwargs: {
-            "labels": ["W1"],
-            "match_column": "usr_label__primary",
-            "display_labels": {},
-            "label_limit": 10,
-            "warnings": [],
-        },
+        lambda *args, **kwargs: pytest.fail("projection grids must resolve reference overlays exactly once"),
     )
 
     rendered = render_plot_review_surface(
@@ -868,7 +863,7 @@ def test_render_plot_review_surface_passes_selected_reference_set_to_projection_
         },
         frames=[pd.DataFrame({"x": [0.0], "y": [1.0], "usr_label__primary": ["W1"]})],
         hue_column=None,
-        reference_labels=[],
+        reference_labels=["fallback_reference"],
         reference_set_id="reference_w_collection",
         joinable_tables=[],
         output_root=tmp_path,
@@ -877,6 +872,7 @@ def test_render_plot_review_surface_passes_selected_reference_set_to_projection_
 
     assert rendered == "rendered"
     assert captured["reference_set_id"] == "reference_w_collection"
+    assert captured["reference_labels"] == ["fallback_reference"]
 
 
 def test_render_plot_review_surface_allows_scatter_grids_with_partial_panel_errors(monkeypatch, tmp_path: Path) -> None:

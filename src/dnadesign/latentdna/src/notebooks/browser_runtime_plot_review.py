@@ -316,22 +316,6 @@ def render_plot_review_surface(
     plot_alt_text = str(plot_spec.get("alt_text") or plot_spec.get("plot_id") or "latentdna live plot")
     resolved_plot_spec = {key: value for key, value in plot_spec.items() if key != "alt_text"}
     kind = str(resolved_plot_spec.get("kind") or "")
-    reference_annotation = resolve_reference_annotation(
-        reference_set_id,
-        frames,
-        workspace_dir=workspace_dir,
-        fallback_labels=reference_labels,
-    )
-    resolved_reference_labels = [str(value) for value in reference_annotation.get("labels", []) if str(value).strip()]
-    reference_match_column = str(reference_annotation.get("match_column") or "usr_label__primary")
-    reference_display_labels = {
-        str(key): str(value)
-        for key, value in dict(reference_annotation.get("display_labels", {}) or {}).items()
-        if str(key).strip() and str(value).strip()
-    }
-    reference_label_limit = reference_annotation.get("label_limit")
-    if not isinstance(reference_label_limit, int):
-        reference_label_limit = None
     if kind == "projection_grid":
         prefer_single_row = _prefer_single_row_panel_layout(
             str(resolved_plot_spec.get("plot_id") or ""),
@@ -358,16 +342,30 @@ def render_plot_review_surface(
             hue_kinds=_configured_hue_kinds(resolved_plot_spec),
             axis_styles=axis_styles,
             joinable_tables=joinable_tables,
-            reference_labels=resolved_reference_labels,
+            reference_labels=reference_labels,
             reference_set_id=reference_set_id,
-            reference_match_column=reference_match_column,
-            reference_display_labels=reference_display_labels,
-            reference_label_limit=reference_label_limit,
             output_root=output_root,
             workspace_dir=workspace_dir,
             alt_text=plot_alt_text,
             prefer_single_row=prefer_single_row,
         )
+
+    reference_annotation = resolve_reference_annotation(
+        reference_set_id,
+        frames,
+        workspace_dir=workspace_dir,
+        fallback_labels=reference_labels,
+    )
+    resolved_reference_labels = [str(value) for value in reference_annotation.get("labels", []) if str(value).strip()]
+    reference_match_column = str(reference_annotation.get("match_column") or "usr_label__primary")
+    reference_display_labels = {
+        str(key): str(value)
+        for key, value in dict(reference_annotation.get("display_labels", {}) or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+    reference_label_limit = reference_annotation.get("label_limit")
+    if not isinstance(reference_label_limit, int):
+        reference_label_limit = None
     if kind in {"xy_scatter_grid", "paired_xy_scatter_grid"}:
         return _render_scatter_grid(
             resolved_plot_spec,
