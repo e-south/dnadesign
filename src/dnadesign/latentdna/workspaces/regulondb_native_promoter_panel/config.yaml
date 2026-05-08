@@ -401,7 +401,7 @@ notebooks:
     candidate_grid_panel_titles:
       - Native source-record intermediate
       - Core60 TSS-upstream intermediate
-    show_missing_projection_placeholders: true
+    show_missing_projection_placeholders: false
     preferred_hues:
       - regulondb__sigma_factor_set
       - regulondb__confidence_level_set

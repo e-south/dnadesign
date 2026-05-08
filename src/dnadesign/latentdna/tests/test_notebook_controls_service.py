@@ -406,12 +406,30 @@ def test_notebook_controls_candidate_grid_defaults_to_projected_views(tmp_path: 
         "intermediate_embedding_7b_context_1kb",
         "output_layer_mean_7b_anchor_60bp",
     ]
+    assert [row.view_id for row in controls.geometry_controls.geometries] == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_context_1kb",
+    ]
+    candidate_set = controls.geometry_controls.candidate_sets[0]
+    assert candidate_set.available_view_ids == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_context_1kb",
+    ]
     candidate_grid = next(row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid")
     assert candidate_grid.view_ids == [
         "intermediate_embedding_7b_anchor_60bp",
         "intermediate_embedding_7b_context_1kb",
     ]
     assert candidate_grid.panel_titles == ["Anchor intermediate", "Context intermediate"]
+    candidate_set_grid = next(
+        row for row in controls.geometry_controls.layout_presets if row.id == "candidate_set__all_materialized_x"
+    )
+    assert candidate_set_grid.view_ids == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_context_1kb",
+    ]
+    assert "Projection-backed subset" in candidate_set_grid.description
+    assert "output-layer" not in candidate_set_grid.description.lower()
     assert controls.geometry_controls.default_layout == "candidate_grid"
 
 
@@ -538,6 +556,24 @@ def test_notebook_controls_candidate_views_expose_representation_metadata(tmp_pa
     assert view.scope == "native_source_record"
     assert view.coordinate_space_id == "evo2_7b_native_source_record_seq_mean"
     assert view.label == "Evo 2 7B · Native source record · Output-layer mean"
+
+
+def test_notebook_geometry_labels_do_not_double_prefix_evo2_models(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["intermediate_embedding_7b_anchor_60bp"]["tags"]["model"] = "evo2_7b"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    context = load_workspace_config(workspace_dir)
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    geometry = next(
+        row for row in controls.geometry_controls.geometries if row.view_id == "intermediate_embedding_7b_anchor_60bp"
+    )
+    assert geometry.label == "Evo 2 7B · Anchor-source insert · Intermediate block mean"
 
 
 def test_notebook_controls_expose_reference_set_labels_and_default_from_config(tmp_path: Path) -> None:

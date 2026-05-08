@@ -537,9 +537,11 @@ def render_geometry_panel_cell() -> str:
                     reference_labels=_geometry.reference_labels,
                     reference_set_id=str(geometry_reference_selector.value),
                 )
-                _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
                 if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
+                    _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
                     _control_widgets.extend([geometry_selector, projection_selector])
+                else:
+                    _control_widgets = [layout_selector]
                 _control_widgets.extend([hue_selector, geometry_reference_selector])
                 _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
                 _accordion_sections = {

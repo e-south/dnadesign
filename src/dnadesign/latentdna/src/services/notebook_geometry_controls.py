@@ -68,9 +68,12 @@ _SCOPE_LABELS = {
 
 
 def _format_view_label(*, model: str | None, family: str | None, scope_name: str | None) -> str:
+    model_label = str(model or "")
+    if model_label and not model_label.startswith("evo2_"):
+        model_label = f"evo2_{model_label}"
     return humanize_candidate(
         {
-            "candidate_model": f"evo2_{model}" if model else "",
+            "candidate_model": model_label,
             "candidate_scope": scope_name or "",
             "candidate_family": family or "",
         }
@@ -242,6 +245,18 @@ def _geometry_inventory(
             )
         )
     return geometries
+
+
+def _projection_backed_geometries(
+    geometries: list[WorkspaceNotebookGeometry],
+    *,
+    notebook,
+) -> list[WorkspaceNotebookGeometry]:
+    if notebook is None or bool(getattr(notebook, "show_missing_projection_placeholders", False)):
+        return geometries
+    if not any(row.projection_ids for row in geometries):
+        return geometries
+    return [row for row in geometries if row.projection_ids]
 
 
 def _manifest_view_ids(
@@ -493,9 +508,14 @@ def _layout_presets(
                 id=preset_id,
                 label=str(getattr(candidate_set, "label", "") or candidate_set_id),
                 mode="fixed_grid",
-                description=str(
-                    getattr(candidate_set, "description", None)
-                    or "Projection grid across a configured candidate representation set."
+                description=(
+                    str(
+                        getattr(candidate_set, "description", None)
+                        or "Projection grid across a configured candidate representation set."
+                    )
+                    if set(candidate_view_ids) == set(getattr(candidate_set, "view_ids", []))
+                    else "Projection-backed subset of the configured candidate representation set; "
+                    "unprojected candidate views are omitted."
                 ),
                 view_ids=[str(view_id) for view_id in candidate_view_ids],
                 panel_titles=[panel_titles_by_view.get(str(view_id), str(view_id)) for view_id in candidate_view_ids],
@@ -661,6 +681,7 @@ def build_workspace_geometry_controls(
     shapes = shape_cache or ViewShapeCache(output_root=context.output_root)
     projection_ids_by_view = _projection_inventory(context)
     geometry_order = _geometry_order(context, notebook_id=notebook_id)
+    notebook = _resolve_notebook(context, notebook_id)
     preferred_hue_order = _preferred_hue_order(context, notebook_id=notebook_id)
     default_hue_kinds = _preferred_hue_kind_defaults(context, notebook_id=notebook_id)
     geometries = _geometry_inventory(
@@ -669,6 +690,7 @@ def build_workspace_geometry_controls(
         geometry_order=geometry_order,
         shape_cache=shapes,
     )
+    geometries = _projection_backed_geometries(geometries, notebook=notebook)
     visible_view_ids = {row.view_id for row in geometries}
     candidate_sets = build_workspace_candidate_sets(
         context,
@@ -709,7 +731,6 @@ def build_workspace_geometry_controls(
         candidate_sets=candidate_sets,
     )
     default_geometry = geometries[0] if geometries else None
-    notebook = _resolve_notebook(context, notebook_id)
     default_reference_set = str(getattr(notebook, "default_reference_set", "") or "") if notebook is not None else ""
     return WorkspaceNotebookGeometryControls(
         default_model=default_geometry.model if default_geometry is not None else "7b",

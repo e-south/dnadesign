@@ -70,7 +70,19 @@ def render_selector_cells() -> tuple[str, ...]:
                 _geometry = runtime.geometry
                 _support = runtime.support
 
-                _model_options = _support.labeled_options((value.upper(), value) for value in _geometry.model_values)
+                projected_geometry_rows = [
+                    row for row in _geometry.geometry_rows if row.get("projection_ids")
+                ]
+                _model_values = _support.unique_in_order(
+                    row.get("model") for row in projected_geometry_rows
+                ) or _geometry.model_values
+                def _model_label(value):
+                    _value = str(value)
+                    if _value.startswith("evo2_"):
+                        return "Evo 2 " + _value.removeprefix("evo2_").upper()
+                    return _value.upper()
+
+                _model_options = _support.labeled_options((_model_label(value), value) for value in _model_values)
                 model_selector = _support.mo.ui.dropdown(
                     options=_model_options,
                     value=(
@@ -87,20 +99,21 @@ def render_selector_cells() -> tuple[str, ...]:
                     ),
                     label="Candidate set / mode",
                 )
-                return (layout_selector, model_selector)
+                return (layout_selector, model_selector, projected_geometry_rows)
             """
         ),
         dedent(
             """\
             @app.cell
-            def _(model_selector, runtime):
+            def _(model_selector, projected_geometry_rows, runtime):
                 _geometry = runtime.geometry
                 _support = runtime.support
 
                 selected_model = str(model_selector.value)
+                _selector_rows = projected_geometry_rows or _geometry.geometry_rows
                 family_values = _support.unique_in_order(
                     row.get("family")
-                    for row in _geometry.geometry_rows
+                    for row in _selector_rows
                     if str(row.get("model")) == selected_model
                 ) or ["intermediate_embedding"]
                 family_default = (
@@ -132,14 +145,15 @@ def render_selector_cells() -> tuple[str, ...]:
         dedent(
             """\
             @app.cell
-            def _(family_selector, runtime, selected_model):
+            def _(family_selector, projected_geometry_rows, runtime, selected_model):
                 _geometry = runtime.geometry
                 _support = runtime.support
 
                 selected_family = str(family_selector.value)
+                _selector_rows = projected_geometry_rows or _geometry.geometry_rows
                 context_values = _support.unique_in_order(
                     row.get("context")
-                    for row in _geometry.geometry_rows
+                    for row in _selector_rows
                     if str(row.get("model")) == selected_model and str(row.get("family")) == selected_family
                 ) or ["merged_anchor_insert_seq_mean"]
                 context_default = (
@@ -171,14 +185,15 @@ def render_selector_cells() -> tuple[str, ...]:
         dedent(
             """\
             @app.cell
-            def _(context_selector, layout_selector, runtime, selected_family, selected_model):
+            def _(context_selector, layout_selector, projected_geometry_rows, runtime, selected_family, selected_model):
                 _geometry = runtime.geometry
                 _support = runtime.support
 
                 _selected_context = str(context_selector.value)
+                _selector_rows = projected_geometry_rows or _geometry.geometry_rows
                 compatible_geometries = [
                     row
-                    for row in _geometry.geometry_rows
+                    for row in _selector_rows
                     if str(row.get("model")) == selected_model
                     and str(row.get("family")) == selected_family
                     and str(row.get("context")) == _selected_context

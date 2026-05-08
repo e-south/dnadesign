@@ -1030,7 +1030,7 @@ views:
       name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_core60}
-    role: appendix
+    role: hidden
   output_layer_mean_7b_reference_core60:
     source: reference_core60_7b_core60_mean_output_layer_features
     vector:
@@ -1046,7 +1046,7 @@ views:
       name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_forward_anchor_mean}
-    role: appendix
+    role: hidden
   output_layer_mean_7b_reference_context_forward_anchor_mean:
     source: reference_context_7b_forward_anchor_mean_output_layer_features
     vector:
@@ -1062,7 +1062,7 @@ views:
       name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_forward_1kb}
-    role: appendix
+    role: hidden
   output_layer_mean_7b_reference_context_forward_1kb:
     source: reference_context_7b_forward_seq_mean_output_layer_features
     vector:
@@ -1078,7 +1078,7 @@ views:
       name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_reverse_complement_anchor_mean}
-    role: appendix
+    role: hidden
   output_layer_mean_7b_reference_context_reverse_complement_anchor_mean:
     source: reference_context_7b_reverse_complement_anchor_mean_output_layer_features
     vector:
@@ -1094,7 +1094,7 @@ views:
       name: value
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags: {encoder: evo2, model: 7b, family: intermediate_embedding, scope: reference_context_reverse_complement_1kb}
-    role: appendix
+    role: hidden
   output_layer_mean_7b_reference_context_reverse_complement_1kb:
     source: reference_context_7b_reverse_complement_seq_mean_output_layer_features
     vector:
@@ -1552,7 +1552,6 @@ notebooks:
     default_surface: plots
     candidate_sets:
       - first_class_intermediate_7b
-      - expanded_reference_intermediate_7b
       - planned_output_layer_7b
     default_candidate_set: first_class_intermediate_7b
     default_reference_set: reference_spyp_sulap
@@ -1564,11 +1563,6 @@ notebooks:
       - intermediate_embedding_7b_full_context_anchor_mean
       - intermediate_embedding_7b_reverse_complement_context_1kb
       - intermediate_embedding_7b_reverse_complement_context_anchor_mean
-      - intermediate_embedding_7b_reference_core60
-      - intermediate_embedding_7b_reference_context_forward_1kb
-      - intermediate_embedding_7b_reference_context_forward_anchor_mean
-      - intermediate_embedding_7b_reference_context_reverse_complement_1kb
-      - intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean
     candidate_grid_views: &browser_candidate_grid_views
       - intermediate_embedding_7b_anchor_60bp
       - intermediate_embedding_7b_full_context_1kb
@@ -1581,7 +1575,7 @@ notebooks:
       - 1 kb anchor mean
       - RC 1 kb sequence mean
       - RC 1 kb anchor mean
-    show_missing_projection_placeholders: true
+    show_missing_projection_placeholders: false
     preferred_hues:
       - sig35_variant
       - spacer_length

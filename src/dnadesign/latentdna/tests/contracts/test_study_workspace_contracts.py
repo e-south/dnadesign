@@ -32,17 +32,22 @@ def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
 
 
+_REFERENCE_DIAGNOSTIC_GEOMETRIES = [
+    "intermediate_embedding_7b_reference_core60",
+    "intermediate_embedding_7b_reference_context_forward_1kb",
+    "intermediate_embedding_7b_reference_context_forward_anchor_mean",
+    "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+    "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+]
+
+
 _EXPANDED_INTERMEDIATE_GEOMETRIES = [
     "intermediate_embedding_7b_anchor_60bp",
     "intermediate_embedding_7b_full_context_1kb",
     "intermediate_embedding_7b_full_context_anchor_mean",
     "intermediate_embedding_7b_reverse_complement_context_1kb",
     "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
-    "intermediate_embedding_7b_reference_core60",
-    "intermediate_embedding_7b_reference_context_forward_1kb",
-    "intermediate_embedding_7b_reference_context_forward_anchor_mean",
-    "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
-    "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+    *_REFERENCE_DIAGNOSTIC_GEOMETRIES,
 ]
 
 
@@ -83,12 +88,12 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     ]
-    assert geometry_ids == _EXPANDED_INTERMEDIATE_GEOMETRIES
+    assert geometry_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     geometry_roles = {row.view_id: row.role for row in controls.geometry_controls.geometries}
     assert geometry_roles["intermediate_embedding_7b_anchor_60bp"] == "primary"
     assert geometry_roles["intermediate_embedding_7b_full_context_anchor_mean"] == "primary"
     assert geometry_roles["intermediate_embedding_7b_full_context_1kb"] == "appendix"
-    assert geometry_roles["intermediate_embedding_7b_reference_core60"] == "appendix"
+    assert all(context.config.views[view_id].role == "hidden" for view_id in _REFERENCE_DIAGNOSTIC_GEOMETRIES)
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
     assert controls.geometry_controls.default_layout == "candidate_grid"
@@ -96,12 +101,11 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
     assert candidate_grid_layout.view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     assert [row.candidate_set_id for row in controls.geometry_controls.candidate_sets] == [
         "first_class_intermediate_7b",
-        "expanded_reference_intermediate_7b",
         "planned_output_layer_7b",
     ]
     assert controls.geometry_controls.candidate_sets[0].view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     assert controls.geometry_controls.candidate_sets[0].available_view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
-    assert controls.geometry_controls.candidate_sets[2].views[0].status == "planned"
+    assert controls.geometry_controls.candidate_sets[1].views[0].status == "planned"
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
     assert "spacer_length" in preferred_hues
@@ -130,6 +134,74 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "reference_w_collection",
         "reference_w_collection_core60",
     }
+
+
+def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> None:
+    for workspace in [_live_workspace(), _regulondb_workspace()]:
+        context = load_workspace_config(workspace)
+        controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+        projections_by_view = {row.view_id: list(row.projection_ids) for row in controls.geometry_controls.geometries}
+
+        for layout in controls.geometry_controls.layout_presets:
+            if layout.mode != "fixed_grid":
+                continue
+            missing = [view_id for view_id in layout.view_ids if not projections_by_view.get(view_id)]
+            assert not missing, f"{workspace.name}:{layout.id} has no projection for {missing}"
+
+
+def test_live_stress_reference_diagnostics_do_not_become_projection_browser_panels() -> None:
+    context = load_workspace_config(_live_workspace())
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    browser_view_ids = {row.view_id for row in controls.geometry_controls.geometries}
+    layout_view_ids = {
+        view_id
+        for layout in controls.geometry_controls.layout_presets
+        for view_id in layout.view_ids
+        if layout.mode == "fixed_grid"
+    }
+
+    assert not browser_view_ids.intersection(_REFERENCE_DIAGNOSTIC_GEOMETRIES)
+    assert not layout_view_ids.intersection(_REFERENCE_DIAGNOSTIC_GEOMETRIES)
+    assert controls.geometry_controls.reference_sets
+    assert controls.geometry_controls.default_reference_set == "reference_spyp_sulap"
+
+
+def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> None:
+    context = load_workspace_config(_live_workspace())
+    appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
+    generate_step = appendix_steps["generate_latent_geometry_browser"]
+    reference_context_umap_steps = {
+        "fit_umap_intermediate_embedding_7b_reference_context_forward_1kb",
+        "fit_umap_intermediate_embedding_7b_reference_context_forward_anchor_mean",
+        "fit_umap_intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+        "fit_umap_intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+    }
+
+    assert not reference_context_umap_steps.intersection(appendix_steps)
+    assert not reference_context_umap_steps.intersection(set(generate_step.depends_on))
+
+
+def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fixed_grids() -> None:
+    context = load_workspace_config(_regulondb_workspace())
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    native_core60_layout = next(
+        row
+        for row in controls.geometry_controls.layout_presets
+        if row.id == "candidate_set__native_core60_7b_representations"
+    )
+
+    assert geometry_ids == [
+        "intermediate_embedding_7b_native_source_record_seq_mean",
+        "intermediate_embedding_7b_core60_tss_upstream",
+    ]
+    assert controls.geometry_controls.candidate_sets[0].available_view_ids == geometry_ids
+    assert native_core60_layout.view_ids == [
+        "intermediate_embedding_7b_native_source_record_seq_mean",
+        "intermediate_embedding_7b_core60_tss_upstream",
+    ]
+    assert "Projection-backed subset" in native_core60_layout.description
+    assert "output-layer" not in native_core60_layout.description.lower()
 
 
 def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
@@ -269,14 +341,14 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.sources["reference_native"].dataset == "usr_promoter_references"
     assert context.config.sources["reference_core60"].dataset == "construct_prom_eth_cip_reference_core60"
     assert context.config.sources["reference_contexts"].dataset == "construct_prom_eth_cip_reference_contexts"
-    assert context.config.views["intermediate_embedding_7b_reference_core60"].role == "appendix"
     expected_appendix_reference_views = [
+        "intermediate_embedding_7b_reference_core60",
         "intermediate_embedding_7b_reference_context_forward_1kb",
         "intermediate_embedding_7b_reference_context_forward_anchor_mean",
         "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
         "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
     ]
-    assert all(context.config.views[view_id].role == "appendix" for view_id in expected_appendix_reference_views)
+    assert all(context.config.views[view_id].role == "hidden" for view_id in expected_appendix_reference_views)
     expected_planned_reference_views = [
         "output_layer_mean_7b_reference_core60",
         "output_layer_mean_7b_reference_context_forward_1kb",
@@ -286,7 +358,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     ]
     assert all(context.config.views[view_id].role == "planned" for view_id in expected_planned_reference_views)
     initial_control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
-    assert all(view_id in initial_control_geometry_ids for view_id in expected_appendix_reference_views)
+    assert all(view_id not in initial_control_geometry_ids for view_id in expected_appendix_reference_views)
     assert all(view_id not in initial_control_geometry_ids for view_id in expected_planned_reference_views)
     expected_total_log_likelihood_sources = [
         "anchor_7b_seq_mean_log_likelihood_total",
@@ -312,8 +384,8 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert decision_ladder == expected_decision_prefix
     browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
     control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
-    assert browser_geometry_ids == _EXPANDED_INTERMEDIATE_GEOMETRIES
-    assert control_geometry_ids == _EXPANDED_INTERMEDIATE_GEOMETRIES
+    assert browser_geometry_ids == _FIRST_CLASS_CANDIDATE_VIEWS
+    assert control_geometry_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert controls.geometry_controls.default_layout == "candidate_grid"
