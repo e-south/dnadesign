@@ -10,8 +10,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from dnadesign.latentdna.src.io.hashing import sha256_file
 from dnadesign.latentdna.src.plots.render import _add_figure_legends, _pyplot
+from dnadesign.latentdna.src.services.freshness_service import evaluate_artifact_freshness
 from dnadesign.latentdna.src.services.plot_service import render_plot
+from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
 def _write_workspace_config(workspace_dir: Path) -> None:
@@ -168,6 +171,14 @@ def _write_scalar(output_root: Path, scalar_id: str, rows: list[dict[str, object
                 "tool_version": "fixture",
                 "command": "fixture",
                 "status": "ok",
+                "source_provenance": [
+                    {
+                        "id": f"fixture_scalar:{scalar_id}",
+                        "role": "fixture_scalar",
+                        "path": table_path.as_posix(),
+                        "digest": sha256_file(table_path),
+                    }
+                ],
                 "outputs": [{"path": table_path.name, "media_type": "application/x-parquet"}],
                 "stats": {"rows": len(rows)},
             },
@@ -273,6 +284,63 @@ def _render_named_plot(workspace_dir: Path, plot_id: str) -> None:
         label_column=None,
         label_values=[],
     )
+
+
+def test_plot_freshness_uses_plot_scoped_config_contract(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    output_root = workspace_dir / "outputs"
+    _write_scalar(
+        output_root,
+        "margin_a",
+        [
+            {
+                "synthetic_margin_ethanol_vs_background": 0.10,
+                "synthetic_margin_cipro_vs_background": 0.20,
+                "design_family": "control",
+                "sig35_variant": "a",
+            }
+        ],
+    )
+    _write_scalar(
+        output_root,
+        "margin_b",
+        [
+            {
+                "synthetic_margin_ethanol_vs_background": 0.30,
+                "synthetic_margin_cipro_vs_background": 0.40,
+                "design_family": "control",
+                "sig35_variant": "a",
+            }
+        ],
+    )
+    _render_named_plot(workspace_dir, "design_centroid_margin_gallery")
+
+    config_path = workspace_dir / "config.yaml"
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["plots"]["representation_health_summary"]["value_label"] = "Updated metric value"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+
+    unrelated_freshness = evaluate_artifact_freshness(
+        context,
+        artifact_kind="plot",
+        artifact_id="design_centroid_margin_gallery",
+    )
+    assert unrelated_freshness["status"] == "ok"
+
+    payload["plots"]["design_centroid_margin_gallery"]["default_hue"] = "sig35_variant"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+
+    changed_freshness = evaluate_artifact_freshness(
+        context,
+        artifact_kind="plot",
+        artifact_id="design_centroid_margin_gallery",
+    )
+    assert changed_freshness["status"] == "attention"
+    assert changed_freshness["reason"] == "stale plot config for plot:design_centroid_margin_gallery"
 
 
 def test_plot_gallery_rendering_records_plural_scalar_and_agreement_inputs(tmp_path: Path) -> None:

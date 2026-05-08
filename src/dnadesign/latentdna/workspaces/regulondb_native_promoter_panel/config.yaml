@@ -355,6 +355,7 @@ plots:
     panel_title: Native source-record sigma UMAP
     default_hue: regulondb__sigma_factor_set
     hue_options:
+      - {column: gc_fraction, label: GC fraction, type: continuous}
       - {column: regulondb__sigma_factor_set, label: Sigma factor set, type: categorical}
       - {column: regulondb__confidence_level_set, label: Confidence level, type: categorical}
       - {column: regulondb__metadata_completeness_class, label: Metadata completeness, type: categorical}
@@ -371,6 +372,7 @@ plots:
     panel_title: Core60 TSS-upstream sigma UMAP
     default_hue: regulondb__sigma_factor_set
     hue_options:
+      - {column: gc_fraction, label: GC fraction, type: continuous}
       - {column: regulondb__sigma_factor_set, label: Sigma factor set, type: categorical}
       - {column: regulondb__confidence_level_set, label: Confidence level, type: categorical}
       - {column: regulondb__metadata_completeness_class, label: Metadata completeness, type: categorical}
@@ -403,10 +405,12 @@ notebooks:
       - Core60 TSS-upstream intermediate
     show_missing_projection_placeholders: false
     preferred_hues:
+      - gc_fraction
       - regulondb__sigma_factor_set
       - regulondb__confidence_level_set
       - regulondb__metadata_completeness_class
     preferred_hue_kinds:
+      gc_fraction: continuous
       regulondb__sigma_factor_set: categorical
       regulondb__confidence_level_set: categorical
       regulondb__metadata_completeness_class: categorical
@@ -435,6 +439,14 @@ recipes:
       - id: materialize_core60_tss_upstream_output_layer
         op: view.materialize
         params: {view: output_layer_mean_7b_core60_tss_upstream}
+      - id: build_sequence_features_intermediate_embedding_7b_native_source_record_seq_mean
+        op: scalar.build
+        depends_on: [materialize_native_source_record_seq_mean]
+        params: {scalar: sequence_features_intermediate_embedding_7b_native_source_record_seq_mean, kind: sequence_features, view_id: intermediate_embedding_7b_native_source_record_seq_mean}
+      - id: build_sequence_features_intermediate_embedding_7b_core60_tss_upstream
+        op: scalar.build
+        depends_on: [materialize_core60_tss_upstream]
+        params: {scalar: sequence_features_intermediate_embedding_7b_core60_tss_upstream, kind: sequence_features, view_id: intermediate_embedding_7b_core60_tss_upstream}
       - id: build_alignment_intermediate_embedding_7b_native_to_core60
         op: alignment.build
         depends_on:
@@ -595,6 +607,8 @@ recipes:
       - id: generate_latent_geometry_browser
         op: notebook.generate
         depends_on:
+          - build_sequence_features_intermediate_embedding_7b_native_source_record_seq_mean
+          - build_sequence_features_intermediate_embedding_7b_core60_tss_upstream
           - render_representation_health_summary
           - render_native_core60_shift_summary
           - render_sigma_factor_structure_summary

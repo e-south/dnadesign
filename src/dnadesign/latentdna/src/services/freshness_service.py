@@ -284,6 +284,49 @@ def _notebook_health_freshness_reasons(
     return [f"notebook health requires attention for notebook:{artifact_id}: {detail}"], True
 
 
+def _plot_config_freshness_reasons(
+    context: WorkspaceContext,
+    *,
+    artifact_id: str,
+    manifest: dict[str, object],
+) -> tuple[list[str], bool]:
+    if artifact_id not in context.config.plots:
+        return [], True
+    from ..plots.recipes import resolve_plot_spec
+    from ._plot_payloads import manifest_params_for_plot
+
+    current_spec = resolve_plot_spec(
+        plots=context.config.plots,
+        plot_id=artifact_id,
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        scalar_ids=[],
+        agreement_id=None,
+        agreement_ids=[],
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        shape_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
+    recorded_params = manifest.get("params")
+    if not isinstance(recorded_params, dict):
+        return [f"freshness unknown: plot manifest lacks params for plot:{artifact_id}"], False
+    if recorded_params != manifest_params_for_plot(current_spec):
+        return [f"stale plot config for plot:{artifact_id}"], True
+    return [], True
+
+
 def _scalar_metric_definition_freshness_reasons(
     context: WorkspaceContext,
     *,
@@ -457,6 +500,8 @@ def evaluate_manifest_freshness(
     for entry in manifest.get("source_provenance", []) or []:
         if not isinstance(entry, dict):
             continue
+        if artifact_kind == "plot" and entry.get("id") == "workspace_config":
+            continue
         path_text = str(entry.get("path") or "")
         recorded_digest = str(entry.get("digest") or "")
         if not path_text or not recorded_digest:
@@ -538,6 +583,17 @@ def evaluate_manifest_freshness(
             known = known and bool(upstream.get("known"))
             reason = str(upstream.get("reason") or f"{upstream_kind}:{input_id} is not fresh")
             reasons.append(f"freshness depends on {upstream_kind}:{input_id}: {reason}")
+
+    if artifact_kind == "plot":
+        checked_any = True
+        plot_config_reasons, plot_config_known = _plot_config_freshness_reasons(
+            context,
+            artifact_id=artifact_id,
+            manifest=manifest,
+        )
+        if plot_config_reasons:
+            reasons.extend(plot_config_reasons)
+        known = known and plot_config_known
 
     if reasons:
         return {"status": "attention", "reason": reasons[0], "known": known, "reasons": reasons}

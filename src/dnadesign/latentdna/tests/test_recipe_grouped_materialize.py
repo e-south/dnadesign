@@ -14,7 +14,9 @@ from dnadesign.infer.src.features.aliases import (
 )
 from dnadesign.infer.src.features.cache_keys import DNA_SEQUENCE_CASE_POLICY
 from dnadesign.latentdna.src.io.matrix_io import read_matrix
+from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.services.recipe_service import run_recipe
+from dnadesign.latentdna.src.services.scalar_service import build_scalar
 from dnadesign.latentdna.src.sources import infer_sidecar_join
 from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
@@ -213,3 +215,30 @@ def test_recipe_groups_compatible_infer_sidecar_materializations_after_one_share
     assert read_matrix(workspace_dir / "outputs" / "views" / "anchor_mean_view" / "matrix.npy").tolist() == [
         [1.0, 2.0, 3.0]
     ]
+
+
+def test_sequence_features_scalar_builds_gc_content_on_materialized_view_rows(tmp_path: Path) -> None:
+    workspace_dir = _write_two_view_sidecar_workspace(tmp_path)
+    run_recipe(workspace_dir, "two_view_recipe", refresh_catalog=False)
+
+    result = build_scalar(
+        workspace_dir,
+        "sequence_features_seq_mean_view",
+        builder_kind="sequence_features",
+        params={"view_id": "seq_mean_view"},
+    )
+
+    assert result.status == "ok"
+    table = read_table(workspace_dir / "outputs" / "scalars" / "sequence_features_seq_mean_view" / "table.parquet")
+    assert table.column_names == [
+        "alias_id",
+        "id",
+        "gc_fraction",
+        "gc_count",
+        "canonical_base_count",
+        "sequence_length",
+    ]
+    assert table["gc_fraction"].to_pylist() == [0.5]
+    assert table["gc_count"].to_pylist() == [30]
+    assert table["canonical_base_count"].to_pylist() == [60]
+    assert table["sequence_length"].to_pylist() == [60]

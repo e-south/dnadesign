@@ -469,6 +469,8 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
     style = _axis_style(axis_styles, column)
     if style is not None:
         return axis_display_label(style, column)
+    if column == "gc_fraction":
+        return "GC fraction"
     if column == "log_likelihood_per_token_7b":
         return "7B log likelihood / token"
     if column == "log_likelihood_per_token_20b":
@@ -602,11 +604,13 @@ def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str
 
 def candidate_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> list[tuple[str, str]]:
     candidate_pairs = [
+        ("alias_id", "alias_id"),
         ("construct__anchor_id", "construct__anchor_id"),
         ("construct__anchor_id", "id"),
         # Anchor-only projection rows should join context summary tables by anchor id.
         ("id", "construct__anchor_id"),
         ("id", "id"),
+        ("alignment_parent_sequence_id", "alignment_parent_sequence_id"),
         ("subject_id", "subject_id"),
         ("context_id", "context_id"),
     ]

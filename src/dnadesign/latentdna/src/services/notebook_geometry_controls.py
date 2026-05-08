@@ -44,7 +44,14 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "context_shift_l2": "continuous",
 }
 
-_JOINABLE_KEY_COLUMNS = {"construct__anchor_id", "id", "subject_id", "context_id"}
+_JOINABLE_KEY_COLUMNS = {
+    "alias_id",
+    "construct__anchor_id",
+    "id",
+    "alignment_parent_sequence_id",
+    "subject_id",
+    "context_id",
+}
 _DEFAULT_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {

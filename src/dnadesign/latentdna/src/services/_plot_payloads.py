@@ -329,6 +329,8 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["y_column"] = spec.y_column
     if spec.color_column is not None:
         params["color_column"] = spec.color_column
+    if spec.color_scale is not None:
+        params["color_scale"] = spec.color_scale
     if spec.shape_column is not None:
         params["shape_column"] = spec.shape_column
     if spec.size_column is not None:
@@ -339,6 +341,12 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["default_hue"] = spec.default_hue
     if spec.hue_options:
         params["hue_options"] = [option.model_dump(mode="json") for option in spec.hue_options]
+    if spec.x_axis_label is not None:
+        params["x_axis_label"] = spec.x_axis_label
+    if spec.y_axis_label is not None:
+        params["y_axis_label"] = spec.y_axis_label
+    if spec.colorbar_label is not None:
+        params["colorbar_label"] = spec.colorbar_label
     if spec.direction_column is not None:
         params["direction_column"] = spec.direction_column
     if spec.unit_column is not None:
@@ -365,6 +373,12 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["sort_rule"] = spec.sort_rule
     if spec.annotation is not None:
         params["annotation"] = spec.annotation.model_dump(mode="json")
+    if spec.single_row_panels:
+        params["single_row_panels"] = True
+    if spec.square_panels:
+        params["square_panels"] = True
+    if spec.hide_repeated_y_axis:
+        params["hide_repeated_y_axis"] = True
     if spec.kind in {"categorical_count", "metric_panel_grid", "distribution"}:
         if spec.scalar_id is not None:
             params["input_kind"] = "scalar_table"

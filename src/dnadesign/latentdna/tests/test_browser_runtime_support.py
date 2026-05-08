@@ -339,6 +339,13 @@ def test_resolve_join_keys_supports_construct_anchor_id_to_id_orientation() -> N
     assert resolve_join_keys(left, right) == ("construct__anchor_id", "id")
 
 
+def test_resolve_join_keys_prefers_alias_id_for_sidecar_row_features() -> None:
+    left = pd.DataFrame({"alias_id": ["alias_a", "alias_b"], "construct__anchor_id": ["a1", "a2"]})
+    right = pd.DataFrame({"alias_id": ["alias_a", "alias_b"], "construct__anchor_id": ["a1", "a1"]})
+
+    assert resolve_join_keys(left, right) == ("alias_id", "alias_id")
+
+
 def test_display_hue_label_and_value_compact_design_regulator_composition() -> None:
     assert display_hue_label("design_regulator_composition", axis_styles=REGULATOR_AXIS_STYLES) == "Reg. comp."
     assert (

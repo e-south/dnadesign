@@ -1516,6 +1516,7 @@ plots:
     panel_titles: *candidate_panel_titles
     default_hue: sig35_variant
     hue_options:
+      - {column: gc_fraction, label: GC fraction, type: continuous}
       - {column: design_family, label: Design family, type: categorical}
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
@@ -1577,11 +1578,13 @@ notebooks:
       - RC 1 kb anchor mean
     show_missing_projection_placeholders: false
     preferred_hues:
+      - gc_fraction
       - sig35_variant
       - spacer_length
       - source_family
       - selection_basis
     preferred_hue_kinds:
+      gc_fraction: continuous
       sig35_variant: categorical
       spacer_length: ordinal
       source_family: categorical
@@ -1655,6 +1658,11 @@ recipes:
       - &materialize_ol7_anchor_mean {id: materialize_output_layer_mean_7b_full_context_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_full_context_anchor_mean}}
       - &materialize_ol7_rev_context {id: materialize_output_layer_mean_7b_reverse_complement_context_1kb, op: view.materialize, params: {view: output_layer_mean_7b_reverse_complement_context_1kb}}
       - &materialize_ol7_rev_anchor_mean {id: materialize_output_layer_mean_7b_reverse_complement_context_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_reverse_complement_context_anchor_mean}}
+      - &sequence_features_ie7_anchor {id: build_sequence_features_intermediate_embedding_7b_anchor_60bp, op: scalar.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {scalar: sequence_features_intermediate_embedding_7b_anchor_60bp, kind: sequence_features, view_id: intermediate_embedding_7b_anchor_60bp}}
+      - &sequence_features_ie7_full_context {id: build_sequence_features_intermediate_embedding_7b_full_context_1kb, op: scalar.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {scalar: sequence_features_intermediate_embedding_7b_full_context_1kb, kind: sequence_features, view_id: intermediate_embedding_7b_full_context_1kb}}
+      - &sequence_features_ie7_anchor_mean {id: build_sequence_features_intermediate_embedding_7b_full_context_anchor_mean, op: scalar.build, depends_on: [materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {scalar: sequence_features_intermediate_embedding_7b_full_context_anchor_mean, kind: sequence_features, view_id: intermediate_embedding_7b_full_context_anchor_mean}}
+      - &sequence_features_ie7_rev_context {id: build_sequence_features_intermediate_embedding_7b_reverse_complement_context_1kb, op: scalar.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {scalar: sequence_features_intermediate_embedding_7b_reverse_complement_context_1kb, kind: sequence_features, view_id: intermediate_embedding_7b_reverse_complement_context_1kb}}
+      - &sequence_features_ie7_rev_anchor_mean {id: build_sequence_features_intermediate_embedding_7b_reverse_complement_context_anchor_mean, op: scalar.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_anchor_mean], params: {scalar: sequence_features_intermediate_embedding_7b_reverse_complement_context_anchor_mean, kind: sequence_features, view_id: intermediate_embedding_7b_reverse_complement_context_anchor_mean}}
       - &align_ie7_full_context {id: build_alignment_intermediate_embedding_7b_anchor_to_full_context, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_1kb], params: {alignment: intermediate_embedding_7b_anchor_to_full_context}}
       - &align_ie7_anchor_mean {id: build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {alignment: intermediate_embedding_7b_anchor_to_anchor_mean}}
       - &align_ie7_rev_context {id: build_alignment_intermediate_embedding_7b_anchor_to_reverse_complement_context, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {alignment: intermediate_embedding_7b_anchor_to_reverse_complement_context}}
@@ -2295,6 +2303,11 @@ recipes:
       - *materialize_ie7_anchor_mean
       - *materialize_ie7_rev_context
       - *materialize_ie7_rev_anchor_mean
+      - *sequence_features_ie7_anchor
+      - *sequence_features_ie7_full_context
+      - *sequence_features_ie7_anchor_mean
+      - *sequence_features_ie7_rev_context
+      - *sequence_features_ie7_rev_anchor_mean
       - *materialize_ol7_anchor
       - *materialize_ol7_full_context
       - *materialize_ol7_anchor_mean
@@ -2403,6 +2416,11 @@ recipes:
       - id: generate_latent_geometry_browser
         op: notebook.generate
         depends_on:
+          - build_sequence_features_intermediate_embedding_7b_anchor_60bp
+          - build_sequence_features_intermediate_embedding_7b_full_context_1kb
+          - build_sequence_features_intermediate_embedding_7b_full_context_anchor_mean
+          - build_sequence_features_intermediate_embedding_7b_reverse_complement_context_1kb
+          - build_sequence_features_intermediate_embedding_7b_reverse_complement_context_anchor_mean
           - render_dataset_overview
           - render_representation_health_summary
           - render_design_structure_summary

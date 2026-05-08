@@ -229,6 +229,7 @@ def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
 def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
     context = load_workspace_config(_regulondb_workspace())
     expected_hues = [
+        "gc_fraction",
         "regulondb__sigma_factor_set",
         "regulondb__confidence_level_set",
         "regulondb__metadata_completeness_class",
@@ -473,13 +474,14 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert appendix_gallery.shape_column is None
     assert appendix_gallery.default_hue == "sig35_variant"
     assert [option.column for option in appendix_gallery.hue_options] == [
+        "gc_fraction",
         "design_family",
         "design_regulator_composition",
         "sig35_variant",
         "spacer_length",
         "source_family",
     ]
-    assert appendix_gallery.hue_options[3].type == "ordinal"
+    assert appendix_gallery.hue_options[4].type == "ordinal"
     assert appendix_gallery.annotation is not None
     assert appendix_gallery.annotation.reference_set == "reference_spyp_sulap"
     assert list(context.config.plots["design_centroid_margin_gallery"].scalars) == [

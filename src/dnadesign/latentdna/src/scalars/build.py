@@ -132,6 +132,118 @@ def _source_column_value_map(
     )
 
 
+_SEQUENCE_FEATURE_JOIN_KEYS = (
+    "alias_id",
+    "id",
+    "sequence_id",
+    "construct__anchor_id",
+    "construct__context_id",
+    "alignment_parent_sequence_id",
+    "subject_id",
+    "context_id",
+)
+
+
+def _gc_feature_row(sequence: object) -> dict[str, object]:
+    if sequence is None:
+        return {
+            "gc_fraction": None,
+            "gc_count": None,
+            "canonical_base_count": None,
+            "sequence_length": None,
+        }
+    text = str(sequence).strip().upper()
+    canonical_base_count = sum(1 for base in text if base in {"A", "C", "G", "T"})
+    gc_count = sum(1 for base in text if base in {"G", "C"})
+    return {
+        "gc_fraction": (gc_count / canonical_base_count) if canonical_base_count else None,
+        "gc_count": gc_count,
+        "canonical_base_count": canonical_base_count,
+        "sequence_length": len(text),
+    }
+
+
+def _resolve_sequence_feature_join_key(rows_table: pa.Table, source_table: pa.Table) -> str:
+    row_columns = set(rows_table.column_names)
+    source_columns = set(source_table.column_names)
+    for key in _SEQUENCE_FEATURE_JOIN_KEYS:
+        if key in row_columns and key in source_columns:
+            return key
+    raise ContractViolationError(
+        "sequence_features requires a shared row key between materialized view rows and the source sequence table"
+    )
+
+
+def _unique_sequence_feature_map(source_table: pa.Table, *, join_key: str) -> dict[object, dict[str, object]]:
+    mapping: dict[object, dict[str, object]] = {}
+    duplicate_keys: list[object] = []
+    for row in source_table.to_pylist():
+        key = row.get(join_key)
+        if key is None:
+            continue
+        if key in mapping:
+            duplicate_keys.append(key)
+            continue
+        mapping[key] = _gc_feature_row(row.get("sequence"))
+    if duplicate_keys:
+        preview = sorted({str(key) for key in duplicate_keys})[:5]
+        raise ContractViolationError(f"sequence_features source rows are not unique on {join_key!r}: {preview}")
+    return mapping
+
+
+def _sequence_features_table(
+    context: WorkspaceContext,
+    *,
+    view_id: str,
+) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object]]:
+    _, rows_path = _view_paths(context, view_id)
+    rows_table = read_table(rows_path)
+    view = context.require_source_view(view_id)
+    source = context.require_source(view.source)
+    resolved = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
+    available_columns = set(inspect_source_schema(resolved)["columns"])
+    if "sequence" not in available_columns:
+        raise ContractViolationError(f"sequence_features requires source {view.source!r} to expose a sequence column")
+    source_columns = [column for column in _SEQUENCE_FEATURE_JOIN_KEYS if column in available_columns]
+    if not source_columns:
+        raise ContractViolationError(f"sequence_features source {view.source!r} exposes no supported row join key")
+    source_table = read_records_table(resolved, columns=[*source_columns, "sequence"])
+    join_key = _resolve_sequence_feature_join_key(rows_table, source_table)
+    features_by_key = _unique_sequence_feature_map(source_table, join_key=join_key)
+    output_rows: list[dict[str, object]] = []
+    missing_keys: list[object] = []
+    output_key_columns = [column for column in _SEQUENCE_FEATURE_JOIN_KEYS if column in rows_table.column_names]
+    for row in rows_table.to_pylist():
+        key = row.get(join_key)
+        features = features_by_key.get(key)
+        if features is None:
+            missing_keys.append(key)
+            features = _gc_feature_row(None)
+        output_rows.append(
+            {
+                **{column: row.get(column) for column in output_key_columns},
+                **features,
+            }
+        )
+    if missing_keys:
+        preview = sorted({str(key) for key in missing_keys[:5]})
+        raise ContractViolationError(f"sequence_features found missing source sequence rows on {join_key!r}: {preview}")
+    table = pa.Table.from_pylist(output_rows)
+    return (
+        table,
+        [
+            ScalarInputRef(kind="view_rows", artifact_id=view_id, path=rows_path),
+            ScalarInputRef(kind="source", artifact_id=view.source, path=resolved.records_path),
+        ],
+        {
+            "view_id": view_id,
+            "join_key": join_key,
+            "rows": table.num_rows,
+            "feature_columns": ["gc_fraction", "gc_count", "canonical_base_count", "sequence_length"],
+        },
+    )
+
+
 def _project_source_column_to_view_rows(
     context: WorkspaceContext,
     *,
@@ -1720,6 +1832,21 @@ def build_scalar_artifact(
         table = pa.Table.from_pylist(output_rows)
         write_table(table, artifact_dir / "table.parquet")
         stats = {"rows": table.num_rows, "sources": len(source_ids), "denominator": denominator}
+        return BuiltScalarArtifact(
+            artifact_dir=artifact_dir,
+            rows=table.num_rows,
+            columns=table.column_names,
+            inputs=inputs,
+            outputs=extra_outputs,
+            stats=stats,
+        )
+
+    if builder_kind == "sequence_features":
+        table, inputs, stats = _sequence_features_table(
+            context,
+            view_id=str(_require_param(params, "view_id")),
+        )
+        write_table(table, artifact_dir / "table.parquet")
         return BuiltScalarArtifact(
             artifact_dir=artifact_dir,
             rows=table.num_rows,
