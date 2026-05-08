@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from dnadesign.usr import sequence_views_path, view_semantics_path
@@ -99,15 +100,32 @@ def _payload_key_set(
     return _payload_key_set_for_path(path.as_posix(), contract.payload_key_column, stat.st_mtime_ns, stat.st_size)
 
 
+def _first_true_index(mask: pa.Array | pa.ChunkedArray) -> int:
+    chunks = mask.chunks if isinstance(mask, pa.ChunkedArray) else [mask]
+    offset = 0
+    for chunk in chunks:
+        for index, value in enumerate(chunk.to_pylist()):
+            if value:
+                return offset + index
+        offset += len(chunk)
+    return -1
+
+
 def alias_payload_keys(contract: InferSidecarJoinContract, aliases: pa.Table, *, dataset: str) -> list[str]:
-    keys: list[str] = []
-    for index, raw_key in enumerate(aliases.column(contract.payload_key_column).to_pylist()):
-        if raw_key is None or not str(raw_key).strip():
-            raise SourceResolutionError(
-                f"{contract.source_label} alias row {index} in {dataset} has no {contract.payload_key_column}"
-            )
-        keys.append(str(raw_key))
-    return keys
+    keys = aliases.column(contract.payload_key_column)
+    null_mask = pc.is_null(keys)
+    if bool(pc.any(null_mask).as_py()):
+        index = _first_true_index(null_mask)
+        raise SourceResolutionError(
+            f"{contract.source_label} alias row {index} in {dataset} has no {contract.payload_key_column}"
+        )
+    blank_mask = pc.fill_null(pc.equal(pc.utf8_trim_whitespace(keys), ""), False)
+    if bool(pc.any(blank_mask).as_py()):
+        index = _first_true_index(blank_mask)
+        raise SourceResolutionError(
+            f"{contract.source_label} alias row {index} in {dataset} has no {contract.payload_key_column}"
+        )
+    return keys.to_pylist()
 
 
 def assert_payload_keys_exist(

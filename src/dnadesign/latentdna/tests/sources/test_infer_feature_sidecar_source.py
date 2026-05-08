@@ -508,7 +508,11 @@ def test_feature_sidecar_inspect_schema_reuses_alias_table_scan(tmp_path: Path, 
     assert calls == [dataset.name]
 
 
-def test_feature_sidecar_alias_rows_without_vector_keys_fail_fast(tmp_path: Path) -> None:
+@pytest.mark.parametrize("raw_vector_key", [None, "  "])
+def test_feature_sidecar_alias_rows_without_vector_keys_fail_fast(
+    tmp_path: Path,
+    raw_vector_key: str | None,
+) -> None:
     usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
     derived_dir = dataset.dir / "_derived" / "infer"
     derived_dir.mkdir(parents=True)
@@ -520,7 +524,7 @@ def test_feature_sidecar_alias_rows_without_vector_keys_fail_fast(tmp_path: Path
                     "view_id": "view_null_key",
                     "view_name": "fixture",
                     "sequence_id": sequence_id,
-                    "feature_vector_key": None,
+                    "feature_vector_key": raw_vector_key,
                     "forward_pass_key": "fp_null_key",
                     "provider": "evo2",
                     "model_name": "evo2_7b",

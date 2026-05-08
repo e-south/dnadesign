@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ..contracts.errors import ContractViolationError
 from ..contracts.workspace import DerivedViewConfig, SourceBackedViewConfig
@@ -17,7 +18,7 @@ from ..sources.provenance import (
     OVERLAY_LEDGER_PAYLOAD_DIGEST_MODE,
     source_provenance_digest,
 )
-from ..sources.resolver import inspect_source_schema, resolve_source
+from ..sources.resolver import ResolvedSource, inspect_source_schema, resolve_source
 from ..views.row_contracts import source_backed_view_row_contract
 from ..workspaces.loader import WorkspaceContext
 from ._artifact_inputs import artifact_kind_for_input_dependency
@@ -28,6 +29,7 @@ from ._artifacts import artifact_exists, artifact_manifest_path
 class FreshnessCache:
     artifact_results: dict[tuple[str, str], dict[str, object]] = field(default_factory=dict)
     path_digests: dict[str, tuple[bool, str | None]] = field(default_factory=dict)
+    source_schemas: dict[tuple[str, str, str], dict[str, Any]] = field(default_factory=dict)
     overlay_inventory_digests: dict[str, str] = field(default_factory=dict)
     overlay_ledger_payload_digests: dict[str, str] = field(default_factory=dict)
 
@@ -65,11 +67,36 @@ def _resolve_overlay_ledger_payload_digest(path: Path, *, cache: FreshnessCache)
     return digest
 
 
+def _source_schema_cache_key(context: WorkspaceContext, resolved: ResolvedSource) -> tuple[str, str, str]:
+    source = resolved.source
+    if hasattr(source, "model_dump_json"):
+        source_fingerprint = source.model_dump_json()
+    else:
+        source_fingerprint = repr(source)
+    return (context.workspace_dir.resolve().as_posix(), resolved.source_id, source_fingerprint)
+
+
+def _inspect_source_schema(
+    context: WorkspaceContext,
+    resolved: ResolvedSource,
+    *,
+    cache: FreshnessCache,
+) -> dict[str, Any]:
+    key = _source_schema_cache_key(context, resolved)
+    cached = cache.source_schemas.get(key)
+    if cached is not None:
+        return cached
+    schema = inspect_source_schema(resolved)
+    cache.source_schemas[key] = schema
+    return schema
+
+
 def _view_config_freshness_reasons(
     context: WorkspaceContext,
     *,
     artifact_id: str,
     manifest: dict[str, object],
+    cache: FreshnessCache,
 ) -> tuple[list[str], bool]:
     if not all(hasattr(context, attribute) for attribute in ("require_view", "config")):
         return [], True
@@ -93,7 +120,7 @@ def _view_config_freshness_reasons(
                 context,
                 source_id=view.source,
                 source=source,
-                available_columns=inspect_source_schema(resolved)["columns"],
+                available_columns=_inspect_source_schema(context, resolved, cache=cache)["columns"],
             )
         except ContractViolationError as exc:
             return [f"stale view config for view:{artifact_id}: {exc}"], True
@@ -628,6 +655,7 @@ def evaluate_manifest_freshness(
             context,
             artifact_id=artifact_id,
             manifest=manifest,
+            cache=cache,
         )
         if view_reasons:
             return {
