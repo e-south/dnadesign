@@ -359,6 +359,7 @@ def render_plot_review_surface(
             axis_styles=axis_styles,
             joinable_tables=joinable_tables,
             reference_labels=resolved_reference_labels,
+            reference_set_id=reference_set_id,
             reference_match_column=reference_match_column,
             reference_display_labels=reference_display_labels,
             reference_label_limit=reference_label_limit,

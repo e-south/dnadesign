@@ -213,6 +213,38 @@ def test_render_projection_grid_default_alt_names_layout_hue_and_reference_overl
     assert "grid" not in alt.lower()
 
 
+def test_render_projection_grid_prepends_dynamic_contract_to_semantic_alt_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_render(fig, *, alt=None):
+        plt.close(fig)
+        captured["alt"] = str(alt or "")
+        return captured["alt"]
+
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", fake_render)
+    frame = pd.DataFrame({"x": [0.0, 1.0], "y": [1.0, 0.0], "gc_fraction": [0.42, 0.51]})
+
+    alt = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[frame],
+        hue_column="gc_fraction",
+        hue_kinds={"gc_fraction": "continuous"},
+        joinable_tables=[],
+        reference_labels=[],
+        reference_set_id="",
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+        alt_text="Configured UMAP gallery semantics.",
+    )
+
+    assert alt == captured["alt"]
+    assert alt.startswith("Single persisted projection colored by GC fraction; reference labels overlay off")
+    assert alt.endswith("Configured UMAP gallery semantics.")
+
+
 def test_render_projection_grid_surfaces_reference_overlay_warnings(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: "rendered plot")
     monkeypatch.setattr(
@@ -514,7 +546,7 @@ def test_render_projection_grid_orders_sig35_legend_by_strength(monkeypatch, tmp
         labels = [text.get_text() for text in legend.get_texts()]
         colors = [handle.get_color() for handle in legend.legend_handles]
         assert labels == ["TTGACA (f)", "TTTACA (d)", "CTGACA (b)", "Control"]
-        assert colors == ["#B2182B", "#F4A582", "#2166AC", "#7F8894"]
+        assert colors == ["#B2182B", "#E69B7B", "#2166AC", "#7F8894"]
     finally:
         plt.close(fig)
 

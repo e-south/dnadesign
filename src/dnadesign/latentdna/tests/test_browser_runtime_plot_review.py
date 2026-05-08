@@ -441,7 +441,7 @@ def test_render_plot_review_surface_orders_sig35_legend_by_strength(monkeypatch,
         labels = [text.get_text() for text in legend.get_texts()]
         colors = [handle.get_color() for handle in legend.legend_handles]
         assert labels == ["TTGACA (f)", "TTTACA (d)", "CTGACA (b)", "Control"]
-        assert colors == ["#B2182B", "#F4A582", "#2166AC", "#7F8894"]
+        assert colors == ["#B2182B", "#E69B7B", "#2166AC", "#7F8894"]
     finally:
         plt.close(fig)
 
@@ -833,6 +833,50 @@ def test_render_plot_review_surface_allows_projection_grids_with_partial_panel_e
     )
 
     assert rendered is sentinel
+
+
+def test_render_plot_review_surface_passes_selected_reference_set_to_projection_grid(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_projection_grid(*args, **kwargs):
+        del args
+        captured.update(kwargs)
+        return "rendered"
+
+    monkeypatch.setattr(plot_review_runtime, "render_projection_grid", fake_projection_grid)
+    monkeypatch.setattr(
+        plot_review_runtime,
+        "resolve_reference_annotation",
+        lambda *args, **kwargs: {
+            "labels": ["W1"],
+            "match_column": "usr_label__primary",
+            "display_labels": {},
+            "label_limit": 10,
+            "warnings": [],
+        },
+    )
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "appendix_umap_gallery",
+            "kind": "projection_grid",
+            "projection_ids": ["proj_a"],
+            "panel_titles": ["Panel A"],
+        },
+        frames=[pd.DataFrame({"x": [0.0], "y": [1.0], "usr_label__primary": ["W1"]})],
+        hue_column=None,
+        reference_labels=[],
+        reference_set_id="reference_w_collection",
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered == "rendered"
+    assert captured["reference_set_id"] == "reference_w_collection"
 
 
 def test_render_plot_review_surface_allows_scatter_grids_with_partial_panel_errors(monkeypatch, tmp_path: Path) -> None:

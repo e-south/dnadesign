@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dnadesign.latentdna.src.notebooks.scaffold_panels import (
     render_geometry_frames_cell,
+    render_geometry_hue_selector_cell,
     render_geometry_panel_cell,
     render_plot_review_cell,
 )
@@ -50,3 +51,14 @@ def test_geometry_selectors_only_offer_projection_backed_single_view_geometries(
     assert "for row in _selector_rows" in selector_cells
     assert 'return "Evo 2 " + _value.removeprefix("evo2_").upper()' in selector_cells
     assert 'for row in _geometry.geometry_rows\n                    if str(row.get("model"))' not in selector_cells
+
+
+def test_geometry_reference_selector_preserves_user_selection_across_view_switches() -> None:
+    selector_cells = "\n".join(render_selector_cells())
+    geometry_hue_cell = render_geometry_hue_selector_cell()
+
+    assert "get_requested_reference, set_requested_reference = _support.mo.state(default_reference)" in selector_cells
+    assert "get_requested_reference" in geometry_hue_cell
+    assert "_requested_reference" in geometry_hue_cell
+    assert "if _requested_reference in _reference_values" in geometry_hue_cell
+    assert "on_change=set_requested_reference" in geometry_hue_cell

@@ -886,7 +886,8 @@ def render_projection_grid(
         reference_set_id=reference_set_id,
         reference_label_count=len(reference_labels),
     )
-    rendered = render_matplotlib_figure(fig, alt=str(alt_text or default_alt_text))
+    figure_alt_text = default_alt_text if alt_text is None else f"{default_alt_text} {str(alt_text).strip()}"
+    rendered = render_matplotlib_figure(fig, alt=figure_alt_text)
     if reference_warnings:
         return mo.vstack(
             [

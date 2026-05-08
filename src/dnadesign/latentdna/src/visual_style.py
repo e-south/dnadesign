@@ -44,6 +44,8 @@ PUBLICATION_PALETTE = [
     "#111111",
 ]
 
+SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE = 0.42
+
 _SEMANTIC_CATEGORY_COLORS = {
     "background": "#56B4E9",
     "background_only": "#56B4E9",
@@ -193,6 +195,49 @@ def _hex_to_rgb(color: str) -> tuple[int, int, int]:
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
     return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+
+def _linear_channel(value: float) -> float:
+    normalized = value / 255.0
+    if normalized <= 0.04045:
+        return normalized / 12.92
+    return ((normalized + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(rgb: tuple[int, int, int]) -> float:
+    red, green, blue = (_linear_channel(value) for value in rgb)
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+
+
+def _is_hex_color(value: object) -> bool:
+    text = str(value or "").strip()
+    if text.startswith("#"):
+        text = text[1:]
+    return len(text) == 6 and all(character in "0123456789abcdefABCDEF" for character in text)
+
+
+def contrast_safe_scatter_color(color: str) -> str:
+    """Darken very light hex colors for readable dense scatter overlays."""
+    if not _is_hex_color(color):
+        return color
+    rgb = _hex_to_rgb(color)
+    if _relative_luminance(rgb) <= SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE:
+        return _rgb_to_hex(rgb)
+
+    lower = 0.0
+    upper = 1.0
+    for _ in range(32):
+        factor = (lower + upper) / 2.0
+        candidate = tuple(int(round(channel * factor)) for channel in rgb)
+        if _relative_luminance(candidate) > SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE:
+            upper = factor
+        else:
+            lower = factor
+    return _rgb_to_hex(tuple(int(round(channel * lower)) for channel in rgb))
+
+
+def contrast_safe_scatter_color_map(color_map: dict[str, str]) -> dict[str, str]:
+    return {category: contrast_safe_scatter_color(color) for category, color in color_map.items()}
 
 
 def _interpolate_hex_color(left: str, right: str, fraction: float) -> str:

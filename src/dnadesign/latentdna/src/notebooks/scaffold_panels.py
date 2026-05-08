@@ -456,7 +456,14 @@ def render_geometry_hue_selector_cell() -> str:
     return dedent(
         """\
         @app.cell
-        def _(available_hues, get_requested_hue, runtime, set_requested_hue):
+        def _(
+            available_hues,
+            get_requested_hue,
+            get_requested_reference,
+            runtime,
+            set_requested_hue,
+            set_requested_reference,
+        ):
             _geometry = runtime.geometry
             _support = runtime.support
 
@@ -480,16 +487,26 @@ def render_geometry_hue_selector_cell() -> str:
                 on_change=set_requested_hue,
             )
             _reference_options = _geometry.reference_annotation_options or {"Off": ""}
+            _reference_values = set(_reference_options.values())
+            _requested_reference = str(get_requested_reference() or "")
+            _selected_reference = (
+                _requested_reference
+                if _requested_reference in _reference_values
+                else _geometry.reference_annotation_default
+                if _geometry.reference_annotation_default in _reference_values
+                else ""
+            )
             geometry_reference_selector = _support.mo.ui.dropdown(
                 options=_reference_options,
                 value=(
                     _support.option_key_for_value(
                         _reference_options,
-                        _geometry.reference_annotation_default,
+                        _selected_reference,
                     )
                     or next(iter(_reference_options))
                 ),
                 label="Reference labels",
+                on_change=set_requested_reference,
             )
             return (geometry_reference_selector, hue_selector)
         """

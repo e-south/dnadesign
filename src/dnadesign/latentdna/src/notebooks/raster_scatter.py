@@ -11,6 +11,9 @@ from matplotlib.colors import Normalize, to_rgb
 
 RASTER_SCATTER_ROW_THRESHOLD = 50_000
 RASTER_SCATTER_PANEL_PIXELS = 1_100
+FOREGROUND_RASTER_MIN_ALPHA = 0.28
+CATEGORICAL_RASTER_MIN_ALPHA = 0.34
+BACKGROUND_RASTER_MIN_ALPHA = 0.10
 
 
 def should_rasterize_scatter(row_count: int) -> bool:
@@ -74,8 +77,13 @@ def _bincount(
     return np.bincount(flat_indices, weights=weights, minlength=size).astype(np.float32, copy=False)
 
 
-def _alpha_from_counts(counts: np.ndarray, *, point_alpha: float) -> np.ndarray:
-    clipped_alpha = min(max(float(point_alpha), 0.01), 0.95)
+def _alpha_from_counts(
+    counts: np.ndarray,
+    *,
+    point_alpha: float,
+    min_point_alpha: float,
+) -> np.ndarray:
+    clipped_alpha = min(max(float(point_alpha), float(min_point_alpha), 0.01), 0.95)
     return np.clip(1.0 - np.power(1.0 - clipped_alpha, counts), 0.0, 1.0)
 
 
@@ -105,6 +113,7 @@ def draw_single_color_raster_scatter(
     y_values: np.ndarray,
     color: str,
     point_alpha: float,
+    min_point_alpha: float = FOREGROUND_RASTER_MIN_ALPHA,
     pixel_width: int = RASTER_SCATTER_PANEL_PIXELS,
     pixel_height: int = RASTER_SCATTER_PANEL_PIXELS,
 ) -> None:
@@ -116,7 +125,7 @@ def draw_single_color_raster_scatter(
     counts = _bincount(flat_indices, size=size).reshape((height, width))
     rgba = np.zeros((height, width, 4), dtype=np.float32)
     rgba[..., :3] = to_rgb(color)
-    rgba[..., 3] = _alpha_from_counts(counts, point_alpha=point_alpha)
+    rgba[..., 3] = _alpha_from_counts(counts, point_alpha=point_alpha, min_point_alpha=min_point_alpha)
     _draw_rgba_image(ax, rgba, extent=extent)
 
 
@@ -130,6 +139,7 @@ def draw_categorical_raster_scatter(
     category_colors: Mapping[str, str],
     category_alpha_multipliers: Mapping[str, float] | None,
     point_alpha: float,
+    min_point_alpha: float = CATEGORICAL_RASTER_MIN_ALPHA,
     pixel_width: int = RASTER_SCATTER_PANEL_PIXELS,
     pixel_height: int = RASTER_SCATTER_PANEL_PIXELS,
 ) -> None:
@@ -160,7 +170,11 @@ def draw_categorical_raster_scatter(
     rgba = np.zeros((height * width, 4), dtype=np.float32)
     occupied = weighted_counts > 0
     rgba[occupied, :3] = weighted_rgb[occupied] / weighted_counts[occupied, np.newaxis]
-    rgba[occupied, 3] = _alpha_from_counts(alpha_counts[occupied], point_alpha=point_alpha)
+    rgba[occupied, 3] = _alpha_from_counts(
+        alpha_counts[occupied],
+        point_alpha=point_alpha,
+        min_point_alpha=min_point_alpha,
+    )
     _draw_rgba_image(ax, rgba.reshape((height, width, 4)), extent=extent)
 
 
@@ -175,6 +189,7 @@ def draw_continuous_raster_scatter(
     vmin: float | None,
     vmax: float | None,
     point_alpha: float,
+    min_point_alpha: float = FOREGROUND_RASTER_MIN_ALPHA,
     pixel_width: int = RASTER_SCATTER_PANEL_PIXELS,
     pixel_height: int = RASTER_SCATTER_PANEL_PIXELS,
 ) -> ScalarMappable:
@@ -194,6 +209,10 @@ def draw_continuous_raster_scatter(
     colormap = plt.get_cmap(str(cmap))
     rgba = np.zeros((height * width, 4), dtype=np.float32)
     rgba[occupied] = colormap(color_norm(means[occupied]))
-    rgba[occupied, 3] = _alpha_from_counts(counts[occupied], point_alpha=point_alpha)
+    rgba[occupied, 3] = _alpha_from_counts(
+        counts[occupied],
+        point_alpha=point_alpha,
+        min_point_alpha=min_point_alpha,
+    )
     _draw_rgba_image(ax, rgba.reshape((height, width, 4)), extent=extent)
     return ScalarMappable(norm=color_norm, cmap=colormap)

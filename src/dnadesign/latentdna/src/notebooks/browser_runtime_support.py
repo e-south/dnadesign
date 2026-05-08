@@ -42,11 +42,13 @@ from ..visual_style import (
     PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
+    contrast_safe_scatter_color_map,
     humanize_display_text,
     reference_annotation_label,
 )
 from ..visual_style import scatter_style as shared_scatter_style
 from ..workspaces.loader import load_workspace_config
+from .raster_scatter import BACKGROUND_RASTER_MIN_ALPHA
 
 _RUNTIME_TABLE_ARTIFACT_KINDS = {
     "alignments": "alignment_set",
@@ -872,6 +874,7 @@ def draw_missing_hue_background(
             y_values=y_values,
             color=MISSING_HUE_BACKGROUND_COLOR,
             point_alpha=alpha,
+            min_point_alpha=BACKGROUND_RASTER_MIN_ALPHA,
         )
         return
     ax.scatter(
@@ -896,8 +899,10 @@ def category_color_map(
     style = _axis_style(axis_styles, column)
     if style is not None:
         ordered = legend_categories(style, categories)
-        return axis_color_map(style, ordered, fallback_palette=PUBLICATION_PALETTE)
-    return axis_color_map(None, ordered_categories_for_axis(None, categories), fallback_palette=PUBLICATION_PALETTE)
+        return contrast_safe_scatter_color_map(axis_color_map(style, ordered, fallback_palette=PUBLICATION_PALETTE))
+    return contrast_safe_scatter_color_map(
+        axis_color_map(None, ordered_categories_for_axis(None, categories), fallback_palette=PUBLICATION_PALETTE)
+    )
 
 
 def category_values_for_legend(

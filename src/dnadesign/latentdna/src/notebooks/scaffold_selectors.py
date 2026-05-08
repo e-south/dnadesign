@@ -265,4 +265,21 @@ def render_selector_cells() -> tuple[str, ...]:
                 return (get_requested_hue, set_requested_hue)
             """
         ),
+        dedent(
+            """\
+            @app.cell
+            def _(runtime):
+                _geometry = runtime.geometry
+                _support = runtime.support
+
+                reference_values = set((_geometry.reference_annotation_options or {"Off": ""}).values())
+                default_reference = (
+                    _geometry.reference_annotation_default
+                    if _geometry.reference_annotation_default in reference_values
+                    else ""
+                )
+                get_requested_reference, set_requested_reference = _support.mo.state(default_reference)
+                return (get_requested_reference, set_requested_reference)
+            """
+        ),
     )

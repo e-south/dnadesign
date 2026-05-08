@@ -35,7 +35,7 @@ from dnadesign.latentdna.src.notebooks.rendering import (
     resolve_plot_render_asset,
     select_plot_render_path,
 )
-from dnadesign.latentdna.src.visual_style import wrap_plot_title
+from dnadesign.latentdna.src.visual_style import SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
 SIGMA35_AXIS_STYLES = {
@@ -119,6 +119,19 @@ REGULATOR_AXIS_STYLES = {
         },
     }
 }
+
+
+def _relative_luminance(color: str) -> float:
+    normalized = color.lstrip("#")
+    channels = [int(normalized[index : index + 2], 16) / 255.0 for index in (0, 2, 4)]
+
+    def _linear(value: float) -> float:
+        if value <= 0.04045:
+            return value / 12.92
+        return ((value + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = (_linear(value) for value in channels)
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
 
 
 def test_select_plot_render_path_prefers_svg_assets(tmp_path: Path) -> None:
@@ -271,6 +284,19 @@ def test_category_color_map_prefers_stable_semantic_colors() -> None:
     assert color_map["control"] == "#111111"
 
 
+def test_category_color_map_darkens_light_scatter_colors() -> None:
+    color_map = category_color_map(
+        ["f", "d", "c", "b"],
+        column="sig35_variant",
+        axis_styles=SIGMA35_AXIS_STYLES,
+    )
+
+    assert color_map["d"] != "#F4A582"
+    assert color_map["c"] != "#92C5DE"
+    assert _relative_luminance(color_map["d"]) <= SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE + 1e-6
+    assert _relative_luminance(color_map["c"]) <= SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE + 1e-6
+
+
 def test_category_color_map_orders_sig35_variant_by_reverse_alphabetical_strength() -> None:
     color_map = category_color_map(
         ["b", "f", "d", "control"],
@@ -281,7 +307,7 @@ def test_category_color_map_orders_sig35_variant_by_reverse_alphabetical_strengt
     assert list(color_map)[:4] == ["f", "d", "b", "control"]
     assert color_map[SIGMA35_NONCANONICAL_BUCKET] == "#9AA5B1"
     assert color_map["f"] == "#B2182B"
-    assert color_map["d"] == "#F4A582"
+    assert color_map["d"] == "#E69B7B"
     assert color_map["b"] == "#2166AC"
     assert color_map["control"] == "#7F8894"
 
@@ -291,7 +317,7 @@ def test_category_color_map_orders_spacer_length_from_cool_to_warm() -> None:
 
     assert list(color_map) == ["16", "17", "18"]
     assert color_map["16"] == "#2C7BB6"
-    assert color_map["17"] == "#FEE090"
+    assert color_map["17"] == "#C2AB6E"
     assert color_map["18"] == "#D73027"
 
 
