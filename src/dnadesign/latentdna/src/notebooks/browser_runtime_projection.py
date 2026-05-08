@@ -471,6 +471,21 @@ def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False)
     return rows, columns
 
 
+def _default_projection_alt_text(
+    *,
+    panel_count: int,
+    hue_column: str | None,
+    axis_styles: dict[str, object] | None,
+    reference_set_id: str | None,
+) -> str:
+    layout = "Single persisted projection" if panel_count == 1 else f"{panel_count}-panel persisted projection grid"
+    hue = (
+        f"colored by {display_hue_label(hue_column, axis_styles=axis_styles)}" if hue_column else "with no hue overlay"
+    )
+    reference = "reference labels overlay enabled" if reference_set_id else "reference labels overlay off"
+    return f"{layout} {hue}; {reference}; point positions use saved projection coordinates."
+
+
 def render_projection_grid(
     panel_specs: list[dict[str, object]],
     *,
@@ -795,6 +810,11 @@ def render_projection_grid(
         )
         style_notebook_legend(legend)
         bottom_margin = layout.bottom_margin
+        legend_rows = max(1, math.ceil(len(legend_labels) / max(layout.columns, 1)))
+        if n_panels == 2 and legend_rows >= 5:
+            extra_height = 0.36 * (legend_rows - 3)
+            fig.set_size_inches(fig.get_figwidth(), fig.get_figheight() + extra_height, forward=True)
+            bottom_margin = max(bottom_margin, min(0.2 + (0.052 * legend_rows), 0.56))
         if plot_id == "appendix_umap_gallery":
             bottom_margin = max(bottom_margin, 0.12)
         if n_panels == 2:
@@ -847,4 +867,10 @@ def render_projection_grid(
         colorbar.ax.xaxis.set_label_position("bottom")
         colorbar.ax.xaxis.set_ticks_position("bottom")
 
-    return render_matplotlib_figure(fig, alt=str(alt_text or "Latent geometry projection grid"))
+    default_alt_text = _default_projection_alt_text(
+        panel_count=n_panels,
+        hue_column=effective_hue,
+        axis_styles=axis_styles,
+        reference_set_id=reference_set_id,
+    )
+    return render_matplotlib_figure(fig, alt=str(alt_text or default_alt_text))

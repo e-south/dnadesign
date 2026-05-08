@@ -1187,7 +1187,9 @@ def _grid_figure_size(panel_count: int, *, square_panels: bool, prefer_single_ro
 def metric_panel_grid_layout(plot_id: str | None, panel_count: int) -> tuple[int, int, tuple[float, float]]:
     square_panels = metric_panel_uses_square_axes(plot_id)
     if plot_id == "representation_health_summary" and panel_count > 1:
-        return panel_count, 1, (9.2, max(4.0 * panel_count, 6.0))
+        rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=True)
+        figsize = _grid_figure_size(panel_count, square_panels=square_panels, prefer_single_row=True)
+        return rows, columns, (figsize[0] + (1.25 * columns), figsize[1])
     rows, columns = _panel_grid_dimensions(panel_count)
     figsize = _grid_figure_size(panel_count, square_panels=square_panels)
     if plot_id == "representation_health_summary":

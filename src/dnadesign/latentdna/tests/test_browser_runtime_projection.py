@@ -164,6 +164,43 @@ def test_render_projection_grid_keeps_point_coordinates_fixed_across_hues(monkey
         plt.close(fig_with_hue)
 
 
+def test_render_projection_grid_default_alt_names_layout_hue_and_reference_overlay(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_render(fig, *, alt=None):
+        plt.close(fig)
+        captured["alt"] = str(alt or "")
+        return captured["alt"]
+
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", fake_render)
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0],
+            "y": [1.0, 0.0],
+            "sig35_variant": ["b", "c"],
+        }
+    )
+
+    alt = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[frame],
+        hue_column="sig35_variant",
+        hue_kinds={"sig35_variant": "categorical"},
+        axis_styles=SIGMA35_AXIS_STYLES,
+        joinable_tables=[],
+        reference_labels=["spyP"],
+        reference_set_id="reference_spyp_sulap",
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert alt == captured["alt"]
+    assert "Single persisted projection" in alt
+    assert "colored by Sigma-35 variant" in alt
+    assert "reference labels overlay enabled" in alt
+    assert "grid" not in alt.lower()
+
+
 def test_render_projection_grid_suppresses_degenerate_continuous_colorbar(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
 
@@ -626,6 +663,56 @@ def test_render_projection_grid_keeps_legend_clear_of_multi_panel_gallery(monkey
         plot_id="appendix_umap_gallery",
         hue_column="design_family",
         hue_kinds={"design_family": "categorical"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        assert _legend_clears_panel_axes(fig)
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_keeps_long_two_panel_legend_clear(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    sigma_labels = [
+        "Sigma19",
+        "Sigma24",
+        "Sigma24 + Sigma38 + Sigma70",
+        "Sigma24 + Sigma70",
+        "Sigma28",
+        "Sigma28 + Sigma32",
+        "Sigma28 + Sigma70",
+        "Sigma32",
+        "Sigma32 + Sigma38",
+        "Sigma32 + Sigma54",
+        "Sigma32 + Sigma70",
+        "Sigma38",
+        "Sigma38 + Sigma54",
+        "Sigma38 + Sigma70",
+        "Sigma54",
+        "Sigma54 + Sigma70",
+        "Sigma70",
+    ]
+    frame = pd.DataFrame(
+        {
+            "x": np.linspace(0.0, 1.0, len(sigma_labels)),
+            "y": np.linspace(1.0, 0.0, len(sigma_labels)),
+            "regulondb__sigma_factor_set": sigma_labels,
+        }
+    )
+    panel_specs = [
+        {"view_id": "native", "projection_id": "proj_native", "title": "Native source-record intermediate"},
+        {"view_id": "core60", "projection_id": "proj_core60", "title": "Core60 TSS-upstream intermediate"},
+    ]
+
+    fig = projection_runtime.render_projection_grid(
+        panel_specs,
+        frames=[frame, frame],
+        hue_column="regulondb__sigma_factor_set",
+        hue_kinds={"regulondb__sigma_factor_set": "categorical"},
         joinable_tables=[],
         reference_labels=[],
         output_root=tmp_path,

@@ -23,6 +23,7 @@ from dnadesign.latentdna.src.plots.render import (
     _render_distribution_panel,
     _render_heatmap_panel,
     _render_metric_panel,
+    metric_panel_grid_layout,
 )
 from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
 
@@ -749,3 +750,10 @@ def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_t
 
 def test_representation_health_summary_declares_square_metric_panels() -> None:
     assert metric_panel_uses_square_axes("representation_health_summary")
+
+
+def test_representation_health_summary_uses_horizontal_metric_panel_layout() -> None:
+    rows, columns, figsize = metric_panel_grid_layout("representation_health_summary", 3)
+
+    assert (rows, columns) == (1, 3)
+    assert figsize[0] > figsize[1]
