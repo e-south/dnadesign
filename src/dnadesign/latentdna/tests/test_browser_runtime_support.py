@@ -708,6 +708,28 @@ def test_available_hues_for_frames_accepts_array_backed_categorical_hues() -> No
     ) == ["regulondb__sigma_factor_set"]
 
 
+def test_available_hues_for_frames_uses_vectorized_missing_mask_for_scalar_strings(monkeypatch) -> None:
+    from dnadesign.latentdna.src.notebooks import browser_runtime_support as support
+
+    calls = 0
+    original = support._is_missing_hue_value
+
+    def counting_missing(value):
+        nonlocal calls
+        calls += 1
+        return original(value)
+
+    monkeypatch.setattr(support, "_is_missing_hue_value", counting_missing)
+    frames = [pd.DataFrame({"design_family": ["ethanol", "cipro", None, "control"] * 512})]
+
+    assert support.available_hues_for_frames(
+        frames,
+        preferred_hues=["design_family"],
+        hue_kinds={"design_family": "categorical"},
+    ) == ["design_family"]
+    assert calls == 0
+
+
 def test_normalize_categorical_hue_value_formats_array_backed_sets() -> None:
     assert (
         normalize_categorical_hue_value(

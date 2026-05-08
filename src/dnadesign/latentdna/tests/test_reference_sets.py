@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.latentdna.src.reference_sets import resolve_reference_set_rows
+import pandas as pd
+
+from dnadesign.latentdna.src.reference_sets import resolve_reference_set_ids_from_columns, resolve_reference_set_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
@@ -39,6 +41,22 @@ def _row(
 def _matched(reference_set_id: str, rows: list[dict[str, object]]) -> list[str]:
     context = load_workspace_config(_stress_workspace())
     resolution = resolve_reference_set_rows(context.config.reference_sets[reference_set_id], rows)
+    return resolution.matched_ids
+
+
+def _matched_from_columns(reference_set_id: str, rows: list[dict[str, object]]) -> list[str]:
+    context = load_workspace_config(_stress_workspace())
+    columns = {
+        column: [row.get(column) for row in rows]
+        for column in {
+            "usr_label__primary",
+            "promoter_standard__collection_id",
+            "promoter_standard__display_name",
+            "selection_basis",
+            "source_family",
+        }
+    }
+    resolution = resolve_reference_set_ids_from_columns(context.config.reference_sets[reference_set_id], columns)
     return resolution.matched_ids
 
 
@@ -101,3 +119,36 @@ def test_stress_reference_sets_resolve_native_core60_and_context_rows_without_mi
         "W1_core60",
         "W1_core60_context1kb_rc",
     ]
+
+
+def test_reference_set_column_resolution_matches_row_resolution_for_selector_sets() -> None:
+    rows = [
+        _row("W1", collection_id="t7_w_collection", selection_basis="native_source_length"),
+        _row("W1_context1kb_rc", collection_id="t7_w_collection", selection_basis="whole_output_reverse_complement"),
+        _row("W1_core60", collection_id="t7_w_collection", selection_basis="sigma_site_pair_midpoint"),
+        _row(
+            "W1_core60_context1kb_rc",
+            collection_id="t7_w_collection",
+            selection_basis="whole_output_reverse_complement",
+        ),
+    ]
+
+    assert _matched_from_columns("reference_w_collection", rows) == _matched("reference_w_collection", rows)
+    assert _matched_from_columns("reference_w_collection_core60", rows) == _matched(
+        "reference_w_collection_core60",
+        rows,
+    )
+
+
+def test_reference_set_column_resolution_uses_positional_series_rows() -> None:
+    context = load_workspace_config(_stress_workspace())
+    reference_set = context.config.reference_sets["reference_w_collection"]
+    columns = {
+        "usr_label__primary": pd.Series(["W1", "W1_core60"], index=[10, 20]),
+        "promoter_standard__collection_id": pd.Series(["t7_w_collection", "t7_w_collection"], index=[10, 20]),
+        "promoter_standard__display_name": pd.Series(["W1", "W1 core60"], index=[10, 20]),
+    }
+
+    resolution = resolve_reference_set_ids_from_columns(reference_set, columns)
+
+    assert resolution.matched_ids == ["W1"]

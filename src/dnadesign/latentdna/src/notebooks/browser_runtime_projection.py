@@ -477,12 +477,20 @@ def _default_projection_alt_text(
     hue_column: str | None,
     axis_styles: dict[str, object] | None,
     reference_set_id: str | None,
+    reference_label_count: int = 0,
 ) -> str:
     layout = "Single persisted projection" if panel_count == 1 else f"{panel_count}-panel persisted projection grid"
     hue = (
         f"colored by {display_hue_label(hue_column, axis_styles=axis_styles)}" if hue_column else "with no hue overlay"
     )
-    reference = "reference labels overlay enabled" if reference_set_id else "reference labels overlay off"
+    if reference_set_id:
+        row_label = "row" if reference_label_count == 1 else "rows"
+        reference = (
+            f"reference labels overlay enabled for `{reference_set_id}` "
+            f"with {reference_label_count} matched {row_label}"
+        )
+    else:
+        reference = "reference labels overlay off"
     return f"{layout} {hue}; {reference}; point positions use saved projection coordinates."
 
 
@@ -523,6 +531,7 @@ def render_projection_grid(
             "The selected geometry layout is declared, but none of its projections are materialized yet.",
             kind="warn",
         )
+    reference_warnings: list[str] = []
     if reference_set_id is not None:
         reference_annotation = resolve_reference_annotation(
             reference_set_id,
@@ -539,6 +548,9 @@ def render_projection_grid(
         }
         resolved_label_limit = reference_annotation.get("label_limit")
         reference_label_limit = resolved_label_limit if isinstance(resolved_label_limit, int) else None
+        reference_warnings = [
+            str(warning).strip() for warning in reference_annotation.get("warnings", []) if str(warning).strip()
+        ]
 
     effective_hue = hue_column
     if effective_hue:
@@ -872,5 +884,15 @@ def render_projection_grid(
         hue_column=effective_hue,
         axis_styles=axis_styles,
         reference_set_id=reference_set_id,
+        reference_label_count=len(reference_labels),
     )
-    return render_matplotlib_figure(fig, alt=str(alt_text or default_alt_text))
+    rendered = render_matplotlib_figure(fig, alt=str(alt_text or default_alt_text))
+    if reference_warnings:
+        return mo.vstack(
+            [
+                mo.callout("Reference overlay warning: " + "; ".join(reference_warnings), kind="warn"),
+                rendered,
+            ],
+            gap=0.25,
+        )
+    return rendered

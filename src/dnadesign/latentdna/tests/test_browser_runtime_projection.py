@@ -173,6 +173,17 @@ def test_render_projection_grid_default_alt_names_layout_hue_and_reference_overl
         return captured["alt"]
 
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", fake_render)
+    monkeypatch.setattr(
+        projection_runtime,
+        "resolve_reference_annotation",
+        lambda *args, **kwargs: {
+            "labels": ["spyP"],
+            "match_column": "usr_label__primary",
+            "display_labels": {},
+            "label_limit": 5,
+            "warnings": [],
+        },
+    )
     frame = pd.DataFrame(
         {
             "x": [0.0, 1.0],
@@ -198,7 +209,39 @@ def test_render_projection_grid_default_alt_names_layout_hue_and_reference_overl
     assert "Single persisted projection" in alt
     assert "colored by Sigma-35 variant" in alt
     assert "reference labels overlay enabled" in alt
+    assert "1 matched row" in alt
     assert "grid" not in alt.lower()
+
+
+def test_render_projection_grid_surfaces_reference_overlay_warnings(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: "rendered plot")
+    monkeypatch.setattr(
+        projection_runtime,
+        "resolve_reference_annotation",
+        lambda *args, **kwargs: {
+            "labels": [],
+            "match_column": "usr_label__primary",
+            "display_labels": {},
+            "label_limit": 0,
+            "warnings": ["reference set `demo` has 2 unmatched reference rows"],
+        },
+    )
+
+    rendered = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[pd.DataFrame({"x": [0.0], "y": [1.0], "usr_label__primary": ["row0"]})],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        reference_set_id="demo",
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "Reference overlay warning" in rendered.text
+    assert "unmatched reference rows" in rendered.text
 
 
 def test_render_projection_grid_suppresses_degenerate_continuous_colorbar(monkeypatch, tmp_path: Path) -> None:
@@ -507,6 +550,50 @@ def test_render_projection_grid_keeps_reference_sig35_rows_neutral_and_out_of_le
         assert _panel_offsets(fig) == [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
         labels = [text.get_text() for text in fig.legends[0].get_texts()]
         assert labels == ["TTGACA (f)", "CTGACA (b)"]
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_uses_vectorized_reference_matching(monkeypatch, tmp_path: Path) -> None:
+    from dnadesign.latentdna.src.notebooks import browser_runtime_support as support
+
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    calls = 0
+    original = support.normalize_label
+
+    def counting_normalize(value):
+        nonlocal calls
+        calls += 1
+        return original(value)
+
+    monkeypatch.setattr(support, "normalize_label", counting_normalize)
+    row_count = 2048
+    frame = pd.DataFrame(
+        {
+            "x": np.arange(row_count, dtype=float),
+            "y": np.arange(row_count, dtype=float),
+            "usr_label__primary": ["dense"] * (row_count - 2) + ["J23105_core60", "W1_core60"],
+        }
+    )
+
+    fig = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[frame],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=["J23105_core60", "W1_core60"],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        highlight_offsets = np.asarray(fig.axes[0].collections[-1].get_offsets(), dtype=float)
+        assert sorted(map(tuple, highlight_offsets.tolist())) == [
+            (float(row_count - 2), float(row_count - 2)),
+            (float(row_count - 1), float(row_count - 1)),
+        ]
+        assert calls == 2
     finally:
         plt.close(fig)
 

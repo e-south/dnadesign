@@ -25,6 +25,10 @@ def _is_missing(value: object) -> bool:
         return True
     if isinstance(value, float):
         return isnan(value)
+    try:
+        return bool(value != value)
+    except (TypeError, ValueError):
+        return False
     return False
 
 
@@ -32,9 +36,7 @@ def _as_comparable(value: object) -> str:
     return "" if _is_missing(value) else str(value)
 
 
-def _selector_matches(row: Mapping[str, object], selector: object) -> bool:
-    column = str(getattr(selector, "column"))
-    value = row.get(column)
+def _selector_value_matches(value: object, selector: object) -> bool:
     if getattr(selector, "non_null", False) and _is_missing(value):
         return False
     equals = getattr(selector, "equals", None)
@@ -50,6 +52,18 @@ def _selector_matches(row: Mapping[str, object], selector: object) -> bool:
     if not_regex is not None and re.search(str(not_regex), _as_comparable(value)) is not None:
         return False
     return True
+
+
+def _selector_matches(row: Mapping[str, object], selector: object) -> bool:
+    column = str(getattr(selector, "column"))
+    return _selector_value_matches(row.get(column), selector)
+
+
+def _column_value(values: Sequence[Any], row_index: int) -> Any:
+    iloc = getattr(values, "iloc", None)
+    if iloc is not None:
+        return iloc[row_index]
+    return values[row_index]
 
 
 def reference_set_required_columns(reference_set: object) -> list[str]:
@@ -129,9 +143,59 @@ def resolve_reference_set_ids_from_columns(
             missing_columns=missing_columns,
             complete=False,
         )
+    expected_ids = [str(value) for value in getattr(reference_set, "ids", [])]
     if not columns:
-        rows: list[dict[str, object]] = []
-    else:
-        row_count = len(next(iter(columns.values())))
-        rows = [{column: values[index] for column, values in columns.items()} for index in range(row_count)]
-    return resolve_reference_set_rows(reference_set, rows)
+        return ReferenceSetResolution(
+            expected_ids=expected_ids,
+            matched_ids=[],
+            selected_rows=[],
+            missing_columns=[],
+            complete=not bool(getattr(reference_set, "require_non_empty", True)),
+        )
+
+    lengths = {len(columns[column]) for column in required_columns}
+    if len(lengths) != 1:
+        raise ValueError("reference set column inputs must share one row axis")
+    row_count = next(iter(lengths))
+    match_column = str(getattr(reference_set, "match_column"))
+    explicit_ids = list(expected_ids)
+    explicit_id_set = set(explicit_ids)
+    selectors = list(getattr(reference_set, "where", []) or [])
+    all_selectors = list(getattr(reference_set, "where_all", []) or [])
+    selector_ids: list[str] = []
+    selected_by_id: dict[str, dict[str, object]] = {}
+
+    for row_index in range(row_count):
+        match_value = _column_value(columns[match_column], row_index)
+        if _is_missing(match_value):
+            continue
+        match_text = str(match_value)
+        selector_matched = False
+        if selectors and any(
+            _selector_value_matches(_column_value(columns[str(getattr(selector, "column"))], row_index), selector)
+            for selector in selectors
+        ):
+            selector_ids.append(match_text)
+            selector_matched = True
+        if all_selectors and all(
+            _selector_value_matches(_column_value(columns[str(getattr(selector, "column"))], row_index), selector)
+            for selector in all_selectors
+        ):
+            selector_ids.append(match_text)
+            selector_matched = True
+        if match_text in explicit_id_set or selector_matched:
+            selected_by_id[match_text] = {
+                column: _column_value(columns[column], row_index) for column in required_columns
+            }
+
+    expected_ids = list(dict.fromkeys([*explicit_ids, *selector_ids]))
+    matched_ids = [value for value in expected_ids if value in selected_by_id]
+    require_non_empty = bool(getattr(reference_set, "require_non_empty", True))
+    complete = len(matched_ids) == len(expected_ids) and (bool(expected_ids) or not require_non_empty)
+    return ReferenceSetResolution(
+        expected_ids=expected_ids,
+        matched_ids=matched_ids,
+        selected_rows=[selected_by_id[value] for value in matched_ids],
+        missing_columns=[],
+        complete=complete,
+    )

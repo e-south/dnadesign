@@ -28,7 +28,7 @@ from ..metadata_axes import (
     normalize_axis_category,
     ordered_categories_for_axis,
 )
-from ..reference_sets import reference_set_required_columns, resolve_reference_set_rows
+from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
     GRID_COLOR,
@@ -327,6 +327,24 @@ def _missing_reference_display_value(value: object) -> bool:
     return False
 
 
+def _scalar_missing_mask(values: pd.Series) -> pd.Series | None:
+    """Use vectorized missing checks when a hue column is scalar-valued."""
+    if pd.api.types.is_numeric_dtype(values.dtype):
+        return values.replace([np.inf, -np.inf], np.nan).isna()
+    if (
+        pd.api.types.is_bool_dtype(values.dtype)
+        or isinstance(values.dtype, pd.CategoricalDtype)
+        or pd.api.types.is_string_dtype(values.dtype)
+    ):
+        return values.isna()
+    if pd.api.types.is_object_dtype(values.dtype):
+        sample = values.dropna().head(128).tolist()
+        if any(_listlike_hue_values(value) is not None for value in sample):
+            return None
+        return values.isna()
+    return None
+
+
 @lru_cache(maxsize=16)
 def _load_workspace_reference_set(workspace_dir_text: str, reference_set_id: str):
     context = load_workspace_config(Path(workspace_dir_text))
@@ -383,18 +401,21 @@ def resolve_reference_annotation(
         }
 
     required_columns = reference_set_required_columns(reference_set)
-    rows: list[dict[str, object]] = []
-    for frame in frames:
-        if frame.empty:
-            continue
-        available_columns = [column for column in required_columns if column in frame.columns]
-        if not available_columns:
-            continue
-        frame_rows = frame[available_columns].to_dict(orient="records")
-        for row in frame_rows:
-            rows.append({column: row.get(column) for column in required_columns})
+    nonempty_frames = [frame for frame in frames if not frame.empty]
+    column_values: dict[str, np.ndarray] = {}
+    for column in required_columns:
+        parts: list[pd.Series] = []
+        column_available = False
+        for frame in nonempty_frames:
+            if column in frame.columns:
+                parts.append(frame[column].reset_index(drop=True))
+                column_available = True
+            else:
+                parts.append(pd.Series([None] * len(frame), dtype=object))
+        if column_available and parts:
+            column_values[column] = pd.concat(parts, ignore_index=True).to_numpy(dtype=object)
 
-    resolution = resolve_reference_set_rows(reference_set, rows)
+    resolution = resolve_reference_set_ids_from_columns(reference_set, column_values)
     match_column = str(getattr(reference_set, "match_column", "usr_label__primary"))
     label_column = getattr(reference_set, "label_column", None)
     configured_display_labels = {
@@ -565,7 +586,9 @@ def normalize_categorical_hue_series(
     scope_mask = _canonical_scope_mask(scoped_frame, style=style)
     if bool(scope_mask.all()):
         return normalized
-    missing_mask = values.map(_is_missing_hue_value)
+    missing_mask = _scalar_missing_mask(values)
+    if missing_mask is None:
+        missing_mask = values.map(_is_missing_hue_value)
     normalized.loc[(~scope_mask) & (~missing_mask)] = style.noncanonical_bucket
     return normalized
 
@@ -715,6 +738,9 @@ def _finite_non_null_series(frame: pd.DataFrame, column: str) -> pd.Series:
     series = frame[column]
     if pd.api.types.is_numeric_dtype(series.dtype):
         return series.replace([np.inf, -np.inf], np.nan).dropna()
+    missing_mask = _scalar_missing_mask(series)
+    if missing_mask is not None:
+        return series.loc[~missing_mask]
     mask = [not _is_missing_hue_value(value) for value in series.tolist()]
     if not any(mask):
         return pd.Series(dtype=series.dtype)
@@ -970,7 +996,8 @@ def draw_reference_labels(
     targets = {normalize_label(label) for label in reference_labels}
     if not targets:
         return
-    selected = frame[frame[match_column].astype(str).map(normalize_label).isin(targets)].copy()
+    match_values = frame[match_column].astype("string").str.strip().str.lower()
+    selected = frame[match_values.isin(targets)].copy()
     if selected.empty:
         return
     selected = selected[
