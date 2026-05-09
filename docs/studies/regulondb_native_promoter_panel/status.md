@@ -197,6 +197,12 @@ current completeness base.
   the local downstream snapshot now reports the primary decision deliverables
   `representation_health_summary`, `native_core60_shift_summary`, and
   `sigma_factor_structure_summary` as current.
+  In LatentDNA prose, native `seq_mean` means a sequence-position mean over
+  Evo2 token states from the emitted native 81 bp source-record sequence, and
+  core60 mean means the same operation over the derived 60 bp TSS-upstream
+  analysis window. Because Evo2 is causal/autoregressive, these pooled token
+  states are prefix-conditioned in the emitted forward orientation; they should
+  not be described as bidirectional promoter encodings.
 - Cluster: submit-ready runbooks exist, but no SCC submission is currently
   needed for the local RegulonDB 7B standard lanes because sidecars are
   complete.

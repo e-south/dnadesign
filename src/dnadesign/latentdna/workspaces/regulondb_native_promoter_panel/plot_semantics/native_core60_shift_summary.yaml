@@ -9,7 +9,12 @@ guardrails:
   - High self-cosine means the rowwise paired view is stable; it does not prove that cohort structure is useful.
 caption: Native source-record versus core60 paired-shift summary for RegulonDB promoter representation views.
 alt_text: Two metric panels compare native-to-core60 median self-cosine and median L2 shift for intermediate embedding and output-layer mean representation views.
-preprocessing_md: Materialized native and core60 views are aligned by parent promoter identity. Rows are standardized and L2-normalized before paired cosine and L2-shift summaries are computed.
+preprocessing_md: |
+  Materialized native and core60 views are aligned by parent promoter identity.
+  The native view is an Evo 2 causal `seq_mean` over the full 81 bp
+  source-record window; the core60 view is a causal mean over the derived
+  TSS-upstream 60 bp analysis window. Rows are standardized and L2-normalized
+  before paired cosine and L2-shift summaries are computed.
 math_md: |
   For aligned native row \(x_i\) and core60 row \(y_i\), the self-cosine is
   $$

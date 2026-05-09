@@ -46,7 +46,8 @@ def render_plot_review_cell() -> str:
                         _plot_label = str(_plot_card["title"])
                         plot_option_pairs.append((_plot_label, str(_plot_card["plot_id"])))
                         plot_review_cards.append(dict(_plot_card))
-                plot_options = _support.labeled_options(plot_option_pairs)
+                _plot_id_options = _support.labeled_options(plot_option_pairs)
+                plot_options = {label: label for label in _plot_id_options}
 
                 default_plot_id = next(
                     (
@@ -66,7 +67,7 @@ def render_plot_review_cell() -> str:
                 plot_selector = _support.mo.ui.dropdown(
                     options=plot_options,
                     value=(
-                        _support.option_key_for_value(plot_options, default_plot_id)
+                        _support.option_key_for_value(_plot_id_options, default_plot_id)
                         or next(iter(plot_options))
                     ),
                     label="Plot",
@@ -76,17 +77,18 @@ def render_plot_review_cell() -> str:
 
 
         @app.cell
-        def _(plot_review_cards, plot_selector):
+        def _(plot_review_cards, plot_selector, runtime):
+            _support = runtime.support
             selected_plot_card = None
             if plot_review_cards:
-                _active_plot_id = (
+                _active_plot_value = (
                     str(plot_selector.value)
                     if plot_selector is not None
                     else str(plot_review_cards[0]["plot_id"])
                 )
-                selected_plot_card = next(
-                    (card for card in plot_review_cards if str(card["plot_id"]) == _active_plot_id),
-                    plot_review_cards[0],
+                selected_plot_card = _support.resolve_labeled_option_card(
+                    plot_review_cards,
+                    _active_plot_value,
                 )
             return (selected_plot_card,)
 

@@ -9,9 +9,14 @@ guardrails:
   - Core60 rows are derived windows and should not be conflated with full native source sequences.
 caption: RegulonDB core60 TSS-upstream UMAP colored by parent native sigma factor annotation.
 alt_text: UMAP projection scatter plot of RegulonDB core60 TSS-upstream promoter windows colored by the parent native promoter sigma factor category.
-preprocessing_md: Uses the core60 TSS-upstream intermediate embedding view. Sigma metadata are inherited from native RegulonDB records through the declared parent-key lookup derivation.
+preprocessing_md: |
+  Uses the core60 TSS-upstream intermediate embedding view. Each row is a mean
+  over Evo 2 block26 token states across the derived 60 bp TSS-upstream
+  analysis window; those token states are causal and prefix-conditioned in the
+  emitted forward orientation. Sigma metadata are inherited from native
+  RegulonDB records through the declared parent-key lookup derivation.
 math_md: |
-  The plotted coordinates are the persisted two-dimensional UMAP embedding of Evo 2 7B block26 intermediate vectors pooled over the core60 window.
+  The plotted coordinates are the persisted two-dimensional UMAP embedding of Evo 2 7B block26 intermediate vectors mean-pooled over sequence positions in the core60 window.
   Colors encode `regulondb__sigma_factor_set` copied from the parent native promoter record.
 rationale_md: Makes the native-versus-core60 comparison auditable without embedding RegulonDB-specific join logic inside LatentDNA plotting code.
 limitations_md: Core60 construction and UMAP projection both change the visible geometry; this plot is an inspection surface, not a decision metric.

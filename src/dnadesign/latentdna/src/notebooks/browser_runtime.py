@@ -41,6 +41,7 @@ from .browser_runtime_support import (
     notebook_theme,
     option_key_for_value,
     read_text,
+    resolve_labeled_option_card,
     style_notebook_axes,
     table_from_records,
     unique_in_order,
@@ -147,6 +148,7 @@ class BrowserSupport:
     pd: ModuleType
     read_text: Callable[[str | None], str | None]
     render_math_markdown: Callable[[str], object]
+    resolve_labeled_option_card: Callable[..., dict[str, object] | None]
     select_plot_render_path: Callable[[list[Path]], Path | None]
     style_notebook_axes: Callable[..., None]
     table_from_records: Callable[..., object]
@@ -571,7 +573,7 @@ def _plot_review_sections(
             {
                 "plot_id": plot_id,
                 "deliverable_id": deliverable_id,
-                "title": str(doc_block.get("title") or _humanize_plot_id(plot_id)),
+                "title": str(semantics.get("title") or doc_block.get("title") or _humanize_plot_id(plot_id)),
                 "visibility_tier": visibility_tier,
                 "render_path": render_path,
                 "question": str(semantics.get("question") or "").strip(),
@@ -862,6 +864,7 @@ def build_workspace_browser_runtime(
             pd=pd,
             read_text=read_text,
             render_math_markdown=render_math_markdown,
+            resolve_labeled_option_card=resolve_labeled_option_card,
             select_plot_render_path=select_plot_render_path,
             style_notebook_axes=style_notebook_axes,
             table_from_records=table_from_records,

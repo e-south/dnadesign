@@ -189,3 +189,17 @@ def test_reference_set_column_resolution_uses_positional_series_rows() -> None:
     resolution = resolve_reference_set_ids_from_columns(reference_set, columns)
 
     assert resolution.matched_ids == ["W1"]
+
+
+def test_reference_set_row_resolution_checks_required_columns_in_every_row() -> None:
+    context = load_workspace_config(_stress_workspace())
+    reference_set = context.config.reference_sets["reference_w_collection"]
+    rows = [
+        _row("W1", collection_id="t7_w_collection", selection_basis="native_source_length"),
+        {"usr_label__primary": "W2"},
+    ]
+
+    resolution = resolve_reference_set_rows(reference_set, rows)
+
+    assert resolution.complete is False
+    assert "promoter_standard__collection_id" in resolution.missing_columns

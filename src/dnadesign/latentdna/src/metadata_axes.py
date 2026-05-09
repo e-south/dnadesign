@@ -136,6 +136,10 @@ def axis_styles_payload(styles: Mapping[str, AxisStyle]) -> dict[str, dict[str, 
 
 
 def _canonical_values(style: AxisStyle) -> set[str]:
+    return {normalize_category_key(value) for value in _canonical_candidates(style) if str(value).strip()}
+
+
+def _canonical_candidates(style: AxisStyle) -> list[str]:
     values = [
         *style.category_order,
         *style.ordinal_subset,
@@ -144,7 +148,7 @@ def _canonical_values(style: AxisStyle) -> set[str]:
         *style.compact_display_labels,
         *style.category_colors,
     ]
-    return {normalize_category_key(value) for value in values if str(value).strip()}
+    return [str(value) for value in values]
 
 
 def _selector_matches(row: Mapping[str, object], selector: Mapping[str, object]) -> bool:
@@ -209,6 +213,45 @@ def normalize_axis_category(style: AxisStyle | None, value: object, *, row: Mapp
     if bucket is not None and canonical_values and normalize_category_key(canonical) not in canonical_values:
         return bucket
     return canonical
+
+
+def normalize_axis_categories(
+    style: AxisStyle,
+    values: Sequence[object],
+    *,
+    rows: Sequence[Mapping[str, object]] | None = None,
+) -> list[str]:
+    """Normalize many category values while reusing style-level canonical maps."""
+
+    candidates = _canonical_candidates(style)
+    canonical_lookup: dict[str, str] = {}
+    for candidate in candidates:
+        canonical_lookup.setdefault(normalize_category_key(candidate), candidate)
+    canonical_values = {normalize_category_key(value) for value in candidates if str(value).strip()}
+    row_values: Sequence[Mapping[str, object] | None]
+    if rows is None:
+        row_values = [None] * len(values)
+    else:
+        row_values = rows
+    if len(row_values) != len(values):
+        raise ValueError("normalize_axis_categories requires rows and values to have the same length")
+
+    normalized_values: list[str] = []
+    bucket = style.noncanonical_bucket
+    for value, row in zip(values, row_values, strict=True):
+        text = str(value or "").strip()
+        if not text:
+            normalized_values.append(bucket or "NA")
+            continue
+        if bucket is not None and not _row_in_canonical_scope(style, row):
+            normalized_values.append(bucket)
+            continue
+        canonical = canonical_lookup.get(normalize_category_key(text), text)
+        if bucket is not None and canonical_values and normalize_category_key(canonical) not in canonical_values:
+            normalized_values.append(bucket)
+            continue
+        normalized_values.append(canonical)
+    return normalized_values
 
 
 def ordered_categories_for_axis(style: AxisStyle | None, values: Sequence[object]) -> list[str]:

@@ -357,6 +357,107 @@ def test_render_plot_review_surface_supports_metric_panel_grid_from_current_scal
     assert "representation_health_summary" in rendered.text
 
 
+def test_render_plot_review_surface_metric_panel_grid_matches_static_panel_grouping(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame(
+            {
+                "category": ["design_family", "design_family"],
+                "label": ["design_family_separation_ratio", "design_family_balanced_separation_ratio"],
+                "display_name": [
+                    "Design-family separation ratio",
+                    "Balanced design-family separation ratio",
+                ],
+                "metric_value": [1.42, 1.31],
+                "direction": ["higher_is_better", "higher_is_better"],
+                "unit": ["ratio", "ratio"],
+                "candidate_family": ["intermediate_embedding", "intermediate_embedding"],
+                "candidate_model": ["evo2_7b", "evo2_7b"],
+                "candidate_scope": ["anchor_60bp", "anchor_60bp"],
+                "candidate_label": ["anchor", "anchor balanced"],
+            }
+        )
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "design_structure_summary",
+            "kind": "metric_panel_grid",
+            "scalar_id": "design_structure_summary_metrics",
+            "row_column": "category",
+            "panel_column": "display_name",
+            "column_column": "label",
+            "label_column": "candidate_label",
+            "value_column": "metric_value",
+            "color_column": "candidate_family",
+            "direction_column": "direction",
+            "unit_column": "unit",
+            "single_row_panels": True,
+            "value_label": "Metric value",
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    titles = [axis.get_title().replace("\n", " ") for axis in fig.axes if axis.axison]
+    assert titles == [
+        "Design Family Separation Ratio",
+        "Balanced Design Family Separation Ratio",
+    ]
+
+
+def test_render_plot_review_surface_metric_panel_grid_fails_closed_on_missing_value_column(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+    frames = [
+        pd.DataFrame(
+            {
+                "category": ["effective_rank"],
+                "label": ["candidate_a"],
+                "display_name": ["Effective rank"],
+                "metric_value": [6.4],
+                "row_count": [1],
+                "direction": ["higher_is_better"],
+                "unit": ["dims"],
+                "candidate_label": ["candidate_a"],
+            }
+        )
+    ]
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "representation_health_summary",
+            "kind": "metric_panel_grid",
+            "scalar_id": "representation_health_summary_metrics",
+            "row_column": "category",
+            "panel_column": "display_name",
+            "column_column": "label",
+            "label_column": "candidate_label",
+            "value_column": "missing_score",
+            "direction_column": "direction",
+            "unit_column": "unit",
+            "value_label": "Metric value",
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "missing required metric-panel columns" in rendered.text
+    assert "`missing_score`" in rendered.text
+
+
 def test_render_plot_review_surface_compacts_regulator_composition_legend(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
     frames = [

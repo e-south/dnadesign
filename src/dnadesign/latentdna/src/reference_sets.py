@@ -78,12 +78,25 @@ def reference_set_required_columns(reference_set: object) -> list[str]:
     return list(dict.fromkeys(column for column in columns if column))
 
 
+def _missing_required_columns_in_rows(
+    rows: Sequence[Mapping[str, object]],
+    required_columns: Sequence[str],
+) -> list[str]:
+    if not rows:
+        return []
+    missing: list[str] = []
+    for column in required_columns:
+        if any(column not in row for row in rows):
+            missing.append(column)
+    return missing
+
+
 def resolve_reference_set_rows(
     reference_set: object,
     rows: Sequence[Mapping[str, object]],
 ) -> ReferenceSetResolution:
     required_columns = reference_set_required_columns(reference_set)
-    missing_columns = [column for column in required_columns if rows and column not in rows[0]]
+    missing_columns = _missing_required_columns_in_rows(rows, required_columns)
     if missing_columns:
         return ReferenceSetResolution(
             expected_ids=[str(value) for value in getattr(reference_set, "ids", [])],

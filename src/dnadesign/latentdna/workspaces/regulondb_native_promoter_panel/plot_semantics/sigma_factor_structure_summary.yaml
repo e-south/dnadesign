@@ -9,7 +9,13 @@ guardrails:
   - Low separation is evidence about this Evo2-derived X, not evidence that sigma factors are biologically irrelevant.
 caption: Sigma-factor set cohort-structure summary for RegulonDB representation views.
 alt_text: Bar panel compares sigma-factor set separation ratio for native and core60 intermediate embedding and output-layer mean representation views.
-preprocessing_md: Uses all-row candidate samples and the shared standardize-then-L2-normalize geometry contract before computing cohort centroids.
+preprocessing_md: |
+  Uses all-row candidate samples and the shared standardize-then-L2-normalize
+  geometry contract before computing cohort centroids. Candidate rows are
+  already pooled Infer outputs: native source-record `seq_mean` over the full
+  81 bp emitted sequence and core60 mean over the derived 60 bp TSS-upstream
+  analysis window. For Evo 2, both are summaries of causal,
+  prefix-conditioned token states.
 math_md: |
   The separation ratio is
   $$

@@ -14,6 +14,7 @@ from dnadesign.latentdna.src.metadata_axes import (
     axis_display_text,
     axis_style_map_from_config,
     legend_categories,
+    normalize_axis_categories,
     normalize_axis_category,
 )
 from dnadesign.latentdna.src.services.notebook_controls_service import build_workspace_notebook_controls_payload
@@ -36,6 +37,16 @@ def test_stress_workspace_declares_sigma35_axis_semantics_in_config() -> None:
         style.noncanonical_bucket
     )
     assert normalize_axis_category(style, "b", row={"source_family": "densegen_generated"}) == "b"
+    batch_values = ["TTTACA", "b", "control", None]
+    batch_rows = [
+        {"source_class": "manual_or_wildtype"},
+        {"source_family": "densegen_generated"},
+        {"source_family": "densegen_generated"},
+        {"source_family": "densegen_generated"},
+    ]
+    assert normalize_axis_categories(style, batch_values, rows=batch_rows) == [
+        normalize_axis_category(style, value, row=row) for value, row in zip(batch_values, batch_rows, strict=True)
+    ]
     assert legend_categories(style, [style.noncanonical_bucket, "b", "f", "control"]) == ["f", "b", "control"]
 
 

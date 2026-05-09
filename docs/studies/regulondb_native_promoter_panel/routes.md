@@ -162,6 +162,10 @@ must not be used as automatic sequence deduplication rules.
   DenseGen metadata or alias native sigma factors into `sig35_variant`.
   The native/full and core60 contracts both name intermediate embeddings,
   output-layer means, and log-likelihood scalar diagnostics from Infer sidecars.
+  Native `seq_mean` and core60 mean are sequence-position means over
+  causal/prefix-conditioned Evo2 token states in the emitted forward
+  orientation: native rows pool the 81 bp source-record window, while core60
+  rows pool the derived 60 bp TSS-upstream analysis window.
   The current local snapshot is feature-backed and reports the primary
   decision deliverables as current; future missing sidecars must be expressed
   through explicit planned source roles, not hidden fallback behavior.

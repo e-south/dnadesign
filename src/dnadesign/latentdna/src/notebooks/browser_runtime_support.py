@@ -309,6 +309,37 @@ def labeled_options(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
     return options
 
 
+def resolve_labeled_option_card(
+    cards: Iterable[dict[str, object]],
+    selected_value: object,
+    *,
+    id_column: str = "plot_id",
+    title_column: str = "title",
+) -> dict[str, object] | None:
+    """Resolve a Marimo dropdown selection against stable IDs and display labels.
+
+    Marimo dropdowns are configured from ``label -> value`` dictionaries, but the
+    browser-side select element exposes display labels. Accepting both the
+    durable ID and the rendered label makes generated notebooks robust to manual
+    use and browser-level review automation.
+    """
+    ordered_cards = [dict(card) for card in cards]
+    if not ordered_cards:
+        return None
+    selected_text = str(selected_value or "").strip()
+    if not selected_text:
+        return ordered_cards[0]
+    for card in ordered_cards:
+        card_id = str(card.get(id_column) or "").strip()
+        card_title = str(card.get(title_column) or "").strip()
+        accepted = {value for value in (card_id, card_title) if value}
+        if card_id and card_title:
+            accepted.add(f"{card_title} [{card_id}]")
+        if selected_text in accepted:
+            return card
+    return ordered_cards[0]
+
+
 def normalize_label(value) -> str:
     return str(value or "").strip().lower()
 

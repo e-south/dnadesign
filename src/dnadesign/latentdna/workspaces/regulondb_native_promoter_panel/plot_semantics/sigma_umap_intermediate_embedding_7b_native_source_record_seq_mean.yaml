@@ -9,9 +9,14 @@ guardrails:
   - Use the persisted projection manifest for fit parameters and row-count checks.
 caption: Native RegulonDB promoter UMAP colored by sigma factor annotation.
 alt_text: UMAP projection scatter plot of 3,182 native RegulonDB promoter embeddings colored by sigma factor category, showing broad category structure for exploratory inspection.
-preprocessing_md: Uses the materialized native source-record sequence-mean intermediate embedding view. Row metadata are copied from the RegulonDB native USR records.
+preprocessing_md: |
+  Uses the materialized native source-record sequence-mean intermediate
+  embedding view. Each row is a mean over Evo 2 block26 token states across the
+  native 81 bp source-record sequence; those token states are causal and
+  prefix-conditioned in the emitted forward orientation. Row metadata are
+  copied from the RegulonDB native USR records.
 math_md: |
-  The plotted coordinates are the persisted two-dimensional UMAP embedding of the Evo 2 7B block26 intermediate sequence-mean vectors.
+  The plotted coordinates are the persisted two-dimensional UMAP embedding of the Evo 2 7B block26 intermediate vectors mean-pooled over sequence positions in the native source-record window.
   Colors encode the categorical `regulondb__sigma_factor_set` metadata column.
 rationale_md: Provides an orientation plot for checking whether native promoter annotations are visibly organized in the latent representation before downstream scalar summaries are trusted.
 limitations_md: UMAP distorts distances and densities; apparent clusters can change with fit parameters and should be checked against high-dimensional metrics before being used for decisions.

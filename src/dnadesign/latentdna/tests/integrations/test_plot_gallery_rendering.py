@@ -11,7 +11,8 @@ import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.latentdna.src.io.hashing import sha256_file
-from dnadesign.latentdna.src.plots.render import _add_figure_legends, _pyplot
+from dnadesign.latentdna.src.plots.legends import add_figure_legends
+from dnadesign.latentdna.src.plots.render import _pyplot
 from dnadesign.latentdna.src.services.freshness_service import evaluate_artifact_freshness
 from dnadesign.latentdna.src.services.plot_service import render_plot
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
@@ -482,7 +483,7 @@ def test_figure_legends_are_reserved_below_the_axes() -> None:
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.scatter([0.0, 1.0], [0.0, 1.0], s=10)
 
-    bottom_margin = _add_figure_legends(
+    bottom_margin = add_figure_legends(
         fig,
         plt,
         plot_id=None,

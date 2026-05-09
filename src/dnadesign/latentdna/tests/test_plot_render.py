@@ -1,31 +1,52 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
 from matplotlib.collections import PathCollection
 
+from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
+from dnadesign.latentdna.src.contracts.plot_semantics import PlotSemantics
 from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
-from dnadesign.latentdna.src.plots.render import (
-    _add_figure_legends,
-    _add_side_figure_legends,
-    _axis_category_value,
-    _category_color_map,
-    _category_key,
-    _continuous_color_encoding,
-    _derived_panel_label,
-    _draw_annotation_callouts,
-    _draw_resolved_annotations,
-    _grid_figure_size,
-    _heatmap_grid_from_rows,
-    _panel_grid_dimensions,
-    _render_distribution_panel,
-    _render_heatmap_panel,
-    _render_metric_panel,
-    metric_panel_grid_layout,
+from dnadesign.latentdna.src.plots.annotation_rendering import draw_annotation_callouts as _draw_annotation_callouts
+from dnadesign.latentdna.src.plots.annotation_rendering import draw_resolved_annotations as _draw_resolved_annotations
+from dnadesign.latentdna.src.plots.annotations import resolve_annotation_rows
+from dnadesign.latentdna.src.plots.layout import _grid_figure_size, _panel_grid_dimensions, metric_panel_grid_layout
+from dnadesign.latentdna.src.plots.legends import (
+    add_figure_legends as _add_figure_legends,
 )
+from dnadesign.latentdna.src.plots.legends import (
+    add_side_figure_legends as _add_side_figure_legends,
+)
+from dnadesign.latentdna.src.plots.render import render_plot_artifact
+from dnadesign.latentdna.src.plots.render_state import LayoutReservation
+from dnadesign.latentdna.src.plots.renderers.agreement import render_correspondence_heatmap_plot
+from dnadesign.latentdna.src.plots.renderers.distribution import derived_panel_label, render_distribution_panel
+from dnadesign.latentdna.src.plots.renderers.heatmap import (
+    heatmap_grid_from_rows as _heatmap_grid_from_rows,
+)
+from dnadesign.latentdna.src.plots.renderers.heatmap import (
+    render_heatmap_panel as _render_heatmap_panel,
+)
+from dnadesign.latentdna.src.plots.renderers.metric import (
+    load_metric_panel_grid_input,
+    metric_panel_groups,
+    metric_panel_needs_candidate_label_ticks,
+    metric_panel_uses_grouped_family_bars,
+    render_metric_panel,
+)
+from dnadesign.latentdna.src.plots.renderers.projection import render_projection_plot
+from dnadesign.latentdna.src.plots.renderers.scatter import axis_category_value as _axis_category_value
+from dnadesign.latentdna.src.plots.renderers.scatter import category_color_map as _category_color_map
+from dnadesign.latentdna.src.plots.renderers.scatter import category_key as _category_key
+from dnadesign.latentdna.src.plots.renderers.scatter import continuous_color_encoding as _continuous_color_encoding
+from dnadesign.latentdna.src.plots.tables import read_table_rows
 from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
@@ -176,6 +197,110 @@ def test_continuous_color_encoding_honors_explicit_hue_option() -> None:
     assert math.isnan(float(encoding["values"][2]))
 
 
+def test_projection_renderer_requires_xy_columns(tmp_path) -> None:
+    projection_dir = tmp_path / "projections" / "fixture_umap"
+    projection_dir.mkdir(parents=True)
+    pq.write_table(pa.table({"x": [0.0, 1.0]}), projection_dir / "coords.parquet")
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_projection",
+            "kind": "projection_scatter",
+            "projection_ids": ["fixture_umap"],
+        }
+    )
+
+    with pytest.raises(ContractViolationError, match="projection artifact fixture_umap.*'y'"):
+        render_projection_plot(
+            SimpleNamespace(output_root=tmp_path),
+            spec,
+            pyplot=plt,
+            axis_styles=None,
+        )
+
+
+def test_xy_scatter_with_no_finite_rows_records_explicit_annotation_state(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "fixture_scalar"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(pa.table({"x": [math.nan], "y": [math.nan]}), scalar_dir / "table.parquet")
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_xy",
+            "kind": "xy_scatter",
+            "scalar_id": "fixture_scalar",
+            "x_column": "x",
+            "y_column": "y",
+        }
+    )
+    semantics = PlotSemantics(
+        plot_id="fixture_xy",
+        question="Does empty xy rendering fail visibly?",
+        decision_role="debug",
+        encoding="xy scatter",
+        scope="unit fixture",
+        guardrails=["No finite rows should not crash metadata generation."],
+        caption="Fixture xy scatter.",
+        alt_text="Fixture xy scatter.",
+        preprocessing_md="Fixture.",
+        math_md="Fixture.",
+        rationale_md="Fixture.",
+        limitations_md="Fixture.",
+        failure_modes_md="Fixture.",
+    )
+
+    _, outputs, metadata = render_plot_artifact(
+        SimpleNamespace(
+            output_root=tmp_path,
+            config=SimpleNamespace(defaults=SimpleNamespace(plot_formats=["png"]), reference_sets={}),
+        ),
+        spec=spec,
+        output_dir=tmp_path / "plots" / "fixture_xy",
+        semantics=semantics,
+    )
+
+    assert [Path(output).name for output in outputs] == ["plot.png"]
+    assert metadata["reference_panels"]["fixture_scalar"]["complete"] is True
+
+
+def test_correspondence_heatmap_rejects_duplicate_assignment_keys(tmp_path: Path) -> None:
+    left_dir = tmp_path / "clusters" / "left"
+    right_dir = tmp_path / "clusters" / "right"
+    left_dir.mkdir(parents=True)
+    right_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["row0", "row0"],
+                "cluster_label": [0, 1],
+            }
+        ),
+        left_dir / "assignments.parquet",
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["row0"],
+                "cluster_label": [0],
+            }
+        ),
+        right_dir / "assignments.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_correspondence",
+            "kind": "correspondence_heatmap",
+            "left_cluster_id": "left",
+            "right_cluster_id": "right",
+        }
+    )
+
+    with pytest.raises(ContractViolationError, match="duplicate row key"):
+        render_correspondence_heatmap_plot(
+            SimpleNamespace(output_root=tmp_path),
+            spec,
+            pyplot=plt,
+        )
+
+
 def test_side_figure_legend_expands_single_panel_canvas() -> None:
     fig, _ = plt.subplots(figsize=(5.15, 5.0))
     categories = [f"SIGMA{index}" for index in range(15)]
@@ -281,7 +406,122 @@ def test_twelve_panel_full_population_gallery_uses_intermediate_output_rows() ->
     assert _panel_grid_dimensions(12) == (2, 6)
 
 
-def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotations() -> None:
+def test_metric_panel_groups_preserve_distinct_display_metrics_within_category() -> None:
+    rows = [
+        {
+            "category": "design_family",
+            "display_name": "Design-family separation ratio",
+            "label": "design_family_separation_ratio",
+            "candidate_label": "candidate_a",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "anchor_60bp",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "ratio",
+            "metric_value": 1.2,
+        },
+        {
+            "category": "design_family",
+            "display_name": "Balanced design-family separation ratio",
+            "label": "design_family_balanced_separation_ratio",
+            "candidate_label": "candidate_a",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "anchor_60bp",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "ratio",
+            "metric_value": 1.1,
+        },
+    ]
+    spec = _metric_spec(plot_id="design_structure_summary", color_column="candidate_family")
+
+    groups = metric_panel_groups(rows, spec)
+
+    assert [group.title for group in groups] == [
+        "Design-family separation ratio",
+        "Balanced design-family separation ratio",
+    ]
+    assert [len(group.rows) for group in groups] == [1, 1]
+
+
+def test_metric_panel_disables_grouped_family_bars_when_keys_would_overwrite_rows() -> None:
+    rows = [
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "context_self_cosine_median",
+            "candidate_label": "anchor vs context anchor mean",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "anchor_vs_context",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.12,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "context_self_cosine_median",
+            "candidate_label": "anchor vs full 1 kb context",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "anchor_vs_context",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.07,
+        },
+    ]
+    spec = _metric_spec(plot_id="context_robustness_summary", color_column="candidate_family")
+
+    assert not metric_panel_uses_grouped_family_bars(rows, spec)
+    assert metric_panel_needs_candidate_label_ticks(rows, spec)
+
+    color_map, _ = _category_color_map([rows], spec.color_column)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    try:
+        render_metric_panel(
+            ax,
+            rows=rows,
+            spec=spec,
+            panel_title="Context self cosine",
+            color_map=color_map,
+            square=False,
+        )
+
+        tick_labels = [label.get_text().replace("\n", " ") for label in ax.get_xticklabels()]
+        assert any("Anchor Vs Context" in label for label in tick_labels)
+        assert any("Anchor Vs Full" in label for label in tick_labels)
+    finally:
+        plt.close(fig)
+
+
+def test_metric_panel_input_requires_configured_value_column(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "fixture_metrics"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "category": ["effective_rank"],
+                "display_name": ["Effective rank"],
+                "label": ["candidate_a"],
+                "candidate_label": ["candidate_a"],
+                "metric_value": [6.4],
+                "row_count": [1],
+                "direction": ["higher_is_better"],
+                "unit": ["dims"],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = _metric_spec(plot_id="representation_health_summary", color_column=None).model_copy(
+        update={"value_column": "missing_score"}
+    )
+
+    with pytest.raises(ContractViolationError, match="missing_score"):
+        load_metric_panel_grid_input(SimpleNamespace(output_root=tmp_path), spec)
+
+
+def testrender_metric_panel_ignores_nan_values_when_setting_limits_and_annotations() -> None:
     rows = [
         {
             "category": "design_family_separation_ratio",
@@ -330,7 +570,7 @@ def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotati
     color_map, _ = _category_color_map([rows], spec.color_column)
     fig, ax = plt.subplots(figsize=(6, 5))
     try:
-        _render_metric_panel(
+        render_metric_panel(
             ax,
             rows=rows,
             spec=spec,
@@ -350,7 +590,7 @@ def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotati
         plt.close(fig)
 
 
-def test_render_metric_panel_keeps_bootstrap_replicates_off_bar_plot() -> None:
+def testrender_metric_panel_keeps_bootstrap_replicates_off_bar_plot() -> None:
     rows = [
         {
             "category": "sig35_ordinal_spearman",
@@ -372,7 +612,7 @@ def test_render_metric_panel_keeps_bootstrap_replicates_off_bar_plot() -> None:
     color_map, _ = _category_color_map([rows], spec.color_column)
     fig, ax = plt.subplots(figsize=(6, 5))
     try:
-        _render_metric_panel(
+        render_metric_panel(
             ax,
             rows=rows,
             spec=spec,
@@ -388,7 +628,7 @@ def test_render_metric_panel_keeps_bootstrap_replicates_off_bar_plot() -> None:
         plt.close(fig)
 
 
-def test_render_metric_panel_uses_compact_candidate_tick_labels() -> None:
+def testrender_metric_panel_uses_compact_candidate_tick_labels() -> None:
     rows = [
         {
             "category": "effective_rank",
@@ -421,7 +661,7 @@ def test_render_metric_panel_uses_compact_candidate_tick_labels() -> None:
     color_map, _ = _category_color_map([rows], spec.color_column)
     fig, ax = plt.subplots(figsize=(6, 5))
     try:
-        _render_metric_panel(
+        render_metric_panel(
             ax,
             rows=rows,
             spec=spec,
@@ -437,7 +677,7 @@ def test_render_metric_panel_uses_compact_candidate_tick_labels() -> None:
         plt.close(fig)
 
 
-def test_render_metric_panel_uses_placeholder_when_all_values_are_missing() -> None:
+def testrender_metric_panel_uses_placeholder_when_all_values_are_missing() -> None:
     rows = [
         {
             "category": "balanced_design_family_separation_ratio",
@@ -468,7 +708,7 @@ def test_render_metric_panel_uses_placeholder_when_all_values_are_missing() -> N
     color_map, _ = _category_color_map([rows], spec.color_column)
     fig, ax = plt.subplots(figsize=(6, 5))
     try:
-        _render_metric_panel(
+        render_metric_panel(
             ax,
             rows=rows,
             spec=spec,
@@ -487,7 +727,7 @@ def test_render_metric_panel_uses_placeholder_when_all_values_are_missing() -> N
         plt.close(fig)
 
 
-def test_render_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> None:
+def testrender_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> None:
     rows = [
         {
             "category": "context_self_cosine_median",
@@ -542,7 +782,7 @@ def test_render_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> No
     color_map, _ = _category_color_map([rows], spec.color_column)
     fig, ax = plt.subplots(figsize=(6, 5))
     try:
-        _render_metric_panel(
+        render_metric_panel(
             ax,
             rows=rows,
             spec=spec,
@@ -570,7 +810,7 @@ def test_render_distribution_panel_orders_sig35_categories_by_strength_and_uses_
     ]
     fig, ax = plt.subplots(figsize=(6, 4))
     try:
-        _render_distribution_panel(
+        render_distribution_panel(
             ax,
             rows=rows,
             metric_column="sig35_margin_f_vs_b",
@@ -603,7 +843,7 @@ def test_render_distribution_panel_preserves_explicit_math_axis_label() -> None:
     fig, ax = plt.subplots(figsize=(6, 4))
     try:
         label = r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
-        _render_distribution_panel(
+        render_distribution_panel(
             ax,
             rows=rows,
             metric_column="sig35_margin_f_vs_b",
@@ -650,6 +890,97 @@ def test_heatmap_grid_respects_configured_sig35_order_without_reference_pollutio
     assert row_values == ["TTGACA (f)", "TAGACA (e)"]
     assert column_values == ["TTGACA (f)", "TAGACA (e)"]
     assert [[round(float(value), 3) for value in row] for row in grid.tolist()] == [[0.0, 0.4], [0.4, 0.0]]
+
+
+def test_heatmap_grid_fails_fast_on_duplicate_semantic_cells() -> None:
+    rows = [
+        {"row_variant": "TTGACA (f)", "column_variant": "TAGACA (e)", "metric_value": 0.4},
+        {"row_variant": "TTGACA (f)", "column_variant": "TAGACA (e)", "metric_value": 0.5},
+    ]
+
+    with pytest.raises(ContractViolationError, match="duplicate heatmap cell"):
+        _heatmap_grid_from_rows(
+            rows,
+            row_column="row_variant",
+            column_column="column_variant",
+            value_column="metric_value",
+            row_order=[],
+            column_order=[],
+        )
+
+
+def test_heatmap_grid_fails_fast_when_later_rows_miss_required_columns() -> None:
+    rows = [
+        {"row_variant": "TTGACA (f)", "column_variant": "TAGACA (e)", "metric_value": 0.4},
+        {"row_variant": "TAGACA (e)", "metric_value": 0.5},
+    ]
+
+    with pytest.raises(ContractViolationError, match="column_variant"):
+        _heatmap_grid_from_rows(
+            rows,
+            row_column="row_variant",
+            column_column="column_variant",
+            value_column="metric_value",
+            row_order=[],
+            column_order=[],
+        )
+
+
+def test_read_table_rows_validates_required_schema_columns(tmp_path) -> None:
+    table_path = tmp_path / "table.parquet"
+    pq.write_table(pa.table({"x": [1.0], "metric_value": [0.4]}), table_path)
+
+    with pytest.raises(ContractViolationError, match="missing required column"):
+        read_table_rows(table_path, required_columns=["x", "y"], artifact_label="fixture table")
+
+
+def test_layout_reservation_tracks_explicit_legend_space() -> None:
+    reservation = LayoutReservation()
+
+    reservation.reserve_bottom(0.08)
+    reservation.reserve_bottom(0.04)
+    reservation.reserve_right(0.20)
+
+    assert reservation.legend_bottom == 0.08
+    assert reservation.legend_right == 0.20
+    assert reservation.has_reservation
+
+
+def test_resolve_annotation_rows_reports_later_row_missing_label_column() -> None:
+    reference_set = SimpleNamespace(
+        ids=["target"],
+        match_column="id",
+        label_column="label",
+        label_mode="label_and_highlight",
+        display_labels={},
+        where=[],
+        where_all=[],
+        require_non_empty=True,
+    )
+    context = SimpleNamespace(config=SimpleNamespace(reference_sets={"fixture_reference": reference_set}))
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_projection",
+            "kind": "projection_scatter",
+            "projection_ids": ["fixture_projection"],
+            "annotation": {"reference_set": "fixture_reference", "missing_policy": "allow"},
+        }
+    )
+
+    resolved = resolve_annotation_rows(
+        context,
+        [
+            {"id": "target", "label": "Target", "x": 0.0, "y": 0.0},
+            {"id": "other", "x": 1.0, "y": 1.0},
+        ],
+        spec=spec,
+    )
+
+    assert resolved.selected_rows == []
+    assert resolved.label_column is None
+    assert resolved.state["complete"] is False
+    assert resolved.state["error"] == "missing_reference_columns"
+    assert resolved.state["missing_columns"] == ["label"]
 
 
 def test_render_heatmap_panel_can_hide_redundant_y_tick_labels() -> None:
@@ -755,7 +1086,7 @@ def test_draw_resolved_annotations_highlights_all_reference_rows_when_labels_are
 
 
 def test_derived_panel_label_humanizes_context_delta_distribution_ids() -> None:
-    assert _derived_panel_label("context_delta_distribution_output_layer_mean_7b") == "Output Layer Mean Evo 2 7B"
+    assert derived_panel_label("context_delta_distribution_output_layer_mean_7b") == "Output Layer Mean Evo 2 7B"
 
 
 def test_wrap_plot_title_respects_explicit_max_lines() -> None:
@@ -802,7 +1133,7 @@ def test_single_row_candidate_layout_can_show_six_configured_panels() -> None:
     assert _panel_grid_dimensions(6, prefer_single_row=True) == (1, 6)
 
 
-def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_two_lines() -> None:
+def testrender_metric_panel_wraps_representation_health_axis_label_to_at_most_two_lines() -> None:
     rows = [
         {
             "category": "pairwise_cosine_distance_iqr",
@@ -833,7 +1164,7 @@ def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_t
     color_map, _ = _category_color_map([rows], spec.color_column)
     fig, ax = plt.subplots(figsize=(6, 5))
     try:
-        _render_metric_panel(
+        render_metric_panel(
             ax,
             rows=rows,
             spec=spec,
@@ -847,6 +1178,54 @@ def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_t
         plt.close(fig)
 
 
+def test_render_metric_panel_keeps_reference_set_qualifier_out_of_axis_label() -> None:
+    rows = [
+        {
+            "category": "reference_set: reference_spyp_sulap",
+            "display_name": "Reference group size\nReference set: spyP / sulAp",
+            "label": "candidate_a",
+            "candidate_label": "candidate_a",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "merged_anchor_insert_seq_mean",
+            "candidate_family": "intermediate_embedding",
+            "direction": "descriptive",
+            "unit": "rows",
+            "metric_value": 2.0,
+        },
+        {
+            "category": "reference_set: reference_spyp_sulap",
+            "display_name": "Reference group size\nReference set: spyP / sulAp",
+            "label": "candidate_b",
+            "candidate_label": "candidate_b",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "full_context_anchor_mean",
+            "candidate_family": "intermediate_embedding",
+            "direction": "descriptive",
+            "unit": "rows",
+            "metric_value": 2.0,
+        },
+    ]
+    spec = _metric_spec(plot_id="reference_alignment_summary", color_column=None)
+    color_map, _ = _category_color_map([rows], spec.color_column)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    try:
+        render_metric_panel(
+            ax,
+            rows=rows,
+            spec=spec,
+            panel_title="Reference group size\nReference set: spyP / sulAp",
+            color_map=color_map,
+            square=True,
+        )
+
+        assert "Reference Set" in ax.get_title()
+        assert "Reference Set" not in ax.get_ylabel()
+        assert "..." not in ax.get_ylabel()
+        assert "Reference Group Size" in ax.get_ylabel()
+    finally:
+        plt.close(fig)
+
+
 def test_representation_health_summary_declares_square_metric_panels() -> None:
     assert metric_panel_uses_square_axes("representation_health_summary")
 
@@ -855,4 +1234,11 @@ def test_representation_health_summary_uses_horizontal_metric_panel_layout() -> 
     rows, columns, figsize = metric_panel_grid_layout("representation_health_summary", 3)
 
     assert (rows, columns) == (1, 3)
+    assert figsize[0] > figsize[1]
+
+
+def test_reference_alignment_summary_uses_landscape_appendix_layout() -> None:
+    rows, columns, figsize = metric_panel_grid_layout("reference_alignment_summary", 31)
+
+    assert (rows, columns) == (4, 8)
     assert figsize[0] > figsize[1]

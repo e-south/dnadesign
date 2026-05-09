@@ -8,7 +8,7 @@ from pydantic import TypeAdapter
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import PlotConfig
 from dnadesign.latentdna.src.plots.recipes import resolve_plot_spec
-from dnadesign.latentdna.src.plots.render import _effective_shape_column
+from dnadesign.latentdna.src.plots.renderers.scatter import effective_shape_column
 
 _PLOT_CONFIG_ADAPTER = TypeAdapter(PlotConfig)
 
@@ -150,7 +150,7 @@ def test_hue_switchable_scatter_surfaces_ignore_shape_channel_at_render_time() -
     )
 
     assert spec.shape_column == "sig35_variant"
-    assert _effective_shape_column(spec) is None
+    assert effective_shape_column(spec) is None
 
 
 def test_metric_panel_grid_inline_spec_rejects_shape_column() -> None:

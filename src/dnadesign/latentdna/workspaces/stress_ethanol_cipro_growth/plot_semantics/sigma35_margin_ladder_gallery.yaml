@@ -1,4 +1,5 @@
 plot_id: sigma35_margin_ladder_gallery
+title: Sigma-35 ladder-margin gallery
 question: Does the row-level Sigma-35 margin actually form the ordered ladder summarized by the ordinal Spearman score?
 decision_role: primary
 encoding: Violin-and-box ladder gallery showing the distribution of the Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the first-class 7B intermediate candidates.

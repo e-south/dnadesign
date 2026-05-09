@@ -16,16 +16,11 @@ from ..metadata_axes import axis_display_text, axis_style_map_from_payload
 from ..plots.layout import _grid_figure_size as static_grid_figure_size
 from ..plots.layout import _panel_grid_dimensions as static_panel_grid_dimensions
 from ..plots.layout import metric_panel_grid_layout
-from ..plots.render import (
-    _category_color_map as static_category_color_map,
-)
-from ..plots.render import (
-    _derived_panel_label,
-    _render_curve_panel,
-    _render_distribution_panel,
-    _render_metric_panel,
-    _render_placeholder_panel,
-)
+from ..plots.panels import render_placeholder_panel
+from ..plots.renderers.curve import render_curve_panel
+from ..plots.renderers.distribution import derived_panel_label, render_distribution_panel
+from ..plots.renderers.metric import metric_panel_groups, metric_panel_required_columns, render_metric_panel
+from ..plots.renderers.scatter import category_color_map as static_category_color_map
 from ..visual_style import (
     TEXT_COLOR,
     compact_candidate_title,
@@ -527,7 +522,7 @@ def _render_scatter_grid(
         panel_title = compact_candidate_title(_plot_panel_title(plot_spec, index, f"Panel {index + 1}"))
         load_error = _frame_load_error(frame)
         if frame.empty or x_column not in frame.columns or y_column not in frame.columns:
-            _render_placeholder_panel(
+            render_placeholder_panel(
                 ax,
                 panel_title=panel_title,
                 message="Panel unavailable" if load_error else "Panel data missing",
@@ -543,7 +538,7 @@ def _render_scatter_grid(
         )
         finite_frame = frame.loc[finite_mask].copy()
         if finite_frame.empty:
-            _render_placeholder_panel(
+            render_placeholder_panel(
                 ax,
                 panel_title=panel_title,
                 message="Margins unavailable",
@@ -932,17 +927,23 @@ def _render_metric_grid(
 
     frame = frames[0]
     spec = ResolvedPlotSpec.model_validate(plot_spec)
-    value_column = spec.value_column if spec.value_column and spec.value_column in frame.columns else None
-    if value_column is None:
-        value_column = "metric_value" if "metric_value" in frame.columns else "row_count"
-    spec = spec.model_copy(update={"value_column": value_column})
+    required_columns = [column for column in metric_panel_required_columns(spec) if column is not None]
+    missing_columns = [str(column) for column in required_columns if str(column) not in frame.columns]
+    if missing_columns:
+        return mo.callout(
+            "The selected plot is missing required metric-panel columns: "
+            + ", ".join(f"`{column}`" for column in missing_columns)
+            + ".",
+            kind="warn",
+        )
     resolved_axis_styles = axis_style_map_from_payload(axis_styles)
 
-    panel_values = list(dict.fromkeys(frame[spec.row_column].astype(str).tolist())) if spec.row_column else ["panel"]
+    records = frame.to_dict(orient="records")
+    panel_groups = metric_panel_groups(records, spec)
     square_metric_panels = bool(spec.square_panels) or metric_panel_uses_square_axes(spec.plot_id)
     rows_count, columns, metric_figsize = metric_panel_grid_layout(
         spec.plot_id,
-        len(panel_values),
+        len(panel_groups),
         prefer_single_row=bool(spec.single_row_panels),
         square_panels=square_metric_panels,
     )
@@ -952,18 +953,15 @@ def _render_metric_grid(
         figsize=metric_figsize,
         squeeze=False,
     )
-    records = frame.to_dict(orient="records")
     color_map, categories = static_category_color_map([records], spec.color_column, axis_styles=resolved_axis_styles)
-    for axis in axes.ravel()[len(panel_values) :]:
+    for axis in axes.ravel()[len(panel_groups) :]:
         axis.set_axis_off()
-    for axis, panel_value in zip(axes.ravel(), panel_values, strict=False):
-        panel_rows = [row for row in records if str(row.get(spec.row_column)) == panel_value]
-        panel_title = str(panel_rows[0].get(spec.panel_column) or panel_value) if panel_rows else panel_value
-        _render_metric_panel(
+    for axis, panel_group in zip(axes.ravel(), panel_groups, strict=False):
+        render_metric_panel(
             axis,
-            rows=panel_rows,
+            rows=panel_group.rows,
             spec=spec,
-            panel_title=panel_title,
+            panel_title=panel_group.title,
             color_map=color_map,
             square=square_metric_panels,
             axis_styles=resolved_axis_styles,
@@ -1037,8 +1035,8 @@ def _render_distribution_grid(
             title = str(panel_titles[panel_title_index])
         else:
             title = (
-                f"{_derived_panel_label(scalar_id)} · {humanize_display_text(metric_column)}"
-                if metric_column and _derived_panel_label(scalar_id)
+                f"{derived_panel_label(scalar_id)} · {humanize_display_text(metric_column)}"
+                if metric_column and derived_panel_label(scalar_id)
                 else humanize_display_text(metric_column or scalar_id)
             )
         panel_title_index += 1
@@ -1109,7 +1107,7 @@ def _render_distribution_grid(
         axis.set_axis_off()
     for axis, (panel_title, frame, metric_column, error_detail) in zip(axes.ravel(), panel_entries, strict=False):
         if frame is None or metric_column is None:
-            _render_placeholder_panel(
+            render_placeholder_panel(
                 axis,
                 panel_title=panel_title,
                 message="Panel unavailable",
@@ -1117,7 +1115,7 @@ def _render_distribution_grid(
                 square=False,
             )
             continue
-        _render_distribution_panel(
+        render_distribution_panel(
             axis,
             rows=frame.to_dict(orient="records"),
             metric_column=metric_column,
@@ -1164,7 +1162,7 @@ def _render_curve_grid(plot_spec: dict[str, object], *, output_root: Path, alt_t
     for axis in axes.ravel()[len(reducer_summaries) :]:
         axis.set_axis_off()
     for axis, (reducer_id, summary), panel_title in zip(axes.ravel(), reducer_summaries, titles, strict=False):
-        _render_curve_panel(
+        render_curve_panel(
             axis,
             reducer_id=reducer_id,
             summary=summary,

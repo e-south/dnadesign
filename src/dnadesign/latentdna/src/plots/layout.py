@@ -71,6 +71,10 @@ def metric_panel_grid_layout(
     square_panels: bool | None = None,
 ) -> tuple[int, int, tuple[float, float]]:
     resolved_square_panels = metric_panel_uses_square_axes(plot_id) if square_panels is None else bool(square_panels)
+    if plot_id == "reference_alignment_summary" and panel_count > 8:
+        columns = min(8, panel_count)
+        rows = int(math.ceil(panel_count / columns))
+        return rows, columns, (3.45 * columns, 3.55 * rows)
     if (prefer_single_row or plot_id == "representation_health_summary") and panel_count > 1:
         rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=True)
         figsize = _grid_figure_size(panel_count, square_panels=resolved_square_panels, prefer_single_row=True)

@@ -24,6 +24,7 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     normalize_hue_kind,
     notebook_theme,
     resolve_join_keys,
+    resolve_labeled_option_card,
     resolve_reference_annotation,
     table_from_records,
 )
@@ -432,6 +433,21 @@ def test_labeled_options_disambiguates_duplicate_labels_without_dropping_values(
     assert "Control [view_a]" in options
     assert "Control [view_b]" in options
     assert options["Treatment"] == "view_c"
+
+
+def test_resolve_labeled_option_card_accepts_ids_titles_and_disambiguated_labels() -> None:
+    cards = [
+        {"plot_id": "sigma35_ordinal_audit", "title": "Sigma-35 ordinal audit"},
+        {"plot_id": "sigma35_margin_ladder_gallery", "title": "Sigma-35 margin ladder gallery"},
+    ]
+
+    assert resolve_labeled_option_card(cards, "sigma35_margin_ladder_gallery") == cards[1]
+    assert resolve_labeled_option_card(cards, "Sigma-35 margin ladder gallery") == cards[1]
+    assert resolve_labeled_option_card(
+        [{"plot_id": "view_a", "title": "Control"}, {"plot_id": "view_b", "title": "Control"}],
+        "Control [view_b]",
+    ) == {"plot_id": "view_b", "title": "Control"}
+    assert resolve_labeled_option_card(cards, "missing") == cards[0]
 
 
 def test_table_from_records_uses_marimo_native_table_widget() -> None:

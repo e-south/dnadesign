@@ -11,6 +11,7 @@ class PlotSemantics(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     plot_id: str = Field(min_length=1)
+    title: str | None = Field(default=None, min_length=1)
     question: str = Field(min_length=1)
     decision_role: Literal["gate", "primary", "appendix", "debug"]
     encoding: str = Field(min_length=1)

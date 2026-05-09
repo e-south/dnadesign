@@ -9,7 +9,14 @@ guardrails:
   - Use UMAP only as an appendix orientation after this collapse check.
 caption: Representation-health gate for native and core60 RegulonDB promoter representation views.
 alt_text: Bar-panel summary comparing effective rank, PC1 variance fraction, and pairwise cosine-distance spread across native source-record and core60 RegulonDB representation views.
-preprocessing_md: Uses materialized view matrices, all-row scorecard samples, and persisted PCA reducer summaries for each configured candidate view. Pairwise cosine metrics follow the shared standardize-then-normalize representation-health contract.
+preprocessing_md: |
+  Uses materialized view matrices, all-row scorecard samples, and persisted PCA
+  reducer summaries for each configured candidate view. Native `seq_mean` rows
+  are means over Evo 2 token-position states for the full source-record
+  sequence; core60 rows are means over the derived 60 bp TSS-upstream window.
+  Because Evo 2 is autoregressive, these token states are causal and
+  prefix-conditioned in the emitted orientation. Pairwise cosine metrics follow
+  the shared standardize-then-normalize representation-health contract.
 math_md: |
   Effective rank is computed from the positive retained PCA variance ratios:
   $$
