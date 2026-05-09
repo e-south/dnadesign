@@ -14,6 +14,7 @@ import pandas as pd
 
 from ..metadata_axes import axis_display_text, axis_style_map_from_payload
 from ..visual_style import (
+    PLOT_TITLE_FONT_SIZE,
     PUBLICATION_PALETTE,
     TEXT_COLOR,
     compact_candidate_title,
@@ -37,6 +38,8 @@ from .browser_runtime_support import (
     load_table,
     load_view_rows,
     normalize_categorical_hue_series,
+    reference_hue_coverage_warnings,
+    reference_hue_render_params,
     resolve_join_keys,
     resolve_reference_annotation,
     style_notebook_axes,
@@ -460,6 +463,8 @@ def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False)
         return 1, 1
     if prefer_single_row and panel_count <= 4:
         return 1, panel_count
+    if panel_count == 12:
+        return 2, 6
     if panel_count in {5, 6}:
         return 2, 3
     if panel_count in {7, 8}:
@@ -510,6 +515,7 @@ def render_projection_grid(
     reference_match_column: str = "usr_label__primary",
     reference_display_labels: dict[str, str] | None = None,
     reference_label_limit: int | None = None,
+    reference_hue_column: str | None = None,
     alt_text: str | None = None,
     prefer_single_row: bool = False,
 ):
@@ -562,6 +568,33 @@ def render_projection_grid(
         if effective_hue not in allowed:
             effective_hue = None
 
+    effective_reference_hue = str(reference_hue_column or "").strip()
+    if effective_reference_hue and reference_labels:
+        reference_warnings.extend(
+            reference_hue_coverage_warnings(
+                resolved_frames,
+                reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_hue_column=effective_reference_hue,
+            )
+        )
+    reference_hue_params = (
+        reference_hue_render_params(
+            resolved_frames,
+            reference_labels=reference_labels,
+            reference_match_column=reference_match_column,
+            reference_hue_column=effective_reference_hue,
+        )
+        if effective_reference_hue and reference_labels
+        else None
+    )
+    if reference_hue_params is None:
+        if effective_reference_hue and reference_labels:
+            reference_warnings.append(
+                f"reference hue `{effective_reference_hue}` has no finite values for selected reference rows"
+            )
+        effective_reference_hue = ""
+
     n_panels = len(panel_specs)
     nrows, ncols = _panel_grid_dimensions(n_panels, prefer_single_row=prefer_single_row)
     if n_panels == 1:
@@ -570,6 +603,9 @@ def render_projection_grid(
     elif prefer_single_row and n_panels <= 4:
         panel_width = 3.55
         panel_height = 4.0
+    elif n_panels == 12:
+        panel_width = 3.65
+        panel_height = 4.75
     else:
         panel_width = 3.65
         panel_height = 3.81
@@ -626,7 +662,7 @@ def render_projection_grid(
     for axis_index, (ax, spec, frame) in enumerate(zip(panel_axes, panel_specs, resolved_frames, strict=True)):
         wrapped_title = wrap_plot_title(
             compact_candidate_title(str(spec.get("title") or spec.get("view_id") or f"Panel {axis_index + 1}")),
-            width=32 if n_panels == 1 else 22,
+            width=32 if n_panels == 1 else 28 if n_panels == 12 else 22,
             max_lines=3,
         )
         max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
@@ -772,7 +808,11 @@ def render_projection_grid(
                             rasterized=point_style.rasterized,
                         )
 
-        ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
+        ax.set_title(
+            wrapped_title,
+            fontweight="semibold",
+            pad=7 if n_panels == 12 and "\n" in wrapped_title else 10 if "\n" in wrapped_title else 8,
+        )
         if artifact_warning:
             _render_projection_attention_badge(ax)
         ax.set_xlabel("Projection 1")
@@ -783,6 +823,9 @@ def render_projection_grid(
             ax.set_ylim(y_min, y_max)
         ax.margins(x=0.06, y=0.06)
         style_notebook_axes(ax, grid=True, square=True)
+        if n_panels == 12:
+            ax.title.set_fontsize(PLOT_TITLE_FONT_SIZE - 1.25)
+            ax.title.set_linespacing(1.0)
 
     for ax in axes_array[n_panels:]:
         ax.set_axis_off()
@@ -795,8 +838,8 @@ def render_projection_grid(
         layout = legend_layout(
             legend_labels,
             plot_id=plot_id,
-            default_anchor_y=0.006 if plot_id == "appendix_umap_gallery" else (0.012 if n_panels <= 1 else 0.008),
-            default_base_margin=0.11,
+            default_anchor_y=0.036 if plot_id == "appendix_umap_gallery" else (0.012 if n_panels <= 1 else 0.008),
+            default_base_margin=0.088 if plot_id == "appendix_umap_gallery" else 0.11,
             row_step=0.043,
         )
         legend = fig.legend(
@@ -828,10 +871,10 @@ def render_projection_grid(
             fig.set_size_inches(fig.get_figwidth(), fig.get_figheight() + extra_height, forward=True)
             bottom_margin = max(bottom_margin, min(0.2 + (0.052 * legend_rows), 0.56))
         if plot_id == "appendix_umap_gallery":
-            bottom_margin = max(bottom_margin, 0.12)
+            bottom_margin = max(bottom_margin, 0.088)
         if n_panels == 2:
             bottom_margin = max(bottom_margin, 0.34)
-        elif n_panels >= 8:
+        elif n_panels >= 8 and plot_id != "appendix_umap_gallery":
             bottom_margin = max(bottom_margin, 0.30)
 
     label_right_padding_px = 12.0
@@ -839,16 +882,22 @@ def render_projection_grid(
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
         colorbar_bottom = 0.12
         label_right_padding_px = 28.0
+    if reference_hue_params is not None:
+        label_right_padding_px = max(label_right_padding_px, 42.0)
     top_margin = max(0.8, 0.96 - (0.042 * max(max_title_lines - 1, 0)))
     if colorbar_bottom > 0.0:
         bottom_margin = max(bottom_margin, 0.2 if n_panels > 1 else 0.16)
     fig.subplots_adjust(
         left=0.1,
-        right=0.97,
+        right=0.92 if reference_hue_params is not None else 0.97,
         top=top_margin,
         bottom=bottom_margin,
         wspace=0.26 if n_panels > 1 else 0.2,
-        hspace=(0.62 + (0.04 * max(max_title_lines - 1, 0))) if n_panels > 1 else 0.3,
+        hspace=(0.24 + (0.025 * max(max_title_lines - 1, 0)))
+        if n_panels == 12
+        else (0.62 + (0.04 * max(max_title_lines - 1, 0)))
+        if n_panels > 1
+        else 0.3,
     )
     fig.canvas.draw()
 
@@ -863,6 +912,8 @@ def render_projection_grid(
                 reference_label_limit=reference_label_limit,
                 right_padding_px=label_right_padding_px,
                 left_padding_px=28.0,
+                reference_hue_column=effective_reference_hue or None,
+                reference_hue_params=reference_hue_params,
             )
 
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
@@ -878,6 +929,28 @@ def render_projection_grid(
         colorbar.set_label(display_hue_label(effective_hue, axis_styles=axis_styles), fontsize=11.5, color=TEXT_COLOR)
         colorbar.ax.xaxis.set_label_position("bottom")
         colorbar.ax.xaxis.set_ticks_position("bottom")
+
+    if reference_hue_params is not None and effective_reference_hue:
+        from matplotlib.cm import ScalarMappable
+        from matplotlib.colors import Normalize
+
+        reference_colorbar_bottom = max(bottom_margin + 0.035, 0.20 if colorbar_bottom > 0.0 else 0.16)
+        reference_colorbar_top = min(top_margin - 0.035, 0.90)
+        reference_colorbar_height = max(reference_colorbar_top - reference_colorbar_bottom, 0.18)
+        reference_norm = reference_hue_params.get("norm") or Normalize(
+            vmin=reference_hue_params.get("vmin"),
+            vmax=reference_hue_params.get("vmax"),
+        )
+        reference_colorbar = fig.colorbar(
+            ScalarMappable(norm=reference_norm, cmap=str(reference_hue_params["cmap"])),
+            cax=fig.add_axes([0.945, reference_colorbar_bottom, 0.012, reference_colorbar_height]),
+        )
+        reference_colorbar.ax.tick_params(labelsize=10.0, colors=TEXT_COLOR)
+        reference_colorbar.set_label(
+            display_hue_label(effective_reference_hue, axis_styles=axis_styles),
+            fontsize=11.0,
+            color=TEXT_COLOR,
+        )
 
     default_alt_text = _default_projection_alt_text(
         panel_count=n_panels,

@@ -595,6 +595,36 @@ _METRICS = [
         direction="descriptive",
         aggregation_level="group_summary",
     ),
+    _metric(
+        "reference_to_centroid_similarity",
+        "Reference-to-centroid similarity",
+        "Cosine similarity between a reference row or reference-set centroid and a configured cohort centroid.",
+        metric_family="reference_alignment",
+        evidence_tier="primary",
+        unit="cosine_similarity",
+        direction="descriptive",
+        aggregation_level="reference_to_centroid",
+    ),
+    _metric(
+        "reference_to_centroid_margin_median",
+        "Reference-to-centroid margin median",
+        "Median best-minus-second-best centroid similarity margin across configured reference entities.",
+        metric_family="reference_alignment",
+        evidence_tier="primary",
+        unit="cosine_similarity_delta",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "reference_strength_ordinal_spearman_median",
+        "Reference strength Spearman median",
+        "Median collection-specific ordinal Spearman across configured reference-standard strength collections.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="correlation",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
 ]
 
 METRIC_DEFINITIONS = {metric.metric_id: metric for metric in _METRICS}

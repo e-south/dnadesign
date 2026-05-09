@@ -13,6 +13,9 @@ import pandas as pd
 
 from ..contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..metadata_axes import axis_display_text, axis_style_map_from_payload
+from ..plots.layout import _grid_figure_size as static_grid_figure_size
+from ..plots.layout import _panel_grid_dimensions as static_panel_grid_dimensions
+from ..plots.layout import metric_panel_grid_layout
 from ..plots.render import (
     _category_color_map as static_category_color_map,
 )
@@ -22,13 +25,6 @@ from ..plots.render import (
     _render_distribution_panel,
     _render_metric_panel,
     _render_placeholder_panel,
-    metric_panel_grid_layout,
-)
-from ..plots.render import (
-    _grid_figure_size as static_grid_figure_size,
-)
-from ..plots.render import (
-    _panel_grid_dimensions as static_panel_grid_dimensions,
 )
 from ..visual_style import (
     TEXT_COLOR,
@@ -87,6 +83,37 @@ def _frame_load_error(frame: pd.DataFrame) -> str:
     return str(frame.attrs.get("load_error") or "").strip()
 
 
+def _filtered_frames(
+    frames: list[pd.DataFrame],
+    *,
+    filter_column: str,
+    filter_value: str,
+) -> list[pd.DataFrame]:
+    filtered: list[pd.DataFrame] = []
+    for index, frame in enumerate(frames):
+        if frame.empty or _frame_load_error(frame):
+            filtered.append(frame)
+            continue
+        if filter_column not in frame.columns:
+            panel_label = str(
+                frame.attrs.get("view_id")
+                or frame.attrs.get("projection_id")
+                or frame.attrs.get("scalar_id")
+                or f"panel {index + 1}"
+            )
+            filtered.append(
+                _load_error_frame(
+                    f"subset filter `{filter_column}` is missing in `{panel_label}`; "
+                    "panel was not rendered to avoid mixing reference subsets"
+                )
+            )
+            continue
+        filtered_frame = frame.loc[frame[filter_column].astype(str) == filter_value].copy()
+        filtered_frame.attrs.update(frame.attrs)
+        filtered.append(filtered_frame)
+    return filtered
+
+
 def _callout_from_frame_errors(frames: list[pd.DataFrame], *, fallback_message: str):
     unique_errors = list(dict.fromkeys(_frame_load_error(frame) for frame in frames if _frame_load_error(frame)))
     if unique_errors:
@@ -129,6 +156,11 @@ def load_plot_review_frames(
             for option in plot_spec.get("hue_options", [])
             if isinstance(option, dict) and option.get("column")
         ]
+        requested_columns.extend(
+            str(option.get("column"))
+            for option in plot_spec.get("filter_options", [])
+            if isinstance(option, dict) and option.get("column")
+        )
         requested_columns = list(dict.fromkeys([*requested_columns, *(reference_required_columns or [])]))
         frames: list[pd.DataFrame] = []
         for projection_id in plot_spec.get("projection_ids", []):
@@ -171,15 +203,17 @@ def load_plot_review_frames(
 
 def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int, *, configured: object = None) -> bool:
     if configured is not None:
-        return bool(configured) and 1 < panel_count <= 4
-    return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 4)
+        return bool(configured) and 1 < panel_count <= 6
+    return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 6)
 
 
 def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False) -> tuple[int, int]:
     if panel_count <= 1:
         return 1, 1
-    if prefer_single_row and panel_count <= 4:
+    if prefer_single_row and panel_count <= 6:
         return 1, panel_count
+    if panel_count == 12:
+        return 2, 6
     if panel_count == 5:
         return 2, 3
     if panel_count == 6:
@@ -195,6 +229,8 @@ def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False)
 
 def _panel_figure_size(panel_count: int, *, prefer_single_row: bool = False) -> tuple[float, float]:
     rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=prefer_single_row)
+    if panel_count == 12:
+        return ((4.15 * columns) + 0.35, (5.3 * rows) + 0.2)
     panel_width = 3.55 if prefer_single_row and columns >= 4 else 4.15
     panel_height = 4.2 if prefer_single_row and panel_count > 1 else 4.35
     return ((panel_width * columns) + 0.35, (panel_height * rows) + 0.2)
@@ -306,15 +342,22 @@ def render_plot_review_surface(
     *,
     frames: list[pd.DataFrame],
     hue_column: str | None,
+    filter_spec: dict[str, object] | None = None,
     axis_styles: dict[str, object] | None = None,
     reference_labels: list[str],
     reference_set_id: str | None = None,
+    reference_hue_column: str | None = None,
     joinable_tables: list[dict[str, object]],
     output_root: Path,
     workspace_dir: Path,
 ):
     plot_alt_text = str(plot_spec.get("alt_text") or plot_spec.get("plot_id") or "latentdna live plot")
     resolved_plot_spec = {key: value for key, value in plot_spec.items() if key != "alt_text"}
+    if filter_spec:
+        filter_column = str(filter_spec.get("column") or "").strip()
+        filter_value = str(filter_spec.get("value") or "").strip()
+        if filter_column and filter_value:
+            frames = _filtered_frames(frames, filter_column=filter_column, filter_value=filter_value)
     kind = str(resolved_plot_spec.get("kind") or "")
     if kind == "projection_grid":
         prefer_single_row = _prefer_single_row_panel_layout(
@@ -344,6 +387,7 @@ def render_plot_review_surface(
             joinable_tables=joinable_tables,
             reference_labels=reference_labels,
             reference_set_id=reference_set_id,
+            reference_hue_column=reference_hue_column,
             output_root=output_root,
             workspace_dir=workspace_dir,
             alt_text=plot_alt_text,
@@ -835,7 +879,11 @@ def _render_scatter_grid(
             if panel_count > 1
             else 0.18
         ),
-        hspace=(0.62 + (0.04 * max(max_title_lines - 1, 0))) if panel_count > 1 else 0.3,
+        hspace=(0.92 + (0.04 * max(max_title_lines - 1, 0)))
+        if panel_count == 12
+        else (0.62 + (0.04 * max(max_title_lines - 1, 0)))
+        if panel_count > 1
+        else 0.3,
     )
 
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
@@ -891,8 +939,13 @@ def _render_metric_grid(
     resolved_axis_styles = axis_style_map_from_payload(axis_styles)
 
     panel_values = list(dict.fromkeys(frame[spec.row_column].astype(str).tolist())) if spec.row_column else ["panel"]
-    square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
-    rows_count, columns, metric_figsize = metric_panel_grid_layout(spec.plot_id, len(panel_values))
+    square_metric_panels = bool(spec.square_panels) or metric_panel_uses_square_axes(spec.plot_id)
+    rows_count, columns, metric_figsize = metric_panel_grid_layout(
+        spec.plot_id,
+        len(panel_values),
+        prefer_single_row=bool(spec.single_row_panels),
+        square_panels=square_metric_panels,
+    )
     fig, axes = plt.subplots(
         rows_count,
         columns,
@@ -1175,7 +1228,9 @@ def _render_categorical_count_grid(
         panel_values = [str(plot_spec.get("plot_id") or "panel")]
 
     square_count_panels = bool(getattr(spec, "square_panels", False))
-    if square_count_panels and len(panel_values) <= 3:
+    if bool(getattr(spec, "single_row_panels", False)) and len(panel_values) <= 6:
+        rows_count, columns = 1, len(panel_values)
+    elif square_count_panels and len(panel_values) <= 3:
         rows_count, columns = 1, len(panel_values)
     elif len(panel_values) <= 3 and not square_count_panels:
         rows_count, columns = len(panel_values), 1

@@ -54,7 +54,7 @@ def _view_declares_reduced_space(config: WorkspaceConfig, view_id: str, *, _seen
             view.derive.right,
             _seen=set(_seen),
         )
-    if view.derive.kind == "concatenate":
+    if view.derive.kind in {"concatenate", "block_normalized_concatenate"}:
         return all(
             _view_declares_reduced_space(config, input_view, _seen=set(_seen)) for input_view in view.derive.inputs
         )
@@ -135,7 +135,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
                     raise WorkspaceValidationError(
                         f"derived view {view_id} references unknown alignment {derive.alignment!r}"
                     )
-            elif derive.kind == "concatenate":
+            elif derive.kind in {"concatenate", "block_normalized_concatenate"}:
                 missing = [input_view for input_view in derive.inputs if input_view not in config.views]
                 if missing:
                     raise WorkspaceValidationError(f"derived view {view_id} references unknown input views {missing!r}")
@@ -149,7 +149,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
                     rendered = ", ".join(f"{input_view}={space}" for input_view, space in input_spaces.items())
                     raise CoordinateSpaceError(
                         "derived view "
-                        f"{view_id} concatenate inputs must share one coordinate "
+                        f"{view_id} {derive.kind} inputs must share one coordinate "
                         f"space or all be reduced; got {rendered}"
                     )
             elif derive.kind in {"aggregate_by_key", "apply_reducer", "normalize"}:

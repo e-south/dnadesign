@@ -1,14 +1,34 @@
 plot_id: candidate_decision_frontier
 question: Which candidate best balances design structure and ordered Sigma-35 signal after the health and context checks?
 decision_role: primary
-encoding: Single-panel representation tradeoff plot over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects retained-component effective rank, and each point is directly labeled.
-scope: The healthy 7B study-facing candidates summarized from the persisted health, design-structure, and Sigma-35 scalar tables. Context rows are joined for provenance in the scalar artifact, but context retention is not a visible encoding in this two-axis plot. Gate-failed output-layer-mean candidates are adjudicated in the preceding health gate rather than repeated here.
+encoding: Single-panel representation tradeoff plot over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects retained-component effective rank, and shape indicates the candidate family.
+scope: >-
+  The healthy 7B study-facing candidates summarized from the persisted health,
+  design-structure, and Sigma-35 scalar tables. The plotted candidates are
+  row-level summaries produced from causal Evo2 token states: anchor-source
+  `seq_mean`, forward 1 kb context `anchor_mean`, and equal-block forward/RC
+  context `anchor_mean` concat. Context rows are joined for provenance in the
+  scalar artifact, but context retention is not a visible encoding in this
+  two-axis plot. Gate-failed output-layer-mean candidates are adjudicated in the
+  preceding health gate rather than repeated here.
 guardrails:
   - Read this figure as a synthesis of the healthy-candidate review path, not a replacement for the health gate or the direct context comparison.
   - Read the row-level bridge plots before treating small point-to-point differences as meaningful.
 caption: Representation tradeoff across the first-class candidate views.
-alt_text: Scatter plot comparing balanced design-family separation and Sigma-35 ordinal Spearman across the healthy study-facing candidates, with direct labels on each point.
-preprocessing_md: This plot reuses persisted scalar summaries rather than recomputing row-level geometry. Each contributing summary already follows the study contract of view-level standardization plus row L2 normalization before cosine-based metrics are formed.
+alt_text: >-
+  Scatter plot comparing balanced design-family separation and Sigma-35 ordinal
+  Spearman across the healthy study-facing candidate summaries: anchor-source
+  causal mean, forward context anchor-span mean, and equal-block
+  forward/reverse-complement anchor-span concat.
+preprocessing_md: >-
+  This plot reuses persisted scalar summaries rather than recomputing row-level
+  geometry. Each contributing summary already follows the study contract of
+  view-level standardization plus row L2 normalization before cosine-based
+  metrics are formed. The plotted candidate names refer to stored row vectors,
+  not raw sequences: `seq_mean` averages all emitted token positions,
+  `anchor_mean` averages the emitted anchor span, and the bidirectional
+  candidate concatenates normalized forward and reverse-complement anchor-span
+  summaries.
 math_md: |
   Point size is the retained-component effective rank from the sampled PCA reducer summary
   $$

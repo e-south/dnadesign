@@ -135,6 +135,85 @@ def _project_matrix_to_reference_rows_for_keys(
     return np.ascontiguousarray(candidate_matrix[np.asarray(ordered_indices, dtype=np.int64)], dtype=np.float32)
 
 
+def _projection_indices_to_reference_rows_for_keys(
+    reference_rows: pa.Table,
+    candidate_rows: pa.Table,
+    *,
+    input_view: str,
+    left_key: str,
+    right_key: str,
+) -> np.ndarray:
+    seen_reference_keys: set[object] = set()
+    duplicate_reference_keys: list[object] = []
+    for row in reference_rows.select([left_key]).to_pylist():
+        key = row[left_key]
+        if key in seen_reference_keys:
+            duplicate_reference_keys.append(key)
+            continue
+        seen_reference_keys.add(key)
+    if duplicate_reference_keys:
+        preview = ", ".join(str(value) for value in duplicate_reference_keys[:5])
+        raise ContractViolationError(f"concatenate reference rows are non-unique on {left_key!r}: {preview}")
+
+    candidate_index_by_key: dict[object, int] = {}
+    for index, row in enumerate(candidate_rows.select([right_key]).to_pylist()):
+        key = row[right_key]
+        if key in candidate_index_by_key:
+            raise ContractViolationError(f"concatenate input {input_view!r} is non-unique on {right_key!r}")
+        candidate_index_by_key[key] = index
+
+    ordered_indices: list[int] = []
+    missing_keys: list[object] = []
+    for row in reference_rows.select([left_key]).to_pylist():
+        key = row[left_key]
+        index = candidate_index_by_key.get(key)
+        if index is None:
+            missing_keys.append(key)
+            continue
+        ordered_indices.append(index)
+
+    if missing_keys:
+        preview = ", ".join(str(value) for value in missing_keys[:5])
+        raise ContractViolationError(
+            f"concatenate input {input_view!r} is missing aligned rows on {right_key!r}: {preview}"
+        )
+    if len(ordered_indices) != len(candidate_index_by_key):
+        raise ContractViolationError(
+            f"concatenate input {input_view!r} has extra rows outside the reference support on {right_key!r}"
+        )
+    return np.asarray(ordered_indices, dtype=np.int64)
+
+
+def _projection_indices_to_reference_rows(
+    reference_rows: pa.Table,
+    candidate_rows: pa.Table,
+    *,
+    input_view: str,
+) -> np.ndarray:
+    candidates = _candidate_join_keys(reference_rows, candidate_rows)
+    if not candidates:
+        raise ContractViolationError(
+            f"concatenate requires matching rows or joinable key support; {input_view!r} shares no supported join key"
+        )
+    failures: list[str] = []
+    for left_key, right_key in candidates:
+        try:
+            return _projection_indices_to_reference_rows_for_keys(
+                reference_rows,
+                candidate_rows,
+                input_view=input_view,
+                left_key=left_key,
+                right_key=right_key,
+            )
+        except ContractViolationError as exc:
+            failures.append(f"{left_key}->{right_key}: {exc}")
+    if len(failures) == 1:
+        raise ContractViolationError(failures[0].split(": ", 1)[1])
+    raise ContractViolationError(
+        f"concatenate could not align {input_view!r} on any supported join key: {'; '.join(failures)}"
+    )
+
+
 def _project_matrix_to_reference_rows(
     reference_rows: pa.Table,
     candidate_rows: pa.Table,
@@ -426,6 +505,131 @@ def _derive_concatenate_artifact(
     return artifact_dir, output_matrix.shape[0], output_matrix.shape[1], record_key, row_columns
 
 
+def _derive_block_normalized_concatenate_artifact(
+    context: WorkspaceContext,
+    *,
+    view_id: str,
+    view: DerivedViewConfig,
+    artifact_dir: Path,
+) -> tuple[Path, int, int, str, list[str]]:
+    loaded_inputs: list[tuple[str, np.ndarray, pa.Table, dict[str, Any], np.ndarray | None]] = []
+    rows_table: pa.Table | None = None
+    record_key: str | None = None
+    row_columns: list[str] | None = None
+    total_dims = 0
+    for input_view in view.derive.inputs:
+        matrix, candidate_rows, manifest = _load_view_artifact(context, input_view)
+        projection_indices: np.ndarray | None = None
+        if rows_table is None:
+            rows_table = candidate_rows
+            record_key = str(manifest["params"]["record_key"])
+            row_columns = list(candidate_rows.column_names)
+        elif not rows_table.equals(candidate_rows, check_metadata=False):
+            projection_indices = _projection_indices_to_reference_rows(
+                rows_table,
+                candidate_rows,
+                input_view=input_view,
+            )
+        loaded_inputs.append((input_view, matrix, candidate_rows, manifest, projection_indices))
+        total_dims += int(matrix.shape[1])
+
+    assert rows_table is not None and record_key is not None and row_columns is not None
+    output_path = artifact_dir / "matrix.npy"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output = np.lib.format.open_memmap(
+        output_path,
+        mode="w+",
+        dtype=np.float32,
+        shape=(int(rows_table.num_rows), total_dims),
+    )
+    column_start = 0
+    try:
+        for _, matrix, _, _, projection_indices in loaded_inputs:
+            column_stop = column_start + int(matrix.shape[1])
+            _write_block_normalized_matrix(
+                matrix,
+                output,
+                column_start=column_start,
+                column_stop=column_stop,
+                projection_indices=projection_indices,
+                center=bool(view.derive.center),
+                scale=bool(view.derive.scale),
+                nonfinite_policy=str(view.derive.nonfinite_policy),
+                zero_variance_policy=str(view.derive.zero_variance_policy),
+                zero_row_policy=str(view.derive.zero_row_policy),
+            )
+            column_start = column_stop
+        output.flush()
+    finally:
+        del output
+    write_table(rows_table, artifact_dir / "rows.parquet")
+    return artifact_dir, int(rows_table.num_rows), total_dims, record_key, row_columns
+
+
+def _write_block_normalized_matrix(
+    matrix: np.ndarray,
+    output: np.ndarray,
+    *,
+    column_start: int,
+    column_stop: int,
+    projection_indices: np.ndarray | None,
+    center: bool,
+    scale: bool,
+    nonfinite_policy: str,
+    zero_variance_policy: str,
+    zero_row_policy: str,
+) -> None:
+    source = np.asarray(matrix, dtype=np.float32)
+    if not np.isfinite(source).all():
+        if nonfinite_policy == "error":
+            raise ContractViolationError("block_normalized_concatenate encountered non-finite values")
+        source_for_stats = np.nan_to_num(source, nan=0.0, posinf=0.0, neginf=0.0)
+    else:
+        source_for_stats = source
+
+    mean = source_for_stats.mean(axis=0, keepdims=True) if center else np.zeros((1, source.shape[1]), dtype=np.float32)
+    if scale:
+        std = np.asarray((source_for_stats - mean).std(axis=0, keepdims=True), dtype=np.float32)
+        zero_mask = np.asarray(std[0] <= 1e-8, dtype=bool)
+        if np.any(zero_mask):
+            if zero_variance_policy == "error":
+                raise ContractViolationError("block_normalized_concatenate encountered zero-variance columns")
+            std[:, zero_mask] = 1.0
+    else:
+        std = np.ones((1, source.shape[1]), dtype=np.float32)
+        zero_mask = np.zeros(source.shape[1], dtype=bool)
+
+    batch_rows = _block_concat_batch_rows(dims=int(source.shape[1]))
+    for start in range(0, int(output.shape[0]), batch_rows):
+        stop = min(start + batch_rows, int(output.shape[0]))
+        if projection_indices is None:
+            working = np.asarray(source[start:stop], dtype=np.float32)
+        else:
+            working = np.asarray(source[projection_indices[start:stop]], dtype=np.float32)
+        if nonfinite_policy == "coerce":
+            working = np.nan_to_num(working, nan=0.0, posinf=0.0, neginf=0.0)
+        if center:
+            working = np.asarray(working - mean, dtype=np.float32)
+        if scale:
+            working = np.asarray(working / std, dtype=np.float32)
+            if np.any(zero_mask):
+                working[:, zero_mask] = 0.0
+        norms = np.linalg.norm(working, axis=1, keepdims=True)
+        zero_rows = np.asarray(norms[:, 0] <= 1e-8, dtype=bool)
+        if np.any(zero_rows) and zero_row_policy == "error":
+            raise ContractViolationError("block_normalized_concatenate encountered zero-norm rows")
+        normalized = np.asarray(working / np.maximum(norms, 1e-8), dtype=np.float32)
+        if np.any(zero_rows):
+            normalized[zero_rows] = 0.0
+        output[start:stop, column_start:column_stop] = normalized
+
+
+def _block_concat_batch_rows(*, dims: int) -> int:
+    target_bytes = 128 * 1024**2
+    row_bytes = max(dims, 1) * np.dtype(np.float32).itemsize * 3
+    return max(int(target_bytes // max(row_bytes, 1)), 128)
+
+
 def derive_view_artifact(
     context: WorkspaceContext,
     *,
@@ -446,4 +650,11 @@ def derive_view_artifact(
         return _derive_apply_reducer_artifact(context, view_id=view_id, view=view, artifact_dir=target_dir)
     if view.derive.kind == "concatenate":
         return _derive_concatenate_artifact(context, view_id=view_id, view=view, artifact_dir=target_dir)
+    if view.derive.kind == "block_normalized_concatenate":
+        return _derive_block_normalized_concatenate_artifact(
+            context,
+            view_id=view_id,
+            view=view,
+            artifact_dir=target_dir,
+        )
     raise ContractViolationError(f"unsupported derived view kind: {view.derive.kind}")

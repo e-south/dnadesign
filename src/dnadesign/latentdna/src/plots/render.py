@@ -46,21 +46,22 @@ from ..visual_style import (
     compact_candidate_title,
     humanize_display_text,
     legend_layout,
+    normalize_category_key,
     reference_annotation_label,
     scatter_style,
     wrap_plot_title,
 )
 from ..workspaces.loader import WorkspaceContext
+from .layout import (
+    _HORIZONTAL_GROUPED_METRIC_PLOT_IDS,
+    _grid_figure_size,
+    _panel_grid_dimensions,
+    _prefer_single_row_panel_layout,
+    metric_panel_grid_layout,
+    plot_tight_layout_kwargs,
+)
 
 _SHAPE_MARKERS = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h"]
-_SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
-    {
-        "balanced_design_family_margin_gallery",
-        "design_centroid_margin_gallery",
-        "representation_scree_diagnostic",
-        "appendix_umap_gallery",
-    }
-)
 
 
 def _pyplot():
@@ -320,7 +321,7 @@ def _shape_marker_map(row_groups: list[list[dict]], column: str | None) -> tuple
     flattened = [row for rows in row_groups for row in rows]
     if flattened and column not in flattened[0]:
         raise ContractViolationError(f"plot shape column is missing: {column!r}")
-    categories = sorted({_category_key(row[column]) for row in flattened})
+    categories = list(dict.fromkeys(_category_key(row[column]) for row in flattened if _category_key(row[column])))
     shape_map = {name: _SHAPE_MARKERS[index % len(_SHAPE_MARKERS)] for index, name in enumerate(categories)}
     return shape_map, categories
 
@@ -685,22 +686,24 @@ def _add_figure_legends(
     axis_styles: dict[str, AxisStyle] | None = None,
 ) -> float:
     legend_specs: list[list[Any]] = []
-    if color_categories and color_title is not None:
+    if len(color_categories) > 1 and color_title is not None:
         legend_specs.append(
             _legend_handles(plt, color_categories, color_map, column=color_title, axis_styles=axis_styles)
         )
-    if shape_categories and shape_title is not None:
+    if len(shape_categories) > 1 and shape_title is not None:
         legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
     if not legend_specs:
         return 0.0
 
-    lowered_plot_ids = {
+    compact_bottom_legend_plot_ids = {
         "balanced_design_family_margin_gallery",
         "design_centroid_margin_gallery",
-        "appendix_umap_gallery",
     }
-    legend_y = 0.008 if plot_id in lowered_plot_ids else 0.012
-    base_margin = 0.08 if plot_id in lowered_plot_ids else 0.055
+    is_appendix_umap = plot_id == "appendix_umap_gallery"
+    uses_compact_bottom_legend = plot_id in compact_bottom_legend_plot_ids
+    legend_y = 0.036 if is_appendix_umap else 0.055 if uses_compact_bottom_legend else 0.012
+    base_margin = 0.088 if is_appendix_umap else 0.095 if uses_compact_bottom_legend else 0.055
+    reserved_bottom = 0.0
     for handles in legend_specs:
         legend_labels = [handle.get_label() for handle in handles]
         resolved_single_row = False if single_row and len(legend_labels) > 12 else single_row
@@ -724,7 +727,12 @@ def _add_figure_legends(
             handletextpad=0.5,
         )
         _style_legend(legend)
+        reserved_bottom = max(reserved_bottom, layout.bottom_margin)
         legend_y = layout.anchor_y + layout.bottom_margin
+    if is_appendix_umap:
+        return min(max(reserved_bottom, 0.088), 0.16)
+    if uses_compact_bottom_legend:
+        return min(max(reserved_bottom, 0.11), 0.18)
     return min(max(legend_y + 0.014, 0.1), 0.40)
 
 
@@ -741,11 +749,11 @@ def _add_side_figure_legends(
     axis_styles: dict[str, AxisStyle] | None = None,
 ) -> float:
     legend_specs: list[list[Any]] = []
-    if color_categories and color_title is not None:
+    if len(color_categories) > 1 and color_title is not None:
         legend_specs.append(
             _legend_handles(plt, color_categories, color_map, column=color_title, axis_styles=axis_styles)
         )
-    if shape_categories and shape_title is not None:
+    if len(shape_categories) > 1 and shape_title is not None:
         legend_specs.append(_shape_legend_handles(plt, shape_categories, shape_map))
     if not legend_specs:
         return 0.0
@@ -773,22 +781,7 @@ def _tight_layout_kwargs(
     legend_bottom: float,
     legend_right: float = 0.0,
 ) -> dict[str, object]:
-    kwargs: dict[str, object] = {
-        "pad": 0.95,
-        "h_pad": 1.4,
-        "w_pad": 0.95,
-    }
-    if spec.plot_id == "balanced_design_family_margin_gallery":
-        kwargs["w_pad"] = 1.38
-    if spec.plot_id == "design_centroid_margin_gallery":
-        kwargs["w_pad"] = 1.18
-    if spec.plot_id == "representation_health_summary":
-        kwargs["w_pad"] = 1.85
-    if spec.plot_id == "dataset_overview":
-        kwargs["w_pad"] = 1.2
-    if legend_bottom > 0.0 or legend_right > 0.0:
-        kwargs["rect"] = (0.0, legend_bottom, max(0.58, 1.0 - legend_right), 0.995)
-    return kwargs
+    return plot_tight_layout_kwargs(spec.plot_id, legend_bottom=legend_bottom, legend_right=legend_right)
 
 
 def _selected_label_rows(rows: list[dict], *, label_column: str | None, label_values: list[str]) -> list[dict]:
@@ -880,6 +873,36 @@ def _draw_annotation_callouts(
         annotation.set_clip_on(True)
         if annotation.arrow_patch is not None:
             annotation.arrow_patch.set_clip_on(True)
+
+
+def _draw_near_point_labels(
+    ax: Any,
+    *,
+    rows: list[dict[str, object]],
+    resolved_x: str,
+    resolved_y: str,
+    label_texts: list[str],
+    font_size: float = 8.4,
+) -> None:
+    for row, label_text in sorted(zip(rows, label_texts, strict=True), key=lambda item: item[1].casefold()):
+        ax.annotate(
+            label_text,
+            xy=(float(row[resolved_x]), float(row[resolved_y])),
+            xytext=(7.0, 6.0),
+            textcoords="offset pixels",
+            fontsize=font_size,
+            fontweight="semibold",
+            ha="left",
+            va="bottom",
+            color=TEXT_COLOR,
+            bbox={
+                "boxstyle": "round,pad=0.16",
+                "fc": "white",
+                "ec": "none",
+                "alpha": ANNOTATION_LABEL_BOX_ALPHA,
+            },
+            zorder=6,
+        )
 
 
 def _draw_annotation_highlights(
@@ -1020,6 +1043,24 @@ def _draw_resolved_annotations(
         return
     if label_mode != "label_and_highlight":
         return
+    if getattr(spec, "plot_id", "") == "candidate_decision_frontier" and spec.annotation is None:
+        _draw_near_point_labels(
+            ax,
+            rows=rows,
+            resolved_x=resolved_x,
+            resolved_y=resolved_y,
+            label_texts=[
+                _annotation_label_text(
+                    context,
+                    spec=spec,
+                    row=row,
+                    resolved_label_column=resolved_label_column,
+                )
+                for row in rows
+            ],
+            font_size=font_size,
+        )
+        return
     highlight_colors = (
         ["#111111"] * len(rows)
         if spec.annotation is not None
@@ -1142,61 +1183,6 @@ def _agreement_summary_metrics(summary: dict[str, object]) -> list[tuple[str, fl
     return metrics
 
 
-def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int, *, configured: object = None) -> bool:
-    if configured is not None:
-        return bool(configured) and 1 < panel_count <= 4
-    return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 4)
-
-
-_HORIZONTAL_GROUPED_METRIC_PLOT_IDS: frozenset[str] = frozenset(
-    {
-        "design_structure_summary",
-        "reference_alignment_summary",
-        "representation_health_summary",
-    }
-)
-
-
-def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False) -> tuple[int, int]:
-    if panel_count <= 1:
-        return 1, 1
-    if prefer_single_row and panel_count <= 4:
-        return 1, panel_count
-    if panel_count == 5:
-        return 2, 3
-    if panel_count == 6:
-        return 2, 3
-    if panel_count in {7, 8}:
-        return 2, 4
-    if panel_count == 4:
-        return 2, 2
-    columns = min(4, max(1, int(math.ceil(math.sqrt(panel_count)))))
-    rows = int(np.ceil(panel_count / columns))
-    return rows, columns
-
-
-def _grid_figure_size(panel_count: int, *, square_panels: bool, prefer_single_row: bool = False) -> tuple[float, float]:
-    if panel_count <= 1:
-        return (5.15, 5.0 if square_panels else 4.7)
-    rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=prefer_single_row)
-    panel_width = 3.55 if prefer_single_row and columns >= 4 else 4.15 if columns >= 4 else 4.3
-    panel_height = 4.2 if square_panels and prefer_single_row else 4.35 if square_panels else 4.05
-    return (panel_width * columns, panel_height * rows)
-
-
-def metric_panel_grid_layout(plot_id: str | None, panel_count: int) -> tuple[int, int, tuple[float, float]]:
-    square_panels = metric_panel_uses_square_axes(plot_id)
-    if plot_id == "representation_health_summary" and panel_count > 1:
-        rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=True)
-        figsize = _grid_figure_size(panel_count, square_panels=square_panels, prefer_single_row=True)
-        return rows, columns, (figsize[0] + (1.25 * columns), figsize[1])
-    rows, columns = _panel_grid_dimensions(panel_count)
-    figsize = _grid_figure_size(panel_count, square_panels=square_panels)
-    if plot_id == "representation_health_summary":
-        figsize = (figsize[0] + (1.45 * columns), figsize[1])
-    return rows, columns, figsize
-
-
 def _ordered_heatmap_axis_values(rows: list[dict[str, object]], column: str, configured_order: list[str]) -> list[str]:
     observed = list(dict.fromkeys(str(row[column]) for row in rows))
     if not configured_order:
@@ -1237,6 +1223,29 @@ def _heatmap_grid_from_rows(
             column_index[column_key],
         ] = float(row[value_column])
     return grid, row_values, column_values
+
+
+def _compact_sigma_variant_letter(value: object) -> str | None:
+    match = re.search(r"\(([A-Za-z])\)\s*$", str(value or ""))
+    if match is None:
+        return None
+    letter = match.group(1)
+    if letter.casefold() not in {"b", "c", "d", "e", "f"}:
+        return None
+    return letter.upper()
+
+
+def _compact_centroid_label(value: object) -> str | None:
+    normalized = normalize_category_key(value)
+    return {
+        "background": "Bg",
+        "background_only": "Bg",
+        "ethanol": "Et",
+        "cipro": "Cp",
+        "ciprofloxacin": "Cp",
+        "dual": "Du",
+        "ethanol_ciprofloxacin": "Du",
+    }.get(normalized)
 
 
 def _heatmap_color_params(
@@ -1286,7 +1295,11 @@ def _render_heatmap_panel(
     grid = np.asarray(grid, dtype=np.float32)
     image = ax.imshow(grid, cmap=cmap, norm=norm, aspect="equal" if square_cells else "auto")
     x_tick_labels = [
-        _axis_category_label(value, column=column_column, axis_styles=axis_styles, compact=square_cells)
+        _compact_sigma_variant_letter(value)
+        if square_cells and str(column_column).endswith("variant") and _compact_sigma_variant_letter(value) is not None
+        else _compact_centroid_label(value)
+        if square_cells and str(column_column) == "centroid_label" and _compact_centroid_label(value) is not None
+        else _axis_category_label(value, column=column_column, axis_styles=axis_styles, compact=square_cells)
         for value in column_values
     ]
     y_tick_labels = [
@@ -1313,6 +1326,7 @@ def _render_heatmap_panel(
     ax.set_title(wrap_plot_title(title, width=24), pad=8)
     finite = np.asarray(grid[np.isfinite(grid)], dtype=np.float32)
     contrast_midpoint = float(np.mean(finite)) if finite.size else 0.0
+    cell_label_font_size = 6.8 if square_cells and str(column_column) == "centroid_label" else 9.2
     for row_index_value in range(len(row_values)):
         for column_index_value in range(len(column_values)):
             value = grid[row_index_value, column_index_value]
@@ -1329,7 +1343,7 @@ def _render_heatmap_panel(
                 ha="center",
                 va="center",
                 color=text_color,
-                fontsize=9.2,
+                fontsize=cell_label_font_size,
             )
     _apply_axes_style(ax, grid=False)
     if square_cells:
@@ -1422,14 +1436,17 @@ def _short_candidate_scope(value: object) -> str:
     if normalized in {
         "60 bp anchor",
         "anchor-source insert",
+        "merged anchor insert seq mean",
         "mixed-length anchor-source insert",
         "anchor-source insert mean",
     }:
         return "anchor insert"
     if normalized == "1 kb construct context":
         return "1 kb ctx"
-    if normalized == "1 kb context anchor mean":
+    if normalized in {"1 kb context anchor mean", "full context anchor mean"}:
         return "1 kb anchor mean"
+    if normalized in {"context anchor mean bidir concat", "context anchor mean bidirectional concat"}:
+        return "bidir anchor mean"
     if normalized == "reverse complement context 1 kb":
         return "RC 1 kb ctx"
     if normalized == "reverse complement context anchor mean":
@@ -1457,14 +1474,17 @@ def _compact_candidate_scope(value: object) -> str:
     if normalized in {
         "60 bp anchor",
         "anchor-source insert",
+        "merged anchor insert seq mean",
         "mixed-length anchor-source insert",
         "anchor-source insert mean",
     }:
         return "anchor insert"
     if normalized == "1 kb construct context":
         return "1kb ctx"
-    if normalized == "1 kb context anchor mean":
+    if normalized in {"1 kb context anchor mean", "full context anchor mean"}:
         return "1kb anchor mean"
+    if normalized in {"context anchor mean bidir concat", "context anchor mean bidirectional concat"}:
+        return "bidir anchor mean"
     if normalized == "reverse complement context 1 kb":
         return "RC 1kb ctx"
     if normalized == "reverse complement context anchor mean":
@@ -1556,6 +1576,54 @@ def _style_metric_tick_labels(
         label.set_rotation_mode("anchor")
         label.set_ha(ha or default_ha)
         label.set_va(va or default_va)
+
+
+def _metric_bootstrap_replicates(row: dict[str, object]) -> np.ndarray:
+    raw_values = row.get("bootstrap_replicates")
+    if raw_values is None:
+        raw_values = row.get("bootstrap_values")
+    if not isinstance(raw_values, list | tuple | np.ndarray):
+        return np.asarray([], dtype=np.float64)
+    values = [numeric for value in raw_values if (numeric := _coerce_finite_float(value)) is not None]
+    return np.asarray(values, dtype=np.float64)
+
+
+def _replicate_offsets(count: int, *, width: float) -> np.ndarray:
+    if count <= 0:
+        return np.asarray([], dtype=np.float64)
+    if count == 1:
+        return np.asarray([0.0], dtype=np.float64)
+    return np.linspace(-width / 2.0, width / 2.0, count, dtype=np.float64)
+
+
+def _draw_metric_bootstrap_points(
+    ax: Any,
+    *,
+    row_positions: list[tuple[dict[str, object], float]],
+    orientation: str,
+    width: float,
+) -> None:
+    del ax, row_positions, orientation, width
+
+
+def _add_metric_uncertainty_note(ax: Any, *, ci_enabled: bool) -> None:
+    if not ci_enabled:
+        return
+    ax.text(
+        0.012,
+        0.02,
+        "Whiskers: 95% bootstrap CI",
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=7.6,
+        color=SPINE_COLOR,
+    )
+
+
+def _metric_panel_title(text: object, *, plot_id: str | None) -> str:
+    del plot_id
+    return wrap_plot_title(text, width=24, max_lines=None)
 
 
 def _render_xy_panel(
@@ -1767,6 +1835,27 @@ def _render_distribution_panel(
         rows = [row for row in rows if normalize_axis_category(style, row.get(color_column), row=row) in allowed]
         if not rows:
             raise ContractViolationError("ordinal distribution requires at least one row in the configured subset")
+    if render_mode == "violin_box" and len(rows) > 24_000:
+        rng = np.random.default_rng(17)
+        if color_column is None:
+            selected = rng.choice(np.arange(len(rows), dtype=np.int64), size=24_000, replace=False)
+            rows = [rows[int(index)] for index in np.sort(selected)]
+        else:
+            sampled_rows: list[dict[str, object]] = []
+            grouped_indices: dict[str, list[int]] = {}
+            for index, row in enumerate(rows):
+                grouped_indices.setdefault(
+                    _axis_category_value(row, color_column, axis_styles=axis_styles),
+                    [],
+                ).append(index)
+            max_per_group = max(1, 24_000 // max(len(grouped_indices), 1))
+            for indices in grouped_indices.values():
+                if len(indices) <= max_per_group:
+                    sampled_rows.extend(rows[index] for index in indices)
+                    continue
+                selected = rng.choice(np.asarray(indices, dtype=np.int64), size=max_per_group, replace=False)
+                sampled_rows.extend(rows[int(index)] for index in np.sort(selected))
+            rows = sampled_rows
     values = np.asarray([float(row[metric_column]) for row in rows], dtype=np.float32)
     bin_count = max(5, min(30, int(np.sqrt(values.size)) + 1))
     boxplot_kwargs = {
@@ -1930,6 +2019,40 @@ def _sorted_metric_rows(rows: list[dict[str, object]], *, spec: ResolvedPlotSpec
     if label_column is None:
         raise ContractViolationError("metric_panel_grid rendering requires a label column")
     sort_rule = spec.sort_rule or "panel_direction"
+    candidate_scope_order = {
+        "merged_anchor_insert_seq_mean": 0,
+        "full_context_1kb": 1,
+        "full_context_anchor_mean": 2,
+        "context_anchor_mean_bidir_concat": 3,
+        "reverse_complement_context_1kb": 4,
+        "reverse_complement_context_anchor_mean": 5,
+        "reference_core60": 6,
+    }
+    candidate_family_order = {
+        "intermediate_embedding": 0,
+        "output_layer_mean": 1,
+    }
+
+    def _candidate_order_key(row: dict[str, object]) -> tuple[float, int, int, str, str]:
+        explicit_order = _coerce_finite_float(row.get("candidate_order"))
+        if explicit_order is not None:
+            return (
+                explicit_order,
+                candidate_family_order.get(str(row.get("candidate_family") or ""), 99),
+                candidate_scope_order.get(str(row.get("candidate_scope") or ""), 99),
+                str(row.get("candidate_id") or "").casefold(),
+                str(row.get(label_column) or "").casefold(),
+            )
+        return (
+            1_000_000.0,
+            candidate_family_order.get(str(row.get("candidate_family") or ""), 99),
+            candidate_scope_order.get(str(row.get("candidate_scope") or ""), 99),
+            str(row.get("candidate_id") or "").casefold(),
+            str(row.get(label_column) or "").casefold(),
+        )
+
+    if sort_rule == "candidate_order":
+        return sorted(rows, key=_candidate_order_key)
     if sort_rule == "label_asc":
         return sorted(rows, key=lambda row: str(row.get(label_column) or "").casefold())
 
@@ -2035,6 +2158,7 @@ def _render_metric_panel(
         )
         bar_value_pairs: list[tuple[Any, float]] = []
         errorbar_specs: list[tuple[float, float, float, float]] = []
+        replicate_positions: list[tuple[dict[str, object], float]] = []
         missing_positions: list[float] = []
         for family, offset in zip(family_order, offsets, strict=False):
             family_rows = {
@@ -2057,6 +2181,7 @@ def _render_metric_panel(
                 family_positions.append(y_position)
                 family_values.append(value)
                 family_ci_rows.append(row)
+                replicate_positions.append((row, y_position))
             if not family_positions:
                 continue
             family_bars = ax.barh(
@@ -2109,10 +2234,17 @@ def _render_metric_panel(
                 capsize=2.0,
                 alpha=0.85,
             )
+        _draw_metric_bootstrap_points(
+            ax,
+            row_positions=replicate_positions,
+            orientation="horizontal",
+            width=bar_height * 0.72,
+        )
         ax.set_ylabel("")
         ax.set_xlabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
-        ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
+        ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
         _apply_axes_style(ax, grid=True, square=square)
+        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled)
         ax.margins(x=0.02, y=0.02)
         if not finite_value_array.size:
             _render_placeholder_panel(
@@ -2161,6 +2293,7 @@ def _render_metric_panel(
         finite_values: list[float] = []
         finite_colors: list[str] = []
         finite_rows: list[dict[str, object]] = []
+        replicate_positions: list[tuple[dict[str, object], float]] = []
         missing_positions: list[float] = []
         for position, row, color in zip(positions, ordered_rows, bar_colors, strict=True):
             value = _coerce_finite_float(row.get(spec.value_column))
@@ -2171,6 +2304,7 @@ def _render_metric_panel(
             finite_values.append(value)
             finite_colors.append(color)
             finite_rows.append(row)
+            replicate_positions.append((row, float(position)))
 
         bars = ax.barh(
             finite_positions,
@@ -2203,6 +2337,12 @@ def _render_metric_panel(
                     capsize=2.0,
                     alpha=0.85,
                 )
+        _draw_metric_bootstrap_points(
+            ax,
+            row_positions=replicate_positions,
+            orientation="horizontal",
+            width=0.42,
+        )
 
         ax.set_yticks(positions, labels)
         ax.tick_params(axis="y", pad=6)
@@ -2214,8 +2354,9 @@ def _render_metric_panel(
             ax.axvline(0.0, color=ZERO_LINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
         ax.set_ylabel("")
         ax.set_xlabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
-        ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
+        ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
         _apply_axes_style(ax, grid=True, square=square)
+        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled)
         ax.margins(x=0.02, y=0.02)
         if not finite_value_array.size:
             _render_placeholder_panel(
@@ -2265,6 +2406,7 @@ def _render_metric_panel(
 
     bar_value_pairs: list[tuple[Any, float]] = []
     errorbar_specs: list[tuple[float, float, float, float]] = []
+    replicate_positions: list[tuple[dict[str, object], float]] = []
     missing_positions: list[float] = []
     if grouped_family_bars:
         family_order = ordered_categories_for_axis(None, [str(row["candidate_family"]) for row in ordered_rows])
@@ -2325,6 +2467,7 @@ def _render_metric_panel(
                 family_positions.append(x_position)
                 family_values.append(value)
                 family_ci_rows.append(row)
+                replicate_positions.append((row, x_position))
             if not family_positions:
                 continue
             family_bars = ax.bar(
@@ -2369,6 +2512,7 @@ def _render_metric_panel(
             finite_values.append(value)
             finite_colors.append(color)
             finite_rows.append(row)
+            replicate_positions.append((row, float(position)))
         bars = ax.bar(
             finite_positions,
             finite_values,
@@ -2397,7 +2541,7 @@ def _render_metric_panel(
             ax.set_xlim(float(positions.min()) - 0.55, float(positions.max()) + 0.55)
     ax.tick_params(axis="x", pad=6)
     tick_labels_for_count = group_labels if grouped_family_bars else labels
-    tick_rotation = 32.0 if grouped_family_bars else 0.0
+    tick_rotation = 32.0 if grouped_family_bars or spec.plot_id == "context_pair_summary" else 0.0
     _style_metric_tick_labels(
         ax,
         label_count=max(len(tick_labels_for_count), len(bar_value_pairs)),
@@ -2425,10 +2569,17 @@ def _render_metric_panel(
             capsize=2.0,
             alpha=0.85,
         )
+    _draw_metric_bootstrap_points(
+        ax,
+        row_positions=replicate_positions,
+        orientation="vertical",
+        width=0.34 if grouped_family_bars else 0.42,
+    )
     ax.set_xlabel("")
     ax.set_ylabel(_wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=20))
-    ax.set_title(wrap_plot_title(panel_title, width=24, max_lines=2), pad=8)
+    ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
     _apply_axes_style(ax, grid=True, square=square)
+    _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled)
     ax.margins(x=0.02, y=0.02)
     if not finite_value_array.size:
         _render_placeholder_panel(
@@ -2670,17 +2821,22 @@ def render_plot_artifact(
         rows_count, columns = _panel_grid_dimensions(len(heatmap_tables), prefer_single_row=prefer_single_row)
         max_row_count = max(len(row_values) for _, _, row_values, _ in heatmap_tables)
         max_column_count = max(len(column_values) for _, _, _, column_values in heatmap_tables)
-        figure_size = (
-            (
-                max(9.6, (2.9 * columns) + 0.6),
-                max(3.25, (2.55 * rows_count) + 0.12),
+        if spec.square_panels:
+            cell_size = 0.26 if spec.plot_id == "reference_to_plan_centroid_heatmap" else 0.46
+            panel_width = max(1.72, 0.95 + (cell_size * max_column_count))
+            panel_height = max(2.12, 1.0 + (cell_size * max_row_count))
+            figure_size = (
+                max(
+                    7.3 if spec.plot_id == "reference_to_plan_centroid_heatmap" else 6.0,
+                    (panel_width * columns) + (2.2 if spec.plot_id == "reference_to_plan_centroid_heatmap" else 0.95),
+                ),
+                max(3.05, (panel_height * rows_count) + 0.35),
             )
-            if spec.square_panels
-            else (
+        else:
+            figure_size = (
                 max(4.2, 1.9 + (1.15 * max_column_count)) * columns,
                 max(4.1, 1.6 + (0.9 * max_row_count)) * rows_count,
             )
-        )
         fig, axes = plt.subplots(
             rows_count,
             columns,
@@ -2718,13 +2874,25 @@ def render_plot_artifact(
             )
         assert image is not None
         if spec.square_panels:
-            fig.subplots_adjust(left=0.07, right=0.875, wspace=0.18, bottom=0.18, top=0.79)
-            colorbar = fig.colorbar(
-                image,
-                cax=fig.add_axes([0.922, 0.19, 0.013, 0.58]),
-                label=_explicit_axis_label(spec.colorbar_label, width=20)
-                or humanize_display_text(str(spec.value_column or "metric_value")),
-            )
+            if spec.plot_id == "reference_to_plan_centroid_heatmap":
+                fig.subplots_adjust(left=0.115, right=0.96, wspace=0.16, bottom=0.28, top=0.82)
+                from matplotlib.colorbar import ColorbarBase
+
+                colorbar = ColorbarBase(
+                    fig.add_axes([0.36, 0.095, 0.38, 0.024]),
+                    cmap=cmap,
+                    norm=norm,
+                    orientation="horizontal",
+                )
+            else:
+                fig.subplots_adjust(left=0.07, right=0.875, wspace=0.18, bottom=0.18, top=0.79)
+                cax_bounds = [0.922, 0.19, 0.013, 0.58]
+                colorbar = fig.colorbar(
+                    image,
+                    cax=fig.add_axes(cax_bounds),
+                    label=_explicit_axis_label(spec.colorbar_label, width=20)
+                    or humanize_display_text(str(spec.value_column or "metric_value")),
+                )
         else:
             colorbar = fig.colorbar(
                 image,
@@ -2847,19 +3015,20 @@ def render_plot_artifact(
                 finite_rows,
                 spec=spec,
             )
-            _draw_resolved_annotations(
-                ax,
-                context=context,
-                spec=spec,
-                rows=selected_rows,
-                resolved_x=resolved_x,
-                resolved_y=resolved_y,
-                resolved_label_column=resolved_label_column,
-                color_map=color_map,
-                font_size=8.4 if spec.plot_id == "candidate_decision_frontier" else 9.5,
-                marker_size=104.0 if spec.plot_id == "candidate_decision_frontier" else 128.0,
-                marker="*",
-            )
+            if spec.plot_id != "candidate_decision_frontier":
+                _draw_resolved_annotations(
+                    ax,
+                    context=context,
+                    spec=spec,
+                    rows=selected_rows,
+                    resolved_x=resolved_x,
+                    resolved_y=resolved_y,
+                    resolved_label_column=resolved_label_column,
+                    color_map=color_map,
+                    font_size=9.5,
+                    marker_size=128.0,
+                    marker="*",
+                )
         plot_metadata["reference_panels"] = {
             spec.scalar_id or spec.distance_id or spec.plot_id: annotation_state,
         }
@@ -2881,17 +3050,30 @@ def render_plot_artifact(
                 color=TEXT_COLOR,
             )
         elif (spec.render_mode or "points") == "points":
-            _add_axis_legends(
-                ax,
-                plt,
-                color_categories=categories,
-                color_map=color_map,
-                color_title=spec.color_column,
-                shape_categories=shape_categories,
-                shape_map=shape_map,
-                shape_title=effective_shape_column,
-                axis_styles=axis_styles,
-            )
+            if spec.plot_id == "candidate_decision_frontier" and shape_categories:
+                grid_legend_right_margin = _add_side_figure_legends(
+                    fig,
+                    plt,
+                    color_categories=categories,
+                    color_map=color_map,
+                    color_title=spec.color_column,
+                    shape_categories=shape_categories,
+                    shape_map=shape_map,
+                    shape_title=effective_shape_column,
+                    axis_styles=axis_styles,
+                )
+            else:
+                _add_axis_legends(
+                    ax,
+                    plt,
+                    color_categories=categories,
+                    color_map=color_map,
+                    color_title=spec.color_column,
+                    shape_categories=shape_categories,
+                    shape_map=shape_map,
+                    shape_title=effective_shape_column,
+                    axis_styles=axis_styles,
+                )
     elif spec.kind in {"xy_scatter_grid", "paired_xy_scatter_grid"}:
         scalar_tables: list[tuple[str, list[dict[str, object]], str, str]] = []
         for scalar_id in spec.scalar_ids:
@@ -2982,7 +3164,9 @@ def render_plot_artifact(
             else [None]
         )
         square_count_panels = bool(getattr(spec, "square_panels", False))
-        if square_count_panels and len(panel_values) <= 3:
+        if bool(getattr(spec, "single_row_panels", False)) and len(panel_values) <= 6:
+            rows_count, columns = 1, len(panel_values)
+        elif square_count_panels and len(panel_values) <= 3:
             rows_count, columns = 1, len(panel_values)
         elif len(panel_values) <= 2:
             rows_count, columns = len(panel_values), 1
@@ -3118,8 +3302,13 @@ def render_plot_artifact(
             raise ContractViolationError(f"metric_panel_grid columns are missing: {missing_columns}")
         resolved_spec = spec.model_copy(update={"value_column": resolved_value_column})
         panel_values = list(dict.fromkeys(str(row[spec.row_column]) for row in rows))
-        square_metric_panels = metric_panel_uses_square_axes(spec.plot_id)
-        rows_count, columns, metric_figsize = metric_panel_grid_layout(spec.plot_id, len(panel_values))
+        square_metric_panels = bool(spec.square_panels) or metric_panel_uses_square_axes(spec.plot_id)
+        rows_count, columns, metric_figsize = metric_panel_grid_layout(
+            spec.plot_id,
+            len(panel_values),
+            prefer_single_row=bool(spec.single_row_panels),
+            square_panels=square_metric_panels,
+        )
         fig, axes = plt.subplots(
             rows_count,
             columns,
@@ -3593,13 +3782,18 @@ def render_plot_artifact(
                     edgecolors=point_style.edgecolors,
                     linewidths=point_style.linewidths,
                 )
+                is_appendix_umap = spec.plot_id == "appendix_umap_gallery"
+                title_width = 28 if is_appendix_umap else 22
                 axis.set_title(
-                    wrap_plot_title(compact_candidate_title(panel_title), width=22, max_lines=3),
-                    pad=8,
+                    wrap_plot_title(compact_candidate_title(panel_title), width=title_width, max_lines=3),
+                    pad=5 if is_appendix_umap else 8,
                 )
                 axis.set_xlabel("Projection 1")
                 axis.set_ylabel("Projection 2")
                 _apply_axes_style(axis, grid=True, square=True)
+                if is_appendix_umap:
+                    axis.title.set_fontsize(PLOT_TITLE_FONT_SIZE - 1.25)
+                    axis.title.set_linespacing(1.0)
                 selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
                     context,
                     projection_rows,
@@ -3631,7 +3825,10 @@ def render_plot_artifact(
     grid_legend_bottom_margin = float(locals().get("grid_legend_bottom_margin", 0.0))
     grid_legend_right_margin = float(locals().get("grid_legend_right_margin", 0.0))
     if spec.kind == "heatmap_grid":
-        fig.subplots_adjust(left=0.08, right=0.92, top=0.94, bottom=0.08, wspace=0.30, hspace=0.48)
+        if spec.square_panels:
+            pass
+        else:
+            fig.subplots_adjust(left=0.08, right=0.92, top=0.94, bottom=0.08, wspace=0.30, hspace=0.48)
     elif spec.kind in {
         "projection_scatter",
         "projection_grid",

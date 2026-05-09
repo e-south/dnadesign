@@ -93,6 +93,16 @@ def _legend_clears_panel_axes(fig) -> bool:
     return bool(legend_bbox.y1 < panel_y0)
 
 
+def _legend_panel_gap(fig) -> float:
+    fig.canvas.draw()
+    if not fig.legends:
+        return 0.0
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = fig.legends[0].get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    panel_y0 = min(axis.get_position().y0 for axis in fig.axes if axis.axison)
+    return float(panel_y0 - legend_bbox.y1)
+
+
 def _write_manifest(
     artifact_dir: Path,
     *,
@@ -274,6 +284,90 @@ def test_render_projection_grid_surfaces_reference_overlay_warnings(monkeypatch,
     assert isinstance(rendered, mo.Html)
     assert "Reference overlay warning" in rendered.text
     assert "unmatched reference rows" in rendered.text
+
+
+def test_render_projection_grid_surfaces_missing_reference_hue_values(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: "rendered plot")
+    monkeypatch.setattr(
+        projection_runtime,
+        "resolve_reference_annotation",
+        lambda *args, **kwargs: {
+            "labels": ["spyP"],
+            "match_column": "usr_label__primary",
+            "display_labels": {},
+            "label_limit": 5,
+            "warnings": [],
+        },
+    )
+
+    rendered = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[pd.DataFrame({"x": [0.0], "y": [1.0], "usr_label__primary": ["spyP"]})],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        reference_set_id="reference_spyp_sulap",
+        reference_hue_column="promoter_standard__strength_value_numeric",
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "Reference overlay warning" in rendered.text
+    assert "reference hue `promoter_standard__strength_value_numeric` has no finite values" in rendered.text
+
+
+def test_render_projection_grid_warns_when_reference_hue_is_missing_in_one_panel(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: "rendered plot")
+    monkeypatch.setattr(
+        projection_runtime,
+        "resolve_reference_annotation",
+        lambda *args, **kwargs: {
+            "labels": ["W1"],
+            "match_column": "usr_label__primary",
+            "display_labels": {},
+            "label_limit": 5,
+            "warnings": [],
+        },
+    )
+    frames = [
+        pd.DataFrame(
+            {
+                "x": [0.0],
+                "y": [1.0],
+                "usr_label__primary": ["W1"],
+                "promoter_standard__strength_value_numeric": [1.0],
+            }
+        ),
+        pd.DataFrame({"x": [1.0], "y": [0.0], "usr_label__primary": ["W1"]}),
+    ]
+    frames[0].attrs["view_id"] = "strength_panel"
+    frames[1].attrs["view_id"] = "missing_hue_panel"
+
+    rendered = projection_runtime.render_projection_grid(
+        [
+            {"view_id": "strength_panel", "projection_id": "proj_a", "title": "Strength panel"},
+            {"view_id": "missing_hue_panel", "projection_id": "proj_b", "title": "Missing hue panel"},
+        ],
+        frames=frames,
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        reference_set_id="reference_w_collection",
+        reference_hue_column="promoter_standard__strength_value_numeric",
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "Reference overlay warning" in rendered.text
+    assert "reference hue `promoter_standard__strength_value_numeric` is missing" in rendered.text
+    assert "missing_hue_panel" in rendered.text
 
 
 def test_render_projection_grid_suppresses_degenerate_continuous_colorbar(monkeypatch, tmp_path: Path) -> None:
@@ -759,6 +853,41 @@ def test_render_projection_grid_handles_seven_panel_gallery_without_axis_zip_fai
         panel_axes = fig.axes[:7]
         assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 2
         assert fig.axes[7].axison is False
+    finally:
+        plt.close(fig)
+
+
+def test_render_projection_grid_uses_two_rows_for_intermediate_and_output_gallery(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+
+    frame = pd.DataFrame(
+        {
+            "x": [0.0, 1.0],
+            "y": [1.0, 0.0],
+            "design_family": ["ethanol", "cipro"],
+        }
+    )
+    panel_specs = [
+        {"view_id": f"view_{index}", "projection_id": f"proj_{index}", "title": f"Panel {index}"} for index in range(12)
+    ]
+
+    fig = projection_runtime.render_projection_grid(
+        panel_specs,
+        frames=[frame for _ in range(12)],
+        plot_id="appendix_umap_gallery",
+        hue_column="design_family",
+        hue_kinds={"design_family": "categorical"},
+        joinable_tables=[],
+        reference_labels=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        panel_axes = fig.axes[:12]
+        assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 2
+        assert len({round(axis.get_position().x0, 3) for axis in panel_axes[:6]}) == 6
+        assert 0.0 <= _legend_panel_gap(fig) <= 0.12
     finally:
         plt.close(fig)
 

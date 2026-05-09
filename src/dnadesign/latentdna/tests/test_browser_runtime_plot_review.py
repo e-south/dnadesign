@@ -875,6 +875,55 @@ def test_render_plot_review_surface_passes_selected_reference_set_to_projection_
     assert captured["reference_labels"] == ["fallback_reference"]
 
 
+def test_render_plot_review_surface_fails_closed_when_filter_column_is_missing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_projection_grid(*args, **kwargs):
+        del args
+        captured.update(kwargs)
+        return "rendered"
+
+    monkeypatch.setattr(plot_review_runtime, "render_projection_grid", fake_projection_grid)
+    frames = [
+        pd.DataFrame(
+            {
+                "x": [0.0],
+                "y": [1.0],
+                "promoter_standard__collection_id": ["t7_w_collection"],
+            }
+        ),
+        pd.DataFrame({"x": [1.0], "y": [0.0]}),
+    ]
+    frames[0].attrs["view_id"] = "filtered_panel"
+    frames[1].attrs["view_id"] = "missing_filter_panel"
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "reference_core60_strength_umap",
+            "kind": "projection_grid",
+            "projection_ids": ["proj_a", "proj_b"],
+            "panel_titles": ["Filtered panel", "Missing filter panel"],
+        },
+        frames=frames,
+        hue_column=None,
+        filter_spec={"column": "promoter_standard__collection_id", "value": "t7_w_collection"},
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered == "rendered"
+    filtered_frames = captured["frames"]
+    assert len(filtered_frames[0]) == 1
+    assert filtered_frames[1].empty
+    assert "subset filter `promoter_standard__collection_id` is missing" in filtered_frames[1].attrs["load_error"]
+    assert "missing_filter_panel" in filtered_frames[1].attrs["load_error"]
+
+
 def test_render_plot_review_surface_allows_scatter_grids_with_partial_panel_errors(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
     frames = [

@@ -31,7 +31,8 @@ _PLOT_ASSET_WRAPPER_STYLE = (
     "display: flex; align-items: flex-start; justify-content: center;"
 )
 _PLOT_ASSET_MEDIA_STYLE = (
-    f"display: block; width: auto; height: auto; max-width: 100%; flex: 0 1 auto; "
+    f"display: block; width: auto; height: auto; max-width: 100%; max-height: 78vh; "
+    f"object-fit: contain; flex: 0 1 auto; "
     f"border-radius: 14px; background: {PANEL_BACKGROUND_COLOR};"
 )
 _PLOT_ASSET_MEDIA_STYLE_MAP = {
@@ -39,6 +40,8 @@ _PLOT_ASSET_MEDIA_STYLE_MAP = {
     "width": "auto",
     "height": "auto",
     "max-width": "100%",
+    "max-height": "78vh",
+    "object-fit": "contain",
     "flex": "0 1 auto",
     "border-radius": "14px",
     "background": PANEL_BACKGROUND_COLOR,

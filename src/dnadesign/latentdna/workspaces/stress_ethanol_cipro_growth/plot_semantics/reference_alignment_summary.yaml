@@ -9,8 +9,8 @@ guardrails:
   - Compare strength-annotated collections within their own collection before making biological claims.
   - Raw reference-source and derived core60 reference sets are separate selectors; do not overlay or compare them as if they share the same sequence-scope contract.
 caption: Reference landmark and collection-collapse summary for the promoted candidate spaces.
-alt_text: Bar-panel summary showing legacy stress-reference alignment and selector-backed reference-set size, median distance, and distance spread for promoted candidate spaces.
-preprocessing_md: Reference metrics use the same view-level standardization and row L2 normalization contract as the other cosine-based plots. Named reference collections are resolved through workspace reference_sets so absent or incomplete collections remain explicit status rows.
+alt_text: Bar-panel summary showing legacy spyP/sulAp stress-reference alignment plus reference-set size, median within-set cosine distance, and distance spread for candidate views carrying native, core60, SFXI, Anderson, and W collection rows.
+preprocessing_md: Reference metrics use the same view-level standardization and row L2 normalization contract as the other cosine-based plots. Named reference collections are resolved through workspace reference_sets so absent or incomplete collections remain explicit status rows. Native-length reference inserts, derived core60 windows, and 1 kb reference contexts are separate sequence-scope contracts; their rows should not be described as one pooled reference manifold.
 math_md: |
   Legacy stress-reference alignment remains:
   $$
@@ -21,6 +21,6 @@ math_md: |
   a_{\mathrm{cipro}} = \cos(c_{\mathrm{cipro}}, r_{\mathrm{sulAp}}) - \cos(c_{\mathrm{bg}}, r_{\mathrm{sulAp}}).
   $$
   Collection-collapse panels report group size, median pairwise cosine distance, and pairwise cosine-distance IQR within each configured reference set after the same normalization contract.
-rationale_md: Keeps named reference landmarks and collection-level collapse visible after the reference inventory expanded beyond the original spyP/sulAp check.
+rationale_md: Keeps named reference landmarks and collection-level collapse visible after the reference inventory expanded beyond the original spyP/sulAp check. The purpose is to detect collapse, spread, and gross landmark inconsistency, not to let natural-reference proximity override the synthetic-design scorecard.
 limitations_md: UMAP and cosine summaries are diagnostics, not assay-era evidence. Some reference groups differ by source-insert versus motif-retaining core60 semantics or strength scale, and small groups can make distance summaries unstable.
 failure_modes_md: Missing labels, mixed collection scales, repeated source rows, or context dilution can make reference groups look more collapsed or separated than the underlying biology supports.

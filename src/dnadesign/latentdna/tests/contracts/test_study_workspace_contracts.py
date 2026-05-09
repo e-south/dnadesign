@@ -45,13 +45,44 @@ _EXPANDED_INTERMEDIATE_GEOMETRIES = [
     "intermediate_embedding_7b_anchor_60bp",
     "intermediate_embedding_7b_full_context_1kb",
     "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
     "intermediate_embedding_7b_reverse_complement_context_1kb",
     "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
     *_REFERENCE_DIAGNOSTIC_GEOMETRIES,
 ]
 
 
-_FIRST_CLASS_CANDIDATE_VIEWS = _EXPANDED_INTERMEDIATE_GEOMETRIES[:5]
+_FIRST_CLASS_CANDIDATE_VIEWS = _EXPANDED_INTERMEDIATE_GEOMETRIES[:6]
+
+
+_FIRST_CLASS_OUTPUT_VIEWS = [
+    "output_layer_mean_7b_anchor_60bp",
+    "output_layer_mean_7b_full_context_1kb",
+    "output_layer_mean_7b_full_context_anchor_mean",
+    "output_layer_mean_7b_context_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_reverse_complement_context_1kb",
+    "output_layer_mean_7b_reverse_complement_context_anchor_mean",
+]
+
+
+_CANDIDATE_X_SELECTION_VIEWS = [
+    "intermediate_embedding_7b_anchor_60bp",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
+]
+
+
+_BROWSER_GEOMETRY_VIEWS = [
+    "intermediate_embedding_7b_anchor_60bp",
+    "intermediate_embedding_7b_full_context_1kb",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_reverse_complement_context_1kb",
+    "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+]
+
+
+_FULL_POPULATION_UMAP_VIEWS = [*_BROWSER_GEOMETRY_VIEWS, *_FIRST_CLASS_OUTPUT_VIEWS]
 
 
 def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None:
@@ -80,6 +111,9 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "context_robustness_summary",
         "context_pair_summary",
         "candidate_decision_frontier",
+        "candidate_x_selection_scorecard",
+        "reference_to_plan_centroid_heatmap",
+        "reference_standard_strength_audit",
         "sigma35_centroid_distance_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
@@ -88,24 +122,32 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     ]
-    assert geometry_ids == _FIRST_CLASS_CANDIDATE_VIEWS
+    assert geometry_ids == _FULL_POPULATION_UMAP_VIEWS
     geometry_roles = {row.view_id: row.role for row in controls.geometry_controls.geometries}
     assert geometry_roles["intermediate_embedding_7b_anchor_60bp"] == "primary"
     assert geometry_roles["intermediate_embedding_7b_full_context_anchor_mean"] == "primary"
+    assert geometry_roles["intermediate_embedding_7b_context_anchor_mean_bidir_concat"] == "primary"
     assert geometry_roles["intermediate_embedding_7b_full_context_1kb"] == "appendix"
+    assert all(geometry_roles[view_id] == "appendix" for view_id in _FIRST_CLASS_OUTPUT_VIEWS)
     assert all(context.config.views[view_id].role == "hidden" for view_id in _REFERENCE_DIAGNOSTIC_GEOMETRIES)
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
     assert controls.geometry_controls.default_layout == "candidate_grid"
     candidate_grid_layout = next(row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid")
-    assert candidate_grid_layout.view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
+    assert candidate_grid_layout.view_ids == _FULL_POPULATION_UMAP_VIEWS
     assert [row.candidate_set_id for row in controls.geometry_controls.candidate_sets] == [
         "first_class_intermediate_7b",
+        "candidate_x_selection_7b",
         "planned_output_layer_7b",
     ]
     assert controls.geometry_controls.candidate_sets[0].view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     assert controls.geometry_controls.candidate_sets[0].available_view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
-    assert controls.geometry_controls.candidate_sets[1].views[0].status == "planned"
+    assert controls.geometry_controls.candidate_sets[1].view_ids == _CANDIDATE_X_SELECTION_VIEWS
+    assert controls.geometry_controls.candidate_sets[1].available_view_ids == _CANDIDATE_X_SELECTION_VIEWS
+    assert controls.geometry_controls.candidate_sets[1].views[2].status != "missing"
+    assert controls.geometry_controls.candidate_sets[2].available_view_ids == _FIRST_CLASS_OUTPUT_VIEWS
+    assert controls.geometry_controls.candidate_sets[2].views[0].status != "planned"
+    assert controls.geometry_controls.candidate_sets[2].views[6].status == "planned"
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
     assert "spacer_length" in preferred_hues
@@ -310,9 +352,11 @@ def test_live_study_representation_health_compares_first_class_intermediate_and_
         "output_layer_mean_7b_anchor_60bp",
         "output_layer_mean_7b_full_context_1kb",
         "output_layer_mean_7b_full_context_anchor_mean",
+        "output_layer_mean_7b_context_anchor_mean_bidir_concat",
         "output_layer_mean_7b_reverse_complement_context_1kb",
         "output_layer_mean_7b_reverse_complement_context_anchor_mean",
     }
+    assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in candidates
     assert expected_first_class_output_views.issubset(candidates)
     assert not expected_first_class_output_views.intersection(omitted)
     assert all("reference" not in view_id for view_id in candidates)
@@ -380,13 +424,14 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "sigma35_ordinal_audit",
         "context_robustness_summary",
         "candidate_decision_frontier",
+        "candidate_x_selection_scorecard",
     ]
     decision_ladder = snapshot["decision_ladder"]
     assert decision_ladder == expected_decision_prefix
     browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
     control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
-    assert browser_geometry_ids == _FIRST_CLASS_CANDIDATE_VIEWS
-    assert control_geometry_ids == _FIRST_CLASS_CANDIDATE_VIEWS
+    assert browser_geometry_ids == _FULL_POPULATION_UMAP_VIEWS
+    assert control_geometry_ids == _FULL_POPULATION_UMAP_VIEWS
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
     assert controls.geometry_controls.default_layout == "candidate_grid"
@@ -484,6 +529,22 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert appendix_gallery.hue_options[4].type == "ordinal"
     assert appendix_gallery.annotation is not None
     assert appendix_gallery.annotation.reference_set == "reference_spyp_sulap"
+    reference_strength_umap = context.config.plots["reference_core60_strength_umap"]
+    assert reference_strength_umap.kind == "projection_grid"
+    assert reference_strength_umap.visibility_tier == "appendix"
+    assert reference_strength_umap.default_hue == "promoter_standard__strength_value_numeric"
+    assert [option.column for option in reference_strength_umap.hue_options] == [
+        "promoter_standard__strength_value_numeric",
+        "promoter_standard__collection_id",
+        "source_family",
+        "selection_basis",
+    ]
+    assert reference_strength_umap.hue_options[0].type == "continuous"
+    assert len(reference_strength_umap.filter_options) == 1
+    reference_strength_filter = reference_strength_umap.filter_options[0]
+    assert reference_strength_filter.column == "promoter_standard__collection_id"
+    assert reference_strength_filter.include_all is True
+    assert [row.value for row in reference_strength_filter.values] == ["anderson_igem", "t7_w_collection"]
     assert list(context.config.plots["design_centroid_margin_gallery"].scalars) == [
         f"design_centroid_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
@@ -502,7 +563,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert list(context.config.plots["representation_scree_diagnostic"].reducers) == [
         f"pca_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
-    assert list(appendix_gallery.projections) == [f"umap_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS]
+    assert list(appendix_gallery.projections) == [f"umap_{view_id}" for view_id in _FULL_POPULATION_UMAP_VIEWS]
     assert "reference_margin_gallery_wildtype" not in context.config.plots
     assert "reference_neighbor_evidence" not in context.config.plots
     assert "context_shift_reference_plane" not in context.config.plots
@@ -580,19 +641,16 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     representation_health_step = pre_assay_steps["build_representation_health_summary_metrics"]
     assert representation_health_step.params["pairwise_max_rows"] == 4096
     assert representation_health_step.params["pairwise_seed"] == 17
-    first_class_output_ids = {
-        "output_layer_mean_7b_anchor_60bp",
-        "output_layer_mean_7b_full_context_1kb",
-        "output_layer_mean_7b_full_context_anchor_mean",
-        "output_layer_mean_7b_reverse_complement_context_1kb",
-        "output_layer_mean_7b_reverse_complement_context_anchor_mean",
-    }
     representation_health_candidates = {row["view_id"] for row in representation_health_step.params["candidates"]}
     omitted_candidate_ids = {row["view_id"] for row in representation_health_step.params.get("omitted_candidates", [])}
-    assert first_class_output_ids.issubset(representation_health_candidates)
+    assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in representation_health_candidates
+    assert set(_FIRST_CLASS_OUTPUT_VIEWS).issubset(representation_health_candidates)
     assert omitted_candidate_ids == set()
-    for view_id in first_class_output_ids:
-        assert f"materialize_{view_id}" in pre_assay_steps
+    for view_id in _FIRST_CLASS_OUTPUT_VIEWS:
+        if view_id == "output_layer_mean_7b_context_anchor_mean_bidir_concat":
+            assert f"derive_{view_id}" in pre_assay_steps
+        else:
+            assert f"materialize_{view_id}" in pre_assay_steps
         assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
         assert f"reduce_pca_{view_id}" in pre_assay_steps
     assert "build_design_structure_summary_metrics" in pre_assay_steps
@@ -664,6 +722,8 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert [row["comparison_id"] for row in context_pair_params["comparisons"]] == [
         "intermediate_embedding_7b_anchor_vs_anchor_mean",
         "intermediate_embedding_7b_anchor_vs_full_context",
+        "intermediate_embedding_7b_anchor_vs_reverse_complement_anchor_mean",
+        "intermediate_embedding_7b_anchor_vs_reverse_complement_context",
     ]
     reference_params = pre_assay_steps["build_reference_alignment_summary_metrics"].params
     assert "reference_group_columns" not in reference_params
@@ -698,6 +758,27 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
             "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
             "context_view_id": "intermediate_embedding_7b_full_context_anchor_mean",
         },
+        {
+            "pair_id": "intermediate_embedding_7b_anchor_vs_full_context",
+            "label": "7B intermediate: anchor vs full 1 kb context",
+            "alignment_id": "intermediate_embedding_7b_anchor_to_full_context",
+            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
+            "context_view_id": "intermediate_embedding_7b_full_context_1kb",
+        },
+        {
+            "pair_id": "intermediate_embedding_7b_anchor_vs_reverse_complement_anchor_mean",
+            "label": "7B intermediate: anchor vs RC context anchor mean",
+            "alignment_id": "intermediate_embedding_7b_anchor_to_reverse_complement_anchor_mean",
+            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
+            "context_view_id": "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+        },
+        {
+            "pair_id": "intermediate_embedding_7b_anchor_vs_reverse_complement_context",
+            "label": "7B intermediate: anchor vs RC full 1 kb context",
+            "alignment_id": "intermediate_embedding_7b_anchor_to_reverse_complement_context",
+            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
+            "context_view_id": "intermediate_embedding_7b_reverse_complement_context_1kb",
+        },
     ]
     assert "render_design_centroid_margin_gallery" in pre_assay_steps
     assert "render_reference_alignment_summary" in pre_assay_steps
@@ -719,6 +800,25 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         assert f"build_umap_sample_{view_id}" in appendix_steps
         assert f"fit_umap_{view_id}" in appendix_steps
         assert appendix_steps[f"build_umap_sample_{view_id}"].params["strategy"] == "all"
+    for view_id in _FIRST_CLASS_OUTPUT_VIEWS:
+        assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert f"reduce_pca_{view_id}" in pre_assay_steps
+        assert f"build_umap_sample_{view_id}" in appendix_steps
+        assert f"fit_umap_{view_id}" in appendix_steps
+        assert appendix_steps[f"build_umap_sample_{view_id}"].params["strategy"] == "all"
+    bidir_view_id = "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    assert f"build_umap_sample_{bidir_view_id}" in appendix_steps
+    assert f"fit_umap_{bidir_view_id}" in appendix_steps
+    assert appendix_steps[f"build_umap_sample_{bidir_view_id}"].depends_on == [
+        "derive_intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    ]
+    assert appendix_steps[f"build_umap_sample_{bidir_view_id}"].params["strategy"] == "all"
+    assert f"fit_umap_{bidir_view_id}" in appendix_steps["render_appendix_umap_gallery"].depends_on
+    output_bidir_view_id = "output_layer_mean_7b_context_anchor_mean_bidir_concat"
+    assert appendix_steps[f"build_umap_sample_{output_bidir_view_id}"].depends_on == [
+        "derive_output_layer_mean_7b_context_anchor_mean_bidir_concat"
+    ]
+    assert f"fit_umap_{output_bidir_view_id}" in appendix_steps["render_appendix_umap_gallery"].depends_on
     assert set(appendix_steps["generate_latent_geometry_browser"].depends_on) >= {
         "render_dataset_overview",
         "render_representation_health_summary",

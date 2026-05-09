@@ -115,6 +115,8 @@ class BrowserGeometry:
     row_metadata_hues: list[str]
     reference_annotation_default: str
     reference_annotation_options: dict[str, str]
+    reference_hue_columns: list[str]
+    reference_hue_options: dict[str, str]
     reference_labels: list[str]
     reference_required_columns: list[str]
     reference_sets: list[dict[str, object]]
@@ -727,7 +729,14 @@ def build_workspace_browser_runtime(
         if configured_default_reference_set in set(reference_annotation_options.values())
         else ""
     )
-    reference_required_columns = _reference_required_columns(reference_sets)
+    reference_hue_options = {
+        "Black stars": "",
+        "Reference strength": "promoter_standard__strength_value_numeric",
+    }
+    reference_hue_columns = [value for value in reference_hue_options.values() if value]
+    reference_required_columns = list(
+        dict.fromkeys([*_reference_required_columns(reference_sets), *reference_hue_columns])
+    )
     global_hue_columns, hue_kinds = _runtime_hue_columns(
         joinable_tables=joinable_tables,
         preferred_hues=preferred_hues,
@@ -829,6 +838,8 @@ def build_workspace_browser_runtime(
             row_metadata_hues=row_metadata_hues,
             reference_annotation_default=reference_annotation_default,
             reference_annotation_options=reference_annotation_options,
+            reference_hue_columns=reference_hue_columns,
+            reference_hue_options=reference_hue_options,
             reference_labels=reference_labels,
             reference_required_columns=reference_required_columns,
             reference_sets=reference_sets,

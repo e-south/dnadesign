@@ -324,7 +324,7 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
         ]
         params.update({"input_view": view.derive.view, "reducer": view.derive.reducer})
         input_payload = {"view": view_id, "input_view": view.derive.view, "reducer": view.derive.reducer}
-    else:
+    elif view.derive.kind in {"concatenate", "block_normalized_concatenate"}:
         input_entries = [
             dependency_artifact_input(
                 context,
@@ -335,7 +335,20 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
             for input_view in view.derive.inputs
         ]
         params.update({"input_views": view.derive.inputs})
+        if view.derive.kind == "block_normalized_concatenate":
+            params.update(
+                {
+                    "center": view.derive.center,
+                    "scale": view.derive.scale,
+                    "block_norm": view.derive.block_norm,
+                    "nonfinite_policy": view.derive.nonfinite_policy,
+                    "zero_variance_policy": view.derive.zero_variance_policy,
+                    "zero_row_policy": view.derive.zero_row_policy,
+                }
+            )
         input_payload = {"view": view_id, "input_views": view.derive.inputs}
+    else:  # pragma: no cover - constrained by workspace schema
+        raise ContractViolationError(f"unsupported derived view kind: {view.derive.kind}")
 
     manifest = ArtifactManifest(
         artifact_kind="view",

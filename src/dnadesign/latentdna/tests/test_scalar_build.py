@@ -227,7 +227,11 @@ def _write_workspace_config(
     )
 
 
-def _dataset_overview_params(*, source_ids: list[str]) -> dict[str, object]:
+def _dataset_overview_params(
+    *,
+    source_ids: list[str],
+    sigma35_include_unlisted_categories: bool = True,
+) -> dict[str, object]:
     return {
         "source_ids": source_ids,
         "dimensions": [
@@ -254,6 +258,7 @@ def _dataset_overview_params(*, source_ids: list[str]) -> dict[str, object]:
                 "label": "Sigma-35 variant",
                 "column": "sig35_variant",
                 "category_order": ["f", "e", "d", "c", "b", "control"],
+                "include_unlisted_categories": sigma35_include_unlisted_categories,
                 "category_labels": {
                     "f": "Variant f",
                     "e": "Variant e",
@@ -647,6 +652,60 @@ def test_dataset_overview_includes_annotated_sigma35_categories_outside_named_la
     assert counts["ACCGCG"] == 1
     assert counts["TTGACA"] == 1
     assert sum(int(row["count"]) for row in sig35_rows) == 8
+
+
+def test_dataset_overview_can_limit_sigma35_panel_to_configured_ladder(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "projected_reference_row",
+            "subject_id": "projected_reference_row",
+            "usr_label__primary": "J23104",
+            "sequence": "TTGACATATGCTAGCTAGCTAGCTAGCTAGCTAGC",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "densegen__used_tfbs_detail": None,
+            "seq_annot__features": [
+                {
+                    "label": "-35",
+                    "role_hint": "sigma70_minus35",
+                    "qualifiers": [{"key": "note", "value": "feature_sequence=TTGACA"}],
+                }
+            ],
+            "derived__features_retained": None,
+        },
+        *_base_rows(),
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_source(workspace_dir / "inputs" / "context.parquet", rows)
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="dataset_overview_counts",
+        builder_kind="dataset_overview",
+        params=_dataset_overview_params(
+            source_ids=["anchor_60bp", "full_context_1kb"],
+            sigma35_include_unlisted_categories=False,
+        ),
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    sig35_rows = [row for row in table if row["dimension"] == "sig35_variant"]
+
+    assert artifact.stats["denominator"] == 7
+    assert [row["category"] for row in sorted(sig35_rows, key=lambda row: row["order"])] == [
+        "f",
+        "e",
+        "d",
+        "c",
+        "b",
+        "control",
+    ]
+    assert "TTGACA" not in {row["category"] for row in sig35_rows}
+    assert sum(int(row["count"]) for row in sig35_rows) == 6
 
 
 def test_dataset_overview_rejects_mismatched_partitions_across_sources(tmp_path: Path) -> None:
@@ -2196,6 +2255,179 @@ def test_ordinal_axis_audit_supports_numeric_rank_metadata_without_sig35_columns
     }
     assert all(row["ordinal_axis_column"] == "standard_id" for row in rows_table)
     assert all(row["ordinal_order_source"] == "strength" for row in rows_table)
+
+
+def test_reference_to_centroid_similarity_maps_references_to_plan_centroids(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "background",
+            "subject_id": "background",
+            "design_family": "background_only",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [1.0, 0.0, 0.0],
+        },
+        {
+            "id": "ethanol",
+            "subject_id": "ethanol",
+            "design_family": "ethanol",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [0.0, 1.0, 0.0],
+        },
+        {
+            "id": "cipro",
+            "subject_id": "cipro",
+            "design_family": "ciprofloxacin",
+            "usr_label__primary": None,
+            "promoter_standard__collection_id": None,
+            "embedding": [0.0, 0.0, 1.0],
+        },
+        {
+            "id": "w_eth",
+            "subject_id": "w_eth",
+            "design_family": "control",
+            "usr_label__primary": "W_eth",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "embedding": [0.0, 0.9, 0.1],
+        },
+        {
+            "id": "w_cipro",
+            "subject_id": "w_cipro",
+            "design_family": "control",
+            "usr_label__primary": "W_cipro",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "embedding": [0.1, 0.0, 0.9],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="reference_to_plan_centroid_metrics",
+        builder_kind="reference_to_centroid_similarity",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "centroid_axis": {
+                "column": "design_family",
+                "groups": [
+                    {"value": "background_only", "label": "Background"},
+                    {"value": "ethanol", "label": "Ethanol"},
+                    {"value": "ciprofloxacin", "label": "Ciprofloxacin"},
+                ],
+            },
+            "reference_sets": [{"reference_set_id": "reference_w_collection", "aggregation": "rows"}],
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    assert {row["metric_id"] for row in table_rows} == {"reference_to_centroid_similarity"}
+    assert {row["reference_entity_id"] for row in table_rows} == {"W_eth", "W_cipro"}
+    assert {row["centroid_group"] for row in table_rows} == {"background_only", "ethanol", "ciprofloxacin"}
+    assert all(row["nearest_centroid_group"] in {"background_only", "ethanol", "ciprofloxacin"} for row in table_rows)
+    assert all(np.isfinite(float(row["nearest_centroid_margin"])) for row in table_rows)
+
+
+def test_collection_strength_ordinal_audit_keeps_reference_strength_scales_separate(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "w_low",
+            "subject_id": "w_low",
+            "standard_id": "W_low",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "promoter_standard__strength_value_numeric": 1.0,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "w_mid",
+            "subject_id": "w_mid",
+            "standard_id": "W_mid",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "promoter_standard__strength_value_numeric": 5.0,
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "w_high",
+            "subject_id": "w_high",
+            "standard_id": "W_high",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "promoter_standard__strength_value_numeric": 10.0,
+            "embedding": [-1.0, 0.0],
+        },
+        {
+            "id": "a_low",
+            "subject_id": "a_low",
+            "standard_id": "A_low",
+            "promoter_standard__collection_id": "anderson_igem",
+            "promoter_standard__strength_value_numeric": 100.0,
+            "embedding": [0.0, -1.0],
+        },
+        {
+            "id": "a_mid",
+            "subject_id": "a_mid",
+            "standard_id": "A_mid",
+            "promoter_standard__collection_id": "anderson_igem",
+            "promoter_standard__strength_value_numeric": 200.0,
+            "embedding": [1.0, 1.0],
+        },
+        {
+            "id": "a_high",
+            "subject_id": "a_high",
+            "standard_id": "A_high",
+            "promoter_standard__collection_id": "anderson_igem",
+            "promoter_standard__strength_value_numeric": 300.0,
+            "embedding": [-1.0, -1.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="reference_standard_strength_audit_metrics",
+        builder_kind="collection_strength_ordinal_audit",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "collection_column": "promoter_standard__collection_id",
+            "group_column": "standard_id",
+            "rank_column": "promoter_standard__strength_value_numeric",
+            "collections": [
+                {"collection_id": "t7_w_collection", "label": "W collection"},
+                {"collection_id": "anderson_igem", "label": "Anderson iGEM"},
+            ],
+            "permutations": 5,
+            "seed": 17,
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    assert {row["reference_collection_id"] for row in table_rows} == {"t7_w_collection", "anderson_igem"}
+    assert {(row["reference_collection_id"], row["ordinal_ranked_group_count"]) for row in table_rows} == {
+        ("t7_w_collection", 3),
+        ("anderson_igem", 3),
+    }
+    assert all(row["ordinal_order_source"] == "promoter_standard__strength_value_numeric" for row in table_rows)
 
 
 def test_axis_centroid_distance_includes_unranked_axis_values(tmp_path: Path) -> None:

@@ -14,7 +14,6 @@ from ..contracts.errors import ContractViolationError
 from ..geometry.cohorts import (
     aligned_cohort_distance_vectors,
     balanced_group_indices,
-    bootstrap_ci,
     centroid_map,
     group_indices,
     ordinal_gap_and_distance_vectors,
@@ -148,6 +147,36 @@ def _cohort_metric_axes(params: dict[str, Any], *, key: str, builder_kind: str) 
             )
         )
     return axes
+
+
+def _bootstrap_values(
+    metric_fn: Callable[[], float],
+    *,
+    iterations: int,
+) -> list[float]:
+    values: list[float] = []
+    for _ in range(iterations):
+        value = float(metric_fn())
+        if np.isfinite(value):
+            values.append(value)
+    return values
+
+
+def _bootstrap_ci_from_values(values: list[float]) -> tuple[float | None, float | None]:
+    if not values:
+        return None, None
+    array = np.asarray(values, dtype=np.float64)
+    return float(np.percentile(array, 2.5)), float(np.percentile(array, 97.5))
+
+
+def _bootstrap_ci_with_values(
+    metric_fn: Callable[[], float],
+    *,
+    iterations: int,
+) -> tuple[float | None, float | None, list[float]]:
+    values = _bootstrap_values(metric_fn, iterations=iterations)
+    ci_lower, ci_upper = _bootstrap_ci_from_values(values)
+    return ci_lower, ci_upper, values
 
 
 def _load_candidate_sample(
@@ -394,7 +423,7 @@ def _design_structure_summary_table(
         for axis in axes:
             groups = group_indices(candidate_sample.rows, column=axis.column, exclude_values=axis.exclude_values)
             value = separation_ratio_from_groups(normalized, groups)
-            ci_lower, ci_upper = bootstrap_ci(
+            ci_lower, ci_upper, bootstrap_replicates = _bootstrap_ci_with_values(
                 lambda groups=groups, rng=rng: separation_ratio_from_groups(
                     normalized,
                     resample_groups(groups, rng=rng),
@@ -413,6 +442,8 @@ def _design_structure_summary_table(
                     extra={
                         "cohort_axis_id": axis.axis_id,
                         "cohort_column": axis.column,
+                        "bootstrap_replicates": bootstrap_replicates,
+                        "bootstrap_iterations": bootstrap_iterations,
                         **({"display_name": axis.display_name} if axis.display_name is not None else {}),
                     },
                 )
@@ -437,7 +468,7 @@ def _design_structure_summary_table(
                 rng=rng,
             )
             balanced_value = separation_ratio_from_groups(normalized, balanced_groups)
-            ci_lower, ci_upper = bootstrap_ci(
+            ci_lower, ci_upper, bootstrap_replicates = _bootstrap_ci_with_values(
                 lambda rng=rng: separation_ratio_from_groups(
                     normalized,
                     balanced_group_indices(
@@ -474,6 +505,8 @@ def _design_structure_summary_table(
                             _optional_param(balanced_axis, "axis_id", default=balanced_column) or balanced_column
                         ),
                         "cohort_column": balanced_column,
+                        "bootstrap_replicates": bootstrap_replicates,
+                        "bootstrap_iterations": bootstrap_iterations,
                         **({"display_name": display_name} if display_name else {}),
                     },
                 )
@@ -794,7 +827,7 @@ def _ordinal_axis_audit_table(
             exclude_values=axis.exclude_values,
             allowed_values=set(axis.ranks),
         )
-        ci_lower, ci_upper = bootstrap_ci(
+        ci_lower, ci_upper, bootstrap_replicates = _bootstrap_ci_with_values(
             lambda groups=global_groups, rng=rng: _ordinal_statistics_from_groups(
                 normalized,
                 resample_groups(groups, rng=rng),
@@ -812,6 +845,8 @@ def _ordinal_axis_audit_table(
                 ci_upper=ci_upper,
                 extra={
                     **axis_extra,
+                    "bootstrap_replicates": bootstrap_replicates,
+                    "bootstrap_iterations": bootstrap_iterations,
                     **({"display_name": spearman_display_name} if spearman_display_name else {}),
                 },
             )
@@ -842,7 +877,7 @@ def _ordinal_axis_audit_table(
             centroids = centroid_map(normalized, balanced_groups)
             gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=axis.ranks)
             balanced_spearman = _spearman_correlation(gaps, distances) if gaps.size else float("nan")
-        ci_lower, ci_upper = bootstrap_ci(
+        ci_lower, ci_upper, bootstrap_replicates = _bootstrap_ci_with_values(
             lambda groups=balanced_groups, rng=rng: _ordinal_statistics_from_groups(
                 normalized,
                 resample_groups(groups, rng=rng),
@@ -860,6 +895,8 @@ def _ordinal_axis_audit_table(
                 ci_upper=ci_upper,
                 extra={
                     **axis_extra,
+                    "bootstrap_replicates": bootstrap_replicates,
+                    "bootstrap_iterations": bootstrap_iterations,
                     **(
                         {"display_name": metric_label(metric_ids["balanced_spearman"])}
                         if metric_label(metric_ids["balanced_spearman"])
@@ -893,7 +930,7 @@ def _ordinal_axis_audit_table(
                 outer_groups=outer_groups,
                 axis=axis,
             )
-            ci_lower, ci_upper = bootstrap_ci(
+            ci_lower, ci_upper, bootstrap_replicates = _bootstrap_ci_with_values(
                 lambda groups=outer_groups, rng=rng: _ordinal_mean_statistic_from_outer_groups(
                     normalized,
                     candidate_sample.rows,
@@ -913,6 +950,8 @@ def _ordinal_axis_audit_table(
                     extra={
                         **axis_extra,
                         "ordinal_within_group_column": outer_column,
+                        "bootstrap_replicates": bootstrap_replicates,
+                        "bootstrap_iterations": bootstrap_iterations,
                         **({"display_name": metric_label(metric_id)} if metric_label(metric_id) else {}),
                     },
                 )
@@ -1406,6 +1445,469 @@ def _reference_alignment_summary_table(
     )
 
 
+def _centroid_axis_groups(axis_config: dict[str, Any]) -> tuple[str, list[tuple[str, str]]]:
+    column = str(_require_param(axis_config, "column"))
+    raw_groups = _require_param(axis_config, "groups")
+    if not isinstance(raw_groups, list) or not raw_groups:
+        raise ContractViolationError("reference_to_centroid_similarity centroid_axis.groups must be a non-empty list")
+    groups: list[tuple[str, str]] = []
+    for raw_group in raw_groups:
+        if not isinstance(raw_group, dict):
+            raise ContractViolationError("reference_to_centroid_similarity centroid groups must be mappings")
+        value = str(raw_group.get("value") or "").strip()
+        if not value:
+            raise ContractViolationError("reference_to_centroid_similarity centroid groups require value")
+        groups.append((value, str(raw_group.get("label") or humanize_label(value))))
+    return column, groups
+
+
+def _reference_set_entries(params: dict[str, Any]) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    for raw_entry in list(_optional_param(params, "reference_sets", default=[])):
+        if isinstance(raw_entry, dict):
+            reference_set_id = str(raw_entry.get("reference_set_id") or raw_entry.get("id") or "").strip()
+            aggregation = str(raw_entry.get("aggregation") or "centroid").strip()
+        else:
+            reference_set_id = str(raw_entry or "").strip()
+            aggregation = "centroid"
+        if not reference_set_id:
+            continue
+        if aggregation not in {"centroid", "rows", "both"}:
+            raise ContractViolationError(
+                "reference_to_centroid_similarity reference_set aggregation must be centroid, rows, or both"
+            )
+        entries.append({"reference_set_id": reference_set_id, "aggregation": aggregation})
+    return entries
+
+
+def _reference_row_label(reference_set: object, row: dict[str, object], fallback_id: str) -> str:
+    display_labels = dict(getattr(reference_set, "display_labels", {}) or {})
+    if fallback_id in display_labels:
+        return str(display_labels[fallback_id])
+    label_column = getattr(reference_set, "label_column", None)
+    if label_column:
+        label = row.get(str(label_column))
+        if label is not None and str(label).strip():
+            return str(label)
+    return fallback_id
+
+
+def _append_reference_to_centroid_rows(
+    rows: list[dict[str, object]],
+    *,
+    context: WorkspaceContext,
+    descriptor: dict[str, object],
+    vector: np.ndarray,
+    centroids: dict[str, np.ndarray],
+    centroid_labels: dict[str, str],
+    reference_set_id: str,
+    reference_set_label: str,
+    reference_entity_id: str,
+    reference_entity_label: str,
+    reference_entity_type: str,
+    reference_set_status: str,
+    reference_set_complete: bool,
+    reference_rows: int,
+) -> None:
+    similarities = {group: float(np.dot(vector, centroid)) for group, centroid in centroids.items()}
+    ordered = sorted(similarities.items(), key=lambda item: item[1], reverse=True)
+    nearest_group = ordered[0][0] if ordered else ""
+    nearest_similarity = ordered[0][1] if ordered else float("nan")
+    second_similarity = ordered[1][1] if len(ordered) > 1 else float("nan")
+    margin = nearest_similarity - second_similarity if np.isfinite(second_similarity) else float("nan")
+    for centroid_group, similarity in similarities.items():
+        rows.append(
+            _metric_row(
+                context=context,
+                descriptor=descriptor,
+                metric_id="reference_to_centroid_similarity",
+                metric_value=similarity,
+                category="reference_to_centroid_similarity",
+                extra={
+                    "reference_set_id": reference_set_id,
+                    "reference_set_label": reference_set_label,
+                    "reference_set_status": reference_set_status,
+                    "reference_set_complete": reference_set_complete,
+                    "reference_rows": reference_rows,
+                    "reference_entity_id": reference_entity_id,
+                    "reference_entity_label": reference_entity_label,
+                    "reference_entity_type": reference_entity_type,
+                    "centroid_group": centroid_group,
+                    "centroid_label": centroid_labels[centroid_group],
+                    "nearest_centroid_group": nearest_group,
+                    "nearest_centroid_label": centroid_labels.get(nearest_group, nearest_group),
+                    "nearest_centroid_similarity": nearest_similarity,
+                    "nearest_centroid_margin": margin,
+                    "label": reference_entity_label,
+                },
+            )
+        )
+
+
+def _reference_to_centroid_similarity_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    candidates = [dict(value) for value in _require_param(params, "candidates")]
+    centroid_column, centroid_groups = _centroid_axis_groups(dict(_require_param(params, "centroid_axis")))
+    reference_entries = _reference_set_entries(params)
+    if not reference_entries:
+        raise ContractViolationError("reference_to_centroid_similarity requires at least one reference_set")
+    min_reference_group_size = int(_optional_param(params, "min_reference_group_size", default=2))
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    centroid_values = [value for value, _ in centroid_groups]
+    centroid_labels = {value: label for value, label in centroid_groups}
+    for candidate in candidates:
+        candidate_sample = _load_candidate_sample(context, candidate)
+        inputs.extend(candidate_sample.inputs)
+        normalized = _normalized_geometry_rows(candidate_sample.matrix)
+        groups = group_indices(
+            candidate_sample.rows,
+            column=centroid_column,
+            allowed_values=set(centroid_values),
+        )
+        missing_groups = [value for value in centroid_values if value not in groups]
+        if missing_groups:
+            raise ContractViolationError(
+                "reference_to_centroid_similarity missing centroid groups "
+                f"for {_require_param(candidate, 'view_id')!r}: {missing_groups}"
+            )
+        centroids = centroid_map(normalized, groups)
+        centroids = {value: centroids[value] for value in centroid_values}
+        for entry in reference_entries:
+            reference_set_id = entry["reference_set_id"]
+            if reference_set_id not in context.config.reference_sets:
+                raise ContractViolationError(
+                    f"reference_to_centroid_similarity references unknown reference_set {reference_set_id!r}"
+                )
+            reference_set = context.config.reference_sets[reference_set_id]
+            resolution = resolve_reference_set_rows(reference_set, candidate_sample.rows)
+            match_column = str(getattr(reference_set, "match_column"))
+            indices = _reference_indices_for_matched_ids(
+                candidate_sample.rows,
+                match_column=match_column,
+                matched_ids=resolution.matched_ids,
+            )
+            status = _reference_status(
+                missing_columns=resolution.missing_columns,
+                expected_ids=resolution.expected_ids,
+                matched_ids=resolution.matched_ids,
+                selected_count=len(indices),
+                min_reference_group_size=1,
+            )
+            reference_set_label = str(getattr(reference_set, "label", None) or humanize_label(reference_set_id))
+            aggregation = entry["aggregation"]
+            if aggregation in {"rows", "both"}:
+                for index in indices:
+                    row = candidate_sample.rows[index]
+                    entity_id = str(row.get(match_column))
+                    _append_reference_to_centroid_rows(
+                        rows,
+                        context=context,
+                        descriptor=candidate_sample.descriptor,
+                        vector=np.asarray(normalized[index], dtype=np.float32),
+                        centroids=centroids,
+                        centroid_labels=centroid_labels,
+                        reference_set_id=reference_set_id,
+                        reference_set_label=reference_set_label,
+                        reference_entity_id=entity_id,
+                        reference_entity_label=_reference_row_label(reference_set, row, entity_id),
+                        reference_entity_type="row",
+                        reference_set_status=status,
+                        reference_set_complete=bool(resolution.complete),
+                        reference_rows=len(indices),
+                    )
+            if aggregation in {"centroid", "both"} and len(indices) >= min_reference_group_size:
+                centroid = try_l2_normalize_vector(np.asarray(normalized[indices].mean(axis=0), dtype=np.float32))
+                if centroid is not None:
+                    _append_reference_to_centroid_rows(
+                        rows,
+                        context=context,
+                        descriptor=candidate_sample.descriptor,
+                        vector=centroid,
+                        centroids=centroids,
+                        centroid_labels=centroid_labels,
+                        reference_set_id=reference_set_id,
+                        reference_set_label=reference_set_label,
+                        reference_entity_id=reference_set_id,
+                        reference_entity_label=reference_set_label,
+                        reference_entity_type="reference_set_centroid",
+                        reference_set_status=status,
+                        reference_set_complete=bool(resolution.complete),
+                        reference_rows=len(indices),
+                    )
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {"candidate_count": len(candidates), "reference_set_count": len(reference_entries), "rows": len(rows)},
+    )
+
+
+def _collection_strength_ordinal_audit_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    candidates = [dict(value) for value in _require_param(params, "candidates")]
+    collection_column = str(_require_param(params, "collection_column"))
+    group_column = str(_require_param(params, "group_column"))
+    rank_column = str(_require_param(params, "rank_column"))
+    collections = [dict(value) for value in _require_param(params, "collections")]
+    metric_ids = dict(_ORDINAL_AXIS_DEFAULT_METRIC_IDS)
+    configured_metric_ids = dict(_optional_param(params, "metric_ids", default={}) or {})
+    metric_ids.update({str(key): str(value) for key, value in configured_metric_ids.items()})
+    permutations = int(_optional_param(params, "permutations", default=200))
+    seed = int(_optional_param(params, "seed", default=context.config.defaults.random_seed))
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    for candidate_offset, candidate in enumerate(candidates):
+        candidate_sample = _load_candidate_sample(context, candidate)
+        inputs.extend(candidate_sample.inputs)
+        normalized = _normalized_geometry_rows(candidate_sample.matrix)
+        for collection_offset, collection in enumerate(collections):
+            collection_id = str(_require_param(collection, "collection_id"))
+            collection_label = str(_optional_param(collection, "label", default=humanize_label(collection_id)))
+            collection_filters = [dict(value) for value in _optional_param(collection, "where", default=[])]
+            collection_indices = [
+                index
+                for index, row in enumerate(candidate_sample.rows)
+                if str(row.get(collection_column) or "") == collection_id
+                and _row_matches_filters(row, collection_filters)
+                and str(row.get(group_column) or "").strip()
+                and _coerce_float(row.get(rank_column)) is not None
+            ]
+            if len(collection_indices) < 3:
+                continue
+            collection_rows = [candidate_sample.rows[index] for index in collection_indices]
+            collection_matrix = normalized[np.asarray(collection_indices, dtype=np.int64)]
+            axis = _resolve_numeric_ordinal_axis(
+                axis_id=f"{collection_id}_strength",
+                axis={
+                    "axis_id": f"{collection_id}_strength",
+                    "label": f"{collection_label} strength",
+                    "rank_column": rank_column,
+                },
+                rows=collection_rows,
+                group_column=group_column,
+                exclude_values=set(),
+            )
+            axis_extra = {
+                **_ordinal_axis_extra(axis),
+                "reference_collection_id": collection_id,
+                "reference_collection_label": collection_label,
+                "reference_collection_column": collection_column,
+            }
+            spearman, kendall = _ordinal_global_statistics(collection_matrix, collection_rows, axis=axis)
+            rows.append(
+                _metric_row(
+                    context=context,
+                    descriptor=candidate_sample.descriptor,
+                    metric_id=metric_ids["spearman"],
+                    metric_value=spearman,
+                    extra={**axis_extra, "display_name": f"{collection_label} strength Spearman"},
+                )
+            )
+            rows.append(
+                _metric_row(
+                    context=context,
+                    descriptor=candidate_sample.descriptor,
+                    metric_id=metric_ids["kendall"],
+                    metric_value=kendall,
+                    extra={**axis_extra, "display_name": f"{collection_label} strength Kendall"},
+                )
+            )
+            rng = np.random.default_rng(seed + candidate_offset * 997 + collection_offset)
+            groups = group_indices(collection_rows, column=axis.column, allowed_values=set(axis.ranks))
+            observed = spearman
+            permutation_values: list[float] = []
+            variants = sorted(set(axis.ranks), key=str.casefold)
+            if np.isfinite(observed) and len(variants) >= 3:
+                centroids = centroid_map(collection_matrix, groups)
+                for _ in range(permutations):
+                    shuffled = rng.permutation([axis.ranks[variant] for variant in variants]).tolist()
+                    shuffled_ranks = {variant: rank for variant, rank in zip(variants, shuffled, strict=True)}
+                    gaps, distances = ordinal_gap_and_distance_vectors(centroids=centroids, ranks=shuffled_ranks)
+                    if gaps.size:
+                        permutation_values.append(_spearman_correlation(gaps, distances))
+            permutation_pvalue = (
+                float(
+                    (1 + np.sum(np.abs(np.asarray(permutation_values, dtype=np.float64)) >= abs(observed)))
+                    / (len(permutation_values) + 1)
+                )
+                if permutation_values and np.isfinite(observed)
+                else float("nan")
+            )
+            rows.append(
+                _metric_row(
+                    context=context,
+                    descriptor=candidate_sample.descriptor,
+                    metric_id=metric_ids["permutation_pvalue"],
+                    metric_value=permutation_pvalue,
+                    extra={**axis_extra, "display_name": f"{collection_label} strength permutation p-value"},
+                )
+            )
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {"candidate_count": len(candidates), "collection_count": len(collections), "rows": len(rows)},
+    )
+
+
+def _row_matches_filters(row: dict[str, object], filters: list[dict[str, Any]]) -> bool:
+    for selector in filters:
+        column = str(_require_param(selector, "column"))
+        value = row.get(column)
+        if "equals" in selector and str(value) != str(selector["equals"]):
+            return False
+        if "in_values" in selector and str(value) not in {str(item) for item in list(selector["in_values"])}:
+            return False
+    return True
+
+
+def _aggregate_values(values: list[float], aggregation: str) -> float:
+    if not values:
+        return float("nan")
+    array = np.asarray(values, dtype=np.float64)
+    if aggregation == "median":
+        return float(np.median(array))
+    if aggregation == "mean":
+        return float(np.mean(array))
+    if aggregation == "max":
+        return float(np.max(array))
+    if aggregation == "min":
+        return float(np.min(array))
+    raise ContractViolationError(f"candidate_x_selection_scorecard unsupported aggregation: {aggregation!r}")
+
+
+def _scorecard_descriptor(
+    context: WorkspaceContext,
+    candidate_id: str,
+    fallback_row: dict[str, object] | None,
+) -> dict[str, object]:
+    if candidate_id in context.config.views:
+        return _candidate_descriptor_from_view(context, view_id=candidate_id)
+    if fallback_row is not None:
+        return {
+            "candidate_id": candidate_id,
+            "candidate_family": fallback_row.get("candidate_family", ""),
+            "candidate_model": fallback_row.get("candidate_model", ""),
+            "candidate_scope": fallback_row.get("candidate_scope", ""),
+            "candidate_label": fallback_row.get("candidate_label", candidate_id),
+        }
+    return {
+        "candidate_id": candidate_id,
+        "candidate_family": "",
+        "candidate_model": "",
+        "candidate_scope": "",
+        "candidate_label": candidate_id,
+    }
+
+
+def _candidate_x_selection_scorecard_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    metric_sources = [dict(value) for value in _optional_param(params, "metric_sources", default=[])]
+    aggregate_sources = [dict(value) for value in _optional_param(params, "aggregate_sources", default=[])]
+    candidate_ids = [str(value) for value in _optional_param(params, "candidate_ids", default=[])]
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    seen_inputs: set[tuple[str, str]] = set()
+    descriptor_rows: dict[str, dict[str, object]] = {}
+
+    def add_inputs(source_inputs: list[ScalarInputRef]) -> None:
+        for source_input in source_inputs:
+            key = (source_input.kind, source_input.artifact_id)
+            if key in seen_inputs:
+                continue
+            seen_inputs.add(key)
+            inputs.append(source_input)
+
+    if not candidate_ids:
+        discovered: list[str] = []
+        for source_spec in metric_sources:
+            source_rows, source_inputs = _load_scalar_rows(
+                context,
+                scalar_id=str(_require_param(source_spec, "scalar")),
+            )
+            add_inputs(source_inputs)
+            for row in source_rows:
+                candidate_id = str(row.get("candidate_id") or "").strip()
+                if candidate_id and candidate_id not in discovered:
+                    discovered.append(candidate_id)
+                    descriptor_rows[candidate_id] = row
+        candidate_ids = discovered
+
+    for source_spec in metric_sources:
+        source_rows, source_inputs = _load_scalar_rows(context, scalar_id=str(_require_param(source_spec, "scalar")))
+        add_inputs(source_inputs)
+        grouped = _rows_by_candidate_and_metric(source_rows)
+        source_metric_id = str(_require_param(source_spec, "metric_id"))
+        output_metric_id = str(_optional_param(source_spec, "output_metric_id", default=source_metric_id))
+        scorecard_section = str(_optional_param(source_spec, "section", default="scorecard"))
+        for candidate_id in candidate_ids:
+            source_row = grouped.get(candidate_id, {}).get(source_metric_id)
+            if source_row is None:
+                continue
+            descriptor_rows.setdefault(candidate_id, source_row)
+            rows.append(
+                _metric_row(
+                    context=context,
+                    descriptor=_scorecard_descriptor(context, candidate_id, source_row),
+                    metric_id=output_metric_id,
+                    metric_value=float(source_row["metric_value"]),
+                    category=scorecard_section,
+                    extra={
+                        "source_scalar": str(_require_param(source_spec, "scalar")),
+                        "source_metric_id": source_metric_id,
+                        "scorecard_section": scorecard_section,
+                        "label": _scorecard_descriptor(context, candidate_id, source_row)["candidate_label"],
+                    },
+                )
+            )
+
+    for aggregate_spec in aggregate_sources:
+        source_rows, source_inputs = _load_scalar_rows(context, scalar_id=str(_require_param(aggregate_spec, "scalar")))
+        add_inputs(source_inputs)
+        source_column = str(_optional_param(aggregate_spec, "source_column", default="metric_value"))
+        output_metric_id = str(_require_param(aggregate_spec, "output_metric_id"))
+        aggregation = str(_optional_param(aggregate_spec, "aggregation", default="median"))
+        filters = [dict(value) for value in _optional_param(aggregate_spec, "where", default=[])]
+        scorecard_section = str(_optional_param(aggregate_spec, "section", default="scorecard"))
+        for candidate_id in candidate_ids:
+            values = [
+                float(row[source_column])
+                for row in source_rows
+                if str(row.get("candidate_id") or "") == candidate_id
+                and source_column in row
+                and _coerce_float(row.get(source_column)) is not None
+                and _row_matches_filters(row, filters)
+            ]
+            source_row = next((row for row in source_rows if str(row.get("candidate_id") or "") == candidate_id), None)
+            descriptor = _scorecard_descriptor(
+                context,
+                candidate_id,
+                source_row or descriptor_rows.get(candidate_id),
+            )
+            rows.append(
+                _metric_row(
+                    context=context,
+                    descriptor=descriptor,
+                    metric_id=output_metric_id,
+                    metric_value=_aggregate_values(values, aggregation),
+                    category=scorecard_section,
+                    extra={
+                        "source_scalar": str(_require_param(aggregate_spec, "scalar")),
+                        "source_column": source_column,
+                        "aggregation": aggregation,
+                        "scorecard_section": scorecard_section,
+                        "label": descriptor["candidate_label"],
+                    },
+                )
+            )
+    return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(candidate_ids), "rows": len(rows)}
+
+
 def _context_pair_summary_table(
     context: WorkspaceContext,
     params: dict[str, Any],
@@ -1645,7 +2147,10 @@ _PREASSAY_BUILDERS: dict[str, ScalarTableBuilder] = {
     "context_robustness_summary": _context_robustness_summary_table,
     "context_pair_summary": _context_pair_summary_table,
     "reference_alignment_summary": _reference_alignment_summary_table,
+    "reference_to_centroid_similarity": _reference_to_centroid_similarity_table,
+    "collection_strength_ordinal_audit": _collection_strength_ordinal_audit_table,
     "candidate_decision_frontier": _candidate_decision_frontier_table,
+    "candidate_x_selection_scorecard": _candidate_x_selection_scorecard_table,
     "axis_centroid_distance": _axis_centroid_distance_table,
 }
 

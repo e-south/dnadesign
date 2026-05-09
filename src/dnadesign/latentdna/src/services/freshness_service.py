@@ -184,6 +184,18 @@ def _view_config_freshness_reasons(
         expected_pairs.update({"input_view": view.derive.view, "reducer": view.derive.reducer})
     elif view.derive.kind == "concatenate":
         expected_pairs.update({"input_views": list(view.derive.inputs)})
+    elif view.derive.kind == "block_normalized_concatenate":
+        expected_pairs.update(
+            {
+                "input_views": list(view.derive.inputs),
+                "center": view.derive.center,
+                "scale": view.derive.scale,
+                "block_norm": view.derive.block_norm,
+                "nonfinite_policy": view.derive.nonfinite_policy,
+                "zero_variance_policy": view.derive.zero_variance_policy,
+                "zero_row_policy": view.derive.zero_row_policy,
+            }
+        )
 
     for key, expected in expected_pairs.items():
         if params.get(key) != expected:

@@ -25,6 +25,12 @@ def _resolved_hue_fields(config: PlotConfig) -> dict[str, object]:
     }
 
 
+def _resolved_filter_fields(config: PlotConfig) -> dict[str, object]:
+    return {
+        "filter_options": list(getattr(config, "filter_options", []) or []),
+    }
+
+
 def _resolved_label_fields(config: PlotConfig) -> dict[str, object]:
     return {
         "x_axis_label": getattr(config, "x_axis_label", None),
@@ -54,6 +60,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=[config.panel_title] if config.panel_title else [],
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -71,6 +78,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -120,6 +128,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             color_column=_resolved_color_column(config),
             shape_column=config.shape_column,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -142,6 +151,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             label_values=list(config.label_values),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -160,6 +170,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -179,6 +190,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_titles=list(config.panel_titles or []),
             annotation=config.annotation,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -195,6 +207,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             panel_column=config.panel_column,
             color_column=_resolved_color_column(config),
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -221,6 +234,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             unit_column=config.unit_column,
             reference_line=config.reference_line,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -238,6 +252,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             color_column=_resolved_color_column(config),
             render_mode=config.render_mode,
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,
@@ -254,6 +269,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             render_mode=config.render_mode,
             panel_titles=list(config.panel_titles or []),
             **_resolved_hue_fields(config),
+            **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
             config_id=config_id,

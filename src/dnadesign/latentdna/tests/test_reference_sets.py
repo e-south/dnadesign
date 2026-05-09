@@ -34,7 +34,9 @@ def _row(
         "source_family": source_family,
         "selection_basis": selection_basis,
         "promoter_standard__collection_id": collection_id,
-        "promoter_standard__display_name": label.replace("_context1kb_rc", "").replace("_core60", ""),
+        "promoter_standard__display_name": label.replace("_context1kb_forward", "")
+        .replace("_context1kb_rc", "")
+        .replace("_core60", ""),
     }
 
 
@@ -68,23 +70,39 @@ def test_stress_reference_sets_resolve_native_core60_and_context_rows_without_mi
         _row("sulAp_context1kb_rc", selection_basis="whole_output_reverse_complement"),
         _row("spyp_core60", selection_basis="sigma_site_pair_midpoint"),
         _row("sulAp_core60", selection_basis="sigma_site_pair_midpoint"),
+        _row("spyp_core60_context1kb_forward", selection_basis="template_window_center"),
+        _row("sulAp_core60_context1kb_forward", selection_basis="template_window_center"),
         _row("spyp_core60_context1kb_rc", selection_basis="whole_output_reverse_complement"),
         _row("sulAp_core60_context1kb_rc", selection_basis="whole_output_reverse_complement"),
         _row("aceBp", selection_basis="native_source_length", source_family="legacy_reference_control"),
+        _row("aceBp_context1kb_forward", selection_basis="template_window_center"),
         _row("aceBp_context1kb_rc", selection_basis="whole_output_reverse_complement"),
         _row("aceBp_core60", selection_basis="sigma_site_pair_midpoint"),
+        _row("aceBp_core60_context1kb_forward", selection_basis="template_window_center"),
         _row("aceBp_core60_context1kb_rc", selection_basis="whole_output_reverse_complement"),
         _row("J23105", collection_id="anderson_igem", selection_basis="native_source_length"),
+        _row("J23105_context1kb_forward", collection_id="anderson_igem", selection_basis="template_window_center"),
         _row("J23105_context1kb_rc", collection_id="anderson_igem", selection_basis="whole_output_reverse_complement"),
         _row("J23105_core60", collection_id="anderson_igem", selection_basis="sigma_site_pair_midpoint"),
+        _row(
+            "J23105_core60_context1kb_forward",
+            collection_id="anderson_igem",
+            selection_basis="template_window_center",
+        ),
         _row(
             "J23105_core60_context1kb_rc",
             collection_id="anderson_igem",
             selection_basis="whole_output_reverse_complement",
         ),
         _row("W1", collection_id="t7_w_collection", selection_basis="native_source_length"),
+        _row("W1_context1kb_forward", collection_id="t7_w_collection", selection_basis="template_window_center"),
         _row("W1_context1kb_rc", collection_id="t7_w_collection", selection_basis="whole_output_reverse_complement"),
         _row("W1_core60", collection_id="t7_w_collection", selection_basis="sigma_site_pair_midpoint"),
+        _row(
+            "W1_core60_context1kb_forward",
+            collection_id="t7_w_collection",
+            selection_basis="template_window_center",
+        ),
         _row(
             "W1_core60_context1kb_rc",
             collection_id="t7_w_collection",
@@ -101,22 +119,35 @@ def test_stress_reference_sets_resolve_native_core60_and_context_rows_without_mi
     assert _matched("reference_spyp_sulap_core60", rows) == [
         "spyp_core60",
         "sulAp_core60",
+        "spyp_core60_context1kb_forward",
+        "sulAp_core60_context1kb_forward",
         "spyp_core60_context1kb_rc",
         "sulAp_core60_context1kb_rc",
     ]
-    assert _matched("reference_native_mg1655", rows) == ["aceBp", "aceBp_context1kb_rc"]
+    assert _matched("reference_native_mg1655", rows) == [
+        "aceBp",
+        "aceBp_context1kb_forward",
+        "aceBp_context1kb_rc",
+    ]
     assert _matched("reference_native_mg1655_core60", rows) == [
         "aceBp_core60",
+        "aceBp_core60_context1kb_forward",
         "aceBp_core60_context1kb_rc",
     ]
-    assert _matched("reference_anderson_igem", rows) == ["J23105", "J23105_context1kb_rc"]
+    assert _matched("reference_anderson_igem", rows) == [
+        "J23105",
+        "J23105_context1kb_forward",
+        "J23105_context1kb_rc",
+    ]
     assert _matched("reference_anderson_igem_core60", rows) == [
         "J23105_core60",
+        "J23105_core60_context1kb_forward",
         "J23105_core60_context1kb_rc",
     ]
-    assert _matched("reference_w_collection", rows) == ["W1", "W1_context1kb_rc"]
+    assert _matched("reference_w_collection", rows) == ["W1", "W1_context1kb_forward", "W1_context1kb_rc"]
     assert _matched("reference_w_collection_core60", rows) == [
         "W1_core60",
+        "W1_core60_context1kb_forward",
         "W1_core60_context1kb_rc",
     ]
 
@@ -124,8 +155,14 @@ def test_stress_reference_sets_resolve_native_core60_and_context_rows_without_mi
 def test_reference_set_column_resolution_matches_row_resolution_for_selector_sets() -> None:
     rows = [
         _row("W1", collection_id="t7_w_collection", selection_basis="native_source_length"),
+        _row("W1_context1kb_forward", collection_id="t7_w_collection", selection_basis="template_window_center"),
         _row("W1_context1kb_rc", collection_id="t7_w_collection", selection_basis="whole_output_reverse_complement"),
         _row("W1_core60", collection_id="t7_w_collection", selection_basis="sigma_site_pair_midpoint"),
+        _row(
+            "W1_core60_context1kb_forward",
+            collection_id="t7_w_collection",
+            selection_basis="template_window_center",
+        ),
         _row(
             "W1_core60_context1kb_rc",
             collection_id="t7_w_collection",

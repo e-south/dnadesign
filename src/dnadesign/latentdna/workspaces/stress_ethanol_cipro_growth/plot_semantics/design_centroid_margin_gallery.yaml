@@ -7,8 +7,14 @@ guardrails:
   - Use this gallery for study-internal orientation across the full promoter population.
   - Judge candidate ranking from the design-structure and Sigma-35 summaries first.
 caption: Internal design-centroid margin gallery across the candidate inventory.
-alt_text: Scatter-panel gallery showing background-relative ethanol and ciprofloxacin centroid margins for the full promoter population in each candidate representation, with ethanol-vs-background margin on the x-axis and ciprofloxacin-vs-background margin on the y-axis.
-preprocessing_md: Margins are computed after view-level standardization and row L2 normalization, using leave-one-out centroids for rows that belong to the target or control cohorts.
+alt_text: Scatter-panel gallery showing background-relative ethanol and ciprofloxacin centroid margins for the full promoter population in each candidate representation; panels include anchor-source, context-derived, reverse-complement, and bidirectional-summary views.
+preprocessing_md: >-
+  Margins are computed after view-level standardization and row L2
+  normalization, using leave-one-out centroids for rows that belong to the target
+  or control cohorts. The plotted views are stored row summaries: `seq_mean`
+  averages all emitted token positions, `anchor_mean` averages a bounded emitted
+  anchor span, and the bidirectional panel concatenates normalized forward and
+  reverse-complement anchor-span summaries.
 math_md: |
   The two plotted margins are
   $$

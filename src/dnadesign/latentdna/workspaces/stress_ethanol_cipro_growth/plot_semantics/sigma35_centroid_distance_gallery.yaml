@@ -7,8 +7,8 @@ guardrails:
   - Use this gallery as appendix-only support for the Sigma-35 ordinal audit, not as a standalone ranking rule.
   - The ordered row and column layout reflects the declared Sigma-35 ladder; it does not prove promoter activity.
 caption: Pairwise Sigma-35 centroid-distance gallery across the main 7B intermediate candidates.
-alt_text: Heatmap gallery showing pairwise cosine distances between Sigma-35 variant centroids across the first-class 7B intermediate representation candidates.
-preprocessing_md: Variant centroids are computed after view-level standardization and row L2 normalization. The rendered matrix is restricted to the configured f/e/d/c/b axis even when source/reference rows carry additional annotated Sigma-35 sequences. Distances are cosine distances between those normalized centroids.
+alt_text: Heatmap gallery showing pairwise cosine distances between Sigma-35 variant centroids across anchor-source, context-anchor, reverse-complement, and bidirectional-summary 7B intermediate candidates.
+preprocessing_md: Variant centroids are computed after view-level standardization and row L2 normalization. The rendered matrix is restricted to the configured f/e/d/c/b DenseGen audit axis even when source/reference rows carry additional annotated Sigma-35 sequences. Distances are cosine distances between those normalized centroids in each stored candidate view.
 math_md: |
   For each variant \(g\), the centroid is
   $$

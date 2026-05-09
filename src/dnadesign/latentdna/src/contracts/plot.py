@@ -53,6 +53,7 @@ class PlotBaseConfig(StrictPlotModel):
     visibility_tier: Literal["primary", "appendix", "debug", "hidden"] = "primary"
     default_hue: str | None = None
     hue_options: list["PlotHueOptionConfig"] = Field(default_factory=list)
+    filter_options: list["PlotFilterOptionConfig"] = Field(default_factory=list)
     x_axis_label: str | None = None
     y_axis_label: str | None = None
     colorbar_label: str | None = None
@@ -74,6 +75,19 @@ class PlotHueOptionConfig(StrictPlotModel):
     column: Identifier
     label: str
     type: Literal["categorical", "binary", "continuous", "ordinal"]
+
+
+class PlotFilterValueConfig(StrictPlotModel):
+    value: str
+    label: str | None = None
+
+
+class PlotFilterOptionConfig(StrictPlotModel):
+    column: Identifier
+    label: str
+    type: Literal["categorical"] = "categorical"
+    include_all: bool = True
+    values: list[PlotFilterValueConfig] = Field(default_factory=list)
 
 
 class PlotAnnotationConfig(StrictPlotModel):
@@ -258,7 +272,7 @@ class MetricPanelGridPlotConfig(PlotBaseConfig):
     color_column: str | None = None
     direction_column: str | None = None
     unit_column: str | None = None
-    sort_rule: Literal["panel_direction", "value_desc", "value_asc", "label_asc"] = "panel_direction"
+    sort_rule: Literal["panel_direction", "value_desc", "value_asc", "label_asc", "candidate_order"] = "panel_direction"
     measure_kind: Literal["metric"] = "metric"
     value_kind: str
     value_label: str
@@ -451,6 +465,7 @@ class ResolvedPlotSpec(StrictPlotModel):
     sort_rule: str | None = None
     default_hue: str | None = None
     hue_options: list[PlotHueOptionConfig] = Field(default_factory=list)
+    filter_options: list[PlotFilterOptionConfig] = Field(default_factory=list)
     x_axis_label: str | None = None
     y_axis_label: str | None = None
     colorbar_label: str | None = None

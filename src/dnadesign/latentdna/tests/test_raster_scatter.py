@@ -7,6 +7,7 @@ from dnadesign.latentdna.src.notebooks.raster_scatter import (
     BACKGROUND_RASTER_MIN_ALPHA,
     CATEGORICAL_RASTER_MIN_ALPHA,
     FOREGROUND_RASTER_MIN_ALPHA,
+    RASTER_SCATTER_PANEL_PIXELS,
     draw_categorical_raster_scatter,
     draw_single_color_raster_scatter,
 )
@@ -14,6 +15,10 @@ from dnadesign.latentdna.src.notebooks.raster_scatter import (
 
 def _max_image_alpha(ax) -> float:
     return float(np.asarray(ax.images[0].get_array())[..., 3].max())
+
+
+def test_default_raster_resolution_prioritizes_readable_full_population_points() -> None:
+    assert RASTER_SCATTER_PANEL_PIXELS <= 800
 
 
 def test_categorical_raster_scatter_lifts_singleton_alpha_for_readability() -> None:

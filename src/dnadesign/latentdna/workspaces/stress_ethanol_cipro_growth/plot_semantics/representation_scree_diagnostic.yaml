@@ -7,8 +7,8 @@ guardrails:
   - Use this as a diagnostic companion to the health summary.
   - Visual variance decay does not say which directions matter for later modeling.
 caption: PCA scree diagnostic for the canonical candidate inventory.
-alt_text: Multi-panel scree curves showing explained and cumulative retained variance for each candidate representation.
-preprocessing_md: Uses the persisted sampled PCA reducer summaries for each candidate representation.
+alt_text: Multi-panel scree curves showing explained and cumulative retained variance for each stored candidate representation, including mean-pooled and concat-derived views.
+preprocessing_md: Uses the persisted sampled PCA reducer summaries for each candidate representation. The curves describe variance in stored row-level summaries after the view has already been mean-pooled or derived; they do not expose the original Evo2 token grid.
 math_md: |
   Each scree panel shows the retained variance ratios
   $$

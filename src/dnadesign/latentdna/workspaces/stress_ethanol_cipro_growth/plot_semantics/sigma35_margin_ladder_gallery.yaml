@@ -8,8 +8,8 @@ guardrails:
   - Do not interpret the y axis as promoter activity or assay strength.
   - The ordinal score still governs ranking; the ladder explains why the score moves.
 caption: Row-level Sigma-35 margin ladder across candidate views.
-alt_text: Violin-and-box panel gallery showing the distribution of the Sigma-35 F-versus-B centroid margin across the f/e/d/c/b Sigma-35 variants across the first-class 7B intermediate candidate views.
-preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted value is then the leave-one-out centroid margin between the `f` and `b` Sigma-35 cohorts; the rendered ladder is restricted to the declared f/e/d/c/b audit categories so reference-derived annotations do not expand the ordinal axis.
+alt_text: Violin-and-box panel gallery showing the Sigma-35 F-versus-B centroid margin across the declared f/e/d/c/b variants for anchor-source, context-anchor, reverse-complement, and bidirectional-summary 7B intermediate views.
+preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted value is then the leave-one-out centroid margin between the `f` and `b` Sigma-35 cohorts; the rendered ladder is restricted to the declared DenseGen f/e/d/c/b audit categories so reference-derived annotations do not expand the ordinal axis. Candidate panels compare stored causal mean-pooled or concat-derived row summaries, not raw sequence logos.
 math_md: |
   The plotted margin is
   $$

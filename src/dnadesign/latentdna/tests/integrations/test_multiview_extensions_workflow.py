@@ -161,6 +161,15 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         "tags": {"operation": "concatenate"},
                         "role": "primary",
                     },
+                    "bundle_block_concat": {
+                        "derive": {
+                            "kind": "block_normalized_concatenate",
+                            "inputs": ["bundle_view", "bundle_norm"],
+                        },
+                        "coordinate_space_id": "bundle_block_concat_space",
+                        "tags": {"operation": "block_normalized_concatenate"},
+                        "role": "primary",
+                    },
                 },
                 "scalars": {
                     "bundle_norm_scalar": {"derive": {"kind": "vector_norm", "view": "bundle_view", "norm": "l2"}},
@@ -263,7 +272,14 @@ def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
         for detail in validate_payload["view_details"]
     )
 
-    for view_id in ["bundle_norm", "context_by_subject", "bundle_reduced", "bundle_reduced_norm", "bundle_concat"]:
+    for view_id in [
+        "bundle_norm",
+        "context_by_subject",
+        "bundle_reduced",
+        "bundle_reduced_norm",
+        "bundle_concat",
+        "bundle_block_concat",
+    ]:
         result = _RUNNER.invoke(
             app,
             ["view", "derive", view_id, "--workspace", workspace_dir.as_posix(), "--json"],
@@ -303,6 +319,10 @@ def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
 
     concatenated_matrix = np.load(outputs / "views" / "bundle_concat" / "matrix.npy")
     assert concatenated_matrix.shape == (3, 4)
+    block_concatenated_matrix = np.load(outputs / "views" / "bundle_block_concat" / "matrix.npy")
+    assert block_concatenated_matrix.shape == (3, 8)
+    assert np.allclose(np.linalg.norm(block_concatenated_matrix[:, :4], axis=1), 1.0)
+    assert np.allclose(np.linalg.norm(block_concatenated_matrix[:, 4:], axis=1), 1.0)
     renamed_table = pq.read_table(outputs / "scalars" / "bundle_norm_renamed" / "table.parquet")
     assert "bundle_norm_value" in renamed_table.column_names
 

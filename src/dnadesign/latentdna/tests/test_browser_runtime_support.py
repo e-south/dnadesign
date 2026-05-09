@@ -24,6 +24,7 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     normalize_hue_kind,
     notebook_theme,
     resolve_join_keys,
+    resolve_reference_annotation,
     table_from_records,
 )
 from dnadesign.latentdna.src.notebooks.rendering import (
@@ -653,6 +654,44 @@ def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> N
 
     assert len(ax.collections) == 0
     assert len(ax.texts) == 0
+
+
+def test_resolve_reference_annotation_warns_when_selected_rows_are_absent_from_panel(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    reference_set = SimpleNamespace(
+        ids=[],
+        where=[SimpleNamespace(column="promoter_standard__collection_id", equals="t7_w_collection", non_null=True)],
+        where_all=[],
+        match_column="usr_label__primary",
+        label_column=None,
+        display_labels={},
+        require_non_empty=True,
+    )
+    monkeypatch.setattr(runtime_support, "_load_workspace_reference_set", lambda *_args: reference_set)
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["W1", "background"],
+                "promoter_standard__collection_id": ["t7_w_collection", None],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["background"],
+                "promoter_standard__collection_id": [None],
+            }
+        ),
+    ]
+    frames[0].attrs["view_id"] = "anchor_view"
+    frames[1].attrs["view_id"] = "context_view"
+
+    annotation = resolve_reference_annotation("reference_w_collection", frames, workspace_dir=tmp_path)
+
+    assert annotation["labels"] == ["W1"]
+    assert any("no matched overlay rows in 1 of 2 non-empty panel" in warning for warning in annotation["warnings"])
+    assert any("context_view" in warning for warning in annotation["warnings"])
 
 
 def test_key_value_table_formats_summary_values() -> None:

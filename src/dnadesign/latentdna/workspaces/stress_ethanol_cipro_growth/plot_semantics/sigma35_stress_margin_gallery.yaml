@@ -8,8 +8,8 @@ guardrails:
   - Treat the y axis as a study-internal stress-family direction derived from design annotations, not as phenotype evidence.
   - Do not rank candidates by eye from point-cloud aesthetics alone.
 caption: Sigma-35 margin versus stress-family margin across candidate views.
-alt_text: Scatter-panel gallery showing Sigma-35 F-vs-B margin versus best stress-family margin for the full promoter population across the first-class 7B intermediate candidate views.
-preprocessing_md: Rows are first standardized within view and L2-normalized. Each axis is then computed as a centroid-similarity margin on the full population in that candidate view, with leave-one-out handling when a row belongs to one of the scored cohorts.
+alt_text: Scatter-panel gallery showing Sigma-35 F-vs-B margin versus best stress-family margin for the full promoter population across anchor-source, context-anchor, reverse-complement, and bidirectional-summary 7B intermediate views.
+preprocessing_md: Rows are first standardized within view and L2-normalized. Each axis is then computed as a centroid-similarity margin on the full population in that candidate view, with leave-one-out handling when a row belongs to one of the scored cohorts. The plotted views are stored row summaries derived from causal Evo2 passes; the bidirectional panel is a forward/RC concat summary rather than a token-level bidirectional model.
 math_md: |
   The x axis is
   $$

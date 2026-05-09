@@ -353,6 +353,55 @@ def _load_workspace_reference_set(workspace_dir_text: str, reference_set_id: str
     return context.config.reference_sets.get(reference_set_id)
 
 
+def _reference_annotation_coverage_warnings(
+    frames: list[pd.DataFrame],
+    *,
+    reference_set_id: str,
+    reference_labels: list[str],
+    reference_match_column: str,
+) -> list[str]:
+    targets = {normalize_label(label) for label in reference_labels if str(label).strip()}
+    if not targets:
+        return []
+
+    panel_count = 0
+    missing_column_panels: list[str] = []
+    empty_match_panels: list[str] = []
+    for index, frame in enumerate(frames):
+        if frame.empty:
+            continue
+        panel_count += 1
+        panel_label = str(
+            frame.attrs.get("view_id")
+            or frame.attrs.get("projection_id")
+            or frame.attrs.get("scalar_id")
+            or f"panel {index + 1}"
+        )
+        if reference_match_column not in frame.columns:
+            missing_column_panels.append(panel_label)
+            continue
+        match_values = frame[reference_match_column].astype("string").str.strip().str.lower()
+        if not bool(match_values.isin(targets).any()):
+            empty_match_panels.append(panel_label)
+
+    warnings: list[str] = []
+    if missing_column_panels:
+        warnings.append(
+            f"reference set `{reference_set_id}` cannot be checked in "
+            f"{len(missing_column_panels)} panel(s) missing `{reference_match_column}`: "
+            + ", ".join(missing_column_panels[:4])
+            + (" ..." if len(missing_column_panels) > 4 else "")
+        )
+    if empty_match_panels:
+        warnings.append(
+            f"reference set `{reference_set_id}` has no matched overlay rows in "
+            f"{len(empty_match_panels)} of {panel_count} non-empty panel(s): "
+            + ", ".join(empty_match_panels[:4])
+            + (" ..." if len(empty_match_panels) > 4 else "")
+        )
+    return warnings
+
+
 def resolve_reference_annotation(
     reference_set_id: str | None,
     frames: list[pd.DataFrame],
@@ -451,6 +500,14 @@ def resolve_reference_annotation(
             warnings.append(
                 f"reference set `{selected_reference_set_id}` has {len(missing_ids)} unmatched reference rows"
             )
+    warnings.extend(
+        _reference_annotation_coverage_warnings(
+            frames,
+            reference_set_id=selected_reference_set_id,
+            reference_labels=resolution.matched_ids,
+            reference_match_column=match_column,
+        )
+    )
     return {
         "reference_set_id": selected_reference_set_id,
         "match_column": match_column,
@@ -479,6 +536,8 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
         return "20B log likelihood / token"
     if column.startswith("log_likelihood_per_token_"):
         return humanize_display_text(column)
+    if column == "promoter_standard__strength_value_numeric":
+        return "Reference strength"
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
         scope = "1 kb construct context" if "__template_1kb_" in column else "anchor-source insert"
@@ -846,6 +905,116 @@ def continuous_hue_render_params(column: str | None, values: pd.Series) -> dict[
     }
 
 
+def selected_reference_rows(
+    frame: pd.DataFrame,
+    *,
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    x_column: str = "x",
+    y_column: str = "y",
+) -> pd.DataFrame:
+    match_column = str(reference_match_column or "usr_label__primary")
+    if frame.empty or match_column not in frame.columns:
+        return pd.DataFrame()
+    if x_column not in frame.columns or y_column not in frame.columns:
+        return pd.DataFrame()
+    targets = {normalize_label(label) for label in reference_labels}
+    if not targets:
+        return pd.DataFrame()
+    match_values = frame[match_column].astype("string").str.strip().str.lower()
+    selected = frame[match_values.isin(targets)].copy()
+    if selected.empty:
+        return selected
+    finite_xy = (
+        pd.to_numeric(selected[x_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
+        & pd.to_numeric(selected[y_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
+    )
+    return selected.loc[finite_xy].copy()
+
+
+def reference_hue_render_params(
+    frames: list[pd.DataFrame],
+    *,
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    reference_hue_column: str | None = None,
+) -> dict[str, object] | None:
+    hue_column = str(reference_hue_column or "").strip()
+    if not hue_column:
+        return None
+    series_parts: list[pd.Series] = []
+    for frame in frames:
+        if hue_column not in frame.columns:
+            continue
+        selected = selected_reference_rows(
+            frame,
+            reference_labels=reference_labels,
+            reference_match_column=reference_match_column,
+        )
+        if selected.empty or hue_column not in selected.columns:
+            continue
+        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if not numeric.empty:
+            series_parts.append(numeric)
+    if not series_parts:
+        return None
+    combined = pd.concat(series_parts, ignore_index=True)
+    if combined.nunique() < 2:
+        return None
+    return continuous_hue_render_params(hue_column, combined)
+
+
+def reference_hue_coverage_warnings(
+    frames: list[pd.DataFrame],
+    *,
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    reference_hue_column: str | None = None,
+) -> list[str]:
+    hue_column = str(reference_hue_column or "").strip()
+    if not hue_column:
+        return []
+    missing_column_panels: list[str] = []
+    empty_hue_panels: list[str] = []
+    for index, frame in enumerate(frames):
+        selected = selected_reference_rows(
+            frame,
+            reference_labels=reference_labels,
+            reference_match_column=reference_match_column,
+        )
+        if selected.empty:
+            continue
+        panel_label = str(
+            frame.attrs.get("view_id")
+            or frame.attrs.get("projection_id")
+            or frame.attrs.get("scalar_id")
+            or f"panel {index + 1}"
+        )
+        if hue_column not in selected.columns:
+            missing_column_panels.append(panel_label)
+            continue
+        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        if not bool(numeric.notna().any()):
+            empty_hue_panels.append(panel_label)
+
+    warnings: list[str] = []
+    if missing_column_panels:
+        warnings.append(
+            f"reference hue `{hue_column}` is missing for selected reference rows in "
+            f"{len(missing_column_panels)} panel(s): "
+            + ", ".join(missing_column_panels[:4])
+            + (" ..." if len(missing_column_panels) > 4 else "")
+        )
+    if empty_hue_panels:
+        warnings.append(
+            f"reference hue `{hue_column}` has no finite values for selected reference rows in "
+            f"{len(empty_hue_panels)} panel(s): "
+            + ", ".join(empty_hue_panels[:4])
+            + (" ..." if len(empty_hue_panels) > 4 else "")
+        )
+    return warnings
+
+
 def scatter_style(row_count: int) -> tuple[float, float]:
     style = shared_scatter_style(row_count)
     return style.point_size, style.alpha
@@ -996,39 +1165,70 @@ def draw_reference_labels(
     y_column: str = "y",
     right_padding_px: float = 0.0,
     left_padding_px: float = 0.0,
+    reference_hue_column: str | None = None,
+    reference_hue_params: dict[str, object] | None = None,
 ) -> None:
     match_column = str(reference_match_column or "usr_label__primary")
-    if frame.empty or match_column not in frame.columns:
-        return
-    if x_column not in frame.columns or y_column not in frame.columns:
-        return
-    targets = {normalize_label(label) for label in reference_labels}
-    if not targets:
-        return
-    match_values = frame[match_column].astype("string").str.strip().str.lower()
-    selected = frame[match_values.isin(targets)].copy()
-    if selected.empty:
-        return
-    selected = selected[
-        pd.to_numeric(selected[x_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
-        & pd.to_numeric(selected[y_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
-    ].copy()
+    selected = selected_reference_rows(
+        frame,
+        reference_labels=reference_labels,
+        reference_match_column=match_column,
+        x_column=x_column,
+        y_column=y_column,
+    )
     if selected.empty:
         return
     placed_boxes: list[tuple[float, float, float, float]] = []
     axes_box = ax.get_window_extent()
     display_x_mid = float((axes_box.x0 + axes_box.x1) / 2.0)
     display_y_mid = float((axes_box.y0 + axes_box.y1) / 2.0)
-    ax.scatter(
-        selected[x_column].to_numpy(dtype=float),
-        selected[y_column].to_numpy(dtype=float),
-        c="#111111",
-        s=125,
-        marker="*",
-        linewidths=0.8,
-        edgecolors="white",
-        zorder=5,
+    hue_column = str(reference_hue_column or "").strip()
+    can_color_by_reference_hue = (
+        bool(hue_column)
+        and reference_hue_params is not None
+        and hue_column in selected.columns
+        and reference_hue_params.get("cmap") is not None
     )
+    if can_color_by_reference_hue:
+        hue_values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        finite_hue = hue_values.notna()
+        if (~finite_hue).any():
+            ax.scatter(
+                selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
+                selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
+                c="#111111",
+                s=125,
+                marker="*",
+                linewidths=0.8,
+                edgecolors="white",
+                zorder=5,
+            )
+        if finite_hue.any():
+            ax.scatter(
+                selected.loc[finite_hue, x_column].to_numpy(dtype=float),
+                selected.loc[finite_hue, y_column].to_numpy(dtype=float),
+                c=hue_values.loc[finite_hue].to_numpy(dtype=float),
+                cmap=str(reference_hue_params["cmap"]),
+                norm=reference_hue_params.get("norm"),
+                vmin=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmin"),
+                vmax=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmax"),
+                s=132,
+                marker="*",
+                linewidths=0.85,
+                edgecolors="white",
+                zorder=5,
+            )
+    else:
+        ax.scatter(
+            selected[x_column].to_numpy(dtype=float),
+            selected[y_column].to_numpy(dtype=float),
+            c="#111111",
+            s=125,
+            marker="*",
+            linewidths=0.8,
+            edgecolors="white",
+            zorder=5,
+        )
     label_rows = selected.sort_values(match_column)
     if reference_label_limit is not None and reference_label_limit >= 0:
         label_rows = label_rows.head(reference_label_limit)

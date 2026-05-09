@@ -2,14 +2,14 @@ plot_id: representation_health_summary
 question: Which candidate Evo2 spaces are healthy enough to survive pre-assay triage?
 decision_role: gate
 encoding: Candidate-by-metric bar panels for effective rank, PC1 variance fraction, median pairwise cosine distance, and pairwise cosine-distance spread, read directly from the metric values rather than a pass/fail hue.
-scope: First-class intermediate-embedding and output-layer mean candidate reducer summaries plus sampled candidate rows used for representation-health diagnostics; reference rows remain controls inside preserved samples, not separate effective-rank cohorts.
+scope: First-class intermediate-embedding and output-layer mean candidate reducer summaries plus sampled candidate rows used for representation-health diagnostics; reference rows remain controls inside preserved samples, not separate effective-rank cohorts. The view inventory includes causal token-position means and equal-block forward/RC concat summaries.
 guardrails:
   - Higher retained effective rank means variance is spread across more retained PCA components.
   - Reference rows are controls for sampling and overlays, not independent representation-health candidates.
   - Candidate choice still depends on design structure and context robustness.
 caption: Representation-health gate across the canonical candidate inventory.
-alt_text: Bar-panel summary comparing effective rank, PC1 variance fraction, and cosine-distance spread for each candidate representation without pass/fail color coding.
-preprocessing_md: Pairwise cosine metrics use view-level standardization followed by row L2 normalization with the study builder's collapse-tolerant policy; zero-variance columns are set to 0.0 after scaling, zero-norm rows remain 0.0, and PCA-derived metrics use the persisted sampled reducer summaries for the candidate tables.
+alt_text: Bar-panel summary comparing effective rank, PC1 variance fraction, and cosine-distance spread for intermediate and output-layer candidate summaries, including anchor-source, context-anchor, reverse-complement, and bidirectional concat views.
+preprocessing_md: Pairwise cosine metrics use view-level standardization followed by row L2 normalization with the study builder's collapse-tolerant policy; zero-variance columns are set to 0.0 after scaling, zero-norm rows remain 0.0, and PCA-derived metrics use the persisted sampled reducer summaries for the candidate tables. Health is computed on stored row vectors after Infer pooling or LatentDNA concat derivation; it does not inspect token-level activations directly.
 math_md: |
   Effective rank is computed over the positive retained PCA components in the persisted reducer summary:
   $$
@@ -22,6 +22,10 @@ math_md: |
   \frac{\lambda_1}{\sum_j \lambda_j}.
   $$
   The other two panels report the median pairwise cosine distance and its interquartile range after the shared standardize-then-normalize contract. They use all row pairs up to the configured pairwise row cap and a deterministic row sample above that cap.
-rationale_md: Filters out collapsed or near-degenerate spaces before the study compares design structure or ordered Sigma-35 signal.
+rationale_md: >-
+  Filters out collapsed or near-degenerate spaces before the study compares
+  design structure or ordered Sigma-35 signal. Rank and spread are eligibility
+  checks: they say whether a view is usable enough to interpret, not whether it
+  is the best biological representation.
 limitations_md: Reducer summaries are sample-based and low-dimensional; the current candidate reducers fit roughly 2k sampled rows and retain 16 PCA components, so the effective rank is a retained-component diagnostic rather than the full 4096-dimensional spectrum.
 failure_modes_md: A space can pass health checks while still encoding nuisance structure such as spacer length or context dilution.

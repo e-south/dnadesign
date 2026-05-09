@@ -7,8 +7,8 @@ guardrails:
   - Read this panel as an ordered metadata-axis check, not as an activity estimate.
   - Do not mix categorical ordinal labels and numeric strength metadata in one pooled score; use one selected group at a time.
 caption: Sigma-35 ordinal audit across candidate representations.
-alt_text: Bar-panel summary showing Sigma-35 ordinal correlation statistics and permutation support for each candidate representation.
-preprocessing_md: Sigma-35 centroid distances are computed after view-level standardization and row L2 normalization on the sampled candidate rows; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
+alt_text: Bar-panel summary showing Sigma-35 ordinal correlation statistics and permutation support for each candidate representation, with the declared DenseGen f/e/d/c/b ladder kept separate from reference-standard strength scales.
+preprocessing_md: Sigma-35 centroid distances are computed after view-level standardization and row L2 normalization on the sampled candidate rows; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0. The candidate rows are already stored summaries from causal Evo2 token states or normalized forward/RC concat blocks, so the ordinal audit evaluates row-level latent geometry rather than tokenwise motifs.
 math_md: |
   The audit compares expected rank gaps
   $$
@@ -19,6 +19,6 @@ math_md: |
   d_{\mathrm{emb}}(g, h) = 1 - \cos(c_g, c_h).
   $$
   It reports global Spearman and Kendall correlations, a balanced Spearman, within-family and within-regulator mean Spearman summaries, and a shuffled-label permutation null for the global Spearman.
-rationale_md: Provides a focused pre-assay check for ordered metadata signal inside a selected subgroup while keeping the visual question stable across possible ordinal groups.
+rationale_md: Provides a focused pre-assay check for ordered metadata signal inside a selected subgroup while keeping the visual question stable across possible ordinal groups. For the current study, the subgroup is the engineered Sigma-35 ladder; Anderson and W strength metadata require collection-specific audits rather than a pooled ordinal scale.
 limitations_md: The current rendered group is the Sigma-35 design ladder. Reference-standard ordinal groups with numeric strength metadata need the same metric family but should be selected explicitly so Anderson, W Collection, and DenseGen priors are not pooled.
 failure_modes_md: Uncertain rank order, mixed strength scales, family-specific confounding, or weak sample coverage for particular variants can make ordinal structure appear stronger or weaker than it is.

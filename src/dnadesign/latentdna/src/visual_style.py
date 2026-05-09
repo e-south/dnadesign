@@ -105,7 +105,6 @@ _LOWERED_LEGEND_PLOT_IDS = frozenset(
         "reference_alignment_summary",
         "representation_scree_diagnostic",
         "appendix_geometry_review",
-        "appendix_umap_gallery",
     }
 )
 
@@ -315,14 +314,14 @@ def categorical_color_map(categories: Iterable[str], *, column: str | None = Non
 
 def scatter_style(row_count: int) -> ScatterStyle:
     if row_count <= 250:
-        return ScatterStyle(point_size=30.0, alpha=0.84, edgecolors="white", linewidths=0.32, rasterized=False)
+        return ScatterStyle(point_size=38.0, alpha=0.92, edgecolors="white", linewidths=0.32, rasterized=False)
     if row_count <= 1_000:
-        return ScatterStyle(point_size=16.0, alpha=0.66, edgecolors="white", linewidths=0.16, rasterized=False)
+        return ScatterStyle(point_size=24.0, alpha=0.82, edgecolors="white", linewidths=0.16, rasterized=False)
     if row_count <= 5_000:
-        return ScatterStyle(point_size=6.6, alpha=0.34, edgecolors="none", linewidths=0.0, rasterized=True)
+        return ScatterStyle(point_size=16.0, alpha=0.76, edgecolors="none", linewidths=0.0, rasterized=True)
     if row_count <= 20_000:
-        return ScatterStyle(point_size=3.4, alpha=0.22, edgecolors="none", linewidths=0.0, rasterized=True)
-    return ScatterStyle(point_size=1.7, alpha=0.15, edgecolors="none", linewidths=0.0, rasterized=True)
+        return ScatterStyle(point_size=12.0, alpha=0.68, edgecolors="none", linewidths=0.0, rasterized=True)
+    return ScatterStyle(point_size=9.0, alpha=0.64, edgecolors="none", linewidths=0.0, rasterized=True)
 
 
 def humanize_display_text(value: object) -> str:

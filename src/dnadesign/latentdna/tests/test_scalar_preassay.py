@@ -10,6 +10,9 @@ def test_preassay_builder_registry_tracks_active_summary_kinds() -> None:
         "design_structure_summary",
         "ordinal_axis_audit",
         "axis_centroid_distance",
+        "candidate_x_selection_scorecard",
+        "collection_strength_ordinal_audit",
         "context_robustness_summary",
         "reference_alignment_summary",
+        "reference_to_centroid_similarity",
     }

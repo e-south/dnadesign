@@ -277,6 +277,17 @@ class ConcatenateViewSpec(StrictWorkspaceModel):
     inputs: list[str] = Field(min_length=2)
 
 
+class BlockNormalizedConcatenateViewSpec(StrictWorkspaceModel):
+    kind: Literal["block_normalized_concatenate"]
+    inputs: list[str] = Field(min_length=2)
+    center: bool = True
+    scale: bool = True
+    block_norm: Literal["l2"] = "l2"
+    nonfinite_policy: Literal["error", "coerce"] = "error"
+    zero_variance_policy: Literal["error", "drop_or_zero"] = "drop_or_zero"
+    zero_row_policy: Literal["error", "zero"] = "zero"
+
+
 class AggregateByKeyViewSpec(StrictWorkspaceModel):
     kind: Literal["aggregate_by_key"]
     view: str
@@ -297,7 +308,12 @@ class NormalizeViewSpec(StrictWorkspaceModel):
 
 
 ViewDeriveSpec = Annotated[
-    VectorDifferenceSpec | ConcatenateViewSpec | AggregateByKeyViewSpec | ApplyReducerViewSpec | NormalizeViewSpec,
+    VectorDifferenceSpec
+    | ConcatenateViewSpec
+    | BlockNormalizedConcatenateViewSpec
+    | AggregateByKeyViewSpec
+    | ApplyReducerViewSpec
+    | NormalizeViewSpec,
     Field(discriminator="kind"),
 ]
 

@@ -1708,6 +1708,7 @@ def build_scalar_artifact(
                     "label": str(raw_dimension.get("label") or humanize_label(dimension)).strip(),
                     "column": column,
                     "category_order": _category_order(raw_dimension.get("category_order", [])),
+                    "include_unlisted_categories": bool(raw_dimension.get("include_unlisted_categories", True)),
                     "category_labels": {
                         str(key): str(value)
                         for key, value in dict(raw_dimension.get("category_labels", {}) or {}).items()
@@ -1807,11 +1808,25 @@ def build_scalar_artifact(
             counts = canonical_counts[dimension]
             category_order = spec["category_order"]
             assert isinstance(category_order, list)
-            ordered_categories = _ordered_dataset_overview_categories(counts, category_order)
+            include_unlisted_categories = bool(spec.get("include_unlisted_categories", True))
+            if include_unlisted_categories:
+                ordered_categories = _ordered_dataset_overview_categories(counts, category_order)
+            else:
+                if not category_order:
+                    raise ContractViolationError(
+                        f"dataset_overview dimension {dimension!r} disables unlisted categories "
+                        "but declares no category_order"
+                    )
+                ordered_categories = list(category_order)
             dimension_total = sum(int(counts.get(category, 0)) for category, _ in ordered_categories)
-            if dimension_total != denominator:
+            if include_unlisted_categories and dimension_total != denominator:
                 raise ContractViolationError(
                     f"dataset_overview dimension {dimension!r} sums to {dimension_total}, expected {denominator}"
+                )
+            if not include_unlisted_categories and dimension_total > denominator:
+                raise ContractViolationError(
+                    f"dataset_overview dimension {dimension!r} sums to {dimension_total}, "
+                    f"expected at most {denominator}"
                 )
             for category, order in ordered_categories:
                 count = int(counts.get(category, 0))

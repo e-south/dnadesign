@@ -4,6 +4,7 @@ import math
 from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
+from matplotlib.collections import PathCollection
 
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
@@ -224,6 +225,62 @@ def test_figure_legend_refuses_single_row_when_many_categories() -> None:
         plt.close(fig)
 
 
+def test_appendix_umap_legend_uses_compact_bottom_band_for_strength_ladder() -> None:
+    fig, _ = plt.subplots(figsize=(24.9, 12.0))
+    categories = ["f", "e", "d", "c", "b"]
+    color_map = {category: "#0072B2" for category in categories}
+    try:
+        bottom_margin = _add_figure_legends(
+            fig,
+            plt,
+            plot_id="appendix_umap_gallery",
+            color_categories=categories,
+            color_map=color_map,
+            color_title="sig35_variant",
+            shape_categories=[],
+            shape_map={},
+            shape_title=None,
+            single_row=True,
+        )
+
+        assert 0.08 <= bottom_margin <= 0.095
+        assert fig.legends
+        anchor = fig.legends[0].get_bbox_to_anchor().transformed(fig.transFigure.inverted())
+        assert 0.03 <= anchor.y0 <= 0.045
+    finally:
+        plt.close(fig)
+
+
+def test_margin_gallery_legend_uses_tight_reserved_bottom_band() -> None:
+    fig, _ = plt.subplots(figsize=(21.2, 4.3))
+    categories = ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin", "control"]
+    color_map = {category: "#0072B2" for category in categories}
+    try:
+        bottom_margin = _add_figure_legends(
+            fig,
+            plt,
+            plot_id="design_centroid_margin_gallery",
+            color_categories=categories,
+            color_map=color_map,
+            color_title="design_family",
+            shape_categories=[],
+            shape_map={},
+            shape_title=None,
+            single_row=True,
+        )
+
+        assert 0.105 <= bottom_margin <= 0.125
+        assert fig.legends
+        anchor = fig.legends[0].get_bbox_to_anchor().transformed(fig.transFigure.inverted())
+        assert 0.04 <= anchor.y0 <= 0.06
+    finally:
+        plt.close(fig)
+
+
+def test_twelve_panel_full_population_gallery_uses_intermediate_output_rows() -> None:
+    assert _panel_grid_dimensions(12) == (2, 6)
+
+
 def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotations() -> None:
     rows = [
         {
@@ -289,6 +346,44 @@ def test_render_metric_panel_ignores_nan_values_when_setting_limits_and_annotati
         finite_text_positions = [text.get_position()[0] for text in ax.texts if text.get_text() != "NA"]
         assert finite_text_positions
         assert max(finite_text_positions) <= upper
+    finally:
+        plt.close(fig)
+
+
+def test_render_metric_panel_keeps_bootstrap_replicates_off_bar_plot() -> None:
+    rows = [
+        {
+            "category": "sig35_ordinal_spearman",
+            "display_name": "Sigma-35 Spearman",
+            "label": "candidate_a",
+            "candidate_label": "candidate_a",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "anchor_60bp",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "rho",
+            "metric_value": 0.42,
+            "ci_lower": 0.31,
+            "ci_upper": 0.52,
+            "bootstrap_replicates": [0.35, 0.40, 0.48],
+        }
+    ]
+    spec = _metric_spec(plot_id="sigma35_ordinal_audit", color_column="candidate_family")
+    color_map, _ = _category_color_map([rows], spec.color_column)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    try:
+        _render_metric_panel(
+            ax,
+            rows=rows,
+            spec=spec,
+            panel_title="Sigma-35 Spearman",
+            color_map=color_map,
+            square=True,
+        )
+
+        assert not any(isinstance(collection, PathCollection) for collection in ax.collections)
+        assert "white dots" not in " ".join(text.get_text() for text in ax.texts)
+        assert "Whiskers: 95% bootstrap CI" in " ".join(text.get_text() for text in ax.texts)
     finally:
         plt.close(fig)
 
@@ -599,7 +694,7 @@ def test_render_heatmap_panel_compacts_sigma35_tick_labels_for_dense_grids() -> 
         )
 
         assert image is not None
-        assert [label.get_text() for label in ax.get_xticklabels()] == ["f", "b"]
+        assert [label.get_text() for label in ax.get_xticklabels()] == ["F", "B"]
         assert [label.get_text() for label in ax.get_yticklabels()] == ["f\nTTGACA", "b\nCTGACA"]
         assert all(label.get_rotation() == 0.0 for label in ax.get_xticklabels())
         assert all(label.get_fontsize() <= 9.5 for label in ax.get_xticklabels())
@@ -701,6 +796,10 @@ def test_single_row_candidate_grid_layout_is_opt_in_for_four_panel_galleries() -
 def test_panel_grid_dimensions_cap_seven_and_eight_panel_galleries_at_two_rows() -> None:
     assert _panel_grid_dimensions(7) == (2, 4)
     assert _panel_grid_dimensions(8) == (2, 4)
+
+
+def test_single_row_candidate_layout_can_show_six_configured_panels() -> None:
+    assert _panel_grid_dimensions(6, prefer_single_row=True) == (1, 6)
 
 
 def test_render_metric_panel_wraps_representation_health_axis_label_to_at_most_two_lines() -> None:
