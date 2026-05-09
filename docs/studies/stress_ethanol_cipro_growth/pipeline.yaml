@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-05-07
+  last_verified: 2026-05-08
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
   densegen:
@@ -39,14 +39,15 @@ study_pipeline:
       - evo2_7b
       - evo2_20b
     infer_priority:
-      working_candidate_family: evo2_7b_full_context_anchor_mean_intermediate
+      working_candidate_family: evo2_7b_context_anchor_mean_bidir_concat_intermediate
       conservative_baseline: evo2_7b_anchor_60bp_intermediate
-      challenger: none_currently_active
+      strength_standard_lens: evo2_7b_full_context_anchor_mean_intermediate
+      challenger: promoted_working_candidate
       full_context_seq_mean_status: collect_for_diagnostic_not_primary_x
       output_layer_mean_status: collect_for_diagnostic_not_primary_x
       log_likelihood_status: collect_as_scalar_qc_not_primary_x
       evo2_20b_status: secondary_debug_required
-      concat_status: retired_from_current_infer_and_latentdna_plan
+      concat_status: controlled_equal_block_bidir_anchor_mean_current_candidate
     configs:
       sequence_views_anchor_construct_insert_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
       sequence_views_context_forward_seq_and_anchor_mean_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
@@ -214,22 +215,28 @@ study_pipeline:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
     latest_materialization:
-      checked: 2026-05-07
-      workspace_snapshot_state: attention
-      deep_validation: pending_after_scc_infer_sync
-      ok_decision_deliverables: []
-      pending_decision_deliverables:
+      checked: 2026-05-08
+      workspace_snapshot_state: ok
+      deep_validation: passed
+      ok_decision_deliverables:
         - dataset_overview
         - design_structure_summary
         - sigma35_ordinal_audit
         - context_robustness_summary
         - candidate_decision_frontier
-      browser_default_geometry_count: 10
-      note: The workspace sees the expanded 7B sidecar-backed geometry inventory, but deliverables must be regenerated from the current canonical sidecars before LatentDNA status is ok.
+        - candidate_x_selection_scorecard
+      pending_decision_deliverables: []
+      browser_default_geometry_count: 6
+      candidate_x_selection:
+        working_candidate: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+        conservative_baseline: intermediate_embedding_7b_anchor_60bp
+        strength_standard_lens: intermediate_embedding_7b_full_context_anchor_mean
+        note: Bidirectional context-anchor mean is the working pre-assay X because it best balances health, Sigma-35 ordering, DenseGen plan separation, and reference-to-plan margins. It is not phenotype-validated.
+      note: The workspace and notebook are regenerated from the current canonical 7B sidecars; candidate-X scorecard, reference-to-plan heatmap, and reference-standard strength audit are current decision deliverables.
       reference_strength_probe:
-        status: exploratory_generated
-        root: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_strength_probe
-        summary: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_strength_probe/spearman_summary.csv
+        status: superseded_by_reference_standard_strength_audit
+        root: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_standard_strength_audit
+        summary: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/scalars/reference_standard_strength_audit_metrics/table.parquet
         note: Spearman checks are within promoter-standard collection because Anderson and T7 W strengths use different reported scales; PCA signs are arbitrary.
   cluster:
     doc: src/dnadesign/cluster/docs/workflows/exploratory-clustering.md

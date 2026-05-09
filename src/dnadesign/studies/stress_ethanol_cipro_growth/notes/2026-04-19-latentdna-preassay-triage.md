@@ -14,7 +14,8 @@ Keep here:
 ## Boundary
 
 The checked-in study record still places the live study in
-`infer_batch_preparation`.
+`latentdna_reference_normalization_audit`. This note is historical synthesis
+that has been refreshed to match the current 7B sequence-view inventory.
 
 The pre-assay question is:
 
@@ -28,34 +29,66 @@ mechanism.
 
 ## Current View Inventory
 
-The published workspace snapshot now surfaces a seven-geometry 7B-first inventory:
+The published workspace snapshot now surfaces a 7B-first inventory with both
+intermediate-embedding and output-layer diagnostic rows in the browser. The
+candidate-X decision set is intentionally smaller than the full notebook
+inventory:
 
 - `intermediate_embedding_7b_anchor_60bp`
-- `pooled_logits_7b_anchor_60bp`
-- `intermediate_embedding_7b_full_context_1kb`
-- `pooled_logits_7b_full_context_1kb`
 - `intermediate_embedding_7b_full_context_anchor_mean`
-- `intermediate_embedding_7b_anchor_plus_full_context_concat`
-- `intermediate_embedding_7b_anchor_plus_anchor_mean_concat`
+- `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
 
 Important scope notes:
 
-- `pooled_logits` is the study-facing label for Infer's persisted
-  `output_layer_mean` family, which is implemented as mean-pooled per-token
-  logits.
+- `output_layer_mean` is Infer's persisted mean-pooled per-token logit family.
+  It is useful for health and QC comparisons, but it is diagnostic rather than
+  the preferred `X`.
 - `anchor_60bp` is a study label, not a literal invariant for every row. The
-  carried controls are 35 bp, 165 bp, 200 bp, and 220 bp.
+  merged anchor source includes variable-length native/reference/control rows.
+  The strict 60 bp contract belongs to the reference core60 lanes and the
+  dominant DenseGen/core60 rows.
 - The primary comparison story is still the 7B intermediate family. The current
-  working candidate is `intermediate_embedding_7b_full_context_anchor_mean`,
-  with `intermediate_embedding_7b_anchor_60bp` retained as the conservative
-  baseline.
-- The 7B pooled-logit views remain diagnostic surfaces and log-likelihood hue
-  sources. They are visible in the browser but are not the preferred
-  study-facing `X`.
-- The two concat views remain explicit challengers rather than retired
-  framework-only capabilities.
+  working candidate is
+  `intermediate_embedding_7b_context_anchor_mean_bidir_concat`, with
+  `intermediate_embedding_7b_anchor_60bp` retained as the conservative
+  DenseGen-plan baseline and
+  `intermediate_embedding_7b_full_context_anchor_mean` retained as the
+  strength-standard interpretation lens.
+- The bidirectional candidate is a controlled equal-block concat of forward and
+  reverse-complement 1 kb context `anchor_mean` summaries. It is an externally
+  constructed two-orientation representation, not a native bidirectional Evo2
+  hidden state.
 - 20B views remain hidden from the notebook and do not participate in the
   current deliverable ladder.
+
+## Mean-Pooling Semantics
+
+Infer stores pooled feature vectors before LatentDNA reads them. For Evo2, the
+token state at sequence position `t` is causal in the emitted orientation:
+
+$$
+h_t^{(\ell)} = f_\theta^{(\ell)}(x_{\le t}).
+$$
+
+For a selected span `I = [a, b)`, `anchor_mean` or `core60_mean` stores a mean
+over token positions:
+
+$$
+z_I^{(\ell)} = |I|^{-1}\sum_{t \in I} h_t^{(\ell)}.
+$$
+
+This is not a mean over embedding dimensions. It is also not a true
+bidirectional hidden state: early positions in the span do not see later bases
+in the forward pass. The reverse-complement pass supplies the complementary
+causal direction as a separate feature block.
+
+The working two-orientation candidate can therefore be described as:
+
+> an equal-block concatenation of forward and reverse-complement
+> prefix-conditioned anchor-span means from matched 1 kb context passes.
+
+That phrasing is deliberately narrower than "a bidirectional Evo2 model" and
+more precise than "full-context mean pooling."
 
 ## Shared Geometry Contract
 

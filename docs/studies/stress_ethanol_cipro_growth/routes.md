@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-05-07
+**Last verified:** 2026-05-08
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
@@ -70,7 +70,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `attention`; the workspace sees the expanded 7B sidecar-backed browser geometry inventory, but the decision deliverables are pending regeneration from current sidecars
+- Current state: `ok`; the workspace snapshot, candidate-X scorecard, reference-to-plan heatmap, reference-standard strength audit, and browser notebook are regenerated from current 7B sidecars
 - Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
@@ -87,40 +87,48 @@ This page keeps the downstream handoff map in one place.
   3. `sigma35_ordinal_audit`
   4. `context_robustness_summary`
   5. `candidate_decision_frontier`
+  6. `candidate_x_selection_scorecard`
 - Companion visuals:
   - `balanced_design_family_margin_gallery`
   - `sigma35_margin_ladder_gallery`
   - `sigma35_stress_margin_gallery`
   - `context_pair_summary`
+  - `reference_to_plan_centroid_heatmap`
+  - `reference_standard_strength_audit`
 - Appendix deliverables:
   - `sigma35_centroid_distance_gallery`
   - `appendix_geometry_review`
   - `appendix_umap_gallery`
-- Snapshot attention surfaces: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
-- Snapshot ok primary surfaces: none
-- Snapshot ok appendix surfaces: none
+- Snapshot attention surfaces: none for LatentDNA decision deliverables
+- Snapshot ok primary surfaces: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
+- Snapshot ok appendix surfaces: `appendix_geometry_review`, `appendix_umap_gallery`
+- Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
+- Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
+- Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
-- Browser default geometry layout: candidate grid over the available 7B
-  sequence-view sidecar geometries, with the current decision layout centered
-  on intermediate embeddings: anchor construct-insert `seq_mean`, forward
-  full-context `seq_mean`, forward full-context `anchor_mean`,
-  reverse-complement full-context `seq_mean`, reverse-complement full-context
-  `anchor_mean`, reference core60 `core60_mean`, reference-context-forward
-  `seq_mean`, reference-context-forward `anchor_mean`,
-  reference-context-reverse-complement `seq_mean`, and
-  reference-context-reverse-complement `anchor_mean`. Concat is retired from
-  the current study plan. Output-layer mean vectors and log-likelihoods are
-  collected diagnostics, not current decision geometry.
+- Browser default geometry layout: candidate grid over the six available 7B
+  intermediate sequence-view sidecar geometries with persisted UMAPs: anchor
+  construct-insert `seq_mean`, forward full-context `seq_mean`, forward
+  full-context `anchor_mean`, controlled equal-block bidirectional forward/RC
+  `anchor_mean`, reverse-complement full-context `seq_mean`, and
+  reverse-complement full-context `anchor_mean`. Reference core60 and
+  reference-context views remain hidden audit geometries until promoted to a
+  study-facing projection layout. Output-layer mean views are mean-pooled
+  per-token output-logits diagnostics using the same pooling scopes, and
+  log-likelihoods are scalar diagnostics; neither family is current decision
+  geometry.
 - Browser hue controls are workspace-configured, not promoter hardcoded. The current browser promotes study metadata carried on materialized view rows, including `source_family`, `selection_basis`, `promoter_standard__collection_id`, and continuous `promoter_standard__strength_value_numeric` when those columns are present.
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors
+  - describe `seq_mean`, `anchor_mean`, and `core60_mean` as token-position
+    means over causal Evo2 states in the emitted orientation, not as native bidirectional encodings
   - do not let reference-neighbor behavior replace synthetic internal-structure gates
+  - do not treat Anderson and W numeric strengths as one pooled biological scale
   - do not treat the notebook browser as the authoritative study-status surface
 - Route note: use this route for downstream comparison outputs after checking
-  the study record. This is a 7B-first sidecar-backed browser posture until
-  the remaining LatentDNA deliverables are regenerated and promoted; the
+  the study record. This is a 7B-first sidecar-backed browser posture; the
   available 7B sequence-view sidecar geometries are the current review basis,
   and the preferred infer family is now `evo2_7b`.
 

@@ -212,6 +212,10 @@ whole-output reverse-complement products from one realized forward construct.
 - `anchor_mean` is an Infer pooling instruction over those coordinates. Construct still emits the
   full context sequence, and Infer should pass that full sequence through the model before pooling
   the anchor span.
+- Construct only defines the emitted sequence and span coordinates. For causal
+  Evo2 models, an Infer `anchor_mean` vector averages prefix-conditioned token
+  states in that emitted orientation; two-sided context requires a separate
+  reverse-complement pass or another explicit downstream representation.
 - semantic variants may share one base sequence id; construct writes distinct sequence-view rows
   instead of forcing duplicate base records
 - with `output.on_conflict=ignore`, already-present base rows are skipped, but planned sequence-view

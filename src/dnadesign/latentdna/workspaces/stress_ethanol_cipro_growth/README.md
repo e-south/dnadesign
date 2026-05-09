@@ -7,17 +7,22 @@ This workspace holds the LatentDNA comparison surfaces for the active stress / e
 - Snapshot artifact: `outputs/status/workspace_snapshot.json`
 - Gate: `representation_health_summary`
 - Active feature source contract: canonical Infer feature sidecars joined to USR sequence-view and view-semantics sidecars
-- Available active geometry: 7B construct-insert `seq_mean` and 7B forward 1 kb context `anchor_mean`
-- Available diagnostic reference geometry: 7B reference core60 `analysis_window`
-  plus 7B reference forward/reverse-complement context `seq_mean` and
-  `anchor_mean`
-- Planned main geometry: forward 1 kb context `seq_mean` and
-  reverse-complement 1 kb context `seq_mean` and `anchor_mean` after the main
-  merged handoff Infer batches complete
+- Available active geometry: completed 7B construct-insert `seq_mean`, forward
+  1 kb context `seq_mean`/`anchor_mean`, reverse-complement 1 kb context
+  `seq_mean`/`anchor_mean`, and the controlled equal-block forward/RC
+  `anchor_mean` concat
+- Available diagnostic reference geometry: completed 7B reference core60
+  `analysis_window` plus 7B reference forward/reverse-complement context
+  `seq_mean` and `anchor_mean`
+- Mean-pooling semantics: Infer averages token-position vectors. For Evo2,
+  those token states are causal and prefix-conditioned in the emitted
+  orientation, so `anchor_mean` is an anchor-span mean over a full-sequence
+  causal pass. The bidirectional candidate is an equal-block forward/RC
+  two-orientation summary, not a native bidirectional hidden state.
 - Reference metadata sources: `usr_promoter_references`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Sigma-35 inventory: source-backed from DenseGen plan tokens, DenseGen fixed-element details, USR `seq_annot` `-35` features, or Construct retained-feature bounds; missing embedding rows mean missing Infer vectors, not filtered Sigma-35 categories
-- Primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
-- Companion visuals: `sigma35_stress_margin_gallery`, `context_pair_summary`
+- Primary review path: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
+- Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`, `reference_to_plan_centroid_heatmap`, `reference_standard_strength_audit`
 - Appendix support: `sigma35_centroid_distance_gallery`
 - Appendix surfaces: `design_centroid_margin_gallery`, `reference_alignment_summary`, `representation_scree_diagnostic`, `appendix_umap_gallery`
 - Current regenerated plots: primary, companion, and appendix surfaces,
@@ -27,7 +32,8 @@ This workspace holds the LatentDNA comparison surfaces for the active stress / e
   reference core60/context sidecars.
 - UMAP role: appendix orientation only
 - Browser geometry default: candidate grid with mixed-length anchor-source
-  insert means and 1 kb context anchor-mean panels
+  insert means, full-context sequence means, forward/RC anchor-mean panels, and
+  the controlled bidirectional anchor-mean concat
 
 Common commands:
 

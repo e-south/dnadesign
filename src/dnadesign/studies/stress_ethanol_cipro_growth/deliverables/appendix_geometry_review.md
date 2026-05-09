@@ -6,9 +6,11 @@ These appendix surfaces provide orientation and diagnostics. Candidate ranking s
 
 #### Plot details
 
-**Data.** Each point is one promoter row in a candidate representation
-space. The gallery uses study-internal design cohorts rather than external
-reference promoters.
+**Data.** Each point is one promoter row in a stored candidate representation
+space. Depending on the panel, that row vector may be an anchor-source
+`seq_mean`, a 1 kb context `seq_mean`, a 1 kb context `anchor_mean`, or the
+equal-block forward/RC `anchor_mean` concat. The gallery uses study-internal
+design cohorts rather than external reference promoters.
 
 **Preprocessing.** Margins use view-level standardization followed by row L2 normalization and leakage-safe leave-one-out cohort centroids.
 
@@ -32,9 +34,11 @@ $$
 
 #### Plot details
 
-**Data.** Anchor and forward 1 kb anchor-mean candidate samples that include
-native references, derived core60 rows, SFXI controls, Anderson iGEM standards,
-and the T7/W collection when those labels are present in the materialized rows.
+**Data.** Candidate samples that include native references, derived core60
+rows, SFXI controls, Anderson iGEM standards, and the T7/W collection when
+those labels are present in the materialized rows. Native-length rows, core60
+rows, and context-derived rows are separate sequence-scope contracts; the panel
+does not pretend they are one homogeneous reference manifold.
 
 **Preprocessing.** Uses the same view-level standardization and row
 normalization contract as the other cosine-based plots. Collection summaries

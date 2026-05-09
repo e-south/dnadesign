@@ -170,6 +170,16 @@ def test_stress_ethanol_cipro_workspace_readme_uses_repo_root_placeholder_for_ru
 
     assert "--repo-root <repo-root>" in readme
     assert "/project/dunlop/esouth/dnadesign" not in readme
+    assert "prefix-conditioned in that orientation" in readme
+    assert "not an Infer target" in readme
+
+
+def test_infer_feature_schema_documents_causal_pooling_semantics() -> None:
+    feature_schema = _read("src/dnadesign/infer/docs/reference/feature-schema.md")
+
+    assert "token-position" in feature_schema
+    assert "prefix-conditioned on the emitted sequence" in feature_schema
+    assert "not a native bidirectional Evo2 hidden state" in feature_schema
 
 
 def test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths() -> None:

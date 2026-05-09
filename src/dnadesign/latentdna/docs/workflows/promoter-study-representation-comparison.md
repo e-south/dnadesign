@@ -5,7 +5,7 @@
 **Surface role:** downstream-analysis
 **Owner-boundary:** latentdna
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-05
+**Last verified:** 2026-05-08
 **Registry-id:** latentdna.promoter-study.representation-comparison
 **Entry artifact:** usr_prom_eth_cip_anchor, construct_prom_eth_cip_context, usr_promoter_references, construct_prom_eth_cip_reference_core60, and construct_prom_eth_cip_reference_contexts
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
@@ -34,17 +34,85 @@ styles from `controls.json` or the workspace config; they do not contain
 Sigma-35 column-name branches.
 
 The active contract is still pre-assay representation triage: choose a plausible
-mean-pooled Evo2 feature space \(X\) for later supervised modeling. Available
-sidecar-backed geometry is narrower than the future target set: the current
-usable features are 7B construct-insert `seq_mean` anchors and 7B forward
-realized-context `anchor_mean` features. Forward context `seq_mean`,
-reverse-complement context features, reference `analysis_window` features,
-output-layer mean vectors, and log-likelihood scalar diagnostics are not
-treated as current decision geometry until their canonical vector or scalar
-sidecars are present and explicitly promoted. The five first-class output-layer
-mean views are included in representation-health diagnostics so effective-rank
-and cosine-distance spread can be compared beside the intermediate embeddings,
-but they do not enter projection grids without projection artifacts.
+mean-pooled Evo2 feature space \(X\) for later supervised modeling. The current
+7B sidecar-backed decision geometry is intentionally small: anchor-source
+`seq_mean`, forward 1 kb context `anchor_mean`, and one controlled equal-block
+bidirectional forward/RC context `anchor_mean` concat. Forward and
+reverse-complement full-context `seq_mean` views remain diagnostics unless they
+beat the predeclared candidate-X checks. Reference core60 and reference-context
+views are hidden audit geometries for reference-normalization questions.
+Output-layer mean views store mean-pooled per-token output-logits summaries,
+and log-likelihood scalar diagnostics are collected for QC. Neither family is
+current decision geometry.
+
+### Mean-Pooling Semantics
+
+Infer writes pooled Evo2 vectors before LatentDNA reads them. For a sequence
+`x_1, ..., x_T`, the per-token layer output at position `t` is treated as a
+causal, prefix-conditioned state:
+
+$$
+h_t^{(\ell)} = f_\theta^{(\ell)}(x_{\le t}).
+$$
+
+For a selected span `I = [a, b)`, the stored span vector is
+
+$$
+z_I^{(\ell)} = |I|^{-1}\sum_{t \in I} h_t^{(\ell)}.
+$$
+
+This is a prefix-conditioned causal mean-pooled span embedding. The mean is
+over sequence positions, not over embedding dimensions. Later positions in the
+span have seen earlier positions in that same emitted sequence, but earlier
+positions have not seen downstream bases. Therefore a forward 1 kb
+`anchor_mean` should be described as "the anchor-span mean pooled from a full
+forward 1 kb causal pass," not as a native bidirectional Evo2 hidden state.
+
+The reverse-complement context views are separate full-sequence Evo2 passes over
+reverse-complement emitted sequences with Construct-provided emitted-orientation
+anchor bounds. The controlled bidirectional candidate is a LatentDNA-derived
+external summary:
+
+$$
+X_{\mathrm{bidir}} = [\mathrm{L2}(Z_{\mathrm{fwd}}); \mathrm{L2}(Z_{\mathrm{rc}})]
+$$
+
+after per-block centering/scaling and row L2 normalization. It is useful because
+it combines forward and reverse-complement causal summaries with equal block
+weight. In study prose, "bidirectional 1 kb view" is acceptable shorthand only
+when expanded as "forward plus reverse-complement causal 1 kb anchor-span
+summaries." It is not a native bidirectional Evo2 hidden state.
+
+### View-Language Glossary
+
+Use these descriptions in study prose, plot accordions, and figure alt text:
+
+- **Anchor-source `seq_mean`:** Evo2 is run on the emitted source insert and
+  Infer averages the token-position vectors across that insert. This is the
+  conservative DenseGen-plan baseline. The merged source is mostly 60 bp, but
+  native references and controls can have other lengths.
+- **Full-context `seq_mean`:** Evo2 is run on the full emitted 1 kb construct
+  context and Infer averages all 1 kb token positions. This summarizes the
+  whole construct window and can dilute anchor-local promoter grammar.
+- **Full-context `anchor_mean`:** Evo2 is run on the full emitted 1 kb context,
+  but Infer averages only the Construct-provided anchor span. This asks what
+  the promoter insert looks like inside vector context under causal
+  left-to-right token states.
+- **Reverse-complement context views:** Construct emits a matched
+  reverse-complement 1 kb sequence with reverse-complement-orientation anchor
+  bounds. Infer runs Evo2 on that emitted sequence as a separate causal pass.
+- **Forward/RC `anchor_mean` concat:** LatentDNA block-normalizes the forward
+  and reverse-complement `anchor_mean` matrices and concatenates them. This is
+  an external two-orientation row summary, not a native bidirectional Evo2
+  model.
+- **Output-layer mean:** Infer applies the same pooling scopes to per-token
+  logits. These views are diagnostic QC surfaces, not the current preferred
+  candidate `X`.
+
+Avoid saying that a pooled view "sees the whole interval" unless the sentence
+also states the causal caveat. A span mean averages token states that have
+different prefix lengths; later positions have seen earlier bases, but earlier
+positions have not seen later bases.
 
 ### Gate
 
@@ -57,6 +125,7 @@ but they do not enter projection grids without projection artifacts.
 3. `sigma35_ordinal_audit`
 4. `context_robustness_summary`
 5. `candidate_decision_frontier`
+6. `candidate_x_selection_scorecard`
 
 ### Companion visuals
 
@@ -64,6 +133,8 @@ but they do not enter projection grids without projection artifacts.
 - `sigma35_margin_ladder_gallery`
 - `sigma35_stress_margin_gallery`
 - `context_pair_summary`
+- `reference_to_plan_centroid_heatmap`
+- `reference_standard_strength_audit`
 
 ### Appendix surfaces
 
@@ -136,18 +207,26 @@ Use the notes for:
 ### Surfaced Notebook Inventory
 
 - `intermediate_embedding_7b_anchor_60bp`
+- `intermediate_embedding_7b_full_context_1kb`
 - `intermediate_embedding_7b_full_context_anchor_mean`
+- `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
+- `intermediate_embedding_7b_reverse_complement_context_1kb`
+- `intermediate_embedding_7b_reverse_complement_context_anchor_mean`
 
-Planned sidecar-backed surfaces are declared for forward full-context sequence
-mean, reverse-complement full-context sequence mean, reverse-complement context
-anchor mean, reference core60 `analysis_window`, and reference forward and
-reverse-complement contexts. The reference sources select zero feature aliases
-until Infer writes the canonical sidecars for
-`infer_prom_eth_cip_reference_views_7b`. Stress-study output-layer mean vectors
-are diagnostic representation-health candidates, not current decision geometry.
-Log-likelihood total or mean-per-token values remain planned diagnostics until
-their scalar sidecars are materialized and promoted by config. 20B and concat
-surfaces are not active in this workspace contract.
+The candidate-X selection set is narrower than the full surfaced notebook
+inventory:
+
+- `intermediate_embedding_7b_anchor_60bp` is the conservative DenseGen-plan
+  baseline.
+- `intermediate_embedding_7b_full_context_anchor_mean` is the strength-standard
+  interpretation lens.
+- `intermediate_embedding_7b_context_anchor_mean_bidir_concat` is the current
+  working pre-assay `X`.
+
+The controlled concat surface uses equal-block forward/RC anchor-mean
+normalization. Raw concat remains out of scope. Stress-study output-layer mean
+vectors and log-likelihood total or mean-per-token values are diagnostic QC
+surfaces. 20B surfaces are not active in this workspace contract.
 
 ### RegulonDB note
 
@@ -165,7 +244,8 @@ panels unless a real output-layer projection artifact is fit and validated.
 
 - `anchor_mean` plots use full emitted 1 kb context sequences and pool over
   Construct-provided emitted-orientation anchor bounds. They do not truncate the
-  sequence before Infer or plotting.
+  sequence before Infer or plotting, and they do not give every token in the
+  span downstream access under Evo2's causal token-state semantics.
 - Reverse-complement context plots require materialized reverse-complement
   context feature aliases. LatentDNA must not reverse-complement sequences or
   synthesize missing products.

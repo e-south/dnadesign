@@ -1,7 +1,9 @@
 # UMAP Gallery
 
 The gallery shows persisted UMAP layouts for candidate and reference-oriented
-spaces. Candidate ranking stays on the primary review path.
+spaces. Candidate ranking stays on the primary review path. UMAP panels are
+useful for spotting obvious overlay or density failures, but they are not the
+evidence for choosing `X`.
 
 ### reference_core60_strength_umap | Reference strength UMAP
 
@@ -50,14 +52,22 @@ sequence features drive each component.
 
 #### Plot details
 
-**Data.** Each panel shows the persisted UMAP projection for one candidate
-representation space. The manifest records whether the expanded reference set
-is matched in each panel.
+**Data.** Each panel shows the persisted UMAP projection for one stored
+representation view. Panels may show intermediate embeddings or output-layer
+diagnostics; they may also differ by pooling scope (`seq_mean` versus
+`anchor_mean`) and emitted orientation (forward versus reverse-complement). The
+manifest records whether the expanded reference set is matched in each panel.
 
-**Preprocessing.** Uses the stored projection artifacts and their recorded fitting metadata. These UMAP layouts come from the stored view matrices rather than the standardized cosine-geometry contract used in the primary ladder.
+**Preprocessing.** Uses the stored projection artifacts and their recorded
+fitting metadata. These UMAP layouts come from the stored view matrices rather
+than the standardized cosine-geometry contract used in the primary ladder. A
+hue change recolors the existing coordinates; it does not refit the projection
+or change the underlying view.
 
 **Definition.** The plotted coordinates are the persisted UMAP embeddings for each candidate space. Hue changes only recolor the same coordinates.
 
 **Decision use.** The layout can surface density artifacts or obvious grouping failures worth checking after the primary summaries.
 
-**Limits.** Apparent visual separation on UMAP is not evidence that a representation is better for pre-assay triage or future supervised modeling.
+**Limits.** Apparent visual separation on UMAP is not evidence that a
+representation is better for pre-assay triage or future supervised modeling.
+Use UMAP as orientation and debugging support only.

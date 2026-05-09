@@ -185,7 +185,12 @@ Notes:
 - keep sequence-window choice outside infer by pointing different jobs at the anchor-only or construct-expanded dataset plane
 - keep `intermediate_block: 26` as the project default unless repo-local benchmarks justify another block
 - the stored schema prefers `output_layer_mean`; `output_embedding` is only a continuity alias in config/docs
-- persisted `output_layer_mean__*` and `intermediate_embedding__*` columns are mean-pooled summaries; the pooling mode is encoded in the suffix such as `seq_mean` or `anchor_mean`
+- persisted `output_layer_mean__*` and `intermediate_embedding__*` columns are
+  token-position mean-pooled summaries; the pooling mode is encoded in the
+  suffix such as `seq_mean` or `anchor_mean`. For causal models such as Evo2,
+  each token state is prefix-conditioned in the emitted orientation, so
+  `anchor_mean` should not be described as a native bidirectional interval
+  embedding.
 - copy the config and change `model.id` when you need a second model lane such as `evo2_20b`
 
 ### 5) Validate, register, and dry-run the infer matrix

@@ -339,7 +339,9 @@ Use these checks to verify Evo2 usage contracts in infer:
 - `params.layer: mid` resolves to the default pooled embedding layer.
 - `params.layer: final` resolves to the last Evo2 embedding block exposed by the loaded torch module.
 - set `params.layer` to an explicit adapter-specific name only when you need a particular block.
-- mean pooling follows `e = (1/n) * Σ_j E_j` over token positions.
+- mean pooling follows `e = (1/n) * Σ_j E_j` over token positions. For causal
+  Evo2 outputs, each `E_j` is prefix-conditioned on the emitted sequence up to
+  position `j`; pooling does not give earlier tokens downstream context.
 
 ```bash
 uv run python - <<'PY' # Run API-level extraction and generation sanity checks.

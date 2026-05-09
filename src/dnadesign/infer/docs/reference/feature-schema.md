@@ -82,9 +82,19 @@ Sequence-view rules:
 - `construct_insert` views map to `context_kind=anchor_only`; they are the
   merged construct-ready anchor handoff rows, not derived core60 rows
 - `seq_mean`, `anchor_mean`, and `core60_mean` are row-level pooling operations
+  over token-position vectors, not over embedding dimensions.
+- Evo2 outputs are causal. A token vector at position `t` is
+  prefix-conditioned on the emitted sequence through `x_{<=t}` in that
+  orientation. Mean-pooling a span therefore averages progressively
+  prefix-conditioned token states; it does not make each token state
+  bidirectional or downstream-aware.
 - `anchor_mean` does not shorten the model input. Infer sends the full emitted sequence to the
   provider, then mean-pools token features over the explicit emitted-orientation
   `pooling_start_0:pooling_end_0` span.
+- Reverse-complement `anchor_mean` is a separate full-sequence Evo2 pass over
+  the reverse-complement emitted sequence. Concatenating forward and
+  reverse-complement anchor-mean vectors is an external two-orientation
+  summary, not a native bidirectional Evo2 hidden state.
 - reverse-complement context rows must already contain reverse-complement sequences and
   reverse-complement-orientation pooling bounds; Infer must not apply a second `L-b, L-a`
   transform.

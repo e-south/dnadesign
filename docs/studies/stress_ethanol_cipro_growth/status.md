@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-05-07
+- Last verified: 2026-05-09
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -8,7 +8,7 @@
 - LatentDNA binding: `latentdna_binding.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Snapshot posture: current after local pull from BU SCC `cluster`
-- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete, so the next execution-readiness question is LatentDNA/DenseGen refresh, not GPU Infer submission.
+- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete, so the next execution-readiness question is downstream LatentDNA review or optional DenseGen plot refresh, not GPU Infer submission.
 
 ### Current Datasets
 
@@ -36,8 +36,13 @@
 - Secondary/debug-required family: `evo2_20b`
 - LatentDNA browser default family: `evo2_7b`
 - Current next surface: `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
+- Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
+- Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
+- Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
 
-The study is still pre-assay representation triage. It has not promoted a phenotype-validated final `X`.
+The study is still pre-assay representation triage. LatentDNA has promoted a
+working pre-assay candidate `X` for downstream planning, but it has not promoted
+a phenotype-validated final `X`.
 
 ### Current Infer Coverage
 
@@ -66,17 +71,18 @@ Completed 7B sidecar lanes:
 ### Current Downstream Posture
 
 - DenseGen analysis surface: `attention`; the source dataset is ready, but the operator-visible plot inventory contains stale artifacts and should be refreshed before relying on DenseGen plots as current.
-- LatentDNA: `attention`; the workspace sees the expanded 7B sidecar-backed geometry inventory, but decision deliverables are pending after the Infer refresh.
+- LatentDNA: `ok`; the workspace snapshot, decision deliverables, candidate-X scorecard, reference-to-plan heatmap, reference-standard strength audit, and `latent_geometry_browser` notebook are regenerated from the current 7B sidecar-backed geometry inventory.
 - Cluster: `planned`; use `routes.md` for the current exploratory-clustering handoff.
 - OPAL: `not_configured`; no active OPAL campaign has been chosen.
 
-Current attention surfaces:
+Current LatentDNA decision surfaces:
 
 - `dataset_overview`
 - `design_structure_summary`
 - `sigma35_ordinal_audit`
 - `context_robustness_summary`
 - `candidate_decision_frontier`
+- `candidate_x_selection_scorecard`
 
 LatentDNA gate:
 
@@ -89,6 +95,7 @@ LatentDNA primary review path:
 - `sigma35_ordinal_audit`
 - `context_robustness_summary`
 - `candidate_decision_frontier`
+- `candidate_x_selection_scorecard`
 
 LatentDNA companion visuals:
 
@@ -96,6 +103,8 @@ LatentDNA companion visuals:
 - `sigma35_margin_ladder_gallery`
 - `sigma35_stress_margin_gallery`
 - `context_pair_summary`
+- `reference_to_plan_centroid_heatmap`
+- `reference_standard_strength_audit`
 
 LatentDNA appendix support:
 
@@ -103,11 +112,23 @@ LatentDNA appendix support:
 - `appendix_geometry_review`
 - `appendix_umap_gallery`
 
-The current browser is limited to the available 7B sequence-view feature sidecars. Appendix deliverables remain secondary until the primary decision surfaces are regenerated and current.
+The current browser is limited to the available 7B sequence-view feature
+sidecars. The default browser geometries include the controlled equal-block
+bidirectional forward/RC anchor-mean candidate. Appendix deliverables remain
+secondary review material, not the evidence source for selecting `X`.
+
+Pooling semantics guardrail: Infer mean-pools over token positions. Because
+Evo2 token states are causal in the emitted orientation, `anchor_mean` is a
+prefix-conditioned anchor-span mean from a full-sequence pass. The
+forward/reverse-complement concat is therefore best described as an
+equal-block, two-orientation 1 kb context-anchor summary. It is analogous to
+the standard forward-plus-reverse workaround for causal sequence models, but it
+is not a native bidirectional Evo2 state or hidden state.
 
 ### Next Actions
 
-- Regenerate the stress LatentDNA decision deliverables from the current canonical Infer sidecars.
-- Re-run `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`.
-- Re-run `uv run ops progress show usr.data-plane.promoter-study-status --json` and confirm LatentDNA leaves `attention` only after deliverables report `ok`.
+- Use the candidate-X scorecard as the current pre-assay representation triage surface: bidirectional context-anchor mean is the working `X`, anchor-source insert mean is the DenseGen-plan baseline, and forward context anchor mean is the strength-standard lens.
+- Keep reference-to-plan behavior as a landmark sanity check, not a phenotype claim.
+- Re-run `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json` after future LatentDNA config or deliverable changes.
+- Re-run `uv run ops progress show usr.data-plane.promoter-study-status --json` and confirm LatentDNA remains `ok`.
 - Refresh DenseGen plots/notebook if operator-visible DenseGen EDA is needed for current study interpretation.

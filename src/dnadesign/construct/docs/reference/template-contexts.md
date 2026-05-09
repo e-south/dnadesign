@@ -32,8 +32,15 @@ These values are emitted relative to the realized sequence that construct writes
 `infer` uses those fields to:
 
 - distinguish anchor-only vs template-backed contexts
-- compute `anchor_mean` pooling inside larger contexts
+- compute `anchor_mean` pooling over the anchor token positions inside larger
+  emitted contexts
 - stamp feature records with stable construct provenance
+
+For causal Evo2 feature extraction, Construct only owns the emitted sequence and
+the emitted-orientation span coordinates. Infer still passes the full emitted
+context through the model before pooling the anchor span, and a separate
+reverse-complement context row is required when downstream analyses need the
+complementary causal direction.
 
 Templated infer jobs fail fast when the required `construct__*` fields are missing.
 

@@ -49,7 +49,10 @@ Operational unit:
 - every 7B sequence-view lane collects intermediate embeddings, mean-pooled
   output-layer logits, and log-likelihoods. Context lanes select both full
   sequence `seq_mean` and bounded `anchor_mean` pooling in the same job so one
-  Evo2 forward pass can serve both vector spans. Concat is not an Infer target.
+  Evo2 forward pass can serve both vector spans. The mean is over token
+  positions in the emitted sequence. Because Evo2 is causal, each pooled token
+  state is prefix-conditioned in that orientation; the forward/RC concat used
+  downstream is an external LatentDNA view, not an Infer target.
 
 Portable preflight:
 
@@ -105,7 +108,9 @@ sidecars. USR row-overlay payload columns are not a coverage source.
 `core60_mean`, `seq_mean`, and `anchor_mean` are distinct feature identities.
 Exact repeated input sequences still share one Evo2 forward pass through the
 `forward_pass_key`; they do not share feature-vector keys unless the full
-feature identity is identical.
+feature identity is identical. Pooling identity includes the emitted
+orientation and explicit span, so reverse-complement context rows remain
+separate causal passes rather than coordinate transforms applied after pooling.
 The lane-specific sequence-view runbooks also render this completion planner as
 a pre-submit gate with `--max-missing-products 0 --max-stale-vectors 0
 --max-stale-scalars 0`. Missing feature vectors and log-likelihood scalars are
