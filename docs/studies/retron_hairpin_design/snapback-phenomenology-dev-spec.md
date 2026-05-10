@@ -2,7 +2,7 @@
 
 **Status:** implemented BspQI-pinned retained-active screen
 **Audience:** Cruncher maintainers and Snapback study operators
-**Study:** `snapback_shortening_effort`
+**Study:** `retron_hairpin_design`
 **Primary lane:** released-product Snapback
 **Contrast lane:** YIU remains contrast-only, not a topology engine
 

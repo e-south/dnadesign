@@ -1,15 +1,17 @@
 version: 1
-study_id: snapback_shortening_effort
+study_id: retron_hairpin_design
 
 intent:
-  primary_goal: Hold one shortening effort in a checked-in record while released-product Snapback stays the execution lane and YIU stays a contrast-only boundary surface.
-  primary_lane: released-product snapback
-  operator_question: Can the released-product lane own the compact post-release object without collapsing back into preserved-site exact-nickase hunting?
+  primary_goal: "Hold one retron hairpin design effort in a checked-in record while released-product Snapback owns cap/shortening geometry, scar-nick owns base-junction scar geometry, and YIU stays a contrast-only boundary surface."
+  primary_lane: "released-product snapback plus scar-nick base-junction context"
+  operator_question: "Which checked-in route owns the current hairpin subproblem: released-product cap/shortening, scar-nick base-junction scar feasibility, or contrast-only YIU boundary language?"
   non_goals:
     - Do not treat YIU as a topology-aware bulge or scaffold designer.
     - Do not fold retron processivity heuristics directly into the Cruncher search contracts.
     - Do not collapse preserved-site Snapback and released-product Snapback into one flagged lane.
+    - Do not collapse scar-nick base-junction feasibility into Snapback cap/shortening scoring.
   context_refs:
+    - repo:docs/studies/retron_hairpin_design/scar-nick-base-junction.md
     - repo:src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md
     - repo:src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md
     - repo:src/dnadesign/cruncher/docs/guides/yiu_workflow.md
@@ -47,7 +49,7 @@ command_groups:
 
 native_agent_bootstrap:
   open_first:
-    - repo:.agents/skills/snapback-hairpin-study/SKILL.md
+    - repo:.agents/skills/retron-hairpin-study/SKILL.md
     - manifest:status.md
     - manifest:routes.md
   pair_with:
@@ -55,6 +57,8 @@ native_agent_bootstrap:
     - code-change-discipline (pragmatic-programming-principles lane)
   must_preserve:
     - released-product Snapback is the active shortening architecture
+    - scar-nick owns base-junction retained-scar feasibility and top-or-bottom terminal nick context
+    - strict scar-nick policy is exact terminal nick, zero protected downstream bases, downstream N only, and S0=M
     - default released-product policy excludes FREQUENT_CUTTER nickases unless explicitly opted in for comparison
     - YIU remains mismatch-centric and contrast-only for this effort
     - retron notes are framing context rather than hidden scoring rules

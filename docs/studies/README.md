@@ -40,14 +40,14 @@ Use these surfaces in order:
 
 - Active promoter-study snapshot:
   `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Checked-in Cruncher shortening-study snapshot:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
-- Checked-in Cruncher shortening-study preflight:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
-- Checked-in Cruncher shortening-study route handoff:
-  `docs/studies/snapback_shortening_effort/routes.md`
-- Repo-local shortening-study skill:
-  `.agents/skills/snapback-hairpin-study/SKILL.md`
+- Checked-in Cruncher retron hairpin study snapshot:
+  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
+- Checked-in Cruncher retron hairpin study preflight:
+  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
+- Checked-in Cruncher retron hairpin study route handoff:
+  `docs/studies/retron_hairpin_design/routes.md`
+- Repo-local retron hairpin study skill:
+  `.agents/skills/retron-hairpin-study/SKILL.md`
 
 ### Fresh-thread bootstrap
 
@@ -67,11 +67,11 @@ visible:
 5. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
    is answered and the next owner surface is the real need.
 
-For the checked-in Cruncher shortening example, pin the study explicitly:
+For the checked-in Cruncher retron hairpin example, pin the study explicitly:
 
-- `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
-- `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
-- Open `docs/studies/snapback_shortening_effort/routes.md` for the canonical
+- `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
+- `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
+- Open `docs/studies/retron_hairpin_design/routes.md` for the canonical
   post-probe handoff after the state or blocker answer is settled.
 
 Authority chain: `docs/studies/index.yaml` selects the active study,
@@ -245,7 +245,7 @@ for the first pull rather than relying on local name guessing.
 - To pin a non-active study or run from outside the repo checkout, add:
   `--repo-root <repo-root> --study-dir docs/studies/<study-id>`
 - The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.
-- The repo-local shortening-study skill lives at `.agents/skills/snapback-hairpin-study/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the pinned `cruncher-study-status` and `cruncher-study-preflight` commands above directly.
+- The repo-local retron hairpin study skill lives at `.agents/skills/retron-hairpin-study/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the pinned `cruncher-study-status` and `cruncher-study-preflight` commands above directly.
 - Read `docs/studies/index.yaml` first.
 - If the request names a checked-in study that is not `active_study_id`, pin it
   with `--study-dir docs/studies/<study-id>` instead of treating the registry

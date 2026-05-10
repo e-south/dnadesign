@@ -1,7 +1,7 @@
-## Snapback Shortening Effort Routes
+## Retron Hairpin Design Effort Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-25
+**Last verified:** 2026-05-09
 
 Use this page after the tracked study status answers `where are we?`.
 Use preflight when you need blocker or command-readiness answers.
@@ -10,11 +10,11 @@ This page keeps the study-owned handoff map in one place.
 ### Quick route
 
 - Snapshot:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/snapback_shortening_effort --json`
+  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/snapback_shortening_effort --scope next --json`
+  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
 - Repo-local study shortcut:
-  `.agents/skills/snapback-hairpin-study/SKILL.md`
+  `.agents/skills/retron-hairpin-study/SKILL.md`
 - Pair with:
   `harness-engineering` for study-surface hardening and
   `code-change-discipline` in the `pragmatic-programming-principles` lane for
@@ -22,7 +22,7 @@ This page keeps the study-owned handoff map in one place.
 
 ### Cold-start contract
 
-- If the request is explicitly about `snapback_shortening_effort`, pin the
+- If the request is explicitly about `retron_hairpin_design`, pin the
   study with the two `cruncher-study-*` commands above even when
   `docs/studies/index.yaml` names another repo-wide active study.
 - After study status or preflight answers the state or blocker question, stay
@@ -36,6 +36,10 @@ This page keeps the study-owned handoff map in one place.
 
 - `released-product Snapback` means the BspQI-pinned dual-enzyme precursor lane where final geometry is evaluated on retained active top and bottom products and rebased so the nick boundary is origin `0` in final-geometry space.
 - `preserved-site Snapback` means the older one-enzyme lane and stays a separate contract.
+- `scar-nick` means the base-junction route for Type IIS retained scars plus
+  terminal nick processing through the `scar_nick` subpackage. It is about
+  which four-base basal scars can survive the nick-disposal process, not about
+  direct phenotype prediction.
 - `YIU` means mismatch-centric payload rendering over a fixed 4 nt internal window; it is not the shortening topology engine here.
 - `retron context` means biological framing from the checked-in audit notes, not scoring hooks or implicit solver relaxations.
 
@@ -62,6 +66,9 @@ This page keeps the study-owned handoff map in one place.
    contrast rendering, not when the task is shortening design.
 6. Use the MSD-HOPV5 visual route only for an explicit prior-design
    comparison. It is a visual-only sibling workspace, not a `de033` solve hit.
+7. Use the scar-nick base-junction route below when the task is profile-diverse
+   `S0=M` scar feasibility, top/bottom nick flexibility, strict terminal nick
+   policy, or `scar_nick` schema evolution.
 
 ### Primary route: released-product Snapback
 
@@ -119,6 +126,42 @@ beside current solve outputs without mixing generated artifacts.
   foldback decomposition before rendering. It does not run catalog search and
   does not overwrite `de033`.
 
+### Context route: scar-nick base-junction
+
+Use this route when the task is base-junction scar feasibility, B26/B43 profile
+calibration, profile-diverse `S0=M` scar analogs, top-versus-bottom nick
+flexibility, or schema work for the nick-disposal model.
+
+- Type: `context`
+- Plane: `data-plane`
+- Surface role: `base-junction-context`
+- Owner-boundary: `cruncher`
+- Current state: `context-ready`
+- Workspace: `src/dnadesign/cruncher/workspaces/scar_nick_teto`
+- Primary note:
+  `docs/studies/retron_hairpin_design/scar-nick-base-junction.md`
+- Tool-owned detail:
+  `src/dnadesign/cruncher/src/scar_nick/`
+- Route note:
+  the strict study policy is exact terminal nick, top or bottom strand allowed,
+  zero protected bases downstream of the nick, downstream degenerate `N` only,
+  and `S0=M` for ligation. The current context records that exact provided L/R
+  sequences cover `0/9`, unique provided profile classes cover `6/7`, and
+  provided constructs by profile analog cover `8/9`. BbsI-HF gives `10/256`
+  retained scars, PaqCI gives `14/256`, and BsaI-HFv2 gives `0/256`.
+  The study target is `scar_nick`-feasible profile coverage across `S3/S2/S1`
+  with `S0=M`, no middle-middle hard `S2/S1` double mismatch, and single-hard,
+  `X+W`, W-only, W+W, or S3-edge double-hard challenge profiles such as `MXMM`,
+  `WXMM`, `XWMM`, `MWXM`, `MXWM`, `XMWM`, `WMMM`, `MWMM`, `MMWM`, `WWMM`,
+  `WMWM`, `MWWM`, `XXMM`, and `XMXM`;
+  exact B26 sequence preservation is calibration context, not the selection
+  objective. Current `scar_nick` outputs treat `nicked_strand`,
+  `surviving_strand`, retained scar source, and profile-bucket coverage as
+  first-class schema/ranking fields for the checked-in BbsI-HF route. Use
+  `export/table__scar_nick_candidate_pair_calls.csv` as the flat left/right
+  pair-call handoff table, and rerun the route before making PaqCI-specific
+  capacity claims.
+
 ### Contrast route: YIU boundary check
 
 Use this route only when you need a contrast surface for boundary language or a
@@ -144,16 +187,18 @@ reminder of what YIU does and does not model.
 ### Context surfaces
 
 - Study note:
-  `docs/studies/snapback_shortening_effort/status.md`
+  `docs/studies/retron_hairpin_design/status.md`
 - Study command ladder:
-  `docs/studies/snapback_shortening_effort/pipeline.yaml` for machine-readable
+  `docs/studies/retron_hairpin_design/pipeline.yaml` for machine-readable
   command groups and native-agent bootstrap support
 - Study lifecycle and preflight contract:
-  `docs/studies/snapback_shortening_effort/ops.study.yaml`
+  `docs/studies/retron_hairpin_design/ops.study.yaml`
+- Scar-nick base-junction note:
+  `docs/studies/retron_hairpin_design/scar-nick-base-junction.md`
 - Consolidated retron/P4 and YIU executive summary:
   `src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md`
 - Snapback phenomenology dev spec:
-  `docs/studies/snapback_shortening_effort/snapback-phenomenology-dev-spec.md`
+  `docs/studies/retron_hairpin_design/snapback-phenomenology-dev-spec.md`
 - Route note:
   `routes.md` is the canonical human handoff; the other notes are study
   context or machine-readable support, not replacement route maps.
