@@ -15,7 +15,7 @@ base-junction scar-nick work.
   base-junction context for B26/B43 profile logic, strict terminal nick policy,
   retained scar families, and scar-nick schema implications
 - `docs/studies/retron_hairpin_design/pipeline.yaml`: the exact command
-  groups and native-agent bootstrap support when machine-readable detail is the
+  groups and automation bootstrap support when machine-readable detail is the
   real need
 - `docs/studies/retron_hairpin_design/ops.study.yaml`: lifecycle order,
   artifacts, execution surfaces, and preflight grouping

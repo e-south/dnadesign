@@ -28,7 +28,7 @@ This page keeps the study-owned handoff map in one place.
 - After study status or preflight answers the state or blocker question, stay
   on this page for the ordered post-probe handoff.
 - Open `pipeline.yaml` only when the task needs machine-readable command-group
-  or native-agent bootstrap metadata.
+  or automation bootstrap metadata.
 - Open `ops.study.yaml` only when the task needs lifecycle or preflight
   declarations.
 
@@ -151,7 +151,7 @@ flexibility, or schema work for the nick-disposal model.
   retained scars, PaqCI gives `14/256`, and BsaI-HFv2 gives `0/256`.
   The study target is `scar_nick`-feasible profile coverage across `S3/S2/S1`
   with `S0=M`, no middle-middle hard `S2/S1` double mismatch, and single-hard,
-  `X+W`, W-only, W+W, or S3-edge double-hard challenge profiles such as `MXMM`,
+  `X+W`, W-only, W+W, or S3-edge double-hard profiles such as `MXMM`,
   `WXMM`, `XWMM`, `MWXM`, `MXWM`, `XMWM`, `WMMM`, `MWMM`, `MMWM`, `WWMM`,
   `WMWM`, `MWWM`, `XXMM`, and `XMXM`;
   exact B26 sequence preservation is calibration context, not the selection
@@ -190,7 +190,7 @@ reminder of what YIU does and does not model.
   `docs/studies/retron_hairpin_design/status.md`
 - Study command ladder:
   `docs/studies/retron_hairpin_design/pipeline.yaml` for machine-readable
-  command groups and native-agent bootstrap support
+  command groups and automation bootstrap support
 - Study lifecycle and preflight contract:
   `docs/studies/retron_hairpin_design/ops.study.yaml`
 - Scar-nick base-junction note:

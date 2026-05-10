@@ -31,7 +31,7 @@ B26 = CGGG / ACAG = M X M X   works
 B43 = CAAG / CTCG = M X M M   fails
 ```
 
-For scar-compatible rescue designs, `S0` must be `M`. The exact B26 `MXMX`
+For scar-compatible candidate designs, `S0` must be `M`. The exact B26 `MXMX`
 profile remains useful as a cap/base control, but it is not scar-compatible
 under that ligation constraint.
 
@@ -47,16 +47,16 @@ B43/172 tells us that a more clamped scar-compatible architecture can fail.
 ```
 
 They do not make exact B26 left/right sequence retention the design objective.
-Under the strict post-nick policy, the useful question is:
+Under the exact terminal-nick policy, the useful question is:
 
 ```text
 Within the `scar_nick`-feasible retained scar space, how do we cover the most
 informative S3/S2/S1 architectures while keeping S0 matched and ligatable?
 ```
 
-### Strict Scar-Nick Policy
+### Scar-Nick Processing Policy
 
-Current best-case processing policy:
+Current processing policy:
 
 ```text
 exact terminal nick
@@ -140,9 +140,10 @@ current practical route is to select profile analogs by set coverage across
    position would otherwise become a hard mismatch.
 4. Keep the active scar panel to at most two non-Watson-Crick positions total.
 5. Allow up to two hard `X` positions only when one is the S3 edge-like
-   disruption; `XXMM` and `XMXM` are active challenge buckets.
+   disruption; `XXMM` and `XMXM` are active S3-edge double-hard buckets.
 6. Keep `MXXM` out of the active panel because it puts hard `X` calls at both
-   middle positions `S2/S1`. It can remain a reserve endpoint, not a default hit.
+   middle positions `S2/S1`. It can remain a reserve comparator, not a default
+   hit.
 7. When a hard mismatch is unavoidable, prefer lower T4 mismatch class tier
    before GC or reference-distance tie-breaks. `G:T/T:G` should be classified as
    `W`, not `X`; remaining hard mismatches should avoid tier-3 choices when a
@@ -160,7 +161,7 @@ buckets:
 | Target profile `S3 S2 S1 S0` | Role |
 | --- | --- |
 | `MXMM` | failure-like scar comparator |
-| `WXMM` | S3 wobble rescue |
+| `WXMM` | S3 wobble candidate |
 | `XWMM` | S3 hard plus S2 wobble architecture |
 | `MWXM` | S2 wobble plus S1 hard architecture |
 | `MXWM` | S2 hard plus S1 wobble architecture |
@@ -171,8 +172,8 @@ buckets:
 | `WWMM` | S3/S2 double-wobble comparator |
 | `WMWM` | S3/S1 double-wobble comparator |
 | `MWWM` | S2/S1 double-wobble comparator |
-| `XXMM` | active S3/S2 double-hard challenge |
-| `XMXM` | active S3/S1 double-hard challenge |
+| `XXMM` | active S3/S2 double-hard bucket |
+| `XMXM` | active S3/S1 double-hard bucket |
 
 The first comparison is:
 
@@ -192,8 +193,8 @@ MWXM = S2 wobble + S1 hard
 XMWM = S3 hard + S1 wobble
 ```
 
-This excludes the middle-middle double-hard endpoint `MXXM` from the active
-panel while still allowing S3-containing double-hard challenge buckets. The
+This excludes the middle-middle double-hard comparator `MXXM` from the active
+panel while still allowing S3-containing double-hard buckets. The
 W-only and W+W buckets are included after the core six buckets so extra capacity
 goes to `G:T/T:G` alternatives rather than repeated hard-mismatch variants.
 

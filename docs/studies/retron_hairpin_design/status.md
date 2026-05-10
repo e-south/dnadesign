@@ -55,9 +55,9 @@
   `TTCA`, `TTCC`, `TTCG`, and `TTCT`; BsaI-HFv2 retains 0/256.
 - Exact B26 `MXMX` remains a biological control architecture, but it is not
   scar-compatible under the `S0=M` ligation constraint.
-- The scar-nick design objective is now profile-diverse, `S0=M`,
+- The scar-nick design target is now profile-diverse, `S0=M`,
   ligation-aware `scar_nick` coverage across `S3/S2/S1`, not exact B26
-  sequence preservation or an `MXXM`-centered rescue ladder.
+  sequence preservation or an `MXXM`-centered panel.
 - Use `routes.md` for the ordered command ladder and the deeper boundary notes.
 
 ### Current phase and surfaces

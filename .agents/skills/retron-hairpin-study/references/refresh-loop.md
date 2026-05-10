@@ -15,7 +15,7 @@ smallest surface that answers the question.
 5. Open `routes.md` after the record or blocker answer is settled.
 6. Open `scar-nick-base-junction.md` only when the question is about stem-base
    scar profiles, top/bottom scar-nick flexibility, or B26/B43 analogs.
-7. Open `pipeline.yaml` only when machine-readable command-group or native-agent
+7. Open `pipeline.yaml` only when machine-readable command-group or automation
    bootstrap context is still needed.
 
 ## Minimum evidence by question
@@ -31,7 +31,7 @@ smallest surface that answers the question.
 ## Pair-with rules
 
 - Pair with `harness-engineering` when the change touches study status,
-  preflight, skill routing, docs integrity, or native-agent bootstrap.
+  preflight, skill routing, docs integrity, or automation bootstrap.
 - Pair with `code-change-discipline` when the change touches lane boundaries,
   ontologies, explicit contracts, degraded modes, or no-silent-fallback rules.
 

@@ -92,7 +92,7 @@ Add explicit coordinate frames instead of overloading one boundary value:
   target evaluation.
 - `foldback_frame`: paired representation after intramolecular foldback.
 
-Every result should expose frame transforms, not just final sequences.
+Every result should expose frame transforms, rather than only final sequences.
 
 #### Processing Events
 

@@ -24,7 +24,7 @@ In scope:
 - scar-nick for upstream Type IIS scar plus terminal nick base-junction geometry
 - YIU as a contrast-only boundary surface
 - `cruncher-study-status` and `cruncher-study-preflight` for this study
-- study-owned native-agent bootstrap, route maps, and progressive disclosure
+- study-owned automation bootstrap, route maps, and progressive disclosure
 
 Out of scope:
 - generic Cruncher operator walkthroughs outside this tracked study
@@ -54,7 +54,7 @@ Out of scope:
 - Use `docs/studies/retron_hairpin_design/routes.md` as the canonical
   next-command handoff.
 - Open `docs/studies/retron_hairpin_design/pipeline.yaml` only when the
-  task needs machine-readable command-group or native-agent bootstrap context.
+  task needs machine-readable command-group or automation bootstrap context.
 - Use [study-surfaces.md](references/study-surfaces.md) for ownership
   boundaries.
 
@@ -85,13 +85,13 @@ Out of scope:
 - `released-product Snapback` is the shortening architecture under test.
 - `scar-nick` is the base-junction processing surface, not a retron phenotype
   predictor.
-- Scar-nick best-case policy is exact terminal nick, top or bottom strand
+- Scar-nick current processing policy is exact terminal nick, top or bottom strand
   allowed, zero protected bases downstream, downstream degenerate `N` only, and
   `S0=M` for ligation.
 - The current scar-nick context says exact supplied B26/B43 L/R pairs are not
   catalog-feasible under that policy; profile-diverse S0-matched analogs are
-  the viable route.
-- Active scar-nick panels allow S3-edge double-hard challenge buckets such as
+  the maintained route.
+- Active scar-nick panels allow S3-edge double-hard buckets such as
   `XXMM` and `XMXM`, but keep middle-middle `MXXM` as reserve/not active.
 - Default operational policy excludes `FREQUENT_CUTTER` nickases.
 - `preserved-site Snapback` stays a separate contract.
