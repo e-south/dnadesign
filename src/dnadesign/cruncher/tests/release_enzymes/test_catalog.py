@@ -46,10 +46,18 @@ def test_builtin_release_catalog_loads_current_type_iis_starting_set() -> None:
     catalog = load_builtin_release_enzyme_catalog_preset("type_iis_release_v1")
 
     by_id = catalog.by_id()
-    assert {"BsaI-HFv2", "BsmBI-v2", "BbsI", "SapI", "BspQI"} <= set(by_id)
+    assert {"BsaI-HFv2", "BsmBI-v2", "BbsI", "BbsI-HF", "PaqCI", "SapI", "BspQI"} <= set(by_id)
     assert by_id["BsaI-HFv2"].recognition_sequence == "GGTCTC"
     assert by_id["BsaI-HFv2"].recommended_5prime_flanking_bases == 6
     assert by_id["BsaI-HFv2"].outside_site is True
+    assert by_id["BbsI-HF"].recognition_sequence == "GAAGAC"
+    assert by_id["BbsI-HF"].top_cut_offset == 8
+    assert by_id["BbsI-HF"].bottom_cut_offset == 12
+    assert by_id["PaqCI"].recognition_sequence == "CACCTGC"
+    assert by_id["PaqCI"].top_cut_offset == 11
+    assert by_id["PaqCI"].bottom_cut_offset == 15
+    assert "MULTI_SITE_REQUIRED" in by_id["PaqCI"].warning_codes
+    assert "ACTIVATOR_REQUIRED" in by_id["PaqCI"].warning_codes
     assert by_id["BspQI"].recognition_sequence == "GCTCTTC"
     assert by_id["BspQI"].top_cut_offset == 8
     assert by_id["BspQI"].bottom_cut_offset == 11
