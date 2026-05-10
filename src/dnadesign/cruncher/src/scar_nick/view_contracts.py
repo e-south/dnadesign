@@ -15,15 +15,24 @@ from dataclasses import dataclass
 from typing import Any
 
 from dnadesign.contracts.visual import ScarNickVisualV1
-from dnadesign.cruncher.nickases.models import iupac_bases_for_symbol, reverse_complement_iupac
 from dnadesign.cruncher.scar_nick.models import ScarNickCandidate
 from dnadesign.cruncher.scar_nick.view_models import ScarNickTerminalNickViewV1, ScarNickViewsManifestV1
+from dnadesign.cruncher.scar_nick.visual_geometry import (
+    ScarNickVisualContext,
+    build_visual_context,
+    complement_sequence,
+    nickase_downstream_symbols,
+    pairing_complement_sequence,
+    protected_sequence_spans,
+    recognition_nt,
+    shift_optional_span,
+    shift_span,
+)
 
 _TYPE_IIS_FILL = "#F0E442"
 _OFFSET_FILL = "#FFF6B3"
 _SCAR_FILL = "#009E73"
 _NICKASE_FILL = "#56B4E9"
-_ALL_BASES = frozenset({"A", "C", "G", "T"})
 _PANEL_SPACER_NT = 4
 _COMBINED_VISUAL_STATE_KIND = "pre_post_terminal_nick"
 _VISUAL_JSONL_FILENAME = "scar_nick_terminal_nick.scar_nick_visual.v1.jsonl"
@@ -39,88 +48,10 @@ class ScarNickCandidateVisualBundle:
     baserender_job: dict[str, Any]
 
 
-@dataclass(frozen=True)
-class ScarNickVisualContext:
-    primary_sequence_5to3: str
-    context_start: int
-    context_end: int
-    retained_product_span: dict[str, int]
-    release_site_span: dict[str, int]
-    type_iis_offset_span: dict[str, int] | None
-    retained_scar_span: dict[str, int]
-    junction_partner_span: dict[str, int] | None
-    nickase_site_span: dict[str, int]
-    nickase_site_source_span: dict[str, int]
-
-
-def complement_sequence(sequence: str) -> str:
-    return reverse_complement_iupac(sequence)[::-1]
-
-
 def _state_title(candidate: ScarNickCandidate, state_kind: str) -> str:
     rank = f"{int(candidate.rank):02d}" if candidate.rank is not None else candidate.candidate_id
     left_right = f"L={candidate.left_base}/R={candidate.right_base}"
     return f"{rank} | {left_right} | {candidate.profile_s3s2s1s0}"
-
-
-def _nickase_source_span(candidate: ScarNickCandidate) -> dict[str, int]:
-    placement = candidate.nickase_placement
-    if placement is None:
-        raise ValueError("scar-nick visual requires a nickase placement")
-    return {"start": placement.source_site_start, "end": placement.source_site_end}
-
-
-def _iupac_symbols_overlap(left_symbol: str, right_symbol: str) -> bool:
-    return bool(iupac_bases_for_symbol(left_symbol) & iupac_bases_for_symbol(right_symbol))
-
-
-def _recognition_nt(motif: str) -> int:
-    return sum(1 for symbol in motif if frozenset(iupac_bases_for_symbol(symbol)) != _ALL_BASES)
-
-
-def _merge_symbol(existing: str, incoming: str, *, coordinate: int, semantic: str) -> str:
-    if not _iupac_symbols_overlap(existing, incoming):
-        raise ValueError(
-            f"scar-nick visual sequence conflict at raw coordinate {coordinate}: "
-            f"{existing!r} cannot satisfy {semantic} symbol {incoming!r}"
-        )
-    if existing == "N":
-        return incoming
-    if incoming == "N":
-        return existing
-    if len(iupac_bases_for_symbol(existing)) == 1:
-        return existing
-    if len(iupac_bases_for_symbol(incoming)) == 1:
-        return incoming
-    return existing
-
-
-def _write_span(
-    symbols: list[str],
-    *,
-    context_start: int,
-    raw_start: int,
-    sequence: str,
-    semantic: str,
-) -> None:
-    for offset, symbol in enumerate(sequence):
-        coordinate = raw_start + offset
-        index = coordinate - context_start
-        symbols[index] = _merge_symbol(symbols[index], symbol, coordinate=coordinate, semantic=semantic)
-
-
-def _span(raw_start: int, raw_end: int, *, context_start: int) -> dict[str, int]:
-    return {"start": raw_start - context_start, "end": raw_end - context_start}
-
-
-def _shift_span(span: dict[str, int], offset: int) -> dict[str, int]:
-    return {"start": span["start"] + offset, "end": span["end"] + offset}
-
-
-def _shift_optional_span(span: dict[str, int] | None, offset: int) -> dict[str, int] | None:
-    if span is None:
-        return None
-    return _shift_span(span, offset)
 
 
 def _panel_coordinate_fields(
@@ -143,21 +74,13 @@ def _panel_coordinate_fields(
         "end": start + len(context.primary_sequence_5to3),
         "terminal_boundary": candidate.terminal_boundary - context.context_start + start,
         "nick_boundary": candidate.nick_boundary - context.context_start + start,
-        "retained_product_span": _shift_span(context.retained_product_span, start),
-        "release_site_span": _shift_span(context.release_site_span, start),
-        "type_iis_offset_span": _shift_optional_span(context.type_iis_offset_span, start),
-        "retained_scar_span": _shift_span(context.retained_scar_span, start),
-        "nickase_site_span": _shift_span(context.nickase_site_span, start),
+        "retained_product_span": shift_span(context.retained_product_span, start),
+        "release_site_span": shift_span(context.release_site_span, start),
+        "type_iis_offset_span": shift_optional_span(context.type_iis_offset_span, start),
+        "retained_scar_span": shift_span(context.retained_scar_span, start),
+        "nickase_site_span": shift_span(context.nickase_site_span, start),
         "fragment_spans": [] if fragment_spans is None else fragment_spans,
     }
-
-
-def _pairing_complement_sequence(*, sequence: str, context: ScarNickVisualContext, candidate: ScarNickCandidate) -> str:
-    complement = list(complement_sequence(sequence))
-    scar_start = context.retained_scar_span["start"]
-    scar_end = context.retained_scar_span["end"]
-    complement[scar_start:scar_end] = list(candidate.right_base[::-1])
-    return "".join(complement)
 
 
 def _rectangular_fills_for_panel(panel: dict[str, Any], *, prefix: str) -> list[dict[str, Any]]:
@@ -227,106 +150,6 @@ def _mismatch_display_indices(*, panels: list[dict[str, Any]], pair_classes: lis
     return sorted(set(indices))
 
 
-def _visual_context(candidate: ScarNickCandidate) -> ScarNickVisualContext:
-    if candidate.release_placement is None:
-        raise ValueError("scar-nick visual requires a release placement")
-    if candidate.nickase_placement is None:
-        raise ValueError("scar-nick visual requires a nickase placement")
-    release = candidate.release_placement
-    nickase = candidate.nickase_placement
-    product_end = len(candidate.retained_product_sequence)
-    context_start = min(release.recognition_site_start, nickase.source_site_start, 0)
-    context_end = max(release.recognition_site_end, nickase.source_site_end, product_end)
-
-    symbols = ["N"] * (context_end - context_start)
-    _write_span(
-        symbols,
-        context_start=context_start,
-        raw_start=release.recognition_site_start,
-        sequence=release.recognition_sequence,
-        semantic="type_iis_release_site",
-    )
-    _write_span(
-        symbols,
-        context_start=context_start,
-        raw_start=nickase.source_site_start,
-        sequence=nickase.motif_top_5to3,
-        semantic="nickase_footprint",
-    )
-    _write_span(
-        symbols,
-        context_start=context_start,
-        raw_start=0,
-        sequence=candidate.retained_product_sequence,
-        semantic="retained_product",
-    )
-
-    offset_span = None
-    if release.recognition_site_end < release.top_cut_boundary:
-        offset_span = _span(release.recognition_site_end, release.top_cut_boundary, context_start=context_start)
-
-    return ScarNickVisualContext(
-        primary_sequence_5to3="".join(symbols),
-        context_start=context_start,
-        context_end=context_end,
-        retained_product_span=_span(0, product_end, context_start=context_start),
-        release_site_span=_span(
-            release.recognition_site_start,
-            release.recognition_site_end,
-            context_start=context_start,
-        ),
-        type_iis_offset_span=offset_span,
-        retained_scar_span=_span(0, candidate.retained_scar_nt, context_start=context_start),
-        junction_partner_span=None,
-        nickase_site_span=_span(nickase.source_site_start, nickase.source_site_end, context_start=context_start),
-        nickase_site_source_span=_nickase_source_span(candidate),
-    )
-
-
-def _protected_sequence_spans(candidate: ScarNickCandidate, context: ScarNickVisualContext) -> list[dict[str, Any]]:
-    release = candidate.release_placement
-    if release is None:
-        return []
-    return [
-        {
-            "semantic": "type_iis_release_site",
-            "start": context.release_site_span["start"],
-            "end": context.release_site_span["end"],
-            "raw_start": release.recognition_site_start,
-            "raw_end": release.recognition_site_end,
-            "mutable": False,
-        },
-        {
-            "semantic": "retained_product",
-            "start": context.retained_product_span["start"],
-            "end": context.retained_product_span["end"],
-            "raw_start": 0,
-            "raw_end": len(candidate.retained_product_sequence),
-            "mutable": False,
-        },
-    ]
-
-
-def _nickase_downstream_symbols(candidate: ScarNickCandidate, context: ScarNickVisualContext) -> list[dict[str, Any]]:
-    placement = candidate.nickase_placement
-    if placement is None:
-        return []
-    payload: list[dict[str, Any]] = []
-    for offset, symbol in enumerate(placement.motif_top_5to3):
-        coordinate = placement.source_site_start + offset
-        if coordinate < candidate.terminal_boundary:
-            continue
-        payload.append(
-            {
-                "raw_coordinate": coordinate,
-                "display_index": coordinate - context.context_start,
-                "symbol": symbol,
-                "fully_degenerate": len(iupac_bases_for_symbol(symbol)) == 4,
-            }
-        )
-    return payload
-
-
 def _release_placement_payload(candidate: ScarNickCandidate) -> dict[str, Any] | None:
     if candidate.release_placement is None:
         return None
@@ -362,7 +185,7 @@ def _nickase_payload(candidate: ScarNickCandidate) -> dict[str, Any] | None:
         "canonical_read_row": canonical_read_row,
         "site": candidate.nickase_site,
         "motif_top_5to3": placement.motif_top_5to3,
-        "recognition_nt": _recognition_nt(placement.motif_top_5to3),
+        "recognition_nt": recognition_nt(placement.motif_top_5to3),
         "vendor": placement.vendor,
         "source_url": placement.source_url,
         "source_family": placement.source_family,
@@ -383,7 +206,7 @@ def _base_view_payload(
     solution_id: str,
     state_kind: str,
 ) -> dict[str, Any]:
-    context = _visual_context(candidate)
+    context = build_visual_context(candidate)
     sequence = context.primary_sequence_5to3
     payload = {
         "version": 1,
@@ -427,8 +250,8 @@ def _base_view_payload(
             "raw_nick_boundary": candidate.nick_boundary,
             "raw_retained_product_span": {"start": 0, "end": len(candidate.retained_product_sequence)},
             "right_base_role": "profile_reference_only_not_linear_downstream_sequence",
-            "protected_sequence_spans": _protected_sequence_spans(candidate, context),
-            "nickase_downstream_symbols": _nickase_downstream_symbols(candidate, context),
+            "protected_sequence_spans": protected_sequence_spans(candidate, context),
+            "nickase_downstream_symbols": nickase_downstream_symbols(candidate, context),
             "reference_distances": candidate.reference_distances,
             "reference_control_distance": candidate.reference_control_distance,
             "gc_fraction": candidate.gc_fraction,
@@ -461,9 +284,9 @@ def build_terminal_nick_visual_contract(
         raise ValueError("scar-nick visual requires explicit nicked_strand and surviving_strand")
 
     view = build_terminal_nick_view(candidate=candidate, solution_id=solution_id, state_kind="post_terminal_nick")
-    context = _visual_context(candidate)
+    context = build_visual_context(candidate)
     panel_sequence = context.primary_sequence_5to3
-    panel_complement = _pairing_complement_sequence(sequence=panel_sequence, context=context, candidate=candidate)
+    panel_complement = pairing_complement_sequence(sequence=panel_sequence, context=context, candidate=candidate)
     spacer = "N" * _PANEL_SPACER_NT
     post_offset = len(panel_sequence) + len(spacer)
     primary_sequence = panel_sequence + spacer + panel_sequence

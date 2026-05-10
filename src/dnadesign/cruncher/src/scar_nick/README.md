@@ -18,8 +18,9 @@ phenotype predictor.
 8. `tables.py` writes the CSV handoff tables.
 9. `artifacts.py` owns artifact paths, manifests, snapshots, and visual bundle
    persistence.
-10. `view_contracts.py` publishes the pre/post terminal-nick visual contract.
-11. `reporting.py` renders the Markdown run summary.
+10. `visual_geometry.py` builds display-coordinate spans and aligned sequences.
+11. `view_contracts.py` publishes the pre/post terminal-nick visual contract.
+12. `reporting.py` renders the Markdown run summary.
 
 ## Core Semantics
 
@@ -42,5 +43,7 @@ phenotype predictor.
 - `export/table__scar_nick_candidate_pair_calls.csv` gives one row per
   candidate and S-site, including left/right bases, aligned right base, pair
   class, mismatch flags, and T4 mismatch tier.
+- `*_pair_identity` fields use the actual aligned pair (`left_nt:aligned_right_nt`);
+  raw `right_nt` remains available in the pair-call table for coordinate audit.
 - `analysis/views/scar_nick_terminal_nick.scar_nick_visual.v1.jsonl` is the
   contract source for the pre/post terminal-nick plot.

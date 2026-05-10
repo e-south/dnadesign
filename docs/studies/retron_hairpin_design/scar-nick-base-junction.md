@@ -243,6 +243,11 @@ candidate rank, `left_base`, `right_base`, `site`, left/right nucleotide,
 aligned right nucleotide, `class_label`, mismatch booleans, mismatch class,
 T4 mismatch tier, profile, route, and strand fields.
 
+`S*_pair_identity` and row-level `pair_identity` mean
+`left_nt:aligned_right_nt`. The raw `right_nt` is still emitted separately so a
+reviewer can audit both the displayed right sequence and the actual aligned
+pairing call.
+
 Ranking should satisfy profile-bucket coverage first, then prefer ligation
 support of at least two effective pairing units, no more than two
 non-Watson-Crick positions total, no hard-hard topology across `S2/S1`, useful

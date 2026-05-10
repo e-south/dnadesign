@@ -99,7 +99,7 @@ def _contains_forbidden_release_site(retained_sequence: str, forbidden_release_s
 
 
 def _pair_identities(profile) -> dict[str, str]:
-    return {pair.site: f"{pair.left_base}:{pair.right_base}" for pair in profile.pairs}
+    return {pair.site: f"{pair.left_base}:{pair.aligned_right_base}" for pair in profile.pairs}
 
 
 def _tnna_flag(sequence: str) -> bool:

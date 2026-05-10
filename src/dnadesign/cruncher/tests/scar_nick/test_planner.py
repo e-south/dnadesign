@@ -680,6 +680,30 @@ def test_candidate_rejections_cover_terminal_pair_profile_and_mismatch_limits() 
     assert "PROFILE_POLICY_RESERVE:MORE_THAN_TWO_NON_WATSON_CRICK" in three_non_wc.rejection_reasons
 
 
+def test_pair_identity_uses_aligned_right_base_for_profile_calls() -> None:
+    context = CandidateRankingContext(
+        target_profile_buckets=[],
+        reject_profiles=[],
+        allow_gt_wobble=True,
+        active_max_hard_mismatches=4,
+        active_max_non_watson_crick_pairs=4,
+    )
+
+    candidate = evaluate_pair_candidate(
+        left_base="AGTG",
+        right_base="CATT",
+        context=context,
+        s0_match_required=True,
+        forbidden_release_sites=[],
+    )
+
+    assert candidate.profile_s3s2s1s0 == "MXMM"
+    assert candidate.s2_pair_identity == "G:A"
+    assert candidate.pair_classes[1].right_base == "T"
+    assert candidate.pair_classes[1].aligned_right_base == "A"
+    assert candidate.pair_classes[1].class_label == "X"
+
+
 def test_retained_release_recognition_site_is_rejected() -> None:
     context = CandidateRankingContext(
         target_profile_buckets=[],

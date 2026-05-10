@@ -292,7 +292,7 @@ def write_candidate_pair_call_table(run_dir: Path, report: ScarNickEvaluationRep
                         "left_nt": pair.left_base,
                         "right_nt": pair.right_base,
                         "aligned_right_nt": pair.aligned_right_base,
-                        "pair_identity": f"{pair.left_base}:{pair.right_base}",
+                        "pair_identity": f"{pair.left_base}:{pair.aligned_right_base}",
                         "class_label": pair.class_label,
                         "is_watson_crick": pair.class_label == "M",
                         "is_wobble": pair.class_label == "W",

@@ -216,6 +216,7 @@ def test_scar_nick_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> Non
     }
     assert {row["site"] for row in pair_call_rows if row["rank"] == "1"} == {"S3", "S2", "S1", "S0"}
     assert any(row["class_label"] in {"W", "X"} for row in pair_call_rows)
+    assert all(row["pair_identity"] == f"{row['left_nt']}:{row['aligned_right_nt']}" for row in pair_call_rows)
 
     show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
     assert show_result.exit_code == 0
