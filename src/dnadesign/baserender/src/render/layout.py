@@ -464,6 +464,7 @@ def compute_layout(
     style: Style,
     *,
     fixed_n: int | None = None,
+    cell_width_scale: float = 1.0,
     fixed_content_top_extent_px: float | None = None,
     fixed_content_bottom_extent_px: float | None = None,
     fixed_content_radius_px: float | None = None,
@@ -471,6 +472,10 @@ def compute_layout(
 ) -> LayoutContext:
     cell = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = cell.width, cell.height
+    scale = float(cell_width_scale)
+    if not math.isfinite(scale) or scale <= 0.0:
+        raise BoundsError("cell_width_scale must be finite and > 0")
+    cw *= scale
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
 
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
@@ -504,7 +509,7 @@ def compute_layout(
         measure_text_width_px("3'", style.font_label, style.font_size_label, style.dpi),
     )
     row_label_width = _row_label_width_px(record, style)
-    row_label_gap = max(8.0, style.font_size_label / 72.0 * style.dpi * 0.35) if row_label_width > 0 else 0.0
+    row_label_gap = max(16.0, style.font_size_label / 72.0 * style.dpi * 0.7) if row_label_width > 0 else 0.0
     left_gutter = terminal_label_dx + terminal_label_width + row_label_gap + row_label_width
     right_gutter = terminal_label_dx + terminal_label_width
     x_left = style.padding_x + left_gutter

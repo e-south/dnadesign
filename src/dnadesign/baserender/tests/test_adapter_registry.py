@@ -17,6 +17,7 @@ from dnadesign.baserender.src.adapters import build_adapter, required_source_col
 from dnadesign.baserender.src.adapters.cruncher_best_window import CruncherBestWindowAdapter
 from dnadesign.baserender.src.adapters.duplex_sequence_v1 import DuplexSequenceV1Adapter
 from dnadesign.baserender.src.adapters.hairpin_topology_v1 import HairpinTopologyV1Adapter
+from dnadesign.baserender.src.adapters.scar_nick_visual_v1 import ScarNickVisualV1Adapter
 from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import (
     SequenceEvidenceMapV1Adapter,
     _style_token_for_owner,
@@ -122,7 +123,7 @@ def test_generic_features_adapter_accepts_display_video_subtitle() -> None:
         },
         policies={},
     )
-    adapter = build_adapter(cfg, alphabet="DNA")
+    adapter = build_adapter(cfg, alphabet="IUPAC_DNA")
     record = adapter.apply(
         {
             "id": "row-1",
@@ -155,6 +156,198 @@ def test_snapback_visual_adapter_requires_no_source_columns() -> None:
 
     adapter = build_adapter(cfg, alphabet="DNA")
     assert isinstance(adapter, SnapbackVisualV1Adapter)
+
+
+def _scar_nick_adapter_payload() -> dict[str, object]:
+    pre_sequence = "GGTCTCGGCCC"
+    pre_complement = "CCAGAGCCTGT"
+    spacer = "NNNN"
+    post_offset = len(pre_sequence) + len(spacer)
+    pre_panel = {
+        "panel_id": "pre_release",
+        "title": "pre-release",
+        "state_kind": "pre_terminal_nick",
+        "nick_state": "intact",
+        "start": 0,
+        "end": len(pre_sequence),
+        "terminal_boundary": 11,
+        "nick_boundary": 11,
+        "retained_product_span": {"start": 7, "end": 11},
+        "release_site_span": {"start": 0, "end": 6},
+        "type_iis_offset_span": {"start": 6, "end": 7},
+        "retained_scar_span": {"start": 7, "end": 11},
+        "nickase_site_span": {"start": 0, "end": 11},
+        "fragment_spans": [],
+    }
+    post_panel = {
+        "panel_id": "post_release",
+        "title": "post-release",
+        "state_kind": "post_terminal_nick",
+        "nick_state": "nicked",
+        "start": post_offset,
+        "end": post_offset + len(pre_sequence),
+        "terminal_boundary": post_offset + 11,
+        "nick_boundary": post_offset + 11,
+        "retained_product_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "release_site_span": {"start": post_offset, "end": post_offset + 6},
+        "type_iis_offset_span": {"start": post_offset + 6, "end": post_offset + 7},
+        "retained_scar_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "nickase_site_span": {"start": post_offset, "end": post_offset + 11},
+        "fragment_spans": [{"row": "complement", "start": post_offset, "end": post_offset + 7}],
+    }
+    fills = []
+    for panel in (pre_panel, post_panel):
+        prefix = panel["panel_id"]
+        fill_specs = [
+            ("type_iis_release_site", "type_iis_release_site", "release_site_span", "#F0E442", 0.34),
+            ("retained_type_iis_scar", "retained_type_iis_scar", "retained_scar_span", "#009E73", 0.36),
+        ]
+        if panel["panel_id"] == "pre_release":
+            fill_specs.append(("nickase_footprint", "nickase_footprint", "nickase_site_span", "#56B4E9", 0.24))
+        for fill_id, semantic, span_name, color, alpha in fill_specs:
+            span = panel[span_name]
+            fills.append(
+                {
+                    "fill_id": f"{prefix}_{fill_id}",
+                    "semantic": semantic,
+                    "start": span["start"],
+                    "end": span["end"],
+                    "cover_rows": "both",
+                    "fill": color,
+                    "alpha": alpha,
+                    "corner_radius": 0.0,
+                }
+            )
+    return {
+        "contract_kind": "scar_nick_visual_v1",
+        "state_id": "candidate_01.pre_post_terminal_nick",
+        "state_kind": "pre_post_terminal_nick",
+        "event_scope": "terminal_nick",
+        "alphabet": "iupac_dna",
+        "primary_sequence": pre_sequence + spacer + pre_sequence,
+        "complement_sequence": pre_complement + spacer + pre_complement,
+        "primary_row_label": "Top",
+        "complement_row_label": "Bottom",
+        "terminal_boundary": post_offset + 11,
+        "nick_boundary": post_offset + 11,
+        "retained_product_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "release_site_span": {"start": post_offset, "end": post_offset + 6},
+        "type_iis_offset_span": {"start": post_offset + 6, "end": post_offset + 7},
+        "retained_scar_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "junction_partner_span": None,
+        "nickase_site_span": {"start": post_offset, "end": post_offset + 11},
+        "nickase_site_source_span": {"start": -7, "end": 4},
+        "nick_state": "pre_post",
+        "retained_scar": "GCCC",
+        "left_base": "GCCC",
+        "right_base": "TGTC",
+        "nicked_strand": "bottom",
+        "surviving_strand": "top",
+        "profile_s3s2s1s0": "MXMX",
+        "profile_payload_outward": "XMXM",
+        "pair_classes": [
+            {"position": 0, "class_label": "M"},
+            {"position": 1, "class_label": "X"},
+            {"position": 2, "class_label": "M"},
+            {"position": 3, "class_label": "X"},
+        ],
+        "panels": [pre_panel, post_panel],
+        "rectangular_fills": fills,
+        "release_placement": {
+            "variant_id": "BsaI-HFv2",
+            "orientation": "forward",
+            "recognition_sequence": "GGTCTC",
+            "recognition_site_excised": True,
+            "source_catalog_id": "type_iis_release_v1",
+            "source_url": "https://www.neb.com/en-us/products/r3733-bsai-hf-v2",
+            "commercial_confidence": "primary_vendor_current",
+            "warning_codes": [],
+            "recognition_site_start": -7,
+            "recognition_site_end": -1,
+            "top_cut_boundary": 0,
+            "bottom_cut_boundary": 4,
+            "retained_scar_start": 0,
+            "retained_scar_end": 4,
+            "retained_scar_nt": 4,
+        },
+        "nickase": {
+            "variant_id": "Test.TerminalBottomNickase",
+            "specificity_id": "TerminalBottomNickase",
+            "orientation": "forward",
+            "canonical_read_row": "primary",
+            "motif_top_5to3": "GGTCTCGNNNN",
+            "recognition_nt": 7,
+            "vendor": "dnadesign test fixture",
+            "source_url": "https://example.invalid/dnadesign/scar-nick-terminal-fixture",
+            "source_family": "nicking_endonuclease",
+            "commercial_confidence": "primary_vendor_current",
+            "warning_codes": [],
+            "site": "Test.TerminalBottomNickase:forward[-7,4)",
+            "source_site_start": -7,
+            "source_site_end": 4,
+            "strand": "bottom",
+            "boundary": 4,
+            "terminal_boundary": 4,
+            "display_boundary": post_offset + 11,
+            "display_site_span": {"start": post_offset, "end": post_offset + 11},
+            "exact_terminal": True,
+        },
+        "meta": {
+            "panel_spacer_indices": list(range(len(pre_sequence), post_offset)),
+            "mismatch_indices": [post_offset + 8, post_offset + 10],
+        },
+    }
+
+
+def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdrop() -> None:
+    cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
+
+    assert required_source_columns(cfg) == []
+
+    adapter = build_adapter(cfg, alphabet="DNA")
+    assert isinstance(adapter, ScarNickVisualV1Adapter)
+
+    record = adapter.apply(_scar_nick_adapter_payload(), row_index=0)
+
+    assert record.id == "candidate_01.pre_post_terminal_nick"
+    assert record.meta["adapter"] == "scar_nick_visual_v1"
+    assert record.meta["span_backdrops"][0]["start"] == 0
+    assert record.meta["span_backdrops"][0]["end"] == 6
+    assert record.meta["span_backdrops"][0]["corner_radius"] == 0.0
+    assert record.features == ()
+    assert "pre-release" not in record.display.overlay_text
+    assert "post-release" not in record.display.overlay_text
+    assert record.meta["segment_labels"][0]["text"] == "BsaI-HFv2"
+    assert record.meta["segment_labels"][1]["text"] == "Test.TerminalBottomNickase"
+    assert record.meta["segment_labels"][2]["text"] == "BsaI-HFv2"
+    assert len(record.meta["segment_labels"]) == 3
+    assert record.meta["panel_transition_arrows"] == [{"start": 11, "end": 15}]
+    assert not any(
+        backdrop["semantic"] == "nickase_footprint" and backdrop["start"] >= 15
+        for backdrop in record.meta["span_backdrops"]
+    )
+    assert record.meta["base_highlights"]["primary"] == list(range(0, 6))
+    assert record.meta["base_highlights"]["complement"] == list(range(0, 11))
+    assert record.meta["base_highlight_colors"]["primary"][0] == "#7A6500"
+    assert record.meta["base_highlight_colors"]["complement"][0] == "#005A8D"
+    assert record.meta["dim_base_indices"]["complement"] == list(range(15, 22))
+    assert record.meta["base_dim_color"] == "#94A3B8"
+    assert record.meta["connector_hidden_indices"] == [11, 12, 13, 14]
+    assert record.meta["connector_cross_indices"] == [23, 25]
+    assert record.meta["connector_cross_color"] == "#111827"
+    assert record.meta["cell_width_scale"] == 1.12
+    assert record.meta["span_edge_markers"][0]["start"] == 0
+    assert record.meta["span_edge_markers"][0]["end"] == 6
+    assert record.meta["span_edge_markers"][-1]["start"] == 15
+    assert record.meta["panel_spans"][0]["panel_id"] == "pre_release"
+    assert record.meta["grid_max_rows"] == 5
+    assert len(record.effects) == 1
+    assert record.effects[0].kind == "boundary_marker"
+    assert record.effects[0].target == {"boundary": 26, "lane": "complement"}
+
+    second_row = adapter.apply(_scar_nick_adapter_payload(), row_index=1)
+    assert "pre-release" not in second_row.display.overlay_text
+    assert second_row.meta["segment_labels"][0]["text"] == "BsaI-HFv2"
 
 
 @pytest.mark.parametrize(

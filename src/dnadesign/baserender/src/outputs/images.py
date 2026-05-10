@@ -11,8 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import numpy as np
 
@@ -20,6 +21,35 @@ from ..config import ImagesOutputCfg, Style
 from ..core import Record, SchemaError
 from ..render import Palette, render_record
 from .names import _safe_stem, _unique_stem
+
+
+def _grid_max_rows_for_records(records: list[Record]) -> int | None:
+    """Return the strictest positive max-row hint on the supplied records."""
+
+    max_rows: int | None = None
+    for record in records:
+        meta = record.meta
+        if not isinstance(meta, Mapping):
+            continue
+        raw_value = meta.get("grid_max_rows")
+        if raw_value is None:
+            continue
+        try:
+            parsed = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            max_rows = parsed if max_rows is None else min(max_rows, parsed)
+    return max_rows
+
+
+def _grid_ncols_for_records(records: list[Record], *, default_ncols: int) -> int:
+    """Return a grid column count from record-level layout hints."""
+
+    max_rows = _grid_max_rows_for_records(records)
+    if max_rows is None or len(records) <= max_rows:
+        return max(1, min(default_ncols, len(records)))
+    return max(1, math.ceil(len(records) / max_rows))
 
 
 def _figure_rgba(fig):
@@ -36,8 +66,10 @@ def _render_record_grid_figure_local(
     style: Style,
     palette: Palette,
     ncols: int,
+    max_rows: int | None = None,
 ):
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
 
     panel_images: list[object] = []
     for record in records:
@@ -48,22 +80,47 @@ def _render_record_grid_figure_local(
     max_h = max(image.shape[0] for image in panel_images)
     max_w = max(image.shape[1] for image in panel_images)
     cols = min(ncols, len(panel_images))
-    rows = int((len(panel_images) + cols - 1) / cols)
+    if max_rows is None:
+        rows = int((len(panel_images) + cols - 1) / cols)
+    else:
+        rows = min(max_rows, len(panel_images))
     dpi = 120
     fig_w = (cols * max_w) / dpi
     fig_h = (rows * max_h) / dpi
     fig, axes = plt.subplots(rows, cols, figsize=(fig_w, fig_h), dpi=dpi, squeeze=False)
     flat_axes = list(axes.flat)
+    for ax in flat_axes:
+        ax.set_axis_off()
 
     for idx, image in enumerate(panel_images):
-        ax = flat_axes[idx]
+        if max_rows is None:
+            ax = flat_axes[idx]
+        else:
+            row = idx % rows
+            col = idx // rows
+            ax = axes[row, col]
         ax.imshow(image)
         ax.set_axis_off()
 
     for ax in flat_axes[len(panel_images) :]:
         ax.set_axis_off()
 
-    fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99, wspace=0.02, hspace=0.02)
+    fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.99, wspace=0.055, hspace=0.025)
+    if cols > 1:
+        for col in range(1, cols):
+            left_edge = axes[0, col - 1].get_position().x1
+            right_edge = axes[0, col].get_position().x0
+            separator_x = (left_edge + right_edge) / 2.0
+            fig.add_artist(
+                Line2D(
+                    [separator_x, separator_x],
+                    [0.015, 0.985],
+                    transform=fig.transFigure,
+                    color="#CBD5E1",
+                    linewidth=1.2,
+                    alpha=0.9,
+                )
+            )
     return fig
 
 
@@ -92,7 +149,8 @@ def write_images(
                 renderer_name=renderer_name,
                 style=style,
                 palette=palette,
-                ncols=1,
+                ncols=_grid_ncols_for_records(materialized, default_ncols=1),
+                max_rows=_grid_max_rows_for_records(materialized),
             )
         fig.patch.set_facecolor("white")
         fig.patch.set_alpha(1.0)
@@ -130,4 +188,11 @@ def write_images(
     return out_dir
 
 
-__all__ = ["_figure_rgba", "_render_record_grid_figure_local", "render_record", "write_images"]
+__all__ = [
+    "_figure_rgba",
+    "_grid_max_rows_for_records",
+    "_grid_ncols_for_records",
+    "_render_record_grid_figure_local",
+    "render_record",
+    "write_images",
+]

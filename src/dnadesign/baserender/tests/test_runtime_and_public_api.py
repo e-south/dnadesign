@@ -20,13 +20,14 @@ import pytest
 import dnadesign.baserender as baserender
 from dnadesign.baserender import load_records_from_parquet, render_parquet_record_figure
 from dnadesign.baserender.src.core import ContractError, RenderingError
-from dnadesign.baserender.src.core.record import Display, Feature
+from dnadesign.baserender.src.core.record import Display, Feature, Record
 from dnadesign.baserender.src.core.registry import (
     clear_feature_effect_contracts,
     get_effect_contract,
     get_feature_contract,
 )
 from dnadesign.baserender.src.core.types import Span
+from dnadesign.baserender.src.outputs.images import _grid_max_rows_for_records, _grid_ncols_for_records
 from dnadesign.baserender.src.render.effects.registry import clear_effect_drawers, get_effect_drawer
 from dnadesign.baserender.src.runtime import initialize_runtime
 
@@ -189,6 +190,14 @@ def test_public_style_helpers_are_root_exports() -> None:
     assert "presentation_default" in baserender.list_style_presets()
     style = baserender.resolve_style(preset=None, overrides={})
     assert isinstance(style, baserender.Style)
+
+
+def test_image_grid_uses_record_max_rows_hint() -> None:
+    records = [Record(id=f"r{index}", alphabet="DNA", sequence="ACGT", meta={"grid_max_rows": 5}) for index in range(8)]
+
+    assert _grid_max_rows_for_records(records) == 5
+    assert _grid_ncols_for_records(records[:5], default_ncols=1) == 1
+    assert _grid_ncols_for_records(records, default_ncols=1) == 2
 
 
 def test_public_batch_parquet_record_loader_returns_requested_order(tmp_path) -> None:
