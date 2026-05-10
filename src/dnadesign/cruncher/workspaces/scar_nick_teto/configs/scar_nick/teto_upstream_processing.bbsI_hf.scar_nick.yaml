@@ -54,7 +54,7 @@ ranking_context:
 search:
   mode: curated_panel
   max_hits: 16
-  materialize_top_k: 8
+  materialize_top_k: 16
 
 output:
   run_dir: outputs/scar_nick/teto_upstream_processing_bbsI_hf

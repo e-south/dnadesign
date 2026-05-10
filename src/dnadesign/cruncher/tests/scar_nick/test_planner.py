@@ -19,11 +19,9 @@ import yaml
 
 from dnadesign.cruncher.app.scar_nick_workflow import validate_scar_nick_spec
 from dnadesign.cruncher.nickases.models import NickaseCatalogEntry
+from dnadesign.cruncher.scar_nick.candidates import evaluate_pair_candidate
+from dnadesign.cruncher.scar_nick.geometry import placements_for_entry
 from dnadesign.cruncher.scar_nick.models import CandidateRankingContext, NickasePlacement, ReleasePlacement
-from dnadesign.cruncher.scar_nick.planner import (
-    _placements_for_entry,
-    evaluate_pair_candidate,
-)
 from dnadesign.cruncher.scar_nick.ranking import rank_pair_candidates, unique_sequence_candidates
 from dnadesign.cruncher.scar_nick.view_contracts import build_terminal_nick_visual_contract
 from dnadesign.cruncher.scar_nick.view_models import ScarNickTerminalNickViewV1
@@ -157,6 +155,57 @@ def _write_terminal_nickase_catalog(tmp_path: Path) -> None:
 def _with_terminal_nickase_catalog(payload: dict[str, Any]) -> dict[str, Any]:
     payload["processing"]["nick"]["catalog"] = {"additional_paths": ["inputs/nickases/terminal.nickases.yaml"]}
     return payload
+
+
+def _release_placement(
+    *,
+    variant_id: str = "BsaI-HFv2",
+    recognition_sequence: str = "GGTCTC",
+    recognition_site_start: int = -7,
+    recognition_site_end: int = -1,
+) -> ReleasePlacement:
+    return ReleasePlacement(
+        variant_id=variant_id,
+        orientation="forward",
+        recognition_sequence=recognition_sequence,
+        source_catalog_id="type_iis_release_v1",
+        source_url=f"https://example.invalid/dnadesign/{variant_id}",
+        commercial_confidence="primary_vendor_current",
+        warning_codes=[],
+        recognition_site_start=recognition_site_start,
+        recognition_site_end=recognition_site_end,
+        top_cut_boundary=0,
+        bottom_cut_boundary=4,
+        retained_scar_start=0,
+        retained_scar_end=4,
+        retained_scar_nt=4,
+        recognition_site_excised=True,
+    )
+
+
+def _nickase_placement(
+    *,
+    variant_id: str = "Test.TerminalBottomNickase",
+    strand: str = "bottom",
+) -> NickasePlacement:
+    return NickasePlacement(
+        variant_id=variant_id,
+        specificity_id="TerminalBottomNickase",
+        orientation="forward",
+        motif_top_5to3="GGTCTCGNNNN",
+        vendor="dnadesign test fixture",
+        source_url="https://example.invalid/dnadesign/scar-nick-terminal-fixture",
+        source_family="nicking_endonuclease",
+        commercial_confidence="primary_vendor_current",
+        warning_codes=[],
+        source_site_start=-7,
+        source_site_end=4,
+        strand=strand,
+        boundary=4,
+        terminal_boundary=4,
+        boundary_distance=0,
+        exact_terminal=True,
+    )
 
 
 def test_validate_scar_nick_spec_returns_ranked_hits(tmp_path: Path) -> None:
@@ -554,11 +603,11 @@ def test_terminal_nick_placements_allow_top_and_bottom_routes_and_reject_invalid
         selection={"commercial_confidence": "primary_vendor_current"},
     )
 
-    short_placements = _placements_for_entry(short_frequent_cutter, terminal_boundary=4, boundary=4)
-    nt_placements = _placements_for_entry(nt_reverse, terminal_boundary=4, boundary=4, target_strand="either")
-    top_placements = _placements_for_entry(top_valid, terminal_boundary=4, boundary=4, target_strand="either")
-    bad_tail_placements = _placements_for_entry(bad_downstream_tail, terminal_boundary=4, boundary=4)
-    degenerate_tail_placements = _placements_for_entry(degenerate_downstream_tail, terminal_boundary=4, boundary=4)
+    short_placements = placements_for_entry(short_frequent_cutter, terminal_boundary=4, boundary=4)
+    nt_placements = placements_for_entry(nt_reverse, terminal_boundary=4, boundary=4, target_strand="either")
+    top_placements = placements_for_entry(top_valid, terminal_boundary=4, boundary=4, target_strand="either")
+    bad_tail_placements = placements_for_entry(bad_downstream_tail, terminal_boundary=4, boundary=4)
+    degenerate_tail_placements = placements_for_entry(degenerate_downstream_tail, terminal_boundary=4, boundary=4)
 
     assert short_placements == []
     assert [(placement.variant_id, placement.orientation, placement.strand) for placement in nt_placements] == [
@@ -746,6 +795,43 @@ def test_ranking_prefers_lower_hard_mismatch_tier_before_gc_tie_break() -> None:
     assert ranked[0].right_base == "CACT"
 
 
+def test_candidate_id_includes_enzyme_route() -> None:
+    context = CandidateRankingContext(
+        target_profile_buckets=[],
+        reject_profiles=[],
+        allow_gt_wobble=True,
+        active_max_hard_mismatches=4,
+        active_max_non_watson_crick_pairs=4,
+    )
+    bsa_candidate = evaluate_pair_candidate(
+        left_base="GCCC",
+        right_base="TGTC",
+        context=context,
+        s0_match_required=True,
+        forbidden_release_sites=[],
+        release_placement=_release_placement(),
+        nickase_placement=_nickase_placement(),
+    )
+    paq_candidate = evaluate_pair_candidate(
+        left_base="GCCC",
+        right_base="TGTC",
+        context=context,
+        s0_match_required=True,
+        forbidden_release_sites=[],
+        release_placement=_release_placement(
+            variant_id="PaqCI",
+            recognition_sequence="CACCTGC",
+            recognition_site_start=-8,
+        ),
+        nickase_placement=_nickase_placement(),
+    )
+
+    assert bsa_candidate.left_base == paq_candidate.left_base
+    assert bsa_candidate.right_base == paq_candidate.right_base
+    assert bsa_candidate.profile_s3s2s1s0 == paq_candidate.profile_s3s2s1s0
+    assert bsa_candidate.candidate_id != paq_candidate.candidate_id
+
+
 def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span() -> None:
     context = CandidateRankingContext(
         target_profile_buckets=[],
@@ -754,49 +840,14 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
         active_max_hard_mismatches=4,
         active_max_non_watson_crick_pairs=4,
     )
-    release_placement = ReleasePlacement(
-        variant_id="BsaI-HFv2",
-        orientation="forward",
-        recognition_sequence="GGTCTC",
-        source_catalog_id="type_iis_release_v1",
-        source_url="https://www.neb.com/en-us/products/r3733-bsai-hf-v2",
-        commercial_confidence="primary_vendor_current",
-        warning_codes=[],
-        recognition_site_start=-7,
-        recognition_site_end=-1,
-        top_cut_boundary=0,
-        bottom_cut_boundary=4,
-        retained_scar_start=0,
-        retained_scar_end=4,
-        retained_scar_nt=4,
-        recognition_site_excised=True,
-    )
-    nickase_placement = NickasePlacement(
-        variant_id="Test.TerminalBottomNickase",
-        specificity_id="TerminalBottomNickase",
-        orientation="forward",
-        motif_top_5to3="GGTCTCGNNNN",
-        vendor="dnadesign test fixture",
-        source_url="https://example.invalid/dnadesign/scar-nick-terminal-fixture",
-        source_family="nicking_endonuclease",
-        commercial_confidence="primary_vendor_current",
-        warning_codes=[],
-        source_site_start=-7,
-        source_site_end=4,
-        strand="bottom",
-        boundary=4,
-        terminal_boundary=4,
-        boundary_distance=0,
-        exact_terminal=True,
-    )
     candidate = evaluate_pair_candidate(
         left_base="GCCC",
         right_base="TGTC",
         context=context,
         s0_match_required=True,
         forbidden_release_sites=[],
-        release_placement=release_placement,
-        nickase_placement=nickase_placement,
+        release_placement=_release_placement(),
+        nickase_placement=_nickase_placement(),
     )
 
     visual = build_terminal_nick_visual_contract(
@@ -824,6 +875,10 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
     assert post_panel["fragment_spans"][0]["end"] == post_panel["retained_scar_span"]["start"]
     assert visual["nickase"]["canonical_read_row"] == "primary"
     assert visual["nickase"]["recognition_nt"] == 7
+    assert visual["meta"]["profile_order"] == "S3_S2_S1_S0"
+    assert visual["meta"]["type_iis_label"] == "BsaI-HFv2 GGTCTC"
+    assert visual["meta"]["nickase_label"] == "Test.TerminalBottomNickase GGTCTCGNNNN"
+    assert visual["meta"]["junction_label"] == "cut"
     assert {fill["semantic"] for fill in visual["rectangular_fills"]} >= {
         "type_iis_release_site",
         "retained_type_iis_scar",

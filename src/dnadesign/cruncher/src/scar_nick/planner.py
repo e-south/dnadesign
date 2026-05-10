@@ -20,41 +20,18 @@ from dnadesign.cruncher.nickases.models import (
     NickaseCatalog,
     NickaseCatalogEntry,
     iupac_bases_for_symbol,
-    normalize_dna,
-    reverse_complement,
 )
 from dnadesign.cruncher.release_enzymes.models import ReleaseEnzymeCatalog, ReleaseEnzymeEntry
 from dnadesign.cruncher.release_enzymes.scanning import derive_release_cut
+from dnadesign.cruncher.scar_nick.candidates import evaluate_pair_candidate
 from dnadesign.cruncher.scar_nick.geometry import (
     build_nickase_geometry_audit,
     compatible_scar_sequences_from_audit,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    entry_commercial_confidence as _geometry_entry_commercial_confidence,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    entry_warning_codes as _geometry_entry_warning_codes,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    iupac_symbol_is_fully_degenerate as _geometry_iupac_symbol_is_fully_degenerate,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    iupac_symbols_overlap as _geometry_iupac_symbols_overlap,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    nickase_entry_rejection_reasons as _geometry_nickase_entry_rejection_reasons,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    nickase_recognition_nt as _geometry_nickase_recognition_nt,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    placement_respects_terminal_downstream_rule as _geometry_placement_respects_terminal_downstream_rule,
-)
-from dnadesign.cruncher.scar_nick.geometry import (
-    placements_for_entry as _geometry_placements_for_entry,
+    iupac_symbols_overlap,
+    nickase_entry_rejection_reasons,
+    placements_for_entry,
 )
 from dnadesign.cruncher.scar_nick.models import (
-    CandidateRankingContext,
     JunctionSpec,
     NickaseGeometryAuditEntry,
     NickasePlacement,
@@ -66,18 +43,14 @@ from dnadesign.cruncher.scar_nick.models import (
     SearchSpec,
     ValidationIssue,
 )
-from dnadesign.cruncher.scar_nick.policy import classify_profile_policy
-from dnadesign.cruncher.scar_nick.profiles import classify_pair_profile
 from dnadesign.cruncher.scar_nick.ranking import (
     rank_pair_candidates,
     ranking_key,
     select_profile_bucket_candidates,
     unique_sequence_candidates,
 )
-from dnadesign.cruncher.utils.hashing import sha256_bytes
 
 _BASES = ("A", "C", "G", "T")
-_ALL_BASES = frozenset(_BASES)
 _RESERVE_REASON_PRIORITY = {
     "MIDDLE_MIDDLE_DOUBLE_HARD": 0,
     "MORE_THAN_TWO_NON_WATSON_CRICK": 1,
@@ -86,68 +59,6 @@ _RESERVE_REASON_PRIORITY = {
     "EXCESSIVE_EFFECTIVE_DISRUPTION": 4,
     "RESERVE_PROFILE_BUCKET": 5,
 }
-
-
-def _candidate_id(left_base: str, right_base: str) -> str:
-    return sha256_bytes(f"{left_base}/{right_base}".encode("utf-8"))[:12]
-
-
-def _gc_fraction(*sequences: str) -> float:
-    joined = "".join(sequences)
-    if not joined:
-        return 0.0
-    return sum(1 for base in joined if base in {"G", "C"}) / len(joined)
-
-
-def _reference_distances(
-    left_base: str,
-    right_base: str,
-    context: CandidateRankingContext,
-) -> tuple[int | None, dict[str, int]]:
-    distances: dict[str, int] = {}
-    for label, reference in sorted(context.optional_reference_profiles.items()):
-        observed_bases = left_base + right_base
-        expected_bases = reference.left_base + reference.right_base
-        distance = sum(
-            1 for observed, expected in zip(observed_bases, expected_bases, strict=True) if observed != expected
-        )
-        distances[label] = distance
-    if not distances:
-        return None, {}
-    if "working_control" in distances:
-        return distances["working_control"], distances
-    return min(distances.values()), distances
-
-
-def _contains_forbidden_release_site(retained_sequence: str, forbidden_release_sites: Iterable[str]) -> bool:
-    retained = normalize_dna(retained_sequence)
-    for raw_site in forbidden_release_sites:
-        site = normalize_dna(raw_site)
-        if site in retained or reverse_complement(site) in retained:
-            return True
-    return False
-
-
-def _pair_identities(profile) -> dict[str, str]:
-    return {pair.site: f"{pair.left_base}:{pair.right_base}" for pair in profile.pairs}
-
-
-def _tnna_flag(sequence: str) -> bool:
-    scar = normalize_dna(sequence)
-    return len(scar) == 4 and scar[0] == "T" and scar[3] == "A"
-
-
-def _surviving_strand(nicked_strand: str | None) -> str | None:
-    if nicked_strand == "top":
-        return "bottom"
-    if nicked_strand == "bottom":
-        return "top"
-    return None
-
-
-def _append_rejection(rejection_reasons: list[str], reason: str) -> None:
-    if reason not in rejection_reasons:
-        rejection_reasons.append(reason)
 
 
 def _select_reserve_policy_examples(
@@ -179,105 +90,6 @@ def _select_reserve_policy_examples(
         if len(selected) >= limit:
             return selected
     return selected
-
-
-def evaluate_pair_candidate(
-    *,
-    left_base: str,
-    right_base: str,
-    context: CandidateRankingContext,
-    s0_match_required: bool,
-    forbidden_release_sites: list[str],
-    release_placement: ReleasePlacement | None = None,
-    nickase_placement: NickasePlacement | None = None,
-    nick_distance: int = 0,
-) -> ScarNickCandidate:
-    left = normalize_dna(left_base)
-    right = normalize_dna(right_base)
-    profile = classify_pair_profile(left, right, allow_gt_wobble=context.allow_gt_wobble)
-    policy_decision = classify_profile_policy(
-        profile.profile_s3s2s1s0,
-        context=context,
-        s0_match_required=s0_match_required,
-    )
-    pair_identities = _pair_identities(profile)
-    retained_sequence = left
-    rejection_reasons: list[str] = []
-    if policy_decision.status == "reject":
-        _append_rejection(rejection_reasons, policy_decision.reason)
-    elif policy_decision.status == "reserve":
-        _append_rejection(rejection_reasons, f"PROFILE_POLICY_RESERVE:{policy_decision.reason}")
-    if profile.profile_s3s2s1s0 in context.reject_profiles:
-        _append_rejection(rejection_reasons, "REJECTED_PROFILE_BUCKET")
-    if context.target_profile_buckets and profile.profile_s3s2s1s0 not in context.target_profile_buckets:
-        _append_rejection(rejection_reasons, "PROFILE_BUCKET_NOT_TARGETED")
-    if profile.ligation_support < context.min_ligation_support:
-        _append_rejection(rejection_reasons, "INSUFFICIENT_LIGATION_SUPPORT")
-    if profile.effective_disruption > context.max_effective_disruption:
-        _append_rejection(rejection_reasons, "EXCESSIVE_EFFECTIVE_DISRUPTION")
-    if _contains_forbidden_release_site(retained_sequence, forbidden_release_sites):
-        _append_rejection(rejection_reasons, "RETAINED_RELEASE_RECOGNITION_SITE")
-
-    reference_distance, reference_distances = _reference_distances(left, right, context)
-    terminal_boundary = release_placement.retained_scar_end if release_placement is not None else 4
-    nick_boundary = (
-        nickase_placement.boundary if nickase_placement is not None else terminal_boundary + int(nick_distance)
-    )
-    nicked_strand = None if nickase_placement is None else nickase_placement.strand
-    surviving_strand = _surviving_strand(nicked_strand)
-    candidate = ScarNickCandidate(
-        candidate_id=_candidate_id(left, right),
-        left_base=left,
-        right_base=right,
-        retained_scar=left,
-        retained_product_sequence=retained_sequence,
-        profile_s3s2s1s0=profile.profile_s3s2s1s0,
-        profile_payload_outward=profile.profile_payload_outward,
-        profile_policy_status=policy_decision.status,
-        profile_policy_reason=policy_decision.reason,
-        s0_match_required=s0_match_required,
-        pair_classes=profile.pairs,
-        s3_pair_identity=pair_identities["S3"],
-        s2_pair_identity=pair_identities["S2"],
-        s1_pair_identity=pair_identities["S1"],
-        s0_pair_identity=pair_identities["S0"],
-        m_count=profile.watson_crick_count,
-        w_count=profile.wobble_count,
-        x_count=profile.hard_mismatch_count,
-        non_watson_crick_count=profile.non_watson_crick_count,
-        middle_hard_count=profile.middle_hard_count,
-        middle_wobble_count=profile.middle_wobble_count,
-        worst_hard_mismatch_tier=profile.worst_hard_mismatch_tier,
-        hard_mismatch_tier_sum=profile.hard_mismatch_tier_sum,
-        middle_hard_mismatch_tier_sum=profile.middle_hard_mismatch_tier_sum,
-        edge_hard_mismatch_tier_sum=profile.edge_hard_mismatch_tier_sum,
-        ligation_support=profile.ligation_support,
-        effective_disruption=profile.effective_disruption,
-        tnna_flag=_tnna_flag(left),
-        nicked_strand=nicked_strand,
-        surviving_strand=surviving_strand,
-        retained_scar_source="top_display_retained_scar_domain",
-        discarded_strand_enzyme_burden=nicked_strand,
-        release_placement=release_placement,
-        retained_scar_nt=len(left),
-        nickase_placement=nickase_placement,
-        nickase_site=(
-            None
-            if nickase_placement is None
-            else (
-                f"{nickase_placement.variant_id}:{nickase_placement.orientation}"
-                f"[{nickase_placement.source_site_start},{nickase_placement.source_site_end})"
-            )
-        ),
-        nick_boundary=nick_boundary,
-        terminal_boundary=terminal_boundary,
-        nick_distance=abs(nick_boundary - terminal_boundary),
-        gc_fraction=_gc_fraction(left, right),
-        reference_control_distance=reference_distance,
-        reference_distances=reference_distances,
-        rejection_reasons=rejection_reasons,
-    )
-    return candidate.model_copy(update={"rank_key": list(ranking_key(candidate, context))})
 
 
 def _release_placement(entry: ReleaseEnzymeEntry, *, required_terminal_scar_nt: int) -> ReleasePlacement:
@@ -364,41 +176,17 @@ def _motif_allows_base(motif: str, *, motif_offset: int, base: str) -> bool:
     return base in iupac_bases_for_symbol(motif[motif_offset])
 
 
-def _iupac_symbol_is_fully_degenerate(symbol: str) -> bool:
-    return _geometry_iupac_symbol_is_fully_degenerate(symbol)
-
-
-def _nickase_recognition_nt(entry: NickaseCatalogEntry) -> int:
-    return _geometry_nickase_recognition_nt(entry)
-
-
-def _entry_warning_codes(entry: NickaseCatalogEntry) -> list[str]:
-    return _geometry_entry_warning_codes(entry)
-
-
-def _entry_commercial_confidence(entry: NickaseCatalogEntry) -> str | None:
-    return _geometry_entry_commercial_confidence(entry)
-
-
 def _nickase_entry_rejection_reasons(
     entry: NickaseCatalogEntry,
     *,
     min_recognition_nt: int,
     disallowed_warning_codes: list[str],
 ) -> list[str]:
-    return _geometry_nickase_entry_rejection_reasons(
+    return nickase_entry_rejection_reasons(
         entry,
         min_recognition_nt=min_recognition_nt,
         disallowed_warning_codes=disallowed_warning_codes,
     )
-
-
-def _iupac_symbols_overlap(left_symbol: str, right_symbol: str) -> bool:
-    return _geometry_iupac_symbols_overlap(left_symbol, right_symbol)
-
-
-def _placement_respects_terminal_downstream_rule(placement: NickasePlacement) -> bool:
-    return _geometry_placement_respects_terminal_downstream_rule(placement)
 
 
 def _candidate_matches_sequence_of_interest(
@@ -416,13 +204,13 @@ def _candidate_matches_sequence_of_interest(
 
     for release_offset, release_symbol in enumerate(release_placement.recognition_sequence):
         coordinate = release_placement.recognition_site_start + release_offset
-        if 0 <= coordinate < len(retained_sequence) and not _iupac_symbols_overlap(
+        if 0 <= coordinate < len(retained_sequence) and not iupac_symbols_overlap(
             release_symbol,
             retained_sequence[coordinate],
         ):
             return False
         motif_offset = coordinate - nickase_placement.source_site_start
-        if 0 <= motif_offset < len(nickase_placement.motif_top_5to3) and not _iupac_symbols_overlap(
+        if 0 <= motif_offset < len(nickase_placement.motif_top_5to3) and not iupac_symbols_overlap(
             nickase_placement.motif_top_5to3[motif_offset],
             release_symbol,
         ):
@@ -442,7 +230,7 @@ def _nickase_placements(
     for boundary in (terminal_boundary, terminal_boundary - 1, terminal_boundary + 1):
         for entry in nickase_catalog.entries:
             placements.extend(
-                _placements_for_entry(
+                placements_for_entry(
                     entry,
                     terminal_boundary=terminal_boundary,
                     boundary=boundary,
@@ -461,25 +249,6 @@ def _nickase_placements(
             item.source_site_start,
             item.source_site_end,
         ),
-    )
-
-
-def _placements_for_entry(
-    entry: NickaseCatalogEntry,
-    *,
-    terminal_boundary: int,
-    boundary: int,
-    target_strand: str = "bottom",
-    min_recognition_nt: int = 4,
-    disallowed_warning_codes: list[str] | None = None,
-) -> list[NickasePlacement]:
-    return _geometry_placements_for_entry(
-        entry,
-        terminal_boundary=terminal_boundary,
-        boundary=boundary,
-        target_strand=target_strand,
-        min_recognition_nt=min_recognition_nt,
-        disallowed_warning_codes=disallowed_warning_codes or [],
     )
 
 
@@ -703,68 +472,6 @@ def build_scar_nick_report(
     )
 
 
-def render_markdown_report(report: ScarNickEvaluationReport) -> str:
-    run_dir = report.run_dir
-    if run_dir:
-        try:
-            run_dir = str(Path(run_dir).resolve().relative_to(Path(report.workspace_root).resolve()))
-        except ValueError:
-            run_dir = Path(run_dir).name
-    lines = [
-        f"# Scar-Nick Report: {report.spec_name}",
-        "",
-        f"- status: {report.status}",
-        f"- workflow: {report.workflow}",
-        f"- terminal_boundary: {report.metadata.terminal_boundary}",
-        f"- release_variant: {report.metadata.release_variant_id}",
-        f"- accepted_candidates: {len(report.candidates)}",
-        f"- compatible_nickase_placements: {report.metadata.compatible_nickase_placement_count}",
-        f"- enzyme_compatible_scars: {report.metadata.enzyme_compatible_scar_count}",
-    ]
-    if run_dir:
-        lines.append(f"- run_dir: {run_dir}")
-    lines.extend(
-        [
-            "",
-            "## Handoff Tables",
-            "",
-            "- candidate_table: `export/table__scar_nick_candidates.csv`",
-            "- candidate_pair_call_table: `export/table__scar_nick_candidate_pair_calls.csv`",
-            "- nickase_geometry_audit_table: `export/table__scar_nick_nickase_geometry_audit.csv`",
-        ]
-    )
-    if report.candidates:
-        lines.extend(["", "## Candidates"])
-        for candidate in report.candidates:
-            lines.append(
-                f"- rank {candidate.rank}: `{candidate.left_base}/{candidate.right_base}` "
-                f"profile={candidate.profile_s3s2s1s0} "
-                f"policy={candidate.profile_policy_status}:{candidate.profile_policy_reason} "
-                f"non_wc={candidate.non_watson_crick_count} "
-                f"middle_hard={candidate.middle_hard_count} "
-                f"hard_tier={candidate.hard_mismatch_tier_sum} "
-                f"middle_hard_tier={candidate.middle_hard_mismatch_tier_sum} "
-                f"nick={candidate.nickase_site}"
-            )
-    if report.reserve_candidates:
-        lines.extend(["", "## Reserve Profile Examples"])
-        for candidate in report.reserve_candidates:
-            lines.append(
-                f"- `{candidate.left_base}/{candidate.right_base}` "
-                f"profile={candidate.profile_s3s2s1s0} "
-                f"policy={candidate.profile_policy_status}:{candidate.profile_policy_reason} "
-                f"non_wc={candidate.non_watson_crick_count} "
-                f"nick={candidate.nickase_site}"
-            )
-    if report.issues:
-        lines.extend(["", "## Issues"])
-        for issue in report.issues:
-            lines.append(f"- {issue.code}: {issue.message}")
-    return "\n".join(lines) + "\n"
-
-
 __all__ = [
     "build_scar_nick_report",
-    "evaluate_pair_candidate",
-    "render_markdown_report",
 ]

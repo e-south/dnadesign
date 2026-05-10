@@ -57,22 +57,22 @@ from dnadesign.cruncher.scar_nick.artifacts import (
     spec_snapshot_path,
     status_path,
     views_manifest_path,
-    write_candidate_pair_call_table,
-    write_candidate_table,
     write_manifest,
     write_materialized_candidate_manifest,
-    write_nickase_geometry_audit_table,
     write_report,
     write_status,
     write_visual_bundle,
 )
 from dnadesign.cruncher.scar_nick.load import load_scar_nick_spec
 from dnadesign.cruncher.scar_nick.models import ScarNickCandidate, ScarNickEvaluationReport, ScarNickSpecDocument
-from dnadesign.cruncher.scar_nick.planner import (
-    build_scar_nick_report,
-    render_markdown_report,
-)
+from dnadesign.cruncher.scar_nick.planner import build_scar_nick_report
 from dnadesign.cruncher.scar_nick.ranking import unique_sequence_candidates
+from dnadesign.cruncher.scar_nick.reporting import render_markdown_report
+from dnadesign.cruncher.scar_nick.tables import (
+    write_candidate_pair_call_table,
+    write_candidate_table,
+    write_nickase_geometry_audit_table,
+)
 from dnadesign.cruncher.scar_nick.view_contracts import (
     build_candidate_visual_bundle,
     build_terminal_nick_visual_contract,

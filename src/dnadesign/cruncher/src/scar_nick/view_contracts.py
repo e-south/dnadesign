@@ -548,6 +548,18 @@ def build_terminal_nick_visual_contract(
             **view["meta"],
             "visual_state_kind": state_kind,
             "display_panels": panels,
+            "profile_order": candidate.profile_order,
+            "type_iis_label": (
+                f"{candidate.release_placement.variant_id} {candidate.release_placement.recognition_sequence}"
+                if candidate.release_placement is not None
+                else ""
+            ),
+            "nickase_label": (
+                f"{nickase_payload['variant_id']} {nickase_payload['motif_top_5to3']}"
+                if nickase_payload is not None
+                else ""
+            ),
+            "junction_label": "cut",
             "panel_spacer_indices": spacer_indices,
             "panel_transition_arrows": [{"start": panels[0]["end"], "end": panels[1]["start"]}],
             "fragment_spans": [post_fragment_span],

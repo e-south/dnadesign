@@ -280,6 +280,25 @@ def test_scar_nick_visual_contract_validates_nick_state_payload() -> None:
     assert nickase_fills[0].start == contract.panels[0].nickase_site_span.start
 
 
+def test_scar_nick_visual_contract_requires_nickase_strand_and_fragment_row_consistency() -> None:
+    mismatched_strand = _scar_nick_visual_payload()
+    mismatched_strand["nickase"]["strand"] = "top"
+    with pytest.raises(ValueError, match="nickase strand must match nicked_strand"):
+        ScarNickVisualV1.model_validate(mismatched_strand)
+
+    wrong_fragment_row = _scar_nick_visual_payload()
+    wrong_fragment_row["panels"][1]["fragment_spans"][0]["row"] = "primary"
+    with pytest.raises(ValueError, match="fragment spans must be on the nicked strand"):
+        ScarNickVisualV1.model_validate(wrong_fragment_row)
+
+    fragment_over_scar = _scar_nick_visual_payload()
+    fragment_over_scar["panels"][1]["fragment_spans"][0]["end"] = (
+        fragment_over_scar["panels"][1]["retained_scar_span"]["start"] + 1
+    )
+    with pytest.raises(ValueError, match="fragment spans must stop before the retained scar"):
+        ScarNickVisualV1.model_validate(fragment_over_scar)
+
+
 def test_scar_nick_visual_contract_accepts_catalog_type_iis_release_without_bsa_i_pin() -> None:
     payload = _scar_nick_visual_payload()
     payload["release_placement"]["variant_id"] = "BbsI-HF"

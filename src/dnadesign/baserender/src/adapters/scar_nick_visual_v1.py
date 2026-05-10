@@ -24,7 +24,7 @@ _NICKASE_EDGE = "#0072B2"
 _TYPE_IIS_TEXT = "#7A6500"
 _NICKASE_TEXT = "#005A8D"
 _MISMATCH_CONNECTOR = "#111827"
-_FRAGMENT_TEXT = "#94A3B8"
+_FRAGMENT_TEXT = "#64748B"
 _PANEL_EDGE = "#CBD5E1"
 _CELL_WIDTH_SCALE = 1.12
 
@@ -150,29 +150,44 @@ def _protected_site_edge_markers(contract: ScarNickVisualV1) -> list[dict[str, o
 def _segment_labels(contract: ScarNickVisualV1) -> list[dict[str, object]]:
     pre_panel = _pre_release_panel(contract)
     post_panel = _post_release_panel(contract)
+    release_label = f"{contract.release_placement.variant_id} {contract.release_placement.recognition_sequence}"
+    nickase_label = f"{contract.nickase.variant_id} {contract.nickase.motif_top_5to3}"
+    nickase_row = _nickase_display_row(contract)
     return [
         {
-            "text": contract.release_placement.variant_id,
+            "text": release_label,
             "start": pre_panel.release_site_span.start,
             "end": pre_panel.release_site_span.end,
             "row_id": "primary",
+            "label_side": "above",
             "color": _TYPE_IIS_TEXT,
             "label_offset_px": -12.0,
         },
         {
-            "text": contract.nickase.variant_id,
+            "text": nickase_label,
             "start": pre_panel.nickase_site_span.start,
             "end": pre_panel.nickase_site_span.end,
-            "row_id": "complement",
+            "row_id": nickase_row,
+            "label_side": "below",
             "color": _NICKASE_TEXT,
             "label_offset_px": 0.0,
         },
         {
-            "text": contract.release_placement.variant_id,
+            "text": release_label,
             "start": post_panel.release_site_span.start,
             "end": post_panel.release_site_span.end,
             "row_id": "primary",
+            "label_side": "above",
             "color": _TYPE_IIS_TEXT,
+            "label_offset_px": -12.0,
+        },
+        {
+            "text": "cut",
+            "start": post_panel.terminal_boundary - 1,
+            "end": post_panel.terminal_boundary,
+            "row_id": "primary",
+            "label_side": "above",
+            "color": "#111827",
             "label_offset_px": -12.0,
         },
     ]
@@ -218,9 +233,9 @@ class ScarNickVisualV1Adapter:
             raise SchemaError(f"Invalid scar_nick_visual_v1 contract at row {row_index}: {exc}") from exc
 
         tag_labels = {
-            "owner:type_iis_release_site": "Type IIS release site",
+            "owner:type_iis_release_site": "Type IIS restriction site",
             "owner:retained_type_iis_scar": "Retained Type IIS scar",
-            "effect:nickase_footprint": "Nickase footprint",
+            "effect:nickase_footprint": "Nicking endonuclease footprint",
         }
 
         nick_lane = "primary" if contract.nicked_strand == "top" else "complement"
@@ -296,6 +311,7 @@ class ScarNickVisualV1Adapter:
                 "scar_nick": {
                     "state_kind": contract.state_kind,
                     "event_scope": contract.event_scope,
+                    "profile_order": "S3_S2_S1_S0",
                     "terminal_boundary": contract.terminal_boundary,
                     "nick_boundary": contract.nick_boundary,
                     "nick_state": contract.nick_state,
@@ -305,6 +321,12 @@ class ScarNickVisualV1Adapter:
                     "surviving_strand": contract.surviving_strand,
                     "profile_s3s2s1s0": contract.profile_s3s2s1s0,
                     "profile_payload_outward": contract.profile_payload_outward,
+                    "type_iis_variant_id": contract.release_placement.variant_id,
+                    "type_iis_recognition_sequence": contract.release_placement.recognition_sequence,
+                    "type_iis_top_cut_boundary": contract.release_placement.top_cut_boundary,
+                    "type_iis_bottom_cut_boundary": contract.release_placement.bottom_cut_boundary,
+                    "nickase_variant_id": contract.nickase.variant_id,
+                    "nickase_motif_top_5to3": contract.nickase.motif_top_5to3,
                 },
             },
         )

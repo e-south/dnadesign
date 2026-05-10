@@ -359,6 +359,8 @@ class ScarNickVisualV1(VisualContractModel):
             raise ValueError("scar-nick visual requires an excised Type IIS recognition site")
         if self.nickase.exact_terminal is not True:
             raise ValueError("scar-nick visual requires an exact terminal nickase placement")
+        if self.nickase.strand != self.nicked_strand:
+            raise ValueError("nickase strand must match nicked_strand")
         if self.nickase.display_boundary != self.nick_boundary:
             raise ValueError("nickase display_boundary must equal nick_boundary")
         if self.nickase.display_site_span.start != self.nickase_site_span.start:
@@ -401,9 +403,16 @@ class ScarNickVisualV1(VisualContractModel):
             raise ValueError("scar-nick visual panels must be ordered pre_release, post_release")
         right_display = self.right_base.upper()[::-1]
         allowed_non_complement_indices: set[int] = set()
+        expected_fragment_row = "primary" if self.nicked_strand == "top" else "complement"
         for panel in self.panels:
             if panel.end > sequence_length:
                 raise ValueError("panel must lie within primary_sequence bounds")
+            if panel.panel_id == "post_release":
+                for fragment_span in panel.fragment_spans:
+                    if fragment_span.row != expected_fragment_row:
+                        raise ValueError("post-release fragment spans must be on the nicked strand")
+                    if fragment_span.end > panel.retained_scar_span.start:
+                        raise ValueError("post-release fragment spans must stop before the retained scar")
             downstream = self.primary_sequence[panel.terminal_boundary : panel.end]
             if any(symbol.upper() != "N" for symbol in downstream):
                 raise ValueError("scar-nick visual allows only degenerate N symbols downstream of each terminal nick")

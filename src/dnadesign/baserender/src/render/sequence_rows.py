@@ -1687,6 +1687,9 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
         row_id = str(raw.get("row_id", "primary")).strip().lower() or "primary"
         if row_id not in {"primary", "complement"}:
             row_id = "primary"
+        side = str(raw.get("label_side", "")).strip().lower()
+        if side not in {"above", "below"}:
+            side = "below" if row_id == "complement" else "above"
         color = str(raw.get("color", "#111827")).strip() or "#111827"
         try:
             label_offset_px = float(raw.get("label_offset_px", 0.0))
@@ -1696,7 +1699,7 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
         text_width = _text_px_width(text, style.font_label, int(round(font_size)), style.dpi)
         x0 = x - text_width / 2.0
         x1 = x + text_width / 2.0
-        tiers = bottom_tiers if row_id == "complement" else top_tiers
+        tiers = bottom_tiers if side == "below" else top_tiers
         tier_index = len(tiers)
         for candidate_index, occupied in enumerate(tiers):
             if all((x1 + horizontal_gap) <= left or (x0 - horizontal_gap) >= right for left, right in occupied):
@@ -1705,13 +1708,13 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
                 break
         else:
             tiers.append([(x0, x1)])
-        placements.append((row_id, text, x, tier_index, color, label_offset_px))
+        placements.append((side, text, x, tier_index, color, label_offset_px))
 
     top_base_y = layout.y_forward + layout.sequence_extent_up + max(18.0, style.font_size_label * 1.4)
     bottom_base_y = layout.y_reverse - layout.sequence_extent_down - max(16.0, style.font_size_label * 1.2)
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
-    for row_id, text, x, tier_index, color, label_offset_px in placements:
-        if row_id == "complement" and show_two:
+    for side, text, x, tier_index, color, label_offset_px in placements:
+        if side == "below" and show_two:
             y = bottom_base_y - tier_index * line_height * 1.05 + label_offset_px
             va = "top"
         else:

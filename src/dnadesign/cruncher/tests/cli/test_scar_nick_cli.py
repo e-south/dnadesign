@@ -174,6 +174,21 @@ def test_scar_nick_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> Non
     assert (run_dir / "analysis" / "candidate_profiles.json").exists()
     assert (run_dir / "analysis" / "nickase_geometry_audit.json").exists()
     assert (run_dir / "export" / "table__scar_nick_candidates.csv").exists()
+    candidate_rows = list(
+        csv.DictReader((run_dir / "export" / "table__scar_nick_candidates.csv").open(encoding="utf-8"))
+    )
+    assert set(candidate_rows[0]) >= {
+        "release_variant_id",
+        "release_recognition_sequence",
+        "release_top_cut_boundary",
+        "release_bottom_cut_boundary",
+        "nickase_variant_id",
+        "nickase_motif_top_5to3",
+        "nickase_strand",
+        "nickase_exact_terminal",
+    }
+    assert candidate_rows[0]["release_recognition_sequence"]
+    assert candidate_rows[0]["nickase_motif_top_5to3"]
     pair_call_table = run_dir / "export" / "table__scar_nick_candidate_pair_calls.csv"
     assert pair_call_table.exists()
     assert (run_dir / "export" / "table__scar_nick_nickase_geometry_audit.csv").exists()
@@ -285,6 +300,10 @@ def test_scar_nick_design_writes_unique_terminal_nick_visuals_and_baserender_job
     ]
     assert post["meta"]["processing_event_scope"] == "terminal_nick"
     assert post["meta"]["release_site_role"] == "excised_provenance"
+    assert post["meta"]["profile_order"] == "S3_S2_S1_S0"
+    assert post["meta"]["type_iis_label"] == "BsaI-HFv2 GGTCTC"
+    assert post["meta"]["nickase_label"] == "Test.TerminalBottomNickase GGTCTCGNNNN"
+    assert post["meta"]["junction_label"] == "cut"
 
     materialized_dirs = sorted((run_dir / "analysis" / "materialized_candidates").iterdir())
     assert [path.name for path in materialized_dirs] == ["candidate_01", "candidate_02"]
