@@ -16,11 +16,12 @@ phenotype predictor.
    model.
 7. `ranking.py` performs deterministic bucket coverage and tie-breaking.
 8. `tables.py` writes the CSV handoff tables.
-9. `artifacts.py` owns artifact paths, manifests, snapshots, and visual bundle
-   persistence.
+9. `artifacts.py` owns artifact paths, manifests, snapshots, and generic
+   persistence helpers.
 10. `visual_geometry.py` builds display-coordinate spans and aligned sequences.
-11. `view_contracts.py` publishes the pre/post terminal-nick visual contract.
-12. `reporting.py` renders the Markdown run summary.
+11. `view_contracts.py` builds the pre/post terminal-nick visual contract.
+12. `visual_publication.py` writes visual bundles and checks artifact drift.
+13. `reporting.py` renders the Markdown run summary.
 
 ## Core Semantics
 

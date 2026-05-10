@@ -410,9 +410,9 @@ class ScarNickVisualV1(VisualContractModel):
             if panel.panel_id == "post_release":
                 for fragment_span in panel.fragment_spans:
                     if fragment_span.row != expected_fragment_row:
-                        raise ValueError("post-release fragment spans must be on the nicked strand")
+                        raise ValueError("post_release fragment spans must be on the nicked strand")
                     if fragment_span.end > panel.retained_scar_span.start:
-                        raise ValueError("post-release fragment spans must stop before the retained scar")
+                        raise ValueError("post_release fragment spans must stop before the retained scar")
             downstream = self.primary_sequence[panel.terminal_boundary : panel.end]
             if any(symbol.upper() != "N" for symbol in downstream):
                 raise ValueError("scar-nick visual allows only degenerate N symbols downstream of each terminal nick")

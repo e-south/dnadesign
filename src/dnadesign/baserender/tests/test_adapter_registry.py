@@ -165,7 +165,7 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
     post_offset = len(pre_sequence) + len(spacer)
     pre_panel = {
         "panel_id": "pre_release",
-        "title": "pre-release",
+        "title": "before terminal nick",
         "state_kind": "pre_terminal_nick",
         "nick_state": "intact",
         "start": 0,
@@ -181,7 +181,7 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
     }
     post_panel = {
         "panel_id": "post_release",
-        "title": "post-release",
+        "title": "after terminal nick",
         "state_kind": "post_terminal_nick",
         "nick_state": "nicked",
         "start": post_offset,
@@ -315,8 +315,8 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["span_backdrops"][0]["end"] == 6
     assert record.meta["span_backdrops"][0]["corner_radius"] == 0.0
     assert record.features == ()
-    assert "pre-release" not in record.display.overlay_text
-    assert "post-release" not in record.display.overlay_text
+    assert "before terminal nick" not in record.display.overlay_text
+    assert "after terminal nick" not in record.display.overlay_text
     assert record.meta["segment_labels"][0]["text"] == "BsaI-HFv2 GGTCTC"
     assert record.meta["segment_labels"][1]["text"] == "Test.TerminalBottomNickase GGTCTCGNNNN"
     assert record.meta["segment_labels"][1]["row_id"] == "complement"
@@ -354,7 +354,7 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["scar_nick"]["nickase_motif_top_5to3"] == "GGTCTCGNNNN"
 
     second_row = adapter.apply(_scar_nick_adapter_payload(), row_index=1)
-    assert "pre-release" not in second_row.display.overlay_text
+    assert "before terminal nick" not in second_row.display.overlay_text
     assert second_row.meta["segment_labels"][0]["text"] == "BsaI-HFv2 GGTCTC"
 
 

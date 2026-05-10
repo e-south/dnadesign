@@ -186,6 +186,8 @@ def test_scar_nick_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> Non
         "nickase_motif_top_5to3",
         "nickase_strand",
         "nickase_exact_terminal",
+        "non_watson_crick_count",
+        "non_wc_count",
     }
     assert candidate_rows[0]["release_recognition_sequence"]
     assert candidate_rows[0]["nickase_motif_top_5to3"]
@@ -213,10 +215,14 @@ def test_scar_nick_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> Non
         "is_watson_crick",
         "is_wobble",
         "is_hard_mismatch",
+        "non_watson_crick_count",
+        "non_wc_count",
     }
+    assert all(row["non_wc_count"] == row["non_watson_crick_count"] for row in candidate_rows)
     assert {row["site"] for row in pair_call_rows if row["rank"] == "1"} == {"S3", "S2", "S1", "S0"}
     assert any(row["class_label"] in {"W", "X"} for row in pair_call_rows)
     assert all(row["pair_identity"] == f"{row['left_nt']}:{row['aligned_right_nt']}" for row in pair_call_rows)
+    assert all(row["non_wc_count"] == row["non_watson_crick_count"] for row in pair_call_rows)
 
     show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
     assert show_result.exit_code == 0

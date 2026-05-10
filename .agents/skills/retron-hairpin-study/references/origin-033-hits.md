@@ -34,8 +34,9 @@ enzyme to `BspQI` and finds exact 0/3/3 hits for `Nt.BstNBI`, `Nt.AlwI`,
 - `0/3/3` means logical origin `0`, stem length `3`, and cap length `3` in the
   final released-product geometry.
 - Use the retained-active screen semantics with `BspQI` pinned as the Type IIS
-  release enzyme for this answer. Older exposed-bottom-only probe language can
-  report near-only and should not be used as the final answer for this question.
+  release enzyme for this answer. Older exposed-strand probe language can
+  report near-only hits and should not be used as the final answer for this
+  question.
 - The screen is a dual-enzyme precursor search. The nickase can appear as a
   forward or reverse-oriented vendor footprint; the visual should bold the
   strand where the canonical 5' to 3' site appears.
