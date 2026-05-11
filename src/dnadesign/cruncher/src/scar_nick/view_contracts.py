@@ -286,11 +286,12 @@ def build_terminal_nick_visual_contract(
     view = build_terminal_nick_view(candidate=candidate, solution_id=solution_id, state_kind="post_terminal_nick")
     context = build_visual_context(candidate)
     panel_sequence = context.primary_sequence_5to3
-    panel_complement = pairing_complement_sequence(sequence=panel_sequence, context=context, candidate=candidate)
+    pre_panel_complement = complement_sequence(panel_sequence)
+    post_panel_complement = pairing_complement_sequence(sequence=panel_sequence, context=context, candidate=candidate)
     spacer = "N" * _PANEL_SPACER_NT
     post_offset = len(panel_sequence) + len(spacer)
     primary_sequence = panel_sequence + spacer + panel_sequence
-    complement = panel_complement + spacer + panel_complement
+    complement = pre_panel_complement + spacer + post_panel_complement
 
     post_fragment_row = "primary" if candidate.nicked_strand == "top" else "complement"
     post_fragment_span = {

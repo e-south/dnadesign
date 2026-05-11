@@ -882,7 +882,7 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
 
     assert visual["state_kind"] == "pre_post_terminal_nick"
     assert visual["primary_sequence"] == "GGTCTCGGCCCNNNNGGTCTCGGCCC"
-    assert visual["complement_sequence"] == "CCAGAGCCTGTNNNNCCAGAGCCTGT"
+    assert visual["complement_sequence"] == "CCAGAGCCGGGNNNNCCAGAGCCTGT"
     assert visual["primary_sequence"][0:6] == "GGTCTC"
     assert visual["release_site_span"] == {"start": 15, "end": 21}
     assert visual["retained_scar_span"] == {"start": 22, "end": 26}
@@ -908,6 +908,44 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
         "retained_type_iis_scar",
         "nickase_footprint",
     }
+
+
+def test_terminal_nick_visual_keeps_pre_release_duplex_watson_crick_until_adapter_anneals() -> None:
+    context = CandidateRankingContext(
+        target_profile_buckets=[],
+        reject_profiles=[],
+        allow_gt_wobble=True,
+        active_max_hard_mismatches=4,
+        active_max_non_watson_crick_pairs=4,
+    )
+    candidate = evaluate_pair_candidate(
+        left_base="GCCC",
+        right_base="TGTC",
+        context=context,
+        s0_match_required=True,
+        forbidden_release_sites=[],
+        release_placement=_release_placement(),
+        nickase_placement=_nickase_placement(),
+    )
+
+    visual = build_terminal_nick_visual_contract(
+        candidate=candidate,
+        solution_id="demo.candidate_01",
+        state_kind="pre_post_terminal_nick",
+    )
+
+    pre_panel, post_panel = visual["panels"]
+    pre_slice = slice(pre_panel["start"], pre_panel["end"])
+    post_scar = slice(post_panel["retained_scar_span"]["start"], post_panel["retained_scar_span"]["end"])
+    pre_scar = slice(pre_panel["retained_scar_span"]["start"], pre_panel["retained_scar_span"]["end"])
+
+    assert visual["complement_sequence"][pre_slice] == "CCAGAGCCGGG"
+    assert visual["complement_sequence"][pre_scar] == "CGGG"
+    assert visual["complement_sequence"][post_scar] == candidate.right_base[::-1]
+    assert visual["meta"]["mismatch_indices"] == [
+        post_panel["retained_scar_span"]["start"] + 1,
+        post_panel["retained_scar_span"]["start"] + 3,
+    ]
 
 
 def test_terminal_nick_view_rejects_boundary_off_retained_scar_end() -> None:

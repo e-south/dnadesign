@@ -56,12 +56,13 @@ def _scar_nick_fill(panel: dict[str, object], semantic: str, fill_id: str, fill:
 
 def _scar_nick_visual_payload() -> dict[str, object]:
     pre_sequence = "GGTCTCGGCCC"
-    pre_complement = "CCAGAGCCTGT"
+    pre_complement = "CCAGAGCCGGG"
+    post_complement = "CCAGAGCCTGT"
     spacer = "NNNN"
     post_offset = len(pre_sequence) + len(spacer)
     pre_panel = {
         "panel_id": "pre_release",
-        "title": "pre-release",
+        "title": "before terminal nick",
         "state_kind": "pre_terminal_nick",
         "nick_state": "intact",
         "start": 0,
@@ -77,7 +78,7 @@ def _scar_nick_visual_payload() -> dict[str, object]:
     }
     post_panel = {
         "panel_id": "post_release",
-        "title": "post-release",
+        "title": "after terminal nick",
         "state_kind": "post_terminal_nick",
         "nick_state": "nicked",
         "start": post_offset,
@@ -110,7 +111,7 @@ def _scar_nick_visual_payload() -> dict[str, object]:
         "event_scope": "terminal_nick",
         "alphabet": "iupac_dna",
         "primary_sequence": pre_sequence + spacer + pre_sequence,
-        "complement_sequence": pre_complement + spacer + pre_complement,
+        "complement_sequence": pre_complement + spacer + post_complement,
         "primary_row_label": "Top",
         "complement_row_label": "Bottom",
         "terminal_boundary": post_offset + 11,
@@ -321,10 +322,20 @@ def test_scar_nick_visual_contract_rejects_non_rectangular_scar_fill() -> None:
 def test_scar_nick_visual_contract_rejects_complement_drift() -> None:
     payload = _scar_nick_visual_payload()
     complement = list(str(payload["complement_sequence"]))
-    complement[0] = "A"
+    complement[15] = "A"
     payload["complement_sequence"] = "".join(complement)
 
-    with pytest.raises(ValueError, match="complement only inside retained scar panels"):
+    with pytest.raises(ValueError, match="complement only inside post_release retained scar"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_pre_release_adapter_mismatch() -> None:
+    payload = _scar_nick_visual_payload()
+    complement = list(str(payload["complement_sequence"]))
+    complement[10] = "T"
+    payload["complement_sequence"] = "".join(complement)
+
+    with pytest.raises(ValueError, match="pre_release panel must be Watson-Crick paired"):
         ScarNickVisualV1.model_validate(payload)
 
 

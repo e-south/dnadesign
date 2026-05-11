@@ -160,7 +160,8 @@ def test_snapback_visual_adapter_requires_no_source_columns() -> None:
 
 def _scar_nick_adapter_payload() -> dict[str, object]:
     pre_sequence = "GGTCTCGGCCC"
-    pre_complement = "CCAGAGCCTGT"
+    pre_complement = "CCAGAGCCGGG"
+    post_complement = "CCAGAGCCTGT"
     spacer = "NNNN"
     post_offset = len(pre_sequence) + len(spacer)
     pre_panel = {
@@ -225,7 +226,7 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
         "event_scope": "terminal_nick",
         "alphabet": "iupac_dna",
         "primary_sequence": pre_sequence + spacer + pre_sequence,
-        "complement_sequence": pre_complement + spacer + pre_complement,
+        "complement_sequence": pre_complement + spacer + post_complement,
         "primary_row_label": "Top",
         "complement_row_label": "Bottom",
         "terminal_boundary": post_offset + 11,

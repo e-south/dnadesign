@@ -402,11 +402,27 @@ class ScarNickVisualV1(VisualContractModel):
         if panel_ids != ["pre_release", "post_release"]:
             raise ValueError("scar-nick visual panels must be ordered pre_release, post_release")
         right_display = self.right_base.upper()[::-1]
+        perfect_complement = _complement_3to5(self.primary_sequence)
         allowed_non_complement_indices: set[int] = set()
         expected_fragment_row = "primary" if self.nicked_strand == "top" else "complement"
         for panel in self.panels:
             if panel.end > sequence_length:
                 raise ValueError("panel must lie within primary_sequence bounds")
+            panel_release = self.primary_sequence[panel.release_site_span.start : panel.release_site_span.end]
+            for observed_symbol, expected_symbol in zip(panel_release, release_sequence, strict=True):
+                if not _iupac_symbols_overlap(observed_symbol, expected_symbol):
+                    raise ValueError(
+                        f"{panel.panel_id} release_site_span must match release_placement recognition_sequence"
+                    )
+            panel_nickase = self.primary_sequence[panel.nickase_site_span.start : panel.nickase_site_span.end]
+            for observed_symbol, expected_symbol in zip(panel_nickase, nickase_motif, strict=True):
+                if not _iupac_symbols_overlap(observed_symbol, expected_symbol):
+                    raise ValueError(f"{panel.panel_id} nickase_site_span must match nickase motif")
+            if panel.panel_id == "pre_release":
+                observed_panel_complement = self.complement_sequence[panel.start : panel.end]
+                expected_panel_complement = perfect_complement[panel.start : panel.end]
+                if observed_panel_complement.upper() != expected_panel_complement.upper():
+                    raise ValueError("pre_release panel must be Watson-Crick paired before adapter annealing")
             if panel.panel_id == "post_release":
                 for fragment_span in panel.fragment_spans:
                     if fragment_span.row != expected_fragment_row:
@@ -418,16 +434,22 @@ class ScarNickVisualV1(VisualContractModel):
                 raise ValueError("scar-nick visual allows only degenerate N symbols downstream of each terminal nick")
             if self.primary_sequence[panel.retained_scar_span.start : panel.retained_scar_span.end] != self.left_base:
                 raise ValueError("each panel retained_scar_span must match left_base")
-            observed_right = self.complement_sequence[panel.retained_scar_span.start : panel.retained_scar_span.end]
-            if observed_right != right_display:
-                raise ValueError("each panel retained_scar_span on complement row must display right_base in S-order")
-            allowed_non_complement_indices.update(range(panel.retained_scar_span.start, panel.retained_scar_span.end))
-        perfect_complement = _complement_3to5(self.primary_sequence)
+            if panel.panel_id == "post_release":
+                observed_right = self.complement_sequence[panel.retained_scar_span.start : panel.retained_scar_span.end]
+                if observed_right != right_display:
+                    raise ValueError(
+                        "post_release retained_scar_span on complement row must display right_base in S-order"
+                    )
+                allowed_non_complement_indices.update(
+                    range(panel.retained_scar_span.start, panel.retained_scar_span.end)
+                )
         for index, (observed, expected) in enumerate(zip(self.complement_sequence, perfect_complement, strict=True)):
             if index in allowed_non_complement_indices:
                 continue
             if observed.upper() != expected.upper():
-                raise ValueError("complement_sequence may differ from complement only inside retained scar panels")
+                raise ValueError(
+                    "complement_sequence may differ from complement only inside post_release retained scar"
+                )
         for fill in self.rectangular_fills:
             if fill.end > sequence_length:
                 raise ValueError("rectangular fill must lie within primary_sequence bounds")
