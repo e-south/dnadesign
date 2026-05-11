@@ -383,7 +383,7 @@ def build_terminal_nick_visual_contract(
                 if nickase_payload is not None
                 else ""
             ),
-            "junction_label": "cut",
+            "junction_label": "",
             "panel_spacer_indices": spacer_indices,
             "panel_transition_arrows": [{"start": panels[0]["end"], "end": panels[1]["start"]}],
             "fragment_spans": [post_fragment_span],

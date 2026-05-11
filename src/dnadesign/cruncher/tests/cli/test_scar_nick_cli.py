@@ -310,7 +310,7 @@ def test_scar_nick_design_writes_unique_terminal_nick_visuals_and_baserender_job
     assert post["meta"]["profile_order"] == "S3_S2_S1_S0"
     assert post["meta"]["type_iis_label"] == "BsaI-HFv2 GGTCTC"
     assert post["meta"]["nickase_label"] == "Test.TerminalBottomNickase GGTCTCGNNNN"
-    assert post["meta"]["junction_label"] == "cut"
+    assert post["meta"]["junction_label"] == ""
 
     materialized_dirs = sorted((run_dir / "analysis" / "materialized_candidates").iterdir())
     assert [path.name for path in materialized_dirs] == ["candidate_01", "candidate_02"]

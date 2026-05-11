@@ -323,9 +323,11 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["segment_labels"][1]["row_id"] == "complement"
     assert record.meta["segment_labels"][1]["label_side"] == "below"
     assert record.meta["segment_labels"][2]["text"] == "BsaI-HFv2 GGTCTC"
-    assert record.meta["segment_labels"][3]["text"] == "cut"
-    assert record.meta["segment_labels"][3]["label_side"] == "above"
-    assert len(record.meta["segment_labels"]) == 4
+    assert {label["text"] for label in record.meta["segment_labels"]} == {
+        "BsaI-HFv2 GGTCTC",
+        "Test.TerminalBottomNickase GGTCTCGNNNN",
+    }
+    assert len(record.meta["segment_labels"]) == 3
     assert record.meta["panel_transition_arrows"] == [{"start": 11, "end": 15}]
     assert not any(
         backdrop["semantic"] == "nickase_footprint" and backdrop["start"] >= 15
@@ -336,7 +338,7 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["base_highlight_colors"]["primary"][0] == "#7A6500"
     assert record.meta["base_highlight_colors"]["complement"][0] == "#005A8D"
     assert record.meta["dim_base_indices"]["complement"] == list(range(15, 22))
-    assert record.meta["base_dim_color"] == "#64748B"
+    assert record.meta["base_dim_color"] == "#94A3B8"
     assert record.meta["connector_hidden_indices"] == [11, 12, 13, 14]
     assert record.meta["connector_cross_indices"] == [23, 25]
     assert record.meta["connector_cross_color"] == "#111827"
@@ -346,10 +348,13 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["span_edge_markers"][-1]["start"] == 15
     assert record.meta["panel_spans"][0]["panel_id"] == "pre_release"
     assert record.meta["grid_max_rows"] == 5
-    assert len(record.effects) == 1
-    assert record.effects[0].kind == "boundary_marker"
-    assert record.effects[0].target == {"boundary": 26, "lane": "complement"}
-    assert record.effects[0].params["label"] == ""
+    assert len(record.effects) == 2
+    assert all(effect.kind == "boundary_marker" for effect in record.effects)
+    assert [effect.target for effect in record.effects] == [
+        {"boundary": 11, "lane": "complement"},
+        {"boundary": 26, "lane": "complement"},
+    ]
+    assert all(effect.params["label"] == "" for effect in record.effects)
     assert record.meta["scar_nick"]["profile_order"] == "S3_S2_S1_S0"
     assert record.meta["scar_nick"]["type_iis_recognition_sequence"] == "GGTCTC"
     assert record.meta["scar_nick"]["nickase_motif_top_5to3"] == "GGTCTCGNNNN"
@@ -372,7 +377,10 @@ def test_scar_nick_visual_adapter_places_nickase_label_on_nicked_top_strand() ->
 
     assert record.meta["segment_labels"][1]["row_id"] == "primary"
     assert record.meta["segment_labels"][1]["label_side"] == "below"
-    assert record.effects[0].target == {"boundary": 26, "lane": "primary"}
+    assert [effect.target for effect in record.effects] == [
+        {"boundary": 11, "lane": "primary"},
+        {"boundary": 26, "lane": "primary"},
+    ]
 
 
 @pytest.mark.parametrize(

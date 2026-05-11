@@ -902,7 +902,7 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
     assert visual["meta"]["profile_order"] == "S3_S2_S1_S0"
     assert visual["meta"]["type_iis_label"] == "BsaI-HFv2 GGTCTC"
     assert visual["meta"]["nickase_label"] == "Test.TerminalBottomNickase GGTCTCGNNNN"
-    assert visual["meta"]["junction_label"] == "cut"
+    assert visual["meta"]["junction_label"] == ""
     assert {fill["semantic"] for fill in visual["rectangular_fills"]} >= {
         "type_iis_release_site",
         "retained_type_iis_scar",

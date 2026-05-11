@@ -24,7 +24,7 @@ _NICKASE_EDGE = "#0072B2"
 _TYPE_IIS_TEXT = "#7A6500"
 _NICKASE_TEXT = "#005A8D"
 _MISMATCH_CONNECTOR = "#111827"
-_FRAGMENT_TEXT = "#64748B"
+_FRAGMENT_TEXT = "#94A3B8"
 _PANEL_EDGE = "#CBD5E1"
 _CELL_WIDTH_SCALE = 1.12
 
@@ -181,15 +181,6 @@ def _segment_labels(contract: ScarNickVisualV1) -> list[dict[str, object]]:
             "color": _TYPE_IIS_TEXT,
             "label_offset_px": -12.0,
         },
-        {
-            "text": "cut",
-            "start": post_panel.terminal_boundary - 1,
-            "end": post_panel.terminal_boundary,
-            "row_id": "primary",
-            "label_side": "above",
-            "color": "#111827",
-            "label_offset_px": -12.0,
-        },
     ]
 
 
@@ -254,7 +245,6 @@ class ScarNickVisualV1Adapter:
                 render={},
             )
             for panel in contract.panels
-            if panel.panel_id == "post_release"
         ]
         span_backdrops = [
             {
