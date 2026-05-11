@@ -1469,6 +1469,18 @@ def _draw_span_backdrops(
         fill = str(raw.get("fill", "")).strip()
         if not fill:
             continue
+        edgecolor: str | tuple[float, float, float, float] = "none"
+        edge_linewidth = 0.0
+        raw_edge_color = str(raw.get("edge_color", "")).strip()
+        if raw_edge_color:
+            try:
+                edge_linewidth = max(0.0, float(raw.get("edge_linewidth", 0.0)))
+                edge_alpha = min(1.0, max(0.0, float(raw.get("edge_alpha", 1.0))))
+                if edge_linewidth > 0.0:
+                    edgecolor = mcolors.to_rgba(raw_edge_color, edge_alpha)
+            except Exception:
+                edgecolor = "none"
+                edge_linewidth = 0.0
         cover_rows = str(raw.get("cover_rows", "both")).strip().lower()
         row_bounds: list[tuple[float, float]] = []
         if cover_rows in {"primary", "both"}:
@@ -1503,9 +1515,9 @@ def _draw_span_backdrops(
                 (end - start) * layout.cw,
                 y1 - y0,
                 boxstyle=f"round,pad=0.0,rounding_size={corner_radius}",
-                linewidth=0.0,
+                linewidth=edge_linewidth,
                 facecolor=mcolors.to_rgba(fill, alpha),
-                edgecolor="none",
+                edgecolor=edgecolor,
                 zorder=0.6,
                 clip_on=False,
                 gid=f"sequence_backdrop:{index}",

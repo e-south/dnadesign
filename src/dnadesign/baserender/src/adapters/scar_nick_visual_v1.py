@@ -247,8 +247,9 @@ class ScarNickVisualV1Adapter:
             )
             for panel in contract.panels
         ]
-        span_backdrops = [
-            {
+        span_backdrops = []
+        for fill in contract.rectangular_fills:
+            backdrop = {
                 "semantic": fill.semantic,
                 "start": fill.start,
                 "end": fill.end,
@@ -257,8 +258,15 @@ class ScarNickVisualV1Adapter:
                 "corner_radius": fill.corner_radius,
                 "cover_rows": fill.cover_rows,
             }
-            for fill in contract.rectangular_fills
-        ]
+            if fill.edge_linewidth > 0.0 and fill.edge_color is not None:
+                backdrop.update(
+                    {
+                        "edge_color": fill.edge_color,
+                        "edge_alpha": fill.edge_alpha,
+                        "edge_linewidth": fill.edge_linewidth,
+                    }
+                )
+            span_backdrops.append(backdrop)
         mismatch_indices = _post_mismatch_indices(contract)
         segment_labels = _segment_labels(contract)
         record = Record(

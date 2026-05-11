@@ -153,6 +153,9 @@ def _scar_nick_visual_payload() -> dict[str, object]:
                     "fill": "#CBD5E1",
                     "alpha": 0.48,
                     "corner_radius": 4.0,
+                    "edge_color": "#94A3B8",
+                    "edge_alpha": 0.64,
+                    "edge_linewidth": 0.45,
                 }
             )
     return {
@@ -333,6 +336,10 @@ def test_scar_nick_visual_contract_validates_nick_state_payload() -> None:
     assert nickase_fills[0].start == contract.panels[0].nickase_site_span.start
     fragment_span = contract.panels[1].fragment_spans[0]
     assert fragment_span.end == contract.panels[1].nick_boundary
+    fragment_fill = next(fill for fill in contract.rectangular_fills if fill.semantic == "annealed_adapter_fragment")
+    assert fragment_fill.edge_color == "#94A3B8"
+    assert fragment_fill.edge_alpha == 0.64
+    assert fragment_fill.edge_linewidth == 0.45
     post_scar_fill = next(
         fill for fill in contract.rectangular_fills if fill.fill_id == "post_release_retained_type_iis_scar"
     )

@@ -11,7 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import pytest
+from matplotlib.patches import FancyBboxPatch
 
 from dnadesign.baserender.src.adapters import build_adapter, required_source_columns
 from dnadesign.baserender.src.adapters.cruncher_best_window import CruncherBestWindowAdapter
@@ -33,10 +36,11 @@ from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import (
 )
 from dnadesign.baserender.src.adapters.yiu_linear_state_v1 import YiuLinearStateV1Adapter
 from dnadesign.baserender.src.adapters.yiu_topology_cartoon_v1 import YiuTopologyCartoonV1Adapter
-from dnadesign.baserender.src.config import AdapterCfg
+from dnadesign.baserender.src.config import AdapterCfg, resolve_style
 from dnadesign.baserender.src.config.adapter_contracts import adapter_descriptor
 from dnadesign.baserender.src.core import SchemaError
-from dnadesign.baserender.src.render import legend_entries_for_record
+from dnadesign.baserender.src.render import Palette, legend_entries_for_record, render_record
+from dnadesign.baserender.src.runtime import initialize_runtime
 
 from .conftest import write_parquet
 
@@ -233,6 +237,9 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
                     "fill": "#CBD5E1",
                     "alpha": 0.48,
                     "corner_radius": 4.0,
+                    "edge_color": "#94A3B8",
+                    "edge_alpha": 0.64,
+                    "edge_linewidth": 0.45,
                 }
             )
     return {
@@ -399,6 +406,9 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
             "alpha": 0.48,
             "corner_radius": 4.0,
             "cover_rows": "complement",
+            "edge_color": "#94A3B8",
+            "edge_alpha": 0.64,
+            "edge_linewidth": 0.45,
         }
     ]
     assert record.meta["base_dim_color"] == "#94A3B8"
@@ -426,6 +436,32 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     second_row = adapter.apply(_scar_nick_adapter_payload(), row_index=1)
     assert "before terminal nick" not in second_row.display.overlay_text
     assert second_row.meta["segment_labels"][0]["text"] == "BsaI-HFv2 GGTCTC"
+
+
+def test_scar_nick_annealed_adapter_backdrop_renders_thin_edge() -> None:
+    cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
+    adapter = build_adapter(cfg, alphabet="DNA")
+    record = adapter.apply(_scar_nick_adapter_payload(), row_index=0)
+    annealed_index = next(
+        index
+        for index, backdrop in enumerate(record.meta["span_backdrops"])
+        if backdrop["semantic"] == "annealed_adapter_fragment"
+    )
+
+    style = resolve_style(preset=None, overrides={"connectors": True})
+    palette = Palette(style.palette)
+    initialize_runtime()
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    try:
+        patch_by_gid = {patch.get_gid(): patch for patch in fig.axes[0].patches if patch.get_gid()}
+        backdrop = patch_by_gid[f"sequence_backdrop:{annealed_index}"]
+    finally:
+        plt.close(fig)
+
+    assert isinstance(backdrop, FancyBboxPatch)
+    assert mcolors.to_hex(backdrop.get_edgecolor(), keep_alpha=False) == "#94a3b8"
+    assert float(backdrop.get_edgecolor()[3]) == pytest.approx(0.64)
+    assert float(backdrop.get_linewidth()) == pytest.approx(0.45)
 
 
 def test_scar_nick_visual_adapter_places_nickase_label_on_nicked_top_strand() -> None:

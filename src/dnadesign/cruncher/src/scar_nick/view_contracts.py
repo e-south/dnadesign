@@ -34,6 +34,7 @@ _OFFSET_FILL = "#FFF6B3"
 _SCAR_FILL = "#009E73"
 _NICKASE_FILL = "#56B4E9"
 _ANNEALED_FRAGMENT_FILL = "#CBD5E1"
+_ANNEALED_FRAGMENT_EDGE = "#94A3B8"
 _PANEL_SPACER_NT = 4
 _COMBINED_VISUAL_STATE_KIND = "pre_post_terminal_nick"
 _VISUAL_JSONL_FILENAME = "scar_nick_terminal_nick.scar_nick_visual.v1.jsonl"
@@ -151,6 +152,9 @@ def _rectangular_fills_for_panel(panel: dict[str, Any], *, prefix: str) -> list[
                     "fill": _ANNEALED_FRAGMENT_FILL,
                     "alpha": 0.48,
                     "corner_radius": 4.0,
+                    "edge_color": _ANNEALED_FRAGMENT_EDGE,
+                    "edge_alpha": 0.64,
+                    "edge_linewidth": 0.45,
                 }
             )
     return fills
@@ -415,7 +419,13 @@ def build_terminal_nick_visual_contract(
             "aligned_right_base_display_order": aligned_right_display,
         },
     }
-    return ScarNickVisualV1.model_validate(payload).model_dump(mode="json")
+    visual = ScarNickVisualV1.model_validate(payload).model_dump(mode="json")
+    for fill in visual["rectangular_fills"]:
+        if fill.get("edge_color") is None:
+            fill.pop("edge_color", None)
+            fill.pop("edge_alpha", None)
+            fill.pop("edge_linewidth", None)
+    return visual
 
 
 def build_views_manifest(*, solution_id: str, include_jobs: bool = True) -> dict[str, Any]:

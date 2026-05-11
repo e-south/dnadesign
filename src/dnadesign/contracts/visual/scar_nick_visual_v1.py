@@ -86,6 +86,9 @@ class ScarNickRectangularFillV1(VisualContractModel):
     fill: str
     alpha: float = Field(ge=0.0, le=1.0)
     corner_radius: float = Field(ge=0.0)
+    edge_color: str | None = None
+    edge_alpha: float = Field(default=1.0, ge=0.0, le=1.0)
+    edge_linewidth: float = Field(default=0.0, ge=0.0)
 
     @model_validator(mode="after")
     def _validate_fill(self) -> "ScarNickRectangularFillV1":
@@ -93,6 +96,8 @@ class ScarNickRectangularFillV1(VisualContractModel):
             raise ValueError("rectangular fill end must be > start")
         if not self.fill.strip():
             raise ValueError("rectangular fill color must be non-empty")
+        if self.edge_linewidth > 0.0 and not str(self.edge_color or "").strip():
+            raise ValueError("rectangular fill edge_color must be non-empty when edge_linewidth is positive")
         if self.semantic == "retained_type_iis_scar" and self.corner_radius != 0.0:
             raise ValueError("retained Type IIS scar fill must be rectangular")
         return self
@@ -531,6 +536,8 @@ class ScarNickVisualV1(VisualContractModel):
                 raise ValueError("annealed_adapter_fragment fill must match each post_release fragment span and row")
             if matches[0].corner_radius <= 0.0:
                 raise ValueError("annealed_adapter_fragment fill must use rounded corners")
+            if matches[0].edge_linewidth <= 0.0:
+                raise ValueError("annealed_adapter_fragment fill must use a visible edge")
         pre_panel = self.panels[0]
         nickase_fill = nickase_fills[0]
         if (

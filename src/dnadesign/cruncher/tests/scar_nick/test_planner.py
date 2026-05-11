@@ -896,6 +896,9 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
     assert fragment_fill["end"] == post_panel["nick_boundary"]
     assert fragment_fill["cover_rows"] == "complement"
     assert fragment_fill["corner_radius"] > 0
+    assert fragment_fill["edge_color"] == "#94A3B8"
+    assert fragment_fill["edge_alpha"] == 0.64
+    assert fragment_fill["edge_linewidth"] == 0.45
     pre_scar_fill = next(
         fill for fill in visual["rectangular_fills"] if fill["fill_id"] == "pre_release_retained_type_iis_scar"
     )
