@@ -33,6 +33,7 @@ _TYPE_IIS_FILL = "#F0E442"
 _OFFSET_FILL = "#FFF6B3"
 _SCAR_FILL = "#009E73"
 _NICKASE_FILL = "#56B4E9"
+_ANNEALED_FRAGMENT_FILL = "#CBD5E1"
 _PANEL_SPACER_NT = 4
 _COMBINED_VISUAL_STATE_KIND = "pre_post_terminal_nick"
 _VISUAL_JSONL_FILENAME = "scar_nick_terminal_nick.scar_nick_visual.v1.jsonl"
@@ -134,6 +135,20 @@ def _rectangular_fills_for_panel(panel: dict[str, Any], *, prefix: str) -> list[
                 "corner_radius": 0.0,
             }
         )
+    if panel["panel_id"] == "post_release":
+        for index, fragment_span in enumerate(panel["fragment_spans"]):
+            fills.append(
+                {
+                    "fill_id": f"{prefix}_annealed_adapter_fragment_{index}",
+                    "semantic": "annealed_adapter_fragment",
+                    "start": fragment_span["start"],
+                    "end": fragment_span["end"],
+                    "cover_rows": fragment_span["row"],
+                    "fill": _ANNEALED_FRAGMENT_FILL,
+                    "alpha": 0.48,
+                    "corner_radius": 4.0,
+                }
+            )
     return fills
 
 
@@ -185,6 +200,7 @@ def _nickase_payload(candidate: ScarNickCandidate) -> dict[str, Any] | None:
         "canonical_read_row": canonical_read_row,
         "site": candidate.nickase_site,
         "motif_top_5to3": placement.motif_top_5to3,
+        "canonical_motif_top_5to3": placement.canonical_motif_top_5to3,
         "recognition_nt": recognition_nt(placement.motif_top_5to3),
         "vendor": placement.vendor,
         "source_url": placement.source_url,
@@ -381,7 +397,7 @@ def build_terminal_nick_visual_contract(
                 else ""
             ),
             "nickase_label": (
-                f"{nickase_payload['variant_id']} {nickase_payload['motif_top_5to3']}"
+                f"{nickase_payload['variant_id']} {nickase_payload['canonical_motif_top_5to3']}"
                 if nickase_payload is not None
                 else ""
             ),

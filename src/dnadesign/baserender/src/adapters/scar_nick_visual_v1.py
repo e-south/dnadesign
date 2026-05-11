@@ -64,7 +64,7 @@ def _post_release_panel(contract: ScarNickVisualV1):
 
 
 def _nickase_display_row(contract: ScarNickVisualV1) -> str:
-    return "primary" if contract.nicked_strand == "top" else "complement"
+    return contract.nickase.canonical_read_row
 
 
 def _pre_release_site_highlights(contract: ScarNickVisualV1) -> dict[str, list[int]]:
@@ -151,7 +151,7 @@ def _segment_labels(contract: ScarNickVisualV1) -> list[dict[str, object]]:
     pre_panel = _pre_release_panel(contract)
     post_panel = _post_release_panel(contract)
     release_label = f"{contract.release_placement.variant_id} {contract.release_placement.recognition_sequence}"
-    nickase_label = f"{contract.nickase.variant_id} {contract.nickase.motif_top_5to3}"
+    nickase_label = f"{contract.nickase.variant_id} {contract.nickase.canonical_motif_top_5to3}"
     nickase_row = _nickase_display_row(contract)
     return [
         {
@@ -227,6 +227,7 @@ class ScarNickVisualV1Adapter:
             "owner:type_iis_release_site": "Type IIS restriction site",
             "owner:retained_type_iis_scar": "Retained Type IIS scar",
             "effect:nickase_footprint": "Nicking endonuclease footprint",
+            "effect:annealed_adapter_fragment": "Annealed adapter fragment",
         }
 
         nick_lane = "primary" if contract.nicked_strand == "top" else "complement"
@@ -317,6 +318,7 @@ class ScarNickVisualV1Adapter:
                     "type_iis_bottom_cut_boundary": contract.release_placement.bottom_cut_boundary,
                     "nickase_variant_id": contract.nickase.variant_id,
                     "nickase_motif_top_5to3": contract.nickase.motif_top_5to3,
+                    "nickase_canonical_motif_top_5to3": contract.nickase.canonical_motif_top_5to3,
                 },
             },
         )

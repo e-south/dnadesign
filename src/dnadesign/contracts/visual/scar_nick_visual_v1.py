@@ -27,6 +27,10 @@ def _complement_3to5(sequence: str) -> str:
     return sequence.translate(_IUPAC_COMPLEMENT).upper()
 
 
+def _reverse_complement_5to3(sequence: str) -> str:
+    return _complement_3to5(sequence)[::-1]
+
+
 def _validate_alphabet_symbols(*, label: str, sequence: str, alphabet: str) -> None:
     allowed = _DNA_BASES if alphabet == "dna" else _IUPAC_DNA_BASES
     invalid = sorted({base.upper() for base in sequence if base.upper() not in allowed})
@@ -222,6 +226,7 @@ class ScarNickNickasePlacementV1(VisualContractModel):
     canonical_read_row: Literal["primary", "complement"]
     site: str
     motif_top_5to3: str
+    canonical_motif_top_5to3: str
     recognition_nt: int = Field(ge=1)
     vendor: str
     source_url: str
@@ -244,6 +249,7 @@ class ScarNickNickasePlacementV1(VisualContractModel):
             ("specificity_id", self.specificity_id),
             ("site", self.site),
             ("motif_top_5to3", self.motif_top_5to3),
+            ("canonical_motif_top_5to3", self.canonical_motif_top_5to3),
             ("vendor", self.vendor),
             ("source_url", self.source_url),
             ("commercial_confidence", self.commercial_confidence),
@@ -254,6 +260,15 @@ class ScarNickNickasePlacementV1(VisualContractModel):
             raise ValueError("reverse nickase placements must mark complement as the canonical read row")
         if self.orientation == "forward" and self.canonical_read_row != "primary":
             raise ValueError("forward nickase placements must mark primary as the canonical read row")
+        if len(self.canonical_motif_top_5to3) != len(self.motif_top_5to3):
+            raise ValueError("nickase canonical_motif_top_5to3 length must match motif_top_5to3")
+        expected_oriented_motif = (
+            self.canonical_motif_top_5to3
+            if self.orientation == "forward"
+            else _reverse_complement_5to3(self.canonical_motif_top_5to3)
+        )
+        if expected_oriented_motif.upper() != self.motif_top_5to3.upper():
+            raise ValueError("nickase motif_top_5to3 must match canonical_motif_top_5to3 in placement orientation")
         if self.source_site_end <= self.source_site_start:
             raise ValueError("nickase source site span must be positive length")
         return self
@@ -375,6 +390,7 @@ class ScarNickVisualV1(VisualContractModel):
         if self.nickase.display_site_span.end != self.nickase_site_span.end:
             raise ValueError("nickase display_site_span must match nickase_site_span")
         nickase_motif = self.nickase.motif_top_5to3
+        canonical_nickase_motif = self.nickase.canonical_motif_top_5to3
         observed_recognition_nt = _recognition_nt(nickase_motif)
         if self.nickase.recognition_nt != observed_recognition_nt:
             raise ValueError("nickase recognition_nt must match motif_top_5to3")
@@ -445,6 +461,19 @@ class ScarNickVisualV1(VisualContractModel):
                 expected_panel_complement = perfect_complement[panel.start : panel.end]
                 if observed_panel_complement.upper() != expected_panel_complement.upper():
                     raise ValueError("pre_release panel must be Watson-Crick paired before adapter annealing")
+                if self.nickase.canonical_read_row == "primary":
+                    observed_canonical_site = self.primary_sequence[
+                        panel.nickase_site_span.start : panel.nickase_site_span.end
+                    ]
+                else:
+                    observed_canonical_site = self.complement_sequence[
+                        panel.nickase_site_span.start : panel.nickase_site_span.end
+                    ][::-1]
+                for observed_symbol, expected_symbol in zip(
+                    observed_canonical_site, canonical_nickase_motif, strict=True
+                ):
+                    if not _iupac_symbols_overlap(observed_symbol, expected_symbol):
+                        raise ValueError("pre_release nickase canonical read row must match canonical_motif_top_5to3")
             if panel.panel_id == "post_release":
                 for fragment_span in panel.fragment_spans:
                     if fragment_span.row != expected_fragment_row:
@@ -478,12 +507,30 @@ class ScarNickVisualV1(VisualContractModel):
         release_fills = [fill for fill in self.rectangular_fills if fill.semantic == "type_iis_release_site"]
         nickase_fills = [fill for fill in self.rectangular_fills if fill.semantic == "nickase_footprint"]
         scar_fills = [fill for fill in self.rectangular_fills if fill.semantic == "retained_type_iis_scar"]
+        fragment_fills = [fill for fill in self.rectangular_fills if fill.semantic == "annealed_adapter_fragment"]
         if len(release_fills) != len(self.panels):
             raise ValueError("scar-nick visual requires one type_iis_release_site fill per panel")
         if len(nickase_fills) != 1:
             raise ValueError("scar-nick visual requires one nickase_footprint fill on the pre_release panel only")
         if len(scar_fills) != len(self.panels):
             raise ValueError("scar-nick visual requires one retained_type_iis_scar fill per panel")
+        post_fragment_spans = [
+            span for panel in self.panels if panel.panel_id == "post_release" for span in panel.fragment_spans
+        ]
+        if len(fragment_fills) != len(post_fragment_spans):
+            raise ValueError("scar-nick visual requires one annealed_adapter_fragment fill per post_release fragment")
+        for fragment_span in post_fragment_spans:
+            matches = [
+                fill
+                for fill in fragment_fills
+                if fill.start == fragment_span.start
+                and fill.end == fragment_span.end
+                and fill.cover_rows == fragment_span.row
+            ]
+            if len(matches) != 1:
+                raise ValueError("annealed_adapter_fragment fill must match each post_release fragment span and row")
+            if matches[0].corner_radius <= 0.0:
+                raise ValueError("annealed_adapter_fragment fill must use rounded corners")
         pre_panel = self.panels[0]
         nickase_fill = nickase_fills[0]
         if (

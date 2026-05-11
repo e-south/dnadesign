@@ -392,6 +392,7 @@ class NickasePlacement(StrictScarNickModel):
     specificity_id: str
     orientation: str
     motif_top_5to3: str
+    canonical_motif_top_5to3: str
     vendor: str
     source_url: str
     source_family: Literal["nicking_endonuclease"]

@@ -219,6 +219,20 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
                     "corner_radius": 0.0,
                 }
             )
+        if panel["panel_id"] == "post_release":
+            fragment_span = panel["fragment_spans"][0]
+            fills.append(
+                {
+                    "fill_id": f"{prefix}_annealed_adapter_fragment_0",
+                    "semantic": "annealed_adapter_fragment",
+                    "start": fragment_span["start"],
+                    "end": fragment_span["end"],
+                    "cover_rows": fragment_span["row"],
+                    "fill": "#CBD5E1",
+                    "alpha": 0.48,
+                    "corner_radius": 4.0,
+                }
+            )
     return {
         "contract_kind": "scar_nick_visual_v1",
         "state_id": "candidate_01.pre_post_terminal_nick",
@@ -309,6 +323,7 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
             "orientation": "forward",
             "canonical_read_row": "primary",
             "motif_top_5to3": "GGTCTCGNNNN",
+            "canonical_motif_top_5to3": "GGTCTCGNNNN",
             "recognition_nt": 7,
             "vendor": "dnadesign test fixture",
             "source_url": "https://example.invalid/dnadesign/scar-nick-terminal-fixture",
@@ -352,7 +367,7 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert "after terminal nick" not in record.display.overlay_text
     assert record.meta["segment_labels"][0]["text"] == "BsaI-HFv2 GGTCTC"
     assert record.meta["segment_labels"][1]["text"] == "Test.TerminalBottomNickase GGTCTCGNNNN"
-    assert record.meta["segment_labels"][1]["row_id"] == "complement"
+    assert record.meta["segment_labels"][1]["row_id"] == "primary"
     assert record.meta["segment_labels"][1]["label_side"] == "below"
     assert record.meta["segment_labels"][2]["text"] == "BsaI-HFv2 GGTCTC"
     assert {label["text"] for label in record.meta["segment_labels"]} == {
@@ -365,11 +380,25 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
         backdrop["semantic"] == "nickase_footprint" and backdrop["start"] >= 15
         for backdrop in record.meta["span_backdrops"]
     )
-    assert record.meta["base_highlights"]["primary"] == list(range(0, 6))
-    assert record.meta["base_highlights"]["complement"] == list(range(0, 11))
+    assert record.meta["base_highlights"]["primary"] == list(range(0, 11))
+    assert record.meta["base_highlights"]["complement"] == []
     assert record.meta["base_highlight_colors"]["primary"][0] == "#7A6500"
-    assert record.meta["base_highlight_colors"]["complement"][0] == "#005A8D"
+    assert record.meta["base_highlight_colors"]["primary"][6] == "#005A8D"
     assert record.meta["dim_base_indices"]["complement"] == list(range(15, 22))
+    fragment_fills = [
+        backdrop for backdrop in record.meta["span_backdrops"] if backdrop["semantic"] == "annealed_adapter_fragment"
+    ]
+    assert fragment_fills == [
+        {
+            "semantic": "annealed_adapter_fragment",
+            "start": 15,
+            "end": 22,
+            "fill": "#CBD5E1",
+            "alpha": 0.48,
+            "corner_radius": 4.0,
+            "cover_rows": "complement",
+        }
+    ]
     assert record.meta["base_dim_color"] == "#94A3B8"
     assert record.meta["connector_hidden_indices"] == [11, 12, 13, 14]
     assert record.meta["connector_cross_indices"] == [23, 25]
@@ -390,6 +419,7 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["scar_nick"]["profile_order"] == "S3_S2_S1_S0"
     assert record.meta["scar_nick"]["type_iis_recognition_sequence"] == "GGTCTC"
     assert record.meta["scar_nick"]["nickase_motif_top_5to3"] == "GGTCTCGNNNN"
+    assert record.meta["scar_nick"]["nickase_canonical_motif_top_5to3"] == "GGTCTCGNNNN"
 
     second_row = adapter.apply(_scar_nick_adapter_payload(), row_index=1)
     assert "before terminal nick" not in second_row.display.overlay_text
@@ -402,6 +432,9 @@ def test_scar_nick_visual_adapter_places_nickase_label_on_nicked_top_strand() ->
     payload["surviving_strand"] = "bottom"
     payload["nickase"]["strand"] = "top"
     payload["panels"][1]["fragment_spans"][0]["row"] = "primary"
+    for fill in payload["rectangular_fills"]:
+        if fill["semantic"] == "annealed_adapter_fragment":
+            fill["cover_rows"] = "primary"
     cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
     adapter = build_adapter(cfg, alphabet="DNA")
 
@@ -409,6 +442,34 @@ def test_scar_nick_visual_adapter_places_nickase_label_on_nicked_top_strand() ->
 
     assert record.meta["segment_labels"][1]["row_id"] == "primary"
     assert record.meta["segment_labels"][1]["label_side"] == "below"
+    assert [effect.target for effect in record.effects] == [
+        {"boundary": 11, "lane": "primary"},
+        {"boundary": 26, "lane": "primary"},
+    ]
+
+
+def test_scar_nick_visual_adapter_bolds_reverse_nickase_on_canonical_complement_row() -> None:
+    payload = _scar_nick_adapter_payload()
+    payload["nicked_strand"] = "top"
+    payload["surviving_strand"] = "bottom"
+    payload["nickase"]["strand"] = "top"
+    payload["nickase"]["orientation"] = "reverse"
+    payload["nickase"]["canonical_read_row"] = "complement"
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNCGAGACC"
+    payload["panels"][1]["fragment_spans"][0]["row"] = "primary"
+    for fill in payload["rectangular_fills"]:
+        if fill["semantic"] == "annealed_adapter_fragment":
+            fill["cover_rows"] = "primary"
+    cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
+    adapter = build_adapter(cfg, alphabet="DNA")
+
+    record = adapter.apply(payload, row_index=0)
+
+    assert record.meta["segment_labels"][1]["row_id"] == "complement"
+    assert record.meta["segment_labels"][1]["text"] == "Test.TerminalBottomNickase NNNNCGAGACC"
+    assert record.meta["base_highlights"]["primary"] == list(range(0, 6))
+    assert record.meta["base_highlights"]["complement"] == list(range(0, 11))
+    assert record.meta["base_highlight_colors"]["complement"][0] == "#005A8D"
     assert [effect.target for effect in record.effects] == [
         {"boundary": 11, "lane": "primary"},
         {"boundary": 26, "lane": "primary"},

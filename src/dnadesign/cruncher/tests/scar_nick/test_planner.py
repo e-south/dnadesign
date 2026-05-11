@@ -193,6 +193,7 @@ def _nickase_placement(
         specificity_id="TerminalBottomNickase",
         orientation="forward",
         motif_top_5to3="GGTCTCGNNNN",
+        canonical_motif_top_5to3="GGTCTCGNNNN",
         vendor="dnadesign test fixture",
         source_url="https://example.invalid/dnadesign/scar-nick-terminal-fixture",
         source_family="nicking_endonuclease",
@@ -897,6 +898,13 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
     post_panel = visual["panels"][1]
     assert post_panel["fragment_spans"] == [{"row": "complement", "start": 15, "end": 22}]
     assert post_panel["fragment_spans"][0]["end"] == post_panel["retained_scar_span"]["start"]
+    fragment_fill = next(
+        fill for fill in visual["rectangular_fills"] if fill["semantic"] == "annealed_adapter_fragment"
+    )
+    assert fragment_fill["start"] == post_panel["fragment_spans"][0]["start"]
+    assert fragment_fill["end"] == post_panel["fragment_spans"][0]["end"]
+    assert fragment_fill["cover_rows"] == "complement"
+    assert fragment_fill["corner_radius"] > 0
     assert visual["nickase"]["canonical_read_row"] == "primary"
     assert visual["nickase"]["recognition_nt"] == 7
     assert visual["meta"]["profile_order"] == "S3_S2_S1_S0"

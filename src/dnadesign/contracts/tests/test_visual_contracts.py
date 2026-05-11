@@ -138,6 +138,20 @@ def _scar_nick_visual_payload() -> dict[str, object]:
         )
         if panel["panel_id"] == "pre_release":
             rectangular_fills.append(_scar_nick_fill(panel, "nickase_site", f"{prefix}_nickase_footprint", "#56B4E9"))
+        if panel["panel_id"] == "post_release":
+            fragment_span = panel["fragment_spans"][0]
+            rectangular_fills.append(
+                {
+                    "fill_id": f"{prefix}_annealed_adapter_fragment_0",
+                    "semantic": "annealed_adapter_fragment",
+                    "start": fragment_span["start"],
+                    "end": fragment_span["end"],
+                    "cover_rows": fragment_span["row"],
+                    "fill": "#CBD5E1",
+                    "alpha": 0.48,
+                    "corner_radius": 4.0,
+                }
+            )
     return {
         "contract_kind": "scar_nick_visual_v1",
         "state_id": "candidate_01.pre_post_terminal_nick",
@@ -191,6 +205,7 @@ def _scar_nick_visual_payload() -> dict[str, object]:
             "orientation": "forward",
             "canonical_read_row": "primary",
             "motif_top_5to3": "GGTCTCGNNNN",
+            "canonical_motif_top_5to3": "GGTCTCGNNNN",
             "recognition_nt": 7,
             "vendor": "dnadesign test fixture",
             "source_url": "https://example.invalid/dnadesign/scar-nick-terminal-fixture",
@@ -417,6 +432,30 @@ def test_scar_nick_visual_contract_requires_release_and_nickase_fills() -> None:
         ScarNickVisualV1.model_validate(no_nickase_fill)
 
 
+def test_scar_nick_visual_contract_requires_post_release_fragment_fill() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["rectangular_fills"] = [
+        fill for fill in payload["rectangular_fills"] if fill["semantic"] != "annealed_adapter_fragment"
+    ]
+
+    with pytest.raises(ValueError, match="annealed_adapter_fragment"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_requires_canonical_nickase_read_row() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["nickase"]["orientation"] = "reverse"
+    payload["nickase"]["canonical_read_row"] = "complement"
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNCGAGACC"
+
+    ScarNickVisualV1.model_validate(payload)
+
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNCGAGACA"
+
+    with pytest.raises(ValueError, match="motif_top_5to3 must match canonical_motif_top_5to3"):
+        ScarNickVisualV1.model_validate(payload)
+
+
 def test_scar_nick_visual_contract_rejects_post_release_nickase_fill() -> None:
     payload = _scar_nick_visual_payload()
     post_panel = payload["panels"][1]
@@ -433,6 +472,7 @@ def test_scar_nick_visual_contract_rejects_short_nickase_recognition_site() -> N
     payload["nickase"]["variant_id"] = "Nt.CviPII"
     payload["nickase"]["specificity_id"] = "CviPII"
     payload["nickase"]["motif_top_5to3"] = "NNNNHGGNNNN"
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNHGGNNNN"
     payload["nickase"]["recognition_nt"] = 3
 
     with pytest.raises(ValueError, match="at least 4 nt"):

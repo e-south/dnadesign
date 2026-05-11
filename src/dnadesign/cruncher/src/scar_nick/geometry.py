@@ -107,6 +107,7 @@ def _placement_for_entry(
         specificity_id=entry.specificity_id,
         orientation=orientation,
         motif_top_5to3=motif,
+        canonical_motif_top_5to3=entry.resolved_vendor_diagram_top_5to3,
         vendor=entry.vendor,
         source_url=entry.source_url,
         source_family=entry.source_family,
