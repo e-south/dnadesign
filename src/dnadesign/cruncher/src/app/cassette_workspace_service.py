@@ -84,9 +84,9 @@ def _base_solve_spec() -> dict[str, Any]:
             },
             "nick_goal": {
                 "target_strand": "primary",
-                "left_nick_window": {"start": 0, "end": 0},
-                "right_nick_window": {"start": 24, "end": 24},
-                "bounded_segment_length": {"min": 24, "max": 24},
+                "left_nick_window": {"start": 7, "end": 7},
+                "right_nick_window": {"start": 17, "end": 17},
+                "bounded_segment_length": {"min": 10, "max": 10},
             },
             "assignment_policy": {
                 "allowed_left_variant_ids": ["Nt.BbvCI"],
@@ -117,7 +117,7 @@ def _base_solve_spec() -> dict[str, Any]:
                 "max_hits": 5,
                 "max_enumerated_candidates": 256,
                 "max_search_nodes": 50000,
-                "bounded_segment_target": 24,
+                "bounded_segment_target": 10,
                 "gc_target": 0.5,
                 "materialize_top_k": 1,
                 "selection": {

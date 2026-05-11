@@ -77,16 +77,12 @@ def _base_spec(**overrides: Any) -> dict[str, Any]:
             },
             "target_profile_buckets": [
                 "MXMM",
-                "WXMM",
                 "XWMM",
                 "MWXM",
                 "MXWM",
                 "XMWM",
-                "WMMM",
                 "MWMM",
                 "MMWM",
-                "WWMM",
-                "WMWM",
                 "MWWM",
                 "XXMM",
                 "XMXM",
@@ -314,23 +310,19 @@ def test_bbs_i_hf_release_expansion_finds_public_catalog_hits(tmp_path: Path) ->
     assert report.release_placement is not None
     assert report.release_placement.variant_id == "BbsI-HF"
     assert report.release_placement.retained_scar_nt == 4
-    assert report.metadata.compatible_nickase_placement_count == 4
-    assert report.metadata.enzyme_compatible_scar_count == 10
+    assert report.metadata.compatible_nickase_placement_count == 3
+    assert report.metadata.enzyme_compatible_scar_count == 6
     assert report.candidates == unique_sequence_candidates(report.candidates)
     assert report.metadata.accepted_candidate_count == len(report.candidates)
     assert report.metadata.materialized_candidate_count == min(8, len(report.candidates))
     assert {candidate.profile_s3s2s1s0 for candidate in report.candidates} >= {
         "MXMM",
-        "WXMM",
         "XWMM",
         "MWXM",
         "MXWM",
         "XMWM",
-        "WMMM",
         "MWMM",
         "MMWM",
-        "WWMM",
-        "WMWM",
         "MWWM",
         "XXMM",
         "XMXM",
@@ -352,18 +344,17 @@ def test_bbs_i_hf_release_expansion_finds_public_catalog_hits(tmp_path: Path) ->
         "CTCC",
         "CTCG",
         "CTCT",
-        "GTGA",
-        "GTGC",
-        "GTGG",
-        "GTGT",
     }
     assert {entry.strand for entry in report.nickase_geometry_audit if entry.compatible} == {"top", "bottom"}
+    bsssi_entries = [entry for entry in report.nickase_geometry_audit if entry.variant_id == "Nb.BssSI"]
+    assert bsssi_entries
+    assert all(not entry.compatible for entry in bsssi_entries)
+    assert all("NON_DEGENERATE_DOWNSTREAM_OF_TERMINAL_NICK" in entry.rejection_reasons for entry in bsssi_entries)
     observed_nickases = {
         candidate.nickase_placement.variant_id for candidate in report.candidates if candidate.nickase_placement
     }
     assert observed_nickases <= {
         "Nb.BsrDI",
-        "Nb.BssSI",
         "Nb.BtsI",
         "Nt.BsmAI",
     }

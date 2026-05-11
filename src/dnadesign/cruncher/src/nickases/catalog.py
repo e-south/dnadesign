@@ -244,9 +244,9 @@ def _normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
         )
         if motif_end_reference:
             motif_len = len(str(canonical_motif).strip())
-            if top_cut_offset is not None and top_cut_offset >= 0:
+            if top_cut_offset is not None:
                 top_cut_offset += motif_len
-            if bottom_cut_offset is not None and bottom_cut_offset >= 0:
+            if bottom_cut_offset is not None:
                 bottom_cut_offset += motif_len
 
     has_legacy_geometry = "nicked_site_strand" in normalized or "cut_offset" in normalized

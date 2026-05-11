@@ -25,10 +25,12 @@ nickases:
     - id: Nt.BbvCI
       specificity_id: BbvCI
       raw_cut_notation: CCTCAGC(-5/none)
+      raw_cut_offset_reference: motif_end
       source: neb
     - id: Nb.BbvCI
       specificity_id: BbvCI
       raw_cut_notation: CCTCAGC(none/-2)
+      raw_cut_offset_reference: motif_end
       source: neb
 ```
 
@@ -85,8 +87,10 @@ catalog:
   Use `motif_start` when the raw values are already normalized as bond-boundary
   offsets from the left edge of `motif_top_5to3`; use `motif_end` when vendor
   notation reports offsets relative to the 3' end of the listed recognition
-  motif, such as `GCAGTG(none/0)` for a bottom nick immediately after the
-  six-base `GCAGTG` site.
+  motif. This applies to positive and negative values. For example,
+  `GCAGTG(none/0)` maps to a bottom nick immediately after the six-base
+  `GCAGTG` site, while `CACGAG(none/-1)` maps to a bottom nick one boundary
+  before the end of the six-base `CACGAG` site.
 - `top_cut_offset`: signed bond-boundary offset from the motif start on the top strand.
 - `bottom_cut_offset`: signed bond-boundary offset from the motif start on the bottom strand.
 - Exactly one of `top_cut_offset` or `bottom_cut_offset` must be defined for a nickase variant.

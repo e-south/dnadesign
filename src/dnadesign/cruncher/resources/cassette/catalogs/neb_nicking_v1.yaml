@@ -28,6 +28,7 @@ variants:
     specificity_id: CviPII
     motif_top_5to3: CCD
     raw_cut_notation: CCD(-3/none)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0626
     source_url: https://www.neb.com/en-us/products/r0626-ntcvipii
@@ -119,6 +120,7 @@ variants:
     specificity_id: BbvCI
     motif_top_5to3: CCTCAGC
     raw_cut_notation: CCTCAGC(none/-2)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0631
     source_url: https://www.neb.com/en-us/products/r0631-nbbbvci
@@ -133,6 +135,7 @@ variants:
     specificity_id: BbvCI
     motif_top_5to3: CCTCAGC
     raw_cut_notation: CCTCAGC(-5/none)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0632
     source_url: https://www.neb.com/en-us/products/r0632-ntbbvci
@@ -147,6 +150,7 @@ variants:
     specificity_id: BsmI
     motif_top_5to3: GAATGC
     raw_cut_notation: GAATGC(none/-1)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0706
     source_url: https://www.neb.com/en-us/products/r0706-nbbsmi
@@ -169,6 +173,7 @@ variants:
     specificity_id: BssSI
     motif_top_5to3: CACGAG
     raw_cut_notation: CACGAG(none/-1)
+    raw_cut_offset_reference: motif_end
     vendor: NEB
     vendor_catalog_number: R0681
     source_url: https://www.neb.com/en-us/products/r0681-nbbsssi

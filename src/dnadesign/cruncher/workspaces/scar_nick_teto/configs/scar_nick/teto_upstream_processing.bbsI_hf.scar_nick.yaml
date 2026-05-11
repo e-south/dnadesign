@@ -39,7 +39,7 @@ ranking_context:
       left_base: CAAG
       right_base: CTCG
       profile_s3s2s1s0: MXMM
-  target_profile_buckets: [MXMM, WXMM, XWMM, MWXM, MXWM, XMWM, WMMM, MWMM, MMWM, WWMM, WMWM, MWWM, XXMM, XMXM]
+  target_profile_buckets: [MXMM, XWMM, MWXM, MXWM, XMWM, MWMM, MMWM, MWWM, XXMM, XMXM]
   reject_profiles: [MMMM]
   allow_gt_wobble: true
   active_max_hard_mismatches: 2
