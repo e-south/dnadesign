@@ -20,10 +20,16 @@ from dnadesign.cruncher.yiu.ligation_scoring import (
 )
 
 
-def _pair_class(left_base: str, aligned_right_base: str, *, allow_gt_wobble: bool) -> tuple[str, str | None, int]:
+def _pair_class(
+    left_base: str,
+    right_base: str,
+    aligned_right_base: str,
+    *,
+    allow_gt_wobble: bool,
+) -> tuple[str, str | None, int]:
     if left_base == aligned_right_base:
         return "M", None, 0
-    mismatch_class = canonical_mismatch_class(left_base, aligned_right_base)
+    mismatch_class = canonical_mismatch_class(left_base, right_base)
     if allow_gt_wobble and mismatch_class == "GT":
         return "W", mismatch_class, mismatch_class_tier(mismatch_class=mismatch_class, ligation_profile="t4")
     return "X", mismatch_class, mismatch_class_tier(mismatch_class=mismatch_class, ligation_profile="t4")
@@ -38,9 +44,9 @@ def classify_pair_profile(
 ) -> PairProfile:
     """Classify a 4-bp paired junction profile in S3/S2/S1/S0 order.
 
-    `right_base` is first reverse-complemented into left-base coordinates. The public
-    profile is reported from the retron-proximal edge to the payload-proximal S0
-    ligation pair.
+    `right_base` is read antiparallel in S3/S2/S1/S0 order. Watson-Crick matches
+    use the complement of that physical right-hand base. Wobble calls use the
+    physical left:right pair and are therefore limited to G:T or T:G.
     """
 
     if profile_order != "S3_S2_S1_S0":
@@ -59,6 +65,7 @@ def classify_pair_profile(
         aligned_symbol = aligned_right[source_offset]
         class_label, mismatch_class, tier = _pair_class(
             left_symbol,
+            right_symbol,
             aligned_symbol,
             allow_gt_wobble=allow_gt_wobble,
         )

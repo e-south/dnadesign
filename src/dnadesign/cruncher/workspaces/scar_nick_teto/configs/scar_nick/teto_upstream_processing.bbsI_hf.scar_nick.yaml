@@ -4,8 +4,8 @@ scar_nick:
   name: teto_upstream_processing_bbsI_hf
 
 junction:
-  left_base: GCCC
-  right_base: TGTC
+  left_base: CGGG
+  right_base: ACAG
   profile_order: S3_S2_S1_S0
   s0_match_required: true
   overhang_length: 4
@@ -31,13 +31,13 @@ ranking_context:
   optional_reference_profiles:
     working_control:
       id: retron_26
-      left_base: GCCC
-      right_base: TGTC
+      left_base: CGGG
+      right_base: ACAG
       profile_s3s2s1s0: MXMX
     failed_control:
       id: retron_43
-      left_base: GTTC
-      right_base: GAGC
+      left_base: CAAG
+      right_base: CTCG
       profile_s3s2s1s0: MXMM
   target_profile_buckets: [MXMM, WXMM, XWMM, MWXM, MXWM, XMWM, WMMM, MWMM, MMWM, WWMM, WMWM, MWWM, XXMM, XMXM]
   reject_profiles: [MMMM]

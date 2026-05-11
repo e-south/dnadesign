@@ -331,6 +331,24 @@ class PairClass(StrictScarNickModel):
     canonical_mismatch_class: str | None = None
     class_tier_t4: int = Field(default=0, ge=0)
 
+    @field_validator("left_base", "right_base", "aligned_right_base")
+    @classmethod
+    def _validate_base_symbol(cls, value: str) -> str:
+        text = normalize_dna(value)
+        if len(text) != 1:
+            raise ValueError("pair class bases must be one A/C/G/T base.")
+        return text
+
+    @model_validator(mode="after")
+    def _validate_pair_label_matches_pair(self) -> "PairClass":
+        if self.class_label == "M" and self.left_base != self.aligned_right_base:
+            raise ValueError("M pair classes require identical left_base and aligned_right_base.")
+        if self.class_label == "W" and (self.left_base, self.right_base) not in {("G", "T"), ("T", "G")}:
+            raise ValueError("W pair classes require a G:T or T:G physical pair.")
+        if self.class_label == "X" and self.left_base == self.aligned_right_base:
+            raise ValueError("X pair classes require a non-identical aligned pair.")
+        return self
+
 
 class PairProfile(StrictScarNickModel):
     profile_s3s2s1s0: str

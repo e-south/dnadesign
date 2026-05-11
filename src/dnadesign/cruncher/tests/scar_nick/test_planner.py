@@ -35,8 +35,8 @@ def _base_spec(**overrides: Any) -> dict[str, Any]:
             "name": "teto_upstream_processing",
         },
         "junction": {
-            "left_base": "GCCC",
-            "right_base": "TGTC",
+            "left_base": "CGGG",
+            "right_base": "ACAG",
             "profile_order": "S3_S2_S1_S0",
             "s0_match_required": True,
             "overhang_length": 4,
@@ -64,14 +64,14 @@ def _base_spec(**overrides: Any) -> dict[str, Any]:
             "optional_reference_profiles": {
                 "working_control": {
                     "id": "retron_26",
-                    "left_base": "GCCC",
-                    "right_base": "TGTC",
+                    "left_base": "CGGG",
+                    "right_base": "ACAG",
                     "profile_s3s2s1s0": "MXMX",
                 },
                 "failed_control": {
                     "id": "retron_43",
-                    "left_base": "GTTC",
-                    "right_base": "GAGC",
+                    "left_base": "CAAG",
+                    "right_base": "CTCG",
                     "profile_s3s2s1s0": "MXMM",
                 },
             },
@@ -652,7 +652,7 @@ def test_candidate_rejections_cover_terminal_pair_profile_and_mismatch_limits() 
     )
     three_non_wc = evaluate_pair_candidate(
         left_base="GTGA",
-        right_base="TACT",
+        right_base="TTGA",
         context=context,
         s0_match_required=True,
         forbidden_release_sites=[],
@@ -680,7 +680,7 @@ def test_candidate_rejections_cover_terminal_pair_profile_and_mismatch_limits() 
     assert "PROFILE_POLICY_RESERVE:MORE_THAN_TWO_NON_WATSON_CRICK" in three_non_wc.rejection_reasons
 
 
-def test_pair_identity_uses_aligned_right_base_for_profile_calls() -> None:
+def test_pair_identity_uses_physical_right_base_for_profile_calls() -> None:
     context = CandidateRankingContext(
         target_profile_buckets=[],
         reject_profiles=[],
@@ -697,11 +697,11 @@ def test_pair_identity_uses_aligned_right_base_for_profile_calls() -> None:
         forbidden_release_sites=[],
     )
 
-    assert candidate.profile_s3s2s1s0 == "MXMM"
-    assert candidate.s2_pair_identity == "G:A"
+    assert candidate.profile_s3s2s1s0 == "MWMM"
+    assert candidate.s2_pair_identity == "G:T"
     assert candidate.pair_classes[1].right_base == "T"
     assert candidate.pair_classes[1].aligned_right_base == "A"
-    assert candidate.pair_classes[1].class_label == "X"
+    assert candidate.pair_classes[1].class_label == "W"
 
 
 def test_retained_release_recognition_site_is_rejected() -> None:
@@ -735,16 +735,16 @@ def test_ranking_prefers_exact_nick_profile_order_low_gc_and_reference_similarit
     )
     candidates = [
         evaluate_pair_candidate(
-            left_base="AAAA",
-            right_base="TGGT",
+            left_base="CGGT",
+            right_base="AATG",
             context=context,
             s0_match_required=True,
             forbidden_release_sites=[],
             nick_distance=1,
         ),
         evaluate_pair_candidate(
-            left_base="AAAA",
-            right_base="TGGT",
+            left_base="CGGT",
+            right_base="AATG",
             context=context,
             s0_match_required=True,
             forbidden_release_sites=[],
@@ -797,15 +797,15 @@ def test_ranking_prefers_lower_hard_mismatch_tier_before_gc_tie_break() -> None:
         reduce_gc_when_tied=True,
     )
     lower_gc_tier3 = evaluate_pair_candidate(
-        left_base="AATG",
-        right_base="CAAT",
+        left_base="AAAA",
+        right_base="TTAT",
         context=context,
         s0_match_required=True,
         forbidden_release_sites=[],
     )
     higher_gc_tier2 = evaluate_pair_candidate(
-        left_base="AATG",
-        right_base="CACT",
+        left_base="AAAA",
+        right_base="TTGT",
         context=context,
         s0_match_required=True,
         forbidden_release_sites=[],
@@ -815,8 +815,8 @@ def test_ranking_prefers_lower_hard_mismatch_tier_before_gc_tie_break() -> None:
 
     assert ranked[0].hard_mismatch_tier_sum == 2
     assert ranked[0].gc_fraction > ranked[1].gc_fraction
-    assert ranked[0].left_base == "AATG"
-    assert ranked[0].right_base == "CACT"
+    assert ranked[0].left_base == "AAAA"
+    assert ranked[0].right_base == "TTGT"
 
 
 def test_candidate_id_includes_enzyme_route() -> None:
@@ -942,10 +942,50 @@ def test_terminal_nick_visual_keeps_pre_release_duplex_watson_crick_until_adapte
     assert visual["complement_sequence"][pre_slice] == "CCAGAGCCGGG"
     assert visual["complement_sequence"][pre_scar] == "CGGG"
     assert visual["complement_sequence"][post_scar] == candidate.right_base[::-1]
+    assert visual["meta"]["right_base_raw_display_order"] == candidate.right_base[::-1]
+    assert visual["meta"]["aligned_right_base_display_order"] == "".join(
+        pair.aligned_right_base for pair in candidate.pair_classes
+    )
     assert visual["meta"]["mismatch_indices"] == [
         post_panel["retained_scar_span"]["start"] + 1,
         post_panel["retained_scar_span"]["start"] + 3,
     ]
+
+
+def test_terminal_nick_visual_renders_wobble_labels_as_gt_aligned_pairs() -> None:
+    context = CandidateRankingContext(
+        target_profile_buckets=[],
+        reject_profiles=[],
+        allow_gt_wobble=True,
+        active_max_hard_mismatches=4,
+        active_max_non_watson_crick_pairs=4,
+    )
+    candidate = evaluate_pair_candidate(
+        left_base="GTGA",
+        right_base="TCTT",
+        context=context,
+        s0_match_required=True,
+        forbidden_release_sites=[],
+        release_placement=_release_placement(),
+        nickase_placement=_nickase_placement(),
+    )
+
+    visual = build_terminal_nick_visual_contract(
+        candidate=candidate,
+        solution_id="demo.candidate_01",
+        state_kind="pre_post_terminal_nick",
+    )
+
+    post_panel = visual["panels"][1]
+    post_scar = slice(post_panel["retained_scar_span"]["start"], post_panel["retained_scar_span"]["end"])
+
+    assert candidate.profile_s3s2s1s0 == "WXMM"
+    assert candidate.pair_classes[0].class_label == "W"
+    assert candidate.pair_classes[0].left_base == "G"
+    assert candidate.pair_classes[0].right_base == "T"
+    assert visual["primary_sequence"][post_scar] == "GTGA"
+    assert visual["complement_sequence"][post_scar] == "TTCT"
+    assert visual["meta"]["right_base_raw_display_order"] == "TTCT"
 
 
 def test_terminal_nick_view_rejects_boundary_off_retained_scar_end() -> None:

@@ -44,7 +44,10 @@ phenotype predictor.
 - `export/table__scar_nick_candidate_pair_calls.csv` gives one row per
   candidate and S-site, including left/right bases, aligned right base, pair
   class, mismatch flags, and T4 mismatch tier.
-- `*_pair_identity` fields use the actual aligned pair (`left_nt:aligned_right_nt`);
-  raw `right_nt` remains available in the pair-call table for coordinate audit.
+- `*_pair_identity` fields and `pair_identity` use the physical S-site pair
+  (`left_nt:right_nt`). `aligned_right_nt` and `aligned_pair_identity` remain
+  available for Watson-Crick complement audits.
 - `analysis/views/scar_nick_terminal_nick.scar_nick_visual.v1.jsonl` is the
-  contract source for the pre/post terminal-nick plot.
+  contract source for the pre/post terminal-nick plot. The post-release junction
+  row displays the raw right-hand bases in S3/S2/S1/S0 order, so visual `W`
+  calls appear as physical `G:T` or `T:G` pairs.

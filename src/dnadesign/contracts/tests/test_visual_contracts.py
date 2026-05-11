@@ -27,7 +27,41 @@ from dnadesign.contracts.visual import (
 
 
 def _scar_nick_pair_classes(profile: str = "MXMX") -> list[dict[str, object]]:
-    return [{"position": index, "class_label": label} for index, label in enumerate(profile)]
+    base_rows = [
+        {
+            "position": 0,
+            "site": "S3",
+            "source_offset": 0,
+            "left_base": "G",
+            "right_base": "C",
+            "aligned_right_base": "G",
+        },
+        {
+            "position": 1,
+            "site": "S2",
+            "source_offset": 1,
+            "left_base": "C",
+            "right_base": "T",
+            "aligned_right_base": "A",
+        },
+        {
+            "position": 2,
+            "site": "S1",
+            "source_offset": 2,
+            "left_base": "C",
+            "right_base": "G",
+            "aligned_right_base": "C",
+        },
+        {
+            "position": 3,
+            "site": "S0",
+            "source_offset": 3,
+            "left_base": "C",
+            "right_base": "T",
+            "aligned_right_base": "A",
+        },
+    ]
+    return [{**row, "class_label": label} for row, label in zip(base_rows, profile, strict=True)]
 
 
 def _scar_nick_fill(panel: dict[str, object], semantic: str, fill_id: str, fill: str) -> dict[str, object]:
@@ -410,6 +444,16 @@ def test_scar_nick_visual_contract_rejects_pair_class_drift() -> None:
     payload["pair_classes"] = _scar_nick_pair_classes("MMXM")
 
     with pytest.raises(ValueError, match="pair_classes class labels"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_wobble_label_without_gt_pair() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["profile_s3s2s1s0"] = "MWMX"
+    payload["profile_payload_outward"] = "XMWM"
+    payload["pair_classes"] = _scar_nick_pair_classes("MWMX")
+
+    with pytest.raises(ValueError, match="W pair_classes must be G:T or T:G physical pairs"):
         ScarNickVisualV1.model_validate(payload)
 
 

@@ -288,6 +288,8 @@ def build_terminal_nick_visual_contract(
     panel_sequence = context.primary_sequence_5to3
     pre_panel_complement = complement_sequence(panel_sequence)
     post_panel_complement = pairing_complement_sequence(sequence=panel_sequence, context=context, candidate=candidate)
+    aligned_right_display = "".join(pair.aligned_right_base for pair in candidate.pair_classes)
+    raw_right_display = candidate.right_base[::-1]
     spacer = "N" * _PANEL_SPACER_NT
     post_offset = len(panel_sequence) + len(spacer)
     primary_sequence = panel_sequence + spacer + panel_sequence
@@ -388,7 +390,9 @@ def build_terminal_nick_visual_contract(
             "panel_transition_arrows": [{"start": panels[0]["end"], "end": panels[1]["start"]}],
             "fragment_spans": [post_fragment_span],
             "mismatch_indices": mismatch_indices,
-            "right_base_display_order": candidate.right_base[::-1],
+            "right_base_display_order": raw_right_display,
+            "right_base_raw_display_order": raw_right_display,
+            "aligned_right_base_display_order": aligned_right_display,
         },
     }
     return ScarNickVisualV1.model_validate(payload).model_dump(mode="json")

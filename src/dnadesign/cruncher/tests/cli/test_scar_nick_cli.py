@@ -63,8 +63,8 @@ def _write_spec(tmp_path: Path, *, materialize_top_k: int = 8) -> tuple[Path, Pa
                     "name": "teto_upstream_processing",
                 },
                 "junction": {
-                    "left_base": "GCCC",
-                    "right_base": "TGTC",
+                    "left_base": "CGGG",
+                    "right_base": "ACAG",
                     "profile_order": "S3_S2_S1_S0",
                     "s0_match_required": True,
                     "overhang_length": 4,
@@ -89,8 +89,8 @@ def _write_spec(tmp_path: Path, *, materialize_top_k: int = 8) -> tuple[Path, Pa
                     "optional_reference_profiles": {
                         "working_control": {
                             "id": "retron_26",
-                            "left_base": "GCCC",
-                            "right_base": "TGTC",
+                            "left_base": "CGGG",
+                            "right_base": "ACAG",
                             "profile_s3s2s1s0": "MXMX",
                         }
                     },
@@ -211,6 +211,9 @@ def test_scar_nick_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> Non
         "site",
         "left_nt",
         "right_nt",
+        "aligned_right_nt",
+        "pair_identity",
+        "aligned_pair_identity",
         "class_label",
         "is_watson_crick",
         "is_wobble",
@@ -221,7 +224,8 @@ def test_scar_nick_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> Non
     assert all(row["non_wc_count"] == row["non_watson_crick_count"] for row in candidate_rows)
     assert {row["site"] for row in pair_call_rows if row["rank"] == "1"} == {"S3", "S2", "S1", "S0"}
     assert any(row["class_label"] in {"W", "X"} for row in pair_call_rows)
-    assert all(row["pair_identity"] == f"{row['left_nt']}:{row['aligned_right_nt']}" for row in pair_call_rows)
+    assert all(row["pair_identity"] == f"{row['left_nt']}:{row['right_nt']}" for row in pair_call_rows)
+    assert all(row["aligned_pair_identity"] == f"{row['left_nt']}:{row['aligned_right_nt']}" for row in pair_call_rows)
     assert all(row["non_wc_count"] == row["non_watson_crick_count"] for row in pair_call_rows)
 
     show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
@@ -409,7 +413,7 @@ def test_scar_nick_show_fails_on_materialized_candidate_payload_drift(tmp_path: 
         run_dir / "analysis" / "materialized_candidates" / "candidate_01" / "analysis" / "candidate.json"
     )
     candidate_payload = json.loads(candidate_json_path.read_text(encoding="utf-8"))
-    candidate_payload["left_base"] = "AAAA"
+    candidate_payload["left_base"] = "CCCC"
     candidate_json_path.write_text(json.dumps(candidate_payload), encoding="utf-8")
 
     show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)

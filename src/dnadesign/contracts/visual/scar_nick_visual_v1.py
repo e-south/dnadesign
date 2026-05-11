@@ -66,6 +66,13 @@ def _recognition_nt(motif: str) -> int:
     return sum(1 for symbol in motif if _iupac_bases_for_symbol(symbol) != set(_DNA_BASES))
 
 
+def _pair_entry_base(entry: JsonMap, field: str, *, position: int) -> str:
+    value = str(entry.get(field) or "").upper()
+    if len(value) != 1 or value not in _DNA_BASES:
+        raise ValueError(f"pair_classes[{position}].{field} must be one A/C/G/T base")
+    return value
+
+
 class ScarNickRectangularFillV1(VisualContractModel):
     fill_id: str
     semantic: str
@@ -392,6 +399,22 @@ class ScarNickVisualV1(VisualContractModel):
         observed_profile = "".join(str(entry.get("class_label") or "") for entry in self.pair_classes)
         if observed_profile != self.profile_s3s2s1s0:
             raise ValueError("pair_classes class labels must match profile_s3s2s1s0")
+        right_display_parts: list[str] = []
+        for index, entry in enumerate(self.pair_classes):
+            class_label = str(entry.get("class_label") or "").upper()
+            left_base = _pair_entry_base(entry, "left_base", position=index)
+            aligned_right_base = _pair_entry_base(entry, "aligned_right_base", position=index)
+            right_base = _pair_entry_base(entry, "right_base", position=index)
+            if class_label == "M" and left_base != aligned_right_base:
+                raise ValueError("M pair_classes must have identical left_base and aligned_right_base")
+            if class_label == "W" and (left_base, right_base) not in {("G", "T"), ("T", "G")}:
+                raise ValueError("W pair_classes must be G:T or T:G physical pairs")
+            if class_label == "X" and left_base == aligned_right_base:
+                raise ValueError("X pair_classes must not have identical left_base and aligned_right_base")
+            right_display_parts.append(right_base)
+        right_display = "".join(right_display_parts)
+        if right_display != self.right_base.upper()[::-1]:
+            raise ValueError("pair_classes right_base values must match right_base in S-order")
         if self.nickase_site_source_span is None:
             raise ValueError("scar-nick visual requires nickase_site_source_span")
         if self.nickase_site_span_clipped:
@@ -401,7 +424,6 @@ class ScarNickVisualV1(VisualContractModel):
         panel_ids = [panel.panel_id for panel in self.panels]
         if panel_ids != ["pre_release", "post_release"]:
             raise ValueError("scar-nick visual panels must be ordered pre_release, post_release")
-        right_display = self.right_base.upper()[::-1]
         perfect_complement = _complement_3to5(self.primary_sequence)
         allowed_non_complement_indices: set[int] = set()
         expected_fragment_row = "primary" if self.nicked_strand == "top" else "complement"
