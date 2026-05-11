@@ -30,6 +30,7 @@ from dnadesign.cruncher.scar_nick.policy import (
 from dnadesign.cruncher.scar_nick.policy import (
     profile_ligation_support as _profile_ligation_support,
 )
+from dnadesign.cruncher.scar_nick.semantics import PROFILE_ORDER_S3S2S1S0
 
 
 class StrictScarNickModel(BaseModel):
@@ -53,7 +54,7 @@ class ScarNickHeader(StrictScarNickModel):
 class JunctionSpec(StrictScarNickModel):
     left_base: str
     right_base: str
-    profile_order: Literal["S3_S2_S1_S0"] = "S3_S2_S1_S0"
+    profile_order: Literal["S3_S2_S1_S0"] = PROFILE_ORDER_S3S2S1S0
     s0_match_required: bool = True
     overhang_length: int = Field(default=4, ge=1)
 
@@ -456,7 +457,7 @@ class ScarNickCandidate(StrictScarNickModel):
     retained_product_sequence: str
     profile_s3s2s1s0: str
     profile_payload_outward: str
-    profile_order: Literal["S3_S2_S1_S0"] = "S3_S2_S1_S0"
+    profile_order: Literal["S3_S2_S1_S0"] = PROFILE_ORDER_S3S2S1S0
     profile_policy_status: ProfilePolicyStatus
     profile_policy_reason: str
     s0_match_required: bool = True

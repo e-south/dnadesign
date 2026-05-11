@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dnadesign.cruncher.nickases.models import normalize_dna, reverse_complement
 from dnadesign.cruncher.scar_nick.models import PairClass, PairProfile
+from dnadesign.cruncher.scar_nick.semantics import PROFILE_ORDER_S3S2S1S0, S_SITE_ORDER
 from dnadesign.cruncher.yiu.ligation_scoring import (
     canonical_mismatch_class,
     mismatch_class_tier,
@@ -39,7 +40,7 @@ def classify_pair_profile(
     left_base: str,
     right_base: str,
     *,
-    profile_order: str = "S3_S2_S1_S0",
+    profile_order: str = PROFILE_ORDER_S3S2S1S0,
     allow_gt_wobble: bool = True,
 ) -> PairProfile:
     """Classify a 4-bp paired junction profile in S3/S2/S1/S0 order.
@@ -49,8 +50,8 @@ def classify_pair_profile(
     physical left:right pair and are therefore limited to G:T or T:G.
     """
 
-    if profile_order != "S3_S2_S1_S0":
-        raise ValueError("scar-nick profile_order must be S3_S2_S1_S0.")
+    if profile_order != PROFILE_ORDER_S3S2S1S0:
+        raise ValueError(f"scar-nick profile_order must be {PROFILE_ORDER_S3S2S1S0}.")
     left = normalize_dna(left_base)
     right = normalize_dna(right_base)
     if len(left) != 4 or len(right) != 4:
@@ -58,7 +59,6 @@ def classify_pair_profile(
     aligned_right = reverse_complement(right)
 
     pairs: list[PairClass] = []
-    sites = ("S3", "S2", "S1", "S0")
     for position, source_offset in enumerate(range(4)):
         left_symbol = left[source_offset]
         right_symbol = right[3 - source_offset]
@@ -72,7 +72,7 @@ def classify_pair_profile(
         pairs.append(
             PairClass(
                 position=position,
-                site=sites[position],
+                site=S_SITE_ORDER[position],
                 source_offset=source_offset,
                 left_base=left_symbol,
                 right_base=right_symbol,

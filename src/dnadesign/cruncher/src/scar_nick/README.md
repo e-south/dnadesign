@@ -8,20 +8,22 @@ phenotype predictor.
 
 1. `load.py` validates the YAML spec boundary.
 2. `geometry.py` audits release-enzyme and nickase compatibility.
-3. `profiles.py` calls the four scar positions in canonical `S3_S2_S1_S0`
+3. `semantics.py` owns shared ontology constants and strand-to-visual-row
+   mapping.
+4. `profiles.py` calls the four scar positions in canonical `S3_S2_S1_S0`
    order.
-4. `policy.py` classifies each profile as `active`, `reserve`, or `reject`.
-5. `candidates.py` builds per-pair candidate records and rejection reasons.
-6. `planner.py` enumerates feasible left/right scar pairs and builds the report
+5. `policy.py` classifies each profile as `active`, `reserve`, or `reject`.
+6. `candidates.py` builds per-pair candidate records and rejection reasons.
+7. `planner.py` enumerates feasible left/right scar pairs and builds the report
    model.
-7. `ranking.py` performs deterministic bucket coverage and tie-breaking.
-8. `tables.py` writes the CSV handoff tables.
-9. `artifacts.py` owns artifact paths, manifests, snapshots, and generic
+8. `ranking.py` performs deterministic bucket coverage and tie-breaking.
+9. `tables.py` writes the CSV handoff tables.
+10. `artifacts.py` owns artifact paths, manifests, snapshots, and generic
    persistence helpers.
-10. `visual_geometry.py` builds display-coordinate spans and aligned sequences.
-11. `view_contracts.py` builds the pre/post terminal-nick visual contract.
-12. `visual_publication.py` writes visual bundles and checks artifact drift.
-13. `reporting.py` renders the Markdown run summary.
+11. `visual_geometry.py` builds display-coordinate spans and aligned sequences.
+12. `view_contracts.py` builds the pre/post terminal-nick visual contract.
+13. `visual_publication.py` writes visual bundles and checks artifact drift.
+14. `reporting.py` renders the Markdown run summary.
 
 ## Core Semantics
 
@@ -32,6 +34,9 @@ phenotype predictor.
   default.
 - `XXMM` and `XMXM` are active S3-edge double-hard profiles when they satisfy
   the rest of the ligation policy.
+- Visual rows are mapped explicitly from strands: top -> primary, bottom ->
+  complement. Post-release scar fill follows the surviving strand; the annealed
+  adapter fill follows the nicked strand.
 
 ## Handoff Artifacts
 

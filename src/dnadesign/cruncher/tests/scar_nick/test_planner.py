@@ -23,6 +23,7 @@ from dnadesign.cruncher.scar_nick.candidates import evaluate_pair_candidate
 from dnadesign.cruncher.scar_nick.geometry import placements_for_entry
 from dnadesign.cruncher.scar_nick.models import CandidateRankingContext, NickasePlacement, ReleasePlacement
 from dnadesign.cruncher.scar_nick.ranking import rank_pair_candidates, unique_sequence_candidates
+from dnadesign.cruncher.scar_nick.semantics import row_for_strand, surviving_strand_for_nick
 from dnadesign.cruncher.scar_nick.view_contracts import build_terminal_nick_visual_contract
 from dnadesign.cruncher.scar_nick.view_models import ScarNickTerminalNickViewV1
 
@@ -919,6 +920,45 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
         "retained_type_iis_scar",
         "nickase_footprint",
     }
+
+
+def test_terminal_nick_visual_derives_rows_from_explicit_strand_semantics() -> None:
+    context = CandidateRankingContext(
+        target_profile_buckets=[],
+        reject_profiles=[],
+        allow_gt_wobble=True,
+        active_max_hard_mismatches=4,
+        active_max_non_watson_crick_pairs=4,
+    )
+    candidate = evaluate_pair_candidate(
+        left_base="GCCC",
+        right_base="TGTC",
+        context=context,
+        s0_match_required=True,
+        forbidden_release_sites=[],
+        release_placement=_release_placement(),
+        nickase_placement=_nickase_placement(strand="top"),
+    )
+
+    assert candidate.nicked_strand == "top"
+    assert candidate.surviving_strand == surviving_strand_for_nick(candidate.nicked_strand)
+
+    visual = build_terminal_nick_visual_contract(
+        candidate=candidate,
+        solution_id="demo.candidate_01",
+        state_kind="pre_post_terminal_nick",
+    )
+
+    post_panel = visual["panels"][1]
+    fragment_fill = next(
+        fill for fill in visual["rectangular_fills"] if fill["semantic"] == "annealed_adapter_fragment"
+    )
+    post_scar_fill = next(
+        fill for fill in visual["rectangular_fills"] if fill["fill_id"] == "post_release_retained_type_iis_scar"
+    )
+    assert post_panel["fragment_spans"][0]["row"] == row_for_strand(candidate.nicked_strand)
+    assert fragment_fill["cover_rows"] == row_for_strand(candidate.nicked_strand)
+    assert post_scar_fill["cover_rows"] == row_for_strand(candidate.surviving_strand)
 
 
 def test_terminal_nick_visual_keeps_pre_release_duplex_watson_crick_until_adapter_anneals() -> None:

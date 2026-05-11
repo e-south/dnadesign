@@ -16,6 +16,7 @@ from typing import Any
 
 from dnadesign.contracts.visual import ScarNickVisualV1
 from dnadesign.cruncher.scar_nick.models import ScarNickCandidate
+from dnadesign.cruncher.scar_nick.semantics import row_for_strand
 from dnadesign.cruncher.scar_nick.view_models import ScarNickTerminalNickViewV1, ScarNickViewsManifestV1
 from dnadesign.cruncher.scar_nick.visual_geometry import (
     ScarNickVisualContext,
@@ -85,11 +86,17 @@ def _panel_coordinate_fields(
     }
 
 
-def _rectangular_fills_for_panel(panel: dict[str, Any], *, prefix: str) -> list[dict[str, Any]]:
+def _rectangular_fills_for_panel(
+    panel: dict[str, Any],
+    *,
+    prefix: str,
+    surviving_row: str | None = None,
+) -> list[dict[str, Any]]:
     scar_cover_rows = "both"
     if panel["panel_id"] == "post_release":
-        fragment_row = panel["fragment_spans"][0]["row"]
-        scar_cover_rows = "complement" if fragment_row == "primary" else "primary"
+        if surviving_row is None:
+            raise ValueError("post-release scar fill requires an explicit surviving row")
+        scar_cover_rows = surviving_row
     fills = [
         {
             "fill_id": f"{prefix}_type_iis_release_site",
@@ -319,7 +326,8 @@ def build_terminal_nick_visual_contract(
     primary_sequence = panel_sequence + spacer + panel_sequence
     complement = pre_panel_complement + spacer + post_panel_complement
 
-    post_fragment_row = "primary" if candidate.nicked_strand == "top" else "complement"
+    post_fragment_row = row_for_strand(candidate.nicked_strand)
+    surviving_row = row_for_strand(candidate.surviving_strand)
     post_fragment_span = {
         "row": post_fragment_row,
         "start": post_offset,
@@ -348,7 +356,13 @@ def build_terminal_nick_visual_contract(
     ]
     rectangular_fills: list[dict[str, Any]] = []
     for panel in panels:
-        rectangular_fills.extend(_rectangular_fills_for_panel(panel, prefix=panel["panel_id"]))
+        rectangular_fills.extend(
+            _rectangular_fills_for_panel(
+                panel,
+                prefix=panel["panel_id"],
+                surviving_row=surviving_row if panel["panel_id"] == "post_release" else None,
+            )
+        )
 
     nickase_payload = _nickase_payload(candidate)
     post_panel = panels[1]

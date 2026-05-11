@@ -23,6 +23,7 @@ from dnadesign.cruncher.scar_nick.models import (
 from dnadesign.cruncher.scar_nick.policy import classify_profile_policy
 from dnadesign.cruncher.scar_nick.profiles import classify_pair_profile
 from dnadesign.cruncher.scar_nick.ranking import ranking_key
+from dnadesign.cruncher.scar_nick.semantics import surviving_strand_for_nick
 from dnadesign.cruncher.utils.hashing import sha256_bytes
 
 
@@ -107,14 +108,6 @@ def _tnna_flag(sequence: str) -> bool:
     return len(scar) == 4 and scar[0] == "T" and scar[3] == "A"
 
 
-def _surviving_strand(nicked_strand: str | None) -> str | None:
-    if nicked_strand == "top":
-        return "bottom"
-    if nicked_strand == "bottom":
-        return "top"
-    return None
-
-
 def _append_rejection(rejection_reasons: list[str], reason: str) -> None:
     if reason not in rejection_reasons:
         rejection_reasons.append(reason)
@@ -163,7 +156,7 @@ def evaluate_pair_candidate(
         nickase_placement.boundary if nickase_placement is not None else terminal_boundary + int(nick_distance)
     )
     nicked_strand = None if nickase_placement is None else nickase_placement.strand
-    surviving_strand = _surviving_strand(nicked_strand)
+    surviving_strand = surviving_strand_for_nick(nicked_strand)
     candidate = ScarNickCandidate(
         candidate_id=_candidate_id(
             left,
