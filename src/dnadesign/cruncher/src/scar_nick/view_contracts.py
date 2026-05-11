@@ -85,6 +85,10 @@ def _panel_coordinate_fields(
 
 
 def _rectangular_fills_for_panel(panel: dict[str, Any], *, prefix: str) -> list[dict[str, Any]]:
+    scar_cover_rows = "both"
+    if panel["panel_id"] == "post_release":
+        fragment_row = panel["fragment_spans"][0]["row"]
+        scar_cover_rows = "complement" if fragment_row == "primary" else "primary"
     fills = [
         {
             "fill_id": f"{prefix}_type_iis_release_site",
@@ -116,7 +120,7 @@ def _rectangular_fills_for_panel(panel: dict[str, Any], *, prefix: str) -> list[
             "semantic": "retained_type_iis_scar",
             "start": panel["retained_scar_span"]["start"],
             "end": panel["retained_scar_span"]["end"],
-            "cover_rows": "both",
+            "cover_rows": scar_cover_rows,
             "fill": _SCAR_FILL,
             "alpha": 0.36,
             "corner_radius": 0.0,
@@ -315,7 +319,7 @@ def build_terminal_nick_visual_contract(
     post_fragment_span = {
         "row": post_fragment_row,
         "start": post_offset,
-        "end": post_offset + context.retained_scar_span["start"],
+        "end": post_offset + context.retained_scar_span["end"],
     }
     panels = [
         _panel_coordinate_fields(

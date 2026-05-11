@@ -297,8 +297,13 @@ def test_scar_nick_design_writes_unique_terminal_nick_visuals_and_baserender_job
     assert scar_fill["semantic"] == "retained_type_iis_scar"
     assert scar_fill["start"] == post["retained_scar_span"]["start"]
     assert scar_fill["end"] == post["retained_scar_span"]["end"]
-    assert scar_fill["cover_rows"] == "both"
+    expected_surviving_row = "primary" if post["surviving_strand"] == "top" else "complement"
+    assert scar_fill["cover_rows"] == expected_surviving_row
     assert scar_fill["corner_radius"] == 0.0
+    annealed_fill = fills_by_semantic["annealed_adapter_fragment"][0]
+    assert annealed_fill["start"] == post["panels"][1]["fragment_spans"][0]["start"]
+    assert annealed_fill["end"] == post["panels"][1]["nick_boundary"]
+    assert annealed_fill["cover_rows"] == post["panels"][1]["fragment_spans"][0]["row"]
     assert any(
         fill["start"] == post["release_site_span"]["start"] and fill["end"] == post["release_site_span"]["end"]
         for fill in fills_by_semantic["type_iis_release_site"]

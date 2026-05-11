@@ -194,7 +194,7 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
         "type_iis_offset_span": {"start": post_offset + 6, "end": post_offset + 7},
         "retained_scar_span": {"start": post_offset + 7, "end": post_offset + 11},
         "nickase_site_span": {"start": post_offset, "end": post_offset + 11},
-        "fragment_spans": [{"row": "complement", "start": post_offset, "end": post_offset + 7}],
+        "fragment_spans": [{"row": "complement", "start": post_offset, "end": post_offset + 11}],
     }
     fills = []
     for panel in (pre_panel, post_panel):
@@ -213,7 +213,9 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
                     "semantic": semantic,
                     "start": span["start"],
                     "end": span["end"],
-                    "cover_rows": "both",
+                    "cover_rows": "primary"
+                    if panel["panel_id"] == "post_release" and semantic == "retained_type_iis_scar"
+                    else "both",
                     "fill": color,
                     "alpha": alpha,
                     "corner_radius": 0.0,
@@ -384,7 +386,7 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["base_highlights"]["complement"] == []
     assert record.meta["base_highlight_colors"]["primary"][0] == "#7A6500"
     assert record.meta["base_highlight_colors"]["primary"][6] == "#005A8D"
-    assert record.meta["dim_base_indices"]["complement"] == list(range(15, 22))
+    assert record.meta["dim_base_indices"]["complement"] == list(range(15, 26))
     fragment_fills = [
         backdrop for backdrop in record.meta["span_backdrops"] if backdrop["semantic"] == "annealed_adapter_fragment"
     ]
@@ -392,7 +394,7 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
         {
             "semantic": "annealed_adapter_fragment",
             "start": 15,
-            "end": 22,
+            "end": 26,
             "fill": "#CBD5E1",
             "alpha": 0.48,
             "corner_radius": 4.0,
@@ -435,6 +437,8 @@ def test_scar_nick_visual_adapter_places_nickase_label_on_nicked_top_strand() ->
     for fill in payload["rectangular_fills"]:
         if fill["semantic"] == "annealed_adapter_fragment":
             fill["cover_rows"] = "primary"
+        if fill["fill_id"] == "post_release_retained_type_iis_scar":
+            fill["cover_rows"] = "complement"
     cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
     adapter = build_adapter(cfg, alphabet="DNA")
 
@@ -460,6 +464,8 @@ def test_scar_nick_visual_adapter_bolds_reverse_nickase_on_canonical_complement_
     for fill in payload["rectangular_fills"]:
         if fill["semantic"] == "annealed_adapter_fragment":
             fill["cover_rows"] = "primary"
+        if fill["fill_id"] == "post_release_retained_type_iis_scar":
+            fill["cover_rows"] = "complement"
     cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
     adapter = build_adapter(cfg, alphabet="DNA")
 

@@ -124,7 +124,7 @@ def _scar_nick_visual_payload() -> dict[str, object]:
         "type_iis_offset_span": {"start": post_offset + 6, "end": post_offset + 7},
         "retained_scar_span": {"start": post_offset + 7, "end": post_offset + 11},
         "nickase_site_span": {"start": post_offset, "end": post_offset + 11},
-        "fragment_spans": [{"row": "complement", "start": post_offset, "end": post_offset + 7}],
+        "fragment_spans": [{"row": "complement", "start": post_offset, "end": post_offset + 11}],
     }
     rectangular_fills = []
     for panel in (pre_panel, post_panel):
@@ -133,7 +133,10 @@ def _scar_nick_visual_payload() -> dict[str, object]:
             [
                 _scar_nick_fill(panel, "release_site", f"{prefix}_type_iis_release_site", "#F0E442"),
                 _scar_nick_fill(panel, "type_iis_offset", f"{prefix}_type_iis_offset_spacer", "#FFF6B3"),
-                _scar_nick_fill(panel, "retained_scar", f"{prefix}_retained_type_iis_scar", "#009E73"),
+                {
+                    **_scar_nick_fill(panel, "retained_scar", f"{prefix}_retained_type_iis_scar", "#009E73"),
+                    "cover_rows": "primary" if panel["panel_id"] == "post_release" else "both",
+                },
             ]
         )
         if panel["panel_id"] == "pre_release":
@@ -328,6 +331,12 @@ def test_scar_nick_visual_contract_validates_nick_state_payload() -> None:
     nickase_fills = [fill for fill in contract.rectangular_fills if fill.semantic == "nickase_footprint"]
     assert len(nickase_fills) == 1
     assert nickase_fills[0].start == contract.panels[0].nickase_site_span.start
+    fragment_span = contract.panels[1].fragment_spans[0]
+    assert fragment_span.end == contract.panels[1].nick_boundary
+    post_scar_fill = next(
+        fill for fill in contract.rectangular_fills if fill.fill_id == "post_release_retained_type_iis_scar"
+    )
+    assert post_scar_fill.cover_rows == "primary"
 
 
 def test_scar_nick_visual_contract_requires_nickase_strand_and_fragment_row_consistency() -> None:
@@ -341,12 +350,19 @@ def test_scar_nick_visual_contract_requires_nickase_strand_and_fragment_row_cons
     with pytest.raises(ValueError, match="fragment spans must be on the nicked strand"):
         ScarNickVisualV1.model_validate(wrong_fragment_row)
 
-    fragment_over_scar = _scar_nick_visual_payload()
-    fragment_over_scar["panels"][1]["fragment_spans"][0]["end"] = (
-        fragment_over_scar["panels"][1]["retained_scar_span"]["start"] + 1
-    )
-    with pytest.raises(ValueError, match="fragment spans must stop before the retained scar"):
-        ScarNickVisualV1.model_validate(fragment_over_scar)
+    fragment_stops_before_nick = _scar_nick_visual_payload()
+    fragment_stops_before_nick["panels"][1]["fragment_spans"][0]["end"] = fragment_stops_before_nick["panels"][1][
+        "retained_scar_span"
+    ]["start"]
+    with pytest.raises(ValueError, match="fragment spans must terminate at the nick boundary"):
+        ScarNickVisualV1.model_validate(fragment_stops_before_nick)
+
+    post_scar_covers_nicked_strand = _scar_nick_visual_payload()
+    for fill in post_scar_covers_nicked_strand["rectangular_fills"]:
+        if fill["fill_id"] == "post_release_retained_type_iis_scar":
+            fill["cover_rows"] = "both"
+    with pytest.raises(ValueError, match="post-release retained Type IIS scar fill must cover the surviving strand"):
+        ScarNickVisualV1.model_validate(post_scar_covers_nicked_strand)
 
 
 def test_scar_nick_visual_contract_accepts_catalog_type_iis_release_without_bsa_i_pin() -> None:

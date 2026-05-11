@@ -887,15 +887,24 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
     assert visual["nickase_site_span_clipped"] is False
     assert [panel["panel_id"] for panel in visual["panels"]] == ["pre_release", "post_release"]
     post_panel = visual["panels"][1]
-    assert post_panel["fragment_spans"] == [{"row": "complement", "start": 15, "end": 22}]
-    assert post_panel["fragment_spans"][0]["end"] == post_panel["retained_scar_span"]["start"]
+    assert post_panel["fragment_spans"] == [{"row": "complement", "start": 15, "end": 26}]
+    assert post_panel["fragment_spans"][0]["end"] == post_panel["nick_boundary"]
     fragment_fill = next(
         fill for fill in visual["rectangular_fills"] if fill["semantic"] == "annealed_adapter_fragment"
     )
     assert fragment_fill["start"] == post_panel["fragment_spans"][0]["start"]
-    assert fragment_fill["end"] == post_panel["fragment_spans"][0]["end"]
+    assert fragment_fill["end"] == post_panel["nick_boundary"]
     assert fragment_fill["cover_rows"] == "complement"
     assert fragment_fill["corner_radius"] > 0
+    pre_scar_fill = next(
+        fill for fill in visual["rectangular_fills"] if fill["fill_id"] == "pre_release_retained_type_iis_scar"
+    )
+    post_scar_fill = next(
+        fill for fill in visual["rectangular_fills"] if fill["fill_id"] == "post_release_retained_type_iis_scar"
+    )
+    assert pre_scar_fill["cover_rows"] == "both"
+    assert post_scar_fill["cover_rows"] == "primary"
+    assert post_scar_fill["fill"] == pre_scar_fill["fill"]
     assert visual["nickase"]["canonical_read_row"] == "primary"
     assert visual["nickase"]["recognition_nt"] == 7
     assert visual["meta"]["profile_order"] == "S3_S2_S1_S0"

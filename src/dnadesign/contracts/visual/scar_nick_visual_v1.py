@@ -478,8 +478,8 @@ class ScarNickVisualV1(VisualContractModel):
                 for fragment_span in panel.fragment_spans:
                     if fragment_span.row != expected_fragment_row:
                         raise ValueError("post_release fragment spans must be on the nicked strand")
-                    if fragment_span.end > panel.retained_scar_span.start:
-                        raise ValueError("post_release fragment spans must stop before the retained scar")
+                    if fragment_span.end != panel.nick_boundary:
+                        raise ValueError("post_release fragment spans must terminate at the nick boundary")
             downstream = self.primary_sequence[panel.terminal_boundary : panel.end]
             if any(symbol.upper() != "N" for symbol in downstream):
                 raise ValueError("scar-nick visual allows only degenerate N symbols downstream of each terminal nick")
@@ -544,11 +544,22 @@ class ScarNickVisualV1(VisualContractModel):
                 for fill in release_fills
             ):
                 raise ValueError("Type IIS release site fills must cover every panel release_site_span")
-            if not any(
-                fill.start == panel.retained_scar_span.start and fill.end == panel.retained_scar_span.end
+            panel_scar_fills = [
+                fill
                 for fill in scar_fills
-            ):
+                if fill.start == panel.retained_scar_span.start and fill.end == panel.retained_scar_span.end
+            ]
+            if not panel_scar_fills:
                 raise ValueError("retained Type IIS scar fills must cover every panel retained_scar_span")
+            expected_scar_cover_rows = (
+                "both"
+                if panel.panel_id == "pre_release"
+                else ("primary" if self.surviving_strand == "top" else "complement")
+            )
+            if len(panel_scar_fills) != 1 or panel_scar_fills[0].cover_rows != expected_scar_cover_rows:
+                if panel.panel_id == "post_release":
+                    raise ValueError("post-release retained Type IIS scar fill must cover the surviving strand")
+                raise ValueError("pre-release retained Type IIS scar fill must cover both strands")
         return self
 
 
