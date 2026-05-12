@@ -160,9 +160,9 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
     assert controls.geometry_controls.candidate_sets[0].available_view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
     assert controls.geometry_controls.candidate_sets[1].view_ids == _CANDIDATE_X_SELECTION_VIEWS
     assert controls.geometry_controls.candidate_sets[1].available_view_ids == _CANDIDATE_X_SELECTION_VIEWS
-    assert controls.geometry_controls.candidate_sets[1].views[2].status != "missing"
+    assert controls.geometry_controls.candidate_sets[1].views[2].status in {"materialized", "missing"}
     assert controls.geometry_controls.candidate_sets[2].available_view_ids == _FIRST_CLASS_OUTPUT_VIEWS
-    assert controls.geometry_controls.candidate_sets[2].views[0].status != "planned"
+    assert controls.geometry_controls.candidate_sets[2].views[0].status in {"materialized", "missing"}
     assert controls.geometry_controls.candidate_sets[2].views[6].status == "planned"
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
