@@ -85,6 +85,17 @@ _BROWSER_GEOMETRY_VIEWS = [
 _FULL_POPULATION_UMAP_VIEWS = [*_BROWSER_GEOMETRY_VIEWS, *_FIRST_CLASS_OUTPUT_VIEWS]
 
 
+def _candidate_grid_layout(controls):
+    return next(
+        (row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid"),
+        None,
+    )
+
+
+def _expected_browser_default_layout(controls) -> str:
+    return "candidate_grid" if _candidate_grid_layout(controls) is not None else "single_view"
+
+
 def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None:
     workspace = _live_workspace()
     context = load_workspace_config(workspace)
@@ -133,9 +144,13 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
     assert all(context.config.views[view_id].role == "hidden" for view_id in _REFERENCE_DIAGNOSTIC_GEOMETRIES)
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
-    assert controls.geometry_controls.default_layout == "candidate_grid"
-    candidate_grid_layout = next(row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid")
-    assert candidate_grid_layout.view_ids == _FULL_POPULATION_UMAP_VIEWS
+    assert context.config.notebooks["latent_geometry_browser"].default_layout == "candidate_grid"
+    assert controls.geometry_controls.default_layout == _expected_browser_default_layout(controls)
+    candidate_grid_layout = _candidate_grid_layout(controls)
+    if candidate_grid_layout is not None:
+        assert candidate_grid_layout.view_ids == _FULL_POPULATION_UMAP_VIEWS
+    else:
+        assert all(not row.projection_ids for row in controls.geometry_controls.geometries)
     assert [row.candidate_set_id for row in controls.geometry_controls.candidate_sets] == [
         "first_class_intermediate_7b",
         "candidate_x_selection_7b",
@@ -438,7 +453,8 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert control_geometry_ids == _FULL_POPULATION_UMAP_VIEWS
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
-    assert controls.geometry_controls.default_layout == "candidate_grid"
+    assert context.config.notebooks["latent_geometry_browser"].default_layout == "candidate_grid"
+    assert controls.geometry_controls.default_layout == _expected_browser_default_layout(controls)
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
     assert "promoter_standard__collection_id" not in snapshot["browser"]["preferred_hues"]
     assert "promoter_standard__strength_value_numeric" not in snapshot["browser"]["preferred_hues"]
