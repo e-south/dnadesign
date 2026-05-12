@@ -94,7 +94,7 @@ infer:
         - SSL_CERT_FILE
         - REQUESTS_CA_BUNDLE
       tls_bundle_example: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
-      profile_secret_policy: file_backed_secret_ref_only
+      profile_secret_policy: file_backed_secret_ref_only  # pragma: allowlist secret
     sge_resource_contract:
       pe_omp: 4
       h_rt: "12:00:00"
