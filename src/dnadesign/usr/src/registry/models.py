@@ -19,6 +19,7 @@ USR_LABEL_NAMESPACE = "usr_label"
 SEQ_ANNOT_NAMESPACE = "seq_annot"
 DERIVED_NAMESPACE = "derived"
 PROMOTER_STANDARD_NAMESPACE = "promoter_standard"
+SFXI_REF_NAMESPACE = "sfxi_ref"
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,39 @@ PROMOTER_STANDARD_COLUMNS: list[RegistryColumn] = [
     RegistryColumn("promoter_standard__notes", "string"),
 ]
 
+SFXI_REF_COLUMNS: list[RegistryColumn] = [
+    RegistryColumn("sfxi_ref__reference_instance_id", "string"),
+    RegistryColumn("sfxi_ref__collection_id", "string"),
+    RegistryColumn("sfxi_ref__batch_id", "string"),
+    RegistryColumn("sfxi_ref__campaign_id", "string"),
+    RegistryColumn("sfxi_ref__reader_experiment_id", "string"),
+    RegistryColumn("sfxi_ref__reader_experiment_date", "int64"),
+    RegistryColumn("sfxi_ref__metric_id", "string"),
+    RegistryColumn("sfxi_ref__metric_value", "float64"),
+    RegistryColumn("sfxi_ref__metric_provenance", "string"),
+    RegistryColumn("sfxi_ref__source_ref", "string"),
+    RegistryColumn("sfxi_ref__score_ref", "string"),
+    RegistryColumn("sfxi_ref__objective_name", "string"),
+    RegistryColumn("sfxi_ref__api_version", "string"),
+    RegistryColumn("sfxi_ref__state_order", "list<string>"),
+    RegistryColumn("sfxi_ref__setpoint_name", "string"),
+    RegistryColumn("sfxi_ref__setpoint_vector", "list<float64>"),
+    RegistryColumn("sfxi_ref__denom_used", "float64"),
+    RegistryColumn("sfxi_ref__denom_percentile", "int64"),
+    RegistryColumn("sfxi_ref__logic_fidelity", "float64"),
+    RegistryColumn("sfxi_ref__effect_raw", "float64"),
+    RegistryColumn("sfxi_ref__effect_scaled", "float64"),
+    RegistryColumn("sfxi_ref__sfxi", "float64"),
+    RegistryColumn("sfxi_ref__r_logic", "float64"),
+    RegistryColumn("sfxi_ref__time_selected_h", "float64"),
+    RegistryColumn("sfxi_ref__reference_design_id", "string"),
+    RegistryColumn("sfxi_ref__sequence_source_id", "string"),
+    RegistryColumn("sfxi_ref__clip_lo_mask", "bool"),
+    RegistryColumn("sfxi_ref__clip_hi_mask", "bool"),
+    RegistryColumn("sfxi_ref__intensity_disabled", "bool"),
+    RegistryColumn("sfxi_ref__flat_logic", "bool"),
+]
+
 
 def _clone_registry_entries(entries: dict[str, RegistryEntry]) -> dict[str, RegistryEntry]:
     return {
@@ -195,4 +229,13 @@ def promoter_standard_entry() -> RegistryEntry:
         owner="usr",
         description="Source-backed synthetic promoter standard strength and collection metadata.",
         columns=list(PROMOTER_STANDARD_COLUMNS),
+    )
+
+
+def sfxi_ref_entry() -> RegistryEntry:
+    return RegistryEntry(
+        namespace=SFXI_REF_NAMESPACE,
+        owner="usr",
+        description="Provenance-aware SFXI reference metrics for annotation overlays.",
+        columns=list(SFXI_REF_COLUMNS),
     )

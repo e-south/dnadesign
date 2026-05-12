@@ -11,6 +11,7 @@ Reference pages define stable contracts for dataset shape, overlays, registry, e
 - [Dataset layout and code map](dataset-layout-and-code-map.md)
 - [Schema contract](schema-contract.md)
 - [Overlay and registry contract](overlay-and-registry.md)
+- [SFXI reference overlay contract](sfxi-reference-overlay.md)
 - [Event log contract](event-log.md)
 - [Python API quickstart](python-api.md)
 - [Maintenance patterns](maintenance.md)

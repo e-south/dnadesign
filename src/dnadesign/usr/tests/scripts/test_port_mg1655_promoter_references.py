@@ -19,6 +19,7 @@ SPYP_INSERT = "ATGC" * 15
 SOXSP_INSERT = "GCTA" * 15
 J23105 = "TTTACGGCTAGCTCAGTCCTAGGTACTATGCTAGC"
 J23103 = "CTGATAGCTAGCTCAGTCCTAGGGATTATGCTAGC"
+J23119 = "TTGACAGCTAGCTCAGTCCTAGGTATAATGCTAGC"
 W9 = "TTATCAAAAAGAGTATTGACATAAAGTCTAACCTATAGGAGTATTACAGCCATCGAGAGGGACACGGCGAA"
 T7A1 = "TTATCAAAAAGAGTATTGACTTAAAGTCTAACCTATAGGATACTTACAGCCATCGAGAGGGACACGGCGAA"
 
@@ -115,6 +116,11 @@ def _write_synthetic_standards_fixture(root: Path) -> Path:
             [
                 "collection_id,promoter_id,display_name,role,sequence,strength_metric,strength_value,strength_reference,source_record,notes",
                 (
+                    "anderson_igem,BBa_J23119,J23119,consensus_promoter,"
+                    f"{J23119},relative_fluorescence_to_BBa_J23100,1,BBa_J23100=1.0,"
+                    "anderson_igem_promoters_catalog,strongest consensus standard"
+                ),
+                (
                     "anderson_igem,BBa_J23105,J23105,constitutive_promoter,"
                     f"{J23105},relative_fluorescence_to_BBa_J23100,0.24,BBa_J23100=1.0,"
                     "anderson_igem_promoters_catalog,fixture Anderson standard"
@@ -131,7 +137,9 @@ def _write_synthetic_standards_fixture(root: Path) -> Path:
                 ),
                 (
                     "t7_w_collection,T7A1,T7A1,parent_promoter,"
-                    f"{T7A1},not_reported,NA,NA,dunlop_lab_t7_w_collection,not reported"
+                    f"{T7A1},ordinal_rank_with_t7_parent,10,"
+                    "W1=weakest; W9=strongest; T7A1=strongest,"
+                    "dunlop_lab_t7_w_collection,strongest parent reference"
                 ),
                 (
                     "t7_w_collection,W9,W9,library_member,"
@@ -147,6 +155,7 @@ def _write_synthetic_standards_fixture(root: Path) -> Path:
         "\n".join(
             [
                 "collection_id,promoter_id,export_to_genbank,exclusion_reason",
+                "anderson_igem,BBa_J23119,true,",
                 "anderson_igem,BBa_J23105,true,",
                 "anderson_igem,BBa_J23103,true,",
                 "anderson_igem,BBa_J23112,false,duplicate_sequence_with_BBa_J23103_conflicting_strength",
@@ -156,6 +165,18 @@ def _write_synthetic_standards_fixture(root: Path) -> Path:
         )
         + "\n",
         encoding="utf-8",
+    )
+    _write_synthetic_standard_genbank(
+        anderson_dir / "BBa_J23119.gb",
+        record_id="BBa_J23119",
+        display_name="J23119",
+        collection_id="anderson_igem",
+        role="consensus_promoter",
+        sequence=J23119,
+        strength_metric="relative_fluorescence_to_BBa_J23100",
+        strength_value="1",
+        strength_reference="BBa_J23100=1.0",
+        source_record="anderson_igem_promoters_catalog",
     )
     _write_synthetic_standard_genbank(
         anderson_dir / "BBa_J23105.gb",
@@ -188,9 +209,9 @@ def _write_synthetic_standards_fixture(root: Path) -> Path:
         collection_id="t7_w_collection",
         role="parent_promoter",
         sequence=T7A1,
-        strength_metric="not_reported",
-        strength_value="NA",
-        strength_reference="NA",
+        strength_metric="ordinal_rank_with_t7_parent",
+        strength_value="10",
+        strength_reference="W1=weakest; W9=strongest; T7A1=strongest",
         source_record="dunlop_lab_t7_w_collection",
     )
     _write_synthetic_standard_genbank(
@@ -360,47 +381,53 @@ def test_synthetic_standards_refresh_j23105_and_write_strength_overlay(tmp_path:
     )
 
     assert plan.legacy_references == ()
-    assert sorted(row.label for row in plan.promoters) == ["J23103", "J23105", "T7A1", "W9", "spyp"]
+    assert sorted(row.label for row in plan.promoters) == ["J23103", "J23105", "J23119", "T7A1", "W9", "spyp"]
     assert "J23112" not in {row.label for row in plan.promoters}
     by_label = {row.label: row for row in plan.promoters}
     assert by_label["J23105"].sequence == J23105
     assert by_label["J23105"].standard_metadata is not None
     assert by_label["J23105"].standard_metadata.strength_value == "0.24"
+    assert by_label["J23119"].standard_metadata is not None
+    assert by_label["J23119"].standard_metadata.strength_value_numeric == 1.0
     assert by_label["W9"].standard_metadata is not None
     assert by_label["W9"].standard_metadata.strength_value_numeric == 9.0
     assert by_label["T7A1"].standard_metadata is not None
-    assert by_label["T7A1"].standard_metadata.strength_value_numeric is None
+    assert by_label["T7A1"].standard_metadata.strength_value_numeric == 10.0
 
     result = port.write_promoter_reference_dataset(
         plan,
         usr_root=usr_root,
         output_dataset="usr_promoter_references",
-        expected_genbank_count=5,
+        expected_genbank_count=6,
         include_legacy_j23105=True,
     )
 
-    assert result.rows_written == 5
+    assert result.rows_written == 6
     assert result.legacy_rows_written == 0
-    assert result.promoter_standard_overlay_rows == 4
+    assert result.promoter_standard_overlay_rows == 5
     dataset = Dataset(usr_root, "usr_promoter_references")
     records = pq.read_table(dataset.records_path).to_pylist()
-    assert {row["usr_label__primary"] for row in records} == {"spyp", "J23105", "J23103", "T7A1", "W9"}
+    assert {row["usr_label__primary"] for row in records} == {"spyp", "J23105", "J23103", "J23119", "T7A1", "W9"}
 
     seq_annot = pq.read_table(overlay_path(dataset.dir, "seq_annot")).to_pylist()
-    assert len(seq_annot) == 5
+    assert len(seq_annot) == 6
     j23105_annot = next(row for row in seq_annot if row["id"] == compute_id("dna", J23105))
     j23105_labels = [feature["label"] for feature in j23105_annot["seq_annot__features"]]
     assert j23105_labels == ["J23105", "-35", "-10"]
 
     standard = pq.read_table(overlay_path(dataset.dir, "promoter_standard")).to_pylist()
     by_standard_label = {row["promoter_standard__display_name"]: row for row in standard}
-    assert set(by_standard_label) == {"J23105", "J23103", "T7A1", "W9"}
+    assert set(by_standard_label) == {"J23119", "J23105", "J23103", "T7A1", "W9"}
+    assert by_standard_label["J23119"]["promoter_standard__strength_metric"] == ("relative_fluorescence_to_BBa_J23100")
+    assert by_standard_label["J23119"]["promoter_standard__strength_value"] == "1"
+    assert by_standard_label["J23119"]["promoter_standard__strength_value_numeric"] == 1.0
     assert by_standard_label["J23105"]["promoter_standard__strength_metric"] == ("relative_fluorescence_to_BBa_J23100")
     assert by_standard_label["J23105"]["promoter_standard__strength_value"] == "0.24"
     assert by_standard_label["J23105"]["promoter_standard__strength_value_numeric"] == 0.24
     assert by_standard_label["W9"]["promoter_standard__strength_reference"] == "W1=weakest; W9=strongest"
-    assert by_standard_label["T7A1"]["promoter_standard__strength_value"] == "NA"
-    assert by_standard_label["T7A1"]["promoter_standard__strength_value_numeric"] is None
+    assert by_standard_label["T7A1"]["promoter_standard__strength_metric"] == ("ordinal_rank_with_t7_parent")
+    assert by_standard_label["T7A1"]["promoter_standard__strength_value"] == "10"
+    assert by_standard_label["T7A1"]["promoter_standard__strength_value_numeric"] == 10.0
 
     views = load_sequence_views(dataset)
     by_view_name = {view.view_name: view for view in views}
