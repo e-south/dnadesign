@@ -22,6 +22,7 @@ from dnadesign.cruncher.scar_nick.visual_geometry import (
     ScarNickVisualContext,
     build_visual_context,
     complement_sequence,
+    degenerate_nickase_motif_indices,
     nickase_downstream_symbols,
     pairing_complement_sequence,
     protected_sequence_spans,
@@ -36,6 +37,8 @@ _SCAR_FILL = "#009E73"
 _NICKASE_FILL = "#56B4E9"
 _ANNEALED_FRAGMENT_FILL = "#CBD5E1"
 _ANNEALED_FRAGMENT_EDGE = "#94A3B8"
+_DEGENERATE_NT_FILL = "#E0F2FE"
+_DEGENERATE_NT_EDGE = "#93C5FD"
 _PANEL_SPACER_NT = 4
 _COMBINED_VISUAL_STATE_KIND = "pre_post_terminal_nick"
 _VISUAL_JSONL_FILENAME = "scar_nick_terminal_nick.scar_nick_visual.v1.jsonl"
@@ -162,6 +165,36 @@ def _rectangular_fills_for_panel(
                     "edge_color": _ANNEALED_FRAGMENT_EDGE,
                     "edge_alpha": 0.64,
                     "edge_linewidth": 0.45,
+                }
+            )
+    return fills
+
+
+def _degenerate_nucleotide_fills_for_panel(
+    panel: dict[str, Any],
+    *,
+    prefix: str,
+    panel_relative_indices: list[int],
+) -> list[dict[str, Any]]:
+    fills: list[dict[str, Any]] = []
+    for panel_relative_index in panel_relative_indices:
+        index = panel["start"] + panel_relative_index
+        if index < panel["nickase_site_span"]["start"] or index >= panel["nickase_site_span"]["end"]:
+            continue
+        for row_id in ("primary", "complement"):
+            fills.append(
+                {
+                    "fill_id": f"{prefix}_degenerate_nucleotide_{row_id}_{index}",
+                    "semantic": "degenerate_nucleotide",
+                    "start": index,
+                    "end": index + 1,
+                    "cover_rows": row_id,
+                    "fill": _DEGENERATE_NT_FILL,
+                    "alpha": 0.84,
+                    "corner_radius": 3.0,
+                    "edge_color": _DEGENERATE_NT_EDGE,
+                    "edge_alpha": 0.80,
+                    "edge_linewidth": 0.36,
                 }
             )
     return fills
@@ -355,12 +388,20 @@ def build_terminal_nick_visual_contract(
         ),
     ]
     rectangular_fills: list[dict[str, Any]] = []
+    degenerate_indices = degenerate_nickase_motif_indices(candidate, context)
     for panel in panels:
         rectangular_fills.extend(
             _rectangular_fills_for_panel(
                 panel,
                 prefix=panel["panel_id"],
                 surviving_row=surviving_row if panel["panel_id"] == "post_release" else None,
+            )
+        )
+        rectangular_fills.extend(
+            _degenerate_nucleotide_fills_for_panel(
+                panel,
+                prefix=panel["panel_id"],
+                panel_relative_indices=degenerate_indices,
             )
         )
 

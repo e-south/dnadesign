@@ -70,6 +70,10 @@ def _recognition_nt(motif: str) -> int:
     return sum(1 for symbol in motif if _iupac_bases_for_symbol(symbol) != set(_DNA_BASES))
 
 
+def _is_fully_degenerate_symbol(symbol: str) -> bool:
+    return _iupac_bases_for_symbol(symbol) == set(_DNA_BASES)
+
+
 def _pair_entry_base(entry: JsonMap, field: str, *, position: int) -> str:
     value = str(entry.get(field) or "").upper()
     if len(value) != 1 or value not in _DNA_BASES:
@@ -513,6 +517,7 @@ class ScarNickVisualV1(VisualContractModel):
         nickase_fills = [fill for fill in self.rectangular_fills if fill.semantic == "nickase_footprint"]
         scar_fills = [fill for fill in self.rectangular_fills if fill.semantic == "retained_type_iis_scar"]
         fragment_fills = [fill for fill in self.rectangular_fills if fill.semantic == "annealed_adapter_fragment"]
+        degenerate_fills = [fill for fill in self.rectangular_fills if fill.semantic == "degenerate_nucleotide"]
         if len(release_fills) != len(self.panels):
             raise ValueError("scar-nick visual requires one type_iis_release_site fill per panel")
         if len(nickase_fills) != 1:
@@ -567,6 +572,24 @@ class ScarNickVisualV1(VisualContractModel):
                 if panel.panel_id == "post_release":
                     raise ValueError("post-release retained Type IIS scar fill must cover the surviving strand")
                 raise ValueError("pre-release retained Type IIS scar fill must cover both strands")
+            for offset, motif_symbol in enumerate(nickase_motif):
+                if not _is_fully_degenerate_symbol(motif_symbol):
+                    continue
+                position = panel.nickase_site_span.start + offset
+                for row_id in ("primary", "complement"):
+                    matches = [
+                        fill
+                        for fill in degenerate_fills
+                        if fill.start == position and fill.end == position + 1 and fill.cover_rows == row_id
+                    ]
+                    if len(matches) != 1:
+                        raise ValueError(
+                            "fully degenerate nickase motif bases require one degenerate_nucleotide fill per row"
+                        )
+                    if matches[0].corner_radius <= 0.0:
+                        raise ValueError("degenerate_nucleotide fills must use rounded corners")
+                    if matches[0].edge_linewidth <= 0.0:
+                        raise ValueError("degenerate_nucleotide fills must use a visible edge")
         return self
 
 

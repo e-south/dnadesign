@@ -153,7 +153,7 @@ def _segment_labels(contract: ScarNickVisualV1) -> list[dict[str, object]]:
     release_label = f"{contract.release_placement.variant_id} {contract.release_placement.recognition_sequence}"
     nickase_label = f"{contract.nickase.variant_id} {contract.nickase.canonical_motif_top_5to3}"
     nickase_row = _nickase_display_row(contract)
-    return [
+    labels: list[dict[str, object]] = [
         {
             "text": release_label,
             "start": pre_panel.release_site_span.start,
@@ -182,6 +182,19 @@ def _segment_labels(contract: ScarNickVisualV1) -> list[dict[str, object]]:
             "label_offset_px": -12.0,
         },
     ]
+    for fragment_span in post_panel.fragment_spans:
+        labels.append(
+            {
+                "text": "Y adaptor",
+                "start": fragment_span.start,
+                "end": fragment_span.end,
+                "row_id": fragment_span.row,
+                "label_side": "below",
+                "color": _FRAGMENT_TEXT,
+                "label_offset_px": 0.0,
+            }
+        )
+    return labels
 
 
 def _panel_transition_arrows(contract: ScarNickVisualV1) -> list[dict[str, int]]:
@@ -227,7 +240,8 @@ class ScarNickVisualV1Adapter:
             "owner:type_iis_release_site": "Type IIS restriction site",
             "owner:retained_type_iis_scar": "Retained Type IIS scar",
             "effect:nickase_footprint": "Nicking endonuclease footprint",
-            "effect:annealed_adapter_fragment": "Annealed adapter fragment",
+            "effect:annealed_adapter_fragment": "Y adaptor",
+            "effect:degenerate_nucleotide": "Degenerate nucleotide",
         }
 
         nick_lane = "primary" if contract.nicked_strand == "top" else "complement"

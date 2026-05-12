@@ -900,6 +900,28 @@ def test_terminal_nick_visual_includes_release_site_scar_and_full_nickase_span()
     assert fragment_fill["edge_color"] == "#94A3B8"
     assert fragment_fill["edge_alpha"] == 0.64
     assert fragment_fill["edge_linewidth"] == 0.45
+    degenerate_fills = [fill for fill in visual["rectangular_fills"] if fill["semantic"] == "degenerate_nucleotide"]
+    assert {(fill["start"], fill["end"], fill["cover_rows"]) for fill in degenerate_fills} == {
+        (7, 8, "primary"),
+        (7, 8, "complement"),
+        (8, 9, "primary"),
+        (8, 9, "complement"),
+        (9, 10, "primary"),
+        (9, 10, "complement"),
+        (10, 11, "primary"),
+        (10, 11, "complement"),
+        (22, 23, "primary"),
+        (22, 23, "complement"),
+        (23, 24, "primary"),
+        (23, 24, "complement"),
+        (24, 25, "primary"),
+        (24, 25, "complement"),
+        (25, 26, "primary"),
+        (25, 26, "complement"),
+    }
+    assert {fill["fill"] for fill in degenerate_fills} == {"#E0F2FE"}
+    assert {fill["edge_color"] for fill in degenerate_fills} == {"#93C5FD"}
+    assert all(fill["corner_radius"] > 0 for fill in degenerate_fills)
     pre_scar_fill = next(
         fill for fill in visual["rectangular_fills"] if fill["fill_id"] == "pre_release_retained_type_iis_scar"
     )

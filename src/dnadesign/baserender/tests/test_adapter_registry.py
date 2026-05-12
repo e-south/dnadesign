@@ -242,6 +242,23 @@ def _scar_nick_adapter_payload() -> dict[str, object]:
                     "edge_linewidth": 0.45,
                 }
             )
+        for position in range(panel["retained_scar_span"]["start"], panel["retained_scar_span"]["end"]):
+            for row_id in ("primary", "complement"):
+                fills.append(
+                    {
+                        "fill_id": f"{prefix}_degenerate_nucleotide_{row_id}_{position}",
+                        "semantic": "degenerate_nucleotide",
+                        "start": position,
+                        "end": position + 1,
+                        "cover_rows": row_id,
+                        "fill": "#E0F2FE",
+                        "alpha": 0.84,
+                        "corner_radius": 3.0,
+                        "edge_color": "#93C5FD",
+                        "edge_alpha": 0.80,
+                        "edge_linewidth": 0.36,
+                    }
+                )
     return {
         "contract_kind": "scar_nick_visual_v1",
         "state_id": "candidate_01.pre_post_terminal_nick",
@@ -379,11 +396,15 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["segment_labels"][1]["row_id"] == "primary"
     assert record.meta["segment_labels"][1]["label_side"] == "below"
     assert record.meta["segment_labels"][2]["text"] == "BsaI-HFv2 GGTCTC"
+    assert record.meta["segment_labels"][3]["text"] == "Y adaptor"
+    assert record.meta["segment_labels"][3]["row_id"] == "complement"
+    assert record.meta["segment_labels"][3]["label_side"] == "below"
     assert {label["text"] for label in record.meta["segment_labels"]} == {
         "BsaI-HFv2 GGTCTC",
         "Test.TerminalBottomNickase GGTCTCGNNNN",
+        "Y adaptor",
     }
-    assert len(record.meta["segment_labels"]) == 3
+    assert len(record.meta["segment_labels"]) == 4
     assert record.meta["panel_transition_arrows"] == [{"start": 11, "end": 15}]
     assert not any(
         backdrop["semantic"] == "nickase_footprint" and backdrop["start"] >= 15
@@ -394,6 +415,19 @@ def test_scar_nick_visual_adapter_maps_rectangular_scar_fill_to_evidence_backdro
     assert record.meta["base_highlight_colors"]["primary"][0] == "#7A6500"
     assert record.meta["base_highlight_colors"]["primary"][6] == "#005A8D"
     assert record.meta["dim_base_indices"]["complement"] == list(range(15, 26))
+    degenerate_fills = [
+        backdrop for backdrop in record.meta["span_backdrops"] if backdrop["semantic"] == "degenerate_nucleotide"
+    ]
+    assert len(degenerate_fills) == 16
+    assert {
+        (backdrop["start"], backdrop["end"], backdrop["cover_rows"], backdrop["corner_radius"])
+        for backdrop in degenerate_fills
+    } >= {
+        (7, 8, "primary", 3.0),
+        (7, 8, "complement", 3.0),
+        (22, 23, "primary", 3.0),
+        (22, 23, "complement", 3.0),
+    }
     fragment_fills = [
         backdrop for backdrop in record.meta["span_backdrops"] if backdrop["semantic"] == "annealed_adapter_fragment"
     ]
@@ -462,6 +496,66 @@ def test_scar_nick_annealed_adapter_backdrop_renders_thin_edge() -> None:
     assert mcolors.to_hex(backdrop.get_edgecolor(), keep_alpha=False) == "#94a3b8"
     assert float(backdrop.get_edgecolor()[3]) == pytest.approx(0.64)
     assert float(backdrop.get_linewidth()) == pytest.approx(0.45)
+
+
+def test_scar_nick_top_strand_y_adaptor_label_does_not_collide_with_title() -> None:
+    payload = _scar_nick_adapter_payload()
+    payload["title"] = "01 | L=AGTG/R=TCTA | WXMM"
+    payload["nicked_strand"] = "top"
+    payload["surviving_strand"] = "bottom"
+    payload["nickase"]["strand"] = "top"
+    payload["panels"][1]["fragment_spans"][0]["row"] = "primary"
+    for fill in payload["rectangular_fills"]:
+        if fill["semantic"] == "annealed_adapter_fragment":
+            fill["cover_rows"] = "primary"
+        if fill["fill_id"] == "post_release_retained_type_iis_scar":
+            fill["cover_rows"] = "complement"
+
+    cfg = AdapterCfg(kind="scar_nick_visual_v1", columns={}, policies={})
+    adapter = build_adapter(cfg, alphabet="DNA")
+    record = adapter.apply(payload, row_index=0)
+
+    y_adaptor_label = next(label for label in record.meta["segment_labels"] if label["text"] == "Y adaptor")
+    assert y_adaptor_label["row_id"] == "primary"
+
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "legend": False,
+            "figure_scale": 1.0,
+            "font_mono": "DejaVu Sans Mono",
+            "font_label": "DejaVu Sans Mono",
+            "font_size_seq": 12,
+            "font_size_label": 8,
+            "font_size_span_link_label": 8,
+            "padding_x": 34.0,
+            "padding_y": 48.0,
+            "baseline_spacing": 48.0,
+            "overlay_align": "center",
+            "overlay_title_color": "#4B5563",
+        },
+    )
+    palette = Palette(style.palette)
+    initialize_runtime()
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        y_adaptor_bbox = next(
+            text.get_window_extent(renderer=renderer) for text in fig.axes[0].texts if text.get_text() == "Y adaptor"
+        )
+        title_bbox = next(
+            text.get_window_extent(renderer=renderer)
+            for text in fig.axes[0].texts
+            if text.get_text() == payload["title"]
+        )
+    finally:
+        plt.close(fig)
+
+    assert not (
+        max(y_adaptor_bbox.x0, title_bbox.x0) < min(y_adaptor_bbox.x1, title_bbox.x1)
+        and max(y_adaptor_bbox.y0, title_bbox.y0) < min(y_adaptor_bbox.y1, title_bbox.y1)
+    )
 
 
 def test_scar_nick_visual_adapter_places_nickase_label_on_nicked_top_strand() -> None:

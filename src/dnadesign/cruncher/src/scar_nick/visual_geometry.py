@@ -169,6 +169,21 @@ def nickase_downstream_symbols(candidate: ScarNickCandidate, context: ScarNickVi
     return payload
 
 
+def degenerate_nickase_motif_indices(candidate: ScarNickCandidate, context: ScarNickVisualContext) -> list[int]:
+    placement = candidate.nickase_placement
+    if placement is None:
+        return []
+    indices: list[int] = []
+    for offset, symbol in enumerate(placement.motif_top_5to3):
+        if len(iupac_bases_for_symbol(symbol)) != 4:
+            continue
+        coordinate = placement.source_site_start + offset
+        display_index = coordinate - context.context_start
+        if 0 <= display_index < len(context.primary_sequence_5to3):
+            indices.append(display_index)
+    return indices
+
+
 def _nickase_source_span(candidate: ScarNickCandidate) -> dict[str, int]:
     placement = candidate.nickase_placement
     if placement is None:
@@ -215,6 +230,7 @@ __all__ = [
     "ScarNickVisualContext",
     "build_visual_context",
     "complement_sequence",
+    "degenerate_nickase_motif_indices",
     "nickase_downstream_symbols",
     "pairing_complement_sequence",
     "protected_sequence_spans",
