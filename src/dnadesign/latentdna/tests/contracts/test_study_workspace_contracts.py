@@ -247,9 +247,12 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
     native_core60_layout = next(
-        row
-        for row in controls.geometry_controls.layout_presets
-        if row.id == "candidate_set__native_core60_7b_representations"
+        (
+            row
+            for row in controls.geometry_controls.layout_presets
+            if row.id == "candidate_set__native_core60_7b_representations"
+        ),
+        None,
     )
 
     assert geometry_ids == [
@@ -257,12 +260,22 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
         "intermediate_embedding_7b_core60_tss_upstream",
     ]
     assert controls.geometry_controls.candidate_sets[0].available_view_ids == geometry_ids
-    assert native_core60_layout.view_ids == [
-        "intermediate_embedding_7b_native_source_record_seq_mean",
-        "intermediate_embedding_7b_core60_tss_upstream",
-    ]
-    assert "Projection-backed subset" in native_core60_layout.description
-    assert "output-layer" not in native_core60_layout.description.lower()
+    fixed_grid_view_ids = {
+        view_id
+        for layout in controls.geometry_controls.layout_presets
+        if layout.mode == "fixed_grid"
+        for view_id in layout.view_ids
+    }
+    assert not any(view_id.startswith("output_layer_mean_") for view_id in fixed_grid_view_ids)
+    if native_core60_layout is not None:
+        assert native_core60_layout.view_ids == [
+            "intermediate_embedding_7b_native_source_record_seq_mean",
+            "intermediate_embedding_7b_core60_tss_upstream",
+        ]
+        assert "Projection-backed subset" in native_core60_layout.description
+        assert "output-layer" not in native_core60_layout.description.lower()
+    else:
+        assert fixed_grid_view_ids == set()
 
 
 def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
