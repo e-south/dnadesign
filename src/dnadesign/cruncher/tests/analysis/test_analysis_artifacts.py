@@ -1482,8 +1482,6 @@ def test_analyze_trajectory_video_generates_video_when_enabled(tmp_path: Path, m
 
 
 def test_analyze_trajectory_video_skips_when_ffmpeg_writer_is_unavailable(tmp_path: Path, monkeypatch) -> None:
-    from dnadesign.baserender.src.core import SchemaError
-
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(
         catalog_root=catalog_root,
@@ -1522,6 +1520,9 @@ def test_analyze_trajectory_video_skips_when_ffmpeg_writer_is_unavailable(tmp_pa
         draws=6,
         tune=2,
     )
+
+    class SchemaError(Exception):
+        pass
 
     def _missing_ffmpeg_renderer(**kwargs: object) -> dict[str, object]:
         raise SchemaError("FFmpeg writer is not available to Matplotlib")
