@@ -88,10 +88,42 @@ def _scar_nick_fill(panel: dict[str, object], semantic: str, fill_id: str, fill:
     }
 
 
+def _scar_nick_degenerate_nucleotide_fills(
+    panel: dict[str, object],
+    *,
+    motif_top_5to3: str,
+) -> list[dict[str, object]]:
+    span = panel["nickase_site_span"]
+    start = int(span["start"])
+    fills: list[dict[str, object]] = []
+    for offset, symbol in enumerate(motif_top_5to3):
+        if symbol.upper() != "N":
+            continue
+        position = start + offset
+        for row_id in ("primary", "complement"):
+            fills.append(
+                {
+                    "fill_id": f"{panel['panel_id']}_degenerate_nucleotide_{row_id}_{position}",
+                    "semantic": "degenerate_nucleotide",
+                    "start": position,
+                    "end": position + 1,
+                    "cover_rows": row_id,
+                    "fill": "#FDE68A",
+                    "alpha": 0.84,
+                    "corner_radius": 3.0,
+                    "edge_color": "#F59E0B",
+                    "edge_alpha": 0.80,
+                    "edge_linewidth": 0.36,
+                }
+            )
+    return fills
+
+
 def _scar_nick_visual_payload() -> dict[str, object]:
     pre_sequence = "GGTCTCGGCCC"
     pre_complement = "CCAGAGCCGGG"
     post_complement = "CCAGAGCCTGT"
+    nickase_motif = "GGTCTCGNNNN"
     spacer = "NNNN"
     post_offset = len(pre_sequence) + len(spacer)
     pre_panel = {
@@ -158,6 +190,7 @@ def _scar_nick_visual_payload() -> dict[str, object]:
                     "edge_linewidth": 0.45,
                 }
             )
+        rectangular_fills.extend(_scar_nick_degenerate_nucleotide_fills(panel, motif_top_5to3=nickase_motif))
     return {
         "contract_kind": "scar_nick_visual_v1",
         "state_id": "candidate_01.pre_post_terminal_nick",
@@ -210,8 +243,8 @@ def _scar_nick_visual_payload() -> dict[str, object]:
             "specificity_id": "TerminalBottomNickase",
             "orientation": "forward",
             "canonical_read_row": "primary",
-            "motif_top_5to3": "GGTCTCGNNNN",
-            "canonical_motif_top_5to3": "GGTCTCGNNNN",
+            "motif_top_5to3": nickase_motif,
+            "canonical_motif_top_5to3": nickase_motif,
             "recognition_nt": 7,
             "vendor": "dnadesign test fixture",
             "source_url": "https://example.invalid/dnadesign/scar-nick-terminal-fixture",
