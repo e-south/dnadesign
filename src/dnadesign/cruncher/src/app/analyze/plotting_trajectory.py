@@ -25,6 +25,10 @@ __all__ = ["_render_trajectory_analysis_plots", "_render_trajectory_video_plot"]
 _MISSING_FFMPEG_SKIP_REASON = "FFmpeg writer is not available to Matplotlib"
 
 
+def _is_missing_ffmpeg_schema_error(exc: Exception) -> bool:
+    return type(exc).__name__ == "SchemaError" and str(exc) == _MISSING_FFMPEG_SKIP_REASON
+
+
 def _resolve_trajectory_video_output_path(*, tmp_root: Path, output_name: str) -> Path:
     video_stem = Path(output_name).stem
     video_ext = Path(output_name).suffix.lstrip(".")
@@ -210,7 +214,6 @@ def _render_trajectory_video_plot(
 
     polished_final_sequence = _resolve_polished_final_sequence(elites_df)
 
-    from dnadesign.baserender.src.core import SchemaError
     from dnadesign.cruncher.analysis.trajectory_video import render_chain_trajectory_video
 
     try:
@@ -227,8 +230,8 @@ def _render_trajectory_video_plot(
             polished_final_sequence=polished_final_sequence,
             objective_from_manifest=objective_from_manifest,
         )
-    except SchemaError as exc:
-        if str(exc) != _MISSING_FFMPEG_SKIP_REASON:
+    except Exception as exc:
+        if not _is_missing_ffmpeg_schema_error(exc):
             raise
         _record_trajectory_video_plot(
             plot_entries=plot_entries,
