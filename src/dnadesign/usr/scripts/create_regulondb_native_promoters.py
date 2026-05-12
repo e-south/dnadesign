@@ -24,7 +24,9 @@ import pyarrow.parquet as pq
 
 from dnadesign.cruncher.ingest.promoters import (
     PromoterRecord,
+    PromoterRegulatoryAssociation,
     load_promoter_export,
+    load_promoter_regulatory_associations,
     load_skipped_promoter_source_rows,
     promoter_record_to_dict,
     skipped_source_row_to_dict,
@@ -695,6 +697,138 @@ def _relation_rows_for_group(
                 )
 
 
+def _association_match_key(value: object) -> str:
+    return str(value or "").strip().casefold()
+
+
+def _association_alias_index(
+    rows: dict[str, list[dict[str, object]]],
+    *,
+    key_field: str,
+) -> dict[str, list[dict[str, object]]]:
+    aliases_by_key: dict[str, list[dict[str, object]]] = {}
+    for alias in rows["promoter_aliases"]:
+        key = _association_match_key(alias.get(key_field))
+        if key:
+            aliases_by_key.setdefault(key, []).append(alias)
+    return aliases_by_key
+
+
+def _matched_aliases_for_association(
+    association: PromoterRegulatoryAssociation,
+    *,
+    aliases_by_id: dict[str, list[dict[str, object]]],
+    aliases_by_name: dict[str, list[dict[str, object]]],
+) -> tuple[list[dict[str, object]], str | None]:
+    promoter_id_key = _association_match_key(association.promoter_id)
+    if promoter_id_key and promoter_id_key in aliases_by_id:
+        return aliases_by_id[promoter_id_key], "promoter_id"
+    promoter_name_key = _association_match_key(association.promoter_name)
+    if promoter_name_key and promoter_name_key in aliases_by_name:
+        return aliases_by_name[promoter_name_key], "promoter_name"
+    return [], None
+
+
+def _project_promoter_associations(
+    associations: Iterable[PromoterRegulatoryAssociation],
+    rows: dict[str, list[dict[str, object]]],
+) -> dict[str, int]:
+    association_list = list(associations)
+    aliases_by_id = _association_alias_index(rows, key_field="promoter_id")
+    aliases_by_name = _association_alias_index(rows, key_field="promoter_name")
+
+    summary = {
+        "promoter_association_rows": len(association_list),
+        "promoter_association_matched_rows": 0,
+        "promoter_association_id_matched_rows": 0,
+        "promoter_association_name_matched_rows": 0,
+        "promoter_association_unmatched_rows": 0,
+        "promoter_association_ambiguous_rows": 0,
+    }
+    for association in association_list:
+        alias_rows, match_kind = _matched_aliases_for_association(
+            association,
+            aliases_by_id=aliases_by_id,
+            aliases_by_name=aliases_by_name,
+        )
+        if not alias_rows:
+            summary["promoter_association_unmatched_rows"] += 1
+            continue
+        usr_ids = {str(alias["usr_id"]) for alias in alias_rows if alias.get("usr_id")}
+        if len(usr_ids) != 1:
+            summary["promoter_association_ambiguous_rows"] += 1
+            continue
+        matched_alias = sorted(
+            alias_rows,
+            key=lambda row: (
+                str(row.get("source_release") or ""),
+                str(row.get("source_route") or ""),
+                str(row.get("promoter_id") or ""),
+            ),
+        )[0]
+        usr_id = next(iter(usr_ids))
+        promoter_id = association.promoter_id or matched_alias.get("promoter_id")
+        rows["regulatory_interactions"].append(
+            {
+                "usr_id": usr_id,
+                "promoter_id": promoter_id,
+                "source_release": association.source_release,
+                "source_route": association.source_route,
+                "regulatory_interaction_id": association.regulatory_interaction_id,
+                "regulon_id": association.regulon_id,
+                "regulon_name": association.regulon_name,
+                "regulator_id": association.regulator_id,
+                "regulator_name": association.regulator_name,
+                "regulator_abbrev": association.regulator_abbrev,
+                "target_type": association.target_type,
+                "function": association.function,
+                "mechanism": association.mechanism,
+                "confidence": association.confidence,
+                "evidence": list(association.evidence),
+                "citation_refs": list(association.citation_refs),
+            }
+        )
+        if association.binding_site_id or association.binding_interval_0based or association.binding_site_sequence:
+            rows["tfbs_sites"].append(
+                {
+                    "usr_id": usr_id,
+                    "promoter_id": promoter_id,
+                    "source_release": association.source_release,
+                    "source_route": association.source_route,
+                    "binding_site_id": association.binding_site_id,
+                    "regulator_abbrev": association.regulator_abbrev,
+                    "raw_coordinates_json": _json(association.binding_raw_coordinates or {}),
+                    "interval_start_0": _interval_start(association.binding_interval_0based),
+                    "interval_end_0": _interval_end(association.binding_interval_0based),
+                    "strand": association.binding_site_strand,
+                    "sequence": association.binding_site_sequence,
+                    "confidence": association.confidence,
+                    "evidence": list(association.evidence),
+                }
+            )
+            rows["coordinate_features"].append(
+                {
+                    "usr_id": usr_id,
+                    "promoter_id": promoter_id,
+                    "source_release": association.source_release,
+                    "source_route": association.source_route,
+                    "feature_kind": "tfbs",
+                    "interval_start_0": _interval_start(association.binding_interval_0based),
+                    "interval_end_0": _interval_end(association.binding_interval_0based),
+                    "strand": association.binding_site_strand,
+                    "coordinate_origin": "regulondb_1based",
+                    "coordinate_inclusivity": "source_inclusive_normalized_half_open",
+                    "genome_accession": None,
+                }
+            )
+        summary["promoter_association_matched_rows"] += 1
+        if match_kind == "promoter_id":
+            summary["promoter_association_id_matched_rows"] += 1
+        elif match_kind == "promoter_name":
+            summary["promoter_association_name_matched_rows"] += 1
+    return summary
+
+
 def _add_skipped_source_rows(export_dir: Path, rows: dict[str, list[dict[str, object]]]) -> Counter[str]:
     skipped_by_reason: Counter[str] = Counter()
     for skipped in load_skipped_promoter_source_rows(export_dir):
@@ -842,6 +976,39 @@ def _dedupe_relation_rows(
         deduped[name] = unique_rows
         collapsed[name] = len(relation_rows) - len(unique_rows)
     return deduped, collapsed
+
+
+def _refresh_overlay_regulatory_context(
+    overlay_rows: list[dict[str, object]],
+    relation_rows: Mapping[str, list[dict[str, object]]],
+) -> None:
+    interactions_by_usr: dict[str, list[dict[str, object]]] = {}
+    for row in relation_rows.get("regulatory_interactions", []):
+        usr_id = str(row.get("usr_id") or "").strip()
+        if usr_id:
+            interactions_by_usr.setdefault(usr_id, []).append(row)
+    for row in overlay_rows:
+        usr_id = str(row.get("id") or "").strip()
+        interactions = interactions_by_usr.get(usr_id, [])
+        if not interactions:
+            continue
+        functions = [str(interaction.get("function") or "") for interaction in interactions]
+        composition = _regulator_composition(functions)
+        regulons = _list_unique(
+            str(value)
+            for interaction in interactions
+            for value in (interaction.get("regulon_id"), interaction.get("regulon_name"))
+            if value
+        )
+        has_citations = bool(row.get("regulondb__has_citations")) or any(
+            interaction.get("citation_refs") for interaction in interactions
+        )
+        row["regulondb__has_regulatory_context"] = True
+        row["regulondb__regulator_composition"] = composition
+        row["regulondb__regulon_count"] = len(regulons)
+        row["regulondb__has_activator"] = composition in {"activator", "mixed"}
+        row["regulondb__has_repressor"] = composition in {"repressor", "mixed"}
+        row["regulondb__has_citations"] = has_citations
 
 
 def _relation_sidecar_integrity_counts(
@@ -1088,9 +1255,13 @@ def build_import_plan(
     usr_root: Path,
     output_dataset: str = DEFAULT_OUTPUT_DATASET,
     created_at: str | None = None,
+    require_promoter_associations: bool = False,
 ) -> NativePromoterImportPlan:
     _check_regulondb_namespace(usr_root)
     manifest, records = load_promoter_export(export_dir)
+    promoter_associations = load_promoter_regulatory_associations(export_dir)
+    if require_promoter_associations and not promoter_associations:
+        raise SchemaError("Cruncher promoter association artifact is missing or empty.")
     conflicts = _validate_promoter_conflicts(records)
     if not manifest.complete:
         raise SchemaError("Cruncher promoter export is incomplete; USR import requires a complete export.")
@@ -1141,7 +1312,11 @@ def build_import_plan(
             "No RegulonDB promoter records passed strict USR base-row metadata policy: "
             f"required={list(_BASE_ROW_REQUIRED_METADATA)}"
         )
+    association_projection = _project_promoter_associations(promoter_associations, relation_rows)
     relation_rows, dedupe_counts = _dedupe_relation_rows(relation_rows)
+    if require_promoter_associations and association_projection["promoter_association_matched_rows"] == 0:
+        raise SchemaError("Required promoter association artifact produced no matched USR regulatory interactions.")
+    _refresh_overlay_regulatory_context(overlay_rows, relation_rows)
     _validate_relation_sidecar_integrity(base_rows, relation_rows)
     orphan_relation_rows, missing_relation_usr_ids = _relation_sidecar_integrity_counts(base_rows, relation_rows)
     aliases_by_usr = {
@@ -1172,6 +1347,7 @@ def build_import_plan(
         "duplicate_relation_row_counts": duplicate_relation_row_counts,
         "skipped_source_row_count": len(relation_rows["skipped_source_rows"]),
         "skipped_source_rows_by_reason": dict(sorted(skipped_by_reason.items())),
+        **association_projection,
         "orphan_relation_row_count": orphan_relation_rows,
         "missing_relation_usr_id_count": missing_relation_usr_ids,
         "required_overlay_metadata_null_counts": _required_overlay_metadata_null_counts(overlay_rows),
@@ -1367,8 +1543,14 @@ def run_import(
     usr_root: Path,
     output_dataset: str = DEFAULT_OUTPUT_DATASET,
     write: bool = False,
+    require_promoter_associations: bool = False,
 ) -> dict[str, object]:
-    plan = build_import_plan(export_dir=export_dir, usr_root=usr_root, output_dataset=output_dataset)
+    plan = build_import_plan(
+        export_dir=export_dir,
+        usr_root=usr_root,
+        output_dataset=output_dataset,
+        require_promoter_associations=require_promoter_associations,
+    )
     payload: dict[str, object] = {"write": bool(write), "plan": plan.summary()}
     if write:
         result = write_import_plan(plan, usr_root=usr_root)
@@ -1384,6 +1566,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--usr-root", type=Path, default=_default_usr_root())
     parser.add_argument("--output-dataset", default=DEFAULT_OUTPUT_DATASET)
     parser.add_argument("--write", action="store_true", help="Create the output dataset. Default is dry-run.")
+    parser.add_argument(
+        "--require-promoter-associations",
+        action="store_true",
+        help="Fail if the Cruncher export has no matched promoter regulatory association overlay.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1394,6 +1581,7 @@ def main(argv: list[str] | None = None) -> int:
         usr_root=args.usr_root,
         output_dataset=args.output_dataset,
         write=bool(args.write),
+        require_promoter_associations=bool(args.require_promoter_associations),
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
