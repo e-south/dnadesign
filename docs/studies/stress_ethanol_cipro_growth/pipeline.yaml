@@ -33,6 +33,8 @@ study_pipeline:
     reference_core60_dataset: construct_prom_eth_cip_reference_core60
     reference_context_dataset: construct_prom_eth_cip_reference_contexts
     reference_feature_dataset: infer_prom_eth_cip_reference_views_7b
+    regulondb_native_promoter_source: usr_regulondb_native_promoters
+    regulondb_native_core60_source: usr_regulondb_native_promoter_core60
   infer:
     preferred_model_family: evo2_7b
     supported_model_families:
@@ -169,6 +171,20 @@ study_pipeline:
           missing_scalars: 0
           stale_vectors: 0
           stale_scalars: 0
+      native_tf_axis_orientation_quota_extension:
+        status: planned
+        source_rows: usr_regulondb_native_promoter_core60
+        target_anchor_dataset: usr_prom_eth_cip_anchor
+        target_context_dataset: construct_prom_eth_cip_context
+        infer_policy: >-
+          Reuse the existing anchor construct-insert and pDual context
+          forward/reverse-complement 7B sequence-view lanes. After the append,
+          `fill-infer --no-submit` should plan only the newly missing native
+          audit row products, not a replacement of existing sidecars.
+        latentdna_policy: >-
+          Native rows are overlay/audit rows. Candidate scorecard samples filter
+          to DenseGen plus manual/wildtype rows, while appendix/all-row views
+          may expose the native RegulonDB cohort once sidecars exist.
     quota_deduplication:
       last_checked: 2026-04-30
       verdict: expected_semantic_overlap_no_fidelity_blocker
@@ -215,9 +231,9 @@ study_pipeline:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
     latest_materialization:
-      checked: 2026-05-08
-      workspace_snapshot_state: ok
-      deep_validation: passed
+      checked: 2026-05-12
+      workspace_snapshot_state: needs_refresh_after_config_change
+      deep_validation: blocked_by_stale_generated_view_rows
       ok_decision_deliverables:
         - dataset_overview
         - design_structure_summary
@@ -232,7 +248,7 @@ study_pipeline:
         conservative_baseline: intermediate_embedding_7b_anchor_60bp
         strength_standard_lens: intermediate_embedding_7b_full_context_anchor_mean
         note: Bidirectional context-anchor mean is the working pre-assay X because it best balances health, Sigma-35 ordering, DenseGen plan separation, and reference-to-plan margins. It is not phenotype-validated.
-      note: The workspace and notebook are regenerated from the current canonical 7B sidecars; candidate-X scorecard, reference-to-plan heatmap, and reference-standard strength audit are current decision deliverables.
+      note: The native lineage metadata/config route is updated, but generated view rows, plots, snapshot, and notebook artifacts have not been regenerated after that change. Current candidate-X conclusions still refer to the previous completed 7B sidecar-backed materialization.
       reference_strength_probe:
         status: superseded_by_reference_standard_strength_audit
         root: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_standard_strength_audit

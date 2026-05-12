@@ -348,6 +348,11 @@ def _campaign_prior(row: dict[str, object]) -> str:
 def _source_class(row: dict[str, object]) -> str:
     if _normalize_text(row.get("densegen__plan")) is not None:
         return "densegen"
+    if (
+        _normalize_text(row.get("regulondb__primary_promoter_name")) is not None
+        or _normalize_text(row.get("derived__parent_dataset")) == "usr_regulondb_native_promoters"
+    ):
+        return "native_regulondb"
     source_family = _normalize_text(row.get("source_family"))
     if source_family is not None:
         normalized = source_family.lower()

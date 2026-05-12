@@ -78,17 +78,40 @@ That is not the implementation and not the model contract.
 5. LatentDNA concatenates the two blocks with equal-block normalization.
 
    The derived view loads the forward and reverse-complement `anchor_mean`
-   matrices, aligns rows, centers/scales each block, L2-normalizes each row
-   within each block, and column-stacks the blocks:
+   matrices, aligns rows by the shared construct anchor identity, centers/scales
+   each block, L2-normalizes each row within each block, and column-stacks the
+   blocks:
 
    $$
    X_\mathrm{bidir} =
-   [\mathrm{L2}(Z_\mathrm{fwd});\mathrm{L2}(Z_\mathrm{rc})].
+   [\mathrm{L2}(\mathrm{Std}(Z_\mathrm{fwd}));
+   \mathrm{L2}(\mathrm{Std}(Z_\mathrm{rc}))].
    $$
 
    Equal-block normalization matters because otherwise the chosen candidate
    could be dominated by whichever orientation block has larger raw variance or
    norm.
+
+6. Reference annotations inherit the forward row axis, while their RC evidence
+   lives in the second feature block.
+
+   For the bidirectional full-population views, the visible row label is the
+   forward/context label, for example `W1_core60` or `spyp_core60`. The paired
+   reverse-complement block is joined from the row with the same
+   `construct__anchor_id`, for example `W1_core60_context1kb_rc` or
+   `spyp_core60_context1kb_rc`. This is why the browser can annotate the
+   bidirectional UMAP with the same reference-set dropdowns while still using a
+   real two-orientation feature vector.
+
+7. Native-length and core60 reference rows remain different sequence-scope
+   contracts.
+
+   Raw native references such as `spyP` and `sulAp` keep their native promoter
+   spans inside the 1 kb context. Raw Anderson and W rows likewise keep their
+   source promoter lengths. The core60 variants are the length-matched 60 bp
+   rows intended for the same-length reference-manifold check. Off-manifold
+   behavior in native-length references is therefore not by itself a concat
+   bug; it must be interpreted against the row's sequence-scope contract.
 
 ## How To Describe The Views
 

@@ -5,7 +5,7 @@ encoding: Single-panel representation tradeoff plot over the healthy 7B study-fa
 scope: >-
   The healthy 7B study-facing candidates summarized from the persisted health,
   design-structure, and Sigma-35 scalar tables. The plotted candidates are
-  row-level summaries produced from causal Evo2 token states: anchor-source
+  row-level summaries produced from causal Evo 2 token states: anchor-source
   `seq_mean`, forward 1 kb context `anchor_mean`, and equal-block forward/RC
   context `anchor_mean` concat. Context rows are joined for provenance in the
   scalar artifact, but context retention is not a visible encoding in this
@@ -27,8 +27,8 @@ preprocessing_md: >-
   metrics are formed. The plotted candidate names refer to stored row vectors,
   not raw sequences: `seq_mean` averages all emitted token positions,
   `anchor_mean` averages the emitted anchor span, and the bidirectional
-  candidate concatenates normalized forward and reverse-complement anchor-span
-  summaries.
+  candidate is a block-standardized, block-L2-normalized concat of forward and
+  reverse-complement anchor-span summaries along the feature axis.
 math_md: |
   Point size is the retained-component effective rank from the sampled PCA reducer summary
   $$

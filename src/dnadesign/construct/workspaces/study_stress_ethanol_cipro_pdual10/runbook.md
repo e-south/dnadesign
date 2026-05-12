@@ -91,6 +91,58 @@ uv run usr --root src/dnadesign/usr/datasets maintenance merge \
   --carry-namespace usr_label \
   --carry-namespace promoter_standard
 
+# Optional native RegulonDB TF-axis audit cohort. This does not create a
+# separate Construct context dataset. It ports RegulonDB TSS-upstream core60
+# rows into the same study anchor quota so the existing forward_anchor_window
+# project and Infer sequence-view lanes can append only the missing contexts and
+# sidecars. First project only stable native promoter metadata onto the core60
+# rows through their parent native promoter ids.
+uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
+  --src usr_regulondb_native_promoters \
+  --dest usr_regulondb_native_promoter_core60 \
+  --namespace regulondb \
+  --src-join id \
+  --dest-join derived__parent_id \
+  --columns "release,primary_source,source_strata_set,primary_promoter_id,primary_promoter_name,metadata_completeness_class" \
+  --allow-missing \
+  --dry-run
+
+# Write the checked metadata projection after the dry-run reports expected
+# matched, unmatched, and ambiguous row counts.
+uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
+  --src usr_regulondb_native_promoters \
+  --dest usr_regulondb_native_promoter_core60 \
+  --namespace regulondb \
+  --src-join id \
+  --dest-join derived__parent_id \
+  --columns "release,primary_source,source_strata_set,primary_promoter_id,primary_promoter_name,metadata_completeness_class" \
+  --allow-missing
+
+# Merge unique native RegulonDB core60 sequence rows into the shared anchor
+# handoff. Keep the default exact-sequence dedupe so the study quota remains
+# sequence-centric; duplicate biological promoter ids stay represented by
+# parent lineage and relation sidecars rather than duplicate Evo2 passes.
+uv run usr --root src/dnadesign/usr/datasets maintenance merge \
+  --dest usr_prom_eth_cip_anchor \
+  --src usr_regulondb_native_promoter_core60 \
+  --union-columns \
+  --if-duplicate error \
+  --dry-run \
+  --carry-namespace construct \
+  --carry-namespace derived \
+  --carry-namespace regulondb
+
+# Apply the native core60 append only after the dry-run confirms no duplicate
+# or schema surprises.
+uv run usr --root src/dnadesign/usr/datasets maintenance merge \
+  --dest usr_prom_eth_cip_anchor \
+  --src usr_regulondb_native_promoter_core60 \
+  --union-columns \
+  --if-duplicate error \
+  --carry-namespace construct \
+  --carry-namespace derived \
+  --carry-namespace regulondb
+
 # Merge the Reader-backed SFXI pDual-10 DenseGen source cohort into the same
 # shared anchor handoff. Use duplicate-error here; duplicate hits should be
 # inspected as evidence over existing rows rather than silently skipped.
@@ -189,6 +241,30 @@ uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
   --namespace promoter_standard \
   --src-join id \
   --dest-join construct__anchor_id \
+  --allow-missing
+
+# Project only coordinate-free lineage and native promoter metadata from the
+# merged anchor handoff onto realized 1 kb contexts. Do not project derived
+# interval coordinates into context rows; those coordinates describe source
+# core60 rows, not the pDual-10 realized sequence.
+uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
+  --src usr_prom_eth_cip_anchor \
+  --dest construct_prom_eth_cip_context \
+  --namespace derived \
+  --src-join id \
+  --dest-join construct__anchor_id \
+  --columns "parent_id,parent_dataset,product_kind,analysis_only,spec_id" \
+  --allow-missing
+
+# Project the native RegulonDB metadata onto context rows after the derived
+# lineage projection succeeds.
+uv run usr --root src/dnadesign/usr/datasets maintenance overlay-project \
+  --src usr_prom_eth_cip_anchor \
+  --dest construct_prom_eth_cip_context \
+  --namespace regulondb \
+  --src-join id \
+  --dest-join construct__anchor_id \
+  --columns "release,primary_source,source_strata_set,primary_promoter_id,primary_promoter_name,metadata_completeness_class" \
   --allow-missing
 
 # Validate the resulting shared Construct context dataset. Use namespace-current

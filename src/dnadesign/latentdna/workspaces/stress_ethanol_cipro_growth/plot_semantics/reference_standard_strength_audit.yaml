@@ -11,7 +11,15 @@ caption: Collection-specific reference-standard strength ordering audit.
 alt_text: Bar-panel audit comparing anchor-source, forward-context, and bidirectional-summary candidate representations by collection-specific ordinal strength metrics for Anderson iGEM and W collection standards.
 preprocessing_md: Uses candidate-space normalized geometry and filters reference standards by collection before computing ordinal statistics from numeric strength metadata. Anderson and W rows are treated as collection-specific standards with their own sequence-scope and strength metadata; their numeric values are not pooled into one universal promoter-strength scale.
 math_md: |
-  Within each collection, the audit computes Spearman and Kendall agreement between numeric strength ranks and observed centroid-distance gaps among standard promoter groups.
+  Within each collection, rows are grouped by promoter standard and ordered by that collection's numeric strength metadata. For each pair of standard groups \(g,h\), the audit compares the numeric rank gap
+  $$
+  \Delta_{\mathrm{rank}}(g,h)=|r_g-r_h|
+  $$
+  with the high-dimensional centroid distance
+  $$
+  d_{\mathrm{emb}}(g,h)=1-\cos(c_g,c_h).
+  $$
+  Spearman and Kendall summarize whether larger strength gaps correspond to larger latent centroid distances. The permutation p-value shuffles the collection-specific strength ranks while keeping the candidate-space geometry fixed.
 rationale_md: Provides the high-dimensional counterpart to the reference strength UMAP while preserving collection-specific strength scales. This answers whether known standards have a detectable latent ordering in a candidate view; it does not calibrate promoter strength for new designs.
 limitations_md: Published strength scales differ by collection and measurement convention. A weak trend in one collection does not invalidate another collection or the DenseGen Sigma-35 ladder.
 failure_modes_md: Sparse numeric annotations, duplicate strength ranks, source-scope filtering mistakes, or overinterpreting projection coordinates can distort apparent strength ordering.

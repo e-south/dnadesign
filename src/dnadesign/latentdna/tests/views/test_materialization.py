@@ -496,6 +496,10 @@ def test_source_class_prefers_sequence_view_semantics_and_promoter_standard_meta
     )
     assert _source_class({"source_family": "densegen_generated", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
     assert _source_class({"source_family": "construct_derived", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
+    assert _source_class({"regulondb__primary_promoter_name": "lexAp", "densegen__plan": None}) == ("native_regulondb")
+    assert _source_class({"derived__parent_dataset": "usr_regulondb_native_promoters", "densegen__plan": None}) == (
+        "native_regulondb"
+    )
     assert _source_class({"promoter_standard__collection_id": "anderson", "densegen__plan": None}) == (
         "synthetic_reference_standard"
     )

@@ -157,6 +157,7 @@ def _build_sample_step(
         reference_set_id=_optional_param(params, "reference_set_id", "reference_set", default=None),
         explicit_ids=_list_param(params, "explicit_ids", "record_ids", "record_id"),
         input_sample_ids=_list_param(params, "input_sample_ids", "input_samples", "input_sample"),
+        where=_optional_param(params, "where", default=None),
         force=force,
     )
 

@@ -12,12 +12,12 @@ alt_text: Scatter plot of 48 reference promoter core60 causal mean-pooled embedd
 preprocessing_md: >-
   Uses the materialized reference core60 intermediate embedding view and
   persisted UMAP projection. Each core60 vector is an Infer `core60_mean`: an
-  exact 60 bp forward sequence passed through Evo2, then mean-pooled over its
+  exact 60 bp forward sequence passed through Evo 2, then mean-pooled over its
   token positions. Metadata are carried from USR reference promoter records
   through Construct and Infer sidecars.
 math_md: |
   UMAP is fit on Evo 2 7B block26 intermediate embedding vectors mean-pooled
-  over token positions in each reference core60 sequence. Because Evo2 is
+  over token positions in each reference core60 sequence. Because Evo 2 is
   causal, each token state is prefix-conditioned in the emitted forward
   orientation.
   Color encodes `promoter_standard__strength_value_numeric` as a continuous hue; display names remain row metadata for interactive inspection rather than dense static labels.

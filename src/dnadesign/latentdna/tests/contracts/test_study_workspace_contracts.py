@@ -114,6 +114,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "candidate_x_selection_scorecard",
         "reference_to_plan_centroid_heatmap",
         "reference_standard_strength_audit",
+        "native_tf_axis_orientation_audit",
         "sigma35_centroid_distance_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
@@ -176,6 +177,9 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "reference_w_collection",
         "reference_w_collection_core60",
     }
+    reference_sets = {row.reference_set_id: row for row in controls.geometry_controls.reference_sets}
+    assert reference_sets["reference_native_mg1655"].label_limit == 32
+    assert reference_sets["reference_native_mg1655_core60"].label_limit == 32
 
 
 def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> None:
@@ -205,7 +209,7 @@ def test_live_stress_reference_diagnostics_do_not_become_projection_browser_pane
     assert not browser_view_ids.intersection(_REFERENCE_DIAGNOSTIC_GEOMETRIES)
     assert not layout_view_ids.intersection(_REFERENCE_DIAGNOSTIC_GEOMETRIES)
     assert controls.geometry_controls.reference_sets
-    assert controls.geometry_controls.default_reference_set == "reference_spyp_sulap"
+    assert controls.geometry_controls.default_reference_set == "reference_spyp_sulap_core60"
 
 
 def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> None:
@@ -453,13 +457,38 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.plots["balanced_design_family_margin_gallery"].y_axis_label == (
         r"$m_{\mathrm{cipro}}(x)=\cos(z_x,c_{\mathrm{cipro}})-\cos(z_x,c_{\mathrm{bg}})$"
     )
+    expected_full_population_hue_options = [
+        "gc_fraction",
+        "design_family",
+        "design_regulator_composition",
+        "sig35_variant",
+        "spacer_length",
+        "source_family",
+    ]
+    balanced_hue_options = context.config.plots["balanced_design_family_margin_gallery"].hue_options
+    assert [option.column for option in balanced_hue_options] == expected_full_population_hue_options
+    assert balanced_hue_options[0].type == "continuous"
+    assert balanced_hue_options[0].scale == "panel"
+    assert balanced_hue_options[4].type == "ordinal"
     assert context.config.plots["sigma35_ordinal_audit"].kind == "metric_panel_grid"
     assert context.config.plots["sigma35_margin_ladder_gallery"].kind == "distribution_grid"
     assert context.config.plots["sigma35_margin_ladder_gallery"].visibility_tier == "primary"
-    assert context.config.plots["sigma35_margin_ladder_gallery"].x_axis_label == "Sigma-35 variant"
-    assert context.config.plots["sigma35_margin_ladder_gallery"].y_axis_label == (
-        r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
+    assert context.config.plots["sigma35_margin_ladder_gallery"].render_mode == "ordinal_swarm"
+    assert context.config.plots["sigma35_margin_ladder_gallery"].hide_repeated_y_axis is False
+    assert context.config.plots["sigma35_margin_ladder_gallery"].x_axis_label == (
+        r"$r_{\mathrm{ord}}(x)$ weak$\to$strong class rank"
     )
+    assert context.config.plots["sigma35_margin_ladder_gallery"].y_axis_label == (
+        r"$m_{\mathrm{ord}}(x)=\cos(z_x,c_{\mathrm{strong}})-\cos(z_x,c_{\mathrm{weak}})$"
+    )
+    assert context.config.plots["sigma35_margin_ladder_gallery"].filter_options[0].column == "ordinal_group_id"
+    assert [
+        value.value for value in context.config.plots["sigma35_margin_ladder_gallery"].filter_options[0].values
+    ] == [
+        "sigma35",
+        "t7_w_collection_core60",
+        "anderson_igem_core60",
+    ]
     assert context.config.plots["sigma35_stress_margin_gallery"].kind == "xy_scatter_grid"
     assert context.config.plots["sigma35_stress_margin_gallery"].visibility_tier == "primary"
     assert context.config.plots["sigma35_stress_margin_gallery"].x_column == "sig35_margin_f_vs_b"
@@ -471,12 +500,24 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.plots["sigma35_stress_margin_gallery"].y_axis_label == (
         r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$"
     )
+    stress_margin_hue_options = context.config.plots["sigma35_stress_margin_gallery"].hue_options
+    assert [option.column for option in stress_margin_hue_options] == expected_full_population_hue_options
+    assert stress_margin_hue_options[0].type == "continuous"
+    assert stress_margin_hue_options[0].scale == "panel"
+    assert stress_margin_hue_options[4].type == "ordinal"
     assert context.config.plots["context_robustness_summary"].kind == "metric_panel_grid"
     assert context.config.plots["context_pair_summary"].kind == "metric_panel_grid"
     assert context.config.plots["candidate_decision_frontier"].kind == "xy_scatter"
     assert context.config.plots["candidate_decision_frontier"].color_column is None
     assert context.config.plots["candidate_decision_frontier"].size_column == "effective_rank"
     assert context.config.plots["candidate_decision_frontier"].size_range == (140.0, 260.0)
+    assert context.config.plots["candidate_decision_frontier"].x_axis_label == (
+        r"$S_{\mathrm{design}}^{\mathrm{balanced}}="
+        r"\operatorname{mean}(d_{\mathrm{between}})/\operatorname{mean}(d_{\mathrm{within}})$"
+    )
+    assert context.config.plots["candidate_decision_frontier"].y_axis_label == (
+        r"$\rho_{\sigma35}=\operatorname{Spearman}(\Delta_{\mathrm{expected}},\Delta_{\mathrm{observed}})$"
+    )
     assert context.config.plots["sigma35_centroid_distance_gallery"].kind == "heatmap_grid"
     assert context.config.plots["sigma35_centroid_distance_gallery"].visibility_tier == "appendix"
     assert context.config.plots["sigma35_centroid_distance_gallery"].x_axis_label == "Sigma-35 variant $h$"
@@ -496,6 +537,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.plots["design_centroid_margin_gallery"].kind == "xy_scatter_grid"
     assert context.config.plots["design_centroid_margin_gallery"].visibility_tier == "appendix"
     expected_reference_hue_options = [
+        "gc_fraction",
         "design_family",
         "design_regulator_composition",
         "sig35_variant",
@@ -504,7 +546,9 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     ]
     design_hue_options = context.config.plots["design_centroid_margin_gallery"].hue_options
     assert [option.column for option in design_hue_options] == expected_reference_hue_options
-    assert design_hue_options[3].type == "ordinal"
+    assert design_hue_options[0].type == "continuous"
+    assert design_hue_options[0].scale == "panel"
+    assert design_hue_options[4].type == "ordinal"
     assert context.config.plots["reference_alignment_summary"].kind == "metric_panel_grid"
     assert context.config.plots["reference_alignment_summary"].visibility_tier == "appendix"
     assert context.config.plots["representation_scree_diagnostic"].kind == "curve_grid"
@@ -526,9 +570,10 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "spacer_length",
         "source_family",
     ]
+    assert appendix_gallery.hue_options[0].scale == "panel"
     assert appendix_gallery.hue_options[4].type == "ordinal"
     assert appendix_gallery.annotation is not None
-    assert appendix_gallery.annotation.reference_set == "reference_spyp_sulap"
+    assert appendix_gallery.annotation.reference_set == "reference_spyp_sulap_core60"
     reference_strength_umap = context.config.plots["reference_core60_strength_umap"]
     assert reference_strength_umap.kind == "projection_grid"
     assert reference_strength_umap.visibility_tier == "appendix"
@@ -545,6 +590,19 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert reference_strength_filter.column == "promoter_standard__collection_id"
     assert reference_strength_filter.include_all is True
     assert [row.value for row in reference_strength_filter.values] == ["anderson_igem", "t7_w_collection"]
+    native_tf_audit = context.config.plots["native_tf_axis_orientation_audit"]
+    assert native_tf_audit.kind == "xy_scatter"
+    assert native_tf_audit.visibility_tier == "appendix"
+    assert native_tf_audit.scalar == "native_tf_axis_orientation_audit"
+    assert native_tf_audit.x_column == "ethanolness"
+    assert native_tf_audit.y_column == "ciproness"
+    assert native_tf_audit.default_hue == "tf_bin"
+    assert "native_tf_context_1kb" not in context.config.sources
+    assert {
+        source.dataset
+        for source in context.config.sources.values()
+        if getattr(source, "dataset", None) == "construct_prom_eth_cip_native_tf_contexts"
+    } == set()
     assert list(context.config.plots["design_centroid_margin_gallery"].scalars) == [
         f"design_centroid_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
@@ -555,7 +613,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         f"sigma35_stress_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
     assert list(context.config.plots["sigma35_margin_ladder_gallery"].scalars) == [
-        f"sigma35_stress_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
+        f"ordinal_ladder_rows_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
     assert list(context.config.plots["sigma35_centroid_distance_gallery"].scalars) == [
         f"sigma35_centroid_distance_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
@@ -614,6 +672,16 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "reference_core60_pca_scree",
     ]
     assert context.config.deliverables["appendix_umap_gallery"].outputs["notebooks"] == ["latent_geometry_browser"]
+    assert context.config.deliverables["native_tf_axis_orientation_audit"].recipe == (
+        "native_tf_axis_orientation_audit_recipe"
+    )
+    assert context.config.deliverables["native_tf_axis_orientation_audit"].outputs["plots"] == [
+        "native_tf_axis_orientation_audit"
+    ]
+    assert context.config.deliverables["native_tf_axis_orientation_audit"].outputs["scalars"] == [
+        "native_tf_axis_orientation_audit",
+        "native_tf_axis_orientation_tests",
+    ]
     assert context.config.exports == {}
 
 
@@ -622,6 +690,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     context = load_workspace_config(workspace)
     pre_assay_steps = {step.id: step for step in _recipe_steps(context, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
+    native_tf_steps = {step.id: step for step in _recipe_steps(context, "native_tf_axis_orientation_audit_recipe")}
 
     assert "materialize_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
     assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" not in pre_assay_steps
@@ -690,6 +759,22 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "build_reference_alignment_summary_metrics" in pre_assay_steps
     assert "build_candidate_decision_frontier_metrics" in pre_assay_steps
     assert "build_context_delta_distribution_output_layer_mean_7b" not in pre_assay_steps
+    assert "build_native_tf_axis_orientation_audit" not in pre_assay_steps
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["view_id"] == (
+        "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    )
+    assert "audit_view_id" not in native_tf_steps["build_native_tf_axis_orientation_audit"].params
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["output_filter"] == {
+        "column": "derived__parent_dataset",
+        "equals": "usr_regulondb_native_promoters",
+    }
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["association_overlay"]["row_key"] == (
+        "derived__parent_id"
+    )
+    assert native_tf_steps["build_native_tf_axis_orientation_tests"].params["where"] == {
+        "column": "derived__parent_dataset",
+        "equals": "usr_regulondb_native_promoters",
+    }
     assert all(
         step.params.get("kind")
         not in {
@@ -790,8 +875,10 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
 
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
+    scorecard_sample_filter = {"column": "source_class", "in": ["densegen", "manual_or_wildtype"]}
     for view_id in _FIRST_CLASS_CANDIDATE_VIEWS:
         assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert pre_assay_steps[f"build_scorecard_sample_{view_id}"].params["where"] == scorecard_sample_filter
         assert f"reduce_pca_{view_id}" in pre_assay_steps
         assert f"build_design_centroid_margins_{view_id}" in pre_assay_steps
         assert f"build_balanced_design_family_margins_{view_id}" in pre_assay_steps
@@ -802,6 +889,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         assert appendix_steps[f"build_umap_sample_{view_id}"].params["strategy"] == "all"
     for view_id in _FIRST_CLASS_OUTPUT_VIEWS:
         assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert pre_assay_steps[f"build_scorecard_sample_{view_id}"].params["where"] == scorecard_sample_filter
         assert f"reduce_pca_{view_id}" in pre_assay_steps
         assert f"build_umap_sample_{view_id}" in appendix_steps
         assert f"fit_umap_{view_id}" in appendix_steps

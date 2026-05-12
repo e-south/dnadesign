@@ -20,6 +20,7 @@ def _write_workspace(tmp_path) -> tuple[object, str]:
         {
             "id": ["row_01", "row_02", "row_03", "row_04"],
             "densegen__plan": ["plan_a", "plan_a", "plan_b", "plan_b"],
+            "source_class": ["densegen", "native_regulondb", "manual_or_wildtype", "densegen"],
         }
     )
     from dnadesign.latentdna.src.io.parquet_io import write_table
@@ -144,6 +145,28 @@ def test_sample_build_supports_explicit_ids_without_row_table_expansion(tmp_path
     sample_rows = read_table(artifact_dir / "rows.parquet").to_pydict()
     assert rows == 2
     assert sample_rows["id"] == ["row_02", "row_04"]
+
+
+def test_sample_build_filters_rows_before_sampling(tmp_path) -> None:
+    context, view_id = _write_workspace(tmp_path)
+
+    artifact_dir, rows = build_sample_artifact(
+        context,
+        sample_id="filtered_candidate_rows",
+        view_id=view_id,
+        strategy="all",
+        n=None,
+        group_column=None,
+        seed=17,
+        explicit_ids=None,
+        where={"column": "source_class", "in": ["densegen", "manual_or_wildtype"]},
+    )
+
+    from dnadesign.latentdna.src.io.parquet_io import read_table
+
+    sample_rows = read_table(artifact_dir / "rows.parquet").to_pydict()
+    assert rows == 3
+    assert sample_rows["id"] == ["row_01", "row_03", "row_04"]
 
 
 def test_sample_build_supports_union_and_intersection(tmp_path) -> None:

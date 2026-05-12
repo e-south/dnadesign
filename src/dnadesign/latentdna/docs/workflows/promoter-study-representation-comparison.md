@@ -74,14 +74,16 @@ anchor bounds. The controlled bidirectional candidate is a LatentDNA-derived
 external summary:
 
 $$
-X_{\mathrm{bidir}} = [\mathrm{L2}(Z_{\mathrm{fwd}}); \mathrm{L2}(Z_{\mathrm{rc}})]
+X_{\mathrm{bidir}} =
+[\mathrm{L2}(\mathrm{Std}(Z_{\mathrm{fwd}}));
+\mathrm{L2}(\mathrm{Std}(Z_{\mathrm{rc}}))]
 $$
 
-after per-block centering/scaling and row L2 normalization. It is useful because
-it combines forward and reverse-complement causal summaries with equal block
-weight. In study prose, "bidirectional 1 kb view" is acceptable shorthand only
-when expanded as "forward plus reverse-complement causal 1 kb anchor-span
-summaries." It is not a native bidirectional Evo2 hidden state.
+where `Std` is fit over the materialized block rows before row L2
+normalization. It is useful because it combines forward and reverse-complement
+causal summaries with equal block weight. In study prose, "bidirectional 1 kb
+view" is acceptable shorthand only when expanded as "forward plus
+reverse-complement causal 1 kb anchor-span summaries." It is not a native bidirectional Evo2 hidden state.
 
 ### View-Language Glossary
 
@@ -101,10 +103,11 @@ Use these descriptions in study prose, plot accordions, and figure alt text:
 - **Reverse-complement context views:** Construct emits a matched
   reverse-complement 1 kb sequence with reverse-complement-orientation anchor
   bounds. Infer runs Evo2 on that emitted sequence as a separate causal pass.
-- **Forward/RC `anchor_mean` concat:** LatentDNA block-normalizes the forward
-  and reverse-complement `anchor_mean` matrices and concatenates them. This is
-  an external two-orientation row summary, not a native bidirectional Evo2
-  model.
+- **Forward/RC `anchor_mean` concat:** LatentDNA standardizes and
+  row-L2-normalizes the forward and reverse-complement `anchor_mean` matrices
+  separately, aligns rows by the configured join key, and concatenates the two
+  blocks along the feature axis. This is an external equal-block
+  two-orientation row summary, not a native bidirectional Evo2 hidden state.
 - **Output-layer mean:** Infer applies the same pooling scopes to per-token
   logits. These views are diagnostic QC surfaces, not the current preferred
   candidate `X`.
@@ -239,6 +242,14 @@ metadata or explicit lookup derivations; they are not aliases for
 summaries and stay in candidate inventory, representation-health metrics, and
 native/core60 alignment summaries. They are not default projection-browser
 panels unless a real output-layer projection artifact is fit and validated.
+
+The stress-study native TF-axis audit is narrower: RegulonDB native core60 rows
+are planned as an append-only cohort in the existing `usr_prom_eth_cip_anchor`
+and `construct_prom_eth_cip_context` handoff. The audit reuses the same
+forward/RC context-anchor bidirectional view as candidate-X triage, filters
+rows by `derived__parent_dataset`, and joins BaeR/CpxR/LexA flags from the
+RegulonDB regulatory-interaction sidecar. It is not a separate Construct
+context project and is not an OPAL input.
 
 ### Sequence-View Plot Contract
 

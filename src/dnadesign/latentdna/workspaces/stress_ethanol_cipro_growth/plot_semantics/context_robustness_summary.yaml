@@ -23,6 +23,6 @@ math_md: |
   \right),
   $$
   where each \(D_A\) is the cohort centroid-distance matrix for that view.
-rationale_md: Answers whether adding a full 1 kb causal Evo2 pass preserves anchor-level design geometry, and whether whole-sequence `seq_mean` dilutes anchor-local structure relative to bounded `anchor_mean`.
+rationale_md: Answers whether adding a full 1 kb causal Evo 2 pass preserves anchor-level design geometry, and whether whole-sequence `seq_mean` dilutes anchor-local structure relative to bounded `anchor_mean`.
 limitations_md: This panel reports a sample estimate rather than the full aligned population, and high agreement can still preserve nuisance structure.
 failure_modes_md: The summary fails fast if anchor and context do not retain the same non-degenerate cohort pairs for a reported annotation axis. A family can still look stable overall while context preserves nuisance structure.

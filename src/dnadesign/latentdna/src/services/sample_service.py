@@ -30,6 +30,7 @@ def build_sample(
     reference_set_id: str | None = None,
     explicit_ids: list[str] | None = None,
     input_sample_ids: list[str] | None = None,
+    where: dict[str, object] | None = None,
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
@@ -52,6 +53,7 @@ def build_sample(
         reference_set_id=reference_set_id,
         explicit_ids=explicit_ids,
         input_sample_ids=input_sample_ids,
+        where=where,
     )
     input_entries: list[ArtifactInput]
     input_digests: dict[str, str]
@@ -97,6 +99,7 @@ def build_sample(
             "reference_set": reference_set_id,
             "explicit_ids": explicit_ids or [],
             "input_sample_ids": input_sample_ids or [],
+            "where": where,
         },
         outputs=[ArtifactOutput(path="rows.parquet", media_type="application/x-parquet")],
         stats={"rows": rows},
@@ -114,6 +117,7 @@ def build_sample(
             "reference_set": reference_set_id,
             "explicit_ids": explicit_ids or [],
             "input_samples": input_sample_ids or [],
+            "where": where,
         },
         input_digests=input_digests,
         metrics={"rows": rows},

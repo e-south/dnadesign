@@ -1,7 +1,7 @@
 plot_id: design_centroid_margin_gallery
 question: How does the full promoter population shift relative to ethanol, ciprofloxacin, and background centroids in each candidate space?
 decision_role: appendix
-encoding: Multi-panel scatter gallery of background-relative ethanol and ciprofloxacin centroid margins across the candidate inventory; the x-axis is ethanol-vs-background margin and the y-axis is ciprofloxacin-vs-background margin.
+encoding: Multi-panel scatter gallery of background-relative ethanol and ciprofloxacin centroid margins across the candidate inventory. The x-axis is ethanol-vs-background margin and the y-axis is ciprofloxacin-vs-background margin.
 scope: The shared promoter population, including study controls and leakage-safe cohort margins.
 guardrails:
   - Use this gallery for study-internal orientation across the full promoter population.
@@ -13,8 +13,9 @@ preprocessing_md: >-
   normalization, using leave-one-out centroids for rows that belong to the target
   or control cohorts. The plotted views are stored row summaries: `seq_mean`
   averages all emitted token positions, `anchor_mean` averages a bounded emitted
-  anchor span, and the bidirectional panel concatenates normalized forward and
-  reverse-complement anchor-span summaries.
+  anchor span, and the bidirectional panel uses a block-standardized,
+  block-L2-normalized feature-axis concat of forward and reverse-complement
+  anchor-span summaries.
 math_md: |
   The two plotted margins are
   $$
@@ -26,5 +27,13 @@ math_md: |
   $$
   Cohort centroids come from the study-internal design families, and leave-one-out centroids are used when a row belongs to the target or control cohort.
 rationale_md: Gives an intuitive, length-matched orientation surface without letting reference promoters or neighborhood heuristics drive candidate selection.
+plot_details_md: |
+  Read this as the direct semantic map. Each point is positioned by two high-dimensional cosine-margin questions: "is this row closer to the ethanol design centroid than to background?" and "is this row closer to the ciprofloxacin design centroid than to background?" This makes it a natural plot for asking where reference promoters land relative to the study's design concepts.
+
+  The distinction from `balanced_design_family_margin_gallery` is the centroid contract. This plot uses the study-internal design-family centroids directly, with leave-one-out handling for rows in the target or control cohort. It is easier to interpret as a map, but it is less protected against design-composition imbalance. If one family has a different mixture of Sigma-35 variants or spacer lengths, the direct centroid can partially reflect that mixture.
+
+  Use this plot for orientation and reference overlays. Use the balanced gallery when the question is whether DenseGen plan identity survives a matched comparison.
 limitations_md: Two-dimensional margins are still a projection of higher-dimensional geometry and cannot substitute for the summary metrics.
 failure_modes_md: Extreme density can visually hide small subcohorts, and centroid leakage would still bias rows if leave-one-out handling regressed.
+docs_refs:
+  - src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md

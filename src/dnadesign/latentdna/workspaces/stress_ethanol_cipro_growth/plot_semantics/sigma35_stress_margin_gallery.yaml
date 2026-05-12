@@ -9,7 +9,7 @@ guardrails:
   - Do not rank candidates by eye from point-cloud aesthetics alone.
 caption: Sigma-35 margin versus stress-family margin across candidate views.
 alt_text: Scatter-panel gallery showing Sigma-35 F-vs-B margin versus best stress-family margin for the full promoter population across anchor-source, context-anchor, reverse-complement, and bidirectional-summary 7B intermediate views.
-preprocessing_md: Rows are first standardized within view and L2-normalized. Each axis is then computed as a centroid-similarity margin on the full population in that candidate view, with leave-one-out handling when a row belongs to one of the scored cohorts. The plotted views are stored row summaries derived from causal Evo2 passes; the bidirectional panel is a forward/RC concat summary rather than a token-level bidirectional model.
+preprocessing_md: Rows are first standardized within view and L2-normalized. Each axis is then computed as a centroid-similarity margin on the full population in that candidate view, with leave-one-out handling when a row belongs to one of the scored cohorts. The plotted views are stored row summaries derived from causal Evo 2 passes; the bidirectional panel is a block-standardized, block-L2-normalized forward/RC concat summary rather than a token-level bidirectional model.
 math_md: |
   The x axis is
   $$
@@ -30,6 +30,37 @@ math_md: |
   m_{\mathrm{cipro}}(x) = \cos(z_x, c_{\mathrm{cipro}}) - \cos(z_x, c_{\mathrm{bg}}).
   $$
   Positive $m_{\mathrm{stress}}(x)$ values mean the row is closer to at least one stress-family centroid than to background.
-rationale_md: This is a deterministic alternative to UMAP. A better candidate keeps the Sigma-35 ladder visible on the x axis without collapsing the stress-family spread on the y axis, so you can see both design themes at once in a row-level cloud.
+rationale_md: >-
+  This is a deterministic alternative to UMAP. A better candidate keeps the
+  Sigma-35 ladder visible on the x axis without collapsing the stress-family
+  spread on the y axis, so you can see both design themes at once in a row-level
+  cloud. The target is not simply "more diffuse is healthier." The useful
+  pattern is interpretable spread: Sigma-35 classes should stratify along the x
+  axis, stress-family designs should separate along the y axis, and the two axes
+  should not collapse into one indistinguishable direction.
+plot_details_md: |
+  Read the x axis as a grammar-like ladder margin. A high value of
+  \(m_{\sigma35}(x)\) means the row is more similar to the Sigma-35 `f`
+  centroid than to the Sigma-35 `b` centroid after view standardization and row
+  L2 normalization. A low or negative value means the row is closer to the `b`
+  side of that internal ladder. This is a geometric strength-like proxy, not a
+  measured expression ratio.
+
+  Read the y axis as "best stress-family pull away from background." The code
+  computes ethanol-vs-background and ciprofloxacin-vs-background margins, then
+  takes the larger of the two:
+  \(m_{\mathrm{stress}}(x)=\max(m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x))\).
+  This does not ask whether the row is specifically ethanol or specifically
+  ciprofloxacin. It asks whether the row is closer to at least one stress-family
+  centroid than to background.
+
+  The plot is useful when the point cloud has structured variation in both
+  directions. A candidate that makes every point high on the y axis but shows no
+  Sigma-35 stratification has lost the ladder. A candidate that shows a clean
+  Sigma-35 x-axis spread but no stress-family y-axis separation has lost the
+  plan identity. The preferred qualitative pattern is joint structure, not
+  maximum scatter for its own sake.
 limitations_md: Both axes are annotation-conditioned centroid margins. They are useful for orientation and communication, but they do not replace the higher-dimensional summary metrics or imply promoter activity.
 failure_modes_md: Strong overplotting can still hide minority subcohorts, and any regression in leave-one-out handling would make in-cohort points look artificially cleaner than they are.
+docs_refs:
+  - src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md

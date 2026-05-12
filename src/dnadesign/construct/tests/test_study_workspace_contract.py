@@ -81,3 +81,24 @@ def test_study_workspace_exposes_shared_forward_and_reverse_complement_context_h
         ("realized_context", "forward", "anchor_mean"),
         ("realized_context", "reverse_complement", "anchor_mean"),
     ]
+
+
+def test_native_regulondb_core60_uses_existing_study_anchor_and_context_handoff() -> None:
+    payload = yaml.safe_load((WORKSPACE / "construct.workspace.yaml").read_text(encoding="utf-8"))
+    project_outputs = {
+        project["contract"].get("output_dataset")
+        for project in payload["workspace"]["projects"]
+        if isinstance(project.get("contract"), dict)
+    }
+
+    assert "construct_prom_eth_cip_native_tf_contexts" not in project_outputs
+
+    runbook = (WORKSPACE / "runbook.md").read_text(encoding="utf-8")
+    assert "usr_regulondb_native_promoter_core60" in runbook
+    assert "--src usr_regulondb_native_promoter_core60" in runbook
+    assert "--dest usr_prom_eth_cip_anchor" in runbook
+    assert "--project forward_anchor_window" in runbook
+    assert "--namespace regulondb" in runbook
+    assert "--namespace derived" in runbook
+    assert "--dest-join derived__parent_id" in runbook
+    assert "--dest-join construct__anchor_id" in runbook

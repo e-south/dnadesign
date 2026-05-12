@@ -3,7 +3,7 @@
 This synthesis plot summarizes the full pre-assay ladder without replacing it.
 It is the publication-facing "why this X" figure for the current synthetic
 comparison surface. Each point is a stored representation view, not a raw
-sequence family: the view names describe how Evo2 token states were pooled or
+sequence family: the view names describe how Evo 2 token states were pooled or
 how forward and reverse-complement summaries were concatenated.
 
 ### candidate_decision_frontier | Representation tradeoff

@@ -1,7 +1,7 @@
 plot_id: candidate_x_selection_scorecard
 question: Which compact candidate-X representation best preserves the pre-assay geometry needed for downstream modeling?
 decision_role: primary
-scope: "Three intentionally selected Evo2 7B intermediate candidates: anchor-source causal mean, forward 1 kb anchor-span causal mean, and equal-block forward/RC 1 kb context anchor-span causal-mean concat."
+scope: "Three intentionally selected Evo 2 7B intermediate candidates: anchor-source causal mean, forward 1 kb anchor-span causal mean, and equal-block forward/RC 1 kb context anchor-span causal-mean concat."
 encoding: Metric-panel scorecard with one panel per selection criterion and bars grouped by candidate representation.
 guardrails:
   - Effective rank is a health gate, not the main selection criterion.
@@ -9,9 +9,19 @@ guardrails:
   - Treat the bidirectional concat as an externally constructed two-orientation summary that must beat its components on declared checks.
 caption: Compact candidate-X selection scorecard for pre-assay representation triage.
 alt_text: Bar-panel scorecard comparing anchor-source causal mean, forward 1 kb anchor-span causal mean, and equal-block forward/reverse-complement anchor-span concat across health, DenseGen plan geometry, Sigma-35 ordering, reference mapping, and reference strength metrics.
-preprocessing_md: Reuses persisted scalar summaries computed after view-level standardization and row L2 normalization. Each source view is an Infer mean over token-position vectors; for Evo2 those token states are prefix-conditioned in the emitted orientation. The bidirectional concat view block-normalizes forward and reverse-complement 1 kb context anchor-mean blocks before concatenation. It is a two-orientation summary, not a native bidirectional Evo2 hidden state.
+preprocessing_md: Reuses persisted scalar summaries computed after view-level standardization and row L2 normalization. Each source view is an Infer mean over token-position vectors; for Evo 2 those token states are prefix-conditioned in the emitted orientation. The bidirectional concat view is a block-standardized, block-L2-normalized feature-axis concat of forward and reverse-complement 1 kb context anchor-mean blocks. It is a two-orientation row summary, not a native bidirectional Evo 2 hidden state.
 math_md: |
   The scorecard combines existing high-dimensional metrics: effective rank, balanced design-family separation, Sigma-35 ordinal Spearman, median reference-to-centroid margin, and median collection-specific strength Spearman.
-rationale_md: Keeps candidate-X selection YAGNI-compliant by comparing one anchor-source view, one forward context-anchor view, and one explicitly normalized two-orientation challenger. The scorecard therefore asks whether extra context and orientation information improve the biological checks without turning the study into a representation zoo.
+
+  For the bidirectional candidate, the row vector is
+  $$
+  z_{\mathrm{FWD+RC}} =
+  \left[
+  \operatorname{L2}(\operatorname{Std}(z_{\mathrm{FWD}}));
+  \operatorname{L2}(\operatorname{Std}(z_{\mathrm{RC}}))
+  \right],
+  $$
+  where each block is standardized across the materialized rows and row-L2-normalized before feature-axis concatenation. This gives the forward and reverse-complement anchor summaries equal block weight; it is not raw concatenation and it does not refit Evo 2 as a token-level bidirectional model.
+rationale_md: Keeps candidate-X selection deliberately narrow by comparing one anchor-source view, one forward context-anchor view, and one explicitly normalized two-orientation challenger. The scorecard therefore asks whether extra context and orientation information improve the biological checks without expanding the study into an unconstrained representation screen.
 limitations_md: These metrics evaluate latent representation structure before assay. They do not estimate promoter activity, ethanol growth, ciprofloxacin growth, or final supervised-model performance.
 failure_modes_md: A candidate can look healthy by rank while failing biological structure checks; reference margins can be diffuse when reference landmarks do not align with synthetic plan axes.

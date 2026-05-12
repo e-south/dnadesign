@@ -19,6 +19,24 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: id
     subject_key: id
+    metadata_include: &study_anchor_metadata
+      - sfxi_ref__reference_instance_id
+      - sfxi_ref__collection_id
+      - sfxi_ref__batch_id
+      - sfxi_ref__campaign_id
+      - sfxi_ref__metric_id
+      - sfxi_ref__metric_value
+      - sfxi_ref__metric_provenance
+      - derived__parent_id
+      - derived__parent_dataset
+      - derived__product_kind
+      - derived__analysis_only
+      - regulondb__release
+      - regulondb__primary_source
+      - regulondb__source_strata_set
+      - regulondb__primary_promoter_id
+      - regulondb__primary_promoter_name
+      - regulondb__metadata_completeness_class
     sequence_scope: source_insert
     source_interval_length_bp: mixed
     pooling_span_bp: full_sequence
@@ -29,6 +47,7 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    metadata_include: *study_anchor_metadata
     sequence_scope: merged_anchor_insert_seq_mean
     source_interval_length_bp: mixed
     pooling_span_bp: full_sequence
@@ -45,6 +64,7 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    metadata_include: *study_anchor_metadata
     sequence_scope: merged_anchor_insert_seq_mean
     source_interval_length_bp: mixed
     pooling_span_bp: full_sequence
@@ -60,6 +80,7 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    metadata_include: *study_anchor_metadata
     sequence_scope: merged_anchor_insert_seq_mean
     source_interval_length_bp: mixed
     pooling_span_bp: full_sequence
@@ -74,6 +95,7 @@ sources:
     dataset: usr_prom_eth_cip_anchor
     record_key: alias_id
     subject_key: id
+    metadata_include: *study_anchor_metadata
     sequence_scope: merged_anchor_insert_seq_mean
     source_interval_length_bp: mixed
     pooling_span_bp: full_sequence
@@ -89,6 +111,17 @@ sources:
     record_key: id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: &study_context_metadata
+      - derived__parent_id
+      - derived__parent_dataset
+      - derived__product_kind
+      - derived__analysis_only
+      - regulondb__release
+      - regulondb__primary_source
+      - regulondb__source_strata_set
+      - regulondb__primary_promoter_id
+      - regulondb__primary_promoter_name
+      - regulondb__metadata_completeness_class
     sequence_scope: template_context
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -99,6 +132,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -117,6 +151,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -134,6 +169,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -150,6 +186,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -166,6 +203,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -182,6 +220,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -197,6 +236,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -211,6 +251,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -225,6 +266,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -243,6 +285,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -260,6 +303,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -276,6 +320,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_anchor_insert_mean
     emitted_length_bp: 1000
     source_interval_length_bp: mixed
@@ -292,6 +337,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -308,6 +354,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -323,6 +370,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -337,6 +385,7 @@ sources:
     record_key: alias_id
     subject_key: construct__anchor_id
     context_key: construct__context_id
+    metadata_include: *study_context_metadata
     sequence_scope: template_context_seq_mean
     emitted_length_bp: 1000
     pooling_span_bp: full_sequence
@@ -716,6 +765,16 @@ metadata:
       kind: coalesce
       sources: [construct_template_id, template_id, construct__template_id]
       value_type: string
+    derived__parent_id: {kind: constant, value: null, value_type: string}
+    derived__parent_dataset: {kind: constant, value: null, value_type: string}
+    derived__product_kind: {kind: constant, value: null, value_type: string}
+    derived__analysis_only: {kind: constant, value: null, value_type: bool}
+    regulondb__release: {kind: constant, value: null, value_type: string}
+    regulondb__primary_source: {kind: constant, value: null, value_type: string}
+    regulondb__source_strata_set: {kind: constant, value: null, value_type: string}
+    regulondb__primary_promoter_id: {kind: constant, value: null, value_type: string}
+    regulondb__primary_promoter_name: {kind: constant, value: null, value_type: string}
+    regulondb__metadata_completeness_class: {kind: constant, value: null, value_type: string}
     design_family:
       kind: annotation
       source: row
@@ -779,6 +838,8 @@ metadata:
         - [densegen__plan]
         - [source_family]
         - [promoter_standard__collection_id]
+        - [regulondb__primary_promoter_name]
+        - [derived__parent_dataset]
       missing_policy: error
       value_type: string
   axes:
@@ -1244,16 +1305,18 @@ reference_sets:
     label: Native MG1655
     match_column: usr_label__primary
     label_column: usr_label__primary
+    label_limit: 32
     where:
       - column: usr_label__primary
-        regex: '^(aceBp|alaSp|aldAp|araBADp|argCBHp|cpxPp|fadEp|inaAp|katGp|marRABp|micFp|phoAp|ppcp|pspAp|pspGp|umuDCp)(?:_context1kb_(?:forward|rc))?$'
+        regex: '^(aceBp|alaSp|aldAp|araBADp|argCBHp|cpxPp|fadEp|inaAp|katGp|marRABp|micFp|phoAp|ppcp|pspAp|pspGp|spyp|sulAp|umuDCp)(?:_context1kb_(?:forward|rc))?$'
   reference_native_mg1655_core60:
     label: Native MG1655 core60
     match_column: usr_label__primary
     label_column: usr_label__primary
+    label_limit: 32
     where:
       - column: usr_label__primary
-        regex: '^(aceBp|alaSp|aldAp|araBADp|argCBHp|cpxPp|fadEp|inaAp|katGp|marRABp|micFp|phoAp|ppcp|pspAp|pspGp|umuDCp)_core60(?:_context1kb_(?:forward|rc))?$'
+        regex: '^(aceBp|alaSp|aldAp|araBADp|argCBHp|cpxPp|fadEp|inaAp|katGp|marRABp|micFp|phoAp|ppcp|pspAp|pspGp|spyp|sulAp|umuDCp)_core60(?:_context1kb_(?:forward|rc))?$'
   reference_anderson_igem:
     label: Anderson iGEM
     match_column: usr_label__primary
@@ -1363,6 +1426,7 @@ plots:
     y_axis_label: '$m_{\mathrm{cipro}}(x)=\cos(z_x,c_{\mathrm{cipro}})-\cos(z_x,c_{\mathrm{bg}})$'
     default_hue: sig35_variant
     hue_options:
+      - {column: gc_fraction, label: GC fraction, type: continuous, scale: panel}
       - {column: design_family, label: Design family, type: categorical}
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
@@ -1395,6 +1459,33 @@ plots:
     visibility_tier: primary
     single_row_panels: true
     square_panels: true
+    hide_repeated_y_axis: false
+    scalars: &ordinal_ladder_rows_scalars
+      - ordinal_ladder_rows_intermediate_embedding_7b_anchor_60bp
+      - ordinal_ladder_rows_intermediate_embedding_7b_full_context_1kb
+      - ordinal_ladder_rows_intermediate_embedding_7b_full_context_anchor_mean
+      - ordinal_ladder_rows_intermediate_embedding_7b_context_anchor_mean_bidir_concat
+      - ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_1kb
+      - ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_anchor_mean
+    metric_columns: [ordinal_margin]
+    x_axis_label: '$r_{\mathrm{ord}}(x)$ weak$\to$strong class rank'
+    y_axis_label: '$m_{\mathrm{ord}}(x)=\cos(z_x,c_{\mathrm{strong}})-\cos(z_x,c_{\mathrm{weak}})$'
+    color_column: ordinal_label
+    render_mode: ordinal_swarm
+    filter_options:
+      - column: ordinal_group_id
+        label: Ordinal ladder
+        include_all: false
+        values:
+          - {value: sigma35, label: Sigma-35 B-F ladder}
+          - {value: t7_w_collection_core60, label: W collection core60}
+          - {value: anderson_igem_core60, label: Anderson iGEM core60}
+    panel_titles: *candidate_panel_titles
+    semantics_ref: plot_semantics/sigma35_margin_ladder_gallery.yaml
+  sigma35_stress_margin_gallery:
+    kind: xy_scatter_grid
+    visibility_tier: primary
+    single_row_panels: true
     scalars: &sigma35_stress_margin_scalars
       - sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp
       - sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
@@ -1402,18 +1493,6 @@ plots:
       - sigma35_stress_margins_intermediate_embedding_7b_context_anchor_mean_bidir_concat
       - sigma35_stress_margins_intermediate_embedding_7b_reverse_complement_context_1kb
       - sigma35_stress_margins_intermediate_embedding_7b_reverse_complement_context_anchor_mean
-    metric_columns: [sig35_margin_f_vs_b]
-    x_axis_label: Sigma-35 variant
-    y_axis_label: '$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$'
-    color_column: sig35_variant
-    render_mode: violin_box
-    panel_titles: *candidate_panel_titles
-    semantics_ref: plot_semantics/sigma35_margin_ladder_gallery.yaml
-  sigma35_stress_margin_gallery:
-    kind: xy_scatter_grid
-    visibility_tier: primary
-    single_row_panels: true
-    scalars: *sigma35_stress_margin_scalars
     panel_titles: *candidate_panel_titles
     x_column: sig35_margin_f_vs_b
     y_column: synthetic_best_stress_margin
@@ -1421,6 +1500,7 @@ plots:
     y_axis_label: '$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$'
     default_hue: sig35_variant
     hue_options:
+      - {column: gc_fraction, label: GC fraction, type: continuous, scale: panel}
       - {column: design_family, label: Design family, type: categorical}
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
@@ -1484,6 +1564,8 @@ plots:
     scalar: candidate_decision_frontier_metrics
     x_column: design_family_balanced_separation_ratio
     y_column: sig35_ordinal_spearman
+    x_axis_label: '$S_{\mathrm{design}}^{\mathrm{balanced}}=\operatorname{mean}(d_{\mathrm{between}})/\operatorname{mean}(d_{\mathrm{within}})$'
+    y_axis_label: '$\rho_{\sigma35}=\operatorname{Spearman}(\Delta_{\mathrm{expected}},\Delta_{\mathrm{observed}})$'
     size_column: effective_rank
     size_range: [140, 260]
     shape_column: frontier_label
@@ -1552,6 +1634,22 @@ plots:
     value_kind: score
     value_label: Metric value
     semantics_ref: plot_semantics/reference_standard_strength_audit.yaml
+  native_tf_axis_orientation_audit:
+    kind: xy_scatter
+    visibility_tier: appendix
+    scalar: native_tf_axis_orientation_audit
+    x_column: ethanolness
+    y_column: ciproness
+    x_axis_label: '$m_{\mathrm{eth}}(x)=\cos(z_x,c_{\mathrm{eth}})-\cos(z_x,c_{\mathrm{bg}})$'
+    y_axis_label: '$m_{\mathrm{cipro}}(x)=\cos(z_x,c_{\mathrm{cipro}})-\cos(z_x,c_{\mathrm{bg}})$'
+    default_hue: tf_bin
+    hue_options:
+      - {column: tf_bin, label: Native TF bin, type: categorical}
+      - {column: has_BaeR, label: BaeR-associated, type: binary}
+      - {column: has_CpxR, label: CpxR-associated, type: binary}
+      - {column: has_LexA, label: LexA-associated, type: binary}
+    shape_column: tf_bin
+    semantics_ref: plot_semantics/native_tf_axis_orientation_audit.yaml
   design_centroid_margin_gallery:
     kind: xy_scatter_grid
     visibility_tier: appendix
@@ -1570,6 +1668,7 @@ plots:
     y_axis_label: '$m_{\mathrm{cipro}}(x)=\cos(z_x,c_{\mathrm{cipro}})-\cos(z_x,c_{\mathrm{bg}})$'
     default_hue: design_family
     hue_options:
+      - {column: gc_fraction, label: GC fraction, type: continuous, scale: panel}
       - {column: design_family, label: Design family, type: categorical}
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
@@ -1663,14 +1762,14 @@ plots:
       - Output logits RC 1 kb anchor mean
     default_hue: sig35_variant
     hue_options:
-      - {column: gc_fraction, label: GC fraction, type: continuous}
+      - {column: gc_fraction, label: GC fraction, type: continuous, scale: panel}
       - {column: design_family, label: Design family, type: categorical}
       - {column: design_regulator_composition, label: Regulator composition, type: categorical}
       - {column: sig35_variant, label: Sigma-35 variant, type: categorical}
       - {column: spacer_length, label: Spacer length, type: ordinal}
       - {column: source_family, label: Source family, type: categorical}
     annotation:
-      reference_set: reference_spyp_sulap
+      reference_set: reference_spyp_sulap_core60
       missing_policy: allow
     semantics_ref: plot_semantics/appendix_umap_gallery.yaml
   context_pair_summary:
@@ -1705,7 +1804,7 @@ notebooks:
       - candidate_x_selection_7b
       - planned_output_layer_7b
     default_candidate_set: first_class_intermediate_7b
-    default_reference_set: reference_spyp_sulap
+    default_reference_set: reference_spyp_sulap_core60
     context_audit_scalar_ids:
       - context_delta_distribution_intermediate_embedding_7b_anchor_mean
       - context_delta_distribution_intermediate_embedding_7b_full_context
@@ -1753,12 +1852,14 @@ notebooks:
     show_missing_projection_placeholders: false
     preferred_hues:
       - gc_fraction
+      - sfxi_ref__metric_value
       - sig35_variant
       - spacer_length
       - source_family
       - selection_basis
     preferred_hue_kinds:
       gc_fraction: continuous
+      sfxi_ref__metric_value: continuous
       sig35_variant: categorical
       spacer_length: ordinal
       source_family: categorical
@@ -1781,6 +1882,7 @@ notebooks:
       - candidate_x_selection_scorecard
       - reference_to_plan_centroid_heatmap
       - reference_standard_strength_audit
+      - native_tf_axis_orientation_audit
       - sigma35_centroid_distance_gallery
       - design_centroid_margin_gallery
       - reference_alignment_summary
@@ -1803,7 +1905,7 @@ recipes:
             - dimension: provenance
               label: Provenance
               column: source_class
-              category_order: [densegen, manual_or_wildtype]
+              category_order: [densegen, manual_or_wildtype, native_regulondb]
             - dimension: generation_plan
               label: Generation plan
               column: design_family
@@ -1859,18 +1961,18 @@ recipes:
       - &align_ie7_anchor_mean {id: build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {alignment: intermediate_embedding_7b_anchor_to_anchor_mean}}
       - &align_ie7_rev_context {id: build_alignment_intermediate_embedding_7b_anchor_to_reverse_complement_context, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {alignment: intermediate_embedding_7b_anchor_to_reverse_complement_context}}
       - &align_ie7_rev_anchor_mean {id: build_alignment_intermediate_embedding_7b_anchor_to_reverse_complement_anchor_mean, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_reverse_complement_context_anchor_mean], params: {alignment: intermediate_embedding_7b_anchor_to_reverse_complement_anchor_mean}}
-      - &score_sample_ie7_anchor {id: build_scorecard_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ie7_full_context {id: build_scorecard_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ie7_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, view: intermediate_embedding_7b_full_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ie7_rev_context {id: build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb, view: intermediate_embedding_7b_reverse_complement_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ie7_rev_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_anchor_mean], params: {sample: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_anchor_mean, view: intermediate_embedding_7b_reverse_complement_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ie7_bidir_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_context_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_context_anchor_mean_bidir_concat], params: {sample: scorecard_sample_intermediate_embedding_7b_context_anchor_mean_bidir_concat, view: intermediate_embedding_7b_context_anchor_mean_bidir_concat, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ol7_anchor {id: build_scorecard_sample_output_layer_mean_7b_anchor_60bp, op: sample.build, depends_on: [materialize_output_layer_mean_7b_anchor_60bp], params: {sample: scorecard_sample_output_layer_mean_7b_anchor_60bp, view: output_layer_mean_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ol7_full_context {id: build_scorecard_sample_output_layer_mean_7b_full_context_1kb, op: sample.build, depends_on: [materialize_output_layer_mean_7b_full_context_1kb], params: {sample: scorecard_sample_output_layer_mean_7b_full_context_1kb, view: output_layer_mean_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ol7_anchor_mean {id: build_scorecard_sample_output_layer_mean_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_output_layer_mean_7b_full_context_anchor_mean], params: {sample: scorecard_sample_output_layer_mean_7b_full_context_anchor_mean, view: output_layer_mean_7b_full_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ol7_rev_context {id: build_scorecard_sample_output_layer_mean_7b_reverse_complement_context_1kb, op: sample.build, depends_on: [materialize_output_layer_mean_7b_reverse_complement_context_1kb], params: {sample: scorecard_sample_output_layer_mean_7b_reverse_complement_context_1kb, view: output_layer_mean_7b_reverse_complement_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ol7_rev_anchor_mean {id: build_scorecard_sample_output_layer_mean_7b_reverse_complement_context_anchor_mean, op: sample.build, depends_on: [materialize_output_layer_mean_7b_reverse_complement_context_anchor_mean], params: {sample: scorecard_sample_output_layer_mean_7b_reverse_complement_context_anchor_mean, view: output_layer_mean_7b_reverse_complement_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
-      - &score_sample_ol7_bidir_anchor_mean {id: build_scorecard_sample_output_layer_mean_7b_context_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_context_anchor_mean_bidir_concat], params: {sample: scorecard_sample_output_layer_mean_7b_context_anchor_mean_bidir_concat, view: output_layer_mean_7b_context_anchor_mean_bidir_concat, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all}}
+      - &score_sample_ie7_anchor {id: build_scorecard_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: &candidate_scorecard_sample_filter {column: source_class, in: [densegen, manual_or_wildtype]}}}
+      - &score_sample_ie7_full_context {id: build_scorecard_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ie7_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, view: intermediate_embedding_7b_full_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ie7_rev_context {id: build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb, view: intermediate_embedding_7b_reverse_complement_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ie7_rev_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_anchor_mean], params: {sample: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_anchor_mean, view: intermediate_embedding_7b_reverse_complement_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ie7_bidir_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_context_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_context_anchor_mean_bidir_concat], params: {sample: scorecard_sample_intermediate_embedding_7b_context_anchor_mean_bidir_concat, view: intermediate_embedding_7b_context_anchor_mean_bidir_concat, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ol7_anchor {id: build_scorecard_sample_output_layer_mean_7b_anchor_60bp, op: sample.build, depends_on: [materialize_output_layer_mean_7b_anchor_60bp], params: {sample: scorecard_sample_output_layer_mean_7b_anchor_60bp, view: output_layer_mean_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ol7_full_context {id: build_scorecard_sample_output_layer_mean_7b_full_context_1kb, op: sample.build, depends_on: [materialize_output_layer_mean_7b_full_context_1kb], params: {sample: scorecard_sample_output_layer_mean_7b_full_context_1kb, view: output_layer_mean_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ol7_anchor_mean {id: build_scorecard_sample_output_layer_mean_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_output_layer_mean_7b_full_context_anchor_mean], params: {sample: scorecard_sample_output_layer_mean_7b_full_context_anchor_mean, view: output_layer_mean_7b_full_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ol7_rev_context {id: build_scorecard_sample_output_layer_mean_7b_reverse_complement_context_1kb, op: sample.build, depends_on: [materialize_output_layer_mean_7b_reverse_complement_context_1kb], params: {sample: scorecard_sample_output_layer_mean_7b_reverse_complement_context_1kb, view: output_layer_mean_7b_reverse_complement_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ol7_rev_anchor_mean {id: build_scorecard_sample_output_layer_mean_7b_reverse_complement_context_anchor_mean, op: sample.build, depends_on: [materialize_output_layer_mean_7b_reverse_complement_context_anchor_mean], params: {sample: scorecard_sample_output_layer_mean_7b_reverse_complement_context_anchor_mean, view: output_layer_mean_7b_reverse_complement_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
+      - &score_sample_ol7_bidir_anchor_mean {id: build_scorecard_sample_output_layer_mean_7b_context_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_context_anchor_mean_bidir_concat], params: {sample: scorecard_sample_output_layer_mean_7b_context_anchor_mean_bidir_concat, view: output_layer_mean_7b_context_anchor_mean_bidir_concat, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
       - &pca_ie7_anchor {id: reduce_pca_intermediate_embedding_7b_anchor_60bp, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_anchor_60bp], params: {view: intermediate_embedding_7b_anchor_60bp, run_id: pca_intermediate_embedding_7b_anchor_60bp, reduced_view_id: intermediate_embedding_7b_anchor_60bp_reduced, sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, dims: 16}}
       - &pca_ie7_full_context {id: reduce_pca_intermediate_embedding_7b_full_context_1kb, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_full_context_1kb], params: {view: intermediate_embedding_7b_full_context_1kb, run_id: pca_intermediate_embedding_7b_full_context_1kb, reduced_view_id: intermediate_embedding_7b_full_context_1kb_reduced, sample: scorecard_sample_intermediate_embedding_7b_full_context_1kb, dims: 16}}
       - &pca_ie7_anchor_mean {id: reduce_pca_intermediate_embedding_7b_full_context_anchor_mean, op: view.reduce, depends_on: [build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean], params: {view: intermediate_embedding_7b_full_context_anchor_mean, run_id: pca_intermediate_embedding_7b_full_context_anchor_mean, reduced_view_id: intermediate_embedding_7b_full_context_anchor_mean_reduced, sample: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, dims: 16}}
@@ -2159,6 +2261,102 @@ recipes:
             - {cohort_column: sig35_variant, target_values: [f], control_values: [b], output_column: sig35_margin_f_vs_b}
             - {target_values: [ethanol], control_values: [background_only], output_column: synthetic_margin_ethanol_vs_background}
             - {target_values: [ciprofloxacin], control_values: [background_only], output_column: synthetic_margin_cipro_vs_background}
+      - &ordinal_ladder_rows_ie7_anchor
+        id: build_ordinal_ladder_rows_intermediate_embedding_7b_anchor_60bp
+        op: scalar.build
+        depends_on: [build_scorecard_sample_intermediate_embedding_7b_anchor_60bp]
+        params:
+          scalar: ordinal_ladder_rows_intermediate_embedding_7b_anchor_60bp
+          kind: ordinal_ladder_rows
+          groups: &ordinal_ladder_rows_groups
+            - group_id: sigma35
+              label: Sigma-35 B-F ladder
+              axis:
+                axis_id: sigma35
+                label: Sigma-35
+                column: sig35_variant
+                order_path: study_inputs/sig35_order.yaml
+                exclude_values: [control]
+                stronger_rank: min
+              where:
+                - {column: source_class, equals: densegen}
+              label_overrides: {b: B, c: C, d: D, e: E, f: F}
+            - group_id: t7_w_collection_core60
+              label: W collection core60
+              axis:
+                axis_id: t7_w_collection_strength
+                label: W collection strength
+                column: usr_label__primary
+                rank_column: promoter_standard__strength_value_numeric
+                stronger_rank: max
+              where:
+                - {column: promoter_standard__collection_id, equals: t7_w_collection}
+                - {column: usr_label__primary, regex: '.*_core60(?:_context1kb_(?:forward|rc))?$'}
+              label_column: promoter_standard__display_name
+            - group_id: anderson_igem_core60
+              label: Anderson iGEM core60
+              axis:
+                axis_id: anderson_igem_strength
+                label: Anderson iGEM strength
+                column: usr_label__primary
+                rank_column: promoter_standard__strength_value_numeric
+                stronger_rank: max
+              where:
+                - {column: promoter_standard__collection_id, equals: anderson_igem}
+                - {column: usr_label__primary, regex: '.*_core60(?:_context1kb_(?:forward|rc))?$'}
+              label_column: promoter_standard__display_name
+          candidates:
+            - {view_id: intermediate_embedding_7b_anchor_60bp, sample_id: scorecard_sample_intermediate_embedding_7b_anchor_60bp}
+      - &ordinal_ladder_rows_ie7_full_context
+        id: build_ordinal_ladder_rows_intermediate_embedding_7b_full_context_1kb
+        op: scalar.build
+        depends_on: [build_scorecard_sample_intermediate_embedding_7b_full_context_1kb]
+        params:
+          scalar: ordinal_ladder_rows_intermediate_embedding_7b_full_context_1kb
+          kind: ordinal_ladder_rows
+          groups: *ordinal_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_full_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_1kb}
+      - &ordinal_ladder_rows_ie7_anchor_mean
+        id: build_ordinal_ladder_rows_intermediate_embedding_7b_full_context_anchor_mean
+        op: scalar.build
+        depends_on: [build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean]
+        params:
+          scalar: ordinal_ladder_rows_intermediate_embedding_7b_full_context_anchor_mean
+          kind: ordinal_ladder_rows
+          groups: *ordinal_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_full_context_anchor_mean, sample_id: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean}
+      - &ordinal_ladder_rows_ie7_bidir_anchor_mean
+        id: build_ordinal_ladder_rows_intermediate_embedding_7b_context_anchor_mean_bidir_concat
+        op: scalar.build
+        depends_on: [build_scorecard_sample_intermediate_embedding_7b_context_anchor_mean_bidir_concat]
+        params:
+          scalar: ordinal_ladder_rows_intermediate_embedding_7b_context_anchor_mean_bidir_concat
+          kind: ordinal_ladder_rows
+          groups: *ordinal_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_context_anchor_mean_bidir_concat, sample_id: scorecard_sample_intermediate_embedding_7b_context_anchor_mean_bidir_concat}
+      - &ordinal_ladder_rows_ie7_rev_context
+        id: build_ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_1kb
+        op: scalar.build
+        depends_on: [build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb]
+        params:
+          scalar: ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_1kb
+          kind: ordinal_ladder_rows
+          groups: *ordinal_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_reverse_complement_context_1kb, sample_id: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb}
+      - &ordinal_ladder_rows_ie7_rev_anchor_mean
+        id: build_ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_anchor_mean
+        op: scalar.build
+        depends_on: [build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_anchor_mean]
+        params:
+          scalar: ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_anchor_mean
+          kind: ordinal_ladder_rows
+          groups: *ordinal_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_reverse_complement_context_anchor_mean, sample_id: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_anchor_mean}
       - &build_representation_health_summary_metrics
         id: build_representation_health_summary_metrics
         op: scalar.build
@@ -2725,12 +2923,12 @@ recipes:
         id: render_sigma35_margin_ladder_gallery
         op: plot.render
         depends_on:
-          - build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp
-          - build_sigma35_stress_margins_intermediate_embedding_7b_full_context_1kb
-          - build_sigma35_stress_margins_intermediate_embedding_7b_full_context_anchor_mean
-          - build_sigma35_stress_margins_intermediate_embedding_7b_context_anchor_mean_bidir_concat
-          - build_sigma35_stress_margins_intermediate_embedding_7b_reverse_complement_context_1kb
-          - build_sigma35_stress_margins_intermediate_embedding_7b_reverse_complement_context_anchor_mean
+          - build_ordinal_ladder_rows_intermediate_embedding_7b_anchor_60bp
+          - build_ordinal_ladder_rows_intermediate_embedding_7b_full_context_1kb
+          - build_ordinal_ladder_rows_intermediate_embedding_7b_full_context_anchor_mean
+          - build_ordinal_ladder_rows_intermediate_embedding_7b_context_anchor_mean_bidir_concat
+          - build_ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_1kb
+          - build_ordinal_ladder_rows_intermediate_embedding_7b_reverse_complement_context_anchor_mean
         params: {plot_id: sigma35_margin_ladder_gallery}
       - &render_sigma35_centroid_distance_gallery
         id: render_sigma35_centroid_distance_gallery
@@ -2882,6 +3080,12 @@ recipes:
       - *sigma35_stress_margins_ie7_bidir_anchor_mean
       - *sigma35_stress_margins_ie7_rev_context
       - *sigma35_stress_margins_ie7_rev_anchor_mean
+      - *ordinal_ladder_rows_ie7_anchor
+      - *ordinal_ladder_rows_ie7_full_context
+      - *ordinal_ladder_rows_ie7_anchor_mean
+      - *ordinal_ladder_rows_ie7_bidir_anchor_mean
+      - *ordinal_ladder_rows_ie7_rev_context
+      - *ordinal_ladder_rows_ie7_rev_anchor_mean
       - *build_representation_health_summary_metrics
       - *build_design_structure_summary_metrics
       - *build_sigma35_ordinal_audit_metrics
@@ -3008,6 +3212,77 @@ recipes:
           - render_representation_scree_diagnostic
           - render_appendix_umap_gallery
         params: {notebook_id: latent_geometry_browser}
+  native_tf_axis_orientation_audit_recipe:
+    steps:
+      - id: materialize_tf_centroid_context_forward_anchor_mean
+        op: view.materialize
+        params: {view: intermediate_embedding_7b_full_context_anchor_mean}
+      - id: materialize_tf_centroid_context_reverse_complement_anchor_mean
+        op: view.materialize
+        params: {view: intermediate_embedding_7b_reverse_complement_context_anchor_mean}
+      - id: derive_tf_centroid_context_anchor_mean_bidir_concat
+        op: view.derive
+        depends_on:
+          - materialize_tf_centroid_context_forward_anchor_mean
+          - materialize_tf_centroid_context_reverse_complement_anchor_mean
+        params: {view: intermediate_embedding_7b_context_anchor_mean_bidir_concat}
+      - id: build_native_tf_axis_orientation_audit
+        op: scalar.build
+        depends_on:
+          - derive_tf_centroid_context_anchor_mean_bidir_concat
+        params:
+          scalar: native_tf_axis_orientation_audit
+          kind: tf_axis_orientation_audit
+          view_id: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+          cohort_column: design_family
+          centroid_groups:
+            background: [background_only]
+            ethanol: [ethanol]
+            cipro: [ciprofloxacin]
+          tf_columns:
+            ethanol: [has_BaeR, has_CpxR]
+            cipro: [has_LexA]
+          embedding_view: pdual10_core60_bidir
+          association_overlay:
+            path: ../../../usr/datasets/usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet
+            row_key: derived__parent_id
+            relation_key: usr_id
+            regulator_column: regulator_abbrev
+            tf_aliases:
+              has_BaeR: [BaeR]
+              has_CpxR: [CpxR]
+              has_LexA: [LexA]
+          output_filter: {column: derived__parent_dataset, equals: usr_regulondb_native_promoters}
+          output_columns:
+            - alias_id
+            - construct__anchor_id
+            - derived__parent_id
+            - derived__parent_dataset
+            - regulondb__primary_promoter_id
+            - regulondb__primary_promoter_name
+            - source_class
+            - has_BaeR
+            - has_CpxR
+            - has_LexA
+            - tf_bin
+            - embedding_view
+            - ethanolness
+            - ciproness
+            - distance_to_ethanol_centroid
+            - distance_to_cipro_centroid
+            - distance_to_background_centroid
+      - id: build_native_tf_axis_orientation_tests
+        op: scalar.build
+        depends_on: [build_native_tf_axis_orientation_audit]
+        params:
+          scalar: native_tf_axis_orientation_tests
+          kind: tf_axis_orientation_tests
+          source_scalar: native_tf_axis_orientation_audit
+          where: {column: derived__parent_dataset, equals: usr_regulondb_native_promoters}
+      - id: render_native_tf_axis_orientation_audit
+        op: plot.render
+        depends_on: [build_native_tf_axis_orientation_tests]
+        params: {plot_id: native_tf_axis_orientation_audit}
 deliverables:
   dataset_overview:
     title: Dataset overview
@@ -3122,6 +3397,26 @@ deliverables:
         - reference_standard_strength_audit
     docs_refs:
       - study:stress_ethanol_cipro_growth/deliverables/candidate_x_selection_scorecard
+    acceptance_checks: []
+  native_tf_axis_orientation_audit:
+    title: Native TF-axis orientation audit
+    section: Calibration
+    question: Do BaeR/CpxR- and LexA-associated native promoters point in the DenseGen ethanol and cipro/SOS directions before batch-zero selection?
+    summary: Optional overlay of native RegulonDB core60 rows appended to the existing pDual10 context handoff; it checks DenseGen axis orientation and is not an OPAL input.
+    recipe: native_tf_axis_orientation_audit_recipe
+    requires:
+      sources:
+        - full_context_1kb
+      views:
+        - intermediate_embedding_7b_context_anchor_mean_bidir_concat
+    outputs:
+      scalars:
+        - native_tf_axis_orientation_audit
+        - native_tf_axis_orientation_tests
+      plots:
+        - native_tf_axis_orientation_audit
+    docs_refs:
+      - study:stress_ethanol_cipro_growth/deliverables/native_tf_axis_orientation_audit
     acceptance_checks: []
   appendix_geometry_review:
     title: Appendix geometry review

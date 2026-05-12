@@ -1,12 +1,12 @@
 plot_id: appendix_umap_gallery
-question: How does the shared promoter population distribute in the persisted UMAP for each stored Evo2 view?
+question: How does the shared promoter population distribute in the persisted UMAP for each stored Evo 2 view?
 decision_role: appendix
 encoding: Multi-panel persisted UMAP scatter gallery with hue-only recoloring across intermediate-embedding and output-layer diagnostic views.
 scope: Persisted projection artifacts for the shared promoter population, including anchor-source, forward-context, reverse-complement-context, and equal-block forward/RC concat views where projections exist.
 guardrails:
   - Use the persisted layout for orientation only. Candidate ranking stays on the scalar summaries.
   - Hue changes recolor fixed coordinates. They do not change the fit.
-caption: Appendix UMAP scatter orientation gallery for the stored Evo2 view inventory.
+caption: Appendix UMAP scatter orientation gallery for the stored Evo 2 view inventory.
 alt_text: Multi-panel UMAP projection gallery for the shared promoter population across anchor-source, forward-context, reverse-complement-context, bidirectional-summary, and output-layer diagnostic views; fixed coordinates are reused while controls only recolor metadata.
 preprocessing_md: Uses persisted projection artifacts and their recorded fit metadata. UMAP uses the stored view matrices unless the projection manifest says otherwise. These stored matrices may be anchor-source `seq_mean`, full-context `seq_mean`, bounded `anchor_mean`, or equal-block forward/RC concat summaries; the projection itself does not recompute pooling.
 math_md: |

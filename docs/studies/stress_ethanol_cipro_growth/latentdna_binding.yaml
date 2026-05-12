@@ -7,6 +7,8 @@ source_datasets:
   reference_native: usr_promoter_references
   reference_core60: construct_prom_eth_cip_reference_core60
   reference_contexts: construct_prom_eth_cip_reference_contexts
+  regulondb_native_promoters: usr_regulondb_native_promoters
+  regulondb_native_core60: usr_regulondb_native_promoter_core60
 supported_model_families:
   - evo2_7b
   - evo2_20b
@@ -83,4 +85,5 @@ decision_deliverables:
   - context_robustness_summary
   - candidate_decision_frontier
   - candidate_x_selection_scorecard
-planned_deliverables: []
+planned_deliverables:
+  - native_tf_axis_orientation_audit

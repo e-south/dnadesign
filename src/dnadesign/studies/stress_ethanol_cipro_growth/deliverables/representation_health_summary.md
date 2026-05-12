@@ -17,7 +17,7 @@ comparison includes the six first-class intermediate-embedding views and the
 six matching output-layer mean views. Reference rows remain controls inside
 preserved samples rather than independent effective-rank cohorts.
 
-The intermediate views are row-level summaries from Evo2 7B block26 hidden
+The intermediate views are row-level summaries from Evo 2 7B block26 hidden
 states: anchor-source `seq_mean`, forward full-context `seq_mean`, forward
 full-context `anchor_mean`, reverse-complement full-context `seq_mean`,
 reverse-complement full-context `anchor_mean`, and the equal-block forward/RC
@@ -30,7 +30,7 @@ path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows
 remain `0.0` so degenerate spaces stay finite and are exposed by the health
 gate. PCA-derived metrics come from the stored reducer summaries on the sampled
 rows. The health plot sees only stored row vectors; it does not inspect the
-original Evo2 token grid directly.
+original Evo 2 token grid directly.
 
 **Definition.** The primary rank-health statistic is retained-component effective rank,
 

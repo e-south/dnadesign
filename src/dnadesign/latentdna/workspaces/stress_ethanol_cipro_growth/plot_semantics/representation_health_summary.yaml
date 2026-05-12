@@ -1,5 +1,5 @@
 plot_id: representation_health_summary
-question: Which candidate Evo2 spaces are healthy enough to survive pre-assay triage?
+question: Which candidate Evo 2 spaces are healthy enough to survive pre-assay triage?
 decision_role: gate
 encoding: Candidate-by-metric bar panels for effective rank, PC1 variance fraction, median pairwise cosine distance, and pairwise cosine-distance spread, read directly from the metric values rather than a pass/fail hue.
 scope: First-class intermediate-embedding and output-layer mean candidate reducer summaries plus sampled candidate rows used for representation-health diagnostics; reference rows remain controls inside preserved samples, not separate effective-rank cohorts. The view inventory includes causal token-position means and equal-block forward/RC concat summaries.
@@ -27,5 +27,5 @@ rationale_md: >-
   design structure or ordered Sigma-35 signal. Rank and spread are eligibility
   checks: they say whether a view is usable enough to interpret, not whether it
   is the best biological representation.
-limitations_md: Reducer summaries are sample-based and low-dimensional; the current candidate reducers fit roughly 2k sampled rows and retain 16 PCA components, so the effective rank is a retained-component diagnostic rather than the full 4096-dimensional spectrum.
+limitations_md: Reducer summaries are sample-based and low-dimensional; the current candidate reducers fit roughly 2k sampled rows and retain 16 PCA components, so the effective rank is a retained-component diagnostic rather than the full stored feature spectrum. Single-orientation intermediate views are 4096-dimensional, the intermediate forward/RC concat is 8192-dimensional, single-orientation output-layer mean views are 512-dimensional, and the output-layer forward/RC concat is 1024-dimensional.
 failure_modes_md: A space can pass health checks while still encoding nuisance structure such as spacer length or context dilution.

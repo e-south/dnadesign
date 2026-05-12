@@ -2,7 +2,7 @@
 
 The summary measures whether adding the 1 kb construct context preserves or
 dilutes anchor-level design geometry. The comparison is not between raw
-sequences; it is between stored row vectors after Infer has pooled causal Evo2
+sequences; it is between stored row vectors after Infer has pooled causal Evo 2
 token states over a source insert, over a full 1 kb context, or over the anchor
 span inside that 1 kb context.
 
@@ -14,7 +14,7 @@ span inside that 1 kb context.
 aligned anchor and construct-context rows, with one context per promoter
 anchor, grouped into the canonical representation families. The anchor-source
 row is a causal `seq_mean` over the source insert. The context rows come from a
-full 1 kb causal Evo2 pass and are summarized either by full-sequence `seq_mean`
+full 1 kb causal Evo 2 pass and are summarized either by full-sequence `seq_mean`
 or by bounded `anchor_mean`.
 
 **Preprocessing.** Anchor and context vectors are standardized within view and row-normalized before any cosine or centroid-distance metric is computed on the persisted sample. Study builders use the collapse-tolerant path: zero-variance columns are set to `0.0` after scaling, and zero-norm rows remain `0.0`.
