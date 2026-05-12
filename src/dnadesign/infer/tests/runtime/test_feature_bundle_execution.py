@@ -31,6 +31,7 @@ from dnadesign.infer.src.features.aliases import (
     FEATURE_VECTOR_RELATIVE_PATH,
 )
 from dnadesign.infer.src.features.context import resolve_sequence_contexts
+from dnadesign.infer.src.features.contracts import SequenceContextRecord
 from dnadesign.infer.src.features.execution import (
     _LOG_LIKELIHOOD_MEAN,
     _LOG_LIKELIHOOD_TOTAL,
@@ -38,6 +39,7 @@ from dnadesign.infer.src.features.execution import (
     _apply_digest_resume_guard,
     _existing_feature_metadata_values,
     _feature_bundle_log_likelihoods,
+    _pool_tensor_for_context,
     build_feature_bundle_outputs,
     execute_feature_bundle,
     feature_metadata_output_ids,
@@ -179,6 +181,120 @@ def _anchor_only_bundle():
     ).feature_bundle
     assert bundle is not None
     return bundle
+
+
+def test_sequence_view_pooling_means_over_positions_not_features() -> None:
+    embeddings = torch.tensor(
+        [
+            [0.0, 1.0, 2.0],
+            [10.0, 11.0, 12.0],
+            [20.0, 21.0, 22.0],
+            [30.0, 31.0, 32.0],
+        ],
+        dtype=torch.float32,
+    )
+    context = SequenceContextRecord(
+        sequence_id="toy_forward_context",
+        anchor_id="toy_anchor",
+        context_id="toy_context",
+        context_kind="template_1kb",
+        template_id=None,
+        resolved_sequence="ACGT",
+        resolved_length=4,
+        anchor_start=1,
+        anchor_end=3,
+        anchor_orientation="forward",
+        construct_version=None,
+        is_wildtype=None,
+        pooling_operation="anchor_mean",
+        pooling_start_0=1,
+        pooling_end_0=3,
+    )
+
+    pooled = _pool_tensor_for_context(embeddings, context=context)
+
+    _assert_list_close(pooled, [15.0, 16.0, 17.0])
+
+
+def _sequence_context_record(
+    *,
+    sequence: str,
+    start_0: int,
+    end_0: int,
+    orientation: str = "forward",
+) -> SequenceContextRecord:
+    return SequenceContextRecord(
+        sequence_id=f"toy_{orientation}_context",
+        anchor_id="toy_anchor",
+        context_id=f"toy_{orientation}_context",
+        context_kind="template_1kb",
+        template_id=None,
+        resolved_sequence=sequence,
+        resolved_length=len(sequence),
+        anchor_start=start_0,
+        anchor_end=end_0,
+        anchor_orientation=orientation,
+        construct_version=None,
+        is_wildtype=None,
+        pooling_operation="anchor_mean",
+        pooling_start_0=start_0,
+        pooling_end_0=end_0,
+    )
+
+
+def _prefix_conditioned_toy_hidden_states(sequence: str) -> torch.Tensor:
+    totals = {"A": 0.0, "C": 0.0, "G": 0.0, "T": 0.0}
+    rows: list[list[float]] = []
+    for position, base in enumerate(sequence.upper(), start=1):
+        totals[base] += 1.0
+        rows.append([totals["A"], totals["C"], totals["G"], totals["T"], float(position)])
+    return torch.tensor(rows, dtype=torch.float32)
+
+
+def test_forward_anchor_pooling_is_downstream_blind_for_prefix_conditioned_states() -> None:
+    sequence = "ACGTACGTACGT"
+    mutated_downstream = sequence[:8] + "TTTT"
+    context = _sequence_context_record(sequence=sequence, start_0=2, end_0=8)
+    mutated_context = _sequence_context_record(sequence=mutated_downstream, start_0=2, end_0=8)
+
+    pooled = _pool_tensor_for_context(_prefix_conditioned_toy_hidden_states(sequence), context=context)
+    pooled_mutated = _pool_tensor_for_context(
+        _prefix_conditioned_toy_hidden_states(mutated_downstream),
+        context=mutated_context,
+    )
+
+    _assert_list_close(pooled, pooled_mutated)
+
+
+def test_reverse_complement_anchor_pooling_is_original_upstream_blind_for_prefix_conditioned_states() -> None:
+    sequence = "AACCGGTTAACCGGTT"
+    mutated_upstream = "TTTT" + sequence[4:]
+    start_0 = 4
+    end_0 = 10
+    rc_sequence = str(Seq(sequence).reverse_complement())
+    rc_mutated_upstream = str(Seq(mutated_upstream).reverse_complement())
+    rc_start_0 = len(sequence) - end_0
+    rc_end_0 = len(sequence) - start_0
+    context = _sequence_context_record(
+        sequence=rc_sequence,
+        start_0=rc_start_0,
+        end_0=rc_end_0,
+        orientation="reverse_complement",
+    )
+    mutated_context = _sequence_context_record(
+        sequence=rc_mutated_upstream,
+        start_0=rc_start_0,
+        end_0=rc_end_0,
+        orientation="reverse_complement",
+    )
+
+    pooled = _pool_tensor_for_context(_prefix_conditioned_toy_hidden_states(rc_sequence), context=context)
+    pooled_mutated = _pool_tensor_for_context(
+        _prefix_conditioned_toy_hidden_states(rc_mutated_upstream),
+        context=mutated_context,
+    )
+
+    _assert_list_close(pooled, pooled_mutated)
 
 
 def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(monkeypatch) -> None:
@@ -1295,6 +1411,11 @@ def test_run_extract_job_sequence_view_anchor_mean_uses_full_context_and_emitted
     forward_sequence = "AAAATTTTAGTCGGGG"
     reverse_complement_sequence = str(Seq(forward_sequence).reverse_complement())
     assert reverse_complement_sequence == "CCCCGACTAAAATTTT"
+    rc_start = len(forward_sequence) - 12
+    rc_end = len(forward_sequence) - 8
+    assert (rc_start, rc_end) == (4, 8)
+    assert rc_end - rc_start == 12 - 8
+    assert reverse_complement_sequence[rc_start:rc_end] == str(Seq(forward_sequence[8:12]).reverse_complement())
     add_result = dataset.add_sequences(
         [forward_sequence, reverse_complement_sequence],
         bio_type="dna",
