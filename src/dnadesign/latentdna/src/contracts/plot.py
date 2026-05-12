@@ -75,6 +75,13 @@ class PlotHueOptionConfig(StrictPlotModel):
     column: Identifier
     label: str
     type: Literal["categorical", "binary", "continuous", "ordinal"]
+    scale: Literal["global", "panel"] = "global"
+
+    @model_validator(mode="after")
+    def _validate_scale(self) -> "PlotHueOptionConfig":
+        if self.scale == "panel" and self.type != "continuous":
+            raise ValueError("panel-scaled hue options must be continuous")
+        return self
 
 
 class PlotFilterValueConfig(StrictPlotModel):
@@ -95,6 +102,9 @@ class PlotAnnotationConfig(StrictPlotModel):
     require_in_every_panel: bool = False
     missing_policy: Literal["fail", "allow"] = "fail"
     collision_policy: Literal["repel_then_callout", "direct_label"] = "repel_then_callout"
+    hue_column: Identifier | None = None
+    marker: str = "*"
+    colorbar_label: str | None = None
 
 
 class ProjectionScatterPlotConfig(PlotBaseConfig):
@@ -287,7 +297,7 @@ class DistributionPlotConfig(PlotBaseConfig):
     agreement: Identifier | None = None
     value_column: str | None = None
     color_column: str | None = None
-    render_mode: Literal["histogram", "ecdf", "violin_box"] = "histogram"
+    render_mode: Literal["histogram", "ecdf", "violin_box", "ordinal_swarm"] = "histogram"
 
     @model_validator(mode="after")
     def _validate_single_input(self) -> "DistributionPlotConfig":
@@ -316,7 +326,7 @@ class DistributionGridPlotConfig(PlotBaseConfig):
     metric_columns: list[str] | None = None
     value_columns: list[str] | None = None
     color_column: str | None = None
-    render_mode: Literal["histogram", "ecdf", "violin_box"] = "histogram"
+    render_mode: Literal["histogram", "ecdf", "violin_box", "ordinal_swarm"] = "histogram"
     panel_titles: list[str] | None = None
 
     @model_validator(mode="after")

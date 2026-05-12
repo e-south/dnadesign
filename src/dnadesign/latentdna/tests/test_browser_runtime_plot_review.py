@@ -613,6 +613,58 @@ def test_render_plot_review_surface_preserves_explicit_math_axis_labels(monkeypa
         plt.close(fig)
 
 
+def test_render_plot_review_surface_preserves_full_math_axis_labels_per_panel(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame(
+            {
+                "sig35_margin_f_vs_b": [0.8, -0.1],
+                "synthetic_best_stress_margin": [0.6, 0.2],
+                "sig35_variant": ["f", "b"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "sig35_margin_f_vs_b": [0.4, -0.2],
+                "synthetic_best_stress_margin": [0.3, 0.1],
+                "sig35_variant": ["f", "b"],
+            }
+        ),
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "sigma35_stress_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "sig35_margin_f_vs_b",
+            "y_column": "synthetic_best_stress_margin",
+            "x_axis_label": r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$",
+            "y_axis_label": r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$",
+            "panel_titles": ["Left", "Right"],
+            "hue_options": [
+                {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
+            ],
+        },
+        frames=frames,
+        hue_column="sig35_variant",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        panel_axes = fig.axes[:2]
+        expected_x_label = r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
+        expected_y_label = r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$"
+        assert [axis.get_xlabel() for axis in panel_axes] == [expected_x_label, expected_x_label]
+        assert [axis.get_ylabel() for axis in panel_axes] == [expected_y_label, expected_y_label]
+        figure_texts = {text.get_text() for text in fig.texts}
+        assert expected_x_label not in figure_texts
+    finally:
+        plt.close(fig)
+
+
 def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_square_panels(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -675,6 +727,61 @@ def test_render_plot_review_surface_renders_sigma35_margin_ladder_as_single_row_
                 "d\nTTTACA",
                 "b\nCTGACA",
             ]
+    finally:
+        plt.close(fig)
+
+
+def test_render_plot_review_surface_ordinal_swarm_keeps_math_axis_labels_on_every_panel(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame(
+            {
+                "ordinal_label": ["weak", "middle", "strong"],
+                "ordinal_plot_order": [1.0, 2.0, 3.0],
+                "ordinal_margin": [-0.3, 0.0, 0.35],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "ordinal_label": ["weak", "middle", "strong"],
+                "ordinal_plot_order": [1.0, 2.0, 3.0],
+                "ordinal_margin": [-0.2, 0.1, 0.45],
+            }
+        ),
+    ]
+    x_label = r"$r_{\mathrm{ord}}(x)$ weak$\to$strong class rank"
+    y_label = r"$m_{\mathrm{ord}}(x)=\cos(z_x,c_{\mathrm{strong}})-\cos(z_x,c_{\mathrm{weak}})$"
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "sigma35_margin_ladder_gallery",
+            "kind": "distribution_grid",
+            "scalar_ids": ["left", "right"],
+            "panel_titles": ["Left", "Right"],
+            "metric_columns": ["ordinal_margin"],
+            "color_column": "ordinal_label",
+            "render_mode": "ordinal_swarm",
+            "single_row_panels": True,
+            "square_panels": True,
+            "hide_repeated_y_axis": True,
+            "x_axis_label": x_label,
+            "y_axis_label": y_label,
+        },
+        frames=frames,
+        hue_column=None,
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        panel_axes = fig.axes[:2]
+        assert [axis.get_xlabel() for axis in panel_axes] == [x_label, x_label]
+        assert [axis.get_ylabel() for axis in panel_axes] == [y_label, y_label]
     finally:
         plt.close(fig)
 
@@ -974,6 +1081,167 @@ def test_render_plot_review_surface_passes_selected_reference_set_to_projection_
     assert rendered == "rendered"
     assert captured["reference_set_id"] == "reference_w_collection"
     assert captured["reference_labels"] == ["fallback_reference"]
+
+
+def test_render_plot_review_surface_passes_reference_label_limit_to_projection_grid(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_projection_grid(*args, **kwargs):
+        del args
+        captured.update(kwargs)
+        return "rendered"
+
+    monkeypatch.setattr(plot_review_runtime, "render_projection_grid", fake_projection_grid)
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "appendix_umap_gallery",
+            "kind": "projection_grid",
+            "projection_ids": ["proj_a"],
+            "panel_titles": ["Panel A"],
+        },
+        frames=[pd.DataFrame({"x": [0.0], "y": [1.0], "usr_label__primary": ["W1"]})],
+        hue_column=None,
+        reference_labels=[],
+        reference_set_id="reference_w_collection",
+        reference_label_limit=-1,
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered == "rendered"
+    assert captured["reference_label_limit"] == -1
+
+
+def test_render_plot_review_scatter_grid_passes_reference_strength_hue(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        plot_review_runtime,
+        "resolve_reference_annotation",
+        lambda *args, **kwargs: {
+            "labels": ["W1", "W9"],
+            "match_column": "usr_label__primary",
+            "display_labels": {"W1": "W1", "W9": "W9"},
+            "label_limit": 5,
+            "warnings": [],
+        },
+    )
+    monkeypatch.setattr(
+        plot_review_runtime,
+        "draw_reference_labels",
+        lambda *args, **kwargs: captured_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        plot_review_runtime,
+        "render_matplotlib_figure",
+        lambda fig, alt=None: (plt.close(fig) or "rendered"),
+    )
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "balanced_design_family_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
+            "panel_titles": ["1 kb anchor mean"],
+            "hue_options": [
+                {"column": "design_family", "type": "categorical"},
+            ],
+        },
+        frames=[
+            pd.DataFrame(
+                {
+                    "synthetic_margin_ethanol_vs_background": [0.3, 0.6, -0.2],
+                    "synthetic_margin_cipro_vs_background": [0.1, 0.4, -0.3],
+                    "usr_label__primary": ["W1", "W9", "densegen_0"],
+                    "promoter_standard__strength_value_numeric": [1.0, 9.0, np.nan],
+                    "design_family": ["reference", "reference", "background"],
+                }
+            )
+        ],
+        hue_column="design_family",
+        reference_labels=[],
+        reference_set_id="reference_w_collection_core60",
+        reference_hue_column="promoter_standard__strength_value_numeric",
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered == "rendered"
+    assert captured_calls
+    assert captured_calls[0]["reference_hue_column"] == "promoter_standard__strength_value_numeric"
+    assert captured_calls[0]["reference_hue_params"] is not None
+
+
+def test_render_plot_review_scatter_grid_passes_reference_label_limit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured_resolution: dict[str, object] = {}
+    captured_calls: list[dict[str, object]] = []
+
+    def fake_resolve_reference_annotation(*args, **kwargs):
+        del args
+        captured_resolution["label_limit"] = kwargs.get("label_limit")
+        return {
+            "labels": ["W1", "W9"],
+            "match_column": "usr_label__primary",
+            "display_labels": {"W1": "W1", "W9": "W9"},
+            "label_limit": kwargs.get("label_limit"),
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(plot_review_runtime, "resolve_reference_annotation", fake_resolve_reference_annotation)
+    monkeypatch.setattr(
+        plot_review_runtime,
+        "draw_reference_labels",
+        lambda *args, **kwargs: captured_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        plot_review_runtime,
+        "render_matplotlib_figure",
+        lambda fig, alt=None: (plt.close(fig) or "rendered"),
+    )
+
+    rendered = render_plot_review_surface(
+        {
+            "plot_id": "balanced_design_family_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
+            "panel_titles": ["1 kb anchor mean"],
+        },
+        frames=[
+            pd.DataFrame(
+                {
+                    "synthetic_margin_ethanol_vs_background": [0.3, 0.6],
+                    "synthetic_margin_cipro_vs_background": [0.1, 0.4],
+                    "usr_label__primary": ["W1", "W9"],
+                }
+            )
+        ],
+        hue_column=None,
+        reference_labels=[],
+        reference_set_id="reference_w_collection_core60",
+        reference_label_limit=-1,
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered == "rendered"
+    assert captured_resolution["label_limit"] == -1
+    assert captured_calls
+    assert captured_calls[0]["reference_label_limit"] == -1
 
 
 def test_render_plot_review_surface_fails_closed_when_filter_column_is_missing(
@@ -1288,6 +1556,43 @@ def test_render_plot_review_surface_places_continuous_colorbar_below_design_cent
         plt.close(fig)
 
 
+def test_render_plot_review_surface_panel_scales_gc_fraction(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(plot_review_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0], "gc_fraction": [0.20, 0.22]}),
+        pd.DataFrame({"x": [0.0, 1.0], "y": [1.0, 0.0], "gc_fraction": [0.53, 0.55]}),
+    ]
+
+    fig = render_plot_review_surface(
+        {
+            "plot_id": "appendix_umap_gallery",
+            "kind": "xy_scatter_grid",
+            "x_column": "x",
+            "y_column": "y",
+            "panel_titles": ["Anchor", "1 kb context"],
+            "hue_options": [
+                {"column": "gc_fraction", "label": "GC fraction", "type": "continuous", "scale": "panel"},
+            ],
+        },
+        frames=frames,
+        hue_column="gc_fraction",
+        reference_labels=[],
+        joinable_tables=[],
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        panel_axes = fig.axes[:2]
+        colorbar_axes = fig.axes[2:]
+        assert len(colorbar_axes) == 1
+        assert panel_axes[0].collections[0].norm.vmax < 0.30
+        assert panel_axes[1].collections[0].norm.vmin > 0.50
+        assert colorbar_axes[0].get_xlabel() == "GC fraction (panel scale)"
+    finally:
+        plt.close(fig)
+
+
 def test_render_plot_review_surface_uses_vertical_layout_for_dataset_overview_three_panels(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -1438,3 +1743,92 @@ def test_load_plot_review_frames_enriches_projection_frames_from_projection_view
     assert len(frames) == 1
     assert frames[0]["log_likelihood_per_token_7b"].tolist() == [-1.2, -0.9]
     assert frames[0].attrs["view_id"] == "intermediate_embedding_7b_anchor_60bp"
+
+
+def test_load_plot_review_frames_enriches_scalar_frames_with_equivalent_sequence_gc(tmp_path: Path) -> None:
+    scalar_id = "design_centroid_margins_output_layer_mean_7b_context_anchor_mean_bidir_concat"
+    scalar_dir = tmp_path / "scalars" / scalar_id
+    scalar_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "alias_id": ["output_alias_a", "output_alias_b"],
+            "construct__anchor_id": ["anchor_a", "anchor_b"],
+            "synthetic_margin_ethanol_vs_background": [0.1, 0.2],
+            "synthetic_margin_cipro_vs_background": [0.3, 0.4],
+            "design_family": ["ethanol", "ciprofloxacin"],
+        }
+    ).to_parquet(scalar_dir / "table.parquet", index=False)
+    (scalar_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "scalar_table",
+                "artifact_id": scalar_id,
+                "status": "ok",
+                "params": {"view_id": "output_layer_mean_7b_context_anchor_mean_bidir_concat"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    view_dir = tmp_path / "views" / "output_layer_mean_7b_context_anchor_mean_bidir_concat"
+    view_dir.mkdir(parents=True)
+    (view_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "view",
+                "artifact_id": "output_layer_mean_7b_context_anchor_mean_bidir_concat",
+                "status": "ok",
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        {
+            "alias_id": ["output_alias_a", "output_alias_b"],
+            "construct__anchor_id": ["anchor_a", "anchor_b"],
+        }
+    ).to_parquet(view_dir / "rows.parquet", index=False)
+    sequence_scalar_id = "sequence_features_intermediate_embedding_7b_full_context_anchor_mean"
+    sequence_dir = tmp_path / "scalars" / sequence_scalar_id
+    sequence_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "alias_id": ["intermediate_alias_a", "intermediate_alias_b"],
+            "construct__anchor_id": ["anchor_a", "anchor_b"],
+            "gc_fraction": [0.51, 0.62],
+        }
+    ).to_parquet(sequence_dir / "table.parquet", index=False)
+    (sequence_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "scalar_table",
+                "artifact_id": sequence_scalar_id,
+                "status": "ok",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    frames = plot_review_runtime.load_plot_review_frames(
+        {
+            "plot_id": "design_centroid_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "scalar_ids": [scalar_id],
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
+            "hue_options": [{"column": "gc_fraction", "label": "GC fraction", "type": "continuous"}],
+        },
+        joinable_tables=[
+            {
+                "kind": "scalar",
+                "artifact_id": sequence_scalar_id,
+                "relative_path": f"scalars/{sequence_scalar_id}/table.parquet",
+                "columns": ["alias_id", "construct__anchor_id", "gc_fraction"],
+                "view_ids": ["intermediate_embedding_7b_full_context_anchor_mean"],
+            }
+        ],
+        output_root=tmp_path,
+    )
+
+    assert len(frames) == 1
+    assert frames[0]["gc_fraction"].tolist() == [0.51, 0.62]
+    assert frames[0].attrs["view_id"] == "output_layer_mean_7b_context_anchor_mean_bidir_concat"

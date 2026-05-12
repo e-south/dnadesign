@@ -327,6 +327,10 @@ def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monk
 
     assert runtime.identity.row_count_text == "candidate_view=123"
     assert runtime.identity.dimensionality_text == "candidate_view=16"
+    assert runtime.support.reference_annotation_mode_options()["Show text labels"] == "show_labels"
+    assert runtime.support.reference_label_limit_for_annotation_mode("show_labels") == -1
+    assert runtime.geometry.reference_hue_options["SFXI metric"] == "sfxi_ref__metric_value"
+    assert "sfxi_ref__metric_value" in runtime.geometry.reference_required_columns
 
 
 def test_reference_annotation_options_keep_label_selection_separate_from_hues() -> None:

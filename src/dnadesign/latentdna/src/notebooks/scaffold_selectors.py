@@ -295,4 +295,18 @@ def render_selector_cells() -> tuple[str, ...]:
                 return (get_requested_reference_hue, set_requested_reference_hue)
             """
         ),
+        dedent(
+            """\
+            @app.cell
+            def _(runtime):
+                _support = runtime.support
+
+                _annotation_modes = _support.reference_annotation_mode_options()
+                _default_annotation_mode = "auto"
+                get_requested_reference_annotation_mode, set_requested_reference_annotation_mode = _support.mo.state(
+                    _default_annotation_mode
+                )
+                return (get_requested_reference_annotation_mode, set_requested_reference_annotation_mode)
+            """
+        ),
     )

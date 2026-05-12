@@ -147,6 +147,7 @@ def reference_annotation_label(value: object) -> str:
     text = " ".join(str(value or "").split()).strip()
     if not text:
         return ""
+    text = re.sub(r"(?:_core60)?_context1kb_(?:forward|rc)$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"_context1kb_rc$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"_core60$", "", text, flags=re.IGNORECASE)
     normalized = normalize_category_key(text)

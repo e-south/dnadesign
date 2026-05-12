@@ -8,7 +8,7 @@ Review native RegulonDB promoter records and TSS-upstream core60 windows in the 
 
 - `usr_regulondb_native_promoters`: native source records and RegulonDB metadata.
 - `usr_regulondb_native_promoter_core60`: TSS-upstream core60 windows derived from native promoter records.
-- Evo 2 7B intermediate embedding sidecars for the native sequence-mean view and core60 mean view.
+- Evo 2 7B intermediate embedding sidecars for the native sequence-mean view and core60 mean view. Both are row-level summaries produced by mean pooling over sequence positions, not over embedding dimensions.
 
 ## Outputs
 
@@ -20,13 +20,13 @@ Review native RegulonDB promoter records and TSS-upstream core60 windows in the 
 
 #### Plot details
 
-Exploratory UMAP over the native source-record intermediate embedding with a fixed sigma-factor overlay. The persisted plot keeps the UMAP geometry and sigma coloring fixed; use the LatentDNA projection browser when reviewing alternate RegulonDB metadata hues on the same fixed geometry.
+Exploratory UMAP over the native source-record intermediate embedding with a fixed sigma-factor overlay. The native source-record view is prefix-conditioned in the stored source-record orientation. The persisted plot keeps the UMAP geometry and sigma coloring fixed; use the LatentDNA projection browser when reviewing alternate RegulonDB metadata hues on the same fixed geometry.
 
 ### sigma_umap_intermediate_embedding_7b_core60_tss_upstream | Core60 Sigma UMAP
 
 #### Plot details
 
-Exploratory UMAP over the TSS-upstream core60 intermediate embedding with a fixed sigma-factor overlay copied from the parent native promoter record. The panel uses the same fixed geometry and coloring contract as the native UMAP so reviewers can compare metadata organization without treating UMAP separation as the decision metric.
+Exploratory UMAP over the TSS-upstream core60 intermediate embedding with a fixed sigma-factor overlay copied from the parent native promoter record. The core60 view is prefix-conditioned in the configured forward orientation. The panel uses the same fixed geometry and coloring contract as the native UMAP so reviewers can compare metadata organization without treating UMAP separation as the decision metric.
 
 ## Interpretation
 

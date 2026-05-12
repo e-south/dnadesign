@@ -14,10 +14,18 @@ from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from dnadesign.latentdna.src.contracts.plot_semantics import PlotSemantics
 from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
+from dnadesign.latentdna.src.plots.annotation_rendering import (
+    annotation_continuous_color_encoding as _annotation_continuous_color_encoding,
+)
 from dnadesign.latentdna.src.plots.annotation_rendering import draw_annotation_callouts as _draw_annotation_callouts
 from dnadesign.latentdna.src.plots.annotation_rendering import draw_resolved_annotations as _draw_resolved_annotations
 from dnadesign.latentdna.src.plots.annotations import resolve_annotation_rows
-from dnadesign.latentdna.src.plots.layout import _grid_figure_size, _panel_grid_dimensions, metric_panel_grid_layout
+from dnadesign.latentdna.src.plots.layout import (
+    _grid_figure_size,
+    _panel_grid_dimensions,
+    metric_panel_grid_layout,
+    plot_tight_layout_kwargs,
+)
 from dnadesign.latentdna.src.plots.legends import (
     add_figure_legends as _add_figure_legends,
 )
@@ -27,7 +35,11 @@ from dnadesign.latentdna.src.plots.legends import (
 from dnadesign.latentdna.src.plots.render import render_plot_artifact
 from dnadesign.latentdna.src.plots.render_state import LayoutReservation
 from dnadesign.latentdna.src.plots.renderers.agreement import render_correspondence_heatmap_plot
-from dnadesign.latentdna.src.plots.renderers.distribution import derived_panel_label, render_distribution_panel
+from dnadesign.latentdna.src.plots.renderers.distribution import (
+    derived_panel_label,
+    render_distribution_panel,
+    render_distribution_plot,
+)
 from dnadesign.latentdna.src.plots.renderers.heatmap import (
     heatmap_grid_from_rows as _heatmap_grid_from_rows,
 )
@@ -46,7 +58,9 @@ from dnadesign.latentdna.src.plots.renderers.scatter import axis_category_value 
 from dnadesign.latentdna.src.plots.renderers.scatter import category_color_map as _category_color_map
 from dnadesign.latentdna.src.plots.renderers.scatter import category_key as _category_key
 from dnadesign.latentdna.src.plots.renderers.scatter import continuous_color_encoding as _continuous_color_encoding
+from dnadesign.latentdna.src.plots.renderers.xy import render_xy_plot
 from dnadesign.latentdna.src.plots.tables import read_table_rows
+from dnadesign.latentdna.src.services._plot_payloads import plot_input_payload
 from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
@@ -94,6 +108,20 @@ SIGMA35_AXIS_STYLES = axis_style_map_from_payload(
         }
     }
 )
+
+
+def _row_xlabel_title_overlaps(fig, *, columns: int) -> list[bool]:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    axes = [axis for axis in fig.axes if axis.axison]
+    overlaps: list[bool] = []
+    for top_axis, bottom_axis in zip(axes[:columns], axes[columns : columns * 2], strict=False):
+        xlabel_bbox = top_axis.xaxis.label.get_window_extent(renderer=renderer)
+        title_bbox = bottom_axis.title.get_window_extent(renderer=renderer)
+        overlaps.append(bool(xlabel_bbox.overlaps(title_bbox)))
+    return overlaps
+
+
 SIGMA35_HEATMAP_AXIS_STYLES = axis_style_map_from_payload(
     {
         "row_variant": {
@@ -216,6 +244,85 @@ def test_projection_renderer_requires_xy_columns(tmp_path) -> None:
             pyplot=plt,
             axis_styles=None,
         )
+
+
+def test_projection_grid_labels_every_panel_x_axes(tmp_path: Path) -> None:
+    projection_ids = [f"fixture_umap_{index}" for index in range(12)]
+    for projection_id in projection_ids:
+        projection_dir = tmp_path / "projections" / projection_id
+        projection_dir.mkdir(parents=True)
+        pq.write_table(pa.table({"x": [0.0, 1.0], "y": [1.0, 0.0]}), projection_dir / "coords.parquet")
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "appendix_umap_gallery",
+            "kind": "projection_grid",
+            "projection_ids": projection_ids,
+        }
+    )
+
+    result = render_projection_plot(
+        SimpleNamespace(output_root=tmp_path),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        panel_axes = result.figure.axes[:12]
+        assert {axis.get_xlabel() for axis in panel_axes} == {"Projection 1"}
+        result.figure.tight_layout(
+            **plot_tight_layout_kwargs(spec.plot_id, legend_bottom=result.layout_reservation.legend_bottom)
+        )
+        assert not any(_row_xlabel_title_overlaps(result.figure, columns=6))
+    finally:
+        plt.close(result.figure)
+
+
+def test_xy_scatter_grid_preserves_full_axis_labels_per_panel(tmp_path: Path) -> None:
+    for scalar_id in ["left", "right"]:
+        scalar_dir = tmp_path / "scalars" / scalar_id
+        scalar_dir.mkdir(parents=True)
+        pq.write_table(
+            pa.table(
+                {
+                    "x": [0.0, 1.0],
+                    "y": [1.0, 0.0],
+                    "sig35_variant": ["f", "b"],
+                }
+            ),
+            scalar_dir / "table.parquet",
+        )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "sigma35_stress_margin_gallery",
+            "kind": "xy_scatter_grid",
+            "scalar_ids": ["left", "right"],
+            "x_column": "x",
+            "y_column": "y",
+            "x_axis_label": r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$",
+            "y_axis_label": r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$",
+            "color_column": "sig35_variant",
+        }
+    )
+
+    result = render_xy_plot(
+        SimpleNamespace(output_root=tmp_path, config=SimpleNamespace(reference_sets={})),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        panel_axes = result.figure.axes[:2]
+        expected_x_label = r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
+        expected_y_label = r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$"
+        assert [axis.get_xlabel() for axis in panel_axes] == [expected_x_label, expected_x_label]
+        assert [axis.get_ylabel() for axis in panel_axes] == [expected_y_label, expected_y_label]
+        figure_texts = {text.get_text() for text in result.figure.texts}
+        assert expected_x_label not in figure_texts
+        assert result.layout_reservation.legend_bottom >= 0.14
+    finally:
+        plt.close(result.figure)
 
 
 def test_xy_scatter_with_no_finite_rows_records_explicit_annotation_state(tmp_path: Path) -> None:
@@ -677,6 +784,79 @@ def testrender_metric_panel_uses_compact_candidate_tick_labels() -> None:
         plt.close(fig)
 
 
+def test_render_metric_panel_rotates_compact_regulondb_scope_labels() -> None:
+    rows = [
+        {
+            "category": "sigma_factor_separation",
+            "display_name": "Sigma-factor separation ratio",
+            "label": "native_block",
+            "candidate_label": "native block",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "native_source_record",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "ratio",
+            "metric_value": 1.14,
+        },
+        {
+            "category": "sigma_factor_separation",
+            "display_name": "Sigma-factor separation ratio",
+            "label": "core60_block",
+            "candidate_label": "core60 block",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "core60_tss_upstream",
+            "candidate_family": "intermediate_embedding",
+            "direction": "higher_is_better",
+            "unit": "ratio",
+            "metric_value": 1.12,
+        },
+        {
+            "category": "sigma_factor_separation",
+            "display_name": "Sigma-factor separation ratio",
+            "label": "native_output",
+            "candidate_label": "native output",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "native_source_record",
+            "candidate_family": "output_layer_mean",
+            "direction": "higher_is_better",
+            "unit": "ratio",
+            "metric_value": 1.03,
+        },
+        {
+            "category": "sigma_factor_separation",
+            "display_name": "Sigma-factor separation ratio",
+            "label": "core60_output",
+            "candidate_label": "core60 output",
+            "candidate_model": "evo2_7b",
+            "candidate_scope": "core60_tss_upstream",
+            "candidate_family": "output_layer_mean",
+            "direction": "higher_is_better",
+            "unit": "ratio",
+            "metric_value": 1.02,
+        },
+    ]
+    spec = _metric_spec(plot_id="sigma_factor_structure_summary", color_column=None)
+    color_map, _ = _category_color_map([rows], spec.color_column)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    try:
+        render_metric_panel(
+            ax,
+            rows=rows,
+            spec=spec,
+            panel_title="Sigma-factor separation ratio",
+            color_map=color_map,
+            square=False,
+        )
+
+        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        assert all("Source Record" not in label for label in tick_labels)
+        assert any("native 81 bp" in label for label in tick_labels)
+        assert any("core60 TSS" in label for label in tick_labels)
+        assert all(label.get_rotation() == 32.0 for label in ax.get_xticklabels())
+    finally:
+        plt.close(fig)
+
+
 def testrender_metric_panel_uses_placeholder_when_all_values_are_missing() -> None:
     rows = [
         {
@@ -835,6 +1015,117 @@ def test_render_distribution_panel_orders_sig35_categories_by_strength_and_uses_
         plt.close(fig)
 
 
+def test_render_distribution_panel_ordinal_swarm_draws_sampled_points_and_rank_annotation() -> None:
+    rows = [
+        {
+            "ordinal_label": "W1",
+            "ordinal_plot_order": 1,
+            "ordinal_margin": -0.3,
+        },
+        {
+            "ordinal_label": "W3",
+            "ordinal_plot_order": 3,
+            "ordinal_margin": 0.1,
+        },
+        {
+            "ordinal_label": "W2",
+            "ordinal_plot_order": 2,
+            "ordinal_margin": -0.1,
+        },
+        {
+            "ordinal_label": "W3",
+            "ordinal_plot_order": 3,
+            "ordinal_margin": 0.25,
+        },
+    ]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    try:
+        render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="ordinal_margin",
+            color_column="ordinal_label",
+            render_mode="ordinal_swarm",
+            panel_title="W strength ladder",
+            square=False,
+        )
+
+        assert [label.get_text() for label in ax.get_xticklabels()] == ["W1", "W2", "W3"]
+        collections = [collection for collection in ax.collections if isinstance(collection, PathCollection)]
+        assert collections, "ordinal swarm should render row-level points"
+        line_labels = {line.get_label() for line in ax.lines}
+        assert "_ordinal_linear_fit" in line_labels
+        assert "_ordinal_class_median_connector" in line_labels
+        assert any("Ordinal-order rho" in text.get_text() and "R^2" in text.get_text() for text in ax.texts)
+    finally:
+        plt.close(fig)
+
+
+def test_render_distribution_panel_ordinal_swarm_does_not_draw_singleton_whiskers() -> None:
+    rows = [
+        {
+            "ordinal_label": f"J231{index:02d}",
+            "ordinal_plot_order": index + 1,
+            "ordinal_margin": float(index) / 10.0,
+        }
+        for index in range(19)
+    ]
+    fig, ax = plt.subplots(figsize=(8, 4))
+    try:
+        render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="ordinal_margin",
+            color_column="ordinal_label",
+            render_mode="ordinal_swarm",
+            panel_title="Anderson strength ladder",
+            square=False,
+        )
+
+        collections = [collection for collection in ax.collections if isinstance(collection, PathCollection)]
+        assert collections, "ordinal swarm should render visible singleton points"
+        assert all(float(size) >= 30.0 for collection in collections for size in collection.get_sizes())
+        assert all((collection.get_alpha() or 0.0) >= 0.78 for collection in collections)
+        line_labels = {line.get_label() for line in ax.lines}
+        assert "_ordinal_linear_fit" in line_labels
+        assert "_ordinal_class_median_connector" not in line_labels
+        assert "_ordinal_class_median_tick" not in line_labels
+        assert "_ordinal_class_iqr" not in line_labels
+        assert all(label.get_rotation() >= 45.0 for label in ax.get_xticklabels())
+        assert all(label.get_fontsize() <= 8.0 for label in ax.get_xticklabels())
+    finally:
+        plt.close(fig)
+
+
+def test_render_distribution_panel_ordinal_swarm_skips_trend_for_degenerate_rank() -> None:
+    rows = [
+        {
+            "ordinal_label": "W1",
+            "ordinal_plot_order": 1,
+            "ordinal_margin": margin,
+        }
+        for margin in [-0.2, 0.0, 0.2]
+    ]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    try:
+        render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="ordinal_margin",
+            color_column="ordinal_label",
+            render_mode="ordinal_swarm",
+            panel_title="Degenerate ladder",
+            square=False,
+        )
+
+        line_labels = {line.get_label() for line in ax.lines}
+        assert "_ordinal_linear_fit" not in line_labels
+        assert "_ordinal_class_median_connector" not in line_labels
+        assert "_ordinal_class_median_tick" in line_labels
+    finally:
+        plt.close(fig)
+
+
 def test_render_distribution_panel_preserves_explicit_math_axis_label() -> None:
     rows = [
         {"sig35_variant": "f", "sig35_margin_f_vs_b": 0.7},
@@ -858,6 +1149,107 @@ def test_render_distribution_panel_preserves_explicit_math_axis_label() -> None:
         assert ax.get_ylabel() == label
     finally:
         plt.close(fig)
+
+
+def test_render_distribution_grid_ordinal_swarm_keeps_math_axis_labels_on_every_panel(tmp_path: Path) -> None:
+    for scalar_id, offset in [("left", 0.0), ("right", 0.1)]:
+        scalar_dir = tmp_path / "scalars" / scalar_id
+        scalar_dir.mkdir(parents=True)
+        pq.write_table(
+            pa.table(
+                {
+                    "ordinal_label": ["weak", "middle", "strong"],
+                    "ordinal_plot_order": [1.0, 2.0, 3.0],
+                    "ordinal_margin": [-0.3 + offset, 0.0 + offset, 0.35 + offset],
+                }
+            ),
+            scalar_dir / "table.parquet",
+        )
+    x_label = r"$r_{\mathrm{ord}}(x)$ weak$\to$strong class rank"
+    y_label = r"$m_{\mathrm{ord}}(x)=\cos(z_x,c_{\mathrm{strong}})-\cos(z_x,c_{\mathrm{weak}})$"
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "ordinal_ladder",
+            "kind": "distribution_grid",
+            "scalar_ids": ["left", "right"],
+            "metric_columns": ["ordinal_margin"],
+            "color_column": "ordinal_label",
+            "render_mode": "ordinal_swarm",
+            "single_row_panels": True,
+            "hide_repeated_y_axis": True,
+            "x_axis_label": x_label,
+            "y_axis_label": y_label,
+        }
+    )
+
+    result = render_distribution_plot(SimpleNamespace(output_root=tmp_path), spec, pyplot=plt, axis_styles=None)
+
+    try:
+        panel_axes = result.figure.axes[:2]
+        assert [axis.get_xlabel() for axis in panel_axes] == [x_label, x_label]
+        assert [axis.get_ylabel() for axis in panel_axes] == [y_label, y_label]
+    finally:
+        plt.close(result.figure)
+
+
+def test_plot_input_payload_preserves_filter_options_for_notebook_dropdowns() -> None:
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "ordinal_ladder",
+            "kind": "distribution_grid",
+            "scalar_ids": ["ordinal_ladder_rows_anchor"],
+            "metric_columns": ["ordinal_margin"],
+            "color_column": "ordinal_label",
+            "render_mode": "ordinal_swarm",
+            "filter_options": [
+                {
+                    "column": "ordinal_group_id",
+                    "label": "Ordinal group",
+                    "include_all": False,
+                    "values": [
+                        {"value": "sigma35", "label": "Sigma-35"},
+                        {"value": "t7_w_collection_core60", "label": "W collection core60"},
+                    ],
+                }
+            ],
+        }
+    )
+
+    payload = plot_input_payload(spec)
+
+    assert payload["filter_options"] == [
+        {
+            "column": "ordinal_group_id",
+            "label": "Ordinal group",
+            "type": "categorical",
+            "include_all": False,
+            "values": [
+                {"value": "sigma35", "label": "Sigma-35"},
+                {"value": "t7_w_collection_core60", "label": "W collection core60"},
+            ],
+        }
+    ]
+
+
+def test_plot_input_payload_preserves_annotation_hue_for_notebook_reference_controls() -> None:
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "sfxi_reference_umap",
+            "kind": "projection_grid",
+            "projection_ids": ["umap_reference_core60"],
+            "annotation": {
+                "reference_set": "reference_sfxi_archive",
+                "hue_column": "sfxi_ref__metric_value",
+                "colorbar_label": "SFXI metric",
+            },
+        }
+    )
+
+    payload = plot_input_payload(spec)
+
+    assert payload["annotation"]["reference_set"] == "reference_sfxi_archive"
+    assert payload["annotation"]["hue_column"] == "sfxi_ref__metric_value"
+    assert payload["annotation"]["colorbar_label"] == "SFXI metric"
 
 
 def test_heatmap_grid_respects_configured_sig35_order_without_reference_pollution() -> None:
@@ -1007,6 +1399,31 @@ def test_render_heatmap_panel_can_hide_redundant_y_tick_labels() -> None:
         plt.close(fig)
 
 
+def test_render_heatmap_panel_can_hide_redundant_x_tick_labels() -> None:
+    fig, ax = plt.subplots(figsize=(4, 3))
+    try:
+        image = _render_heatmap_panel(
+            ax,
+            grid=[[0.0, 0.5], [0.5, 0.0]],
+            row_values=["TTGACA (f)", "CTGACA (b)"],
+            column_values=["TTGACA (f)", "CTGACA (b)"],
+            row_column="row_variant",
+            column_column="column_variant",
+            title="Sigma-35 distance",
+            cmap="cividis",
+            norm=None,
+            square_cells=True,
+            show_x_tick_labels=False,
+            show_x_axis_label=False,
+        )
+
+        assert image is not None
+        assert ax.get_xlabel() == ""
+        assert all(not tick.get_text() for tick in ax.get_xticklabels())
+    finally:
+        plt.close(fig)
+
+
 def test_render_heatmap_panel_compacts_sigma35_tick_labels_for_dense_grids() -> None:
     fig, ax = plt.subplots(figsize=(3.8, 3.4))
     try:
@@ -1083,6 +1500,101 @@ def test_draw_resolved_annotations_highlights_all_reference_rows_when_labels_are
         assert len(ax.texts) == 0
     finally:
         plt.close(fig)
+
+
+def test_annotation_hue_requires_finite_numeric_values_by_default() -> None:
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_projection",
+            "kind": "projection_scatter",
+            "projection_ids": ["fixture_projection"],
+            "annotation": {
+                "reference_set": "reference_sfxi",
+                "hue_column": "sfxi_ref__metric_value",
+            },
+        }
+    )
+
+    with pytest.raises(ContractViolationError, match="non-finite annotation hue"):
+        _annotation_continuous_color_encoding(
+            [
+                {"x": 0.0, "y": 0.0, "sfxi_ref__metric_value": 0.15},
+                {"x": 1.0, "y": 1.0, "sfxi_ref__metric_value": math.nan},
+            ],
+            spec,
+        )
+
+
+def test_projection_scatter_reference_stars_use_continuous_annotation_hue(tmp_path: Path) -> None:
+    projection_dir = tmp_path / "projections" / "fixture_umap"
+    projection_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["ref-low", "ref-high", "background"],
+                "x": [0.0, 1.0, 0.5],
+                "y": [0.0, 1.0, 0.5],
+                "is_reference": [True, True, False],
+                "usr_label__primary": ["ES low", "ES high", "background"],
+                "sfxi_ref__metric_value": [0.15, 0.85, 0.4],
+            }
+        ),
+        projection_dir / "coords.parquet",
+    )
+    reference_set = SimpleNamespace(
+        ids=[],
+        match_column="id",
+        label_column="usr_label__primary",
+        label_mode="highlight_only",
+        display_labels={},
+        where=[
+            SimpleNamespace(
+                column="is_reference",
+                equals=True,
+                in_values=[],
+                regex=None,
+                not_regex=None,
+                non_null=True,
+            )
+        ],
+        where_all=[],
+        require_non_empty=True,
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_sfxi_reference_umap",
+            "kind": "projection_scatter",
+            "projection_ids": ["fixture_umap"],
+            "annotation": {
+                "reference_set": "reference_sfxi",
+                "hue_column": "sfxi_ref__metric_value",
+                "colorbar_label": "SFXI",
+            },
+        }
+    )
+
+    result = render_projection_plot(
+        SimpleNamespace(
+            output_root=tmp_path,
+            config=SimpleNamespace(reference_sets={"reference_sfxi": reference_set}),
+        ),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        arrays = [
+            collection.get_array()
+            for collection in result.figure.axes[0].collections
+            if collection.get_array() is not None
+        ]
+        assert len(arrays) == 1
+        assert arrays[0].tolist() == [0.15, 0.85]
+        assert len(result.figure.axes) == 2
+        assert result.figure.axes[1].get_ylabel() == "SFXI"
+    finally:
+        plt.close(result.figure)
 
 
 def test_derived_panel_label_humanizes_context_delta_distribution_ids() -> None:

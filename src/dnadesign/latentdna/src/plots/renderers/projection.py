@@ -10,7 +10,11 @@ from ...contracts.plot import ResolvedPlotSpec
 from ...metadata_axes import AxisStyle
 from ...visual_style import PLOT_TITLE_FONT_SIZE, compact_candidate_title, scatter_style, wrap_plot_title
 from ...workspaces.loader import WorkspaceContext
-from ..annotation_rendering import draw_resolved_annotations
+from ..annotation_rendering import (
+    add_annotation_colorbar,
+    annotation_continuous_color_encoding,
+    draw_resolved_annotations,
+)
 from ..annotations import resolve_annotation_rows
 from ..axes import apply_axes_style
 from ..layout import _grid_figure_size, _panel_grid_dimensions, _prefer_single_row_panel_layout
@@ -45,6 +49,32 @@ def _projection_rows(context: WorkspaceContext, projection_id: str) -> list[dict
         required_columns=("x", "y"),
         artifact_label=f"projection artifact {projection_id}",
     )
+
+
+def _annotation_hue_column(spec: ResolvedPlotSpec) -> str | None:
+    if spec.annotation is None or spec.annotation.hue_column is None:
+        return None
+    return str(spec.annotation.hue_column)
+
+
+def _annotation_color_encoding(
+    rows: list[dict[str, object]],
+    spec: ResolvedPlotSpec,
+    *,
+    base_color_encoding: dict[str, object] | None = None,
+    template: dict[str, object] | None = None,
+) -> dict[str, object] | None:
+    annotation_hue = _annotation_hue_column(spec)
+    if annotation_hue is None:
+        return None
+    if base_color_encoding is not None:
+        if spec.color_column != annotation_hue:
+            raise ContractViolationError(
+                "projection plots cannot render separate continuous colorbars for base scatter hue "
+                f"{spec.color_column!r} and annotation hue {annotation_hue!r}; use the same column or split plots"
+            )
+        return annotation_continuous_color_encoding(rows, spec, template=base_color_encoding)
+    return annotation_continuous_color_encoding(rows, spec, template=template)
 
 
 def _render_projection_scatter(
@@ -91,6 +121,11 @@ def _render_projection_scatter(
     apply_axes_style(axis, grid=True, square=True)
 
     annotation_rows = resolve_annotation_rows(context, rows, spec=spec)
+    annotation_color_encoding = _annotation_color_encoding(
+        annotation_rows.selected_rows,
+        spec,
+        base_color_encoding=color_encoding,
+    )
     draw_resolved_annotations(
         axis,
         context=context,
@@ -100,12 +135,15 @@ def _render_projection_scatter(
         resolved_y="y",
         resolved_label_column=annotation_rows.label_column,
         color_map=color_map,
+        annotation_color_encoding=annotation_color_encoding,
     )
 
     metadata = {"reference_panels": {spec.projection_ids[0]: annotation_rows.state}}
     layout_reservation = LayoutReservation()
     if color_encoding is not None:
         add_continuous_colorbar(figure, axis, spec=spec, color_encoding=color_encoding)
+    elif annotation_color_encoding is not None:
+        add_annotation_colorbar(figure, axis, spec=spec, color_encoding=annotation_color_encoding)
     elif len(categories) + len(shape_categories) > 8:
         layout_reservation.reserve_right(
             add_side_figure_legends(
@@ -178,12 +216,20 @@ def _render_projection_grid(
         axis.axis("off")
 
     metadata: dict[str, object] = {"reference_panels": {}}
-    for axis, projection_rows, projection_id, panel_title in zip(
-        axes.ravel(),
-        projection_tables,
-        spec.projection_ids,
-        titles,
-        strict=False,
+    annotation_rows_by_projection = [resolve_annotation_rows(context, rows, spec=spec) for rows in projection_tables]
+    global_annotation_color_encoding = _annotation_color_encoding(
+        [row for annotation_rows in annotation_rows_by_projection for row in annotation_rows.selected_rows],
+        spec,
+    )
+    for axis_index, (axis, projection_rows, projection_id, panel_title, annotation_rows) in enumerate(
+        zip(
+            axes.ravel(),
+            projection_tables,
+            spec.projection_ids,
+            titles,
+            annotation_rows_by_projection,
+            strict=False,
+        )
     ):
         point_style = scatter_style(len(projection_rows))
         scatter_points(
@@ -214,7 +260,15 @@ def _render_projection_grid(
         if is_appendix_umap:
             axis.title.set_fontsize(PLOT_TITLE_FONT_SIZE - 1.25)
             axis.title.set_linespacing(1.0)
-        annotation_rows = resolve_annotation_rows(context, projection_rows, spec=spec)
+        panel_annotation_color_encoding = (
+            _annotation_color_encoding(
+                annotation_rows.selected_rows,
+                spec,
+                template=global_annotation_color_encoding,
+            )
+            if global_annotation_color_encoding is not None
+            else None
+        )
         draw_resolved_annotations(
             axis,
             context=context,
@@ -224,10 +278,18 @@ def _render_projection_grid(
             resolved_y="y",
             resolved_label_column=annotation_rows.label_column,
             color_map=color_map,
+            annotation_color_encoding=panel_annotation_color_encoding,
         )
         metadata["reference_panels"][projection_id] = annotation_rows.state
 
     layout_reservation = LayoutReservation()
+    if global_annotation_color_encoding is not None:
+        add_annotation_colorbar(
+            figure,
+            axes.ravel()[: len(projection_tables)].tolist(),
+            spec=spec,
+            color_encoding=global_annotation_color_encoding,
+        )
     layout_reservation.reserve_bottom(
         add_figure_legends(
             figure,

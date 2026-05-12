@@ -1,5 +1,5 @@
 plot_id: representation_health_summary
-question: Which candidate Evo2 spaces are healthy enough to survive pre-assay triage?
+question: Which candidate Evo 2 spaces are healthy enough to survive pre-assay triage?
 decision_role: gate
 encoding: Candidate-by-metric bar panels for effective rank, PC1 variance fraction, median pairwise cosine distance, and pairwise cosine-distance spread, read directly from the metric values rather than a pass/fail hue.
 scope: Candidate reducer summaries and sampled candidate rows used for representation-health diagnostics.

@@ -62,3 +62,19 @@ def test_geometry_reference_selector_preserves_user_selection_across_view_switch
     assert "_requested_reference" in geometry_hue_cell
     assert "if _requested_reference in _reference_values" in geometry_hue_cell
     assert "on_change=set_requested_reference" in geometry_hue_cell
+
+
+def test_reference_annotation_mode_selector_controls_geometry_and_plot_label_limits() -> None:
+    selector_cells = "\n".join(render_selector_cells())
+    geometry_hue_cell = render_geometry_hue_selector_cell()
+    geometry_panel_cell = render_geometry_panel_cell()
+    plot_review_cell = render_plot_review_cell()
+
+    assert "get_requested_reference_annotation_mode" in selector_cells
+    assert "set_requested_reference_annotation_mode" in selector_cells
+    assert "Reference annotations" in geometry_hue_cell
+    assert "geometry_reference_annotation_selector" in geometry_panel_cell
+    assert "reference_label_limit=" in geometry_panel_cell
+    assert "plot_reference_annotation_selector" in plot_review_cell
+    assert "_support = runtime.support" in plot_review_cell
+    assert "reference_label_limit=plot_reference_label_limit" in plot_review_cell

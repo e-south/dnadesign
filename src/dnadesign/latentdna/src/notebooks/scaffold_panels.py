@@ -125,6 +125,18 @@ def render_plot_review_cell() -> str:
         def _(runtime):
             _support = runtime.support
 
+            _annotation_modes = _support.reference_annotation_mode_options()
+            _default_annotation_mode = "auto"
+            get_requested_plot_reference_annotation_mode, set_requested_plot_reference_annotation_mode = (
+                _support.mo.state(_default_annotation_mode)
+            )
+            return (get_requested_plot_reference_annotation_mode, set_requested_plot_reference_annotation_mode)
+
+
+        @app.cell
+        def _(runtime):
+            _support = runtime.support
+
             get_requested_plot_hue, set_requested_plot_hue = _support.mo.state("")
             return (get_requested_plot_hue, set_requested_plot_hue)
 
@@ -133,11 +145,13 @@ def render_plot_review_cell() -> str:
         def _(
             get_requested_plot_hue,
             get_requested_plot_reference,
+            get_requested_plot_reference_annotation_mode,
             get_requested_plot_reference_hue,
             runtime,
             selected_plot_card,
             set_requested_plot_hue,
             set_requested_plot_reference,
+            set_requested_plot_reference_annotation_mode,
             set_requested_plot_reference_hue,
             surface_selector,
         ):
@@ -148,6 +162,7 @@ def render_plot_review_cell() -> str:
             available_plot_hues = []
             plot_filter_selector = None
             plot_hue_selector = None
+            plot_reference_annotation_selector = None
             plot_reference_hue_selector = None
             plot_reference_selector = None
             if (
@@ -279,11 +294,30 @@ def render_plot_review_cell() -> str:
                         label="Reference hue",
                         on_change=set_requested_plot_reference_hue,
                     )
+                    _annotation_mode_options = _support.reference_annotation_mode_options()
+                    _annotation_mode_values = set(_annotation_mode_options.values())
+                    _requested_annotation_mode = str(get_requested_plot_reference_annotation_mode() or "auto")
+                    _selected_annotation_mode = (
+                        _requested_annotation_mode if _requested_annotation_mode in _annotation_mode_values else "auto"
+                    )
+                    plot_reference_annotation_selector = _support.mo.ui.dropdown(
+                        options=_annotation_mode_options,
+                        value=(
+                            _support.option_key_for_value(
+                                _annotation_mode_options,
+                                _selected_annotation_mode,
+                            )
+                            or next(iter(_annotation_mode_options))
+                        ),
+                        label="Reference annotations",
+                        on_change=set_requested_plot_reference_annotation_mode,
+                    )
             return (
                 active_plot_frames,
                 available_plot_hues,
                 plot_filter_selector,
                 plot_hue_selector,
+                plot_reference_annotation_selector,
                 plot_reference_hue_selector,
                 plot_reference_selector,
             )
@@ -294,9 +328,11 @@ def render_plot_review_cell() -> str:
             available_plot_hues,
             get_requested_plot_hue,
             get_requested_plot_reference,
+            get_requested_plot_reference_annotation_mode,
             get_requested_plot_reference_hue,
             plot_filter_selector,
             plot_hue_selector,
+            plot_reference_annotation_selector,
             plot_reference_hue_selector,
             plot_reference_selector,
             runtime,
@@ -304,8 +340,10 @@ def render_plot_review_cell() -> str:
         ):
             plot_effective_hue = None
             plot_filter = None
+            plot_reference_label_limit = None
             plot_selected_reference_set = runtime.geometry.reference_annotation_default
             plot_selected_reference_hue_column = ""
+            _support = runtime.support
             if selected_plot_card is not None and bool(selected_plot_card.get("live_render")):
                 _active_plot_spec = dict(selected_plot_card.get("plot_spec") or {})
                 _default_hue = str(_active_plot_spec.get("default_hue") or "")
@@ -337,6 +375,21 @@ def render_plot_review_cell() -> str:
                     if plot_reference_hue_selector is not None
                     else ""
                 )
+                _plot_reference_annotation_value = (
+                    plot_reference_annotation_selector.value
+                    if plot_reference_annotation_selector is not None
+                    else None
+                )
+                _selected_reference_annotation_mode = (
+                    str(_plot_reference_annotation_value)
+                    if _plot_reference_annotation_value is not None
+                    else str(get_requested_plot_reference_annotation_mode() or "auto")
+                    if plot_reference_annotation_selector is not None
+                    else "auto"
+                )
+                plot_reference_label_limit = _support.reference_label_limit_for_annotation_mode(
+                    _selected_reference_annotation_mode
+                )
                 _filter_options = [
                     _option
                     for _option in _active_plot_spec.get("filter_options", [])
@@ -352,6 +405,7 @@ def render_plot_review_cell() -> str:
             return (
                 plot_effective_hue,
                 plot_filter,
+                plot_reference_label_limit,
                 plot_selected_reference_hue_column,
                 plot_selected_reference_set,
             )
@@ -364,8 +418,10 @@ def render_plot_review_cell() -> str:
             plot_filter,
             plot_effective_hue,
             plot_hue_selector,
+            plot_reference_annotation_selector,
             plot_reference_hue_selector,
             plot_reference_selector,
+            plot_reference_label_limit,
             plot_selected_reference_hue_column,
             plot_selected_reference_set,
             plot_review_cards,
@@ -406,6 +462,7 @@ def render_plot_review_cell() -> str:
                         filter_spec=plot_filter,
                         reference_labels=runtime.geometry.reference_labels,
                         reference_set_id=plot_selected_reference_set,
+                        reference_label_limit=plot_reference_label_limit,
                         reference_hue_column=plot_selected_reference_hue_column or None,
                         joinable_tables=runtime.geometry.joinable_tables,
                     )
@@ -433,6 +490,7 @@ def render_plot_review_cell() -> str:
                         plot_filter_selector,
                         plot_hue_selector,
                         plot_reference_selector,
+                        plot_reference_annotation_selector,
                         plot_reference_hue_selector,
                     ]
                     if widget is not None
@@ -500,7 +558,7 @@ def render_plot_review_cell() -> str:
                     ("Caption", "caption_md"),
                     ("Preprocessing", "preprocessing_md"),
                     ("Math", "math_md"),
-                    ("Why this helps choose X", "rationale_md"),
+                    ("Rationale", "rationale_md"),
                     ("Limits", "limitations_md"),
                     ("Failure modes", "failure_modes_md"),
                     ("Plot details", "plot_details_md"),
@@ -660,10 +718,12 @@ def render_geometry_hue_selector_cell() -> str:
             available_hues,
             get_requested_hue,
             get_requested_reference,
+            get_requested_reference_annotation_mode,
             get_requested_reference_hue,
             runtime,
             set_requested_hue,
             set_requested_reference,
+            set_requested_reference_annotation_mode,
             set_requested_reference_hue,
         ):
             _geometry = runtime.geometry
@@ -698,17 +758,22 @@ def render_geometry_hue_selector_cell() -> str:
                 if _geometry.reference_annotation_default in _reference_values
                 else ""
             )
-            geometry_reference_selector = _support.mo.ui.dropdown(
-                options=_reference_options,
-                value=(
-                    _support.option_key_for_value(
-                        _reference_options,
-                        _selected_reference,
-                    )
-                    or next(iter(_reference_options))
-                ),
-                label="Reference labels",
-                on_change=set_requested_reference,
+            _has_reference_overlay_options = any(str(value).strip() for value in _reference_options.values())
+            geometry_reference_selector = (
+                _support.mo.ui.dropdown(
+                    options=_reference_options,
+                    value=(
+                        _support.option_key_for_value(
+                            _reference_options,
+                            _selected_reference,
+                        )
+                        or next(iter(_reference_options))
+                    ),
+                    label="Reference labels",
+                    on_change=set_requested_reference,
+                )
+                if _has_reference_overlay_options
+                else None
             )
             _reference_hue_options = _geometry.reference_hue_options or {"Black stars": ""}
             _reference_hue_values = set(_reference_hue_options.values())
@@ -716,19 +781,50 @@ def render_geometry_hue_selector_cell() -> str:
             _selected_reference_hue = (
                 _requested_reference_hue if _requested_reference_hue in _reference_hue_values else ""
             )
-            geometry_reference_hue_selector = _support.mo.ui.dropdown(
-                options=_reference_hue_options,
-                value=(
-                    _support.option_key_for_value(
-                        _reference_hue_options,
-                        _selected_reference_hue,
-                    )
-                    or next(iter(_reference_hue_options))
-                ),
-                label="Reference hue",
-                on_change=set_requested_reference_hue,
+            geometry_reference_hue_selector = (
+                _support.mo.ui.dropdown(
+                    options=_reference_hue_options,
+                    value=(
+                        _support.option_key_for_value(
+                            _reference_hue_options,
+                            _selected_reference_hue,
+                        )
+                        or next(iter(_reference_hue_options))
+                    ),
+                    label="Reference hue",
+                    on_change=set_requested_reference_hue,
+                )
+                if _has_reference_overlay_options
+                else None
             )
-            return (geometry_reference_hue_selector, geometry_reference_selector, hue_selector)
+            _annotation_mode_options = _support.reference_annotation_mode_options()
+            _annotation_mode_values = set(_annotation_mode_options.values())
+            _requested_annotation_mode = str(get_requested_reference_annotation_mode() or "auto")
+            _selected_annotation_mode = (
+                _requested_annotation_mode if _requested_annotation_mode in _annotation_mode_values else "auto"
+            )
+            geometry_reference_annotation_selector = (
+                _support.mo.ui.dropdown(
+                    options=_annotation_mode_options,
+                    value=(
+                        _support.option_key_for_value(
+                            _annotation_mode_options,
+                            _selected_annotation_mode,
+                        )
+                        or next(iter(_annotation_mode_options))
+                    ),
+                    label="Reference annotations",
+                    on_change=set_requested_reference_annotation_mode,
+                )
+                if _has_reference_overlay_options
+                else None
+            )
+            return (
+                geometry_reference_annotation_selector,
+                geometry_reference_hue_selector,
+                geometry_reference_selector,
+                hue_selector,
+            )
         """
     )
 
@@ -741,6 +837,7 @@ def render_geometry_panel_cell() -> str:
             available_hues,
             context_selector,
             family_selector,
+            geometry_reference_annotation_selector,
             geometry_reference_hue_selector,
             geometry_reference_selector,
             geometry_scope_note,
@@ -766,6 +863,16 @@ def render_geometry_panel_cell() -> str:
             else:
                 requested_hue = str(hue_selector.value)
                 effective_hue = requested_hue if requested_hue in available_hues else ""
+                reference_set_id = (
+                    str(geometry_reference_selector.value)
+                    if geometry_reference_selector is not None
+                    else ""
+                )
+                reference_label_limit = _support.reference_label_limit_for_annotation_mode(
+                    str(geometry_reference_annotation_selector.value)
+                    if geometry_reference_annotation_selector is not None
+                    else "auto"
+                )
                 geometry_plot = _renderers.render_projection_grid(
                     panel_specs,
                     frames=projection_frames,
@@ -773,15 +880,27 @@ def render_geometry_panel_cell() -> str:
                     hue_kinds=_geometry.hue_kinds,
                     joinable_tables=_geometry.joinable_tables,
                     reference_labels=_geometry.reference_labels,
-                    reference_set_id=str(geometry_reference_selector.value),
-                    reference_hue_column=str(geometry_reference_hue_selector.value) or None,
+                    reference_set_id=reference_set_id,
+                    reference_label_limit=reference_label_limit,
+                    reference_hue_column=(
+                        str(geometry_reference_hue_selector.value)
+                        if geometry_reference_hue_selector is not None
+                        else ""
+                    )
+                    or None,
                 )
                 if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
                     _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
                     _control_widgets.extend([geometry_selector, projection_selector])
                 else:
                     _control_widgets = [layout_selector]
-                _control_widgets.extend([hue_selector, geometry_reference_selector, geometry_reference_hue_selector])
+                _control_widgets.append(hue_selector)
+                if geometry_reference_selector is not None:
+                    _control_widgets.append(geometry_reference_selector)
+                if geometry_reference_annotation_selector is not None:
+                    _control_widgets.append(geometry_reference_annotation_selector)
+                if geometry_reference_hue_selector is not None:
+                    _control_widgets.append(geometry_reference_hue_selector)
                 _layout_label = str(selected_layout.get("label")) if selected_layout is not None else "Single view"
                 _accordion_sections = {
                     "Selection": _support.mo.md(
@@ -817,6 +936,18 @@ def render_geometry_panel_cell() -> str:
                         )
                     )
                 }
+                _accordion_sections["Reading the projection"] = _support.mo.md(
+                    "\\n".join(
+                        [
+                            "- Coordinates come from persisted projection artifacts; changing hue or reference labels "
+                            "does not refit UMAP or PCA.",
+                            "- Distances are only comparable within a panel unless panels explicitly share one "
+                            "projection artifact.",
+                            "- Reference labels are matched rows in the selected view; a missing label means no row "
+                            "matched the active view and reference-set selector.",
+                        ]
+                    )
+                )
                 _population_lines = []
                 for _panel_spec in panel_specs:
                     _projection_id = str(_panel_spec.get("projection_id") or "")

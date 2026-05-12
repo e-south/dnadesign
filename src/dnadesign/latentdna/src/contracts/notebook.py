@@ -101,6 +101,7 @@ class WorkspaceNotebookReferenceSet(StrictNotebookModel):
     match_column: str
     label_column: str | None = None
     label_mode: Literal["label_and_highlight", "highlight_only"]
+    label_limit: int | None = Field(default=None, ge=0)
     explicit_ids: list[str] = Field(default_factory=list)
     selector_columns: list[str] = Field(default_factory=list)
 

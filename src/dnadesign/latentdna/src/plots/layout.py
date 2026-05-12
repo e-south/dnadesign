@@ -25,6 +25,14 @@ _HORIZONTAL_GROUPED_METRIC_PLOT_IDS: frozenset[str] = frozenset(
     }
 )
 
+_FULL_FORMULA_XY_GRID_PLOT_IDS: frozenset[str] = frozenset(
+    {
+        "balanced_design_family_margin_gallery",
+        "design_centroid_margin_gallery",
+        "sigma35_stress_margin_gallery",
+    }
+)
+
 
 def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int, *, configured: object = None) -> bool:
     if configured is not None:
@@ -100,10 +108,8 @@ def plot_tight_layout_kwargs(
         "h_pad": 1.4,
         "w_pad": 0.95,
     }
-    if plot_id == "balanced_design_family_margin_gallery":
-        kwargs["w_pad"] = 1.38
-    if plot_id == "design_centroid_margin_gallery":
-        kwargs["w_pad"] = 1.18
+    if plot_id in _FULL_FORMULA_XY_GRID_PLOT_IDS:
+        kwargs["w_pad"] = 2.05
     if plot_id == "representation_health_summary":
         kwargs["w_pad"] = 1.85
     if plot_id == "dataset_overview":

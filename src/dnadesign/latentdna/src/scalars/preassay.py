@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -656,9 +657,9 @@ def _resolve_numeric_ordinal_axis(
         for group_value, values in grouped_values.items()
         if values
     }
-    if len(ranks) < 3:
+    if len(ranks) < 2:
         raise ContractViolationError(
-            f"ordinal axis {axis_id!r} requires at least three finite ranked groups from {rank_column!r}"
+            f"ordinal axis {axis_id!r} requires at least two finite ranked groups from {rank_column!r}"
         )
     return _OrdinalAxis(
         axis_id=axis_id,
@@ -1761,6 +1762,8 @@ def _row_matches_filters(row: dict[str, object], filters: list[dict[str, Any]]) 
             return False
         if "in_values" in selector and str(value) not in {str(item) for item in list(selector["in_values"])}:
             return False
+        if "regex" in selector and re.search(str(selector["regex"]), str(value or "")) is None:
+            return False
     return True
 
 
@@ -2043,6 +2046,179 @@ def _candidate_decision_frontier_table(
     return pa.Table.from_pylist(rows), inputs, {"candidate_count": len(rows), "rows": len(rows)}
 
 
+def _ordinal_extreme_values(axis: _OrdinalAxis, *, stronger_rank: str) -> tuple[list[str], list[str]]:
+    if stronger_rank not in {"min", "max"}:
+        raise ContractViolationError("ordinal_ladder_rows stronger_rank must be 'min' or 'max'")
+    rank_values = list(axis.ranks.values())
+    if not rank_values:
+        raise ContractViolationError(f"ordinal axis {axis.axis_id!r} has no rank values")
+    strong_rank = min(rank_values) if stronger_rank == "min" else max(rank_values)
+    weak_rank = max(rank_values) if stronger_rank == "min" else min(rank_values)
+    target_values = [value for value, rank in axis.ranks.items() if rank == strong_rank]
+    control_values = [value for value, rank in axis.ranks.items() if rank == weak_rank]
+    return target_values, control_values
+
+
+def _ordinal_plot_order_map(axis: _OrdinalAxis, *, stronger_rank: str) -> dict[str, int]:
+    rank_values = sorted(set(axis.ranks.values()), reverse=stronger_rank == "min")
+    rank_to_order = {rank: index + 1 for index, rank in enumerate(rank_values)}
+    return {value: rank_to_order[rank] for value, rank in axis.ranks.items()}
+
+
+def _ordinal_reference_centroid(
+    normalized: np.ndarray,
+    groups: dict[str, list[int]],
+    values: list[str],
+    *,
+    role: str,
+) -> tuple[np.ndarray, int]:
+    indices = sorted({index for value in values for index in groups.get(value, [])})
+    if not indices:
+        raise ContractViolationError(f"ordinal_ladder_rows {role} values matched no rows: {values}")
+    centroid = try_l2_normalize_vector(
+        np.asarray(normalized[np.asarray(indices, dtype=np.int64)].mean(axis=0), dtype=np.float32)
+    )
+    if centroid is None:
+        raise ContractViolationError(f"ordinal_ladder_rows {role} centroid is degenerate for values: {values}")
+    return centroid, len(indices)
+
+
+def _ordinal_row_label(
+    context: WorkspaceContext,
+    *,
+    row: dict[str, object],
+    axis: _OrdinalAxis,
+    group_config: dict[str, Any],
+    axis_value: str,
+) -> str:
+    label_column = str(_optional_param(group_config, "label_column", default="") or "")
+    if label_column:
+        label = str(row.get(label_column) or "").strip()
+        if label:
+            return label
+    label_overrides = {
+        str(key): str(value)
+        for key, value in dict(_optional_param(group_config, "label_overrides", default={}) or {}).items()
+    }
+    if axis_value in label_overrides:
+        return label_overrides[axis_value]
+    core60_label = re.sub(r"_core60(?:_context1kb_(?:forward|rc))?$", "", axis_value)
+    if core60_label != axis_value:
+        return core60_label
+    return axis_display_text(_axis_style_for_column(context, axis.column), axis_value, compact=True)
+
+
+def _ordinal_ladder_rows_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    candidates = [dict(value) for value in _require_param(params, "candidates")]
+    group_configs = [dict(value) for value in _require_param(params, "groups")]
+    rows: list[dict[str, object]] = []
+    inputs: list[ScalarInputRef] = []
+    group_counts: dict[str, int] = {}
+    for candidate in candidates:
+        candidate_sample = _load_candidate_sample(context, candidate)
+        inputs.extend(candidate_sample.inputs)
+        normalized = _normalized_geometry_rows(candidate_sample.matrix)
+        descriptor = candidate_sample.descriptor
+        for group_config in group_configs:
+            group_id = str(_require_param(group_config, "group_id"))
+            group_label = str(_optional_param(group_config, "label", default=humanize_label(group_id)))
+            filters = [dict(value) for value in _optional_param(group_config, "where", default=[])]
+            filtered_pairs = [
+                (index, row) for index, row in enumerate(candidate_sample.rows) if _row_matches_filters(row, filters)
+            ]
+            if not filtered_pairs:
+                raise ContractViolationError(f"ordinal_ladder_rows group {group_id!r} matched no rows")
+            axis_config = dict(_require_param(group_config, "axis"))
+            stronger_rank = str(_optional_param(axis_config, "stronger_rank", default="max"))
+            axis = _resolve_ordinal_axis(
+                context,
+                axis=axis_config,
+                rows=[row for _, row in filtered_pairs],
+            )
+            if axis.input_ref is not None and axis.input_ref not in inputs:
+                inputs.append(axis.input_ref)
+            groups: dict[str, list[int]] = {}
+            row_records: list[tuple[int, dict[str, object], str]] = []
+            for index, row in filtered_pairs:
+                axis_value = str(row.get(axis.column) or "").strip()
+                if not axis_value or axis_value in axis.exclude_values or axis_value not in axis.ranks:
+                    continue
+                groups.setdefault(axis_value, []).append(index)
+                row_records.append((index, row, axis_value))
+            if len(groups) < 2:
+                raise ContractViolationError(
+                    f"ordinal_ladder_rows group {group_id!r} requires at least two ranked classes"
+                )
+            target_values = [str(value) for value in _optional_param(group_config, "target_values", default=[]) or []]
+            control_values = [str(value) for value in _optional_param(group_config, "control_values", default=[]) or []]
+            if not target_values or not control_values:
+                target_values, control_values = _ordinal_extreme_values(axis, stronger_rank=stronger_rank)
+            target_reference, target_members = _ordinal_reference_centroid(
+                normalized,
+                groups,
+                target_values,
+                role="target",
+            )
+            control_reference, control_members = _ordinal_reference_centroid(
+                normalized,
+                groups,
+                control_values,
+                role="control",
+            )
+            plot_order = _ordinal_plot_order_map(axis, stronger_rank=stronger_rank)
+            for index, row, axis_value in row_records:
+                vector = np.asarray(normalized[index], dtype=np.float32)
+                target_similarity = float(vector @ target_reference)
+                control_similarity = float(vector @ control_reference)
+                ordinal_margin = target_similarity - control_similarity
+                rows.append(
+                    {
+                        **row,
+                        **descriptor,
+                        "ordinal_group_id": group_id,
+                        "ordinal_group_label": group_label,
+                        "ordinal_axis_id": axis.axis_id,
+                        "ordinal_axis_label": axis.label,
+                        "ordinal_axis_column": axis.column,
+                        "ordinal_axis_value": axis_value,
+                        "ordinal_label": _ordinal_row_label(
+                            context,
+                            row=row,
+                            axis=axis,
+                            group_config=group_config,
+                            axis_value=axis_value,
+                        ),
+                        "ordinal_rank_value": float(axis.ranks[axis_value]),
+                        "ordinal_plot_order": int(plot_order[axis_value]),
+                        "ordinal_margin": ordinal_margin,
+                        "ordinal_target_values": ",".join(target_values),
+                        "ordinal_control_values": ",".join(control_values),
+                        "ordinal_target_similarity": target_similarity,
+                        "ordinal_control_similarity": control_similarity,
+                        "ordinal_stronger_rank": stronger_rank,
+                        "ordinal_order_source": axis.order_source,
+                        "ordinal_order_exploratory": axis.exploratory,
+                        "ordinal_group_count": len(groups),
+                        "ordinal_target_members": target_members,
+                        "ordinal_control_members": control_members,
+                    }
+                )
+            group_counts[group_id] = group_counts.get(group_id, 0) + len(row_records)
+    return (
+        pa.Table.from_pylist(rows),
+        inputs,
+        {
+            "candidate_count": len(candidates),
+            "ordinal_group_count": len(group_configs),
+            "rows": len(rows),
+            "rows_by_group": group_counts,
+        },
+    )
+
+
 def _axis_centroid_distance_table(
     context: WorkspaceContext,
     params: dict[str, Any],
@@ -2151,6 +2327,7 @@ _PREASSAY_BUILDERS: dict[str, ScalarTableBuilder] = {
     "collection_strength_ordinal_audit": _collection_strength_ordinal_audit_table,
     "candidate_decision_frontier": _candidate_decision_frontier_table,
     "candidate_x_selection_scorecard": _candidate_x_selection_scorecard_table,
+    "ordinal_ladder_rows": _ordinal_ladder_rows_table,
     "axis_centroid_distance": _axis_centroid_distance_table,
 }
 

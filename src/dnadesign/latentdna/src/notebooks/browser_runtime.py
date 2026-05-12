@@ -41,6 +41,8 @@ from .browser_runtime_support import (
     notebook_theme,
     option_key_for_value,
     read_text,
+    reference_annotation_mode_options,
+    reference_label_limit_for_annotation_mode,
     resolve_labeled_option_card,
     style_notebook_axes,
     table_from_records,
@@ -52,6 +54,11 @@ __all__ = ["build_workspace_browser_runtime", "load_workspace_notebook_controls"
 
 
 _ALLOWED_RUNTIME_HUE_KINDS = {"categorical", "binary", "continuous", "ordinal"}
+_REFERENCE_HUE_OPTIONS = {
+    "Black stars": "",
+    "Reference strength": "promoter_standard__strength_value_numeric",
+    "SFXI metric": "sfxi_ref__metric_value",
+}
 _PLOT_REVIEW_LIVE_RENDER_KINDS = {
     "projection_grid",
     "xy_scatter_grid",
@@ -147,6 +154,8 @@ class BrowserSupport:
     option_key_for_value: Callable[[dict[str, object], object], str | None]
     pd: ModuleType
     read_text: Callable[[str | None], str | None]
+    reference_annotation_mode_options: Callable[[], dict[str, str]]
+    reference_label_limit_for_annotation_mode: Callable[[str | None], int | None]
     render_math_markdown: Callable[[str], object]
     resolve_labeled_option_card: Callable[..., dict[str, object] | None]
     select_plot_render_path: Callable[[list[Path]], Path | None]
@@ -731,10 +740,7 @@ def build_workspace_browser_runtime(
         if configured_default_reference_set in set(reference_annotation_options.values())
         else ""
     )
-    reference_hue_options = {
-        "Black stars": "",
-        "Reference strength": "promoter_standard__strength_value_numeric",
-    }
+    reference_hue_options = dict(_REFERENCE_HUE_OPTIONS)
     reference_hue_columns = [value for value in reference_hue_options.values() if value]
     reference_required_columns = list(
         dict.fromkeys([*_reference_required_columns(reference_sets), *reference_hue_columns])
@@ -863,6 +869,8 @@ def build_workspace_browser_runtime(
             labeled_options=labeled_options,
             pd=pd,
             read_text=read_text,
+            reference_annotation_mode_options=reference_annotation_mode_options,
+            reference_label_limit_for_annotation_mode=reference_label_limit_for_annotation_mode,
             render_math_markdown=render_math_markdown,
             resolve_labeled_option_card=resolve_labeled_option_card,
             select_plot_render_path=select_plot_render_path,

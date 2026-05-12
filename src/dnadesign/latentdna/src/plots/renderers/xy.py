@@ -12,7 +12,13 @@ import pyarrow.parquet as pq
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
 from ...metadata_axes import AxisStyle
-from ...visual_style import SPINE_COLOR, compact_candidate_title, humanize_display_text, scatter_style, wrap_plot_title
+from ...visual_style import (
+    SPINE_COLOR,
+    compact_candidate_title,
+    humanize_display_text,
+    scatter_style,
+    wrap_plot_title,
+)
 from ...workspaces.loader import WorkspaceContext
 from ..annotation_rendering import draw_resolved_annotations
 from ..annotations import empty_annotation_state, resolve_annotation_rows
@@ -34,6 +40,14 @@ from .scatter import (
     scatter_point_sizes,
     scatter_points,
     shape_marker_map,
+)
+
+_FULL_FORMULA_XY_GRID_PLOT_IDS = frozenset(
+    {
+        "balanced_design_family_margin_gallery",
+        "design_centroid_margin_gallery",
+        "sigma35_stress_margin_gallery",
+    }
 )
 
 
@@ -67,15 +81,14 @@ def ordered_numeric_axes(
     return resolved_x, resolved_y
 
 
-def _xy_axis_labels(
-    axis: Any,
+def _xy_axis_label_texts(
     rows: list[dict[str, object]],
     *,
     spec: ResolvedPlotSpec,
     resolved_x: str,
     resolved_y: str,
-) -> None:
-    axis.set_xlabel(
+) -> tuple[str, str]:
+    return (
         resolved_axis_label(
             explicit_label=spec.x_axis_label,
             fallback_label=scatter_axis_label(
@@ -85,9 +98,7 @@ def _xy_axis_labels(
             ),
             width=28,
             max_lines=2,
-        )
-    )
-    axis.set_ylabel(
+        ),
         resolved_axis_label(
             explicit_label=spec.y_axis_label,
             fallback_label=scatter_axis_label(
@@ -97,8 +108,21 @@ def _xy_axis_labels(
             ),
             width=28,
             max_lines=2,
-        )
+        ),
     )
+
+
+def _xy_axis_labels(
+    axis: Any,
+    rows: list[dict[str, object]],
+    *,
+    spec: ResolvedPlotSpec,
+    resolved_x: str,
+    resolved_y: str,
+) -> None:
+    x_label, y_label = _xy_axis_label_texts(rows, spec=spec, resolved_x=resolved_x, resolved_y=resolved_y)
+    axis.set_xlabel(x_label)
+    axis.set_ylabel(y_label)
 
 
 def _finite_xy_rows(
@@ -394,10 +418,13 @@ def _render_xy_grid(
         configured=spec.single_row_panels,
     )
     rows_count, columns = _panel_grid_dimensions(len(scalar_tables), prefer_single_row=prefer_single_row)
+    figsize = _grid_figure_size(len(scalar_tables), square_panels=True, prefer_single_row=prefer_single_row)
+    if spec.plot_id in _FULL_FORMULA_XY_GRID_PLOT_IDS and prefer_single_row and columns > 1:
+        figsize = (figsize[0] + (0.9 * columns), figsize[1] + 0.35)
     figure, axes = pyplot.subplots(
         rows_count,
         columns,
-        figsize=_grid_figure_size(len(scalar_tables), square_panels=True, prefer_single_row=prefer_single_row),
+        figsize=figsize,
         squeeze=False,
     )
     color_map, categories = category_color_map(
@@ -450,6 +477,8 @@ def _render_xy_grid(
                 axis_styles=axis_styles,
             )
         )
+    if spec.plot_id in _FULL_FORMULA_XY_GRID_PLOT_IDS and len(scalar_tables) > 1:
+        layout_reservation.reserve_bottom(0.16)
     return XYRenderResult(figure=figure, metadata=metadata, layout_reservation=layout_reservation)
 
 

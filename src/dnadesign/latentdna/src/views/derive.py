@@ -583,35 +583,36 @@ def _write_block_normalized_matrix(
     if not np.isfinite(source).all():
         if nonfinite_policy == "error":
             raise ContractViolationError("block_normalized_concatenate encountered non-finite values")
-        source_for_stats = np.nan_to_num(source, nan=0.0, posinf=0.0, neginf=0.0)
-    else:
-        source_for_stats = source
 
-    mean = source_for_stats.mean(axis=0, keepdims=True) if center else np.zeros((1, source.shape[1]), dtype=np.float32)
+    mean, std = _block_normalization_stats(
+        source,
+        center=center,
+        scale=scale,
+        nonfinite_policy=nonfinite_policy,
+    )
     if scale:
-        std = np.asarray((source_for_stats - mean).std(axis=0, keepdims=True), dtype=np.float32)
         zero_mask = np.asarray(std[0] <= 1e-8, dtype=bool)
         if np.any(zero_mask):
             if zero_variance_policy == "error":
                 raise ContractViolationError("block_normalized_concatenate encountered zero-variance columns")
             std[:, zero_mask] = 1.0
     else:
-        std = np.ones((1, source.shape[1]), dtype=np.float32)
+        std = np.ones((1, source.shape[1]), dtype=np.float64)
         zero_mask = np.zeros(source.shape[1], dtype=bool)
 
     batch_rows = _block_concat_batch_rows(dims=int(source.shape[1]))
     for start in range(0, int(output.shape[0]), batch_rows):
         stop = min(start + batch_rows, int(output.shape[0]))
         if projection_indices is None:
-            working = np.asarray(source[start:stop], dtype=np.float32)
+            working = np.asarray(source[start:stop], dtype=np.float64)
         else:
-            working = np.asarray(source[projection_indices[start:stop]], dtype=np.float32)
+            working = np.asarray(source[projection_indices[start:stop]], dtype=np.float64)
         if nonfinite_policy == "coerce":
             working = np.nan_to_num(working, nan=0.0, posinf=0.0, neginf=0.0)
         if center:
-            working = np.asarray(working - mean, dtype=np.float32)
+            working = working - mean
         if scale:
-            working = np.asarray(working / std, dtype=np.float32)
+            working = working / std
             if np.any(zero_mask):
                 working[:, zero_mask] = 0.0
         norms = np.linalg.norm(working, axis=1, keepdims=True)
@@ -622,6 +623,44 @@ def _write_block_normalized_matrix(
         if np.any(zero_rows):
             normalized[zero_rows] = 0.0
         output[start:stop, column_start:column_stop] = normalized
+
+
+def _block_normalization_stats(
+    matrix: np.ndarray,
+    *,
+    center: bool,
+    scale: bool,
+    nonfinite_policy: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    rows, dims = int(matrix.shape[0]), int(matrix.shape[1])
+    if rows <= 0:
+        raise ContractViolationError("block_normalized_concatenate requires at least one row")
+    if not center and not scale:
+        return np.zeros((1, dims), dtype=np.float64), np.ones((1, dims), dtype=np.float64)
+
+    sums = np.zeros(dims, dtype=np.float64)
+    batch_rows = _block_concat_batch_rows(dims=dims)
+    for start in range(0, rows, batch_rows):
+        stop = min(start + batch_rows, rows)
+        block = np.asarray(matrix[start:stop], dtype=np.float64)
+        if nonfinite_policy == "coerce":
+            block = np.nan_to_num(block, nan=0.0, posinf=0.0, neginf=0.0)
+        sums += block.sum(axis=0)
+    stat_mean = sums / float(rows)
+    mean = stat_mean.reshape(1, dims) if center else np.zeros((1, dims), dtype=np.float64)
+    if not scale:
+        return mean, np.ones((1, dims), dtype=np.float64)
+
+    sum_squared_deviation = np.zeros(dims, dtype=np.float64)
+    for start in range(0, rows, batch_rows):
+        stop = min(start + batch_rows, rows)
+        block = np.asarray(matrix[start:stop], dtype=np.float64)
+        if nonfinite_policy == "coerce":
+            block = np.nan_to_num(block, nan=0.0, posinf=0.0, neginf=0.0)
+        centered = block - stat_mean
+        sum_squared_deviation += np.square(centered).sum(axis=0)
+    std = np.sqrt(sum_squared_deviation / float(rows)).reshape(1, dims)
+    return mean, std
 
 
 def _block_concat_batch_rows(*, dims: int) -> int:

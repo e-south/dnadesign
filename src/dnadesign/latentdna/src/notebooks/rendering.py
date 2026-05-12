@@ -27,8 +27,9 @@ MAX_INLINE_SVG_BYTES = 5_000_000
 MAX_INLINE_NOTEBOOK_ASSET_BYTES = 600_000
 _DISPLAY_MATH_RE = re.compile(r"\$\$(.*?)\$\$", flags=re.DOTALL)
 _PLOT_ASSET_WRAPPER_STYLE = (
-    "width: 100%; overflow-x: auto; padding: 0.2rem 0 0.35rem 0; "
-    "display: flex; align-items: flex-start; justify-content: center;"
+    f"width: 100%; overflow-x: auto; padding: 0.65rem; box-sizing: border-box; "
+    f"display: flex; align-items: flex-start; justify-content: center; "
+    f"border-radius: 14px; background: {PANEL_BACKGROUND_COLOR};"
 )
 _PLOT_ASSET_MEDIA_STYLE = (
     f"display: block; width: auto; height: auto; max-width: 100%; max-height: 78vh; "

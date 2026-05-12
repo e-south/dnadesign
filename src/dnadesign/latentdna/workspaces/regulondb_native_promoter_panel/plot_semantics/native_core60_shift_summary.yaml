@@ -18,11 +18,11 @@ preprocessing_md: |
 math_md: |
   For aligned native row \(x_i\) and core60 row \(y_i\), the self-cosine is
   $$
-  \cos(\hat{x_i}, \hat{y_i})
+  \cos(\hat{x}_i, \hat{y}_i)
   $$
   and the shift is
   $$
-  \lVert \hat{x_i} - \hat{y_i} \rVert_2.
+  \lVert \hat{x}_i - \hat{y}_i \rVert_2.
   $$
   The plot reports medians across aligned rows for each representation family.
 rationale_md: Directly tests whether native length/source-record pooling and core60 TSS-upstream pooling appear to occupy compatible local geometry before downstream candidate selection.

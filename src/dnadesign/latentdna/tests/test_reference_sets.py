@@ -125,11 +125,21 @@ def test_stress_reference_sets_resolve_native_core60_and_context_rows_without_mi
         "sulAp_core60_context1kb_rc",
     ]
     assert _matched("reference_native_mg1655", rows) == [
+        "spyp",
+        "sulAp",
+        "spyp_context1kb_rc",
+        "sulAp_context1kb_rc",
         "aceBp",
         "aceBp_context1kb_forward",
         "aceBp_context1kb_rc",
     ]
     assert _matched("reference_native_mg1655_core60", rows) == [
+        "spyp_core60",
+        "sulAp_core60",
+        "spyp_core60_context1kb_forward",
+        "sulAp_core60_context1kb_forward",
+        "spyp_core60_context1kb_rc",
+        "sulAp_core60_context1kb_rc",
         "aceBp_core60",
         "aceBp_core60_context1kb_forward",
         "aceBp_core60_context1kb_rc",

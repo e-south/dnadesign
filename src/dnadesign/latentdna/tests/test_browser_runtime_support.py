@@ -23,6 +23,8 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     normalize_categorical_hue_value,
     normalize_hue_kind,
     notebook_theme,
+    reference_hue_render_params,
+    reference_label_limit_for_annotation_mode,
     resolve_join_keys,
     resolve_labeled_option_card,
     resolve_reference_annotation,
@@ -638,6 +640,29 @@ def test_draw_reference_labels_separates_close_reference_annotations() -> None:
     assert len(set(text_positions)) == 3
 
 
+def test_draw_reference_labels_uses_compact_font_for_many_native_labels() -> None:
+    labels = [f"gene{i}p_core60_context1kb_forward" for i in range(8)]
+    frame = pd.DataFrame(
+        {
+            "usr_label__primary": labels,
+            "x": np.linspace(0.0, 0.7, num=len(labels)),
+            "y": np.linspace(0.1, 0.8, num=len(labels)),
+        }
+    )
+    fig, ax = plt.subplots(figsize=(4.0, 4.0))
+
+    draw_reference_labels(
+        ax,
+        frame,
+        reference_labels=labels,
+        reference_label_limit=len(labels),
+    )
+
+    assert len(ax.texts) == len(labels)
+    assert max(text.get_fontsize() for text in ax.texts) <= 7.8
+    assert all("_context1kb" not in text.get_text() for text in ax.texts)
+
+
 def test_draw_reference_labels_uses_translucent_label_boxes() -> None:
     frame = pd.DataFrame(
         {
@@ -670,6 +695,26 @@ def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> N
 
     assert len(ax.collections) == 0
     assert len(ax.texts) == 0
+
+
+def test_resolve_reference_annotation_does_not_fallback_to_default_labels_for_unknown_set(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(runtime_support, "_load_workspace_reference_set", lambda *_args: None)
+    frames = [pd.DataFrame({"usr_label__primary": ["spyp", "sulAp"]})]
+
+    annotation = resolve_reference_annotation(
+        "reference_anderson_igem_core60_typo",
+        frames,
+        workspace_dir=tmp_path,
+        fallback_labels=["spyp", "sulAp"],
+    )
+
+    assert annotation["labels"] == []
+    assert annotation["label_limit"] == 0
+    assert "spyp" not in annotation["warnings"][0]
+    assert "not configured" in annotation["warnings"][0]
 
 
 def test_resolve_reference_annotation_warns_when_selected_rows_are_absent_from_panel(
@@ -708,6 +753,71 @@ def test_resolve_reference_annotation_warns_when_selected_rows_are_absent_from_p
     assert annotation["labels"] == ["W1"]
     assert any("no matched overlay rows in 1 of 2 non-empty panel" in warning for warning in annotation["warnings"])
     assert any("context_view" in warning for warning in annotation["warnings"])
+
+
+def test_resolve_reference_annotation_honors_configured_label_limit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    reference_set = SimpleNamespace(
+        ids=[],
+        where=[SimpleNamespace(column="source_family", equals="native_mg1655", non_null=True)],
+        where_all=[],
+        match_column="usr_label__primary",
+        label_column=None,
+        display_labels={},
+        require_non_empty=True,
+        label_limit=32,
+    )
+    monkeypatch.setattr(runtime_support, "_load_workspace_reference_set", lambda *_args: reference_set)
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": [f"gene{i}p" for i in range(8)],
+                "source_family": ["native_mg1655"] * 8,
+            }
+        )
+    ]
+
+    annotation = resolve_reference_annotation("reference_native_mg1655", frames, workspace_dir=tmp_path)
+
+    assert annotation["labels"] == [f"gene{i}p" for i in range(8)]
+    assert annotation["label_limit"] == 32
+
+
+def test_reference_hue_render_params_supports_semantic_xy_columns() -> None:
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["W1", "W9", "densegen_0"],
+                "synthetic_margin_ethanol_vs_background": [0.3, 0.6, -0.2],
+                "synthetic_margin_cipro_vs_background": [0.1, 0.4, -0.3],
+                "promoter_standard__strength_value_numeric": [1.0, 9.0, np.nan],
+            }
+        )
+    ]
+
+    params = reference_hue_render_params(
+        frames,
+        reference_labels=["W1", "W9"],
+        reference_hue_column="promoter_standard__strength_value_numeric",
+        x_column="synthetic_margin_ethanol_vs_background",
+        y_column="synthetic_margin_cipro_vs_background",
+    )
+
+    assert params is not None
+    assert params["cmap"] == "viridis"
+
+
+def test_display_hue_label_names_sfxi_reference_metric() -> None:
+    assert display_hue_label("sfxi_ref__metric_value") == "SFXI metric"
+
+
+def test_reference_label_limit_for_annotation_mode_maps_notebook_options() -> None:
+    assert reference_label_limit_for_annotation_mode("auto") is None
+    assert reference_label_limit_for_annotation_mode("markers_only") == 0
+    assert reference_label_limit_for_annotation_mode("show_labels") == -1
+    assert reference_label_limit_for_annotation_mode("unknown") is None
 
 
 def test_key_value_table_formats_summary_values() -> None:

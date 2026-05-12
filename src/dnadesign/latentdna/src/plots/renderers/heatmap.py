@@ -151,6 +151,8 @@ def render_heatmap_panel(
     square_cells: bool = False,
     x_axis_label: str | None = None,
     y_axis_label: str | None = None,
+    show_x_tick_labels: bool = True,
+    show_x_axis_label: bool = True,
     show_y_tick_labels: bool = True,
     show_y_axis_label: bool = True,
     axis_styles: dict[str, AxisStyle] | None = None,
@@ -169,18 +171,26 @@ def render_heatmap_panel(
         axis_category_label(value, column=row_column, axis_styles=axis_styles, compact=square_cells)
         for value in row_values
     ]
-    axis.set_xticks(
-        range(len(column_values)),
-        x_tick_labels,
-        rotation=0 if square_cells else 30,
-        ha="center" if square_cells else "right",
-    )
+    if show_x_tick_labels:
+        axis.set_xticks(
+            range(len(column_values)),
+            x_tick_labels,
+            rotation=0 if square_cells else 30,
+            ha="center" if square_cells else "right",
+        )
+    else:
+        axis.set_xticks(range(len(column_values)), [])
+        axis.tick_params(axis="x", length=0)
     if show_y_tick_labels:
         axis.set_yticks(range(len(row_values)), y_tick_labels)
     else:
         axis.set_yticks(range(len(row_values)), [])
         axis.tick_params(axis="y", length=0)
-    axis.set_xlabel(resolved_axis_label(explicit_label=x_axis_label, fallback_label=column_column, width=20))
+    axis.set_xlabel(
+        resolved_axis_label(explicit_label=x_axis_label, fallback_label=column_column, width=20)
+        if show_x_axis_label
+        else ""
+    )
     axis.set_ylabel(
         resolved_axis_label(explicit_label=y_axis_label, fallback_label=row_column, width=20)
         if show_y_axis_label
@@ -209,7 +219,7 @@ def render_heatmap_panel(
                 fontsize=cell_label_font_size,
             )
     apply_axes_style(axis, grid=False)
-    if square_cells:
+    if square_cells and show_x_tick_labels:
         style_compact_category_tick_labels(axis, axis_name="x")
     if square_cells and show_y_tick_labels:
         style_compact_category_tick_labels(axis, axis_name="y")
@@ -369,6 +379,8 @@ def render_heatmap_grid_plot(
             strict=False,
         )
     ):
+        panel_row = panel_index // columns
+        show_x_axis = panel_row == rows_count - 1
         image = render_heatmap_panel(
             axis,
             grid=grid,
@@ -382,6 +394,8 @@ def render_heatmap_grid_plot(
             square_cells=bool(spec.square_panels),
             x_axis_label=spec.x_axis_label,
             y_axis_label=spec.y_axis_label,
+            show_x_tick_labels=show_x_axis,
+            show_x_axis_label=show_x_axis,
             show_y_tick_labels=not (spec.hide_repeated_y_axis and panel_index > 0),
             show_y_axis_label=not (spec.hide_repeated_y_axis and panel_index > 0),
             axis_styles=axis_styles,
@@ -400,11 +414,14 @@ def render_heatmap_grid_plot(
                 orientation="horizontal",
             )
         else:
-            fig.subplots_adjust(left=0.07, right=0.875, wspace=0.18, bottom=0.18, top=0.79)
-            colorbar = fig.colorbar(
-                image,
-                cax=fig.add_axes([0.922, 0.19, 0.013, 0.58]),
-                label=colorbar_label,
+            fig.subplots_adjust(left=0.07, right=0.96, wspace=0.22, hspace=0.36, bottom=0.22, top=0.86)
+            from matplotlib.colorbar import ColorbarBase
+
+            colorbar = ColorbarBase(
+                fig.add_axes([0.34, 0.06, 0.36, 0.024]),
+                cmap=cmap,
+                norm=norm,
+                orientation="horizontal",
             )
     else:
         colorbar = fig.colorbar(

@@ -400,7 +400,7 @@ plots:
     x_axis_label: Sigma-35 variant
     y_axis_label: '$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$'
     color_column: sig35_variant
-    render_mode: violin_box
+    render_mode: ordinal_swarm
     panel_titles:
       - Evo 2 7B · Mixed-length anchor-source insert · Intermediate block mean
       - Evo 2 7B · 1 kb construct context · Intermediate block mean
@@ -483,6 +483,8 @@ plots:
     scalar: candidate_decision_frontier_metrics
     x_column: design_family_balanced_separation_ratio
     y_column: sig35_ordinal_spearman
+    x_axis_label: '$S_{\mathrm{design}}^{\mathrm{balanced}}=\operatorname{mean}(d_{\mathrm{between}})/\operatorname{mean}(d_{\mathrm{within}})$'
+    y_axis_label: '$\rho_{\sigma35}=\operatorname{Spearman}(\Delta_{\mathrm{expected}},\Delta_{\mathrm{observed}})$'
     size_column: effective_rank
     size_range: [140, 260]
     label_column: frontier_label
@@ -1292,7 +1294,7 @@ deliverables:
   representation_health_summary:
     title: Representation health summary
     section: Gate
-    question: Which candidate mean-pooled Evo2 spaces are healthy enough to survive pre-assay triage?
+    question: Which candidate mean-pooled Evo 2 spaces are healthy enough to survive pre-assay triage?
     summary: Collapse gate across the canonical candidate inventory.
     recipe: pre_assay_representation_triage_recipe
     requires:

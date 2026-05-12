@@ -1173,6 +1173,489 @@ def test_cohort_similarity_margin_returns_nan_for_degenerate_standardized_view(t
     assert artifact.stats["synthetic_margin_ethanol_vs_background_degenerate_reference"] is True
 
 
+def test_tf_axis_orientation_audit_computes_generic_tf_bins_and_margins(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "bg_1",
+            "subject_id": "bg_1",
+            "source": "densegen",
+            "design_family": "background",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "bg_2",
+            "subject_id": "bg_2",
+            "source": "densegen",
+            "design_family": "background",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "eth_1",
+            "subject_id": "eth_1",
+            "source": "densegen",
+            "design_family": "ethanol",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "eth_2",
+            "subject_id": "eth_2",
+            "source": "densegen",
+            "design_family": "ethanol",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "cip_1",
+            "subject_id": "cip_1",
+            "source": "densegen",
+            "design_family": "ciprofloxacin",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "cip_2",
+            "subject_id": "cip_2",
+            "source": "densegen",
+            "design_family": "ciprofloxacin",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "native_baer",
+            "subject_id": "native_baer",
+            "source": "regulondb",
+            "design_family": "native",
+            "has_BaeR": True,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "native_lexa",
+            "subject_id": "native_lexa",
+            "source": "regulondb",
+            "design_family": "native",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": True,
+        },
+        {
+            "id": "native_mixed",
+            "subject_id": "native_mixed",
+            "source": "regulondb",
+            "design_family": "native",
+            "has_BaeR": True,
+            "has_CpxR": False,
+            "has_LexA": True,
+        },
+        {
+            "id": "native_none",
+            "subject_id": "native_none",
+            "source": "regulondb",
+            "design_family": "native",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+    ]
+    matrix = np.asarray(
+        [
+            [0.0, 0.0],
+            [0.0, 0.2],
+            [2.0, 0.0],
+            [2.0, 0.2],
+            [0.0, 2.0],
+            [0.2, 2.0],
+            [1.8, 0.1],
+            [0.1, 1.8],
+            [1.4, 1.4],
+            [0.1, 0.1],
+        ],
+        dtype=np.float32,
+    )
+    _write_view_artifact(workspace_dir, view_id="tf_view", rows=rows, matrix=matrix, record_key="id")
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="tf_axis_orientation_audit",
+        builder_kind="tf_axis_orientation_audit",
+        params={
+            "view_id": "tf_view",
+            "cohort_column": "design_family",
+            "centroid_groups": {
+                "background": ["background"],
+                "ethanol": ["ethanol"],
+                "cipro": ["ciprofloxacin"],
+            },
+            "tf_columns": {
+                "ethanol": ["has_BaeR", "has_CpxR"],
+                "cipro": ["has_LexA"],
+            },
+            "embedding_view": "pdual10_core60_bidir",
+            "output_filter": {"column": "source", "equals": "regulondb"},
+        },
+    )
+
+    table_artifact = pq.read_table(artifact.artifact_dir / "table.parquet")
+    table = table_artifact.to_pylist()
+    by_id = {row["id"]: row for row in table}
+    assert set(by_id) == {"native_baer", "native_lexa", "native_mixed", "native_none"}
+    assert "design_family" not in table_artifact.column_names
+    assert by_id["native_baer"]["tf_bin"] == "ethanol_TF"
+    assert by_id["native_lexa"]["tf_bin"] == "lexA_TF"
+    assert by_id["native_mixed"]["tf_bin"] == "mixed"
+    assert by_id["native_none"]["tf_bin"] == "neither"
+    assert by_id["native_baer"]["embedding_view"] == "pdual10_core60_bidir"
+    assert by_id["native_baer"]["ethanolness"] > by_id["native_none"]["ethanolness"]
+    assert by_id["native_lexa"]["ciproness"] > by_id["native_none"]["ciproness"]
+    assert artifact.stats["input_rows"] == 10
+    assert artifact.stats["tf_bin_counts"] == {"ethanol_TF": 1, "lexA_TF": 1, "mixed": 1, "neither": 1}
+
+
+def test_tf_axis_orientation_audit_requires_explicit_output_filter(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "bg_1", "subject_id": "bg_1", "source": "densegen", "design_family": "background"},
+        {"id": "eth_1", "subject_id": "eth_1", "source": "densegen", "design_family": "ethanol"},
+        {"id": "cip_1", "subject_id": "cip_1", "source": "densegen", "design_family": "ciprofloxacin"},
+        {
+            "id": "native_1",
+            "subject_id": "native_1",
+            "source": "regulondb",
+            "design_family": "native",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+    ]
+    for row in rows[:3]:
+        row["has_BaeR"] = False
+        row["has_CpxR"] = False
+        row["has_LexA"] = False
+    matrix = np.asarray([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0], [0.5, 0.5]], dtype=np.float32)
+    _write_view_artifact(workspace_dir, view_id="tf_view", rows=rows, matrix=matrix, record_key="id")
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    with pytest.raises(ContractViolationError, match="requires output_filter"):
+        build_scalar_artifact(
+            context,
+            scalar_id="tf_axis_orientation_audit",
+            builder_kind="tf_axis_orientation_audit",
+            params={
+                "view_id": "tf_view",
+                "cohort_column": "design_family",
+                "centroid_groups": {
+                    "background": ["background"],
+                    "ethanol": ["ethanol"],
+                    "cipro": ["ciprofloxacin"],
+                },
+                "tf_columns": {
+                    "ethanol": ["has_BaeR", "has_CpxR"],
+                    "cipro": ["has_LexA"],
+                },
+            },
+        )
+
+
+def test_tf_axis_orientation_audit_fails_fast_when_tf_columns_are_missing(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "bg_1", "subject_id": "bg_1", "design_family": "background", "has_BaeR": False},
+        {"id": "eth_1", "subject_id": "eth_1", "design_family": "ethanol", "has_BaeR": False},
+        {"id": "cip_1", "subject_id": "cip_1", "design_family": "ciprofloxacin", "has_BaeR": False},
+    ]
+    matrix = np.asarray([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], dtype=np.float32)
+    _write_view_artifact(workspace_dir, view_id="tf_view", rows=rows, matrix=matrix, record_key="id")
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    with pytest.raises(ContractViolationError, match="missing required tf columns"):
+        build_scalar_artifact(
+            context,
+            scalar_id="tf_axis_orientation_audit",
+            builder_kind="tf_axis_orientation_audit",
+            params={
+                "view_id": "tf_view",
+                "cohort_column": "design_family",
+                "centroid_groups": {
+                    "background": ["background"],
+                    "ethanol": ["ethanol"],
+                    "cipro": ["ciprofloxacin"],
+                },
+                "tf_columns": {
+                    "ethanol": ["has_BaeR", "has_CpxR"],
+                    "cipro": ["has_LexA"],
+                },
+                "output_filter": {"column": "design_family", "equals": "native"},
+            },
+        )
+
+
+def test_tf_axis_orientation_audit_can_join_generic_tf_association_overlay(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "bg_1", "subject_id": "bg_1", "source": "densegen", "design_family": "background"},
+        {"id": "bg_2", "subject_id": "bg_2", "source": "densegen", "design_family": "background"},
+        {"id": "eth_1", "subject_id": "eth_1", "source": "densegen", "design_family": "ethanol"},
+        {"id": "cip_1", "subject_id": "cip_1", "source": "densegen", "design_family": "ciprofloxacin"},
+        {"id": "native_cpx", "subject_id": "native_cpx", "source": "regulondb", "design_family": "native"},
+        {"id": "native_lexa", "subject_id": "native_lexa", "source": "regulondb", "design_family": "native"},
+    ]
+    matrix = np.asarray(
+        [
+            [1.0, 0.0],
+            [1.0, 0.1],
+            [0.0, 1.0],
+            [1.0, 1.0],
+            [0.1, 1.0],
+            [0.9, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    _write_view_artifact(workspace_dir, view_id="tf_view", rows=rows, matrix=matrix, record_key="id")
+    overlay_path = workspace_dir / "inputs" / "regulatory_interactions.parquet"
+    overlay_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"usr_id": "native_cpx", "regulator_abbrev": "CpxR"},
+                {"usr_id": "native_lexa", "regulator_abbrev": "LexA"},
+            ]
+        ),
+        overlay_path,
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="tf_axis_orientation_audit",
+        builder_kind="tf_axis_orientation_audit",
+        params={
+            "view_id": "tf_view",
+            "cohort_column": "design_family",
+            "centroid_groups": {
+                "background": ["background"],
+                "ethanol": ["ethanol"],
+                "cipro": ["ciprofloxacin"],
+            },
+            "tf_columns": {
+                "ethanol": ["has_BaeR", "has_CpxR"],
+                "cipro": ["has_LexA"],
+            },
+            "association_overlay": {
+                "path": "inputs/regulatory_interactions.parquet",
+                "row_key": "id",
+                "relation_key": "usr_id",
+                "regulator_column": "regulator_abbrev",
+                "tf_aliases": {
+                    "has_BaeR": ["BaeR"],
+                    "has_CpxR": ["CpxR"],
+                    "has_LexA": ["LexA"],
+                },
+            },
+            "output_filter": {"column": "source", "equals": "regulondb"},
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    by_id = {row["id"]: row for row in table}
+    assert set(by_id) == {"native_cpx", "native_lexa"}
+    assert by_id["native_cpx"]["has_CpxR"] is True
+    assert by_id["native_cpx"]["tf_bin"] == "ethanol_TF"
+    assert by_id["native_lexa"]["has_LexA"] is True
+    assert by_id["native_lexa"]["tf_bin"] == "lexA_TF"
+    assert any(input_ref.kind == "association_overlay" for input_ref in artifact.inputs)
+    assert artifact.stats["association_overlay_rows"] == 2
+
+
+def test_tf_axis_orientation_audit_can_use_separate_centroid_and_audit_views(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    centroid_rows = [
+        {"id": "bg_1", "subject_id": "bg_1", "source": "densegen", "design_family": "background"},
+        {"id": "eth_1", "subject_id": "eth_1", "source": "densegen", "design_family": "ethanol"},
+        {"id": "cip_1", "subject_id": "cip_1", "source": "densegen", "design_family": "ciprofloxacin"},
+    ]
+    audit_rows = [
+        {
+            "id": "native_baer",
+            "subject_id": "native_baer",
+            "source": "regulondb",
+            "has_BaeR": True,
+            "has_CpxR": False,
+            "has_LexA": False,
+        },
+        {
+            "id": "native_lexa",
+            "subject_id": "native_lexa",
+            "source": "regulondb",
+            "has_BaeR": False,
+            "has_CpxR": False,
+            "has_LexA": True,
+        },
+    ]
+    _write_view_artifact(
+        workspace_dir,
+        view_id="synthetic_centroids",
+        rows=centroid_rows,
+        matrix=np.asarray([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], dtype=np.float32),
+        record_key="id",
+    )
+    _write_view_artifact(
+        workspace_dir,
+        view_id="native_pdual_context",
+        rows=audit_rows,
+        matrix=np.asarray([[0.0, 1.0], [1.0, 1.0]], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="tf_axis_orientation_audit",
+        builder_kind="tf_axis_orientation_audit",
+        params={
+            "view_id": "synthetic_centroids",
+            "audit_view_id": "native_pdual_context",
+            "cohort_column": "design_family",
+            "centroid_groups": {
+                "background": ["background"],
+                "ethanol": ["ethanol"],
+                "cipro": ["ciprofloxacin"],
+            },
+            "tf_columns": {
+                "ethanol": ["has_BaeR", "has_CpxR"],
+                "cipro": ["has_LexA"],
+            },
+            "output_filter": {"column": "source", "equals": "regulondb"},
+        },
+    )
+
+    rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    assert {row["id"] for row in rows} == {"native_baer", "native_lexa"}
+    assert artifact.stats["centroid_view_id"] == "synthetic_centroids"
+    assert artifact.stats["audit_view_id"] == "native_pdual_context"
+    assert artifact.stats["centroid_rows"] == 3
+    assert artifact.stats["input_rows"] == 2
+    assert {input_ref.artifact_id for input_ref in artifact.inputs} >= {"synthetic_centroids", "native_pdual_context"}
+
+
+def test_tf_axis_orientation_tests_reports_effect_sizes_and_excludes_mixed_rows(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    audit_rows = [
+        {"id": "baer_1", "source": "regulondb", "tf_bin": "ethanol_TF", "ethanolness": 1.2, "ciproness": 0.0},
+        {"id": "cpxr_1", "source": "regulondb", "tf_bin": "ethanol_TF", "ethanolness": 1.0, "ciproness": 0.1},
+        {"id": "lexa_1", "source": "regulondb", "tf_bin": "lexA_TF", "ethanolness": 0.1, "ciproness": 1.2},
+        {"id": "lexa_2", "source": "regulondb", "tf_bin": "lexA_TF", "ethanolness": 0.0, "ciproness": 1.1},
+        {"id": "mixed_1", "source": "regulondb", "tf_bin": "mixed", "ethanolness": 10.0, "ciproness": 10.0},
+        {"id": "none_1", "source": "regulondb", "tf_bin": "neither", "ethanolness": 0.2, "ciproness": 0.1},
+        {"id": "none_2", "source": "regulondb", "tf_bin": "neither", "ethanolness": 0.1, "ciproness": 0.2},
+        {"id": "dense_1", "source": "densegen", "tf_bin": "neither", "ethanolness": 99.0, "ciproness": 99.0},
+    ]
+    scalar_dir = workspace_dir / "outputs" / "scalars" / "tf_axis_orientation_audit"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(pa.Table.from_pylist(audit_rows), scalar_dir / "table.parquet")
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="tf_axis_orientation_tests",
+        builder_kind="tf_axis_orientation_tests",
+        params={
+            "source_scalar": "tf_axis_orientation_audit",
+            "where": {"column": "source", "equals": "regulondb"},
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    by_axis = {row["axis"]: row for row in rows_table}
+    assert by_axis["ethanolness"]["target_bin"] == "ethanol_TF"
+    assert by_axis["ethanolness"]["n_target"] == 2
+    assert by_axis["ethanolness"]["n_background"] == 2
+    assert by_axis["ethanolness"]["median_difference"] > 0
+    assert by_axis["ethanolness"]["rank_biserial"] == pytest.approx(1.0)
+    assert by_axis["ethanolness"]["p_value_method"] == "exact_enumeration"
+    assert by_axis["ethanolness"]["tie_group_count"] == 0
+    assert by_axis["ciproness"]["target_bin"] == "lexA_TF"
+    assert by_axis["ciproness"]["rank_biserial"] == pytest.approx(1.0)
+    assert artifact.stats["tested_axes"] == ["ethanolness", "ciproness"]
+
+
+def test_tf_axis_orientation_tests_fails_fast_when_where_column_is_missing(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    scalar_dir = workspace_dir / "outputs" / "scalars" / "tf_axis_orientation_audit"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"id": "baer_1", "tf_bin": "ethanol_TF", "ethanolness": 1.0, "ciproness": 0.0},
+                {"id": "none_1", "tf_bin": "neither", "ethanolness": 0.0, "ciproness": 0.0},
+            ]
+        ),
+        scalar_dir / "table.parquet",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    with pytest.raises(ContractViolationError, match="where column"):
+        build_scalar_artifact(
+            context,
+            scalar_id="tf_axis_orientation_tests",
+            builder_kind="tf_axis_orientation_tests",
+            params={
+                "source_scalar": "tf_axis_orientation_audit",
+                "where": {"column": "source", "equals": "regulondb"},
+            },
+        )
+
+
+def test_tf_axis_orientation_tests_requires_explicit_where_filter(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    scalar_dir = workspace_dir / "outputs" / "scalars" / "tf_axis_orientation_audit"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"id": "baer_1", "source": "regulondb", "tf_bin": "ethanol_TF", "ethanolness": 1.0, "ciproness": 0.0},
+                {"id": "none_1", "source": "regulondb", "tf_bin": "neither", "ethanolness": 0.0, "ciproness": 0.0},
+            ]
+        ),
+        scalar_dir / "table.parquet",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    with pytest.raises(ContractViolationError, match="requires where"):
+        build_scalar_artifact(
+            context,
+            scalar_id="tf_axis_orientation_tests",
+            builder_kind="tf_axis_orientation_tests",
+            params={"source_scalar": "tf_axis_orientation_audit"},
+        )
+
+
 def test_cohort_similarity_margin_honors_sample_scope(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -2428,6 +2911,298 @@ def test_collection_strength_ordinal_audit_keeps_reference_strength_scales_separ
         ("anderson_igem", 3),
     }
     assert all(row["ordinal_order_source"] == "promoter_standard__strength_value_numeric" for row in table_rows)
+
+
+def test_ordinal_ladder_rows_emit_sigma35_and_collection_strength_rows(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "sig_f",
+            "subject_id": "sig_f",
+            "sig35_variant": "f",
+            "source_class": "densegen",
+            "promoter_standard__collection_id": None,
+            "usr_label__primary": "sig_f",
+            "promoter_standard__strength_value_numeric": None,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "sig_b",
+            "subject_id": "sig_b",
+            "sig35_variant": "b",
+            "source_class": "densegen",
+            "promoter_standard__collection_id": None,
+            "usr_label__primary": "sig_b",
+            "promoter_standard__strength_value_numeric": None,
+            "embedding": [-1.0, 0.0],
+        },
+        {
+            "id": "w1",
+            "subject_id": "w1",
+            "sig35_variant": "control",
+            "source_class": "construct_derived",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "usr_label__primary": "W1_core60",
+            "promoter_standard__display_name": "W1",
+            "promoter_standard__strength_value_numeric": 1.0,
+            "selection_basis": "template_window_center",
+            "embedding": [0.0, -1.0],
+        },
+        {
+            "id": "w9",
+            "subject_id": "w9",
+            "sig35_variant": "control",
+            "source_class": "construct_derived",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "usr_label__primary": "W9_core60",
+            "promoter_standard__display_name": "W9",
+            "promoter_standard__strength_value_numeric": 9.0,
+            "selection_basis": "template_window_center",
+            "embedding": [0.0, 1.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+    study_inputs_dir = workspace_dir / "study_inputs"
+    study_inputs_dir.mkdir(parents=True, exist_ok=True)
+    (study_inputs_dir / "sig35_order.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "source": "test fixture",
+                "exploratory": False,
+                "order": [
+                    {"variant_id": "f", "sequence": "TTGACA", "rank": 1},
+                    {"variant_id": "b", "sequence": "CTGACA", "rank": 5},
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="ordinal_ladder_rows",
+        builder_kind="ordinal_ladder_rows",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "groups": [
+                {
+                    "group_id": "sigma35",
+                    "label": "Sigma-35",
+                    "axis": {
+                        "axis_id": "sigma35",
+                        "label": "Sigma-35",
+                        "column": "sig35_variant",
+                        "order_path": "study_inputs/sig35_order.yaml",
+                        "exclude_values": ["control"],
+                        "stronger_rank": "min",
+                    },
+                    "where": [{"column": "source_class", "equals": "densegen"}],
+                },
+                {
+                    "group_id": "t7_w_collection_core60",
+                    "label": "W collection core60",
+                    "axis": {
+                        "axis_id": "t7_w_collection_strength",
+                        "label": "W collection strength",
+                        "column": "usr_label__primary",
+                        "rank_column": "promoter_standard__strength_value_numeric",
+                        "stronger_rank": "max",
+                    },
+                    "where": [
+                        {"column": "promoter_standard__collection_id", "equals": "t7_w_collection"},
+                        {"column": "usr_label__primary", "regex": ".*_core60$"},
+                    ],
+                    "label_column": "promoter_standard__display_name",
+                },
+            ],
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    assert {row["ordinal_group_id"] for row in table_rows} == {"sigma35", "t7_w_collection_core60"}
+    assert {row["ordinal_label"] for row in table_rows if row["ordinal_group_id"] == "sigma35"} == {"B", "F"}
+    assert {row["ordinal_label"] for row in table_rows if row["ordinal_group_id"] == "t7_w_collection_core60"} == {
+        "W1",
+        "W9",
+    }
+    assert all(row["ordinal_margin"] is not None for row in table_rows)
+    assert artifact.stats["ordinal_group_count"] == 2
+
+
+def test_ordinal_ladder_rows_use_filtered_core60_collection_extremes(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {
+            "id": "w1_rc",
+            "subject_id": "w1_rc",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "usr_label__primary": "W1_core60_context1kb_rc",
+            "promoter_standard__display_name": "W1",
+            "promoter_standard__strength_value_numeric": 1.0,
+            "embedding": [0.0, -1.0],
+        },
+        {
+            "id": "t7_rc",
+            "subject_id": "t7_rc",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "usr_label__primary": "T7A1_core60_context1kb_rc",
+            "promoter_standard__display_name": "T7A1",
+            "promoter_standard__strength_value_numeric": 10.0,
+            "embedding": [0.0, 1.0],
+        },
+        {
+            "id": "w_native_decoy",
+            "subject_id": "w_native_decoy",
+            "promoter_standard__collection_id": "t7_w_collection",
+            "usr_label__primary": "W9_native",
+            "promoter_standard__display_name": "W9 native decoy",
+            "promoter_standard__strength_value_numeric": 999.0,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "j23103_rc",
+            "subject_id": "j23103_rc",
+            "promoter_standard__collection_id": "anderson_igem",
+            "usr_label__primary": "J23103_core60_context1kb_rc",
+            "promoter_standard__display_name": "J23103",
+            "promoter_standard__strength_value_numeric": 0.01,
+            "embedding": [-1.0, 0.0],
+        },
+        {
+            "id": "j23113_rc",
+            "subject_id": "j23113_rc",
+            "promoter_standard__collection_id": "anderson_igem",
+            "usr_label__primary": "J23113_core60_context1kb_rc",
+            "promoter_standard__display_name": "J23113",
+            "promoter_standard__strength_value_numeric": 0.01,
+            "embedding": [-1.0, 0.0],
+        },
+        {
+            "id": "j23100_rc",
+            "subject_id": "j23100_rc",
+            "promoter_standard__collection_id": "anderson_igem",
+            "usr_label__primary": "J23100_core60_context1kb_rc",
+            "promoter_standard__display_name": "J23100",
+            "promoter_standard__strength_value_numeric": 1.0,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "j23119_rc",
+            "subject_id": "j23119_rc",
+            "promoter_standard__collection_id": "anderson_igem",
+            "usr_label__primary": "J23119_core60_context1kb_rc",
+            "promoter_standard__display_name": "J23119",
+            "promoter_standard__strength_value_numeric": 1.0,
+            "embedding": [1.0, 0.0],
+        },
+        {
+            "id": "anderson_native_decoy",
+            "subject_id": "anderson_native_decoy",
+            "promoter_standard__collection_id": "anderson_igem",
+            "usr_label__primary": "J23199_native",
+            "promoter_standard__display_name": "J23199 native decoy",
+            "promoter_standard__strength_value_numeric": 2.0,
+            "embedding": [0.0, 1.0],
+        },
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="ordinal_ladder_rows",
+        builder_kind="ordinal_ladder_rows",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "groups": [
+                {
+                    "group_id": "t7_w_collection_core60",
+                    "label": "W collection core60",
+                    "axis": {
+                        "axis_id": "t7_w_collection_strength",
+                        "label": "W collection strength",
+                        "column": "usr_label__primary",
+                        "rank_column": "promoter_standard__strength_value_numeric",
+                        "stronger_rank": "max",
+                    },
+                    "where": [
+                        {"column": "promoter_standard__collection_id", "equals": "t7_w_collection"},
+                        {"column": "usr_label__primary", "regex": ".*_core60(?:_context1kb_(?:forward|rc))?$"},
+                    ],
+                    "label_column": "promoter_standard__display_name",
+                },
+                {
+                    "group_id": "anderson_igem_core60",
+                    "label": "Anderson iGEM core60",
+                    "axis": {
+                        "axis_id": "anderson_igem_strength",
+                        "label": "Anderson iGEM strength",
+                        "column": "usr_label__primary",
+                        "rank_column": "promoter_standard__strength_value_numeric",
+                        "stronger_rank": "max",
+                    },
+                    "where": [
+                        {"column": "promoter_standard__collection_id", "equals": "anderson_igem"},
+                        {"column": "usr_label__primary", "regex": ".*_core60(?:_context1kb_(?:forward|rc))?$"},
+                    ],
+                    "label_column": "promoter_standard__display_name",
+                },
+            ],
+        },
+    )
+
+    table_rows = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    rows_by_group = {
+        group_id: [row for row in table_rows if row["ordinal_group_id"] == group_id]
+        for group_id in {"t7_w_collection_core60", "anderson_igem_core60"}
+    }
+    assert {row["usr_label__primary"] for row in rows_by_group["t7_w_collection_core60"]} == {
+        "W1_core60_context1kb_rc",
+        "T7A1_core60_context1kb_rc",
+    }
+    assert {row["ordinal_target_values"] for row in rows_by_group["t7_w_collection_core60"]} == {
+        "T7A1_core60_context1kb_rc"
+    }
+    assert {row["ordinal_control_values"] for row in rows_by_group["t7_w_collection_core60"]} == {
+        "W1_core60_context1kb_rc"
+    }
+    assert {row["ordinal_target_members"] for row in rows_by_group["t7_w_collection_core60"]} == {1}
+    assert {row["ordinal_control_members"] for row in rows_by_group["t7_w_collection_core60"]} == {1}
+
+    assert {row["usr_label__primary"] for row in rows_by_group["anderson_igem_core60"]} == {
+        "J23103_core60_context1kb_rc",
+        "J23113_core60_context1kb_rc",
+        "J23100_core60_context1kb_rc",
+        "J23119_core60_context1kb_rc",
+    }
+    assert {row["ordinal_target_values"] for row in rows_by_group["anderson_igem_core60"]} == {
+        "J23100_core60_context1kb_rc,J23119_core60_context1kb_rc"
+    }
+    assert {row["ordinal_control_values"] for row in rows_by_group["anderson_igem_core60"]} == {
+        "J23103_core60_context1kb_rc,J23113_core60_context1kb_rc"
+    }
+    assert {row["ordinal_target_members"] for row in rows_by_group["anderson_igem_core60"]} == {2}
+    assert {row["ordinal_control_members"] for row in rows_by_group["anderson_igem_core60"]} == {2}
 
 
 def test_axis_centroid_distance_includes_unranked_axis_values(tmp_path: Path) -> None:

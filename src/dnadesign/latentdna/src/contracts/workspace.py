@@ -507,6 +507,7 @@ class ReferenceSetConfig(StrictWorkspaceModel):
     match_column: str = "id"
     label_column: str | None = None
     label_mode: Literal["label_and_highlight", "highlight_only"] = "label_and_highlight"
+    label_limit: int | None = Field(default=None, ge=0)
     display_labels: dict[str, str] = Field(default_factory=dict)
     where: list[ReferenceSetSelectorConfig] = Field(default_factory=list)
     where_all: list[ReferenceSetSelectorConfig] = Field(default_factory=list)

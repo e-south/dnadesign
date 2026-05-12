@@ -467,18 +467,18 @@ def resolve_reference_annotation(
         return {
             "reference_set_id": selected_reference_set_id,
             "match_column": "usr_label__primary",
-            "labels": list(fallback_labels or []),
+            "labels": [],
             "display_labels": {},
-            "label_limit": label_limit,
+            "label_limit": 0,
             "warnings": [f"reference set `{selected_reference_set_id}` could not be loaded: {exc}"],
         }
     if reference_set is None:
         return {
             "reference_set_id": selected_reference_set_id,
             "match_column": "usr_label__primary",
-            "labels": list(fallback_labels or []),
+            "labels": [],
             "display_labels": {},
-            "label_limit": label_limit,
+            "label_limit": 0,
             "warnings": [f"reference set `{selected_reference_set_id}` is not configured"],
         }
 
@@ -519,7 +519,13 @@ def resolve_reference_annotation(
             display_value = configured_display_labels.get(match_value, match_value)
         display_labels[match_value] = display_value
 
-    default_label_limit = 0 if len(resolution.matched_ids) > 5 else 5
+    configured_label_limit = getattr(reference_set, "label_limit", None)
+    if configured_label_limit is not None:
+        default_label_limit = int(configured_label_limit)
+    elif len(resolution.matched_ids) > 5:
+        default_label_limit = 0
+    else:
+        default_label_limit = 5
     warnings = []
     if resolution.missing_columns:
         warnings.append(
@@ -569,6 +575,8 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
         return humanize_display_text(column)
     if column == "promoter_standard__strength_value_numeric":
         return "Reference strength"
+    if column == "sfxi_ref__metric_value":
+        return "SFXI metric"
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
         scope = "1 kb construct context" if "__template_1kb_" in column else "anchor-source insert"
@@ -576,6 +584,46 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
     if column.startswith("cluster_label__"):
         return humanize_display_text(column.replace("cluster_label__", ""))
     return humanize_column_name(column)
+
+
+def hue_option_scale(
+    hue_options: object,
+    column: str | None,
+    *,
+    panel_count: int = 1,
+) -> str:
+    """Return the configured continuous-hue scale contract for a selected column."""
+
+    column_name = str(column or "").strip()
+    if not column_name:
+        return "global"
+    if isinstance(hue_options, list):
+        for option in hue_options:
+            option_column = ""
+            option_scale = ""
+            if isinstance(option, dict):
+                option_column = str(option.get("column") or "").strip()
+                option_scale = str(option.get("scale") or "").strip()
+            else:
+                option_column = str(getattr(option, "column", "") or "").strip()
+                option_scale = str(getattr(option, "scale", "") or "").strip()
+            if option_column == column_name and option_scale in {"global", "panel"}:
+                return option_scale
+    if column_name == "gc_fraction" and panel_count > 1:
+        return "panel"
+    return "global"
+
+
+def continuous_hue_colorbar_label(
+    column: str,
+    *,
+    axis_styles: dict[str, object] | None = None,
+    panel_scaled: bool = False,
+) -> str:
+    label = display_hue_label(column, axis_styles=axis_styles)
+    if panel_scaled:
+        return f"{label} (panel scale)"
+    return label
 
 
 def display_hue_value(column: str | None, value: object, *, axis_styles: dict[str, object] | None = None) -> str:
@@ -969,6 +1017,8 @@ def reference_hue_render_params(
     reference_labels: list[str],
     reference_match_column: str = "usr_label__primary",
     reference_hue_column: str | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
 ) -> dict[str, object] | None:
     hue_column = str(reference_hue_column or "").strip()
     if not hue_column:
@@ -981,6 +1031,8 @@ def reference_hue_render_params(
             frame,
             reference_labels=reference_labels,
             reference_match_column=reference_match_column,
+            x_column=x_column,
+            y_column=y_column,
         )
         if selected.empty or hue_column not in selected.columns:
             continue
@@ -995,12 +1047,31 @@ def reference_hue_render_params(
     return continuous_hue_render_params(hue_column, combined)
 
 
+def reference_annotation_mode_options() -> dict[str, str]:
+    return {
+        "Auto labels": "auto",
+        "Markers only": "markers_only",
+        "Show text labels": "show_labels",
+    }
+
+
+def reference_label_limit_for_annotation_mode(mode: str | None) -> int | None:
+    normalized = str(mode or "auto").strip()
+    if normalized == "markers_only":
+        return 0
+    if normalized == "show_labels":
+        return -1
+    return None
+
+
 def reference_hue_coverage_warnings(
     frames: list[pd.DataFrame],
     *,
     reference_labels: list[str],
     reference_match_column: str = "usr_label__primary",
     reference_hue_column: str | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
 ) -> list[str]:
     hue_column = str(reference_hue_column or "").strip()
     if not hue_column:
@@ -1012,6 +1083,8 @@ def reference_hue_coverage_warnings(
             frame,
             reference_labels=reference_labels,
             reference_match_column=reference_match_column,
+            x_column=x_column,
+            y_column=y_column,
         )
         if selected.empty:
             continue
@@ -1264,6 +1337,9 @@ def draw_reference_labels(
     if reference_label_limit is not None and reference_label_limit >= 0:
         label_rows = label_rows.head(reference_label_limit)
     display_labels = reference_display_labels or {}
+    label_font_size = 7.4 if len(label_rows) > 5 else PLOT_TICK_FONT_SIZE
+    label_font_weight = "medium" if len(label_rows) > 5 else "semibold"
+    label_box_padding = 0.12 if len(label_rows) > 5 else 0.18
     for row in label_rows.to_dict(orient="records"):
         point_x = float(row[x_column])
         point_y = float(row[y_column])
@@ -1278,7 +1354,7 @@ def draw_reference_labels(
             placed_boxes=placed_boxes,
             x_mid=display_x_mid,
             y_mid=display_y_mid,
-            font_size=PLOT_TICK_FONT_SIZE,
+            font_size=label_font_size,
             left_padding_px=left_padding_px,
             right_padding_px=right_padding_px,
         )
@@ -1288,13 +1364,13 @@ def draw_reference_labels(
             xy=(point_x, point_y),
             xytext=(placement.offset_x, placement.offset_y),
             textcoords="offset pixels",
-            fontsize=PLOT_TICK_FONT_SIZE,
-            fontweight="semibold",
+            fontsize=label_font_size,
+            fontweight=label_font_weight,
             ha=placement.ha,
             va=placement.va,
             color=TEXT_COLOR,
             bbox={
-                "boxstyle": "round,pad=0.18",
+                "boxstyle": f"round,pad={label_box_padding}",
                 "fc": "white",
                 "ec": "none",
                 "alpha": ANNOTATION_LABEL_BOX_ALPHA,

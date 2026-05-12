@@ -595,6 +595,7 @@ def _reference_set_controls(context) -> list[WorkspaceNotebookReferenceSet]:
                 match_column=reference_set.match_column,
                 label_column=reference_set.label_column,
                 label_mode=reference_set.label_mode,
+                label_limit=reference_set.label_limit,
                 explicit_ids=[str(value) for value in reference_set.ids],
                 selector_columns=list(dict.fromkeys(selector_columns)),
             )

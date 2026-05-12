@@ -103,6 +103,18 @@ def _legend_panel_gap(fig) -> float:
     return float(panel_y0 - legend_bbox.y1)
 
 
+def _row_xlabel_title_overlaps(fig, *, columns: int) -> list[bool]:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    axes = [axis for axis in fig.axes if axis.axison]
+    overlaps: list[bool] = []
+    for top_axis, bottom_axis in zip(axes[:columns], axes[columns : columns * 2], strict=False):
+        xlabel_bbox = top_axis.xaxis.label.get_window_extent(renderer=renderer)
+        title_bbox = bottom_axis.title.get_window_extent(renderer=renderer)
+        overlaps.append(bool(xlabel_bbox.overlaps(title_bbox)))
+    return overlaps
+
+
 def _write_manifest(
     artifact_dir: Path,
     *,
@@ -255,6 +267,47 @@ def test_render_projection_grid_prepends_dynamic_contract_to_semantic_alt_text(
     assert alt.endswith("Configured UMAP gallery semantics.")
 
 
+def test_render_projection_grid_panel_scales_gc_fraction_without_many_colorbars(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: fig)
+    frames = [
+        pd.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0], "gc_fraction": [0.20, 0.22]}),
+        pd.DataFrame({"x": [0.0, 1.0], "y": [1.0, 0.0], "gc_fraction": [0.53, 0.55]}),
+    ]
+
+    fig = projection_runtime.render_projection_grid(
+        [
+            {"view_id": "anchor", "projection_id": "umap_anchor", "title": "Anchor"},
+            {"view_id": "context", "projection_id": "umap_context", "title": "1 kb context"},
+        ],
+        frames=frames,
+        hue_column="gc_fraction",
+        hue_kinds={"gc_fraction": "continuous"},
+        joinable_tables=[],
+        reference_labels=[],
+        reference_set_id="",
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    try:
+        panel_axes = fig.axes[:2]
+        colorbar_axes = fig.axes[2:]
+        assert len(colorbar_axes) == 1
+        assert panel_axes[0].collections[0].norm.vmax < 0.30
+        assert panel_axes[1].collections[0].norm.vmin > 0.50
+        assert colorbar_axes[0].get_xlabel() == "GC fraction (panel scale)"
+        assert [tick.get_text() for tick in colorbar_axes[0].get_xticklabels()] == [
+            "panel low",
+            "mid",
+            "panel high",
+        ]
+    finally:
+        plt.close(fig)
+
+
 def test_render_projection_grid_surfaces_reference_overlay_warnings(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(projection_runtime, "render_matplotlib_figure", lambda fig, alt=None: "rendered plot")
     monkeypatch.setattr(
@@ -316,6 +369,63 @@ def test_render_projection_grid_surfaces_missing_reference_hue_values(monkeypatc
     assert isinstance(rendered, mo.Html)
     assert "Reference overlay warning" in rendered.text
     assert "reference hue `promoter_standard__strength_value_numeric` has no finite values" in rendered.text
+
+
+def test_render_projection_grid_forwards_reference_label_limit_override(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured_resolution: dict[str, object] = {}
+    captured_draw_calls: list[dict[str, object]] = []
+
+    def fake_resolve_reference_annotation(*args, **kwargs):
+        del args
+        captured_resolution["label_limit"] = kwargs.get("label_limit")
+        return {
+            "labels": ["W1", "W9"],
+            "match_column": "usr_label__primary",
+            "display_labels": {"W1": "W1", "W9": "W9"},
+            "label_limit": kwargs.get("label_limit"),
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(projection_runtime, "resolve_reference_annotation", fake_resolve_reference_annotation)
+    monkeypatch.setattr(
+        projection_runtime,
+        "draw_reference_labels",
+        lambda *args, **kwargs: captured_draw_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        projection_runtime,
+        "render_matplotlib_figure",
+        lambda fig, alt=None: (plt.close(fig) or "rendered plot"),
+    )
+
+    rendered = projection_runtime.render_projection_grid(
+        [{"view_id": "view_a", "projection_id": "proj_a", "title": "Anchor view"}],
+        frames=[
+            pd.DataFrame(
+                {
+                    "x": [0.0, 1.0],
+                    "y": [1.0, 0.0],
+                    "usr_label__primary": ["W1", "W9"],
+                }
+            )
+        ],
+        hue_column=None,
+        hue_kinds={},
+        joinable_tables=[],
+        reference_labels=[],
+        reference_set_id="reference_w_collection",
+        reference_label_limit=-1,
+        output_root=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    assert rendered == "rendered plot"
+    assert captured_resolution["label_limit"] == -1
+    assert captured_draw_calls
+    assert captured_draw_calls[0]["reference_label_limit"] == -1
 
 
 def test_render_projection_grid_warns_when_reference_hue_is_missing_in_one_panel(
@@ -887,6 +997,8 @@ def test_render_projection_grid_uses_two_rows_for_intermediate_and_output_galler
         panel_axes = fig.axes[:12]
         assert len({round(axis.get_position().y0, 3) for axis in panel_axes}) == 2
         assert len({round(axis.get_position().x0, 3) for axis in panel_axes[:6]}) == 6
+        assert {axis.get_xlabel() for axis in panel_axes} == {"Projection 1"}
+        assert not any(_row_xlabel_title_overlaps(fig, columns=6))
         assert 0.0 <= _legend_panel_gap(fig) <= 0.12
     finally:
         plt.close(fig)
@@ -1247,6 +1359,7 @@ def test_render_projection_grid_places_continuous_colorbar_below_panels_and_uses
         assert panel_axes[0].collections[0].cmap.name == "coolwarm"
         assert colorbar_ax.get_position().width > colorbar_ax.get_position().height
         assert colorbar_ax.get_position().y1 < min(axis.get_position().y0 for axis in panel_axes)
+        assert min(axis.get_position().y0 for axis in panel_axes) - colorbar_ax.get_position().y1 > 0.16
     finally:
         plt.close(fig)
 

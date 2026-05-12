@@ -6,7 +6,7 @@ scope: Native source-record and TSS-upstream core60 RegulonDB promoter views acr
 guardrails:
   - Use this high-dimensional cohort summary before interpreting UMAP clusters.
   - The sigma-factor set column can encode multi-label sets; do not collapse it into single-factor biology without a separate policy.
-  - Low separation is evidence about this Evo2-derived X, not evidence that sigma factors are biologically irrelevant.
+  - Low separation is evidence about this Evo 2-derived X, not evidence that sigma factors are biologically irrelevant.
 caption: Sigma-factor set cohort-structure summary for RegulonDB representation views.
 alt_text: Bar panel compares sigma-factor set separation ratio for native and core60 intermediate embedding and output-layer mean representation views.
 preprocessing_md: |

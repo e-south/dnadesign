@@ -107,6 +107,13 @@ def test_template_uses_required_references_and_trimmed_browser_surface() -> None
     assert payload["plots"]["candidate_decision_frontier"]["kind"] == "xy_scatter"
     assert payload["plots"]["candidate_decision_frontier"]["size_column"] == "effective_rank"
     assert payload["plots"]["candidate_decision_frontier"]["size_range"] == [140, 260]
+    assert payload["plots"]["candidate_decision_frontier"]["x_axis_label"] == (
+        r"$S_{\mathrm{design}}^{\mathrm{balanced}}="
+        r"\operatorname{mean}(d_{\mathrm{between}})/\operatorname{mean}(d_{\mathrm{within}})$"
+    )
+    assert payload["plots"]["candidate_decision_frontier"]["y_axis_label"] == (
+        r"$\rho_{\sigma35}=\operatorname{Spearman}(\Delta_{\mathrm{expected}},\Delta_{\mathrm{observed}})$"
+    )
     assert payload["plots"]["balanced_design_family_margin_gallery"]["x_axis_label"] == (
         r"$m_{\mathrm{eth}}(x)=\cos(z_x,c_{\mathrm{eth}})-\cos(z_x,c_{\mathrm{bg}})$"
     )

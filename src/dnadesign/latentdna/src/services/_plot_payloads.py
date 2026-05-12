@@ -254,6 +254,8 @@ def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["default_hue"] = spec.default_hue
     if spec.hue_options:
         payload["hue_options"] = [option.model_dump(mode="json") for option in spec.hue_options]
+    if spec.filter_options:
+        payload["filter_options"] = [option.model_dump(mode="json") for option in spec.filter_options]
     if spec.x_axis_label is not None:
         payload["x_axis_label"] = spec.x_axis_label
     if spec.y_axis_label is not None:
@@ -278,6 +280,8 @@ def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["label_column"] = spec.label_column
     if spec.label_values:
         payload["label_values"] = spec.label_values
+    if spec.annotation is not None:
+        payload["annotation"] = spec.annotation.model_dump(mode="json")
     if spec.config_id is not None:
         payload["plot_recipe"] = spec.config_id
     return payload
@@ -379,6 +383,8 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["square_panels"] = True
     if spec.hide_repeated_y_axis:
         params["hide_repeated_y_axis"] = True
+    if spec.filter_options:
+        params["filter_options"] = [option.model_dump(mode="json") for option in spec.filter_options]
     if spec.kind in {"categorical_count", "metric_panel_grid", "distribution"}:
         if spec.scalar_id is not None:
             params["input_kind"] = "scalar_table"

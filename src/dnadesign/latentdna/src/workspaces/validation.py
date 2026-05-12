@@ -479,7 +479,12 @@ def _validate_deliverable(config: WorkspaceConfig, deliverable_id: str, delivera
             section = config_sections.get(category)
             artifact_kind = ARTIFACT_REFERENCE_CATEGORIES.get(category)
             for item_id in ids:
-                if section is not None and item_id not in section:
+                recipe_produces_output = (
+                    section_name == "outputs"
+                    and artifact_kind is not None
+                    and (artifact_kind, item_id) in expected_outputs
+                )
+                if section is not None and item_id not in section and not recipe_produces_output:
                     raise WorkspaceValidationError(
                         f"deliverable {deliverable_id} references unknown {category[:-1]} {item_id!r} in {section_name}"
                     )

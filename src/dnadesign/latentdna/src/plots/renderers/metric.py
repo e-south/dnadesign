@@ -113,6 +113,10 @@ def _short_candidate_scope(value: object) -> str:
         return "anchor + anchor-mean"
     if normalized == "anchor + 1 kb context concat":
         return "anchor + 1 kb ctx"
+    if normalized == "native source record":
+        return "native 81 bp"
+    if normalized in {"core60 tss upstream", "core60 tss-upstream"}:
+        return "core60 TSS"
     return text
 
 
@@ -151,7 +155,27 @@ def _compact_candidate_scope(value: object) -> str:
         return "anchor+anchor-mean"
     if normalized == "anchor + 1 kb context concat":
         return "anchor+1kb ctx"
+    if normalized == "native source record":
+        return "native81"
+    if normalized in {"core60 tss upstream", "core60 tss-upstream"}:
+        return "core60 TSS"
     return text
+
+
+def _tick_labels_need_rotation(labels: list[str], *, grouped_family_bars: bool, plot_id: str | None) -> bool:
+    """Return whether metric-panel x tick labels need angled placement.
+
+    This keeps dense biological labels readable without plot-id-specific pixel tuning. The
+    grouped-family path is always rotated because the labels are compact semantic groups;
+    non-grouped bars rotate only when a short grid contains long candidate descriptions.
+    """
+
+    if grouped_family_bars or plot_id == "context_pair_summary":
+        return True
+    if not labels:
+        return False
+    max_line_length = max(len(line) for label in labels for line in str(label).splitlines())
+    return len(labels) <= 6 and max_line_length > 14
 
 
 def _short_candidate_family(value: object) -> str:
@@ -902,7 +926,15 @@ def render_metric_panel(
             ax.set_xlim(float(positions.min()) - 0.55, float(positions.max()) + 0.55)
     ax.tick_params(axis="x", pad=6)
     tick_labels_for_count = group_labels if grouped_family_bars else labels
-    tick_rotation = 32.0 if grouped_family_bars or spec.plot_id == "context_pair_summary" else 0.0
+    tick_rotation = (
+        32.0
+        if _tick_labels_need_rotation(
+            tick_labels_for_count,
+            grouped_family_bars=grouped_family_bars,
+            plot_id=spec.plot_id,
+        )
+        else 0.0
+    )
     _style_metric_tick_labels(
         ax,
         label_count=max(len(tick_labels_for_count), len(bar_value_pairs)),

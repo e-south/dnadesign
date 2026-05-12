@@ -87,10 +87,12 @@ Current runtime limits:
 - `plot render` now accepts either a named `plots.<id>` recipe with no inline plot flags, or an ad hoc inline spec; mixing the two modes is rejected.
 - Projection plot recipes may declare a shared `color_column`, explicit
   `panel_titles` for grids, a `panel_title` for single projection scatters,
-  typed `hue_options`, and optional highlighted label subsets through
-  `label_column` plus `label_values`. Static projection scatters use continuous
-  colorbars for `type: continuous` hues and reserve figure space for categorical
-  legends instead of drawing legends over the axes.
+  typed `hue_options`, optional `scale: panel` for continuous hues whose values
+  should be normalized within each panel instead of across a mixed-scope grid,
+  and optional highlighted label subsets through `label_column` plus
+  `label_values`. Static projection scatters use continuous colorbars for
+  `type: continuous` hues and reserve figure space for categorical legends
+  instead of drawing legends over the axes.
 - Projection annotations may use `plots.<id>.annotation.reference_set` to
   resolve a workspace reference set per panel. Render manifests record
   `expected_ids`, `matched_ids`, and completeness for each panel. Reference sets

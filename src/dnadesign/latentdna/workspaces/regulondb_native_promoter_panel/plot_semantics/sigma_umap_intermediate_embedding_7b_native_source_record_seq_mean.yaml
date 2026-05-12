@@ -13,8 +13,9 @@ preprocessing_md: |
   Uses the materialized native source-record sequence-mean intermediate
   embedding view. Each row is a mean over Evo 2 block26 token states across the
   native 81 bp source-record sequence; those token states are causal and
-  prefix-conditioned in the emitted forward orientation. Row metadata are
-  copied from the RegulonDB native USR records.
+  prefix-conditioned in the stored source-record orientation. Row metadata are
+  copied from the RegulonDB native USR records. This native source-record view
+  should not be described as a curated forward-orientation core60 window.
 math_md: |
   The plotted coordinates are the persisted two-dimensional UMAP embedding of the Evo 2 7B block26 intermediate vectors mean-pooled over sequence positions in the native source-record window.
   Colors encode the categorical `regulondb__sigma_factor_set` metadata column.
