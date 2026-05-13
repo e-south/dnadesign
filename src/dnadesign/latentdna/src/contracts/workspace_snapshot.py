@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .candidate_inventory import CandidateInventoryRow
+
 
 class StrictWorkspaceSnapshotModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -43,6 +45,10 @@ class WorkspaceSnapshotExport(StrictWorkspaceSnapshotModel):
 class WorkspaceSnapshotBrowser(StrictWorkspaceSnapshotModel):
     default_geometry_ids: list[str] = Field(default_factory=list)
     preferred_hues: list[str] = Field(default_factory=list)
+    candidate_sets: dict[str, dict[str, object]] = Field(default_factory=dict)
+
+
+WorkspaceSnapshotCandidate = CandidateInventoryRow
 
 
 class WorkspaceSnapshot(StrictWorkspaceSnapshotModel):
@@ -52,6 +58,7 @@ class WorkspaceSnapshot(StrictWorkspaceSnapshotModel):
     sources: dict[str, WorkspaceSnapshotSource]
     model_families: list[str] = Field(default_factory=list)
     canonical_views: list[str] = Field(default_factory=list)
+    candidate_inventory: list[CandidateInventoryRow] = Field(default_factory=list)
     deliverables: dict[str, WorkspaceSnapshotDeliverable] = Field(default_factory=dict)
     exports: dict[str, WorkspaceSnapshotExport] = Field(default_factory=dict)
     browser: WorkspaceSnapshotBrowser

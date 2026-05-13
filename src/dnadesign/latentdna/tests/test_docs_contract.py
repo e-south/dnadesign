@@ -79,7 +79,12 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "### Gate" in workflow
     assert "pre-assay representation triage" in workflow
     assert "canonical Infer feature sidecars" in workflow
-    assert "sidecar-backed geometry is narrower than the future target set" in workflow
+    assert "candidate_x_selection_scorecard" in workflow
+    assert "controlled equal-block" in workflow
+    assert "bidirectional forward/RC context `anchor_mean` concat" in workflow
+    assert "prefix-conditioned causal mean-pooled span embedding" in workflow
+    assert "not a native bidirectional Evo2 hidden state" in workflow
+    assert "working pre-assay `X`" in workflow
     assert "eight canonical 7B+20B" not in workflow
     assert "Leave geodesic pilots in study notes" in workflow
     assert 'zero_variance_policy="drop_or_zero"' in workflow
@@ -87,11 +92,21 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "workspace snapshot" in workflow
     assert latentdna_binding["supported_model_families"] == ["evo2_7b", "evo2_20b"]
     assert latentdna_binding["default_model_family"] == "evo2_7b"
+    assert latentdna_binding["source_datasets"]["merged_anchor_insert"] == "usr_prom_eth_cip_anchor"
     assert latentdna_binding["source_datasets"]["reference_native"] == "usr_promoter_references"
     assert latentdna_binding["source_datasets"]["reference_core60"] == "construct_prom_eth_cip_reference_core60"
     assert latentdna_binding["source_datasets"]["reference_contexts"] == "construct_prom_eth_cip_reference_contexts"
+    assert (
+        latentdna_binding["default_geometry_inventory"]["working_candidate"]
+        == "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    )
+    assert "candidate_x_selection_scorecard" in latentdna_binding["decision_deliverables"]
     assert study_pipeline["study_pipeline"]["infer"]["preferred_model_family"] == "evo2_7b"
     assert study_pipeline["study_pipeline"]["infer"]["supported_model_families"] == ["evo2_7b", "evo2_20b"]
+    assert (
+        study_pipeline["study_pipeline"]["infer"]["infer_priority"]["working_candidate_family"]
+        == "evo2_7b_context_anchor_mean_bidir_concat_intermediate"
+    )
 
     assert "`latentdna workspace snapshot`" in cli_contracts
     assert "`latentdna.workspace_snapshot.v1`" in cli_contracts
@@ -109,6 +124,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "workspace_snapshot.json" in workspace_readme
     assert "UMAP role: appendix orientation only" in workspace_readme
     assert "Reference metadata sources:" in workspace_readme
+    assert "causal and prefix-conditioned" in workspace_readme
 
     assert "Gate:" in study_routes
     assert "representation_health_summary" in study_routes
@@ -120,11 +136,14 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "design_structure_summary" in study_routes
     assert "context_robustness_summary" in study_routes
     assert "candidate_decision_frontier" in study_routes
+    assert "candidate_x_selection_scorecard" in study_routes
     assert "balanced_design_family_margin_gallery" in study_routes
     assert "sigma35_margin_ladder_gallery" in study_routes
     assert "sigma35_centroid_distance_gallery" in study_routes
     assert "sigma35_stress_margin_gallery" in study_routes
     assert "context_pair_summary" in study_routes
+    assert "Snapshot attention surfaces: none for LatentDNA decision deliverables" in study_routes
+    assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_routes
     assert "Plane: `data-plane`" in study_routes
     assert "Plane: `control-plane`" in study_routes
     assert "Surface role: `producer`" in study_routes
@@ -138,15 +157,19 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "7B-first sidecar-backed browser posture" in study_routes
     assert "available 7B sequence-view sidecar geometries" in study_routes
     assert "preferred infer family is now `evo2_7b`" in study_routes
+    assert "token-position" in study_routes
+    assert "not as native bidirectional encodings" in study_routes
     assert "eight canonical 7B+20B" not in study_routes
 
     assert "The study phase is `infer_batch_preparation`" in study_status
-    assert "Current attention surfaces:" in study_status
+    assert "Current LatentDNA decision surfaces:" in study_status
     assert "representation_health_summary" in study_status
     assert "candidate_decision_frontier" in study_status
+    assert "candidate_x_selection_scorecard" in study_status
     assert "balanced_design_family_margin_gallery" in study_status
     assert "sigma35_margin_ladder_gallery" in study_status
     assert "sigma35_stress_margin_gallery" in study_status
+    assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_status
     assert "Preferred infer family: `evo2_7b`" in study_status
     assert "Supported infer families: `evo2_7b`, `evo2_20b`" in study_status
     assert "LatentDNA browser default family: `evo2_7b`" in study_status
@@ -154,9 +177,12 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "LatentDNA primary review path:" in study_status
     assert "LatentDNA companion visuals:" in study_status
     assert "LatentDNA appendix support:" in study_status
-    assert "available 7B sequence-view feature sidecars" in study_status
+    assert "available 7B sequence-view feature" in study_status
+    assert "sidecars" in study_status
     assert "eight canonical 7B+20B" not in study_status
-    assert "Appendix deliverables remain secondary" in study_status
+    assert "secondary review material" in study_status
+    assert "Pooling semantics guardrail" in study_status
+    assert "not a native bidirectional Evo2 state" in study_status
 
 
 def test_latentdna_docs_remove_legacy_promoter_surface_names() -> None:

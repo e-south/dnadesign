@@ -34,11 +34,8 @@ SUPPORTED_PLOT_KINDS: frozenset[str] = frozenset(
 
 SQUARE_METRIC_PANEL_PLOT_IDS: frozenset[str] = frozenset(
     {
-        "representation_health_summary",
-        "design_structure_summary",
-        "sigma35_ordinal_audit",
         "context_robustness_summary",
-        "reference_alignment_summary",
+        "representation_health_summary",
     }
 )
 
@@ -56,9 +53,13 @@ class PlotBaseConfig(StrictPlotModel):
     visibility_tier: Literal["primary", "appendix", "debug", "hidden"] = "primary"
     default_hue: str | None = None
     hue_options: list["PlotHueOptionConfig"] = Field(default_factory=list)
+    filter_options: list["PlotFilterOptionConfig"] = Field(default_factory=list)
     x_axis_label: str | None = None
     y_axis_label: str | None = None
     colorbar_label: str | None = None
+    single_row_panels: bool = False
+    square_panels: bool = False
+    hide_repeated_y_axis: bool = False
 
     @model_validator(mode="after")
     def _validate_hue_defaults(self) -> "PlotBaseConfig":
@@ -74,18 +75,42 @@ class PlotHueOptionConfig(StrictPlotModel):
     column: Identifier
     label: str
     type: Literal["categorical", "binary", "continuous", "ordinal"]
+    scale: Literal["global", "panel"] = "global"
+
+    @model_validator(mode="after")
+    def _validate_scale(self) -> "PlotHueOptionConfig":
+        if self.scale == "panel" and self.type != "continuous":
+            raise ValueError("panel-scaled hue options must be continuous")
+        return self
+
+
+class PlotFilterValueConfig(StrictPlotModel):
+    value: str
+    label: str | None = None
+
+
+class PlotFilterOptionConfig(StrictPlotModel):
+    column: Identifier
+    label: str
+    type: Literal["categorical"] = "categorical"
+    include_all: bool = True
+    values: list[PlotFilterValueConfig] = Field(default_factory=list)
 
 
 class PlotAnnotationConfig(StrictPlotModel):
     reference_set: Identifier
     require_in_every_panel: bool = False
-    missing_policy: Literal["fail"] = "fail"
+    missing_policy: Literal["fail", "allow"] = "fail"
     collision_policy: Literal["repel_then_callout", "direct_label"] = "repel_then_callout"
+    hue_column: Identifier | None = None
+    marker: str = "*"
+    colorbar_label: str | None = None
 
 
 class ProjectionScatterPlotConfig(PlotBaseConfig):
     kind: Literal["projection_scatter"]
     projection: Identifier
+    panel_title: str | None = None
     color_column: str | None = None
     shape_column: str | None = None
     label_column: str | None = None
@@ -257,7 +282,7 @@ class MetricPanelGridPlotConfig(PlotBaseConfig):
     color_column: str | None = None
     direction_column: str | None = None
     unit_column: str | None = None
-    sort_rule: Literal["panel_direction", "value_desc", "value_asc", "label_asc"] = "panel_direction"
+    sort_rule: Literal["panel_direction", "value_desc", "value_asc", "label_asc", "candidate_order"] = "panel_direction"
     measure_kind: Literal["metric"] = "metric"
     value_kind: str
     value_label: str
@@ -272,7 +297,7 @@ class DistributionPlotConfig(PlotBaseConfig):
     agreement: Identifier | None = None
     value_column: str | None = None
     color_column: str | None = None
-    render_mode: Literal["histogram", "ecdf", "violin_box"] = "histogram"
+    render_mode: Literal["histogram", "ecdf", "violin_box", "ordinal_swarm"] = "histogram"
 
     @model_validator(mode="after")
     def _validate_single_input(self) -> "DistributionPlotConfig":
@@ -301,7 +326,7 @@ class DistributionGridPlotConfig(PlotBaseConfig):
     metric_columns: list[str] | None = None
     value_columns: list[str] | None = None
     color_column: str | None = None
-    render_mode: Literal["histogram", "ecdf", "violin_box"] = "histogram"
+    render_mode: Literal["histogram", "ecdf", "violin_box", "ordinal_swarm"] = "histogram"
     panel_titles: list[str] | None = None
 
     @model_validator(mode="after")
@@ -450,8 +475,12 @@ class ResolvedPlotSpec(StrictPlotModel):
     sort_rule: str | None = None
     default_hue: str | None = None
     hue_options: list[PlotHueOptionConfig] = Field(default_factory=list)
+    filter_options: list[PlotFilterOptionConfig] = Field(default_factory=list)
     x_axis_label: str | None = None
     y_axis_label: str | None = None
     colorbar_label: str | None = None
+    single_row_panels: bool = False
+    square_panels: bool = False
+    hide_repeated_y_axis: bool = False
     config_id: Identifier | None = None
     semantics_ref: str | None = None

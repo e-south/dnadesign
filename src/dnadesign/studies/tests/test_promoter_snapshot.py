@@ -25,6 +25,7 @@ from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyR
 from dnadesign.studies.families.promoter.snapshot import (
     PromoterStudyStatusDependencies,
     PromoterStudyStatusResolvedContext,
+    _build_planned_outputs_state,
     build_promoter_study_status,
     resolve_promoter_study_status_context,
 )
@@ -54,6 +55,29 @@ def test_promoter_next_planned_phase_skips_nonblocking_reference_branch() -> Non
 
     assert _first_phase_by_status(phases, status="planned", require_main_study_state=True) == phases[1]
     assert _first_phase_by_status(phases, status="planned") == phases[0]
+
+
+def test_planned_outputs_ignore_completed_logical_output_datasets(tmp_path: Path) -> None:
+    study_context = _make_study_context(tmp_path)
+    study_context = replace(
+        study_context,
+        phase_states=(
+            *study_context.phase_states,
+            {
+                "id": "feature_sidecar_export",
+                "status": "complete",
+                "output_dataset": "promoter/demo_feature_matrix",
+            },
+        ),
+    )
+
+    assert _build_planned_outputs_state(study_context=study_context) == {
+        "state": "ok",
+        "pending_datasets": [],
+        "drives_top_level_attention": False,
+        "include_in_summary": False,
+        "summary": "planned outputs clear",
+    }
 
 
 def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:

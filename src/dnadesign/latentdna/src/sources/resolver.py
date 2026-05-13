@@ -63,9 +63,7 @@ def resolve_source(source_id: str, source: SourceConfig, *, workspace_dir: Path)
     if isinstance(source, MatrixBundleSourceConfig):
         bundle = parquet_source.records_path(source.path, workspace_dir=workspace_dir)
         rows_path = bundle / "rows.parquet"
-        matrix_path = bundle / "matrix.npy"
-        if not matrix_path.exists():
-            matrix_path = bundle / "matrix.npz"
+        matrix_path = _resolve_matrix_bundle_matrix_path(bundle, source_id=source_id)
         return ResolvedSource(
             source_id=source_id,
             source=source,
@@ -90,6 +88,17 @@ def resolve_source(source_id: str, source: SourceConfig, *, workspace_dir: Path)
         )
         return ResolvedSource(source_id=source_id, source=source, workspace_dir=workspace_dir, records_path=records)
     raise SourceResolutionError(f"unsupported source kind for {source_id}: {source.kind}")
+
+
+def _resolve_matrix_bundle_matrix_path(bundle: Path, *, source_id: str) -> Path:
+    candidates = [bundle / "matrix.npy", bundle / "matrix.npz"]
+    existing = [path for path in candidates if path.exists()]
+    if len(existing) > 1:
+        names = ", ".join(path.name for path in existing)
+        raise SourceResolutionError(
+            f"matrix bundle source {source_id} has ambiguous matrix payloads; keep exactly one of: {names}"
+        )
+    return existing[0] if existing else bundle / "matrix.npy"
 
 
 def require_records_path(resolved: ResolvedSource) -> Path:

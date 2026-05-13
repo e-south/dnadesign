@@ -1,15 +1,24 @@
 plot_id: balanced_design_family_margin_gallery
-question: Does design-family separation remain visible across the full promoter population when the balanced centroid directions behind the scalar metric are used?
+question: Does design-family separation remain visible across the full promoter population when ethanol, ciprofloxacin, dual, and background reference centroids are built from matched design strata?
 decision_role: primary
-encoding: Two-panel scatter gallery of full-population ethanol-vs-background and ciprofloxacin-vs-background centroid margins across the active 7B intermediate candidates, with the family centroids derived from balanced study subsets.
-scope: The full shared promoter population in the active 7B intermediate candidates, while the family centroid directions are computed from balanced synthetic subsets so the explanatory axes are not driven by Sigma-35 or spacer imbalance.
+encoding: Scatter gallery of full-population ethanol-vs-background and ciprofloxacin-vs-background centroid margins across the first-class 7B intermediate candidates. The plotted rows are the full population, while the family centroids used for the axes are derived from balanced reference subsets.
+scope: The full shared promoter population in the first-class 7B intermediate candidates. The candidate panels include anchor-source `seq_mean`, forward and reverse-complement 1 kb context summaries, and the equal-block forward/RC anchor-mean concat. The family centroid directions are built from synthetic rows matched across `sig35_variant` and `spacer_length`, so the axes are less likely to be driven by unequal Sigma-35 or spacer composition.
 guardrails:
   - Use this gallery as the row-level bridge for the balanced design-family separation metric, not as a replacement for the scalar summary.
   - Treat the axes as study-internal design-family directions, not phenotype evidence.
   - Judge candidate ranking from the metric summary first and use this gallery to explain the score.
 caption: Balanced design-family margin gallery across the main 7B intermediate candidates.
-alt_text: Scatter-panel gallery showing ethanol-versus-background and ciprofloxacin-versus-background centroid margins for the full promoter population in the 60 bp anchor and 1 kb context anchor-mean intermediate spaces, with balanced study-internal family directions.
-preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted population stays full, while the underlying design-family centroid directions are computed from balanced synthetic subsets over `design_family`, `sig35_variant`, and `spacer_length`, with leave-one-out handling for in-cohort rows that participate in those balanced centroids.
+alt_text: Scatter-panel gallery showing ethanol-versus-background and ciprofloxacin-versus-background centroid margins for the full promoter population across the first-class 7B intermediate views, including anchor-source, context-anchor, reverse-complement, and bidirectional-summary panels.
+preprocessing_md: >-
+  Rows are first standardized within view and L2-normalized. Source views have
+  already been mean-pooled by Infer over token positions; for Evo 2 those token
+  states are causal in the emitted orientation. The plotted population stays
+  full. Only the reference centroids are balanced: within each retained
+  `(sig35_variant, spacer_length)` stratum, the builder requires the configured
+  design families to be present and samples the same number of rows from each
+  family. Strata that cannot support the matched comparison are excluded.
+  Leave-one-out handling is used when an in-cohort plotted row also participates
+  in the centroid reference set.
 math_md: |
   The plotted margins are
   $$
@@ -19,7 +28,18 @@ math_md: |
   $$
   m_{\mathrm{cipro}}(x) = \cos(z_x, c_{\mathrm{cipro}}) - \cos(z_x, c_{\mathrm{bg}}).
   $$
-  Positive values mean the row is closer to the target family centroid than to background on that axis. The centroids are computed on the balanced synthetic subset, with leave-one-out handling when a row belongs to a scored cohort.
-rationale_md: This gallery is the row-level witness for the balanced design-family separation ratio. A better candidate keeps the family clouds more directionally separated even though the plotted population is still the full library, so the balanced scalar score is not just a small-sample artifact.
+  Positive values mean the row is closer to the target family centroid than to background on that axis. Here "balanced" means the centroids are computed from matched synthetic reference rows, not from the full unbalanced family counts:
+  $$
+  c_{\mathrm{eth}}, c_{\mathrm{cipro}}, c_{\mathrm{dual}}, c_{\mathrm{bg}}
+  \leftarrow
+  \text{equal-count samples within each retained }(\mathrm{Sigma35}, \mathrm{spacer})\text{ stratum}.
+  $$
+rationale_md: This gallery is the row-level witness for the balanced design-family separation ratio. A better candidate keeps the family clouds directionally separated even when the family-centroid axes are estimated from matched Sigma-35/spacer strata. That makes the plot closer to the causal question "does the representation preserve DenseGen plan identity?" and farther from the weaker question "does the representation mostly see whichever Sigma-35 or spacer settings are overrepresented in a family?"
+plot_details_md: |
+  Read this plot as a fairer version of the direct design-centroid map. The scatter still contains every row, including references and controls when present in the scalar artifact. The balancing affects the axes: it builds the ethanol, ciprofloxacin, dual, and background centroid directions from matched synthetic subsets. If ethanol rows are mostly one Sigma-35 variant and background rows are mostly another, an unbalanced centroid could partly encode that composition difference. The balanced version asks whether family separation remains after matching those obvious design axes.
+
+  This is sampling, but it is not arbitrary downsampling. For each `(sig35_variant, spacer_length)` stratum, the code keeps the stratum only if the required design families are present, then samples the minimum available count from each family without replacement. With `balance_reference_only: true`, those matched rows define the centroids, while all rows are still projected onto the resulting margin axes.
 limitations_md: This gallery is still a two-axis projection of higher-dimensional geometry. The balanced centroid directions make the axes fairer, but the scalar metric still governs adjudication.
 failure_modes_md: If balanced-centroid construction or leave-one-out handling regresses, the family quadrants can look cleaner than they really are.
+docs_refs:
+  - src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md

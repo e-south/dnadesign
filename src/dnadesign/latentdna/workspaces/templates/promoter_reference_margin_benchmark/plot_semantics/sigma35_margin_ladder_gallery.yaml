@@ -1,14 +1,14 @@
 plot_id: sigma35_margin_ladder_gallery
 question: Does the row-level Sigma-35 margin actually form the ordered ladder summarized by the ordinal Spearman score?
 decision_role: primary
-encoding: Three-panel violin-and-box ladder showing the distribution of the Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the main 7B intermediate candidates.
+encoding: Three-panel ordinal swarm ladder showing the row-level Sigma-35 F-vs-B centroid margin across the Sigma-35 variants in the main 7B intermediate candidates. Each point is one row; the black interval marks the within-class interquartile range and the black tick marks the median.
 scope: The full shared promoter population in the main 7B intermediate comparison views.
 guardrails:
   - Use this ladder as the row-level bridge to the Sigma-35 ordinal summary, not as a replacement for the scalar audit.
   - Do not interpret the y axis as promoter activity or assay strength.
   - The ordinal score still governs ranking; the ladder explains why the score moves.
 caption: Row-level Sigma-35 margin ladder across the main 7B intermediate candidates.
-alt_text: Violin-and-box panel gallery showing the distribution of the Sigma-35 F-versus-B centroid margin across Sigma-35 variants for the full promoter population in the anchor, 1 kb seq-mean, and 1 kb anchor-mean intermediate spaces.
+alt_text: Ordinal swarm panel gallery showing the Sigma-35 F-versus-B centroid margin across Sigma-35 variants for the full promoter population in the anchor, 1 kb seq-mean, and 1 kb anchor-mean intermediate spaces.
 preprocessing_md: Rows are first standardized within view and L2-normalized. The plotted value is then the leave-one-out centroid margin between the `f` and `b` Sigma-35 cohorts over the full shared promoter population in each candidate view.
 math_md: |
   The plotted margin is
@@ -16,6 +16,7 @@ math_md: |
   m_{\sigma35}(x) = \cos(z_x, c_f) - \cos(z_x, c_b),
   $$
   where $c_f$ and $c_b$ are the study-internal centroids for Sigma-35 variants `f` and `b`, using leave-one-out handling for in-cohort rows. Positive values mean a row sits closer to the `f` centroid than the `b` centroid; more negative values mean the opposite.
-rationale_md: This makes the ordinal Spearman feel earned. A better candidate shows the variant distributions shifting in the declared `f > e > d > c > b` order, so the scalar audit is summarizing a visible row-level ladder rather than inventing one.
+  The ordinal-swarm annotation reports Spearman rho between row-level Sigma-35 class order and this high-dimensional margin, plus a simple linear $R^2$ for those same row-level variables.
+rationale_md: This makes the ordinal Spearman auditable. A better candidate shows the row-level margins shifting in the declared `f > e > d > c > b` order, so the scalar audit summarizes a visible ladder rather than relying on a single bar value.
 limitations_md: This is still a single derived axis conditioned on study labels, so it cannot substitute for the full ordinal audit or imply phenotype.
 failure_modes_md: If the category ordering regresses or control rows are overinterpreted, the ladder can be visually misleading.

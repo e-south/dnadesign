@@ -90,7 +90,7 @@ artifact-native analysis.
   registry drift becomes testable.
 - Each family owns its own workspace contract and output tree even when it
   consumes artifacts from another family.
-- Study records such as the checked-in snapback shortening effort can pin one
+- Study records such as the checked-in retron hairpin design effort can pin one
   family route without redefining the underlying family model.
 
 ### Sample-family behavior

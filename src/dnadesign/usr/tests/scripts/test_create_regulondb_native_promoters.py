@@ -9,7 +9,9 @@ import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.cruncher.ingest.promoters import (
+    PromoterAssociationSourceFile,
     PromoterQuery,
+    PromoterSourceFile,
     SkippedPromoterSourceRow,
     export_dnadesign_data_promoter_superset,
     export_promoter_records,
@@ -91,7 +93,7 @@ def test_build_import_plan_collapses_duplicate_sequences_and_keeps_sig35_out(tmp
 
     plan = native.build_import_plan(export_dir=export_dir, usr_root=usr_root)
 
-    expected_sequence = "aatataatggttgaca"
+    expected_sequence = "AATATAATGGTTGACA"
     assert len(plan.base_rows) == 1
     assert plan.base_rows[0]["id"] == compute_id("dna", expected_sequence)
     assert plan.base_rows[0]["bio_type"] == "dna"
@@ -107,6 +109,21 @@ def test_build_import_plan_collapses_duplicate_sequences_and_keeps_sig35_out(tmp
     assert overlay["regulondb__has_minus35_box"] is True
     assert overlay["regulondb__regulator_composition"] == "activator"
     assert len(plan.relation_rows["source_rows"]) == 2
+
+
+def test_build_import_plan_hard_uppercases_regulondb_model_input_sequences(tmp_path: Path) -> None:
+    export_dir = _write_export(
+        tmp_path,
+        [
+            _payload(promoter_id="PM0001", sequence="aaTATAATggTTGACA"),
+        ],
+    )
+    usr_root = _tmp_usr_root(tmp_path)
+
+    plan = native.build_import_plan(export_dir=export_dir, usr_root=usr_root)
+
+    assert plan.base_rows[0]["sequence"] == "AATATAATGGTTGACA"
+    assert plan.base_rows[0]["id"] == compute_id("dna", "AATATAATGGTTGACA")
 
 
 def test_build_import_plan_deduplicates_aliases_but_preserves_source_rows(tmp_path: Path) -> None:
@@ -272,6 +289,185 @@ def test_build_import_plan_carries_skipped_source_rows_as_dataset_sidecar(tmp_pa
     assert row["source_row_ref"] == "PromoterSet.tsv:3"
     assert plan.validation_report["skipped_source_row_count"] == 1
     assert plan.validation_report["skipped_source_rows_by_reason"] == {"missing_sequence": 1}
+
+
+def test_build_import_plan_projects_association_overlay_into_regulatory_interactions(tmp_path: Path) -> None:
+    promoter_set = tmp_path / "RegulonDB_13/promoters/PromoterSet.tsv"
+    promoter_set.parent.mkdir(parents=True)
+    promoter_set.write_text(
+        "\n".join(
+            [
+                "1)pmId\t2)pmName\t3)strand\t4)posTSS\t5)sigmaFactor\t6)pmSequence\t"
+                "7)firstGeneName\t8)pmEvidence\t9)confidenceLevel",
+                "PM1\tspyp\treverse\t1825688\tsigma70\t"
+                "atatatatatatatatatatatatatatatatatatatatatatatatatatatatatatatatTcg\t"
+                "spy\t[EXP-IDA-TRANSCRIPTION-INIT-MAPPING:S]\tS",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    network = tmp_path / "RegulonDB_11/network_associations/network_tf_tu.txt"
+    network.parent.mkdir(parents=True)
+    network.write_text(
+        "\n".join(
+            [
+                "BaeR\tspy[spyp]\t+\t[BPP]\tConfirmed\t",
+                "LexA\tunmatched[missingp]\t-\t[EXP]\tWeak\t",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    export_dir = tmp_path / "cruncher_export"
+    export_dnadesign_data_promoter_superset(
+        export_dir,
+        data_root=tmp_path,
+        provider=lambda _root: [
+            PromoterSourceFile(
+                source_id="regulondb_13_promoter_set",
+                source="regulondb",
+                release="13.0",
+                path="RegulonDB_13/promoters/PromoterSet.tsv",
+                table="PromoterSet.tsv",
+                stratum="local_release_pinned_curated",
+                role="curated_base",
+                file_format="tsv",
+                parser_hint="regulondb_promoter_set",
+                creates_base_rows=True,
+            )
+        ],
+        association_provider=lambda _root: [
+            PromoterAssociationSourceFile(
+                source_id="regulondb_11_network_tf_tu",
+                source="regulondb",
+                release="11.0",
+                path="RegulonDB_11/network_associations/network_tf_tu.txt",
+                table="network_tf_tu.txt",
+                stratum="historical_curated_network_association",
+                role="tf_promoter_association_overlay",
+                file_format="tsv",
+                parser_hint="regulondb_network_tf_tu",
+            )
+        ],
+        fetched_at=FETCHED_AT,
+    )
+    usr_root = _tmp_usr_root(tmp_path)
+
+    plan = native.build_import_plan(export_dir=export_dir, usr_root=usr_root)
+
+    rows = plan.relation_rows["regulatory_interactions"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["usr_id"] == plan.base_rows[0]["id"]
+    assert row["promoter_id"] == "PM1"
+    assert row["source_release"] == "11.0"
+    assert row["source_route"] == "regulondb_11_network_tf_tu"
+    assert row["regulator_abbrev"] == "BaeR"
+    assert row["target_type"] == "transcription_unit"
+    assert row["function"] == "activator"
+    assert row["confidence"] == "Confirmed"
+    assert row["evidence"] == ["BPP"]
+    assert plan.validation_report["promoter_association_rows"] == 2
+    assert plan.validation_report["promoter_association_matched_rows"] == 1
+    assert plan.validation_report["promoter_association_unmatched_rows"] == 1
+    assert plan.regulondb_overlay_rows[0]["regulondb__has_regulatory_context"] is True
+    assert plan.regulondb_overlay_rows[0]["regulondb__regulator_composition"] == "activator"
+
+
+def test_build_import_plan_projects_associations_by_direct_promoter_id_before_name(tmp_path: Path) -> None:
+    promoter_set = tmp_path / "RegulonDB_13/promoters/PromoterSet.tsv"
+    promoter_set.parent.mkdir(parents=True)
+    promoter_set.write_text(
+        "\n".join(
+            [
+                "1)pmId\t2)pmName\t3)strand\t4)posTSS\t5)sigmaFactor\t6)pmSequence\t"
+                "7)firstGeneName\t8)pmEvidence\t9)confidenceLevel",
+                "PM1\tspyp\treverse\t1825688\tsigma70\t"
+                "atatatatatatatatatatatatatatatatatatatatatatatatatatatatatatatatTcg\t"
+                "spy\t[EXP-IDA-TRANSCRIPTION-INIT-MAPPING:S]\tS",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    tf_riset = tmp_path / "RegulonDB_13/binding_sites/TF-RISet.tsv"
+    tf_riset.parent.mkdir(parents=True)
+    tf_riset.write_text(
+        "\n".join(
+            [
+                "1)riId\t2)riType\t3)regulatorId\t4)regulatorName\t5)cnfName\t6)tfrsID\t"
+                "7)tfrsLeft\t8)tfrsRight\t9)strand\t10)tfrsSeq\t11)riFunction\t"
+                "12)promoterID\t13)promoterName\t14)tss\t15)sigmaF\t16)tfrsDistToPm\t"
+                "17)firstGene\t18)tfrsDistTo1Gene\t19)targetTuOrGene\t20)confidenceLevel\t"
+                "21)tfrsEvidence\t22)riEvidence\t23)addEvidence\t24)riEvTech\t25)riEvCategory\t"
+                "26)tfrsPMIDS\t27)riPMIDS",
+                "RI0001\ttf-promoter\tREG0001\tCpxR\tCpxR-P\tBS0001\t10\t20\tforward\t"
+                "ACGT\tactivator\tPM1\tname_from_association\t100\tsigma70\t-50\tspy\t-80\t"
+                "TU0001:spy\tS\tEXP:S\tEXP:S\t\tbinding\texpression\t12345\t12345",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    export_dir = tmp_path / "cruncher_export"
+    export_dnadesign_data_promoter_superset(
+        export_dir,
+        data_root=tmp_path,
+        provider=lambda _root: [
+            PromoterSourceFile(
+                source_id="regulondb_13_promoter_set",
+                source="regulondb",
+                release="13.0",
+                path="RegulonDB_13/promoters/PromoterSet.tsv",
+                table="PromoterSet.tsv",
+                stratum="local_release_pinned_curated",
+                role="curated_base",
+                file_format="tsv",
+                parser_hint="regulondb_promoter_set",
+                creates_base_rows=True,
+            )
+        ],
+        association_provider=lambda _root: [
+            PromoterAssociationSourceFile(
+                source_id="regulondb_13_tf_riset",
+                source="regulondb",
+                release="13.0",
+                path="RegulonDB_13/binding_sites/TF-RISet.tsv",
+                table="TF-RISet.tsv",
+                stratum="current_curated_regulatory_interaction",
+                role="tf_promoter_association_overlay",
+                file_format="tsv",
+                parser_hint="regulondb_tf_riset",
+            )
+        ],
+        require_association_sources=True,
+        fetched_at=FETCHED_AT,
+    )
+    usr_root = _tmp_usr_root(tmp_path)
+
+    plan = native.build_import_plan(export_dir=export_dir, usr_root=usr_root, require_promoter_associations=True)
+
+    rows = plan.relation_rows["regulatory_interactions"]
+    assert len(rows) == 1
+    assert rows[0]["usr_id"] == plan.base_rows[0]["id"]
+    assert rows[0]["promoter_id"] == "PM1"
+    assert rows[0]["regulator_abbrev"] == "CpxR"
+    assert plan.validation_report["promoter_association_matched_rows"] == 1
+    assert plan.regulondb_overlay_rows[0]["regulondb__has_regulatory_context"] is True
+    assert plan.regulondb_overlay_rows[0]["regulondb__regulator_composition"] == "activator"
+
+
+def test_build_import_plan_fails_when_required_association_artifact_is_missing(tmp_path: Path) -> None:
+    export_dir = _write_export(tmp_path, [_payload(promoter_id="PM0001", name="cpxP")])
+    usr_root = _tmp_usr_root(tmp_path)
+
+    with pytest.raises(SchemaError, match="promoter association artifact"):
+        native.build_import_plan(
+            export_dir=export_dir,
+            usr_root=usr_root,
+            require_promoter_associations=True,
+        )
 
 
 def test_dry_run_does_not_create_usr_dataset(tmp_path: Path) -> None:

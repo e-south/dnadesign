@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 from ..adapters import build_adapter, list_adapter_descriptors, required_source_columns
 from ..adapters import get_adapter_descriptor as _get_adapter_descriptor
@@ -42,6 +42,147 @@ from ..render.renderer import get_renderer_descriptor as _get_renderer_descripto
 from ..render.renderer import renderer_descriptors
 from ..runtime import initialize_runtime
 from ..styles.curated import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
+from .sequence_panel import (
+    BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
+    BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION,
+    DEFAULT_SEQUENCE_PANEL_PROFILE,
+    SequencePanelConfig,
+    SequencePanelDiagnostics,
+    SequencePanelImage,
+    sequence_panel_config_for_adapter,
+)
+
+
+def _normalize_panel_image(
+    image: Any,
+    *,
+    target_width_px: int,
+    target_height_px: int,
+    vertical_anchor: str,
+    canvas_top_pad_px: int,
+) -> Any:
+    import numpy as np
+    from PIL import Image
+
+    if int(target_width_px) <= 0 or int(target_height_px) <= 0:
+        raise SchemaError("sequence panel target dimensions must be positive")
+
+    rgba = np.asarray(image)
+    ensure(rgba.ndim == 3 and rgba.shape[2] in {3, 4}, "sequence panel image must be RGB/RGBA", SchemaError)
+    if rgba.shape[2] == 3:
+        alpha = np.full(rgba.shape[:2], 255, dtype=np.uint8)
+        rgba = np.dstack([rgba[:, :, :3], alpha])
+
+    alpha = rgba[:, :, 3]
+    rgb = rgba[:, :, :3]
+    content_mask = ((rgb < 245).any(axis=2)) & (alpha > 0)
+    if content_mask.any():
+        ys, xs = np.where(content_mask)
+        pad = 8
+        y0 = max(0, int(ys.min()) - pad)
+        y1 = min(rgba.shape[0], int(ys.max()) + pad + 1)
+        x0 = max(0, int(xs.min()) - pad)
+        x1 = min(rgba.shape[1], int(xs.max()) + pad + 1)
+        rgba = rgba[y0:y1, x0:x1, :]
+
+    source = Image.fromarray(rgba.astype(np.uint8, copy=False))
+    scale = min(int(target_width_px) / max(source.width, 1), int(target_height_px) / max(source.height, 1))
+    resized = source.resize(
+        (max(1, int(source.width * scale)), max(1, int(source.height * scale))),
+        Image.Resampling.LANCZOS,
+    )
+    canvas = Image.new("RGBA", (int(target_width_px), int(target_height_px)), (255, 255, 255, 255))
+    x = (canvas.width - resized.width) // 2
+    anchor = str(vertical_anchor).strip().lower()
+    if anchor == "top":
+        y = min(max(0, int(canvas_top_pad_px)), max(0, canvas.height - resized.height))
+    elif anchor == "bottom":
+        y = max(0, canvas.height - resized.height)
+    elif anchor == "center":
+        y = (canvas.height - resized.height) // 2
+    else:
+        raise SchemaError("sequence panel vertical_anchor must be 'top', 'center', or 'bottom'")
+    canvas.alpha_composite(resized, dest=(x, y))
+    return np.asarray(canvas)
+
+
+def _legend_tags(record: Record) -> tuple[str, ...]:
+    tags: set[str] = set()
+    for feature in record.features:
+        for tag in feature.tags:
+            text = str(tag).strip()
+            if text:
+                tags.add(text)
+    return tuple(sorted(tags))
+
+
+def render_sequence_panel_image(
+    row: Mapping[str, object],
+    *,
+    config: SequencePanelConfig | None = None,
+    adapter_kind: str | None = None,
+    style_profile: str = DEFAULT_SEQUENCE_PANEL_PROFILE,
+    adapter_columns: Mapping[str, object] | None = None,
+    adapter_policies: Mapping[str, object] | None = None,
+    style_overrides: Mapping[str, object] | None = None,
+    target_width_px: int = 2200,
+    target_height_px: int = 310,
+    vertical_anchor: str = "center",
+    canvas_top_pad_px: int = 0,
+) -> SequencePanelImage:
+    import matplotlib.pyplot as plt
+
+    if config is None:
+        ensure(adapter_kind is not None, "adapter_kind is required when config is not provided", SchemaError)
+        config = sequence_panel_config_for_adapter(
+            adapter_kind=str(adapter_kind),
+            style_profile=style_profile,
+            adapter_columns=adapter_columns,
+            adapter_policies=adapter_policies,
+            style_overrides=style_overrides,
+            target_width_px=target_width_px,
+            target_height_px=target_height_px,
+            vertical_anchor=vertical_anchor,
+            canvas_top_pad_px=canvas_top_pad_px,
+        )
+
+    record = adapt_record(
+        row,
+        adapter_kind=config.adapter_kind,
+        adapter_columns=config.adapter_columns,
+        adapter_policies=config.adapter_policies,
+        alphabet=config.alphabet,
+    )
+    fig = render_record_figure(
+        record,
+        renderer_name=config.renderer_name,
+        style_preset=config.style_preset,
+        style_overrides=config.style_overrides,
+    )
+    image = _figure_rgba(fig)
+    plt.close(fig)
+    image = _normalize_panel_image(
+        image,
+        target_width_px=config.target_width_px,
+        target_height_px=config.target_height_px,
+        vertical_anchor=config.vertical_anchor,
+        canvas_top_pad_px=config.canvas_top_pad_px,
+    )
+    diagnostics = SequencePanelDiagnostics(
+        contract_id=BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
+        contract_version=BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION,
+        style_profile=config.style_profile,
+        style_preset=str(config.style_preset) if config.style_preset is not None else None,
+        adapter_kind=config.adapter_kind,
+        renderer_name=config.renderer_name,
+        sequence_length_bp=len(str(record.sequence)),
+        feature_count=len(record.features),
+        strand_count=2 if bool((config.style_overrides or {}).get("show_reverse_complement", False)) else 1,
+        legend_entries=_legend_tags(record),
+        image_width_px=int(image.shape[1]),
+        image_height_px=int(image.shape[0]),
+    )
+    return SequencePanelImage(image=image, diagnostics=diagnostics)
 
 
 def _build_public_adapter(

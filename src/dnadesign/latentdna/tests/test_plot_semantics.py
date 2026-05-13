@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
+from dnadesign.latentdna.src.contracts.errors import WorkspaceValidationError
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
-from dnadesign.latentdna.src.workspaces.plot_semantics import resolve_plot_semantics
+from dnadesign.latentdna.src.workspaces.plot_semantics import inline_plot_semantics, resolve_plot_semantics
 
 
 def test_plot_semantics_loads_sidecar_and_returns_required_fields(tmp_path: Path) -> None:
@@ -74,3 +76,48 @@ def test_plot_semantics_loads_sidecar_and_returns_required_fields(tmp_path: Path
     assert semantics.scope == "Full population."
     assert semantics.caption == "Dataset composition across scopes and biological axes."
     assert semantics.alt_text == "Multi-panel bar chart summarizing dataset counts."
+
+
+def test_inline_plot_semantics_is_explicitly_not_a_study_contract() -> None:
+    semantics = inline_plot_semantics("ad_hoc_scatter")
+
+    assert semantics.plot_id == "ad_hoc_scatter"
+    assert semantics.decision_role == "debug"
+    assert "Inline plot semantics" in semantics.guardrails[0]
+    assert "Declare plot semantics" in semantics.failure_modes_md
+
+
+def test_workspace_config_refuses_missing_plot_semantics_reference(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "plot_semantics_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {},
+                "metadata": {"include": []},
+                "plots": {
+                    "dataset_overview": {
+                        "kind": "categorical_count",
+                        "scalar": "dataset_overview_counts",
+                        "category_column": "panel_id",
+                        "label_column": "label",
+                        "value_column": "row_count",
+                        "panel_column": "category",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(WorkspaceValidationError, match="must declare semantics_ref"):
+        load_workspace_config(workspace_dir, validate_plot_semantics=False)

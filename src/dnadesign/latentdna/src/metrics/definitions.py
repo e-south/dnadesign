@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass
 
 from ..contracts.errors import ContractViolationError
+from ..io.hashing import sha256_payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,10 +21,6 @@ class MetricDefinition:
     aggregation_level: str
     task_id: str | None = None
     definition_version: str = "2026-04-17"
-
-    @property
-    def math_definition(self) -> str:
-        return self.mathematical_definition
 
     @property
     def higher_is_better(self) -> bool | None:
@@ -56,6 +54,35 @@ def _metric(
         aggregation_level=aggregation_level,
         task_id=task_id,
     )
+
+
+def _model_or_mapping(value: object) -> dict[str, object]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="json")
+        return dict(dumped) if isinstance(dumped, Mapping) else {}
+    return {}
+
+
+def metric_definitions_from_config(config: object | None) -> dict[str, MetricDefinition]:
+    configured = getattr(config, "metric_definitions", {}) if config is not None else {}
+    definitions: dict[str, MetricDefinition] = {}
+    for metric_id, raw_definition in dict(configured or {}).items():
+        payload = _model_or_mapping(raw_definition)
+        definitions[str(metric_id)] = MetricDefinition(
+            metric_id=str(metric_id),
+            display_name=str(payload["display_name"]),
+            mathematical_definition=str(payload["mathematical_definition"]),
+            metric_family=str(payload["metric_family"]),
+            evidence_tier=str(payload["evidence_tier"]),
+            unit=str(payload["unit"]),
+            direction=str(payload["direction"]),
+            aggregation_level=str(payload["aggregation_level"]),
+            task_id=str(payload["task_id"]) if payload.get("task_id") is not None else None,
+            definition_version=str(payload.get("definition_version") or "workspace_config.v1"),
+        )
+    return definitions
 
 
 _METRICS = [
@@ -246,16 +273,6 @@ _METRICS = [
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "knn_sig35_enrichment_delta",
-        "kNN sig35 enrichment",
-        "Mean within-neighborhood enrichment delta for sig35_variant labels.",
-        metric_family="biology_signal",
-        evidence_tier="secondary",
-        unit="delta_fraction",
-        direction="higher_is_better",
-        aggregation_level="candidate_summary",
-    ),
-    _metric(
         "reference_in_knn_rate",
         "Reference in-kNN rate",
         "Fraction of rows whose top-k neighborhood contains the intended reference anchor.",
@@ -359,7 +376,7 @@ _METRICS = [
     _metric(
         "effective_rank",
         "Effective rank",
-        "Entropy-derived effective rank of the centered representation spectrum.",
+        "Entropy-derived effective rank across the retained PCA components reported by the reducer summary.",
         metric_family="representation_health",
         evidence_tier="primary",
         unit="dims",
@@ -410,7 +427,7 @@ _METRICS = [
     _metric(
         "design_family_balanced_separation_ratio",
         "Balanced design-family separation ratio",
-        "Design-family separation ratio after balancing by Sigma-35 variant and spacer length.",
+        "Design-family separation ratio after balancing by config-declared cohort columns.",
         metric_family="design_structure",
         evidence_tier="primary",
         unit="ratio",
@@ -429,16 +446,6 @@ _METRICS = [
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "sig35_variant_separation_ratio",
-        "Sigma-35 separation ratio",
-        "Mean between-centroid cosine distance divided by mean within-centroid cosine distance for Sigma-35 cohorts.",
-        metric_family="design_structure",
-        evidence_tier="primary",
-        unit="ratio",
-        direction="higher_is_better",
-        aggregation_level="candidate_summary",
-    ),
-    _metric(
         "spacer_length_separation_ratio",
         "Spacer-length separation ratio",
         "Mean between-centroid cosine distance divided by mean within-centroid cosine distance for "
@@ -450,63 +457,62 @@ _METRICS = [
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "sig35_ordinal_spearman",
-        "Sigma-35 ordinal Spearman",
-        "Spearman correlation between expected Sigma-35 rank gaps and observed centroid distances.",
-        metric_family="design_structure",
+        "cohort_separation_ratio",
+        "Cohort separation ratio",
+        "Mean between-centroid cosine distance divided by mean within-centroid cosine distance for a "
+        "config-declared metadata cohort.",
+        metric_family="cohort_structure",
+        evidence_tier="primary",
+        unit="ratio",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "ordinal_axis_spearman",
+        "Ordinal-axis Spearman",
+        "Spearman correlation between configured ordinal-rank gaps and observed centroid distances.",
+        metric_family="ordinal_structure",
         evidence_tier="primary",
         unit="correlation",
         direction="higher_is_better",
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "sig35_ordinal_kendall",
-        "Sigma-35 ordinal Kendall",
-        "Kendall tau correlation between expected Sigma-35 rank gaps and observed centroid distances.",
-        metric_family="design_structure",
+        "ordinal_axis_kendall",
+        "Ordinal-axis Kendall",
+        "Kendall tau correlation between configured ordinal-rank gaps and observed centroid distances.",
+        metric_family="ordinal_structure",
         evidence_tier="primary",
         unit="correlation",
         direction="higher_is_better",
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "sig35_balanced_ordinal_spearman",
-        "Balanced Sigma-35 ordinal Spearman",
-        "Spearman correlation between expected Sigma-35 rank gaps and observed centroid distances "
-        "after balancing by design family and spacer length.",
-        metric_family="design_structure",
+        "ordinal_axis_balanced_spearman",
+        "Balanced ordinal-axis Spearman",
+        "Spearman correlation between configured ordinal-rank gaps and observed centroid distances after "
+        "config-declared cohort balancing.",
+        metric_family="ordinal_structure",
         evidence_tier="primary",
         unit="correlation",
         direction="higher_is_better",
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "sig35_within_family_mean_spearman",
-        "Within-family Sigma-35 Spearman",
-        "Mean within-design-family Spearman correlation between expected Sigma-35 rank gaps and "
-        "observed centroid distances.",
-        metric_family="design_structure",
+        "ordinal_axis_within_group_mean_spearman",
+        "Within-group ordinal-axis Spearman",
+        "Mean within-group Spearman correlation between configured ordinal-rank gaps and observed centroid distances.",
+        metric_family="ordinal_structure",
         evidence_tier="primary",
         unit="correlation",
         direction="higher_is_better",
         aggregation_level="candidate_summary",
     ),
     _metric(
-        "sig35_within_regulator_mean_spearman",
-        "Within-regulator Sigma-35 Spearman",
-        "Mean within-regulator-composition Spearman correlation between expected Sigma-35 rank gaps and "
-        "observed centroid distances.",
-        metric_family="design_structure",
-        evidence_tier="primary",
-        unit="correlation",
-        direction="higher_is_better",
-        aggregation_level="candidate_summary",
-    ),
-    _metric(
-        "sig35_label_permutation_pvalue",
-        "Sigma-35 permutation p-value",
-        "Permutation p-value for the global Sigma-35 ordinal Spearman statistic under shuffled Sigma-35 labels.",
-        metric_family="design_structure",
+        "ordinal_axis_label_permutation_pvalue",
+        "Ordinal-axis permutation p-value",
+        "Permutation p-value for the global ordinal-axis Spearman statistic under shuffled ordinal labels.",
+        metric_family="ordinal_structure",
         evidence_tier="primary",
         unit="p_value",
         direction="lower_is_better",
@@ -526,16 +532,6 @@ _METRICS = [
         "design_regulator_composition_retention_correlation",
         "Regulator-composition retention",
         "Pearson correlation between anchor and context centroid-distance matrices for regulator-composition cohorts.",
-        metric_family="context_stability",
-        evidence_tier="primary",
-        unit="correlation",
-        direction="higher_is_better",
-        aggregation_level="candidate_summary",
-    ),
-    _metric(
-        "sig35_variant_retention_correlation",
-        "Sigma-35 retention",
-        "Pearson correlation between anchor and context centroid-distance matrices for Sigma-35 cohorts.",
         metric_family="context_stability",
         evidence_tier="primary",
         unit="correlation",
@@ -563,21 +559,111 @@ _METRICS = [
         direction="higher_is_better",
         aggregation_level="candidate_summary",
     ),
+    _metric(
+        "reference_group_size",
+        "Reference group size",
+        "Number of labeled reference rows in a configured reference set or metadata reference group.",
+        metric_family="reference_alignment",
+        evidence_tier="appendix",
+        unit="rows",
+        direction="descriptive",
+        aggregation_level="group_summary",
+    ),
+    _metric(
+        "reference_group_pairwise_cosine_distance_median",
+        "Reference group median distance",
+        (
+            "Median pairwise cosine distance within a configured reference set or metadata reference group "
+            "after view-level normalization."
+        ),
+        metric_family="reference_alignment",
+        evidence_tier="appendix",
+        unit="distance",
+        direction="descriptive",
+        aggregation_level="group_summary",
+    ),
+    _metric(
+        "reference_group_pairwise_cosine_distance_iqr",
+        "Reference group distance IQR",
+        (
+            "Interquartile range of pairwise cosine distances within a labeled reference group "
+            "or configured reference set after view-level normalization."
+        ),
+        metric_family="reference_alignment",
+        evidence_tier="appendix",
+        unit="distance",
+        direction="descriptive",
+        aggregation_level="group_summary",
+    ),
+    _metric(
+        "reference_to_centroid_similarity",
+        "Reference-to-centroid similarity",
+        "Cosine similarity between a reference row or reference-set centroid and a configured cohort centroid.",
+        metric_family="reference_alignment",
+        evidence_tier="primary",
+        unit="cosine_similarity",
+        direction="descriptive",
+        aggregation_level="reference_to_centroid",
+    ),
+    _metric(
+        "reference_to_centroid_margin_median",
+        "Reference-to-centroid margin median",
+        "Median best-minus-second-best centroid similarity margin across configured reference entities.",
+        metric_family="reference_alignment",
+        evidence_tier="primary",
+        unit="cosine_similarity_delta",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
+    _metric(
+        "reference_strength_ordinal_spearman_median",
+        "Reference strength Spearman median",
+        "Median collection-specific ordinal Spearman across configured reference-standard strength collections.",
+        metric_family="ordinal_structure",
+        evidence_tier="primary",
+        unit="correlation",
+        direction="higher_is_better",
+        aggregation_level="candidate_summary",
+    ),
 ]
 
 METRIC_DEFINITIONS = {metric.metric_id: metric for metric in _METRICS}
 
 
-def resolve_metric_definition(metric_id: str) -> MetricDefinition:
+def _combined_metric_definitions(config: object | None = None) -> dict[str, MetricDefinition]:
+    workspace_definitions = metric_definitions_from_config(config)
+    overlap = sorted(set(METRIC_DEFINITIONS).intersection(workspace_definitions))
+    if overlap:
+        raise ContractViolationError(f"workspace metric_definitions cannot override global metric ids: {overlap}")
+    return {**METRIC_DEFINITIONS, **workspace_definitions}
+
+
+def resolve_metric_definition(metric_id: str, *, config: object | None = None) -> MetricDefinition:
+    definitions = _combined_metric_definitions(config)
     try:
-        return METRIC_DEFINITIONS[metric_id]
+        return definitions[metric_id]
     except KeyError as exc:  # pragma: no cover - enforced by tests
         raise ContractViolationError(f"no metric definition is registered for {metric_id!r}") from exc
 
 
-def validate_metric_registry() -> None:
+def metric_definition_digest(metric_id: str, *, config: object | None = None) -> str:
+    definition = resolve_metric_definition(metric_id, config=config)
+    return sha256_payload(asdict(definition))
+
+
+def metric_definition_digests(
+    metric_ids: list[str] | set[str] | tuple[str, ...], *, config: object | None = None
+) -> dict[str, str]:
+    return {
+        metric_id: metric_definition_digest(metric_id, config=config)
+        for metric_id in sorted({str(metric_id) for metric_id in metric_ids})
+    }
+
+
+def validate_metric_registry(config: object | None = None) -> None:
+    definitions = _combined_metric_definitions(config)
     if len(METRIC_DEFINITIONS) != len(_METRICS):
         raise ContractViolationError("metric registry reuses metric identifiers")
-    display_names = [metric.display_name for metric in _METRICS]
+    display_names = [metric.display_name for metric in definitions.values()]
     if len(display_names) != len(set(display_names)):
         raise ContractViolationError("metric registry reuses display names")

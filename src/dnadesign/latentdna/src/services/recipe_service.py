@@ -12,6 +12,7 @@ from typing import Any, Callable
 from ..contracts.errors import ArtifactConflictError, ContractViolationError
 from ..contracts.recipe import RecipeValidationResult, expected_step_artifacts, topological_step_order
 from ..contracts.result import CommandResult
+from ..contracts.workspace import InferFeatureSidecarSourceConfig
 from ..runs.recorder import record_audit
 from ..workspaces.loader import load_workspace_config
 from ._artifacts import artifact_exists
@@ -21,7 +22,7 @@ from .alignment_service import build_alignment
 from .cluster_service import fit_cluster
 from .distance_service import score_distance
 from .enrichment_service import score_enrichment
-from .export_service import export_matrix, export_table
+from .export_service import export_anndata, export_matrix, export_table
 from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 from .neighbors_service import fit_neighbors
 from .notebook_service import generate_notebook
@@ -31,7 +32,7 @@ from .projection_service import fit_projection
 from .sample_service import build_sample
 from .scalar_service import build_scalar, derive_scalar
 from .snapshot_service import build_snapshot
-from .view_service import derive_view, materialize_view, reduce_view
+from .view_service import derive_view, materialize_view, materialize_views, reduce_view
 
 
 def _require_param(params: dict[str, Any], *keys: str) -> Any:
@@ -56,6 +57,17 @@ def _list_param(params: dict[str, Any], *keys: str) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
+
+
+def _materialize_group_key(context, step) -> tuple[str, str] | None:
+    if step.op != "view.materialize":
+        return None
+    view_id = str(_require_param(step.params, "view_id", "view"))
+    view = context.require_source_view(view_id)
+    source = context.require_source(view.source)
+    if isinstance(source, InferFeatureSidecarSourceConfig) and view.vector.kind == "column":
+        return (source.root, source.dataset)
+    return None
 
 
 def _materialize_view_step(
@@ -145,6 +157,7 @@ def _build_sample_step(
         reference_set_id=_optional_param(params, "reference_set_id", "reference_set", default=None),
         explicit_ids=_list_param(params, "explicit_ids", "record_ids", "record_id"),
         input_sample_ids=_list_param(params, "input_sample_ids", "input_samples", "input_sample"),
+        where=_optional_param(params, "where", default=None),
         force=force,
     )
 
@@ -379,6 +392,23 @@ def _export_table_step(
     )
 
 
+def _export_anndata_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    return export_anndata(
+        workspace,
+        str(_require_param(params, "export_id", "export")),
+        projection_ids=_list_param(params, "projection_ids", "projections", "projection"),
+        neighbor_ids=_list_param(params, "neighbor_ids", "neighbors", "neighbor"),
+        allow_memory_overage=allow_memory_overage,
+        force=force,
+    )
+
+
 def _build_snapshot_step(
     workspace: str | Path,
     params: dict[str, Any],
@@ -401,6 +431,7 @@ STEP_EXECUTORS: dict[str, Callable[..., CommandResult]] = {
     "cluster.fit": _fit_cluster_step,
     "distance.score": _score_distance_step,
     "enrich.score": _score_enrichment_step,
+    "export.anndata": _export_anndata_step,
     "export.matrix": _export_matrix_step,
     "export.table": _export_table_step,
     "neighbors.fit": _fit_neighbors_step,
@@ -463,6 +494,7 @@ def run_recipe(
     step_statuses: list[str] = []
     step_summaries: list[dict[str, Any]] = []
     freshness_cache = FreshnessCache()
+    processed_steps: set[str] = set()
     progress = start_run_progress(
         context,
         command="recipe run",
@@ -472,9 +504,132 @@ def run_recipe(
         event_sink=event_sink,
     )
 
+    def record_step_result(
+        *,
+        step_id: str,
+        step,
+        step_result: CommandResult,
+        rebuilt: bool,
+        rebuild_reasons: list[str],
+    ) -> None:
+        nonlocal executed_steps, rebuilt_steps
+        executed_steps += 1
+        if rebuilt:
+            rebuilt_steps += 1
+        outputs.extend(step_result.outputs)
+        step_statuses.append(str(step_result.status))
+        summary_status = "attention" if step_result.status == "attention" else ("rebuilt" if rebuilt else "ok")
+        summary = {
+            "step_id": step_id,
+            "op": step.op,
+            "status": summary_status,
+            "artifact_kind": step_result.artifact_kind,
+            "artifact_id": step_result.artifact_id,
+        }
+        if rebuilt:
+            summary["rebuild_reasons"] = rebuild_reasons
+        if step_result.warnings:
+            step_warnings = [f"{step_id}: {warning}" for warning in step_result.warnings]
+            warnings.extend(step_warnings)
+            summary["warnings"] = step_result.warnings
+            for warning in step_warnings:
+                progress.warning(warning)
+        step_summaries.append(summary)
+        progress.step_finished(current_step=step_id, status=str(summary_status))
+
+    def materialize_step_group(start_step_id: str) -> list[str]:
+        start_index = order.index(start_step_id)
+        start_key = _materialize_group_key(context, steps_by_id[start_step_id])
+        if start_key is None:
+            return [start_step_id]
+        grouped = [start_step_id]
+        for candidate_id in order[start_index + 1 :]:
+            candidate = steps_by_id[candidate_id]
+            if candidate_id in processed_steps or _materialize_group_key(context, candidate) != start_key:
+                break
+            if set(candidate.depends_on) - processed_steps:
+                break
+            grouped.append(candidate_id)
+        return grouped
+
     try:
         for step_id in order:
+            if step_id in processed_steps:
+                continue
             step = steps_by_id[step_id]
+            group_step_ids = materialize_step_group(step_id)
+            if len(group_step_ids) > 1:
+                runnable: list[tuple[str, Any, bool, list[str]]] = []
+                for grouped_step_id in group_step_ids:
+                    grouped_step = steps_by_id[grouped_step_id]
+                    progress.step_started(current_step=grouped_step_id)
+                    try:
+                        refs = expected_step_artifacts(grouped_step.op, grouped_step.params)
+                    except ValueError as exc:
+                        raise ContractViolationError(str(exc)) from exc
+                    existence = [
+                        artifact_exists(context, artifact_kind=kind, artifact_id=artifact_id)
+                        for kind, artifact_id in refs
+                    ]
+                    step_force = force or bool(grouped_step.params.get("force", False))
+                    rebuild_reasons: list[str] = []
+                    if not step_force and existence and all(existence):
+                        freshness = [
+                            evaluate_artifact_freshness(
+                                context,
+                                artifact_kind=kind,
+                                artifact_id=artifact_id,
+                                cache=freshness_cache,
+                            )
+                            for kind, artifact_id in refs
+                        ]
+                        if all(entry["status"] == "ok" for entry in freshness):
+                            skipped_steps += 1
+                            step_summaries.append(
+                                {"step_id": grouped_step_id, "op": grouped_step.op, "status": "skipped"}
+                            )
+                            processed_steps.add(grouped_step_id)
+                            progress.step_finished(current_step=grouped_step_id, status="skipped")
+                            continue
+                        step_force = True
+                        rebuild_reasons = [
+                            str(entry.get("reason") or "freshness requires attention") for entry in freshness
+                        ]
+                    if not step_force and any(existence) and not all(existence):
+                        raise ArtifactConflictError(
+                            f"recipe step {grouped_step_id} has partial existing outputs; rerun with --force to rebuild"
+                        )
+                    runnable.append((grouped_step_id, grouped_step, step_force, rebuild_reasons))
+                if runnable:
+                    view_ids = [
+                        str(_require_param(grouped_step.params, "view_id", "view"))
+                        for _, grouped_step, _, _ in runnable
+                    ]
+                    group_force = any(step_force for _, _, step_force, _ in runnable)
+                    for grouped_step_id, _, _, rebuild_reasons in runnable:
+                        if rebuild_reasons:
+                            progress.step_progress(
+                                current_step=grouped_step_id,
+                                message="rebuild required because upstream freshness needs attention",
+                            )
+                    with heartbeat_scope(progress, current_step=runnable[0][0]):
+                        group_results = materialize_views(
+                            context.workspace_dir,
+                            view_ids,
+                            force=group_force,
+                            allow_memory_overage=allow_memory_overage,
+                        )
+                    for grouped_step_id, grouped_step, _, rebuild_reasons in runnable:
+                        view_id = str(_require_param(grouped_step.params, "view_id", "view"))
+                        record_step_result(
+                            step_id=grouped_step_id,
+                            step=grouped_step,
+                            step_result=group_results[view_id],
+                            rebuilt=bool(rebuild_reasons),
+                            rebuild_reasons=rebuild_reasons,
+                        )
+                        processed_steps.add(grouped_step_id)
+                continue
             progress.step_started(current_step=step_id)
             try:
                 refs = expected_step_artifacts(step.op, step.params)
@@ -498,6 +653,7 @@ def run_recipe(
                 if all(entry["status"] == "ok" for entry in freshness):
                     skipped_steps += 1
                     step_summaries.append({"step_id": step_id, "op": step.op, "status": "skipped"})
+                    processed_steps.add(step_id)
                     progress.step_finished(current_step=step_id, status="skipped")
                     continue
                 step_force = True
@@ -521,30 +677,15 @@ def run_recipe(
                     force=step_force,
                     allow_memory_overage=allow_memory_overage,
                 )
-            executed_steps += 1
             rebuilt = bool(rebuild_reasons)
-            if rebuilt:
-                rebuilt_steps += 1
-            outputs.extend(step_result.outputs)
-            step_statuses.append(str(step_result.status))
-            summary_status = "attention" if step_result.status == "attention" else ("rebuilt" if rebuilt else "ok")
-            summary = {
-                "step_id": step_id,
-                "op": step.op,
-                "status": summary_status,
-                "artifact_kind": step_result.artifact_kind,
-                "artifact_id": step_result.artifact_id,
-            }
-            if rebuilt:
-                summary["rebuild_reasons"] = rebuild_reasons
-            if step_result.warnings:
-                step_warnings = [f"{step_id}: {warning}" for warning in step_result.warnings]
-                warnings.extend(step_warnings)
-                summary["warnings"] = step_result.warnings
-                for warning in step_warnings:
-                    progress.warning(warning)
-            step_summaries.append(summary)
-            progress.step_finished(current_step=step_id, status=str(summary_status))
+            record_step_result(
+                step_id=step_id,
+                step=step,
+                step_result=step_result,
+                rebuilt=rebuilt,
+                rebuild_reasons=rebuild_reasons,
+            )
+            processed_steps.add(step_id)
     except Exception as exc:
         progress.fail(current_step=step_id if "step_id" in locals() else None, message=str(exc))
         raise

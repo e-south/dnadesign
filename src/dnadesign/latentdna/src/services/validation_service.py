@@ -6,45 +6,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pyarrow.parquet as pq
+
 from dnadesign.usr import SequencesError
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls
-from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
+from ..contracts.workspace import ColumnCohortConfig, SourceBackedViewConfig
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..sources.resolver import inspect_source_schema, resolve_source
+from ..studies.study_binding import (
+    REQUIRED_STUDY_DELIVERABLE_DOC_FILES,
+    REQUIRED_STUDY_RECORD_FILES,
+    missing_required_files,
+)
 from ..views.row_contracts import source_backed_view_row_contract
 from ..workspaces.loader import load_workspace_config
 from ..workspaces.paths import resolve_repo_path
 from ..workspaces.plot_semantics import validate_plot_semantics_sidecars
+from .semantic_validation_service import validate_workspace_sequence_semantics
 
-_PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
-    "design_family": {"densegen__plan", "usr_label__primary"},
-    "design_regulator_composition": {
-        "densegen__plan",
-        "densegen__required_regulators",
-        "usr_label__primary",
-    },
-    "sig35_variant": {"usr_label__primary"},
-    "spacer_length": {"densegen__used_tfbs_detail", "usr_label__primary"},
-    "campaign_prior": {"densegen__plan", "usr_label__primary"},
-    "is_control": {"densegen__plan", "usr_label__primary"},
-    "source_class": {"densegen__plan", "usr_label__primary"},
-    "regulondb__sigma_factor_set": {"regulondb__sigma_factor_set"},
-    "regulondb__regulator_composition": {"regulondb__regulator_composition"},
-    "regulondb__box_pattern": {"regulondb__box_pattern"},
-    "regulondb__confidence_level_set": {"regulondb__confidence_level_set"},
-    "regulondb__metadata_completeness_class": {"regulondb__metadata_completeness_class"},
-}
-_PROMOTER_METADATA_ANY_COLUMN_GROUPS: dict[str, tuple[set[str], ...]] = {
-    "sig35_variant": (
-        {"densegen__plan"},
-        {"densegen__used_tfbs_detail"},
-        {"seq_annot__features"},
-        {"sequence", "derived__features_retained"},
-    ),
-}
 _NON_MATERIALIZABLE_VIEW_ROLES = {"planned", "retired"}
 _OPTIONAL_SOURCE_ROLES = {"planned", "retired"}
 _MISSING_SOURCE_MARKERS = ("not found", "not initialized")
@@ -81,6 +64,21 @@ def _materialized_view_source_contract_state(
     if vector_column is not None and params.get("vector_column") != vector_column:
         return "stale"
     return "current"
+
+
+def _materialized_view_row_count(rows_path: Path) -> int:
+    try:
+        return int(pq.read_metadata(rows_path).num_rows)
+    except Exception as exc:
+        raise WorkspaceValidationError(f"materialized view rows are unreadable: {rows_path}") from exc
+
+
+def _materialized_view_matrix_shape(matrix_path: Path) -> tuple[int, ...]:
+    try:
+        matrix = np.load(matrix_path, mmap_mode="r")
+        return tuple(int(value) for value in matrix.shape)
+    except Exception as exc:
+        raise WorkspaceValidationError(f"materialized view matrix is unreadable: {matrix_path}") from exc
 
 
 def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
@@ -127,17 +125,24 @@ def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
     return notebook_details
 
 
+def _source_required_columns(source) -> list[str]:
+    required_columns: list[str] = []
+    for column in [source.record_key, source.subject_key, source.context_key]:
+        if column is not None and column not in required_columns:
+            required_columns.append(column)
+    return required_columns
+
+
 def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     context = load_workspace_config(workspace)
     validate_plot_semantics_sidecars(context)
     source_columns: dict[str, set[str]] = {}
+    source_schemas: dict[str, dict[str, object]] = {}
     source_details: list[dict[str, object]] = []
     for source_id in sorted(context.config.sources):
         source = context.require_source(source_id)
         resolved = resolve_source(source_id, source, workspace_dir=context.workspace_dir)
-        required_columns = [source.record_key, source.subject_key]
-        if source.context_key is not None:
-            required_columns.append(source.context_key)
+        required_columns = _source_required_columns(source)
         try:
             schema_info = inspect_source_schema(resolved)
         except Exception as exc:
@@ -164,6 +169,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             missing_rendered = ", ".join(missing_columns)
             raise WorkspaceValidationError(f"source {source_id} is missing required columns: {missing_rendered}")
         source_columns[source_id] = columns
+        source_schemas[source_id] = schema_info
         source_details.append(
             {
                 "source_id": source_id,
@@ -200,20 +206,37 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                 )
             if view.vector.kind == "column":
                 view_detail["vector_column"] = view.vector.name
+            try:
+                row_contract = source_backed_view_row_contract(
+                    context,
+                    source_id=view.source,
+                    source=source,
+                    available_columns=columns,
+                )
+            except Exception as exc:
+                raise WorkspaceValidationError(f"view {view_id} row-column contract is invalid: {exc}") from exc
             view_dir = context.output_root / "views" / view_id
             rows_path = view_dir / "rows.parquet"
             matrix_path = view_dir / "matrix.npy"
             if rows_path.is_file() and matrix_path.is_file():
-                materialized_columns = {field.name for field in read_schema(rows_path)}
-                try:
-                    row_contract = source_backed_view_row_contract(
-                        context,
-                        source_id=view.source,
-                        source=source,
-                        available_columns=columns,
+                expected_row_count = int(source_schemas[view.source]["row_count"])
+                materialized_row_count = _materialized_view_row_count(rows_path)
+                materialized_matrix_shape = _materialized_view_matrix_shape(matrix_path)
+                view_detail["materialized_row_count"] = materialized_row_count
+                view_detail["materialized_matrix_shape"] = list(materialized_matrix_shape)
+                if not materialized_matrix_shape:
+                    raise WorkspaceValidationError(f"materialized view matrix has no shape: {view_id}")
+                if int(materialized_matrix_shape[0]) != materialized_row_count:
+                    raise WorkspaceValidationError(
+                        "materialized view row table and matrix row counts disagree: "
+                        f"{view_id} ({materialized_row_count} rows vs matrix shape {materialized_matrix_shape})"
                     )
-                except Exception as exc:
-                    raise WorkspaceValidationError(f"view {view_id} row-column contract is invalid: {exc}") from exc
+                if materialized_row_count != expected_row_count:
+                    raise WorkspaceValidationError(
+                        "materialized view row count no longer matches source schema: "
+                        f"{view_id} ({materialized_row_count} materialized vs {expected_row_count} source rows)"
+                    )
+                materialized_columns = {field.name for field in read_schema(rows_path)}
                 required_materialized_columns = set(row_contract.materialized_row_columns)
                 missing_materialized_columns = sorted(
                     column for column in required_materialized_columns if column not in materialized_columns
@@ -253,6 +276,50 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
             }
         )
 
+    sequence_semantic_details, sequence_semantic_warnings = validate_workspace_sequence_semantics(
+        context,
+        source_columns=source_columns,
+        source_schemas=source_schemas,
+    )
+
+    metadata_derivation_details: list[dict[str, object]] = []
+    for column_name, derivation in sorted(context.config.metadata.derivations.items()):
+        detail: dict[str, object] = {"column": column_name, "kind": derivation.kind}
+        if derivation.kind == "lookup":
+            source_columns_for_lookup = source_columns.get(derivation.source, set())
+            missing = sorted(
+                column
+                for column in (derivation.right_key, derivation.value_column)
+                if column not in source_columns_for_lookup
+            )
+            if missing:
+                raise WorkspaceValidationError(
+                    f"metadata derivation {column_name!r} lookup source {derivation.source!r} "
+                    f"is missing columns: {missing}"
+                )
+            detail.update(
+                {
+                    "source": derivation.source,
+                    "left_key": derivation.left_key,
+                    "right_key": derivation.right_key,
+                    "value_column": derivation.value_column,
+                    "missing_policy": derivation.missing_policy,
+                }
+            )
+        elif derivation.kind == "annotation":
+            detail.update(
+                {
+                    "source": derivation.source,
+                    "derive": derivation.derive,
+                    "handler": derivation.handler,
+                    "required_columns": list(derivation.required_columns),
+                    "any_required_column_groups": [list(group) for group in derivation.any_required_column_groups],
+                    "missing_policy": derivation.missing_policy,
+                    "value_type": derivation.value_type,
+                }
+            )
+        metadata_derivation_details.append(detail)
+
     landmark_details: list[dict[str, object]] = []
     for landmark_id in sorted(context.config.landmarks):
         landmark = context.require_landmark(landmark_id)
@@ -273,55 +340,43 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     cohort_details: list[dict[str, object]] = []
     for cohort_id in sorted(context.config.cohorts):
         cohort = context.require_cohort(cohort_id)
-        if isinstance(cohort, ColumnCohortConfig):
-            if cohort.column not in source_columns[cohort.source]:
-                raise WorkspaceValidationError(
-                    f"cohort {cohort_id} column is missing from source {cohort.source}: {cohort.column}"
-                )
-            cohort_details.append(
-                {
-                    "cohort_id": cohort_id,
-                    "source": cohort.source,
-                    "kind": cohort.kind,
-                    "column": cohort.column,
-                }
-            )
-            continue
-        assert isinstance(cohort, PromoterMetadataCohortConfig)
-        missing = sorted(_PROMOTER_METADATA_REQUIRED_COLUMNS[cohort.derive] - source_columns[cohort.source])
-        if missing:
+        if not isinstance(cohort, ColumnCohortConfig):
+            raise WorkspaceValidationError(f"cohort {cohort_id} uses unsupported cohort kind {cohort.kind!r}")
+        if cohort.column not in source_columns[cohort.source]:
             raise WorkspaceValidationError(
-                f"cohort {cohort_id} promoter metadata inputs are missing from source {cohort.source}: {missing}"
-            )
-        any_groups = _PROMOTER_METADATA_ANY_COLUMN_GROUPS.get(cohort.derive, ())
-        if any_groups and not any(group.issubset(source_columns[cohort.source]) for group in any_groups):
-            rendered_groups = ["{" + ", ".join(sorted(group)) + "}" for group in any_groups]
-            raise WorkspaceValidationError(
-                f"cohort {cohort_id} promoter metadata inputs require at least one of "
-                f"{rendered_groups} in source {cohort.source}"
+                f"cohort {cohort_id} column is missing from source {cohort.source}: {cohort.column}"
             )
         cohort_details.append(
             {
                 "cohort_id": cohort_id,
                 "source": cohort.source,
                 "kind": cohort.kind,
-                "derive": cohort.derive,
+                "column": cohort.column,
             }
         )
 
     study_binding = None
     if context.config.study_binding is not None:
-        docs_root = resolve_repo_path(context.config.study_binding.docs_root)
-        required_files = ["study.yaml"]
-        missing = [name for name in required_files if not (docs_root / name).exists()]
-        if missing:
+        record_root = resolve_repo_path(context.config.study_binding.record_root)
+        missing_record_files = missing_required_files(record_root, REQUIRED_STUDY_RECORD_FILES)
+        if missing_record_files:
             raise WorkspaceValidationError(
-                f"study docs_root is missing required files: {docs_root} ({', '.join(sorted(missing))})"
+                "study record_root is missing required checked-in record files: "
+                f"{record_root} ({', '.join(sorted(missing_record_files))})"
+            )
+        deliverable_docs_root = resolve_repo_path(context.config.study_binding.deliverable_docs_root)
+        missing_docs_files = missing_required_files(deliverable_docs_root, REQUIRED_STUDY_DELIVERABLE_DOC_FILES)
+        if missing_docs_files:
+            raise WorkspaceValidationError(
+                "study deliverable_docs_root is missing required files: "
+                f"{deliverable_docs_root} ({', '.join(sorted(missing_docs_files))})"
             )
         study_binding = {
             "study_id": context.config.study_binding.study_id,
-            "docs_root": docs_root.as_posix(),
-            "required_files": required_files,
+            "record_root": record_root.as_posix(),
+            "deliverable_docs_root": deliverable_docs_root.as_posix(),
+            "record_required_files": list(REQUIRED_STUDY_RECORD_FILES),
+            "deliverable_docs_required_files": list(REQUIRED_STUDY_DELIVERABLE_DOC_FILES),
         }
 
     notebook_details = _deep_validate_notebook_artifacts(context)
@@ -334,6 +389,9 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
         "study_binding": study_binding,
         "source_details": source_details,
         "view_details": view_details,
+        "metadata_derivation_details": metadata_derivation_details,
+        "sequence_semantic_details": sequence_semantic_details,
+        "warnings": sequence_semantic_warnings,
         "landmark_details": landmark_details,
         "cohort_details": cohort_details,
         "notebook_details": notebook_details,

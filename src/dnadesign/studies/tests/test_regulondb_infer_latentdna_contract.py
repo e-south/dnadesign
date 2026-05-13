@@ -4,6 +4,9 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.latentdna.src.services.workspace_snapshot_service import _decision_ladder
+from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
+
 
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
@@ -71,9 +74,18 @@ def test_regulondb_latentdna_binding_declares_native_and_core60_bundle_sources()
 
     assert expected_sources <= set(binding["source_datasets"])
     assert (
-        "intermediate_embedding_7b_core60_tss_upstream" in binding["default_geometry_inventory"]["planned_geometries"]
+        "intermediate_embedding_7b_core60_tss_upstream"
+        in binding["default_geometry_inventory"]["default_review_geometries"]
     )
-    assert (
-        "log_likelihood_total_7b_core60_tss_upstream"
-        in binding["default_geometry_inventory"]["planned_scalar_diagnostics"]
+    assert "log_likelihood_total_7b_core60_tss_upstream" in binding["default_geometry_inventory"]["scalar_diagnostics"]
+
+
+def test_regulondb_latentdna_binding_decision_deliverables_match_workspace_ladder() -> None:
+    repo_root = _repo_root()
+    binding = yaml.safe_load(
+        (repo_root / "docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml").read_text(encoding="utf-8")
     )
+    context = load_workspace_config(repo_root / "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel")
+
+    assert binding["decision_deliverables"] == _decision_ladder(context)
+    assert set(binding["decision_deliverables"]) <= set(context.config.deliverables)

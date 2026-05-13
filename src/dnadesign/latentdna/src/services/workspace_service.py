@@ -79,7 +79,8 @@ def show_workspace(workspace: str | Path) -> dict[str, str | int]:
     }
     if context.config.study_binding is not None:
         payload["study_binding_study_id"] = context.config.study_binding.study_id
-        payload["study_binding_docs_root"] = context.config.study_binding.docs_root
+        payload["study_binding_record_root"] = context.config.study_binding.record_root
+        payload["study_binding_deliverable_docs_root"] = context.config.study_binding.deliverable_docs_root
     return payload
 
 

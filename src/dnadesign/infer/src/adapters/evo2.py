@@ -60,6 +60,14 @@ def _bucket_indices_by_token_length(tokens: Sequence[Sequence[int]]) -> List[Lis
     return [buckets[length] for length in sorted(buckets)]
 
 
+def _bucket_indices_by_sequence_length(seqs: Sequence[str]) -> List[List[int]]:
+    """Group sequence indices by string length for padding-free native scoring."""
+    buckets: Dict[int, List[int]] = {}
+    for index, seq in enumerate(seqs):
+        buckets.setdefault(len(seq), []).append(index)
+    return [buckets[length] for length in sorted(buckets)]
+
+
 def _normalize_pool_config(pool: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if pool is None:
         return None
@@ -99,6 +107,26 @@ def _pool_batched_tensor(
             "Use pool.dim >= 1 and avoid pooling over batch dimension."
         )
     return pooled
+
+
+def _validate_batched_sequence_tensor(
+    tensor: torch.Tensor,
+    *,
+    tokens: torch.Tensor,
+    tensor_name: str,
+) -> torch.Tensor:
+    if not torch.is_tensor(tensor):
+        raise CapabilityError(f"Evo2 {tensor_name} output must be a torch.Tensor.")
+    if tensor.ndim != 3:
+        raise CapabilityError(f"Evo2 {tensor_name} tensor layout must be [B, L, *]; got rank {tensor.ndim}.")
+    expected_batch, expected_length = int(tokens.size(0)), int(tokens.size(1))
+    observed_batch, observed_length = int(tensor.size(0)), int(tensor.size(1))
+    if observed_batch != expected_batch or observed_length != expected_length:
+        raise CapabilityError(
+            f"Evo2 {tensor_name} tensor layout must be [B, L, *]; "
+            f"tokens=[{expected_batch}, {expected_length}] output=[{observed_batch}, {observed_length}, *]."
+        )
+    return tensor
 
 
 class Evo2Adapter:
@@ -349,7 +377,7 @@ class Evo2Adapter:
         def _forward_logits(x: torch.Tensor) -> torch.Tensor:
             outputs, _ = self.model(x)
             try:
-                return outputs[0]  # [B, L, V]
+                return _validate_batched_sequence_tensor(outputs[0], tokens=x, tensor_name="logits")  # [B, L, V]
             except Exception as e:
                 raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
 
@@ -386,7 +414,13 @@ class Evo2Adapter:
                 logits_batch = outputs
             if resolved_layer not in embeddings:
                 raise CapabilityError(f"Embedding layer '{resolved_layer}' not found in Evo2 response.")
-            return logits_batch, embeddings[resolved_layer]
+            logits_batch = _validate_batched_sequence_tensor(logits_batch, tokens=x, tensor_name="logits")
+            embedding_batch = _validate_batched_sequence_tensor(
+                embeddings[resolved_layer],
+                tokens=x,
+                tensor_name="embedding",
+            )
+            return logits_batch, embedding_batch
 
         logits_by_input, embeddings_by_input = self._run_dual_extract_batches_by_length(
             tokens=tokens,
@@ -439,7 +473,11 @@ class Evo2Adapter:
             _, embeddings = self.model(x, return_embeddings=True, layer_names=[resolved_layer])
             if resolved_layer not in embeddings:
                 raise CapabilityError(f"Embedding layer '{resolved_layer}' not found in Evo2 response.")
-            return embeddings[resolved_layer]  # [B, L, D]
+            return _validate_batched_sequence_tensor(
+                embeddings[resolved_layer],
+                tokens=x,
+                tensor_name="embedding",
+            )  # [B, L, D]
 
         embeddings_by_input = self._run_extract_batches_by_length(
             tokens=tokens,
@@ -456,14 +494,55 @@ class Evo2Adapter:
             raise CapabilityError("Evo2 supports only method='native' in v1.")
         if reduction not in {"sum", "mean"}:
             raise CapabilityError("Evo2 log_likelihood supports reduction='sum' or 'mean' only.")
-        red = reduction
+        if not seqs:
+            return []
+
+        # Evo2's scorer pads mixed-length batches. Score equal-length groups so
+        # shorter sequences never absorb a pad-token likelihood term.
+        values_by_input: List[Optional[float]] = [None] * len(seqs)
         with torch.inference_mode():
-            values = self.model.score_sequences(
-                seqs,
-                batch_size=max(1, len(seqs)),
-                reduce_method=red,
-            )
-        return [float(v) for v in values]
+            for group in _bucket_indices_by_sequence_length(seqs):
+                group_seqs = [seqs[index] for index in group]
+                group_values = self.model.score_sequences(
+                    group_seqs,
+                    batch_size=max(1, len(group_seqs)),
+                    reduce_method=reduction,
+                )
+                for row_index, sample_index in enumerate(group):
+                    values_by_input[sample_index] = float(group_values[row_index])
+
+        if any(value is None for value in values_by_input):
+            raise CapabilityError("Evo2 log-likelihood output assembly failed: missing scores.")
+        return [value for value in values_by_input if value is not None]
+
+    def log_likelihood_total_and_mean(
+        self, seqs: List[str], *, method: str = "native"
+    ) -> tuple[List[float], List[float]]:
+        """
+        Compute total and mean log likelihoods with one native sum score per length bucket.
+        """
+        if method != "native":
+            raise CapabilityError("Evo2 supports only method='native' in v1.")
+        if not seqs:
+            return [], []
+
+        totals_by_input: List[Optional[float]] = [None] * len(seqs)
+        with torch.inference_mode():
+            for group in _bucket_indices_by_sequence_length(seqs):
+                group_seqs = [seqs[index] for index in group]
+                group_totals = self.model.score_sequences(
+                    group_seqs,
+                    batch_size=max(1, len(group_seqs)),
+                    reduce_method="sum",
+                )
+                for row_index, sample_index in enumerate(group):
+                    totals_by_input[sample_index] = float(group_totals[row_index])
+
+        if any(value is None for value in totals_by_input):
+            raise CapabilityError("Evo2 log-likelihood output assembly failed: missing total scores.")
+        totals = [value for value in totals_by_input if value is not None]
+        means = [float("nan") if len(seq) <= 1 else total / float(len(seq) - 1) for seq, total in zip(seqs, totals)]
+        return totals, means
 
     def generate(
         self,

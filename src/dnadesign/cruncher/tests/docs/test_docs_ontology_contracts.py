@@ -94,14 +94,18 @@ def test_released_snapback_docs_publish_route_and_geometry_literals() -> None:
         assert final_geometry_source in combined
 
 
-def test_snapback_shortening_docs_keep_primary_lane_and_contrast_lane_explicit() -> None:
-    status = _read_repo("docs/studies/snapback_shortening_effort/status.md")
-    routes = _read_repo("docs/studies/snapback_shortening_effort/routes.md")
-    skill = _read_repo(".agents/skills/snapback-hairpin-study/SKILL.md")
+def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit() -> None:
+    status = _read_repo("docs/studies/retron_hairpin_design/status.md")
+    routes = _read_repo("docs/studies/retron_hairpin_design/routes.md")
+    skill = _read_repo(".agents/skills/retron-hairpin-study/SKILL.md")
 
-    assert "The active execution lane is `released-product Snapback` in `de033`." in status
+    assert "The active cap/shortening execution lane is `released-product Snapback` in" in status
+    assert "The active base-junction context lane is scar-nick through the `scar_nick`" in status
+    assert "subpackage. It owns Type IIS retained scar space" in status
     assert "### Primary route: released-product Snapback" in routes
+    assert "### Context route: scar-nick base-junction" in routes
     assert "This is the active study lane." in routes
     assert "### Contrast route: YIU boundary check" in routes
     assert "released-product Snapback remains the active shortening lane" in skill
-    assert "YIU remains a contrast-only boundary surface" in skill
+    assert "scar-nick context preserves the strict terminal nick rule" in skill
+    assert "YIU remains mismatch-centric and contrast-only" in skill

@@ -245,6 +245,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert smoke_payload["status"] == "error"
     assert smoke_payload["checks"]["notebook_exists"] is True
     assert smoke_payload["checks"]["control_plane_loads"] is True
+    assert smoke_payload["checks"]["marimo_check_passes"] is True
     assert smoke_payload["checks"]["default_deliverable_ready"] is False
 
     inspect_health_result = _RUNNER.invoke(
@@ -255,6 +256,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     inspect_health_payload = json.loads(inspect_health_result.stdout)
     assert inspect_health_payload["data"]["health"]["status"] == "error"
     assert inspect_health_payload["data"]["health"]["checks"]["notebook_exists"] is True
+    assert inspect_health_payload["data"]["health"]["checks"]["marimo_check_passes"] is True
 
     status_before = _RUNNER.invoke(
         app,
@@ -330,9 +332,12 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert "runtime.support.notebook_theme()" in notebook_text
     assert "_plot_review = runtime.plot_review" in notebook_text
     assert "render_projection_grid(" in notebook_text
-    assert "comparison_scope_note" in notebook_text
+    assert "comparison_scope_note" not in notebook_text
     assert 'runtime["' not in notebook_text
     assert "_controls = load_workspace_notebook_controls(CONTROL_PATH)" in notebook_text
+    assert "Sigma-35 organization, and context robustness" not in notebook_text
+    assert "_plot_scope_text = _identity.title" in notebook_text
+    assert "Review the current artifact set:" not in notebook_text
     assert '_runtime_paths = _controls["runtime_paths"]' in notebook_text
     assert '_runtime_paths["workspace_relative_path"]' in notebook_text
     assert '_runtime_paths["output_relative_path"]' in notebook_text
@@ -345,21 +350,22 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert 'label="Model"' in notebook_text
     assert 'label="Family"' in notebook_text
     assert 'label="Context"' in notebook_text
-    assert 'label="Layout"' in notebook_text
+    assert 'label="Candidate set / mode"' in notebook_text
     assert 'label="Geometry"' in notebook_text
+    assert 'label="Projection"' in notebook_text
     assert 'label="Hue"' in notebook_text
-    assert notebook_text.count("searchable=True") == 3
+    assert notebook_text.count("searchable=True") == 2
     assert "on_change=set_requested_hue" in notebook_text
-    assert 'label="Left geometry"' in notebook_text
-    assert 'label="Right geometry"' in notebook_text
-    assert "Plots" in notebook_text
-    assert "Geometry audit" in notebook_text
-    assert "Comparison audit" in notebook_text
-    assert "mo.state(default_tab)" in notebook_text
-    assert "value=active_top_tab" in notebook_text
-    assert "on_change=set_active_top_tab" in notebook_text
-    assert "lazy=True" in notebook_text
-    assert "Review the current artifact set for representation health" in notebook_text
+    assert 'label="Left geometry"' not in notebook_text
+    assert 'label="Right geometry"' not in notebook_text
+    assert "Artifact group" in notebook_text
+    assert "Projection browser" in notebook_text
+    assert '"Geometry browser": geometry_panel' not in notebook_text
+    assert "mo.state(default_tab)" not in notebook_text
+    assert "value=active_top_tab" not in notebook_text
+    assert "on_change=set_active_top_tab" not in notebook_text
+    assert "lazy=True" not in notebook_text
+    assert "Review the current artifact set: " not in notebook_text
     assert "Point positions are fixed by the saved coordinates" in notebook_text
     assert "Jump list:" not in notebook_text
     assert "mo.accordion(" in notebook_text
@@ -408,6 +414,7 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert health_after.exit_code == 0, health_after.stdout
     health_after_payload = json.loads(health_after.stdout)
     assert health_after_payload["data"]["health"]["status"] == "ok"
+    assert health_after_payload["data"]["health"]["checks"]["marimo_check_passes"] is True
 
     export_path = workspace_dir / "atlas_review.html"
     export_result = subprocess.run(
@@ -530,6 +537,7 @@ def test_notebook_smoke_uses_live_default_deliverable_status(tmp_path: Path, mon
     assert smoke_result.exit_code != 0, smoke_result.stdout
     smoke_payload = json.loads(smoke_result.stdout)
     assert smoke_payload["status"] == "error"
+    assert smoke_payload["checks"]["marimo_check_passes"] is True
     assert smoke_payload["checks"]["default_deliverable_ready"] is False
     assert "plot freshness requires attention" in "".join(smoke_payload["warnings"])
 

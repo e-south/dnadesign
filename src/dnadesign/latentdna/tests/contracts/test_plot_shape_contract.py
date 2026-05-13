@@ -8,7 +8,7 @@ from pydantic import TypeAdapter
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import PlotConfig
 from dnadesign.latentdna.src.plots.recipes import resolve_plot_spec
-from dnadesign.latentdna.src.plots.render import _effective_shape_column
+from dnadesign.latentdna.src.plots.renderers.scatter import effective_shape_column
 
 _PLOT_CONFIG_ADAPTER = TypeAdapter(PlotConfig)
 
@@ -48,6 +48,40 @@ def test_xy_scatter_plot_config_accepts_ordinal_hue_options() -> None:
 
     assert config.default_hue == "spacer_length"
     assert config.hue_options[0].type == "ordinal"
+
+
+def test_plot_config_accepts_panel_scaled_continuous_hue_options() -> None:
+    config = _PLOT_CONFIG_ADAPTER.validate_python(
+        {
+            "kind": "xy_scatter",
+            "scalar": "design_centroid_margins",
+            "x_column": "synthetic_margin_ethanol_vs_background",
+            "y_column": "synthetic_margin_cipro_vs_background",
+            "default_hue": "gc_fraction",
+            "hue_options": [
+                {"column": "gc_fraction", "label": "GC fraction", "type": "continuous", "scale": "panel"},
+            ],
+        }
+    )
+
+    assert config.default_hue == "gc_fraction"
+    assert config.hue_options[0].scale == "panel"
+
+
+def test_plot_config_rejects_panel_scaled_categorical_hue_options() -> None:
+    with pytest.raises(ValueError, match="panel-scaled hue options must be continuous"):
+        _PLOT_CONFIG_ADAPTER.validate_python(
+            {
+                "kind": "xy_scatter",
+                "scalar": "design_centroid_margins",
+                "x_column": "synthetic_margin_ethanol_vs_background",
+                "y_column": "synthetic_margin_cipro_vs_background",
+                "default_hue": "design_family",
+                "hue_options": [
+                    {"column": "design_family", "label": "Design family", "type": "categorical", "scale": "panel"},
+                ],
+            }
+        )
 
 
 def test_plot_config_rejects_default_hue_not_declared_in_hue_options() -> None:
@@ -150,7 +184,7 @@ def test_hue_switchable_scatter_surfaces_ignore_shape_channel_at_render_time() -
     )
 
     assert spec.shape_column == "sig35_variant"
-    assert _effective_shape_column(spec) is None
+    assert effective_shape_column(spec) is None
 
 
 def test_metric_panel_grid_inline_spec_rejects_shape_column() -> None:

@@ -7,22 +7,11 @@ from __future__ import annotations
 import json
 import re
 
-import pyarrow as pa
-
 from ..contracts.errors import ContractViolationError
-from ..contracts.workspace import PromoterMetadataCohortConfig
-from ..metadata.derivations import derive_metadata_value
-from ..workspaces.loader import WorkspaceContext
+from ..contracts.promoter_metadata import REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS
 
 _SIG35_PATTERN = re.compile(r"__sig35[=_]([A-Za-z0-9]+)")
 _CONTROL_LABELS = {"spyp", "sulap", "soxsp", "j23105", "spy_p", "sul_ap", "sox_sp"}
-_REGULONDB_NATIVE_PROMOTER_DERIVATIONS = {
-    "regulondb__sigma_factor_set",
-    "regulondb__regulator_composition",
-    "regulondb__box_pattern",
-    "regulondb__confidence_level_set",
-    "regulondb__metadata_completeness_class",
-}
 
 
 def _normalize_text(value: object) -> str | None:
@@ -127,24 +116,7 @@ def _design_regulator_composition(row: dict[str, object]) -> str:
     return "unknown"
 
 
-def _configured_derivation_value(
-    context: WorkspaceContext,
-    row: dict[str, object],
-    *,
-    column_name: str,
-) -> object:
-    derivation = (context.config.metadata.derivations or {}).get(column_name)
-    if derivation is None:
-        return None
-    return derive_metadata_value(row, derivation)
-
-
-def _sig35_variant(row: dict[str, object], *, context: WorkspaceContext | None = None) -> str:
-    if context is not None:
-        configured = _configured_derivation_value(context, row, column_name="sig35_variant")
-        if configured is not None:
-            text = _normalize_text(configured)
-            return "unknown" if text is None else text.lower()
+def _sig35_variant(row: dict[str, object]) -> str:
     plan = _normalize_text(row.get("densegen__plan")) or ""
     match = _SIG35_PATTERN.search(plan)
     if match is not None:
@@ -182,6 +154,10 @@ def _sig35_variant_from_feature_detail(row: dict[str, object]) -> str | None:
 
 
 def _used_tfbs_detail_entries(value: object) -> list[dict[str, object]]:
+    return _coerce_list_of_dict_entries(value, field_name="densegen__used_tfbs_detail")
+
+
+def _coerce_list_of_dict_entries(value: object, *, field_name: str) -> list[dict[str, object]]:
     if value is None:
         return []
     if hasattr(value, "as_py"):
@@ -193,19 +169,19 @@ def _used_tfbs_detail_entries(value: object) -> list[dict[str, object]]:
         try:
             value = json.loads(text)
         except json.JSONDecodeError as exc:  # pragma: no cover - malformed payloads are caught by callers
-            raise ContractViolationError("densegen__used_tfbs_detail must be valid JSON when encoded as text") from exc
+            raise ContractViolationError(f"{field_name} must be valid JSON when encoded as text") from exc
     if not isinstance(value, list) and hasattr(value, "tolist"):
         converted = value.tolist()
         if isinstance(converted, list):
             value = converted
     if not isinstance(value, list):
-        raise ContractViolationError("densegen__used_tfbs_detail must decode to a list of dict entries")
+        raise ContractViolationError(f"{field_name} must decode to a list of dict entries")
     entries: list[dict[str, object]] = []
     for item in value:
         if hasattr(item, "as_py"):
             item = item.as_py()
         if not isinstance(item, dict):
-            raise ContractViolationError("densegen__used_tfbs_detail entries must be dictionaries")
+            raise ContractViolationError(f"{field_name} entries must be dictionaries")
         entries.append(dict(item))
     return entries
 
@@ -281,32 +257,7 @@ def _seq_annot_feature_entries(value: object) -> list[dict[str, object]]:
 
 
 def _generic_feature_entries(value: object, *, field_name: str) -> list[dict[str, object]]:
-    if value is None:
-        return []
-    if hasattr(value, "as_py"):
-        value = value.as_py()
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return []
-        try:
-            value = json.loads(text)
-        except json.JSONDecodeError as exc:  # pragma: no cover - malformed payloads are caught by callers
-            raise ContractViolationError(f"{field_name} must be valid JSON when encoded as text") from exc
-    if not isinstance(value, list) and hasattr(value, "tolist"):
-        converted = value.tolist()
-        if isinstance(converted, list):
-            value = converted
-    if not isinstance(value, list):
-        raise ContractViolationError(f"{field_name} must decode to a list of dict entries")
-    entries: list[dict[str, object]] = []
-    for item in value:
-        if hasattr(item, "as_py"):
-            item = item.as_py()
-        if not isinstance(item, dict):
-            raise ContractViolationError(f"{field_name} entries must be dictionaries")
-        entries.append(dict(item))
-    return entries
+    return _coerce_list_of_dict_entries(value, field_name=field_name)
 
 
 def _feature_sequence_from_qualifiers(feature: dict[str, object]) -> str | None:
@@ -397,6 +348,11 @@ def _campaign_prior(row: dict[str, object]) -> str:
 def _source_class(row: dict[str, object]) -> str:
     if _normalize_text(row.get("densegen__plan")) is not None:
         return "densegen"
+    if (
+        _normalize_text(row.get("regulondb__primary_promoter_name")) is not None
+        or _normalize_text(row.get("derived__parent_dataset")) == "usr_regulondb_native_promoters"
+    ):
+        return "native_regulondb"
     source_family = _normalize_text(row.get("source_family"))
     if source_family is not None:
         normalized = source_family.lower()
@@ -410,8 +366,8 @@ def _source_class(row: dict[str, object]) -> str:
     return "manual_or_wildtype" if _is_control_row(row) else "densegen"
 
 
-def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: WorkspaceContext | None = None) -> object:
-    if derive in _REGULONDB_NATIVE_PROMOTER_DERIVATIONS:
+def derive_promoter_metadata_value(row: dict[str, object], *, derive: str) -> object:
+    if derive in REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS:
         if derive not in row:
             raise ContractViolationError(f"native RegulonDB promoter metadata column is missing: {derive}")
         return row[derive]
@@ -420,7 +376,7 @@ def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: Wo
     if derive == "design_regulator_composition":
         return _design_regulator_composition(row)
     if derive == "sig35_variant":
-        return _sig35_variant(row, context=context)
+        return _sig35_variant(row)
     if derive == "spacer_length":
         return _spacer_length(row)
     if derive == "campaign_prior":
@@ -430,16 +386,3 @@ def _promoter_metadata_value(row: dict[str, object], *, derive: str, context: Wo
     if derive == "source_class":
         return _source_class(row)
     raise ContractViolationError(f"unsupported promoter metadata derivation: {derive}")
-
-
-def _promoter_metadata_columns(
-    rows: list[dict[str, object]],
-    *,
-    context: WorkspaceContext,
-    configs: list[tuple[str, PromoterMetadataCohortConfig]],
-) -> dict[str, pa.Array]:
-    arrays: dict[str, pa.Array] = {}
-    for cohort_id, config in configs:
-        values = [_promoter_metadata_value(row, derive=config.derive, context=context) for row in rows]
-        arrays[cohort_id] = pa.array(values)
-    return arrays

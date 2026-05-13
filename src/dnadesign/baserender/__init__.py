@@ -22,6 +22,10 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "BaseRenderJobV3": ("dnadesign.baserender.src.config", "BaseRenderJobV3"),
     "RenderJobV3": ("dnadesign.baserender.src.config", "RenderJobV3"),
     "RenderContractDescriptor": ("dnadesign.baserender.src.config", "RenderContractDescriptor"),
+    "Style": ("dnadesign.baserender.src.config", "Style"),
+    "resolve_style": ("dnadesign.baserender.src.config", "resolve_style"),
+    "resolve_preset_path": ("dnadesign.baserender.src.config", "resolve_preset_path"),
+    "list_style_presets": ("dnadesign.baserender.src.config", "list_style_presets"),
     "run_sequence_rows_job": ("dnadesign.baserender.src.public", "run_sequence_rows_job"),
     "run_render_job": ("dnadesign.baserender.src.public", "run_render_job"),
     "run_cruncher_showcase_job": ("dnadesign.baserender.src.public", "run_cruncher_showcase_job"),
@@ -52,6 +56,20 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "render_record_figure": ("dnadesign.baserender.src.public", "render_record_figure"),
     "render_record_grid_figure": ("dnadesign.baserender.src.public", "render_record_grid_figure"),
     "render_parquet_record_figure": ("dnadesign.baserender.src.public", "render_parquet_record_figure"),
+    "BASERENDER_SEQUENCE_PANEL_CONTRACT_ID": (
+        "dnadesign.baserender.src.public",
+        "BASERENDER_SEQUENCE_PANEL_CONTRACT_ID",
+    ),
+    "BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION": (
+        "dnadesign.baserender.src.public",
+        "BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION",
+    ),
+    "DEFAULT_SEQUENCE_PANEL_PROFILE": ("dnadesign.baserender.src.public", "DEFAULT_SEQUENCE_PANEL_PROFILE"),
+    "SequencePanelConfig": ("dnadesign.baserender.src.public", "SequencePanelConfig"),
+    "SequencePanelDiagnostics": ("dnadesign.baserender.src.public", "SequencePanelDiagnostics"),
+    "SequencePanelImage": ("dnadesign.baserender.src.public", "SequencePanelImage"),
+    "sequence_panel_config_for_adapter": ("dnadesign.baserender.src.public", "sequence_panel_config_for_adapter"),
+    "render_sequence_panel_image": ("dnadesign.baserender.src.public", "render_sequence_panel_image"),
     "DENSEGEN_TFBS_REQUIRED_KEYS": ("dnadesign.baserender.src.contracts", "DENSEGEN_TFBS_REQUIRED_KEYS"),
 }
 

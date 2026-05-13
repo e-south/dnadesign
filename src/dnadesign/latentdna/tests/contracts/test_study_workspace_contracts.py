@@ -24,8 +24,76 @@ def _live_workspace() -> Path:
     return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "stress_ethanol_cipro_growth"
 
 
+def _regulondb_workspace() -> Path:
+    return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "regulondb_native_promoter_panel"
+
+
 def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
+
+
+_REFERENCE_DIAGNOSTIC_GEOMETRIES = [
+    "intermediate_embedding_7b_reference_core60",
+    "intermediate_embedding_7b_reference_context_forward_1kb",
+    "intermediate_embedding_7b_reference_context_forward_anchor_mean",
+    "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+    "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+]
+
+
+_EXPANDED_INTERMEDIATE_GEOMETRIES = [
+    "intermediate_embedding_7b_anchor_60bp",
+    "intermediate_embedding_7b_full_context_1kb",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_reverse_complement_context_1kb",
+    "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+    *_REFERENCE_DIAGNOSTIC_GEOMETRIES,
+]
+
+
+_FIRST_CLASS_CANDIDATE_VIEWS = _EXPANDED_INTERMEDIATE_GEOMETRIES[:6]
+
+
+_FIRST_CLASS_OUTPUT_VIEWS = [
+    "output_layer_mean_7b_anchor_60bp",
+    "output_layer_mean_7b_full_context_1kb",
+    "output_layer_mean_7b_full_context_anchor_mean",
+    "output_layer_mean_7b_context_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_reverse_complement_context_1kb",
+    "output_layer_mean_7b_reverse_complement_context_anchor_mean",
+]
+
+
+_CANDIDATE_X_SELECTION_VIEWS = [
+    "intermediate_embedding_7b_anchor_60bp",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
+]
+
+
+_BROWSER_GEOMETRY_VIEWS = [
+    "intermediate_embedding_7b_anchor_60bp",
+    "intermediate_embedding_7b_full_context_1kb",
+    "intermediate_embedding_7b_full_context_anchor_mean",
+    "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_reverse_complement_context_1kb",
+    "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+]
+
+
+_FULL_POPULATION_UMAP_VIEWS = [*_BROWSER_GEOMETRY_VIEWS, *_FIRST_CLASS_OUTPUT_VIEWS]
+
+
+def _candidate_grid_layout(controls):
+    return next(
+        (row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid"),
+        None,
+    )
+
+
+def _expected_browser_default_layout(controls) -> str:
+    return "candidate_grid" if _candidate_grid_layout(controls) is not None else "single_view"
 
 
 def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None:
@@ -54,26 +122,53 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "context_robustness_summary",
         "context_pair_summary",
         "candidate_decision_frontier",
+        "candidate_x_selection_scorecard",
+        "reference_to_plan_centroid_heatmap",
+        "reference_standard_strength_audit",
+        "native_tf_axis_orientation_audit",
         "sigma35_centroid_distance_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
+        "reference_core60_strength_umap",
+        "reference_core60_pca_scree",
         "representation_scree_diagnostic",
         "appendix_umap_gallery",
     ]
-    assert geometry_ids == [
-        "intermediate_embedding_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_anchor_mean",
-    ]
+    assert geometry_ids == _FULL_POPULATION_UMAP_VIEWS
     geometry_roles = {row.view_id: row.role for row in controls.geometry_controls.geometries}
     assert geometry_roles["intermediate_embedding_7b_anchor_60bp"] == "primary"
     assert geometry_roles["intermediate_embedding_7b_full_context_anchor_mean"] == "primary"
+    assert geometry_roles["intermediate_embedding_7b_context_anchor_mean_bidir_concat"] == "primary"
+    assert geometry_roles["intermediate_embedding_7b_full_context_1kb"] == "appendix"
+    assert all(geometry_roles[view_id] == "appendix" for view_id in _FIRST_CLASS_OUTPUT_VIEWS)
+    assert all(context.config.views[view_id].role == "hidden" for view_id in _REFERENCE_DIAGNOSTIC_GEOMETRIES)
     assert controls.geometry_controls.default_compare_left == "intermediate_embedding_7b_anchor_60bp"
     assert controls.geometry_controls.default_compare_right == "intermediate_embedding_7b_full_context_anchor_mean"
-    assert controls.geometry_controls.default_layout == "candidate_grid"
+    assert context.config.notebooks["latent_geometry_browser"].default_layout == "candidate_grid"
+    assert controls.geometry_controls.default_layout == _expected_browser_default_layout(controls)
+    candidate_grid_layout = _candidate_grid_layout(controls)
+    if candidate_grid_layout is not None:
+        assert candidate_grid_layout.view_ids == _FULL_POPULATION_UMAP_VIEWS
+    else:
+        assert all(not row.projection_ids for row in controls.geometry_controls.geometries)
+    assert [row.candidate_set_id for row in controls.geometry_controls.candidate_sets] == [
+        "first_class_intermediate_7b",
+        "candidate_x_selection_7b",
+        "planned_output_layer_7b",
+    ]
+    assert controls.geometry_controls.candidate_sets[0].view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
+    assert controls.geometry_controls.candidate_sets[0].available_view_ids == _FIRST_CLASS_CANDIDATE_VIEWS
+    assert controls.geometry_controls.candidate_sets[1].view_ids == _CANDIDATE_X_SELECTION_VIEWS
+    assert controls.geometry_controls.candidate_sets[1].available_view_ids == _CANDIDATE_X_SELECTION_VIEWS
+    assert controls.geometry_controls.candidate_sets[1].views[2].status in {"materialized", "missing"}
+    assert controls.geometry_controls.candidate_sets[2].available_view_ids == _FIRST_CLASS_OUTPUT_VIEWS
+    assert controls.geometry_controls.candidate_sets[2].views[0].status in {"materialized", "missing"}
+    assert controls.geometry_controls.candidate_sets[2].views[6].status == "planned"
     assert "design_family" in preferred_hues
     assert "sig35_variant" in preferred_hues
     assert "spacer_length" in preferred_hues
-    assert "promoter_standard__strength_value_numeric" in preferred_hues
+    assert "promoter_standard__collection_id" not in preferred_hues
+    assert "promoter_standard__strength_value_numeric" not in preferred_hues
     assert "log_likelihood_per_token_7b" not in preferred_hues
     assert "wildtype_margin_ethanol_vs_control" not in preferred_hues
     assert "wildtype_margin_cipro_vs_control" not in preferred_hues
@@ -84,10 +179,229 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         assert controls.geometry_controls.hue_kinds["design_family"] == "categorical"
         assert controls.geometry_controls.hue_kinds["is_control"] == "binary"
         assert controls.geometry_controls.hue_kinds["spacer_length"] == "ordinal"
-        assert controls.geometry_controls.hue_kinds["promoter_standard__strength_value_numeric"] == "continuous"
     else:
         assert controls.geometry_controls.joinable_tables == []
-    assert controls.geometry_controls.reference_labels == ["spyp", "sulap", "j23105"]
+    assert controls.geometry_controls.reference_labels == ["spyP", "sulAp"]
+    assert {row.reference_set_id for row in controls.geometry_controls.reference_sets} >= {
+        "reference_spyp_sulap",
+        "reference_spyp_sulap_core60",
+        "reference_native_mg1655",
+        "reference_native_mg1655_core60",
+        "reference_anderson_igem",
+        "reference_anderson_igem_core60",
+        "reference_w_collection",
+        "reference_w_collection_core60",
+    }
+    reference_sets = {row.reference_set_id: row for row in controls.geometry_controls.reference_sets}
+    assert reference_sets["reference_native_mg1655"].label_limit == 32
+    assert reference_sets["reference_native_mg1655_core60"].label_limit == 32
+
+
+def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> None:
+    for workspace in [_live_workspace(), _regulondb_workspace()]:
+        context = load_workspace_config(workspace)
+        controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+        projections_by_view = {row.view_id: list(row.projection_ids) for row in controls.geometry_controls.geometries}
+
+        for layout in controls.geometry_controls.layout_presets:
+            if layout.mode != "fixed_grid":
+                continue
+            missing = [view_id for view_id in layout.view_ids if not projections_by_view.get(view_id)]
+            assert not missing, f"{workspace.name}:{layout.id} has no projection for {missing}"
+
+
+def test_live_stress_reference_diagnostics_do_not_become_projection_browser_panels() -> None:
+    context = load_workspace_config(_live_workspace())
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    browser_view_ids = {row.view_id for row in controls.geometry_controls.geometries}
+    layout_view_ids = {
+        view_id
+        for layout in controls.geometry_controls.layout_presets
+        for view_id in layout.view_ids
+        if layout.mode == "fixed_grid"
+    }
+
+    assert not browser_view_ids.intersection(_REFERENCE_DIAGNOSTIC_GEOMETRIES)
+    assert not layout_view_ids.intersection(_REFERENCE_DIAGNOSTIC_GEOMETRIES)
+    assert controls.geometry_controls.reference_sets
+    assert controls.geometry_controls.default_reference_set == "reference_spyp_sulap_core60"
+
+
+def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> None:
+    context = load_workspace_config(_live_workspace())
+    appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
+    generate_step = appendix_steps["generate_latent_geometry_browser"]
+    reference_context_umap_steps = {
+        "fit_umap_intermediate_embedding_7b_reference_context_forward_1kb",
+        "fit_umap_intermediate_embedding_7b_reference_context_forward_anchor_mean",
+        "fit_umap_intermediate_embedding_7b_reference_context_reverse_complement_1kb",
+        "fit_umap_intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+    }
+
+    assert not reference_context_umap_steps.intersection(appendix_steps)
+    assert not reference_context_umap_steps.intersection(set(generate_step.depends_on))
+
+
+def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fixed_grids() -> None:
+    context = load_workspace_config(_regulondb_workspace())
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    projection_grid_views = [
+        "intermediate_embedding_7b_native_source_record_seq_mean",
+        "intermediate_embedding_7b_core60_tss_upstream",
+    ]
+    native_core60_layout = next(
+        (
+            row
+            for row in controls.geometry_controls.layout_presets
+            if row.id == "candidate_set__native_core60_7b_representations"
+        ),
+        None,
+    )
+
+    assert set(geometry_ids) >= set(projection_grid_views)
+    assert set(controls.geometry_controls.candidate_sets[0].available_view_ids) >= set(projection_grid_views)
+    fixed_grid_view_ids = {
+        view_id
+        for layout in controls.geometry_controls.layout_presets
+        if layout.mode == "fixed_grid"
+        for view_id in layout.view_ids
+    }
+    assert not any(view_id.startswith("output_layer_mean_") for view_id in fixed_grid_view_ids)
+    if native_core60_layout is not None:
+        assert native_core60_layout.view_ids == projection_grid_views
+        assert "Projection-backed subset" in native_core60_layout.description
+        assert "output-layer" not in native_core60_layout.description.lower()
+    else:
+        assert fixed_grid_view_ids == set()
+
+
+def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
+    workspace = _regulondb_workspace()
+    context = load_workspace_config(workspace)
+    notebook = context.require_notebook("latent_geometry_browser")
+    ordered_plot_ids = set(notebook.ordered_plots)
+    covered_plot_ids: set[str] = set()
+
+    assert context.config.study_binding is not None
+    docs_root = _repo_root() / context.config.study_binding.deliverable_docs_root
+    for deliverable in context.config.deliverables.values():
+        if not ordered_plot_ids.intersection(deliverable.outputs.get("plots", [])):
+            continue
+        for docs_ref in deliverable.docs_refs:
+            relative_ref = docs_ref.removeprefix(f"study:{context.config.study_binding.study_id}/")
+            markdown_path = docs_root / f"{relative_ref}.md"
+            if markdown_path.is_file():
+                parsed = _parse_deliverable_markdown(markdown_path.read_text(encoding="utf-8"))
+                covered_plot_ids.update(parsed["plot_sections"])
+
+    assert ordered_plot_ids.issubset(covered_plot_ids)
+
+
+def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
+    context = load_workspace_config(_regulondb_workspace())
+    expected_hues = [
+        "gc_fraction",
+        "regulondb__sigma_factor_set",
+        "regulondb__confidence_level_set",
+        "regulondb__metadata_completeness_class",
+        "regulondb__regulator_composition",
+        "regulondb__box_pattern",
+        "regulondb__source_strata_set",
+        "regulondb__sigma_factor_count",
+        "emitted_length_bp",
+    ]
+    for plot_id in [
+        "sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean",
+        "sigma_umap_intermediate_embedding_7b_core60_tss_upstream",
+    ]:
+        plot = context.config.plots[plot_id]
+        assert plot.default_hue == "regulondb__sigma_factor_set"
+        assert [option.column for option in plot.hue_options] == expected_hues
+        assert plot.hue_options[-2].type == "ordinal"
+        assert plot.hue_options[-1].type == "ordinal"
+
+
+def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:
+    doc = (
+        _repo_root()
+        / "src"
+        / "dnadesign"
+        / "studies"
+        / "regulondb_native_promoter_panel"
+        / "deliverables"
+        / "sigma_umap_panel.md"
+    ).read_text(encoding="utf-8")
+
+    assert "notebook hue dropdown" not in doc
+    assert "fixed sigma-factor overlay" in doc
+    assert "fixed geometry" in doc
+
+
+def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
+    requirements = {
+        (_live_workspace(), "appendix_umap_gallery"): ["scatter", "fixed coordinates"],
+        (_live_workspace(), "design_centroid_margin_gallery"): ["x-axis", "y-axis"],
+        (_regulondb_workspace(), "sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean"): [
+            "projection",
+            "scatter",
+        ],
+        (_regulondb_workspace(), "sigma_umap_intermediate_embedding_7b_core60_tss_upstream"): [
+            "projection",
+            "scatter",
+        ],
+    }
+
+    for (workspace, plot_id), phrases in requirements.items():
+        context = load_workspace_config(workspace)
+        semantics = resolve_plot_semantics(context, plot_id=plot_id)
+        visible_text = "\n".join(
+            [
+                semantics.encoding,
+                semantics.caption,
+                semantics.alt_text,
+                semantics.preprocessing_md,
+                semantics.math_md,
+                semantics.limitations_md,
+                semantics.failure_modes_md,
+            ]
+        ).lower()
+
+        for phrase in phrases:
+            assert phrase in visible_text, f"{plot_id} semantics should mention {phrase!r}"
+
+
+def test_live_study_representation_health_compares_first_class_intermediate_and_output_layer_views() -> None:
+    context = load_workspace_config(_live_workspace())
+    recipe = context.config.recipes["pre_assay_representation_triage_recipe"]
+    health_step = next(step for step in recipe.steps if step.id == "build_representation_health_summary_metrics")
+    candidates = {str(row["view_id"]) for row in health_step.params["candidates"]}
+    omitted = {str(row["view_id"]) for row in health_step.params.get("omitted_candidates", [])}
+
+    expected_first_class_output_views = {
+        "output_layer_mean_7b_anchor_60bp",
+        "output_layer_mean_7b_full_context_1kb",
+        "output_layer_mean_7b_full_context_anchor_mean",
+        "output_layer_mean_7b_context_anchor_mean_bidir_concat",
+        "output_layer_mean_7b_reverse_complement_context_1kb",
+        "output_layer_mean_7b_reverse_complement_context_anchor_mean",
+    }
+    assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in candidates
+    assert expected_first_class_output_views.issubset(candidates)
+    assert not expected_first_class_output_views.intersection(omitted)
+    assert all("reference" not in view_id for view_id in candidates)
+    assert all("reference" not in view_id for view_id in omitted)
+
+
+def test_live_study_reference_context_sources_do_not_inherit_promoter_metadata_derivations() -> None:
+    context = load_workspace_config(_live_workspace())
+    source_ids = [source_id for source_id in context.config.sources if source_id.startswith("reference_context_7b_")]
+
+    assert source_ids
+    for source_id in source_ids:
+        source = context.config.sources[source_id]
+        assert source.metadata_include_mode == "replace"
+        assert source.metadata_include == []
 
 
 def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> None:
@@ -102,21 +416,25 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.sources["reference_native"].dataset == "usr_promoter_references"
     assert context.config.sources["reference_core60"].dataset == "construct_prom_eth_cip_reference_core60"
     assert context.config.sources["reference_contexts"].dataset == "construct_prom_eth_cip_reference_contexts"
-    expected_reference_views = [
+    expected_appendix_reference_views = [
         "intermediate_embedding_7b_reference_core60",
         "intermediate_embedding_7b_reference_context_forward_1kb",
         "intermediate_embedding_7b_reference_context_forward_anchor_mean",
         "intermediate_embedding_7b_reference_context_reverse_complement_1kb",
         "intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean",
+    ]
+    assert all(context.config.views[view_id].role == "hidden" for view_id in expected_appendix_reference_views)
+    expected_planned_reference_views = [
         "output_layer_mean_7b_reference_core60",
         "output_layer_mean_7b_reference_context_forward_1kb",
         "output_layer_mean_7b_reference_context_forward_anchor_mean",
         "output_layer_mean_7b_reference_context_reverse_complement_1kb",
         "output_layer_mean_7b_reference_context_reverse_complement_anchor_mean",
     ]
-    assert all(context.config.views[view_id].role == "planned" for view_id in expected_reference_views)
+    assert all(context.config.views[view_id].role == "planned" for view_id in expected_planned_reference_views)
     initial_control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
-    assert all(view_id not in initial_control_geometry_ids for view_id in expected_reference_views)
+    assert all(view_id not in initial_control_geometry_ids for view_id in expected_appendix_reference_views)
+    assert all(view_id not in initial_control_geometry_ids for view_id in expected_planned_reference_views)
     expected_total_log_likelihood_sources = [
         "anchor_7b_seq_mean_log_likelihood_total",
         "full_context_7b_forward_anchor_mean_log_likelihood_total",
@@ -136,22 +454,21 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "sigma35_ordinal_audit",
         "context_robustness_summary",
         "candidate_decision_frontier",
+        "candidate_x_selection_scorecard",
     ]
     decision_ladder = snapshot["decision_ladder"]
     assert decision_ladder == expected_decision_prefix
-    expected_browser_geometries = [
-        "intermediate_embedding_7b_anchor_60bp",
-        "intermediate_embedding_7b_full_context_anchor_mean",
-    ]
     browser_geometry_ids = snapshot["browser"]["default_geometry_ids"]
     control_geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
-    assert browser_geometry_ids == expected_browser_geometries
-    assert control_geometry_ids == expected_browser_geometries
+    assert browser_geometry_ids == _FULL_POPULATION_UMAP_VIEWS
+    assert control_geometry_ids == _FULL_POPULATION_UMAP_VIEWS
     assert controls.geometry_controls.default_model == "7b"
     assert controls.geometry_controls.default_family == "intermediate_embedding"
-    assert controls.geometry_controls.default_layout == "candidate_grid"
+    assert context.config.notebooks["latent_geometry_browser"].default_layout == "candidate_grid"
+    assert controls.geometry_controls.default_layout == _expected_browser_default_layout(controls)
     assert "spacer_length" in snapshot["browser"]["preferred_hues"]
-    assert "promoter_standard__strength_value_numeric" in snapshot["browser"]["preferred_hues"]
+    assert "promoter_standard__collection_id" not in snapshot["browser"]["preferred_hues"]
+    assert "promoter_standard__strength_value_numeric" not in snapshot["browser"]["preferred_hues"]
     assert "log_likelihood_per_token_7b" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_ethanol_vs_control" not in snapshot["browser"]["preferred_hues"]
     assert "wildtype_margin_cipro_vs_control" not in snapshot["browser"]["preferred_hues"]
@@ -167,13 +484,38 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.plots["balanced_design_family_margin_gallery"].y_axis_label == (
         r"$m_{\mathrm{cipro}}(x)=\cos(z_x,c_{\mathrm{cipro}})-\cos(z_x,c_{\mathrm{bg}})$"
     )
+    expected_full_population_hue_options = [
+        "gc_fraction",
+        "design_family",
+        "design_regulator_composition",
+        "sig35_variant",
+        "spacer_length",
+        "source_family",
+    ]
+    balanced_hue_options = context.config.plots["balanced_design_family_margin_gallery"].hue_options
+    assert [option.column for option in balanced_hue_options] == expected_full_population_hue_options
+    assert balanced_hue_options[0].type == "continuous"
+    assert balanced_hue_options[0].scale == "panel"
+    assert balanced_hue_options[4].type == "ordinal"
     assert context.config.plots["sigma35_ordinal_audit"].kind == "metric_panel_grid"
     assert context.config.plots["sigma35_margin_ladder_gallery"].kind == "distribution_grid"
     assert context.config.plots["sigma35_margin_ladder_gallery"].visibility_tier == "primary"
-    assert context.config.plots["sigma35_margin_ladder_gallery"].x_axis_label == "Sigma-35 variant"
-    assert context.config.plots["sigma35_margin_ladder_gallery"].y_axis_label == (
-        r"$m_{\sigma35}(x)=\cos(z_x,c_f)-\cos(z_x,c_b)$"
+    assert context.config.plots["sigma35_margin_ladder_gallery"].render_mode == "ordinal_swarm"
+    assert context.config.plots["sigma35_margin_ladder_gallery"].hide_repeated_y_axis is False
+    assert context.config.plots["sigma35_margin_ladder_gallery"].x_axis_label == (
+        r"$r_{\mathrm{ord}}(x)$ weak$\to$strong class rank"
     )
+    assert context.config.plots["sigma35_margin_ladder_gallery"].y_axis_label == (
+        r"$m_{\mathrm{ord}}(x)=\cos(z_x,c_{\mathrm{strong}})-\cos(z_x,c_{\mathrm{weak}})$"
+    )
+    assert context.config.plots["sigma35_margin_ladder_gallery"].filter_options[0].column == "ordinal_group_id"
+    assert [
+        value.value for value in context.config.plots["sigma35_margin_ladder_gallery"].filter_options[0].values
+    ] == [
+        "sigma35",
+        "t7_w_collection_core60",
+        "anderson_igem_core60",
+    ]
     assert context.config.plots["sigma35_stress_margin_gallery"].kind == "xy_scatter_grid"
     assert context.config.plots["sigma35_stress_margin_gallery"].visibility_tier == "primary"
     assert context.config.plots["sigma35_stress_margin_gallery"].x_column == "sig35_margin_f_vs_b"
@@ -185,12 +527,24 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.plots["sigma35_stress_margin_gallery"].y_axis_label == (
         r"$m_{\mathrm{stress}}(x)=\max\{m_{\mathrm{eth}}(x),m_{\mathrm{cipro}}(x)\}$"
     )
+    stress_margin_hue_options = context.config.plots["sigma35_stress_margin_gallery"].hue_options
+    assert [option.column for option in stress_margin_hue_options] == expected_full_population_hue_options
+    assert stress_margin_hue_options[0].type == "continuous"
+    assert stress_margin_hue_options[0].scale == "panel"
+    assert stress_margin_hue_options[4].type == "ordinal"
     assert context.config.plots["context_robustness_summary"].kind == "metric_panel_grid"
     assert context.config.plots["context_pair_summary"].kind == "metric_panel_grid"
     assert context.config.plots["candidate_decision_frontier"].kind == "xy_scatter"
     assert context.config.plots["candidate_decision_frontier"].color_column is None
     assert context.config.plots["candidate_decision_frontier"].size_column == "effective_rank"
     assert context.config.plots["candidate_decision_frontier"].size_range == (140.0, 260.0)
+    assert context.config.plots["candidate_decision_frontier"].x_axis_label == (
+        r"$S_{\mathrm{design}}^{\mathrm{balanced}}="
+        r"\operatorname{mean}(d_{\mathrm{between}})/\operatorname{mean}(d_{\mathrm{within}})$"
+    )
+    assert context.config.plots["candidate_decision_frontier"].y_axis_label == (
+        r"$\rho_{\sigma35}=\operatorname{Spearman}(\Delta_{\mathrm{expected}},\Delta_{\mathrm{observed}})$"
+    )
     assert context.config.plots["sigma35_centroid_distance_gallery"].kind == "heatmap_grid"
     assert context.config.plots["sigma35_centroid_distance_gallery"].visibility_tier == "appendix"
     assert context.config.plots["sigma35_centroid_distance_gallery"].x_axis_label == "Sigma-35 variant $h$"
@@ -202,7 +556,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     dataset_semantics = resolve_plot_semantics(context, plot_id="dataset_overview")
     assert "generation plan" in dataset_semantics.scope
     assert "shared denominator" in dataset_semantics.scope
-    assert "anchor_60bp" in " ".join(dataset_semantics.guardrails)
+    assert "merged anchor-source insert" in " ".join(dataset_semantics.guardrails)
     context_semantics = resolve_plot_semantics(context, plot_id="context_robustness_summary")
     assert "4,096-row design-family-stratified sample" in context_semantics.scope
     umap_semantics = resolve_plot_semantics(context, plot_id="appendix_umap_gallery")
@@ -210,18 +564,18 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.plots["design_centroid_margin_gallery"].kind == "xy_scatter_grid"
     assert context.config.plots["design_centroid_margin_gallery"].visibility_tier == "appendix"
     expected_reference_hue_options = [
+        "gc_fraction",
         "design_family",
         "design_regulator_composition",
         "sig35_variant",
         "spacer_length",
         "source_family",
-        "promoter_standard__collection_id",
-        "promoter_standard__strength_value_numeric",
     ]
     design_hue_options = context.config.plots["design_centroid_margin_gallery"].hue_options
     assert [option.column for option in design_hue_options] == expected_reference_hue_options
-    assert design_hue_options[3].type == "ordinal"
-    assert design_hue_options[-1].type == "continuous"
+    assert design_hue_options[0].type == "continuous"
+    assert design_hue_options[0].scale == "panel"
+    assert design_hue_options[4].type == "ordinal"
     assert context.config.plots["reference_alignment_summary"].kind == "metric_panel_grid"
     assert context.config.plots["reference_alignment_summary"].visibility_tier == "appendix"
     assert context.config.plots["representation_scree_diagnostic"].kind == "curve_grid"
@@ -235,21 +589,66 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert appendix_gallery.visibility_tier == "appendix"
     assert appendix_gallery.shape_column is None
     assert appendix_gallery.default_hue == "sig35_variant"
-    assert [option.column for option in appendix_gallery.hue_options] == expected_reference_hue_options
-    assert appendix_gallery.hue_options[3].type == "ordinal"
-    assert appendix_gallery.hue_options[-1].type == "continuous"
+    assert [option.column for option in appendix_gallery.hue_options] == [
+        "gc_fraction",
+        "design_family",
+        "design_regulator_composition",
+        "sig35_variant",
+        "spacer_length",
+        "source_family",
+    ]
+    assert appendix_gallery.hue_options[0].scale == "panel"
+    assert appendix_gallery.hue_options[4].type == "ordinal"
+    assert appendix_gallery.annotation is not None
+    assert appendix_gallery.annotation.reference_set == "reference_spyp_sulap_core60"
+    reference_strength_umap = context.config.plots["reference_core60_strength_umap"]
+    assert reference_strength_umap.kind == "projection_grid"
+    assert reference_strength_umap.visibility_tier == "appendix"
+    assert reference_strength_umap.default_hue == "promoter_standard__strength_value_numeric"
+    assert [option.column for option in reference_strength_umap.hue_options] == [
+        "promoter_standard__strength_value_numeric",
+        "promoter_standard__collection_id",
+        "source_family",
+        "selection_basis",
+    ]
+    assert reference_strength_umap.hue_options[0].type == "continuous"
+    assert len(reference_strength_umap.filter_options) == 1
+    reference_strength_filter = reference_strength_umap.filter_options[0]
+    assert reference_strength_filter.column == "promoter_standard__collection_id"
+    assert reference_strength_filter.include_all is True
+    assert [row.value for row in reference_strength_filter.values] == ["anderson_igem", "t7_w_collection"]
+    native_tf_audit = context.config.plots["native_tf_axis_orientation_audit"]
+    assert native_tf_audit.kind == "xy_scatter"
+    assert native_tf_audit.visibility_tier == "appendix"
+    assert native_tf_audit.scalar == "native_tf_axis_orientation_audit"
+    assert native_tf_audit.x_column == "ethanolness"
+    assert native_tf_audit.y_column == "ciproness"
+    assert native_tf_audit.default_hue == "tf_bin"
+    assert "native_tf_context_1kb" not in context.config.sources
+    assert {
+        source.dataset
+        for source in context.config.sources.values()
+        if getattr(source, "dataset", None) == "construct_prom_eth_cip_native_tf_contexts"
+    } == set()
     assert list(context.config.plots["design_centroid_margin_gallery"].scalars) == [
-        "design_centroid_margins_intermediate_embedding_7b_anchor_60bp",
-        "design_centroid_margins_intermediate_embedding_7b_full_context_anchor_mean",
+        f"design_centroid_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
+    ]
+    assert list(context.config.plots["balanced_design_family_margin_gallery"].scalars) == [
+        f"balanced_design_family_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
+    ]
+    assert list(context.config.plots["sigma35_stress_margin_gallery"].scalars) == [
+        f"sigma35_stress_margins_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
+    ]
+    assert list(context.config.plots["sigma35_margin_ladder_gallery"].scalars) == [
+        f"ordinal_ladder_rows_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
+    ]
+    assert list(context.config.plots["sigma35_centroid_distance_gallery"].scalars) == [
+        f"sigma35_centroid_distance_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
     assert list(context.config.plots["representation_scree_diagnostic"].reducers) == [
-        "pca_intermediate_embedding_7b_anchor_60bp",
-        "pca_intermediate_embedding_7b_full_context_anchor_mean",
+        f"pca_{view_id}" for view_id in _FIRST_CLASS_CANDIDATE_VIEWS
     ]
-    assert list(appendix_gallery.projections) == [
-        "umap_intermediate_embedding_7b_anchor_60bp",
-        "umap_intermediate_embedding_7b_full_context_anchor_mean",
-    ]
+    assert list(appendix_gallery.projections) == [f"umap_{view_id}" for view_id in _FULL_POPULATION_UMAP_VIEWS]
     assert "reference_margin_gallery_wildtype" not in context.config.plots
     assert "reference_neighbor_evidence" not in context.config.plots
     assert "context_shift_reference_plane" not in context.config.plots
@@ -289,13 +688,27 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert context.config.deliverables["candidate_decision_frontier"].outputs["plots"] == [
         "candidate_decision_frontier"
     ]
-    assert context.config.deliverables["appendix_geometry_audit"].outputs["plots"] == [
+    assert context.config.deliverables["appendix_geometry_review"].outputs["plots"] == [
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
     ]
-    assert context.config.deliverables["appendix_umap_gallery"].outputs["plots"] == ["appendix_umap_gallery"]
+    assert context.config.deliverables["appendix_umap_gallery"].outputs["plots"] == [
+        "appendix_umap_gallery",
+        "reference_core60_strength_umap",
+        "reference_core60_pca_scree",
+    ]
     assert context.config.deliverables["appendix_umap_gallery"].outputs["notebooks"] == ["latent_geometry_browser"]
+    assert context.config.deliverables["native_tf_axis_orientation_audit"].recipe == (
+        "native_tf_axis_orientation_audit_recipe"
+    )
+    assert context.config.deliverables["native_tf_axis_orientation_audit"].outputs["plots"] == [
+        "native_tf_axis_orientation_audit"
+    ]
+    assert context.config.deliverables["native_tf_axis_orientation_audit"].outputs["scalars"] == [
+        "native_tf_axis_orientation_audit",
+        "native_tf_axis_orientation_tests",
+    ]
     assert context.config.exports == {}
 
 
@@ -304,6 +717,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     context = load_workspace_config(workspace)
     pre_assay_steps = {step.id: step for step in _recipe_steps(context, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
+    native_tf_steps = {step.id: step for step in _recipe_steps(context, "native_tf_axis_orientation_audit_recipe")}
 
     assert "materialize_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
     assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" not in pre_assay_steps
@@ -320,6 +734,21 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_full_context_concat" not in pre_assay_steps
     assert "build_scorecard_sample_intermediate_embedding_7b_anchor_plus_anchor_mean_concat" not in pre_assay_steps
     assert "build_representation_health_summary_metrics" in pre_assay_steps
+    representation_health_step = pre_assay_steps["build_representation_health_summary_metrics"]
+    assert representation_health_step.params["pairwise_max_rows"] == 4096
+    assert representation_health_step.params["pairwise_seed"] == 17
+    representation_health_candidates = {row["view_id"] for row in representation_health_step.params["candidates"]}
+    omitted_candidate_ids = {row["view_id"] for row in representation_health_step.params.get("omitted_candidates", [])}
+    assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in representation_health_candidates
+    assert set(_FIRST_CLASS_OUTPUT_VIEWS).issubset(representation_health_candidates)
+    assert omitted_candidate_ids == set()
+    for view_id in _FIRST_CLASS_OUTPUT_VIEWS:
+        if view_id == "output_layer_mean_7b_context_anchor_mean_bidir_concat":
+            assert f"derive_{view_id}" in pre_assay_steps
+        else:
+            assert f"materialize_{view_id}" in pre_assay_steps
+        assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert f"reduce_pca_{view_id}" in pre_assay_steps
     assert "build_design_structure_summary_metrics" in pre_assay_steps
     assert "build_sigma35_ordinal_audit_metrics" in pre_assay_steps
     stress_margin_anchor = pre_assay_steps["build_sigma35_stress_margins_intermediate_embedding_7b_anchor_60bp"]
@@ -341,6 +770,9 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     centroid_distance_anchor_mean = pre_assay_steps[
         "build_sigma35_centroid_distance_intermediate_embedding_7b_full_context_anchor_mean"
     ]
+    assert centroid_distance_anchor.params["kind"] == "axis_centroid_distance"
+    assert centroid_distance_anchor.params["axis"]["axis_id"] == "sigma35"
+    assert centroid_distance_anchor.params["axis"]["column"] == "sig35_variant"
     assert "sample_id" not in centroid_distance_anchor.params
     assert "sample_id" not in centroid_distance_anchor_mean.params
     assert (
@@ -348,11 +780,28 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         not in pre_assay_steps
     )
     assert "build_context_delta_distribution_intermediate_embedding_7b_anchor_mean" in pre_assay_steps
+    assert "build_context_delta_distribution_intermediate_embedding_7b_full_context" in pre_assay_steps
     assert "build_context_pair_summary_metrics" in pre_assay_steps
     assert "build_context_robustness_summary_metrics" in pre_assay_steps
     assert "build_reference_alignment_summary_metrics" in pre_assay_steps
     assert "build_candidate_decision_frontier_metrics" in pre_assay_steps
-    assert "build_context_delta_distribution_pooled_logits_7b" not in pre_assay_steps
+    assert "build_context_delta_distribution_output_layer_mean_7b" not in pre_assay_steps
+    assert "build_native_tf_axis_orientation_audit" not in pre_assay_steps
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["view_id"] == (
+        "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    )
+    assert "audit_view_id" not in native_tf_steps["build_native_tf_axis_orientation_audit"].params
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["output_filter"] == {
+        "column": "derived__parent_dataset",
+        "equals": "usr_regulondb_native_promoters",
+    }
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["association_overlay"]["row_key"] == (
+        "derived__parent_id"
+    )
+    assert native_tf_steps["build_native_tf_axis_orientation_tests"].params["where"] == {
+        "column": "derived__parent_dataset",
+        "equals": "usr_regulondb_native_promoters",
+    }
     assert all(
         step.params.get("kind")
         not in {
@@ -365,10 +814,42 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         for step in pre_assay_steps.values()
         if getattr(step, "op", None) == "scalar.build"
     )
-    assert (
-        pre_assay_steps["build_sigma35_ordinal_audit_metrics"].params["sig35_order_path"]
-        == "study_inputs/sig35_order.yaml"
+    ordinal_axis_params = pre_assay_steps["build_sigma35_ordinal_audit_metrics"].params
+    assert ordinal_axis_params["kind"] == "ordinal_axis_audit"
+    assert ordinal_axis_params["axis"]["axis_id"] == "sigma35"
+    assert ordinal_axis_params["axis"]["column"] == "sig35_variant"
+    assert ordinal_axis_params["axis"]["order_path"] == "study_inputs/sig35_order.yaml"
+    assert ordinal_axis_params["axis"]["metric_ids"]["spearman"] == "sig35_ordinal_spearman"
+    assert [row["column"] for row in ordinal_axis_params["axis"]["within_groups"]] == [
+        "design_family",
+        "design_regulator_composition",
+    ]
+    assert pre_assay_steps["build_candidate_decision_frontier_metrics"].params["ordinal_scalar"] == (
+        "sigma35_ordinal_audit_metrics"
     )
+    assert pre_assay_steps["build_candidate_decision_frontier_metrics"].params["ordinal_metric_id"] == (
+        "sig35_ordinal_spearman"
+    )
+    context_pair_params = pre_assay_steps["build_context_pair_summary_metrics"].params
+    assert [row["comparison_id"] for row in context_pair_params["comparisons"]] == [
+        "intermediate_embedding_7b_anchor_vs_anchor_mean",
+        "intermediate_embedding_7b_anchor_vs_full_context",
+        "intermediate_embedding_7b_anchor_vs_reverse_complement_anchor_mean",
+        "intermediate_embedding_7b_anchor_vs_reverse_complement_context",
+    ]
+    reference_params = pre_assay_steps["build_reference_alignment_summary_metrics"].params
+    assert "reference_group_columns" not in reference_params
+    assert reference_params["reference_sets"] == [
+        "reference_spyp_sulap",
+        "reference_spyp_sulap_core60",
+        "reference_sfxi_archive",
+        "reference_native_mg1655",
+        "reference_native_mg1655_core60",
+        "reference_anderson_igem",
+        "reference_anderson_igem_core60",
+        "reference_w_collection",
+        "reference_w_collection_core60",
+    ]
     assert pre_assay_steps["build_context_delta_distribution_intermediate_embedding_7b_anchor_mean"].params[
         "where"
     ] == {
@@ -389,6 +870,27 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
             "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
             "context_view_id": "intermediate_embedding_7b_full_context_anchor_mean",
         },
+        {
+            "pair_id": "intermediate_embedding_7b_anchor_vs_full_context",
+            "label": "7B intermediate: anchor vs full 1 kb context",
+            "alignment_id": "intermediate_embedding_7b_anchor_to_full_context",
+            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
+            "context_view_id": "intermediate_embedding_7b_full_context_1kb",
+        },
+        {
+            "pair_id": "intermediate_embedding_7b_anchor_vs_reverse_complement_anchor_mean",
+            "label": "7B intermediate: anchor vs RC context anchor mean",
+            "alignment_id": "intermediate_embedding_7b_anchor_to_reverse_complement_anchor_mean",
+            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
+            "context_view_id": "intermediate_embedding_7b_reverse_complement_context_anchor_mean",
+        },
+        {
+            "pair_id": "intermediate_embedding_7b_anchor_vs_reverse_complement_context",
+            "label": "7B intermediate: anchor vs RC full 1 kb context",
+            "alignment_id": "intermediate_embedding_7b_anchor_to_reverse_complement_context",
+            "anchor_view_id": "intermediate_embedding_7b_anchor_60bp",
+            "context_view_id": "intermediate_embedding_7b_reverse_complement_context_1kb",
+        },
     ]
     assert "render_design_centroid_margin_gallery" in pre_assay_steps
     assert "render_reference_alignment_summary" in pre_assay_steps
@@ -400,12 +902,38 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
 
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
-    assert (
-        appendix_steps["build_umap_sample_intermediate_embedding_7b_full_context_anchor_mean"].params["strategy"]
-        == "all"
-    )
-    assert "build_umap_sample_intermediate_embedding_7b_full_context_1kb" not in appendix_steps
-    assert "fit_umap_intermediate_embedding_7b_full_context_1kb" not in appendix_steps
+    scorecard_sample_filter = {"column": "source_class", "in": ["densegen", "manual_or_wildtype"]}
+    for view_id in _FIRST_CLASS_CANDIDATE_VIEWS:
+        assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert pre_assay_steps[f"build_scorecard_sample_{view_id}"].params["where"] == scorecard_sample_filter
+        assert f"reduce_pca_{view_id}" in pre_assay_steps
+        assert f"build_design_centroid_margins_{view_id}" in pre_assay_steps
+        assert f"build_balanced_design_family_margins_{view_id}" in pre_assay_steps
+        assert f"build_sigma35_stress_margins_{view_id}" in pre_assay_steps
+        assert f"build_sigma35_centroid_distance_{view_id}" in pre_assay_steps
+        assert f"build_umap_sample_{view_id}" in appendix_steps
+        assert f"fit_umap_{view_id}" in appendix_steps
+        assert appendix_steps[f"build_umap_sample_{view_id}"].params["strategy"] == "all"
+    for view_id in _FIRST_CLASS_OUTPUT_VIEWS:
+        assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
+        assert pre_assay_steps[f"build_scorecard_sample_{view_id}"].params["where"] == scorecard_sample_filter
+        assert f"reduce_pca_{view_id}" in pre_assay_steps
+        assert f"build_umap_sample_{view_id}" in appendix_steps
+        assert f"fit_umap_{view_id}" in appendix_steps
+        assert appendix_steps[f"build_umap_sample_{view_id}"].params["strategy"] == "all"
+    bidir_view_id = "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    assert f"build_umap_sample_{bidir_view_id}" in appendix_steps
+    assert f"fit_umap_{bidir_view_id}" in appendix_steps
+    assert appendix_steps[f"build_umap_sample_{bidir_view_id}"].depends_on == [
+        "derive_intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    ]
+    assert appendix_steps[f"build_umap_sample_{bidir_view_id}"].params["strategy"] == "all"
+    assert f"fit_umap_{bidir_view_id}" in appendix_steps["render_appendix_umap_gallery"].depends_on
+    output_bidir_view_id = "output_layer_mean_7b_context_anchor_mean_bidir_concat"
+    assert appendix_steps[f"build_umap_sample_{output_bidir_view_id}"].depends_on == [
+        "derive_output_layer_mean_7b_context_anchor_mean_bidir_concat"
+    ]
+    assert f"fit_umap_{output_bidir_view_id}" in appendix_steps["render_appendix_umap_gallery"].depends_on
     assert set(appendix_steps["generate_latent_geometry_browser"].depends_on) >= {
         "render_dataset_overview",
         "render_representation_health_summary",
@@ -431,7 +959,7 @@ def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() 
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
-        / "appendix_geometry_audit.md"
+        / "appendix_geometry_review.md"
     ).read_text(encoding="utf-8")
     appendix_umap_doc = (
         _repo_root()

@@ -4,32 +4,29 @@ Geometry control assembly for workspace notebook surfaces.
 
 from __future__ import annotations
 
-import numpy as np
 import pyarrow.types as pa_types
 
 from ..contracts.notebook import (
+    WorkspaceNotebookAxisStyle,
     WorkspaceNotebookCompareMetrics,
     WorkspaceNotebookComparisonBasis,
     WorkspaceNotebookGeometry,
     WorkspaceNotebookGeometryControls,
     WorkspaceNotebookLayoutPreset,
+    WorkspaceNotebookReferenceSet,
     WorkspaceNotebookTableRef,
 )
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..labels import humanize_candidate
-
-_DEFAULT_GEOMETRY_ORDER = [
-    "intermediate_embedding_7b_anchor_60bp",
-    "intermediate_embedding_7b_full_context_anchor_mean",
-]
+from ..metadata_axes import axis_style_map_from_config, axis_styles_payload
+from ..visual_style import reference_annotation_label
+from .candidate_set_service import build_workspace_candidate_sets, candidate_set_view_ids
+from .view_shape_cache import ViewShapeCache
 
 _PREFERRED_HUES = [
-    "design_family",
-    "design_regulator_composition",
-    "sig35_variant",
-    "spacer_length",
     "source_class",
+    "emitted_length_bp",
     "is_control",
     "synthetic_margin_ethanol_vs_background",
     "synthetic_margin_cipro_vs_background",
@@ -38,11 +35,8 @@ _PREFERRED_HUES = [
 ]
 
 _PREFERRED_HUE_KIND_DEFAULTS = {
-    "design_family": "categorical",
-    "design_regulator_composition": "categorical",
-    "sig35_variant": "categorical",
-    "spacer_length": "ordinal",
     "source_class": "categorical",
+    "emitted_length_bp": "continuous",
     "is_control": "binary",
     "synthetic_margin_ethanol_vs_background": "continuous",
     "synthetic_margin_cipro_vs_background": "continuous",
@@ -50,27 +44,43 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "context_shift_l2": "continuous",
 }
 
-_JOINABLE_KEY_COLUMNS = {"construct__anchor_id", "id", "subject_id", "context_id"}
+_JOINABLE_KEY_COLUMNS = {
+    "alias_id",
+    "construct__anchor_id",
+    "id",
+    "alignment_parent_sequence_id",
+    "subject_id",
+    "context_id",
+}
 _DEFAULT_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {
     "intermediate_embedding": "Intermediate block mean",
-    "pooled_logits": "Pooled logits",
+    "output_layer_mean": "Output-layer mean",
 }
 
 _SCOPE_LABELS = {
-    "anchor_60bp": "60 bp anchor",
+    "merged_anchor_insert_seq_mean": "Mixed-length anchor-source insert",
     "full_context_1kb": "1 kb construct context",
     "full_context_anchor_mean": "1 kb context anchor mean",
     "reverse_complement_context_anchor_mean": "1 kb reverse-complement context anchor mean",
+    "reverse_complement_context_1kb": "1 kb reverse-complement construct context",
+    "reference_core60": "reference core60",
+    "reference_context_forward_1kb": "reference 1 kb forward context",
+    "reference_context_forward_anchor_mean": "reference 1 kb forward anchor mean",
+    "reference_context_reverse_complement_1kb": "reference 1 kb reverse-complement context",
+    "reference_context_reverse_complement_anchor_mean": "reference 1 kb reverse-complement anchor mean",
     "anchor_plus_anchor_mean_concat": "anchor + anchor-mean concat",
 }
 
 
 def _format_view_label(*, model: str | None, family: str | None, scope_name: str | None) -> str:
+    model_label = str(model or "")
+    if model_label and not model_label.startswith("evo2_"):
+        model_label = f"evo2_{model_label}"
     return humanize_candidate(
         {
-            "candidate_model": f"evo2_{model}" if model else "",
+            "candidate_model": model_label,
             "candidate_scope": scope_name or "",
             "candidate_family": family or "",
         }
@@ -145,7 +155,25 @@ def _resolve_notebook(context, notebook_id: str | None):
 def _geometry_order(context, *, notebook_id: str | None) -> list[str]:
     notebook = _resolve_notebook(context, notebook_id)
     configured = list(getattr(notebook, "geometry_order", []) or []) if notebook is not None else []
-    return configured or list(_DEFAULT_GEOMETRY_ORDER)
+    if configured:
+        return configured
+    candidate_set_ids = list(getattr(notebook, "candidate_sets", []) or []) if notebook is not None else []
+    default_candidate_set = str(getattr(notebook, "default_candidate_set", "") or "") if notebook is not None else ""
+    ordered_candidate_sets = [
+        *([default_candidate_set] if default_candidate_set else []),
+        *[candidate_set_id for candidate_set_id in candidate_set_ids if candidate_set_id != default_candidate_set],
+    ]
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for candidate_set_id in ordered_candidate_sets:
+        if candidate_set_id not in context.config.candidate_sets:
+            continue
+        for view_id in candidate_set_view_ids(context, candidate_set_id):
+            if view_id in seen:
+                continue
+            seen.add(view_id)
+            resolved.append(view_id)
+    return resolved or list(context.config.views)
 
 
 def _unique_in_order(values) -> list[str]:
@@ -163,24 +191,30 @@ def _unique_in_order(values) -> list[str]:
 def _preferred_hue_order(context, *, notebook_id: str | None) -> list[str]:
     notebook = _resolve_notebook(context, notebook_id)
     configured = list(getattr(notebook, "preferred_hues", []) or []) if notebook is not None else []
-    return _unique_in_order([*_PREFERRED_HUES, *configured])
+    axis_columns = [style.column for style in axis_style_map_from_config(context.config).values()]
+    return _unique_in_order([*_PREFERRED_HUES, *configured, *axis_columns])
 
 
 def _preferred_hue_kind_defaults(context, *, notebook_id: str | None) -> dict[str, str]:
     notebook = _resolve_notebook(context, notebook_id)
     configured = dict(getattr(notebook, "preferred_hue_kinds", {}) or {}) if notebook is not None else {}
+    axis_kinds = {
+        style.column: style.kind
+        for style in axis_style_map_from_config(context.config).values()
+        if style.kind is not None
+    }
     return {
         **_PREFERRED_HUE_KIND_DEFAULTS,
+        **{str(column): str(kind) for column, kind in axis_kinds.items() if str(column).strip()},
         **{str(column): str(kind) for column, kind in configured.items() if str(column).strip()},
     }
 
 
-def _view_shape(context, view_id: str) -> tuple[int, int] | None:
-    matrix_path = context.output_root / "views" / view_id / "matrix.npy"
-    if not matrix_path.is_file():
+def _view_shape(view_id: str, *, shape_cache: ViewShapeCache) -> tuple[int, int] | None:
+    rows, dims = shape_cache.get(view_id)
+    if rows is None or dims is None:
         return None
-    matrix = np.load(matrix_path, mmap_mode="r")
-    return int(matrix.shape[0]), int(matrix.shape[1])
+    return rows, dims
 
 
 def _geometry_inventory(
@@ -188,6 +222,7 @@ def _geometry_inventory(
     *,
     projection_ids_by_view: dict[str, list[str]],
     geometry_order: list[str],
+    shape_cache: ViewShapeCache,
 ) -> list[WorkspaceNotebookGeometry]:
     geometries: list[WorkspaceNotebookGeometry] = []
     order = {view_id: index for index, view_id in enumerate(geometry_order)}
@@ -199,7 +234,7 @@ def _geometry_inventory(
         scope_name = str(tags.get("scope") or "")
         if role in {"hidden", "planned", "retired"}:
             continue
-        shape = _view_shape(context, view_id)
+        shape = _view_shape(view_id, shape_cache=shape_cache)
         view_dir = context.output_root / "views" / view_id
         geometries.append(
             WorkspaceNotebookGeometry(
@@ -217,6 +252,18 @@ def _geometry_inventory(
             )
         )
     return geometries
+
+
+def _projection_backed_geometries(
+    geometries: list[WorkspaceNotebookGeometry],
+    *,
+    notebook,
+) -> list[WorkspaceNotebookGeometry]:
+    if notebook is None or bool(getattr(notebook, "show_missing_projection_placeholders", False)):
+        return geometries
+    if not any(row.projection_ids for row in geometries):
+        return geometries
+    return [row for row in geometries if row.projection_ids]
 
 
 def _manifest_view_ids(
@@ -400,12 +447,17 @@ def _layout_presets(
     geometry_rows: list[WorkspaceNotebookGeometry],
     *,
     notebook_id: str | None,
+    candidate_sets: list | None = None,
 ) -> list[WorkspaceNotebookLayoutPreset]:
     available = {row.view_id for row in geometry_rows}
+    projected = {row.view_id for row in geometry_rows if row.projection_ids}
     notebook = _resolve_notebook(context, notebook_id)
     candidate_grid_views = list(getattr(notebook, "candidate_grid_views", []) or []) if notebook is not None else []
     candidate_grid_titles = (
         list(getattr(notebook, "candidate_grid_panel_titles", []) or []) if notebook is not None else []
+    )
+    show_missing_projection_placeholders = (
+        bool(getattr(notebook, "show_missing_projection_placeholders", False)) if notebook is not None else False
     )
     presets: list[WorkspaceNotebookLayoutPreset] = [
         WorkspaceNotebookLayoutPreset(
@@ -415,17 +467,68 @@ def _layout_presets(
             description="Render one persisted projection with the selected hue.",
         ),
     ]
-    if candidate_grid_views and set(candidate_grid_views).issubset(available):
+    if candidate_grid_views:
+        candidate_grid_pairs = [
+            (view_id, candidate_grid_titles[index] if index < len(candidate_grid_titles) else "")
+            for index, view_id in enumerate(candidate_grid_views)
+            if view_id in available and (show_missing_projection_placeholders or view_id in projected)
+        ]
+        resolved_candidate_grid_views = [view_id for view_id, _ in candidate_grid_pairs]
+        resolved_candidate_grid_titles = [title for _, title in candidate_grid_pairs]
+    else:
+        resolved_candidate_grid_views = []
+        resolved_candidate_grid_titles = []
+    if len(resolved_candidate_grid_views) >= 2:
         presets.append(
             WorkspaceNotebookLayoutPreset(
                 id="candidate_grid",
                 label="Candidate grid",
                 mode="fixed_grid",
-                description="Projection grid across the surfaced 7B intermediate candidates.",
-                view_ids=candidate_grid_views,
-                panel_titles=candidate_grid_titles,
+                description="Projection grid across the configured candidates with persisted projection artifacts.",
+                view_ids=resolved_candidate_grid_views,
+                panel_titles=resolved_candidate_grid_titles,
             )
         )
+    seen_preset_ids = {preset.id for preset in presets}
+    for candidate_set in candidate_sets or []:
+        candidate_set_id = str(getattr(candidate_set, "candidate_set_id", "") or "")
+        preset_id = f"candidate_set__{candidate_set_id}"
+        if not candidate_set_id or preset_id in seen_preset_ids:
+            continue
+        candidate_view_ids = [
+            view_id for view_id in getattr(candidate_set, "available_view_ids", []) if str(view_id) in available
+        ]
+        if not show_missing_projection_placeholders:
+            candidate_view_ids = [view_id for view_id in candidate_view_ids if str(view_id) in projected]
+        if len(candidate_view_ids) < 2:
+            continue
+        panel_titles_by_view = {
+            str(view_id): str(title)
+            for view_id, title in zip(
+                getattr(candidate_set, "available_view_ids", []),
+                getattr(candidate_set, "panel_titles", []),
+                strict=False,
+            )
+        }
+        presets.append(
+            WorkspaceNotebookLayoutPreset(
+                id=preset_id,
+                label=str(getattr(candidate_set, "label", "") or candidate_set_id),
+                mode="fixed_grid",
+                description=(
+                    str(
+                        getattr(candidate_set, "description", None)
+                        or "Projection grid across a configured candidate representation set."
+                    )
+                    if set(candidate_view_ids) == set(getattr(candidate_set, "view_ids", []))
+                    else "Projection-backed subset of the configured candidate representation set; "
+                    "unprojected candidate views are omitted."
+                ),
+                view_ids=[str(view_id) for view_id in candidate_view_ids],
+                panel_titles=[panel_titles_by_view.get(str(view_id), str(view_id)) for view_id in candidate_view_ids],
+            )
+        )
+        seen_preset_ids.add(preset_id)
     return presets
 
 
@@ -437,9 +540,21 @@ def _reference_labels(context) -> list[str]:
         if getattr(reference_set, "label_mode", None) != "label_and_highlight":
             continue
         display_labels = dict(getattr(reference_set, "display_labels", {}) or {})
-        for raw_label in getattr(reference_set, "ids", []):
+        explicit_ids = list(getattr(reference_set, "ids", []) or [])
+        selector_ids = [
+            str(value)
+            for selector in [
+                *(getattr(reference_set, "where", []) or []),
+                *(getattr(reference_set, "where_all", []) or []),
+            ]
+            for value in (getattr(selector, "in_values", []) or [])
+        ]
+        seed_ids = explicit_ids or selector_ids
+        if len(seed_ids) > 5:
+            continue
+        for raw_label in seed_ids:
             raw_text = str(raw_label).strip()
-            label = str(display_labels.get(raw_text, raw_text)).strip()
+            label = reference_annotation_label(display_labels.get(raw_text, raw_text))
             if not label or label in seen:
                 continue
             seen.add(label)
@@ -458,6 +573,34 @@ def _reference_labels(context) -> list[str]:
         seen.add(label)
         labels.append(label)
     return labels
+
+
+def _reference_set_controls(context) -> list[WorkspaceNotebookReferenceSet]:
+    controls: list[WorkspaceNotebookReferenceSet] = []
+    for reference_set_id, reference_set in context.config.reference_sets.items():
+        if not bool(getattr(reference_set, "notebook_exposed", True)):
+            continue
+        selector_columns = [
+            str(getattr(selector, "column"))
+            for selector in [
+                *(getattr(reference_set, "where", []) or []),
+                *(getattr(reference_set, "where_all", []) or []),
+            ]
+            if str(getattr(selector, "column", "")).strip()
+        ]
+        controls.append(
+            WorkspaceNotebookReferenceSet(
+                reference_set_id=reference_set_id,
+                label=getattr(reference_set, "label", None),
+                match_column=reference_set.match_column,
+                label_column=reference_set.label_column,
+                label_mode=reference_set.label_mode,
+                label_limit=reference_set.label_limit,
+                explicit_ids=[str(value) for value in reference_set.ids],
+                selector_columns=list(dict.fromkeys(selector_columns)),
+            )
+        )
+    return controls
 
 
 def _comparison_bases(
@@ -496,12 +639,6 @@ def _default_compare_views(
     configured_compare = list(getattr(notebook, "default_compare_views", []) or []) if notebook is not None else []
     if len(configured_compare) == 2:
         configured_pairs.append((configured_compare[0], configured_compare[1]))
-    configured_pairs.extend(
-        [
-            ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_anchor_mean"),
-            ("intermediate_embedding_7b_anchor_60bp", "intermediate_embedding_7b_full_context_1kb"),
-        ]
-    )
     for left_view, right_view in configured_pairs:
         if left_view in view_ids and right_view in view_ids:
             return left_view, right_view
@@ -524,20 +661,51 @@ def _default_layout_id(
     configured = str(getattr(notebook, "default_layout", "") or "").strip() if notebook is not None else ""
     if configured and configured in available:
         return configured
+    default_candidate_set = (
+        str(getattr(notebook, "default_candidate_set", "") or "").strip() if notebook is not None else ""
+    )
+    candidate_preset_id = f"candidate_set__{default_candidate_set}" if default_candidate_set else ""
+    if candidate_preset_id in available:
+        return candidate_preset_id
+    for preset in presets:
+        if preset.mode == "fixed_grid" and len(preset.view_ids) > 1:
+            return preset.id
     return "single_view"
 
 
-def build_workspace_geometry_controls(context, *, notebook_id: str | None = None) -> WorkspaceNotebookGeometryControls:
+def _axis_style_controls(context) -> dict[str, WorkspaceNotebookAxisStyle]:
+    payload = axis_styles_payload(axis_style_map_from_config(context.config))
+    return {
+        column: WorkspaceNotebookAxisStyle.model_validate(style_payload) for column, style_payload in payload.items()
+    }
+
+
+def build_workspace_geometry_controls(
+    context,
+    *,
+    notebook_id: str | None = None,
+    shape_cache: ViewShapeCache | None = None,
+) -> WorkspaceNotebookGeometryControls:
+    shapes = shape_cache or ViewShapeCache(output_root=context.output_root)
     projection_ids_by_view = _projection_inventory(context)
     geometry_order = _geometry_order(context, notebook_id=notebook_id)
+    notebook = _resolve_notebook(context, notebook_id)
     preferred_hue_order = _preferred_hue_order(context, notebook_id=notebook_id)
     default_hue_kinds = _preferred_hue_kind_defaults(context, notebook_id=notebook_id)
     geometries = _geometry_inventory(
         context,
         projection_ids_by_view=projection_ids_by_view,
         geometry_order=geometry_order,
+        shape_cache=shapes,
     )
+    geometries = _projection_backed_geometries(geometries, notebook=notebook)
     visible_view_ids = {row.view_id for row in geometries}
+    candidate_sets = build_workspace_candidate_sets(
+        context,
+        notebook_id=notebook_id,
+        visible_view_ids=visible_view_ids,
+        shape_cache=shapes,
+    )
     joinable_tables, schemas_by_path = _table_inventory(
         context,
         visible_view_ids=visible_view_ids,
@@ -555,6 +723,7 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         default_hue_kinds=default_hue_kinds,
     )
     preferred_hues = [column for column in preferred_hue_order if column in hue_kinds]
+    axis_styles = _axis_style_controls(context)
     view_row_columns = {field.name for schema in view_row_schemas_by_id.values() for field in schema}
     row_metadata_hues = [column for column in preferred_hue_order if column in hue_kinds and column in view_row_columns]
     comparison_bases = _comparison_bases(context, geometries)
@@ -563,22 +732,33 @@ def build_workspace_geometry_controls(context, *, notebook_id: str | None = None
         geometries,
         notebook_id=notebook_id,
     )
-    layout_presets = _layout_presets(context, geometries, notebook_id=notebook_id)
+    layout_presets = _layout_presets(
+        context,
+        geometries,
+        notebook_id=notebook_id,
+        candidate_sets=candidate_sets,
+    )
+    default_geometry = geometries[0] if geometries else None
+    default_reference_set = str(getattr(notebook, "default_reference_set", "") or "") if notebook is not None else ""
     return WorkspaceNotebookGeometryControls(
-        default_model="7b",
-        default_family="intermediate_embedding",
-        default_context="anchor_60bp",
+        default_model=default_geometry.model if default_geometry is not None else "7b",
+        default_family=default_geometry.family if default_geometry is not None else "intermediate_embedding",
+        default_context=default_geometry.context if default_geometry is not None else "merged_anchor_insert_seq_mean",
         default_layout=_default_layout_id(context, layout_presets, notebook_id=notebook_id),
+        default_reference_set=default_reference_set,
         default_compare_left=default_compare_left,
         default_compare_right=default_compare_right,
         geometries=geometries,
         preferred_hues=preferred_hues,
         row_metadata_hues=row_metadata_hues,
         hue_kinds=hue_kinds,
+        axis_styles={column: style for column, style in axis_styles.items() if column in preferred_hues},
         joinable_tables=joinable_tables,
         layout_presets=layout_presets,
         comparison_bases=comparison_bases,
         reference_labels=_reference_labels(context),
+        reference_sets=_reference_set_controls(context),
+        candidate_sets=candidate_sets,
         compare_metrics=WorkspaceNotebookCompareMetrics(
             sample_rows=192,
             distance_pair_limit=4096,

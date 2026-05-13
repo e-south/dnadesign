@@ -26,6 +26,7 @@ Configs:
 - `config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml`
 - `config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml`
 - `config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml`
+- `config.sequence_views.reference_source_and_sfxi_source.evo2_7b.yaml`
 - `config.yaml` points at the default 7B full-lane set
 
 Operational unit:
@@ -39,12 +40,19 @@ Operational unit:
 - use the three `config.sequence_views.reference_*` configs for reference
   core60 and reference-context Notify lanes; the combined reference config is a
   planning surface because it spans two USR event streams
+- use `config.sequence_views.reference_source_and_sfxi_source.evo2_7b.yaml` only
+  as a source-local diagnostic/dogfood config. It spans two source datasets, is
+  not a default Notify unit, and is not counted as downstream merged-anchor or
+  merged-context quota.
 - keep the multi-job sequence-view config for completion planning; it is not
   the live Notify default because it spans multiple USR event streams
 - every 7B sequence-view lane collects intermediate embeddings, mean-pooled
   output-layer logits, and log-likelihoods. Context lanes select both full
   sequence `seq_mean` and bounded `anchor_mean` pooling in the same job so one
-  Evo2 forward pass can serve both vector spans. Concat is not an Infer target.
+  Evo2 forward pass can serve both vector spans. The mean is over token
+  positions in the emitted sequence. Because Evo2 is causal, each pooled token
+  state is prefix-conditioned in that orientation; the forward/RC concat used
+  downstream is an external LatentDNA view, not an Infer target.
 
 Portable preflight:
 
@@ -66,6 +74,9 @@ uv run infer validate config \
 
 uv run infer validate config \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
+
+uv run infer validate config \
+  --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_source_and_sfxi_source.evo2_7b.yaml
 
 uv run infer validate config \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
@@ -90,13 +101,16 @@ uv run notify setup resolve-events \
 The multi-job sequence-view completion configs are planning surfaces, not live
 Notify units. They classify reusable, stale, missing, and product-missing work
 for `construct_insert`, forward `realized_context`, reverse-complement
-`realized_context`, and reference `analysis_window` views without loading Evo2.
+`realized_context`, reference `analysis_window`, and reference context views
+without loading Evo2.
 Reusable work is counted only from canonical sequence-view feature/scalar
 sidecars. USR row-overlay payload columns are not a coverage source.
 `core60_mean`, `seq_mean`, and `anchor_mean` are distinct feature identities.
 Exact repeated input sequences still share one Evo2 forward pass through the
 `forward_pass_key`; they do not share feature-vector keys unless the full
-feature identity is identical.
+feature identity is identical. Pooling identity includes the emitted
+orientation and explicit span, so reverse-complement context rows remain
+separate causal passes rather than coordinate transforms applied after pooling.
 The lane-specific sequence-view runbooks also render this completion planner as
 a pre-submit gate with `--max-missing-products 0 --max-stale-vectors 0
 --max-stale-scalars 0`. Missing feature vectors and log-likelihood scalars are
@@ -140,6 +154,9 @@ uv run ops runbook plan \
 Planning those presets on this node requires the same webhook secret-file
 surface DenseGen already uses. Export `NOTIFY_WEBHOOK_FILE` or materialize a
 profile with `webhook.source=secret_ref` before submit.
+On this workstation, source the path-only local env file before planning or
+submitting Notify-backed lanes:
+`source $HOME/.config/dnadesign/notify/env/study_stress_ethanol_cipro.env`.
 
 Cold-start gate for first real write-back:
 
@@ -167,6 +184,7 @@ Recommended Infer Notify bootstrap for the real study:
 ```bash
 export NOTIFY_WEBHOOK_FILE=/abs/path/to/study_stress_ethanol_cipro.webhook
 export SSL_CERT_FILE=/abs/path/to/ca-bundle.pem
+export REQUESTS_CA_BUNDLE="$SSL_CERT_FILE"
 
 uv run notify setup slack \
   --tool infer \
@@ -223,10 +241,18 @@ uv run notify usr-events watch --profile "$PROFILE" --follow --idle-timeout 7200
 Seed the cursor only when you want a new watcher to start at the current end
 of an existing event stream. If you want replay, do not preseed it.
 
-Current Slack delivery semantics come from USR `.events.log` write-back events:
+Current Slack delivery semantics come from USR `.events.log` events:
 
 - `attach` emits a `running` update with an Infer-specific message that names
-  the run id, dataset id, chunk rows, and workspace row count.
+  the run id, dataset id, chunk rows, and workspace row count for row-overlay
+  writeback lanes.
+- `infer_feature_bundle_progress` emits sparse `running` updates for 7B
+  sequence-view lanes while compute is in progress. These messages report views
+  completed this run, forward-pass progress, sidecar-key quotas, elapsed time,
+  and ETA without including low-level sidecar paths.
+- `infer_feature_bundle_complete` emits the terminal `success` update for
+  sequence-view lanes after alias, vector, scalar-alias, and scalar sidecars are
+  reconciled.
 - `materialize` emits a `success` update with the default USR message
   `materialize on <dataset> (rows_written=<n>)`.
 - Profile defaults for this study keep `include_args`, `include_context`, and
@@ -236,13 +262,67 @@ Current Slack delivery semantics come from USR `.events.log` write-back events:
   one watcher stdout line per attach or per flush. A healthy watcher can stay
   quiet while the cursor advances and the spool stays empty.
 
+2026-04-30 Evo2 7B sequence-view dogfood evidence:
+
+- Real GPU run completed
+  `reference_analysis_window_core60_mean_7b` against
+  `construct_prom_eth_cip_reference_core60` on the local RTX PRO 6000
+  Blackwell GPU with `--batch-size 128 --device cuda:0 --precision bf16`.
+- The lane produced all 48 reference core60 views, 96 vector sidecars, and 96
+  scalar sidecars. Completion validation now reports zero missing products,
+  stale vectors, stale scalars, missing vectors, or missing scalars for that
+  lane.
+- Real GPU runs also completed the paired reference context lanes and the
+  source-local reference/SFXI diagnostic config. Reference contexts produced 384
+  vectors and 192 scalar payloads across 96 records; the diagnostic config
+  produced 142 vectors/scalars across 71 source-local views.
+- The source/SFXI diagnostic run took `18.91s`, peaked at about `15.2 GiB` GPU
+  residency, and is not a downstream quota lane. The paired reference-context
+  run took `23.67s`, peaked at about `33.8 GiB` GPU residency, and reached 100%
+  sampled GPU utilization during the 1 kb context passes.
+- Notify consumed the terminal
+  `infer_feature_bundle_complete` event through the lane-specific profile, with
+  the watcher cursor advanced to the event-log tail and no failed spool entries.
+- Same-batch repeatability is exact for the tested source/reference jobs: a
+  fresh public Evo2 adapter recompute over 311 contexts and 215 unique forward
+  passes matched persisted sidecars with `max_vector_abs_diff=0.0` and
+  `max_scalar_abs_diff=0.0` for total log-likelihood, mean log-likelihood,
+  mean-pooled output logits, and mean-pooled intermediate embeddings. Smaller
+  ad hoc batch shapes can show expected BF16 drift, so preserve batch shape when
+  strict bitwise comparison is the goal.
+- Reference-context fidelity also passed structural checks: 48 forward/reverse
+  context pairs are exact reverse complements, all reference context records are
+  1 kb, all reference anchor spans are 60 bp, and reverse anchor offsets map to
+  the expected emitted-orientation coordinates.
+- Completed sequence-view reruns now resolve existing sidecars before loading
+  Evo2. The measured direct no-op path for the newly completed lanes is about
+  `3-4s`, `0.8GB` RSS, and no GPU residency.
+
+For another agent continuing batch work, use the study-level filler instead of
+submitting individual runbooks by hand:
+
+```bash
+source "$HOME/.config/dnadesign/notify/env/study_stress_ethanol_cipro.env"
+uv run ops runbook fill-infer \
+  --study-dir docs/studies/stress_ethanol_cipro_growth \
+  --repo-root . \
+  --plan-only
+```
+
+As of the latest dogfood run, the stress filler sees nine Infer lanes: three
+runnable main 7B lanes, three complete reference lanes, three unsupported lanes,
+zero blocked lanes, zero missing products, `1,258,462` missing vectors, and `943,674` missing
+scalars. Submit from the target batch environment with `--submit` only after the
+plan matches the intended queue and Notify profile state.
+
 Hydration versus hung for `evo2_20b`:
 
 - expected startup path is `fetch -> weight hydration -> GPU residency ->
-  first attach events`
+  first attach/feature-bundle events`
 - before declaring a hang, check:
   - `nvidia-smi` shows the infer process and rising/stable memory residency
-  - the target dataset `.events.log` gains new `attach` events
+  - the target dataset `.events.log` gains new `attach`,
+    `infer_feature_bundle_progress`, or `infer_feature_bundle_complete` events
   - the watcher cursor advances
   - the watcher spool remains empty
 

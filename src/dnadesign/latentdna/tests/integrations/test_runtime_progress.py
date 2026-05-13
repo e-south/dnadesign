@@ -238,6 +238,80 @@ def test_projection_grid_records_reference_set_completeness_and_persists_pdf(tmp
     assert (workspace_dir / "outputs" / "plots" / "atlas" / "plot.pdf").is_file()
 
 
+def test_projection_grid_resolves_selector_reference_set_in_every_panel(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["reference_sets"] = {
+        "reference_rows": {
+            "match_column": "usr_label__primary",
+            "label_column": "usr_label__primary",
+            "where": [
+                {
+                    "column": "source_family",
+                    "in_values": ["reference_source", "construct_derived"],
+                }
+            ],
+        }
+    }
+    config["plots"]["atlas"]["annotation"]["reference_set"] = "reference_rows"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    complete_rows = [
+        {
+            "x": 0.0,
+            "y": 0.0,
+            "usr_label__primary": "J23105",
+            "source_family": "reference_source",
+            "family": "control",
+        },
+        {
+            "x": 1.0,
+            "y": 0.0,
+            "usr_label__primary": "W1_core60",
+            "source_family": "construct_derived",
+            "family": "control",
+        },
+        {
+            "x": 0.5,
+            "y": 1.0,
+            "usr_label__primary": "dense_01",
+            "source_family": "densegen_generated",
+            "family": "designed",
+        },
+    ]
+    _write_projection(workspace_dir, "p1", complete_rows)
+    _write_projection(workspace_dir, "p2", complete_rows)
+
+    render_plot(
+        workspace_dir,
+        "atlas",
+        kind=None,
+        projection_ids=[],
+        panel_titles=[],
+        enrichment_id=None,
+        distance_id=None,
+        scalar_id=None,
+        agreement_id=None,
+        reducer_id=None,
+        left_cluster_id=None,
+        right_cluster_id=None,
+        value_column=None,
+        x_column=None,
+        y_column=None,
+        color_column=None,
+        render_mode=None,
+        label_column=None,
+        label_values=[],
+    )
+
+    manifest = json.loads((workspace_dir / "outputs" / "plots" / "atlas" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["stats"]["reference_set_complete"] is True
+    assert manifest["stats"]["reference_panels"]["p1"]["expected_ids"] == ["J23105", "W1_core60"]
+    assert manifest["stats"]["reference_panels"]["p2"]["matched_ids"] == ["J23105", "W1_core60"]
+
+
 def test_recipe_run_progress_json_emits_heartbeat_and_final_result(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

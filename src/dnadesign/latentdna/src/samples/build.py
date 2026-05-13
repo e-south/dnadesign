@@ -13,6 +13,7 @@ import pyarrow as pa
 
 from ..contracts.errors import ContractViolationError
 from ..io.parquet_io import read_table, write_table
+from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..workspaces.loader import WorkspaceContext
 
 
@@ -85,6 +86,31 @@ def _combine_sample_sets(
     return pa.Table.from_pylist(output_rows, schema=sample_tables[0].schema)
 
 
+def _filter_rows(rows: pa.Table, where: dict[str, Any] | None) -> pa.Table:
+    if where is None:
+        return rows
+    if not isinstance(where, dict):
+        raise ContractViolationError("sample where must be a mapping")
+    column = str(where.get("column") or "")
+    if not column:
+        raise ContractViolationError("sample where requires column")
+    if column not in rows.column_names:
+        raise ContractViolationError(f"sample where column is missing from row ledger: {column!r}")
+
+    values = rows[column].combine_chunks().to_pylist()
+    if "equals" in where:
+        expected = where["equals"]
+        selected_indices = [index for index, value in enumerate(values) if value == expected]
+    elif "in" in where or "in_values" in where:
+        expected_values = set(where.get("in", where.get("in_values")) or [])
+        selected_indices = [index for index, value in enumerate(values) if value in expected_values]
+    else:
+        raise ContractViolationError("sample where supports equals, in, or in_values")
+    if not selected_indices:
+        raise ContractViolationError(f"sample where matched no rows on {column!r}")
+    return rows.take(pa.array(selected_indices, type=pa.int64()))
+
+
 def build_sample_artifact(
     context: WorkspaceContext,
     *,
@@ -97,8 +123,11 @@ def build_sample_artifact(
     explicit_ids: list[str] | None = None,
     input_sample_ids: list[str] | None = None,
     reference_set_id: str | None = None,
+    where: dict[str, Any] | None = None,
 ) -> tuple[Path, int]:
     if strategy in {"union", "intersection"}:
+        if where is not None:
+            raise ContractViolationError(f"{strategy} sampling does not support where filters")
         sample_table = _combine_sample_sets(
             context,
             strategy=strategy,
@@ -114,6 +143,7 @@ def build_sample_artifact(
         rows = read_table(rows_path)
         if rows.num_rows == 0:
             raise ContractViolationError(f"view {view_id} has no rows to sample")
+        rows = _filter_rows(rows, where)
 
         rng = np.random.default_rng(seed)
         selected_indices: list[int]
@@ -164,21 +194,27 @@ def build_sample_artifact(
                 raise ContractViolationError(f"unknown reference_set for sampling: {reference_set_id}")
             reference_set = context.config.reference_sets[reference_set_id]
             match_column = reference_set.match_column
-            if match_column not in rows.column_names:
-                raise ContractViolationError(f"reference_set match column is missing from row ledger: {match_column!r}")
-            value_to_index: dict[str, int] = {}
-            for index, value in enumerate(rows[match_column].combine_chunks().to_pylist()):
-                value_to_index.setdefault(str(value), index)
-            missing_ids = [str(value) for value in reference_set.ids if str(value) not in value_to_index]
-            if missing_ids:
-                missing = ", ".join(missing_ids)
+            required_columns = reference_set_required_columns(reference_set)
+            missing_columns = [column for column in required_columns if column not in rows.column_names]
+            if missing_columns:
+                raise ContractViolationError(
+                    f"reference_set required columns are missing from row ledger: {missing_columns!r}"
+                )
+            column_values = {column: rows[column].combine_chunks().to_pylist() for column in required_columns}
+            resolution = resolve_reference_set_ids_from_columns(reference_set, column_values)
+            if not resolution.complete:
+                missing_ids = sorted(set(resolution.expected_ids).difference(resolution.matched_ids))
+                missing = ", ".join(missing_ids) if missing_ids else f"{reference_set_id} matched no rows"
                 raise ContractViolationError(
                     f"reference_set sampling could not find ids in {match_column!r}: {missing}"
                 )
+            value_to_index: dict[str, int] = {}
+            for index, value in enumerate(column_values[match_column]):
+                value_to_index.setdefault(str(value), index)
             selected_indices = sorted(
                 {
                     *selected_indices,
-                    *(value_to_index[str(value)] for value in reference_set.ids),
+                    *(value_to_index[str(value)] for value in resolution.expected_ids),
                 }
             )
 

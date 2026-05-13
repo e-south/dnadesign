@@ -3,12 +3,12 @@ from types import SimpleNamespace
 
 import marimo as mo
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime_support
+from dnadesign.latentdna.src.notebooks import rendering as notebook_rendering
 from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
-    MAX_INLINE_NOTEBOOK_ASSET_BYTES,
-    MAX_INLINE_SVG_BYTES,
     available_hues_for_frames,
     candidate_hue_columns,
     category_color_map,
@@ -16,21 +16,126 @@ from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     continuous_hue_render_params,
     display_hue_label,
     display_hue_value,
+    display_reference_label,
     draw_reference_labels,
     key_value_table,
     labeled_options,
     normalize_categorical_hue_value,
     normalize_hue_kind,
     notebook_theme,
+    reference_hue_render_params,
+    reference_label_limit_for_annotation_mode,
+    resolve_join_keys,
+    resolve_labeled_option_card,
+    resolve_reference_annotation,
+    table_from_records,
+)
+from dnadesign.latentdna.src.notebooks.rendering import (
+    MAX_INLINE_NOTEBOOK_ASSET_BYTES,
+    MAX_INLINE_SVG_BYTES,
     render_math_markdown,
     render_matplotlib_figure,
     render_plot_asset,
-    resolve_join_keys,
     resolve_plot_render_asset,
     select_plot_render_path,
-    table_from_records,
 )
-from dnadesign.latentdna.src.visual_style import wrap_plot_title
+from dnadesign.latentdna.src.visual_style import SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE, wrap_plot_title
+
+SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
+SIGMA35_AXIS_STYLES = {
+    "sig35_variant": {
+        "axis_id": "sigma35",
+        "column": "sig35_variant",
+        "label": "Sigma-35 variant",
+        "kind": "categorical",
+        "category_order": ["f", "e", "d", "c", "b", "control"],
+        "display_labels": {
+            "f": "TTGACA (f)",
+            "e": "TAGACA (e)",
+            "d": "TTTACA (d)",
+            "c": "TTGTGA (c)",
+            "b": "CTGACA (b)",
+            "control": "Control",
+        },
+        "category_colors": {
+            "f": "#B2182B",
+            "e": "#D6604D",
+            "d": "#F4A582",
+            "c": "#92C5DE",
+            "b": "#2166AC",
+            "control": "#7F8894",
+        },
+        "noncanonical_bucket": SIGMA35_NONCANONICAL_BUCKET,
+        "noncanonical_label": "Reference/other",
+        "include_noncanonical_in_legend": False,
+        "canonical_row_match": "any",
+        "canonical_row_selectors": [
+            {"column": "source_class", "in_values": ["densegen"]},
+            {"column": "source_family", "in_values": ["densegen_generated"]},
+        ],
+    }
+}
+SPACER_AXIS_STYLES = {
+    "spacer_length": {
+        "axis_id": "spacer_length",
+        "column": "spacer_length",
+        "label": "Spacer length",
+        "kind": "ordinal",
+        "category_order": ["16", "17", "18"],
+        "category_colors": {"16": "#2C7BB6", "17": "#FEE090", "18": "#D73027"},
+    }
+}
+DESIGN_FAMILY_AXIS_STYLES = {
+    "design_family": {
+        "axis_id": "design_family",
+        "column": "design_family",
+        "label": "Design family",
+        "kind": "categorical",
+        "category_order": ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin", "control"],
+        "category_colors": {
+            "background_only": "#56B4E9",
+            "ethanol": "#E69F00",
+            "ciprofloxacin": "#009E73",
+            "ethanol_ciprofloxacin": "#CC79A7",
+            "control": "#111111",
+        },
+    }
+}
+REGULATOR_AXIS_STYLES = {
+    "design_regulator_composition": {
+        "axis_id": "regulator_composition",
+        "column": "design_regulator_composition",
+        "label": "Reg. comp.",
+        "kind": "categorical",
+        "category_order": [
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA",
+            "sig35=b",
+            "cpxR_MANWWHTTTAM",
+            "control",
+            "lexA_CTGTATAWAWWHACA",
+        ],
+        "display_labels": {
+            "baeR_TTTCTSCVHNA+lexA_CTGTATAWAWWHACA": "BaeR+LexA",
+            "cpxR_MANWWHTTTAM": "CpxR",
+            "lexA_CTGTATAWAWWHACA": "LexA",
+            "sig35=b": "Bg",
+            "control": "Ctrl",
+        },
+    }
+}
+
+
+def _relative_luminance(color: str) -> float:
+    normalized = color.lstrip("#")
+    channels = [int(normalized[index : index + 2], 16) / 255.0 for index in (0, 2, 4)]
+
+    def _linear(value: float) -> float:
+        if value <= 0.04045:
+            return value / 12.92
+        return ((value + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = (_linear(value) for value in channels)
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
 
 
 def test_select_plot_render_path_prefers_svg_assets(tmp_path: Path) -> None:
@@ -42,6 +147,32 @@ def test_select_plot_render_path_prefers_svg_assets(tmp_path: Path) -> None:
     pdf_path.write_bytes(b"%PDF-1.4")
 
     assert select_plot_render_path([png_path, pdf_path, svg_path]) == svg_path
+
+
+def test_load_table_reuses_cached_parquet_payloads(monkeypatch, tmp_path: Path) -> None:
+    table_path = tmp_path / "coords.parquet"
+    pd.DataFrame({"id": ["row0", "row1"], "x": [0.0, 1.0], "y": [1.0, 0.0]}).to_parquet(
+        table_path,
+        index=False,
+    )
+    if hasattr(runtime_support, "_cached_parquet_table"):
+        runtime_support._cached_parquet_table.cache_clear()
+    read_calls: list[Path] = []
+    original_read_parquet = runtime_support.pd.read_parquet
+
+    def counting_read_parquet(path, *args, **kwargs):
+        read_calls.append(Path(path))
+        return original_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(runtime_support.pd, "read_parquet", counting_read_parquet)
+
+    first = runtime_support.load_table(table_path)
+    second = runtime_support.load_table(table_path)
+
+    assert len(read_calls) == 1
+    assert first is not second
+    first["scratch"] = 1
+    assert "scratch" not in second.columns
 
 
 def test_resolve_plot_render_asset_uses_raster_fallback_for_large_svg(tmp_path: Path) -> None:
@@ -59,7 +190,7 @@ def test_resolve_plot_render_asset_uses_raster_fallback_for_large_svg(tmp_path: 
     assert "inline notebook rendering" in notice
 
 
-def test_resolve_plot_render_asset_reports_missing_raster_fallback(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_reports_missing_alternate(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     svg_path.write_bytes(b"x" * (MAX_INLINE_SVG_BYTES + 1))
 
@@ -67,10 +198,10 @@ def test_resolve_plot_render_asset_reports_missing_raster_fallback(tmp_path: Pat
 
     assert render_path is None
     assert notice is not None
-    assert "no raster or pdf fallback" in notice.lower()
+    assert "no raster or pdf alternate" in notice.lower()
 
 
-def test_resolve_plot_render_asset_prefers_pdf_for_large_inline_asset(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_uses_small_raster_for_large_inline_svg(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     png_path = tmp_path / "plot.png"
     svg_path.write_bytes(b"x" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
@@ -84,7 +215,7 @@ def test_resolve_plot_render_asset_prefers_pdf_for_large_inline_asset(tmp_path: 
     assert "large for inline notebook rendering" in notice
 
 
-def test_resolve_plot_render_asset_uses_pdf_fallback_when_raster_is_missing(tmp_path: Path) -> None:
+def test_resolve_plot_render_asset_uses_pdf_alternate_when_raster_is_missing(tmp_path: Path) -> None:
     svg_path = tmp_path / "plot.svg"
     pdf_path = tmp_path / "plot.pdf"
     svg_path.write_bytes(b"x" * (MAX_INLINE_SVG_BYTES + 1))
@@ -97,8 +228,58 @@ def test_resolve_plot_render_asset_uses_pdf_fallback_when_raster_is_missing(tmp_
     assert "plot.pdf" in notice
 
 
+def test_resolve_plot_render_asset_uses_raster_alternate_even_when_large(tmp_path: Path) -> None:
+    svg_path = tmp_path / "plot.svg"
+    png_path = tmp_path / "plot.png"
+    pdf_path = tmp_path / "plot.pdf"
+    svg_path.write_bytes(b"x" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+    pdf_path.write_bytes(b"%PDF-1.4")
+
+    render_path, notice = resolve_plot_render_asset(svg_path)
+
+    assert render_path == png_path
+    assert notice is not None
+    assert "plot.png" in notice
+
+
+def test_resolve_plot_render_asset_accepts_large_raster_assets(tmp_path: Path) -> None:
+    png_path = tmp_path / "plot.png"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+
+    render_path, notice = resolve_plot_render_asset(png_path)
+
+    assert render_path == png_path
+    assert notice is None
+
+
+def test_resolve_plot_render_asset_keeps_large_raster_without_pdf(tmp_path: Path) -> None:
+    png_path = tmp_path / "plot.png"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+
+    render_path, notice = resolve_plot_render_asset(png_path)
+
+    assert render_path == png_path
+    assert notice is None
+
+
+def test_render_plot_asset_uses_marimo_image_for_large_raster_without_pdf(tmp_path: Path) -> None:
+    png_path = tmp_path / "plot.png"
+    png_path.write_bytes(b"p" * (MAX_INLINE_NOTEBOOK_ASSET_BYTES + 1))
+
+    rendered = render_plot_asset(png_path, workspace_dir=tmp_path, alt_text="large raster")
+
+    assert "large raster" in rendered.text
+    assert "<img" in rendered.text
+    assert "latentdna-plot-asset" in rendered.text
+
+
 def test_category_color_map_prefers_stable_semantic_colors() -> None:
-    color_map = category_color_map(["ethanol", "ciprofloxacin", "background_only", "ethanol_ciprofloxacin", "control"])
+    color_map = category_color_map(
+        ["ethanol", "ciprofloxacin", "background_only", "ethanol_ciprofloxacin", "control"],
+        column="design_family",
+        axis_styles=DESIGN_FAMILY_AXIS_STYLES,
+    )
 
     assert color_map["background_only"] == "#56B4E9"
     assert color_map["ethanol"] == "#E69F00"
@@ -107,22 +288,40 @@ def test_category_color_map_prefers_stable_semantic_colors() -> None:
     assert color_map["control"] == "#111111"
 
 
-def test_category_color_map_orders_sig35_variant_by_reverse_alphabetical_strength() -> None:
-    color_map = category_color_map(["b", "f", "d", "control"], column="sig35_variant")
+def test_category_color_map_darkens_light_scatter_colors() -> None:
+    color_map = category_color_map(
+        ["f", "d", "c", "b"],
+        column="sig35_variant",
+        axis_styles=SIGMA35_AXIS_STYLES,
+    )
 
-    assert list(color_map) == ["f", "d", "b", "control"]
+    assert color_map["d"] != "#F4A582"
+    assert color_map["c"] != "#92C5DE"
+    assert _relative_luminance(color_map["d"]) <= SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE + 1e-6
+    assert _relative_luminance(color_map["c"]) <= SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE + 1e-6
+
+
+def test_category_color_map_orders_sig35_variant_by_reverse_alphabetical_strength() -> None:
+    color_map = category_color_map(
+        ["b", "f", "d", "control"],
+        column="sig35_variant",
+        axis_styles=SIGMA35_AXIS_STYLES,
+    )
+
+    assert list(color_map)[:4] == ["f", "d", "b", "control"]
+    assert color_map[SIGMA35_NONCANONICAL_BUCKET] == "#9AA5B1"
     assert color_map["f"] == "#B2182B"
-    assert color_map["d"] == "#F4A582"
+    assert color_map["d"] == "#E69B7B"
     assert color_map["b"] == "#2166AC"
     assert color_map["control"] == "#7F8894"
 
 
 def test_category_color_map_orders_spacer_length_from_cool_to_warm() -> None:
-    color_map = category_color_map(["18", "16", "17"], column="spacer_length")
+    color_map = category_color_map(["18", "16", "17"], column="spacer_length", axis_styles=SPACER_AXIS_STYLES)
 
     assert list(color_map) == ["16", "17", "18"]
     assert color_map["16"] == "#2C7BB6"
-    assert color_map["17"] == "#FEE090"
+    assert color_map["17"] == "#C2AB6E"
     assert color_map["18"] == "#D73027"
 
 
@@ -170,17 +369,57 @@ def test_resolve_join_keys_supports_construct_anchor_id_to_id_orientation() -> N
     assert resolve_join_keys(left, right) == ("construct__anchor_id", "id")
 
 
+def test_resolve_join_keys_prefers_alias_id_for_sidecar_row_features() -> None:
+    left = pd.DataFrame({"alias_id": ["alias_a", "alias_b"], "construct__anchor_id": ["a1", "a2"]})
+    right = pd.DataFrame({"alias_id": ["alias_a", "alias_b"], "construct__anchor_id": ["a1", "a1"]})
+
+    assert resolve_join_keys(left, right) == ("alias_id", "alias_id")
+
+
 def test_display_hue_label_and_value_compact_design_regulator_composition() -> None:
-    assert display_hue_label("design_regulator_composition") == "Reg. comp."
-    assert display_hue_value("design_regulator_composition", "cpxR_MANWWHTTTAM+lexA_CTGTATAWAWWHACA") == "CpxR+LexA"
-    assert display_hue_value("design_regulator_composition", "sig35=b") == "Bg"
-    assert display_hue_value("design_regulator_composition", "control") == "Ctrl"
-    assert normalize_categorical_hue_value("design_regulator_composition", float("nan")) == "NA"
+    assert display_hue_label("design_regulator_composition", axis_styles=REGULATOR_AXIS_STYLES) == "Reg. comp."
+    assert (
+        display_hue_value(
+            "design_regulator_composition",
+            "cpxR_MANWWHTTTAM",
+            axis_styles=REGULATOR_AXIS_STYLES,
+        )
+        == "CpxR"
+    )
+    assert display_hue_value("design_regulator_composition", "sig35=b", axis_styles=REGULATOR_AXIS_STYLES) == "Bg"
+    assert display_hue_value("design_regulator_composition", "control", axis_styles=REGULATOR_AXIS_STYLES) == "Ctrl"
+    assert (
+        normalize_categorical_hue_value(
+            "design_regulator_composition",
+            float("nan"),
+            axis_styles=REGULATOR_AXIS_STYLES,
+        )
+        == "NA"
+    )
 
 
 def test_display_hue_value_formats_sig35_variant_for_legends() -> None:
-    assert display_hue_value("sig35_variant", "f") == "TTGACA (f)"
-    assert display_hue_value("sig35_variant", "control") == "Control"
+    assert display_hue_value("sig35_variant", "f", axis_styles=SIGMA35_AXIS_STYLES) == "TTGACA (f)"
+    assert display_hue_value("sig35_variant", "control", axis_styles=SIGMA35_AXIS_STYLES) == "Control"
+
+
+def test_sig35_hue_normalization_keeps_reference_variants_out_of_densegen_legend() -> None:
+    assert (
+        normalize_categorical_hue_value("sig35_variant", "TTTACA", axis_styles=SIGMA35_AXIS_STYLES)
+        == SIGMA35_NONCANONICAL_BUCKET
+    )
+    assert (
+        normalize_categorical_hue_value("sig35_variant", "ACCGCG", axis_styles=SIGMA35_AXIS_STYLES)
+        == SIGMA35_NONCANONICAL_BUCKET
+    )
+    assert normalize_categorical_hue_value("sig35_variant", "f", axis_styles=SIGMA35_AXIS_STYLES) == "f"
+
+
+def test_reference_display_label_strips_core60_context_suffixes() -> None:
+    assert display_reference_label("J23118_core60") == "J23118"
+    assert display_reference_label("W2_core60_context1kb_rc") == "W2"
+    assert display_reference_label("spyp") == "spyP"
+    assert display_reference_label("sulAp") == "sulAp"
 
 
 def test_labeled_options_disambiguates_duplicate_labels_without_dropping_values() -> None:
@@ -198,14 +437,29 @@ def test_labeled_options_disambiguates_duplicate_labels_without_dropping_values(
     assert options["Treatment"] == "view_c"
 
 
+def test_resolve_labeled_option_card_accepts_ids_titles_and_disambiguated_labels() -> None:
+    cards = [
+        {"plot_id": "sigma35_ordinal_audit", "title": "Sigma-35 ordinal audit"},
+        {"plot_id": "sigma35_margin_ladder_gallery", "title": "Sigma-35 margin ladder gallery"},
+    ]
+
+    assert resolve_labeled_option_card(cards, "sigma35_margin_ladder_gallery") == cards[1]
+    assert resolve_labeled_option_card(cards, "Sigma-35 margin ladder gallery") == cards[1]
+    assert resolve_labeled_option_card(
+        [{"plot_id": "view_a", "title": "Control"}, {"plot_id": "view_b", "title": "Control"}],
+        "Control [view_b]",
+    ) == {"plot_id": "view_b", "title": "Control"}
+    assert resolve_labeled_option_card(cards, "missing") == cards[0]
+
+
 def test_table_from_records_uses_marimo_native_table_widget() -> None:
     table = table_from_records([{"Artifact": "table_a", "Columns": ["x", "y"]}], columns=["Artifact", "Columns"])
 
     assert isinstance(table, mo.ui.table)
 
 
-def test_render_matplotlib_figure_prefers_inline_svg_in_app_run_mode(monkeypatch) -> None:
-    monkeypatch.setattr(runtime_support.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
+def test_render_matplotlib_figure_prefers_raster_image_in_app_run_mode(monkeypatch) -> None:
+    monkeypatch.setattr(notebook_rendering.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
 
     fig, ax = plt.subplots()
     ax.plot([0, 1], [1, 0])
@@ -214,7 +468,8 @@ def test_render_matplotlib_figure_prefers_inline_svg_in_app_run_mode(monkeypatch
 
     assert isinstance(rendered, mo.Html)
     assert "run mode figure" in rendered.text
-    assert "data:image/svg+xml;base64," in rendered.text
+    assert "<img" in rendered.text
+    assert "image/png" in rendered.text
     assert "overflow-x: auto" in rendered.text
     assert "max-width: 100%" in rendered.text
 
@@ -244,7 +499,7 @@ def test_render_plot_asset_uses_plot_alt_text_for_raster_assets(tmp_path: Path) 
 
     assert isinstance(rendered, mo.Html)
     assert "Context robustness summary" in rendered.text
-    assert "data:image/png;base64," in rendered.text
+    assert "<img" in rendered.text
     assert "overflow-x: auto" in rendered.text
     assert "max-width: 100%" in rendered.text
 
@@ -258,9 +513,8 @@ def test_render_plot_asset_prefers_png_for_large_svg_with_raster_fallback(tmp_pa
     rendered = render_plot_asset(svg_path, workspace_dir=tmp_path, alt_text="UMAP gallery")
 
     assert isinstance(rendered, mo.Html)
-    assert "data:image/png;base64," in rendered.text
-    assert "inline notebook rendering" not in rendered.text
-    assert "plot.png" not in rendered.text
+    assert "<img" in rendered.text
+    assert "Displaying `plot.png` because `plot.svg` is large for inline notebook rendering" in rendered.text
 
 
 def test_render_math_markdown_emits_equation_images_for_display_math() -> None:
@@ -294,6 +548,35 @@ def test_render_math_markdown_normalizes_common_latex_inequalities() -> None:
     assert "fell back to plain text" not in rendered.text
 
 
+def test_render_math_markdown_normalizes_latex_norm_delimiters() -> None:
+    rendered = render_math_markdown(
+        """
+        Pairwise shift uses
+        $$
+        \\lVert \\hat{x_i} - \\hat{y_i} \\rVert_2.
+        $$
+        """
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "Math expression" in rendered.text
+    assert "Pairwise shift uses" in rendered.text
+
+
+def test_render_math_markdown_falls_back_for_unsupported_mathtext() -> None:
+    rendered = render_math_markdown(
+        """
+        Unsupported display math
+        $$
+        \\not_a_mathtext_command{x}
+        $$
+        """
+    )
+
+    assert isinstance(rendered, mo.Html)
+    assert "not_a_mathtext_command" in rendered.text
+
+
 def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:
     frame = pd.DataFrame(
         {
@@ -316,6 +599,27 @@ def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:
     assert any(text.get_text() == "spyP" for text in ax.texts)
 
 
+def test_draw_reference_labels_uses_reference_set_display_labels() -> None:
+    frame = pd.DataFrame(
+        {
+            "usr_label__primary": ["J23105", "background_only"],
+            "x": [0.4, -0.2],
+            "y": [0.25, -0.1],
+        }
+    )
+    fig, ax = plt.subplots()
+
+    draw_reference_labels(
+        ax,
+        frame,
+        reference_labels=["J23105"],
+        reference_display_labels={"J23105": "Anderson J23105"},
+    )
+
+    assert len(ax.collections) == 1
+    assert any(text.get_text() == "Anderson J23105" for text in ax.texts)
+
+
 def test_draw_reference_labels_separates_close_reference_annotations() -> None:
     frame = pd.DataFrame(
         {
@@ -334,6 +638,29 @@ def test_draw_reference_labels_separates_close_reference_annotations() -> None:
 
     assert len(text_positions) == 3
     assert len(set(text_positions)) == 3
+
+
+def test_draw_reference_labels_uses_compact_font_for_many_native_labels() -> None:
+    labels = [f"gene{i}p_core60_context1kb_forward" for i in range(8)]
+    frame = pd.DataFrame(
+        {
+            "usr_label__primary": labels,
+            "x": np.linspace(0.0, 0.7, num=len(labels)),
+            "y": np.linspace(0.1, 0.8, num=len(labels)),
+        }
+    )
+    fig, ax = plt.subplots(figsize=(4.0, 4.0))
+
+    draw_reference_labels(
+        ax,
+        frame,
+        reference_labels=labels,
+        reference_label_limit=len(labels),
+    )
+
+    assert len(ax.texts) == len(labels)
+    assert max(text.get_fontsize() for text in ax.texts) <= 7.8
+    assert all("_context1kb" not in text.get_text() for text in ax.texts)
 
 
 def test_draw_reference_labels_uses_translucent_label_boxes() -> None:
@@ -370,14 +697,137 @@ def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> N
     assert len(ax.texts) == 0
 
 
+def test_resolve_reference_annotation_does_not_fallback_to_default_labels_for_unknown_set(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(runtime_support, "_load_workspace_reference_set", lambda *_args: None)
+    frames = [pd.DataFrame({"usr_label__primary": ["spyp", "sulAp"]})]
+
+    annotation = resolve_reference_annotation(
+        "reference_anderson_igem_core60_typo",
+        frames,
+        workspace_dir=tmp_path,
+        fallback_labels=["spyp", "sulAp"],
+    )
+
+    assert annotation["labels"] == []
+    assert annotation["label_limit"] == 0
+    assert "spyp" not in annotation["warnings"][0]
+    assert "not configured" in annotation["warnings"][0]
+
+
+def test_resolve_reference_annotation_warns_when_selected_rows_are_absent_from_panel(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    reference_set = SimpleNamespace(
+        ids=[],
+        where=[SimpleNamespace(column="promoter_standard__collection_id", equals="t7_w_collection", non_null=True)],
+        where_all=[],
+        match_column="usr_label__primary",
+        label_column=None,
+        display_labels={},
+        require_non_empty=True,
+    )
+    monkeypatch.setattr(runtime_support, "_load_workspace_reference_set", lambda *_args: reference_set)
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["W1", "background"],
+                "promoter_standard__collection_id": ["t7_w_collection", None],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["background"],
+                "promoter_standard__collection_id": [None],
+            }
+        ),
+    ]
+    frames[0].attrs["view_id"] = "anchor_view"
+    frames[1].attrs["view_id"] = "context_view"
+
+    annotation = resolve_reference_annotation("reference_w_collection", frames, workspace_dir=tmp_path)
+
+    assert annotation["labels"] == ["W1"]
+    assert any("no matched overlay rows in 1 of 2 non-empty panel" in warning for warning in annotation["warnings"])
+    assert any("context_view" in warning for warning in annotation["warnings"])
+
+
+def test_resolve_reference_annotation_honors_configured_label_limit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    reference_set = SimpleNamespace(
+        ids=[],
+        where=[SimpleNamespace(column="source_family", equals="native_mg1655", non_null=True)],
+        where_all=[],
+        match_column="usr_label__primary",
+        label_column=None,
+        display_labels={},
+        require_non_empty=True,
+        label_limit=32,
+    )
+    monkeypatch.setattr(runtime_support, "_load_workspace_reference_set", lambda *_args: reference_set)
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": [f"gene{i}p" for i in range(8)],
+                "source_family": ["native_mg1655"] * 8,
+            }
+        )
+    ]
+
+    annotation = resolve_reference_annotation("reference_native_mg1655", frames, workspace_dir=tmp_path)
+
+    assert annotation["labels"] == [f"gene{i}p" for i in range(8)]
+    assert annotation["label_limit"] == 32
+
+
+def test_reference_hue_render_params_supports_semantic_xy_columns() -> None:
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["W1", "W9", "densegen_0"],
+                "synthetic_margin_ethanol_vs_background": [0.3, 0.6, -0.2],
+                "synthetic_margin_cipro_vs_background": [0.1, 0.4, -0.3],
+                "promoter_standard__strength_value_numeric": [1.0, 9.0, np.nan],
+            }
+        )
+    ]
+
+    params = reference_hue_render_params(
+        frames,
+        reference_labels=["W1", "W9"],
+        reference_hue_column="promoter_standard__strength_value_numeric",
+        x_column="synthetic_margin_ethanol_vs_background",
+        y_column="synthetic_margin_cipro_vs_background",
+    )
+
+    assert params is not None
+    assert params["cmap"] == "viridis"
+
+
+def test_display_hue_label_names_sfxi_reference_metric() -> None:
+    assert display_hue_label("sfxi_ref__metric_value") == "SFXI metric"
+
+
+def test_reference_label_limit_for_annotation_mode_maps_notebook_options() -> None:
+    assert reference_label_limit_for_annotation_mode("auto") is None
+    assert reference_label_limit_for_annotation_mode("markers_only") == 0
+    assert reference_label_limit_for_annotation_mode("show_labels") == -1
+    assert reference_label_limit_for_annotation_mode("unknown") is None
+
+
 def test_key_value_table_formats_summary_values() -> None:
-    table = key_value_table([("Deliverables", 7), ("Families", ["intermediate_embedding", "pooled_logits"])])
+    table = key_value_table([("Deliverables", 7), ("Families", ["intermediate_embedding", "output_layer_mean"])])
 
     assert isinstance(table, mo.ui.table)
     frame = table.data.drop(columns=["_marimo_row_id"])
     assert frame.to_dict(orient="records") == [
         {"Field": "Deliverables", "Value": 7},
-        {"Field": "Families", "Value": ["intermediate_embedding", "pooled_logits"]},
+        {"Field": "Families", "Value": ["intermediate_embedding", "output_layer_mean"]},
     ]
 
 
@@ -441,6 +891,51 @@ def test_available_hues_for_frames_intersects_support_across_visible_panels() ->
         preferred_hues=["design_family", "context_shift_l2"],
         hue_kinds={"design_family": "categorical", "context_shift_l2": "continuous"},
     ) == ["design_family", "context_shift_l2"]
+
+
+def test_available_hues_for_frames_accepts_array_backed_categorical_hues() -> None:
+    frames = [
+        pd.DataFrame({"regulondb__sigma_factor_set": [np.array(["sigma70"], dtype=object)]}),
+        pd.DataFrame({"regulondb__sigma_factor_set": [np.array(["sigma38", "sigma70"], dtype=object)]}),
+    ]
+
+    assert available_hues_for_frames(
+        frames,
+        preferred_hues=["regulondb__sigma_factor_set"],
+        hue_kinds={"regulondb__sigma_factor_set": "categorical"},
+    ) == ["regulondb__sigma_factor_set"]
+
+
+def test_available_hues_for_frames_uses_vectorized_missing_mask_for_scalar_strings(monkeypatch) -> None:
+    from dnadesign.latentdna.src.notebooks import browser_runtime_support as support
+
+    calls = 0
+    original = support._is_missing_hue_value
+
+    def counting_missing(value):
+        nonlocal calls
+        calls += 1
+        return original(value)
+
+    monkeypatch.setattr(support, "_is_missing_hue_value", counting_missing)
+    frames = [pd.DataFrame({"design_family": ["ethanol", "cipro", None, "control"] * 512})]
+
+    assert support.available_hues_for_frames(
+        frames,
+        preferred_hues=["design_family"],
+        hue_kinds={"design_family": "categorical"},
+    ) == ["design_family"]
+    assert calls == 0
+
+
+def test_normalize_categorical_hue_value_formats_array_backed_sets() -> None:
+    assert (
+        normalize_categorical_hue_value(
+            "regulondb__sigma_factor_set",
+            np.array(["sigma38", "sigma70"], dtype=object),
+        )
+        == "Sigma38 + Sigma70"
+    )
 
 
 def test_available_hues_for_frames_ignores_empty_panels_when_resolving_hues() -> None:

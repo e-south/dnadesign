@@ -67,13 +67,28 @@ class SequenceViewSelectorConfig(_StrictFeatureModel):
 class SequenceViewPoolingConfig(_StrictFeatureModel):
     operation: Literal["seq_mean", "anchor_mean", "core60_mean"]
     bounds_from: Optional[Literal["sequence_view", "construct_overlay"]] = None
+    start_0: Optional[int] = Field(default=None, ge=0)
+    end_0: Optional[int] = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _validate_bounds_source(self) -> "SequenceViewPoolingConfig":
+        explicit_bounds = self.start_0 is not None or self.end_0 is not None
+        if explicit_bounds and (self.start_0 is None or self.end_0 is None):
+            raise ValueError("feature_bundle.sequence_view_inputs[].pooling explicit bounds require start_0 and end_0.")
+        if self.start_0 is not None and self.end_0 is not None and self.end_0 <= self.start_0:
+            raise ValueError("feature_bundle.sequence_view_inputs[].pooling.end_0 must be greater than start_0.")
         if self.operation == "anchor_mean" and self.bounds_from is None:
             raise ValueError("feature_bundle.sequence_view_inputs[].pooling.bounds_from is required for anchor_mean.")
         if self.operation != "anchor_mean" and self.bounds_from is not None:
             raise ValueError("feature_bundle.sequence_view_inputs[].pooling.bounds_from is only valid for anchor_mean.")
+        if explicit_bounds and self.operation != "core60_mean":
+            raise ValueError(
+                "feature_bundle.sequence_view_inputs[].pooling explicit bounds are only valid for core60_mean."
+            )
+        if self.operation == "core60_mean" and explicit_bounds and self.end_0 - self.start_0 != 60:
+            raise ValueError(
+                "feature_bundle.sequence_view_inputs[].pooling core60_mean explicit bounds must span 60 bp."
+            )
         return self
 
 

@@ -11,6 +11,7 @@ variants:
     specificity_id: Mva1269I
     motif_top_5to3: GAATGC
     raw_cut_notation: GAATGC(none/-1)
+    raw_cut_offset_reference: motif_end
     vendor: Thermo Fisher Scientific
     vendor_catalog_number: ER2051
     source_url: https://www.thermofisher.com/order/catalog/product/ER2051
@@ -31,6 +32,7 @@ variants:
     specificity_id: Bpu10I
     motif_top_5to3: CCTNAGC
     raw_cut_notation: CCTNAGC(none/-2)
+    raw_cut_offset_reference: motif_end
     vendor: Thermo Fisher Scientific
     vendor_catalog_number: ER1681
     source_url: https://www.thermofisher.com/order/catalog/product/ER1681

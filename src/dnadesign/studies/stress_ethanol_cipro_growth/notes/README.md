@@ -47,3 +47,7 @@ This `notes/` surface is where longer interpretation should go.
 ## Current Notes
 
 - [2026-04-19 LatentDNA Pre-Assay Triage](</Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-04-19-latentdna-preassay-triage.md>)
+- [2026-05-09 Bidirectional Context-Anchor Mean Confidence Audit](</Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-09-bidirectional-context-anchor-mean-confidence-audit.md>)
+- [2026-05-09 Candidate-View Language Prose Audit](</Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-09-view-language-prose-audit.md>)
+- [2026-05-10 Candidate-X Rationale And Story Surfaces](</Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md>)
+- [2026-05-10 Native Reference Processing And Ontology Audit](</Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-native-reference-processing-and-ontology-audit.md>)

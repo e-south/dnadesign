@@ -51,7 +51,7 @@ def inspect_views(workspace: str | Path) -> dict[str, object]:
                 item["left"] = view.derive.left
                 item["right"] = view.derive.right
                 item["alignment"] = view.derive.alignment
-            elif view.derive.kind == "concatenate":
+            elif view.derive.kind in {"concatenate", "block_normalized_concatenate"}:
                 item["inputs"] = list(view.derive.inputs)
             else:
                 item["input_view"] = view.derive.view

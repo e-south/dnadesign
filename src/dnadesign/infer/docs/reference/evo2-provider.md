@@ -43,18 +43,22 @@ Default feature bundles collect all three groups:
 Interpret these names as feature families, not persisted tensor shapes:
 
 - `log_likelihood` is scalar by definition
-- `output_layer_mean` refers to the final-layer embedding family
+- `output_layer_mean` refers to the per-token output-logits family after the
+  requested token-position pooling operation
 - `intermediate_embedding` refers to the selected internal-layer embedding family
 
 `output_embedding` is accepted as a config/docs alias for continuity, but stored schema and new docs should prefer `output_layer_mean`.
 
 ### Pooling modes
 
-For feature bundles, `infer` uses:
+For feature bundles, `infer` uses row-level pooling over the sequence-position
+axis of the tokenwise tensor:
 
-- `seq_mean`: mean across the full resolved sequence
-- `anchor_mean`: mean across the anchor span inside a templated context
-- `core60_mean`: explicit 60 bp analysis-core pooling for sequence-view bundles
+- `seq_mean`: mean of all token-position vectors in the full resolved sequence
+- `anchor_mean`: mean of token-position vectors over the explicit anchor span
+  inside a templated context
+- `core60_mean`: mean of token-position vectors over an exact 60 bp
+  analysis-core sequence-view bundle
 
 Rules:
 
@@ -62,6 +66,9 @@ Rules:
 - templated contexts emit both `seq_mean` and `anchor_mean`
 - sequence-view bundles emit the union of the row-level pooling operations requested by `sequence_view_inputs[]`
 - tokenwise tensors are pooled in memory and discarded; tokenwise persistence is not part of the v1 repo-aligned contract
+- for causal Evo2 outputs, each token vector is prefix-conditioned in the
+  emitted orientation; pooling a span does not make earlier token states aware
+  of downstream bases
 
 When writing to USR, the persisted outputs for `output_layer_mean` and
 `intermediate_embedding` are the pooled summaries. The pooling mode is part of
@@ -104,8 +111,8 @@ Feature bundles emit stable out ids such as:
 
 Read these ids literally:
 
-- `output_layer_mean__seq_mean` is the mean-pooled final-layer embedding across sequence positions
-- `output_layer_mean__core60_mean` is the explicit 60 bp analysis-core mean-pooling surface for sequence-view bundles
+- `output_layer_mean__seq_mean` is the mean-pooled per-token output-logits vector across sequence positions
+- `output_layer_mean__core60_mean` is the explicit 60 bp analysis-core mean-pooled output-logits surface for sequence-view bundles
 - `intermediate_embedding__block26_mlp_out__seq_mean` is the mean-pooled 7B block-26 representation across sequence positions
 - `intermediate_embedding__block23_mlp_out__seq_mean` is the mean-pooled 20B block-23 representation across sequence positions
 - bare names such as `output_layer_mean` or `intermediate_embedding` are bundle categories, not raw persisted tensors
@@ -115,6 +122,8 @@ Structured bundle metadata is persisted as additional infer out ids such as:
 - `metadata__context_id`
 - `metadata__template_id`
 - `metadata__intermediate_selector`
+- `metadata__runtime_fingerprint_key`
+- `metadata__sequence_case_policy`
 - `metadata__feature_request_digest`
 
 ### Resume and digest behavior

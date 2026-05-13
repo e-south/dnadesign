@@ -4,26 +4,33 @@ Shared browser runtime support helpers for generated latentdna marimo notebooks.
 
 from __future__ import annotations
 
-import base64
 import json
 import re
 from functools import lru_cache
-from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Iterable
-from xml.sax.saxutils import escape
 
 import marimo as mo
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
 from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..labels import humanize_column_name
+from ..metadata_axes import (
+    AxisStyle,
+    axis_color_map,
+    axis_display_label,
+    axis_display_text,
+    axis_style_map_from_payload,
+    legend_categories,
+    normalize_axis_category,
+    ordered_categories_for_axis,
+)
+from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
-    DEFAULT_NOTEBOOK_FIG_DPI,
     GRID_COLOR,
     NOTEBOOK_FONT_STACK,
     PANEL_BACKGROUND_COLOR,
@@ -32,20 +39,16 @@ from ..visual_style import (
     PLOT_LEGEND_FONT_SIZE,
     PLOT_TICK_FONT_SIZE,
     PLOT_TITLE_FONT_SIZE,
+    PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
-    categorical_color_map,
-    display_category_text,
+    contrast_safe_scatter_color_map,
     humanize_display_text,
-    ordered_categories,
+    reference_annotation_label,
 )
 from ..visual_style import scatter_style as shared_scatter_style
-
-REFERENCE_DISPLAY = {
-    "spyp": "spyP",
-    "sulap": "sulAp",
-    "j23105": "J23105",
-}
+from ..workspaces.loader import load_workspace_config
+from .raster_scatter import BACKGROUND_RASTER_MIN_ALPHA
 
 _RUNTIME_TABLE_ARTIFACT_KINDS = {
     "alignments": "alignment_set",
@@ -55,27 +58,6 @@ _RUNTIME_TABLE_ARTIFACT_KINDS = {
     "scalars": "scalar_table",
     "views": "view",
 }
-
-PREFERRED_RASTER_PLOT_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
-PREFERRED_PLOT_RENDER_SUFFIXES = (".svg", *PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf")
-MAX_INLINE_SVG_BYTES = 5_000_000
-MAX_INLINE_NOTEBOOK_ASSET_BYTES = 600_000
-NOTEBOOK_MEDIA_MAX_WIDTH_PX = 1400
-_DISPLAY_MATH_RE = re.compile(r"\$\$(.*?)\$\$", flags=re.DOTALL)
-_PLOT_ASSET_WRAPPER_STYLE = (
-    "width: 100%; overflow-x: auto; padding: 0.2rem 0 0.35rem 0; "
-    "display: flex; align-items: flex-start; justify-content: center;"
-)
-_PLOT_ASSET_MEDIA_STYLE = (
-    f"display: block; width: auto; height: auto; max-width: 100%; flex: 0 1 auto; "
-    f"border-radius: 14px; background: {PANEL_BACKGROUND_COLOR};"
-)
-_MATH_BLOCK_STYLE = "padding: 0.1rem 0 0.25rem 0;"
-_MATH_IMAGE_STYLE = "display: block; max-width: 100%; height: auto;"
-_MATH_COMMAND_NORMALIZATIONS = (
-    (r"\\le\b", r"\\leq"),
-    (r"\\ge\b", r"\\geq"),
-)
 
 
 def load_json(path: Path) -> dict[str, object]:
@@ -139,14 +121,13 @@ def _manifest_attention_warning(manifest: dict[str, object], *, artifact_kind: s
     return f"{artifact_kind} `{artifact_id}` is rendered from an attention-state artifact."
 
 
-def load_table(
+def _load_table_uncached(
     path: Path,
     *,
     require_fresh_manifest: bool = False,
     allowed_statuses: set[str] | None = None,
+    columns: list[str] | None = None,
 ) -> pd.DataFrame:
-    if not path.is_file():
-        return pd.DataFrame()
     manifest: dict[str, object] | None = None
     artifact_kind = ""
     artifact_id = ""
@@ -161,7 +142,7 @@ def load_table(
                 allow_missing_status=artifact_kind != "view",
                 allowed_statuses=allowed_statuses,
             )
-    frame = pd.read_parquet(path)
+    frame = pd.read_parquet(path, columns=columns)
     if manifest is not None:
         status = str(manifest.get("status") or "").strip().lower()
         if status and status != "ok":
@@ -169,6 +150,72 @@ def load_table(
             warning = _manifest_attention_warning(manifest, artifact_kind=artifact_kind, artifact_id=artifact_id)
             if warning:
                 frame.attrs["artifact_warning"] = warning
+    return frame
+
+
+def _cache_token(path: Path) -> tuple[int, int]:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return 0, 0
+    return int(stat.st_mtime_ns), int(stat.st_size)
+
+
+def _manifest_cache_identity(path: Path) -> tuple[str, int, int]:
+    metadata = _table_artifact_metadata(path)
+    if metadata is None:
+        return "", 0, 0
+    artifact_dir, _, _ = metadata
+    manifest_path = artifact_dir / "manifest.json"
+    mtime_ns, size = _cache_token(manifest_path)
+    return str(manifest_path), mtime_ns, size
+
+
+@lru_cache(maxsize=64)
+def _cached_parquet_table(
+    path_text: str,
+    path_mtime_ns: int,
+    path_size: int,
+    manifest_path_text: str,
+    manifest_mtime_ns: int,
+    manifest_size: int,
+    require_fresh_manifest: bool,
+    allowed_statuses_key: tuple[str, ...],
+    columns_key: tuple[str, ...],
+) -> pd.DataFrame:
+    del path_mtime_ns, path_size, manifest_path_text, manifest_mtime_ns, manifest_size
+    return _load_table_uncached(
+        Path(path_text),
+        require_fresh_manifest=require_fresh_manifest,
+        allowed_statuses=set(allowed_statuses_key) if allowed_statuses_key else None,
+        columns=list(columns_key) if columns_key else None,
+    )
+
+
+def load_table(
+    path: Path,
+    *,
+    require_fresh_manifest: bool = False,
+    allowed_statuses: set[str] | None = None,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    if not path.is_file():
+        return pd.DataFrame()
+    path_mtime_ns, path_size = _cache_token(path)
+    manifest_path_text, manifest_mtime_ns, manifest_size = _manifest_cache_identity(path)
+    cached = _cached_parquet_table(
+        str(path),
+        path_mtime_ns,
+        path_size,
+        manifest_path_text,
+        manifest_mtime_ns,
+        manifest_size,
+        require_fresh_manifest,
+        tuple(sorted(str(status) for status in (allowed_statuses or []))),
+        tuple(columns or ()),
+    )
+    frame = cached.copy()
+    frame.attrs = dict(cached.attrs)
     return frame
 
 
@@ -183,107 +230,6 @@ def read_text(path_text: str | None) -> str | None:
 
 def load_workspace_notebook_controls(control_path: Path) -> dict[str, object]:
     return WorkspaceNotebookControls.model_validate(load_json(control_path)).model_dump(mode="json")
-
-
-def _image_data_uri(image_bytes: bytes, *, suffix: str) -> str:
-    mime_type = {
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".webp": "image/webp",
-    }.get(suffix.lower(), "application/octet-stream")
-    encoded = base64.b64encode(image_bytes).decode("ascii")
-    return f"data:{mime_type};base64,{encoded}"
-
-
-def _inline_plot_image(image_bytes: bytes, *, suffix: str, alt: str) -> mo.Html:
-    return mo.Html(
-        (
-            '<div class="latentdna-plot-asset" role="img" aria-label="'
-            + escape(alt)
-            + '" style="'
-            + escape(_PLOT_ASSET_WRAPPER_STYLE)
-            + '"><img src="'
-            + _image_data_uri(image_bytes, suffix=suffix)
-            + '" alt="'
-            + escape(alt)
-            + '" style="'
-            + escape(_PLOT_ASSET_MEDIA_STYLE)
-            + '" /></div>'
-        )
-    )
-
-
-def fig_to_image(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent geometry plot"):
-    buf = BytesIO()
-    fig.patch.set_facecolor(PANEL_BACKGROUND_COLOR)
-    fig.patch.set_alpha(1.0)
-    fig.savefig(
-        buf,
-        format="png",
-        dpi=int(dpi),
-        bbox_inches="tight",
-        pad_inches=0.05,
-        facecolor=fig.get_facecolor(),
-        edgecolor="none",
-    )
-    image_bytes = buf.getvalue()
-    plt.close(fig)
-    return _inline_plot_image(image_bytes, suffix=".png", alt=alt)
-
-
-def _svg_data_uri(svg_markup: str) -> str:
-    encoded = base64.b64encode(svg_markup.encode("utf-8")).decode("ascii")
-    return f"data:image/svg+xml;base64,{encoded}"
-
-
-def fig_to_svg(fig, *, dpi: int = DEFAULT_NOTEBOOK_FIG_DPI, alt: str = "latent geometry plot"):
-    buf = StringIO()
-    fig.patch.set_facecolor(PANEL_BACKGROUND_COLOR)
-    fig.patch.set_alpha(1.0)
-    fig.savefig(
-        buf,
-        format="svg",
-        dpi=int(dpi),
-        bbox_inches="tight",
-        pad_inches=0.05,
-        facecolor=fig.get_facecolor(),
-        edgecolor="none",
-    )
-    svg_markup = buf.getvalue()
-    plt.close(fig)
-    return mo.Html(
-        (
-            '<div class="latentdna-plot-asset" role="img" aria-label="'
-            + escape(alt)
-            + '" style="'
-            + escape(_PLOT_ASSET_WRAPPER_STYLE)
-            + '"><img src="'
-            + _svg_data_uri(svg_markup)
-            + '" alt="'
-            + escape(alt)
-            + '" style="'
-            + escape(_PLOT_ASSET_MEDIA_STYLE)
-            + '" /></div>'
-        )
-    )
-
-
-def render_matplotlib_figure(fig, *, alt: str = "latent geometry plot"):
-    # marimo app-mode iframes can fail to hydrate interactive mpl payloads; prefer
-    # inline SVG there so the audit surfaces stay usable without frontend JS errors.
-    if mo.app_meta().mode == "run":
-        try:
-            return fig_to_svg(fig, alt=alt)
-        except Exception:
-            return fig_to_image(fig, alt=alt)
-    try:
-        return mo.mpl.interactive(fig)
-    except Exception:
-        try:
-            return fig_to_svg(fig, alt=alt)
-        except Exception:
-            return fig_to_image(fig, alt=alt)
 
 
 def notebook_theme():
@@ -315,178 +261,6 @@ def notebook_theme():
         </style>
         """
     )
-
-
-def select_plot_render_path(plot_files: Iterable[Path]) -> Path | None:
-    existing_paths = [Path(path) for path in plot_files if Path(path).is_file()]
-    for suffix in PREFERRED_PLOT_RENDER_SUFFIXES:
-        candidate = next((path for path in existing_paths if path.suffix.lower() == suffix), None)
-        if candidate is not None:
-            return candidate
-    return existing_paths[0] if existing_paths else None
-
-
-def _fallback_plot_render_path(path: Path) -> Path | None:
-    for suffix in (*PREFERRED_RASTER_PLOT_SUFFIXES, ".pdf"):
-        candidate = path.with_suffix(suffix)
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def resolve_plot_render_asset(path: Path) -> tuple[Path | None, str | None]:
-    if not path.is_file():
-        return None, f"Plot asset is missing: `{path.name}`."
-    asset_size = path.stat().st_size
-    if path.suffix.lower() == ".svg" and asset_size > MAX_INLINE_NOTEBOOK_ASSET_BYTES:
-        fallback_path = _fallback_plot_render_path(path)
-        if fallback_path is not None:
-            return (
-                fallback_path,
-                (
-                    f"Displaying `{fallback_path.name}` because `{path.name}` is large for inline notebook "
-                    f"rendering ({asset_size:,} bytes)."
-                ),
-            )
-    if path.suffix.lower() != ".svg":
-        return path, None
-    svg_size = asset_size
-    if svg_size <= MAX_INLINE_SVG_BYTES:
-        return path, None
-    fallback_path = _fallback_plot_render_path(path)
-    if fallback_path is not None:
-        return (
-            fallback_path,
-            (
-                f"Displaying `{fallback_path.name}` because `{path.name}` exceeds the inline notebook "
-                f"limit ({svg_size:,} bytes)."
-            ),
-        )
-    return (
-        None,
-        (
-            f"`{path.name}` exceeds the inline notebook limit ({svg_size:,} bytes) "
-            "and no raster or PDF fallback is available."
-        ),
-    )
-
-
-def render_plot_asset(path: Path, *, workspace_dir: Path, alt_text: str | None = None):
-    render_path, notice = resolve_plot_render_asset(path)
-    if render_path is None:
-        return mo.md(notice or f"`{path.relative_to(workspace_dir).as_posix()}`")
-    alt = str(alt_text or render_path.name)
-    suffix = render_path.suffix.lower()
-    if suffix == ".svg":
-        svg_html = render_path.read_text(encoding="utf-8")
-        rendered = mo.Html(
-            (
-                "<div class='latentdna-plot-asset' role='img' aria-label='"
-                + escape(alt)
-                + "' style='"
-                + escape(_PLOT_ASSET_WRAPPER_STYLE)
-                + "'>"
-                f"<img src='{_svg_data_uri(svg_html)}' alt='{escape(alt)}' style='{escape(_PLOT_ASSET_MEDIA_STYLE)}' />"
-                "</div>"
-            )
-        )
-    elif suffix == ".pdf":
-        rendered = mo.pdf(
-            src=render_path,
-            width="100%",
-            height="78vh",
-            style={
-                "border-radius": "14px",
-                "background": PANEL_BACKGROUND_COLOR,
-            },
-        )
-    elif suffix in PREFERRED_RASTER_PLOT_SUFFIXES:
-        rendered = _inline_plot_image(render_path.read_bytes(), suffix=suffix, alt=alt)
-    else:
-        rendered = mo.md(f"`{render_path.relative_to(workspace_dir).as_posix()}`")
-    return rendered
-
-
-@lru_cache(maxsize=256)
-def _render_math_svg_bytes(expression: str) -> bytes:
-    from matplotlib.font_manager import FontProperties
-    from matplotlib.mathtext import math_to_image
-
-    normalized = " ".join(str(expression).split()).strip()
-    for pattern, replacement in _MATH_COMMAND_NORMALIZATIONS:
-        normalized = re.sub(pattern, replacement, normalized)
-    if not normalized:
-        return b""
-    buffer = BytesIO()
-    math_to_image(
-        f"${normalized}$",
-        buffer,
-        format="svg",
-        dpi=220,
-        prop=FontProperties(size=15.0, family=PLOT_FONT_FAMILY),
-        color="#E5EDF5",
-    )
-    return buffer.getvalue()
-
-
-def _clean_markdown_prose(text: str) -> str:
-    return text.replace(r"\(", "").replace(r"\)", "").strip()
-
-
-def _transparent_math_svg_markup(svg_markup: str) -> str:
-    return re.sub(
-        r'(<g id="patch_1">\s*<path\b[^>]*)(/>)',
-        r'\1 style="fill: none; stroke: none;"\2',
-        svg_markup,
-        count=1,
-        flags=re.DOTALL,
-    )
-
-
-def render_math_markdown(text: str):
-    content = str(text or "").strip()
-    if not content:
-        return mo.md("")
-    parts: list[object] = []
-    cursor = 0
-    for match in _DISPLAY_MATH_RE.finditer(content):
-        prose = _clean_markdown_prose(content[cursor : match.start()])
-        if prose:
-            parts.append(mo.md(prose))
-        formula = match.group(1).strip()
-        try:
-            svg_bytes = _render_math_svg_bytes(formula)
-        except ValueError:
-            parts.append(
-                mo.callout(
-                    "Math rendering fell back to plain text for one formula because the syntax was not supported.",
-                    kind="warn",
-                )
-            )
-            parts.append(mo.md(f"`{formula}`"))
-            cursor = match.end()
-            continue
-        if svg_bytes:
-            svg_markup = _transparent_math_svg_markup(svg_bytes.decode("utf-8"))
-            parts.append(
-                mo.Html(
-                    (
-                        "<div class='latentdna-math-block' style='" + escape(_MATH_BLOCK_STYLE) + "'>"
-                        f"<img src='{_svg_data_uri(svg_markup)}' alt='Math expression' "
-                        f"style='{escape(_MATH_IMAGE_STYLE)}' />"
-                        "</div>"
-                    )
-                )
-            )
-        cursor = match.end()
-    trailing = _clean_markdown_prose(content[cursor:])
-    if trailing:
-        parts.append(mo.md(trailing))
-    if not parts:
-        return mo.md(_clean_markdown_prose(content))
-    if len(parts) == 1:
-        return parts[0]
-    return mo.vstack(parts, gap=0.25)
 
 
 def unique_in_order(values):
@@ -535,56 +309,430 @@ def labeled_options(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
     return options
 
 
+def resolve_labeled_option_card(
+    cards: Iterable[dict[str, object]],
+    selected_value: object,
+    *,
+    id_column: str = "plot_id",
+    title_column: str = "title",
+) -> dict[str, object] | None:
+    """Resolve a Marimo dropdown selection against stable IDs and display labels.
+
+    Marimo dropdowns are configured from ``label -> value`` dictionaries, but the
+    browser-side select element exposes display labels. Accepting both the
+    durable ID and the rendered label makes generated notebooks robust to manual
+    use and browser-level review automation.
+    """
+    ordered_cards = [dict(card) for card in cards]
+    if not ordered_cards:
+        return None
+    selected_text = str(selected_value or "").strip()
+    if not selected_text:
+        return ordered_cards[0]
+    for card in ordered_cards:
+        card_id = str(card.get(id_column) or "").strip()
+        card_title = str(card.get(title_column) or "").strip()
+        accepted = {value for value in (card_id, card_title) if value}
+        if card_id and card_title:
+            accepted.add(f"{card_title} [{card_id}]")
+        if selected_text in accepted:
+            return card
+    return ordered_cards[0]
+
+
 def normalize_label(value) -> str:
     return str(value or "").strip().lower()
 
 
 def display_reference_label(value) -> str:
-    text = str(value or "")
-    return REFERENCE_DISPLAY.get(normalize_label(text), text)
+    return reference_annotation_label(value)
 
 
-def display_hue_label(column: str) -> str:
-    if column == "design_regulator_composition":
-        return "Reg. comp."
+def _missing_reference_display_value(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        return False
+    if isinstance(missing, bool):
+        return missing
+    return False
+
+
+def _scalar_missing_mask(values: pd.Series) -> pd.Series | None:
+    """Use vectorized missing checks when a hue column is scalar-valued."""
+    if pd.api.types.is_numeric_dtype(values.dtype):
+        return values.replace([np.inf, -np.inf], np.nan).isna()
+    if (
+        pd.api.types.is_bool_dtype(values.dtype)
+        or isinstance(values.dtype, pd.CategoricalDtype)
+        or pd.api.types.is_string_dtype(values.dtype)
+    ):
+        return values.isna()
+    if pd.api.types.is_object_dtype(values.dtype):
+        sample = values.dropna().head(128).tolist()
+        if any(_listlike_hue_values(value) is not None for value in sample):
+            return None
+        return values.isna()
+    return None
+
+
+@lru_cache(maxsize=16)
+def _load_workspace_reference_set(workspace_dir_text: str, reference_set_id: str):
+    context = load_workspace_config(Path(workspace_dir_text))
+    return context.config.reference_sets.get(reference_set_id)
+
+
+def _reference_annotation_coverage_warnings(
+    frames: list[pd.DataFrame],
+    *,
+    reference_set_id: str,
+    reference_labels: list[str],
+    reference_match_column: str,
+) -> list[str]:
+    targets = {normalize_label(label) for label in reference_labels if str(label).strip()}
+    if not targets:
+        return []
+
+    panel_count = 0
+    missing_column_panels: list[str] = []
+    empty_match_panels: list[str] = []
+    for index, frame in enumerate(frames):
+        if frame.empty:
+            continue
+        panel_count += 1
+        panel_label = str(
+            frame.attrs.get("view_id")
+            or frame.attrs.get("projection_id")
+            or frame.attrs.get("scalar_id")
+            or f"panel {index + 1}"
+        )
+        if reference_match_column not in frame.columns:
+            missing_column_panels.append(panel_label)
+            continue
+        match_values = frame[reference_match_column].astype("string").str.strip().str.lower()
+        if not bool(match_values.isin(targets).any()):
+            empty_match_panels.append(panel_label)
+
+    warnings: list[str] = []
+    if missing_column_panels:
+        warnings.append(
+            f"reference set `{reference_set_id}` cannot be checked in "
+            f"{len(missing_column_panels)} panel(s) missing `{reference_match_column}`: "
+            + ", ".join(missing_column_panels[:4])
+            + (" ..." if len(missing_column_panels) > 4 else "")
+        )
+    if empty_match_panels:
+        warnings.append(
+            f"reference set `{reference_set_id}` has no matched overlay rows in "
+            f"{len(empty_match_panels)} of {panel_count} non-empty panel(s): "
+            + ", ".join(empty_match_panels[:4])
+            + (" ..." if len(empty_match_panels) > 4 else "")
+        )
+    return warnings
+
+
+def resolve_reference_annotation(
+    reference_set_id: str | None,
+    frames: list[pd.DataFrame],
+    *,
+    workspace_dir: Path,
+    fallback_labels: list[str] | None = None,
+    label_limit: int | None = None,
+) -> dict[str, object]:
+    if reference_set_id is None:
+        return {
+            "reference_set_id": "",
+            "match_column": "usr_label__primary",
+            "labels": list(fallback_labels or []),
+            "display_labels": {},
+            "label_limit": label_limit,
+            "warnings": [],
+        }
+    selected_reference_set_id = str(reference_set_id or "").strip()
+    if not selected_reference_set_id:
+        return {
+            "reference_set_id": "",
+            "match_column": "usr_label__primary",
+            "labels": [],
+            "display_labels": {},
+            "label_limit": 0,
+            "warnings": [],
+        }
+
+    try:
+        reference_set = _load_workspace_reference_set(str(workspace_dir), selected_reference_set_id)
+    except Exception as exc:
+        return {
+            "reference_set_id": selected_reference_set_id,
+            "match_column": "usr_label__primary",
+            "labels": [],
+            "display_labels": {},
+            "label_limit": 0,
+            "warnings": [f"reference set `{selected_reference_set_id}` could not be loaded: {exc}"],
+        }
+    if reference_set is None:
+        return {
+            "reference_set_id": selected_reference_set_id,
+            "match_column": "usr_label__primary",
+            "labels": [],
+            "display_labels": {},
+            "label_limit": 0,
+            "warnings": [f"reference set `{selected_reference_set_id}` is not configured"],
+        }
+
+    required_columns = reference_set_required_columns(reference_set)
+    nonempty_frames = [frame for frame in frames if not frame.empty]
+    column_values: dict[str, np.ndarray] = {}
+    for column in required_columns:
+        parts: list[pd.Series] = []
+        column_available = False
+        for frame in nonempty_frames:
+            if column in frame.columns:
+                parts.append(frame[column].reset_index(drop=True))
+                column_available = True
+            else:
+                parts.append(pd.Series([None] * len(frame), dtype=object))
+        if column_available and parts:
+            column_values[column] = pd.concat(parts, ignore_index=True).to_numpy(dtype=object)
+
+    resolution = resolve_reference_set_ids_from_columns(reference_set, column_values)
+    match_column = str(getattr(reference_set, "match_column", "usr_label__primary"))
+    label_column = getattr(reference_set, "label_column", None)
+    configured_display_labels = {
+        str(key): str(value)
+        for key, value in dict(getattr(reference_set, "display_labels", {}) or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+    display_labels: dict[str, str] = {}
+    for row in resolution.selected_rows:
+        match_value = str(row.get(match_column) or "").strip()
+        if not match_value:
+            continue
+        display_value = None
+        if label_column:
+            candidate_display = row.get(str(label_column))
+            if not _missing_reference_display_value(candidate_display) and str(candidate_display).strip():
+                display_value = str(candidate_display).strip()
+        if display_value is None:
+            display_value = configured_display_labels.get(match_value, match_value)
+        display_labels[match_value] = display_value
+
+    configured_label_limit = getattr(reference_set, "label_limit", None)
+    if configured_label_limit is not None:
+        default_label_limit = int(configured_label_limit)
+    elif len(resolution.matched_ids) > 5:
+        default_label_limit = 0
+    else:
+        default_label_limit = 5
+    warnings = []
+    if resolution.missing_columns:
+        warnings.append(
+            f"reference set `{selected_reference_set_id}` is missing columns: " + ", ".join(resolution.missing_columns)
+        )
+    if resolution.expected_ids and set(resolution.matched_ids) != set(resolution.expected_ids):
+        missing_ids = [value for value in resolution.expected_ids if value not in set(resolution.matched_ids)]
+        if missing_ids:
+            warnings.append(
+                f"reference set `{selected_reference_set_id}` has {len(missing_ids)} unmatched reference rows"
+            )
+    warnings.extend(
+        _reference_annotation_coverage_warnings(
+            frames,
+            reference_set_id=selected_reference_set_id,
+            reference_labels=resolution.matched_ids,
+            reference_match_column=match_column,
+        )
+    )
+    return {
+        "reference_set_id": selected_reference_set_id,
+        "match_column": match_column,
+        "labels": resolution.matched_ids,
+        "display_labels": display_labels,
+        "label_limit": default_label_limit if label_limit is None else label_limit,
+        "warnings": warnings,
+    }
+
+
+def _axis_style(axis_styles: dict[str, object] | None, column: str | None):
+    if column is None:
+        return None
+    return axis_style_map_from_payload(axis_styles).get(str(column))
+
+
+def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = None) -> str:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return axis_display_label(style, column)
+    if column == "gc_fraction":
+        return "GC fraction"
     if column == "log_likelihood_per_token_7b":
         return "7B log likelihood / token"
     if column == "log_likelihood_per_token_20b":
         return "20B log likelihood / token"
     if column.startswith("log_likelihood_per_token_"):
         return humanize_display_text(column)
+    if column == "promoter_standard__strength_value_numeric":
+        return "Reference strength"
+    if column == "sfxi_ref__metric_value":
+        return "SFXI metric"
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
-        scope = "1 kb construct context" if "__template_1kb_" in column else "60 bp anchor"
+        scope = "1 kb construct context" if "__template_1kb_" in column else "anchor-source insert"
         return f"{model} log likelihood / token ({scope})"
     if column.startswith("cluster_label__"):
         return humanize_display_text(column.replace("cluster_label__", ""))
     return humanize_column_name(column)
 
 
-def display_hue_value(column: str | None, value: object) -> str:
-    return display_category_text(value, column=column)
+def hue_option_scale(
+    hue_options: object,
+    column: str | None,
+    *,
+    panel_count: int = 1,
+) -> str:
+    """Return the configured continuous-hue scale contract for a selected column."""
+
+    column_name = str(column or "").strip()
+    if not column_name:
+        return "global"
+    if isinstance(hue_options, list):
+        for option in hue_options:
+            option_column = ""
+            option_scale = ""
+            if isinstance(option, dict):
+                option_column = str(option.get("column") or "").strip()
+                option_scale = str(option.get("scale") or "").strip()
+            else:
+                option_column = str(getattr(option, "column", "") or "").strip()
+                option_scale = str(getattr(option, "scale", "") or "").strip()
+            if option_column == column_name and option_scale in {"global", "panel"}:
+                return option_scale
+    if column_name == "gc_fraction" and panel_count > 1:
+        return "panel"
+    return "global"
 
 
-def normalize_categorical_hue_value(column: str | None, value: object) -> str:
-    if pd.isna(value):
+def continuous_hue_colorbar_label(
+    column: str,
+    *,
+    axis_styles: dict[str, object] | None = None,
+    panel_scaled: bool = False,
+) -> str:
+    label = display_hue_label(column, axis_styles=axis_styles)
+    if panel_scaled:
+        return f"{label} (panel scale)"
+    return label
+
+
+def display_hue_value(column: str | None, value: object, *, axis_styles: dict[str, object] | None = None) -> str:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return axis_display_text(style, value)
+    return humanize_display_text(value)
+
+
+def normalize_categorical_hue_value(
+    column: str | None,
+    value: object,
+    *,
+    axis_styles: dict[str, object] | None = None,
+    row: dict[str, object] | None = None,
+) -> str:
+    style = _axis_style(axis_styles, column)
+    return _normalize_categorical_hue_value_with_style(style, value, row=row)
+
+
+def _normalize_categorical_hue_value_with_style(
+    style: AxisStyle | None,
+    value: object,
+    *,
+    row: dict[str, object] | None = None,
+) -> str:
+    if _is_missing_hue_value(value):
+        if style is not None and style.noncanonical_bucket is not None:
+            return style.noncanonical_bucket
         return "NA"
-    if str(column or "").strip() == "spacer_length":
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError):
-            numeric = None
-        if numeric is not None and np.isfinite(numeric):
-            return str(int(numeric)) if numeric.is_integer() else f"{numeric:g}"
-    if str(column or "").strip() == "design_regulator_composition":
-        normalized = display_hue_value(column, value)
-        return normalized or "NA"
+    listlike_text = _format_listlike_hue_value(value)
+    if listlike_text is not None:
+        return listlike_text
+    if style is not None:
+        return normalize_axis_category(style, value, row=row)
     text = str(value)
     return text if text.strip() else "NA"
 
 
-def normalize_categorical_hue_series(column: str | None, values: pd.Series) -> pd.Series:
-    return values.map(lambda value: normalize_categorical_hue_value(column, value)).astype(str)
+def _normalize_categorical_values_without_row_context(
+    values: pd.Series,
+    *,
+    style: AxisStyle | None,
+) -> pd.Series:
+    try:
+        unique_values = pd.unique(values)
+        normalized_by_value = {
+            value: _normalize_categorical_hue_value_with_style(style, value) for value in unique_values
+        }
+        normalized = values.map(normalized_by_value)
+        missing = normalized.isna()
+        if bool(missing.any()):
+            normalized.loc[missing] = values.loc[missing].map(
+                lambda value: _normalize_categorical_hue_value_with_style(style, value)
+            )
+        return normalized.astype(str)
+    except TypeError:
+        return values.map(lambda value: _normalize_categorical_hue_value_with_style(style, value)).astype(str)
+
+
+def _selector_match_mask(frame: pd.DataFrame, selector: dict[str, object]) -> pd.Series | None:
+    column = str(selector.get("column") or "").strip()
+    if not column or column not in frame.columns:
+        return None
+    value_text = frame[column].astype(str)
+    if selector.get("equals") is not None:
+        return value_text == str(selector.get("equals"))
+    in_values = selector.get("in_values") or []
+    if in_values:
+        return value_text.isin({str(item) for item in in_values})
+    if bool(selector.get("non_null", False)):
+        return frame[column].notna() & frame[column].astype(str).str.strip().ne("")
+    return pd.Series(False, index=frame.index)
+
+
+def _canonical_scope_mask(frame: pd.DataFrame, *, style: AxisStyle) -> pd.Series:
+    selector_masks = [
+        mask
+        for selector in style.canonical_row_selectors
+        if (mask := _selector_match_mask(frame, selector)) is not None
+    ]
+    if not selector_masks:
+        return pd.Series(True, index=frame.index)
+    stacked = pd.concat(selector_masks, axis=1)
+    if style.canonical_row_match == "all":
+        return stacked.all(axis=1)
+    return stacked.any(axis=1)
+
+
+def normalize_categorical_hue_series(
+    column: str | None,
+    values: pd.Series,
+    *,
+    axis_styles: dict[str, object] | None = None,
+    frame: pd.DataFrame | None = None,
+) -> pd.Series:
+    style = _axis_style(axis_styles, column)
+    normalized = _normalize_categorical_values_without_row_context(values, style=style)
+    if frame is None or style is None or style.noncanonical_bucket is None or not style.canonical_row_selectors:
+        return normalized
+    scoped_frame = frame.reindex(values.index)
+    scope_mask = _canonical_scope_mask(scoped_frame, style=style)
+    if bool(scope_mask.all()):
+        return normalized
+    missing_mask = _scalar_missing_mask(values)
+    if missing_mask is None:
+        missing_mask = values.map(_is_missing_hue_value)
+    normalized.loc[(~scope_mask) & (~missing_mask)] = style.noncanonical_bucket
+    return normalized
 
 
 def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str] | None:
@@ -596,11 +744,13 @@ def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str
 
 def candidate_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> list[tuple[str, str]]:
     candidate_pairs = [
+        ("alias_id", "alias_id"),
         ("construct__anchor_id", "construct__anchor_id"),
         ("construct__anchor_id", "id"),
         # Anchor-only projection rows should join context summary tables by anchor id.
         ("id", "construct__anchor_id"),
         ("id", "id"),
+        ("alignment_parent_sequence_id", "alignment_parent_sequence_id"),
         ("subject_id", "subject_id"),
         ("context_id", "context_id"),
     ]
@@ -627,13 +777,20 @@ def geometry_map(geometry_rows: list[dict[str, object]]) -> dict[str, dict[str, 
     return {str(row["view_id"]): row for row in geometry_rows}
 
 
-def load_view_rows(view_id: str, *, output_root: Path) -> pd.DataFrame:
+def _existing_parquet_columns(path: Path, requested_columns: list[str] | None) -> list[str] | None:
+    if requested_columns is None:
+        return None
+    existing = set(pq.read_schema(path).names)
+    return [column for column in dict.fromkeys(requested_columns) if column in existing]
+
+
+def load_view_rows(view_id: str, *, output_root: Path, columns: list[str] | None = None) -> pd.DataFrame:
     view_dir = output_root / "views" / view_id
     load_view_manifest(view_id, output_root=output_root)
     rows_path = view_dir / "rows.parquet"
     if not rows_path.is_file():
         raise ValueError(f"view rows artifact is missing for `{view_id}`")
-    return load_table(rows_path)
+    return load_table(rows_path, columns=_existing_parquet_columns(rows_path, columns))
 
 
 def load_view_matrix(view_id: str, *, output_root: Path) -> np.ndarray:
@@ -679,10 +836,63 @@ def normalize_hue_kind(value: object) -> str | None:
     return None
 
 
+def _listlike_hue_values(value: object) -> list[object] | None:
+    if isinstance(value, np.ndarray):
+        return value.reshape(-1).tolist()
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if isinstance(value, (set, frozenset)):
+        return sorted(value, key=lambda item: str(item))
+    return None
+
+
+def _is_missing_hue_value(value: object) -> bool:
+    listlike = _listlike_hue_values(value)
+    if listlike is not None:
+        return not listlike or all(_is_missing_hue_value(item) for item in listlike)
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        return False
+    if isinstance(missing, (bool, np.bool_)):
+        return bool(missing)
+    return False
+
+
+def _format_hue_token(value: object) -> str:
+    text = str(value or "").strip()
+    sigma_match = re.fullmatch(r"sigma(\d+)", text, flags=re.IGNORECASE)
+    if sigma_match:
+        return f"Sigma{sigma_match.group(1)}"
+    return humanize_display_text(value)
+
+
+def _format_listlike_hue_value(value: object) -> str | None:
+    listlike = _listlike_hue_values(value)
+    if listlike is None:
+        return None
+    parts = [_format_hue_token(item) for item in listlike if not _is_missing_hue_value(item)]
+    compact_parts = [part for part in parts if part]
+    return " + ".join(compact_parts) if compact_parts else "NA"
+
+
 def _finite_non_null_series(frame: pd.DataFrame, column: str) -> pd.Series:
     if column not in frame.columns:
         return pd.Series(dtype=object)
-    return frame[column].replace([np.inf, -np.inf], np.nan).dropna()
+    series = frame[column]
+    if pd.api.types.is_numeric_dtype(series.dtype):
+        return series.replace([np.inf, -np.inf], np.nan).dropna()
+    missing_mask = _scalar_missing_mask(series)
+    if missing_mask is not None:
+        return series.loc[~missing_mask]
+    mask = [not _is_missing_hue_value(value) for value in series.tolist()]
+    if not any(mask):
+        return pd.Series(dtype=series.dtype)
+    return series.loc[mask]
+
+
+def finite_non_null_hue_series(frame: pd.DataFrame, column: str) -> pd.Series:
+    return _finite_non_null_series(frame, column)
 
 
 def available_hues_for_frames(
@@ -774,13 +984,210 @@ def continuous_hue_render_params(column: str | None, values: pd.Series) -> dict[
     }
 
 
+def selected_reference_rows(
+    frame: pd.DataFrame,
+    *,
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    x_column: str = "x",
+    y_column: str = "y",
+) -> pd.DataFrame:
+    match_column = str(reference_match_column or "usr_label__primary")
+    if frame.empty or match_column not in frame.columns:
+        return pd.DataFrame()
+    if x_column not in frame.columns or y_column not in frame.columns:
+        return pd.DataFrame()
+    targets = {normalize_label(label) for label in reference_labels}
+    if not targets:
+        return pd.DataFrame()
+    match_values = frame[match_column].astype("string").str.strip().str.lower()
+    selected = frame[match_values.isin(targets)].copy()
+    if selected.empty:
+        return selected
+    finite_xy = (
+        pd.to_numeric(selected[x_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
+        & pd.to_numeric(selected[y_column], errors="coerce").replace([np.inf, -np.inf], np.nan).notna()
+    )
+    return selected.loc[finite_xy].copy()
+
+
+def reference_hue_render_params(
+    frames: list[pd.DataFrame],
+    *,
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    reference_hue_column: str | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
+) -> dict[str, object] | None:
+    hue_column = str(reference_hue_column or "").strip()
+    if not hue_column:
+        return None
+    series_parts: list[pd.Series] = []
+    for frame in frames:
+        if hue_column not in frame.columns:
+            continue
+        selected = selected_reference_rows(
+            frame,
+            reference_labels=reference_labels,
+            reference_match_column=reference_match_column,
+            x_column=x_column,
+            y_column=y_column,
+        )
+        if selected.empty or hue_column not in selected.columns:
+            continue
+        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if not numeric.empty:
+            series_parts.append(numeric)
+    if not series_parts:
+        return None
+    combined = pd.concat(series_parts, ignore_index=True)
+    if combined.nunique() < 2:
+        return None
+    return continuous_hue_render_params(hue_column, combined)
+
+
+def reference_annotation_mode_options() -> dict[str, str]:
+    return {
+        "Auto labels": "auto",
+        "Markers only": "markers_only",
+        "Show text labels": "show_labels",
+    }
+
+
+def reference_label_limit_for_annotation_mode(mode: str | None) -> int | None:
+    normalized = str(mode or "auto").strip()
+    if normalized == "markers_only":
+        return 0
+    if normalized == "show_labels":
+        return -1
+    return None
+
+
+def reference_hue_coverage_warnings(
+    frames: list[pd.DataFrame],
+    *,
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    reference_hue_column: str | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
+) -> list[str]:
+    hue_column = str(reference_hue_column or "").strip()
+    if not hue_column:
+        return []
+    missing_column_panels: list[str] = []
+    empty_hue_panels: list[str] = []
+    for index, frame in enumerate(frames):
+        selected = selected_reference_rows(
+            frame,
+            reference_labels=reference_labels,
+            reference_match_column=reference_match_column,
+            x_column=x_column,
+            y_column=y_column,
+        )
+        if selected.empty:
+            continue
+        panel_label = str(
+            frame.attrs.get("view_id")
+            or frame.attrs.get("projection_id")
+            or frame.attrs.get("scalar_id")
+            or f"panel {index + 1}"
+        )
+        if hue_column not in selected.columns:
+            missing_column_panels.append(panel_label)
+            continue
+        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        if not bool(numeric.notna().any()):
+            empty_hue_panels.append(panel_label)
+
+    warnings: list[str] = []
+    if missing_column_panels:
+        warnings.append(
+            f"reference hue `{hue_column}` is missing for selected reference rows in "
+            f"{len(missing_column_panels)} panel(s): "
+            + ", ".join(missing_column_panels[:4])
+            + (" ..." if len(missing_column_panels) > 4 else "")
+        )
+    if empty_hue_panels:
+        warnings.append(
+            f"reference hue `{hue_column}` has no finite values for selected reference rows in "
+            f"{len(empty_hue_panels)} panel(s): "
+            + ", ".join(empty_hue_panels[:4])
+            + (" ..." if len(empty_hue_panels) > 4 else "")
+        )
+    return warnings
+
+
 def scatter_style(row_count: int) -> tuple[float, float]:
     style = shared_scatter_style(row_count)
     return style.point_size, style.alpha
 
 
-def category_color_map(categories: list[str], *, column: str | None = None) -> dict[str, str]:
-    return categorical_color_map(ordered_categories(categories, column=column), column=column)
+MISSING_HUE_BACKGROUND_COLOR = "#CBD5E1"
+
+
+def draw_missing_hue_background(
+    ax,
+    *,
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    point_style,
+    rasterize_panel: bool,
+    raster_renderer,
+) -> None:
+    """Draw rows that lack the selected continuous hue without dropping the cloud."""
+    if len(x_values) == 0:
+        return
+    alpha = max(float(point_style.alpha) * 0.64, 0.10)
+    if rasterize_panel:
+        raster_renderer(
+            ax,
+            x_values=x_values,
+            y_values=y_values,
+            color=MISSING_HUE_BACKGROUND_COLOR,
+            point_alpha=alpha,
+            min_point_alpha=BACKGROUND_RASTER_MIN_ALPHA,
+        )
+        return
+    ax.scatter(
+        x_values,
+        y_values,
+        c=MISSING_HUE_BACKGROUND_COLOR,
+        s=point_style.point_size,
+        alpha=alpha,
+        linewidths=0.0,
+        edgecolors="none",
+        rasterized=point_style.rasterized,
+        zorder=0.8,
+    )
+
+
+def category_color_map(
+    categories: list[str],
+    *,
+    column: str | None = None,
+    axis_styles: dict[str, object] | None = None,
+) -> dict[str, str]:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        ordered = legend_categories(style, categories)
+        return contrast_safe_scatter_color_map(axis_color_map(style, ordered, fallback_palette=PUBLICATION_PALETTE))
+    return contrast_safe_scatter_color_map(
+        axis_color_map(None, ordered_categories_for_axis(None, categories), fallback_palette=PUBLICATION_PALETTE)
+    )
+
+
+def category_values_for_legend(
+    categories: list[str],
+    *,
+    column: str | None = None,
+    axis_styles: dict[str, object] | None = None,
+) -> list[str]:
+    style = _axis_style(axis_styles, column)
+    if style is not None:
+        return legend_categories(style, categories)
+    return ordered_categories_for_axis(None, categories)
 
 
 def table_from_records(
@@ -855,41 +1262,89 @@ def draw_reference_labels(
     frame: pd.DataFrame,
     *,
     reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    reference_display_labels: dict[str, str] | None = None,
+    reference_label_limit: int | None = None,
     x_column: str = "x",
     y_column: str = "y",
     right_padding_px: float = 0.0,
     left_padding_px: float = 0.0,
+    reference_hue_column: str | None = None,
+    reference_hue_params: dict[str, object] | None = None,
 ) -> None:
-    if frame.empty or "usr_label__primary" not in frame.columns:
-        return
-    if x_column not in frame.columns or y_column not in frame.columns:
-        return
-    selected = frame[
-        frame["usr_label__primary"]
-        .astype(str)
-        .map(normalize_label)
-        .isin({normalize_label(label) for label in reference_labels})
-    ].copy()
+    match_column = str(reference_match_column or "usr_label__primary")
+    selected = selected_reference_rows(
+        frame,
+        reference_labels=reference_labels,
+        reference_match_column=match_column,
+        x_column=x_column,
+        y_column=y_column,
+    )
     if selected.empty:
         return
     placed_boxes: list[tuple[float, float, float, float]] = []
     axes_box = ax.get_window_extent()
     display_x_mid = float((axes_box.x0 + axes_box.x1) / 2.0)
     display_y_mid = float((axes_box.y0 + axes_box.y1) / 2.0)
-    ax.scatter(
-        selected[x_column].to_numpy(dtype=float),
-        selected[y_column].to_numpy(dtype=float),
-        c="#111111",
-        s=125,
-        marker="*",
-        linewidths=0.8,
-        edgecolors="white",
-        zorder=5,
+    hue_column = str(reference_hue_column or "").strip()
+    can_color_by_reference_hue = (
+        bool(hue_column)
+        and reference_hue_params is not None
+        and hue_column in selected.columns
+        and reference_hue_params.get("cmap") is not None
     )
-    for row in selected.sort_values("usr_label__primary").to_dict(orient="records"):
+    if can_color_by_reference_hue:
+        hue_values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        finite_hue = hue_values.notna()
+        if (~finite_hue).any():
+            ax.scatter(
+                selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
+                selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
+                c="#111111",
+                s=125,
+                marker="*",
+                linewidths=0.8,
+                edgecolors="white",
+                zorder=5,
+            )
+        if finite_hue.any():
+            ax.scatter(
+                selected.loc[finite_hue, x_column].to_numpy(dtype=float),
+                selected.loc[finite_hue, y_column].to_numpy(dtype=float),
+                c=hue_values.loc[finite_hue].to_numpy(dtype=float),
+                cmap=str(reference_hue_params["cmap"]),
+                norm=reference_hue_params.get("norm"),
+                vmin=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmin"),
+                vmax=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmax"),
+                s=132,
+                marker="*",
+                linewidths=0.85,
+                edgecolors="white",
+                zorder=5,
+            )
+    else:
+        ax.scatter(
+            selected[x_column].to_numpy(dtype=float),
+            selected[y_column].to_numpy(dtype=float),
+            c="#111111",
+            s=125,
+            marker="*",
+            linewidths=0.8,
+            edgecolors="white",
+            zorder=5,
+        )
+    label_rows = selected.sort_values(match_column)
+    if reference_label_limit is not None and reference_label_limit >= 0:
+        label_rows = label_rows.head(reference_label_limit)
+    display_labels = reference_display_labels or {}
+    label_font_size = 7.4 if len(label_rows) > 5 else PLOT_TICK_FONT_SIZE
+    label_font_weight = "medium" if len(label_rows) > 5 else "semibold"
+    label_box_padding = 0.12 if len(label_rows) > 5 else 0.18
+    for row in label_rows.to_dict(orient="records"):
         point_x = float(row[x_column])
         point_y = float(row[y_column])
-        label = display_reference_label(row["usr_label__primary"])
+        match_value = str(row.get(match_column) or "")
+        label = display_reference_label(display_labels.get(match_value, match_value))
         display_x, display_y = ax.transData.transform((point_x, point_y))
         placement = choose_annotation_placement(
             display_x=display_x,
@@ -899,7 +1354,7 @@ def draw_reference_labels(
             placed_boxes=placed_boxes,
             x_mid=display_x_mid,
             y_mid=display_y_mid,
-            font_size=PLOT_TICK_FONT_SIZE,
+            font_size=label_font_size,
             left_padding_px=left_padding_px,
             right_padding_px=right_padding_px,
         )
@@ -909,13 +1364,13 @@ def draw_reference_labels(
             xy=(point_x, point_y),
             xytext=(placement.offset_x, placement.offset_y),
             textcoords="offset pixels",
-            fontsize=PLOT_TICK_FONT_SIZE,
-            fontweight="semibold",
+            fontsize=label_font_size,
+            fontweight=label_font_weight,
             ha=placement.ha,
             va=placement.va,
             color=TEXT_COLOR,
             bbox={
-                "boxstyle": "round,pad=0.18",
+                "boxstyle": f"round,pad={label_box_padding}",
                 "fc": "white",
                 "ec": "none",
                 "alpha": ANNOTATION_LABEL_BOX_ALPHA,

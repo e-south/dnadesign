@@ -18,8 +18,9 @@ from ._logging import get_logger
 from .config import JobConfig, ModelConfig
 from .contracts import resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import ValidationError
+from .features.cache_keys import build_runtime_fingerprint
 from .features.execution import execute_feature_bundle, feature_metadata_output_ids
-from .ingest.validators import validate_dna, validate_protein
+from .ingest.validators import canonicalize_dna, validate_protein
 from .runtime.adapter_dispatch import (
     resolve_extract_callable,
     resolve_generate_callable,
@@ -49,13 +50,25 @@ def clear_adapter_cache() -> None:
     _clear_adapter_cache()
 
 
-def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
+def _canonicalize_alphabet(alphabet: str, seqs: List[str]) -> List[str]:
     if alphabet == "dna":
-        validate_dna(seqs, allow_iupac=False)
-    elif alphabet == "protein":
+        return canonicalize_dna(seqs, allow_iupac=False)
+    if alphabet == "protein":
         validate_protein(seqs, allow_extended_aas=False)
-    else:
-        raise ValidationError(f"Unknown alphabet: {alphabet}")
+        return list(seqs)
+    raise ValidationError(f"Unknown alphabet: {alphabet}")
+
+
+def _canonicalize_record_sequences(records, seqs: List[str]):
+    if records is None:
+        return None
+    canonical_records = []
+    for index, row in enumerate(records):
+        payload = dict(row)
+        if "sequence" in payload:
+            payload["sequence"] = seqs[index]
+        canonical_records.append(payload)
+    return canonical_records
 
 
 def run_extract_job(
@@ -84,11 +97,17 @@ def run_extract_job(
         ]
 
     validate_extract_output_namespace(model_id=model.id, outputs=job.outputs or [])
-    _validate_alphabet(model.alphabet, seqs)
+    seqs = _canonicalize_alphabet(model.alphabet, seqs)
+    records = _canonicalize_record_sequences(records, seqs)
 
     # micro-batch
     micro_bs, default_bs = resolve_extract_batch_policy(model_batch_size=model.batch_size)
     auto_derate = _auto_derate_enabled()
+    runtime_fingerprint = build_runtime_fingerprint(
+        model_name=model.id,
+        precision=model.precision,
+        device=model.device,
+    )
 
     # resume plan
     if source == "usr" and ids is not None:
@@ -110,7 +129,10 @@ def run_extract_job(
     if job.feature_bundle is not None:
         if job.outputs is None:
             raise ValidationError("feature_bundle extract jobs must resolve output specs before execution.")
-        adapter = _get_adapter(model)
+
+        def adapter_factory():
+            return _get_adapter(model)
+
         on_chunk_by_output = {
             out.id: build_extract_chunk_write_back(
                 source=source,
@@ -177,7 +199,8 @@ def run_extract_job(
                 bundle=job.feature_bundle,
                 existing=existing,
                 need_idx=todo_idx,
-                adapter=adapter,
+                adapter=None,
+                adapter_factory=adapter_factory,
                 micro_batch_size=micro_bs,
                 default_batch_size=default_bs,
                 auto_derate=auto_derate,
@@ -187,6 +210,8 @@ def run_extract_job(
                 on_chunk_by_metadata=on_chunk_by_metadata,
                 on_chunk_output_group=on_chunk_output_group,
                 on_chunk_metadata_group=on_chunk_metadata_group,
+                runtime_fingerprint=runtime_fingerprint,
+                sequence_view_shard_size_views=(job.io.checkpoint.every_n if job.io.checkpoint.enabled else None),
             )
         finally:
             pbar.close()
@@ -292,7 +317,7 @@ def run_generate_job(
     prompts = load_generate_ingest(inputs, ingest=job.ingest)
 
     gen_name = resolve_generate_namespaced_fn(model_id=model.id, fn=getattr(job, "fn", None))
-    _validate_alphabet(model.alphabet, prompts)
+    prompts = _canonicalize_alphabet(model.alphabet, prompts)
     adapter = _get_adapter(model)
 
     # Choose generate fn from explicit contract-validated namespaced function.

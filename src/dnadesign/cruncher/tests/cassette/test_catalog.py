@@ -148,7 +148,9 @@ def test_builtin_neb_preset_loads_and_preserves_product_alias_metadata() -> None
     assert catalog.preset_id == "neb_nicking_v1"
     assert catalog.preset_ids == ["neb_nicking_v1"]
     assert "Nt.BbvCI" in entries
-    assert entries["Nt.BbvCI"].top_cut_offset == -5
+    assert entries["Nt.BbvCI"].top_cut_offset == 2
+    assert entries["Nb.BbvCI"].bottom_cut_offset == 5
+    assert entries["Nb.BssSI"].bottom_cut_offset == 5
     assert entries["Nt.BstNBI"].vendor_catalog_number == "R0607"
     assert entries["Nt.BstNBI"].selection is not None
     assert entries["Nt.BstNBI"].selection.outside_site is True

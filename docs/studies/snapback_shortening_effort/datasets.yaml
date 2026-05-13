@@ -1,6 +1,0 @@
-study_id: snapback_shortening_effort
-usr_remotes_path: n/a
-datasets: []
-notes:
-  - This study is workspace/spec driven rather than shared-USR-dataset driven.
-  - Keep Snapback and YIU specs in the study-owned route map and pipeline context instead of inventing synthetic dataset placeholders.

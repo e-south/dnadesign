@@ -12,13 +12,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..metadata_axes import axis_display_text, axis_style_map_from_payload
 from ..visual_style import (
+    PLOT_TITLE_FONT_SIZE,
     PUBLICATION_PALETTE,
     TEXT_COLOR,
     compact_candidate_title,
-    display_category_text,
     legend_layout,
-    ordered_categories,
     wrap_plot_title,
 )
 from ..visual_style import (
@@ -26,19 +26,35 @@ from ..visual_style import (
 )
 from .browser_runtime_support import (
     available_hues_for_frames,
+    candidate_join_keys,
     category_color_map,
+    category_values_for_legend,
     classify_hue_series,
+    continuous_hue_colorbar_label,
     continuous_hue_render_params,
     display_hue_label,
+    draw_missing_hue_background,
     draw_reference_labels,
+    finite_non_null_hue_series,
+    hue_option_scale,
     load_table,
     load_view_rows,
     normalize_categorical_hue_series,
-    render_matplotlib_figure,
+    reference_hue_coverage_warnings,
+    reference_hue_render_params,
     resolve_join_keys,
+    resolve_reference_annotation,
     style_notebook_axes,
     style_notebook_legend,
 )
+from .raster_scatter import (
+    draw_categorical_raster_scatter,
+    draw_continuous_raster_scatter,
+    draw_single_color_raster_scatter,
+    scatter_data_extent,
+    should_rasterize_scatter,
+)
+from .rendering import render_matplotlib_figure
 
 
 def _error_frame(message: str) -> pd.DataFrame:
@@ -117,11 +133,28 @@ def _table_view_ids(item: dict[str, object]) -> set[str]:
     return {str(view_id) for view_id in item.get("view_ids", []) if isinstance(view_id, str) and str(view_id).strip()}
 
 
+def _equivalent_sequence_feature_view_ids(view_id: str | None) -> set[str]:
+    if not view_id:
+        return set()
+    candidates = {view_id}
+    prefixes = ("intermediate_embedding_7b_", "output_layer_mean_7b_")
+    suffix = next((view_id.removeprefix(prefix) for prefix in prefixes if view_id.startswith(prefix)), "")
+    if not suffix:
+        return candidates
+    candidates.add(f"intermediate_embedding_7b_{suffix}")
+    if suffix == "context_anchor_mean_bidir_concat":
+        candidates.add("intermediate_embedding_7b_full_context_anchor_mean")
+    return candidates
+
+
 def _table_matches_view(item: dict[str, object], view_id: str | None) -> bool:
     if not view_id:
         return True
     explicit_view_ids = _table_view_ids(item)
     if explicit_view_ids:
+        artifact_id = str(item.get("artifact_id") or "artifact")
+        if artifact_id.startswith("sequence_features_"):
+            return bool(explicit_view_ids.intersection(_equivalent_sequence_feature_view_ids(view_id)))
         return view_id in explicit_view_ids
     artifact_id = str(item.get("artifact_id") or "artifact")
     if artifact_id.startswith("design_centroid_margins_"):
@@ -140,7 +173,14 @@ def _merge_view_row_columns(
 ) -> tuple[pd.DataFrame, set[str]]:
     if not view_id or not required_columns:
         return frame, set()
-    view_rows = load_view_rows(view_id, output_root=output_root)
+    possible_view_join_columns = pd.DataFrame(columns=["construct__anchor_id", "context_id", "id", "subject_id"])
+    view_row_columns = sorted(
+        {
+            *required_columns,
+            *[right_key for _, right_key in candidate_join_keys(frame, possible_view_join_columns)],
+        }
+    )
+    view_rows = load_view_rows(view_id, output_root=output_root, columns=view_row_columns)
     if view_rows.empty:
         return frame, set()
     join_keys = resolve_join_keys(frame, view_rows)
@@ -169,7 +209,7 @@ def _required_column_sources(
     *,
     requested_columns: set[str],
     view_id: str | None,
-) -> dict[str, dict[str, object]]:
+) -> tuple[dict[str, dict[str, object]], dict[str, list[dict[str, object]]]]:
     sources_by_column: dict[str, list[dict[str, object]]] = {column: [] for column in requested_columns}
     for item in joinable_tables:
         relative_path = item.get("relative_path")
@@ -188,16 +228,25 @@ def _required_column_sources(
             )
 
     resolved: dict[str, dict[str, object]] = {}
+    ambiguous_sources: dict[str, list[dict[str, object]]] = {}
     for column, candidates in sources_by_column.items():
         if not candidates:
             continue
         if len(candidates) > 1:
-            candidate_labels = ", ".join(str(candidate["artifact_id"]) for candidate in candidates)
-            raise ValueError(
-                f"ambiguous metadata source for `{column}` on `{view_id or 'projection'}`: {candidate_labels}"
-            )
+            ambiguous_sources[column] = candidates
+            continue
         resolved[column] = candidates[0]
-    return resolved
+    return resolved, ambiguous_sources
+
+
+def _raise_ambiguous_required_columns(
+    *,
+    ambiguous_sources: dict[str, list[dict[str, object]]],
+    view_id: str | None,
+) -> None:
+    for column, candidates in sorted(ambiguous_sources.items()):
+        candidate_labels = ", ".join(str(candidate["artifact_id"]) for candidate in candidates)
+        raise ValueError(f"ambiguous metadata source for `{column}` on `{view_id or 'projection'}`: {candidate_labels}")
 
 
 def _merge_required_joinable_column(
@@ -215,38 +264,82 @@ def _merge_required_joinable_column(
         raise ValueError(
             f"required metadata source `{artifact_id}` for `{column}` on `{view_id or 'projection'}` is empty"
         )
-    join_keys = resolve_join_keys(frame, table)
-    if join_keys is None:
+    join_key_candidates = candidate_join_keys(frame, table)
+    if not join_key_candidates:
         raise ValueError(
             f"required metadata source `{artifact_id}` for `{column}` cannot join onto `{view_id or 'projection'}`"
         )
-    left_key, right_key = join_keys
-    _assert_unique_join_key(table, right_key, artifact_id=artifact_id)
-    merged_source = frame.drop(columns=[column], errors="ignore")
-    selected = table[[right_key, *([column] if column != right_key else [])]].copy()
-    if left_key == right_key:
-        merged = merged_source.merge(selected, on=left_key, how="left")
-    else:
-        merged = merged_source.merge(selected, left_on=left_key, right_on=right_key, how="left")
-        if right_key in merged.columns:
-            merged = merged.drop(columns=[right_key])
-    if column not in merged.columns:
+    best_merged: pd.DataFrame | None = None
+    best_value_count = -1
+    best_error: ValueError | None = None
+    for left_key, right_key in join_key_candidates:
+        try:
+            _assert_unique_join_key(table, right_key, artifact_id=artifact_id)
+        except ValueError as exc:
+            best_error = exc
+            continue
+        merged_source = frame.drop(columns=[column], errors="ignore")
+        selected = table[[right_key, *([column] if column != right_key else [])]].copy()
+        if left_key == right_key:
+            merged = merged_source.merge(selected, on=left_key, how="left")
+        else:
+            merged = merged_source.merge(selected, left_on=left_key, right_on=right_key, how="left")
+            if right_key in merged.columns:
+                merged = merged.drop(columns=[right_key])
+        if column not in merged.columns:
+            continue
+        value_count = int(finite_non_null_hue_series(merged, column).shape[0])
+        if value_count > best_value_count:
+            best_merged = merged
+            best_value_count = value_count
+        if value_count > 0:
+            return merged
+    if best_merged is None:
+        if best_error is not None:
+            raise best_error
         raise ValueError(
             "required metadata column "
             f"`{column}` from `{artifact_id}` was not materialized onto `{view_id or 'projection'}`"
         )
-    return merged
+    return best_merged
 
 
 def _column_has_required_values(frame: pd.DataFrame, column: str) -> bool:
     if column not in frame.columns:
         return False
-    series = frame[column].replace([np.inf, -np.inf], np.nan)
+    series = finite_non_null_hue_series(frame, column)
     if series.empty:
         return False
     if pd.api.types.is_object_dtype(series.dtype) or pd.api.types.is_string_dtype(series.dtype):
         series = series.map(lambda value: None if isinstance(value, str) and not value.strip() else value)
     return bool(series.notna().any())
+
+
+def _categorical_hue_series(
+    frame: pd.DataFrame,
+    hue_column: str,
+    *,
+    axis_styles: dict[str, object] | None = None,
+) -> pd.Series:
+    return normalize_categorical_hue_series(
+        hue_column,
+        frame[hue_column],
+        axis_styles=axis_styles,
+        frame=frame,
+    )
+
+
+def _continuous_params_for_frame(
+    frame: pd.DataFrame,
+    hue_column: str,
+    fallback: dict[str, object],
+) -> dict[str, object]:
+    if hue_column not in frame.columns:
+        return fallback
+    values = pd.to_numeric(frame[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if values.empty or values.nunique() < 2:
+        return fallback
+    return continuous_hue_render_params(hue_column, values)
 
 
 def _assert_required_columns_materialized(
@@ -279,12 +372,17 @@ def enrich_projection_frame(
         view_id=view_id,
         required_columns=requested_columns,
     )
+    effective_requested_columns = set(requested_columns)
     if requested_columns:
-        required_sources = _required_column_sources(
+        required_sources, ambiguous_sources = _required_column_sources(
             joinable_tables,
             requested_columns=requested_columns.difference(authoritative_view_columns),
             view_id=view_id,
         )
+        if ambiguous_sources:
+            if strict_required_columns:
+                _raise_ambiguous_required_columns(ambiguous_sources=ambiguous_sources, view_id=view_id)
+            effective_requested_columns = requested_columns.difference(ambiguous_sources)
         for column in sorted(required_sources):
             enriched = _merge_required_joinable_column(
                 enriched,
@@ -308,7 +406,7 @@ def enrich_projection_frame(
         artifact_id = str(item.get("artifact_id") or "artifact")
         table_columns = [str(column) for column in item.get("columns", []) if isinstance(column, str)]
         if requested_columns:
-            needed_columns = requested_columns.difference(enriched.columns)
+            needed_columns = effective_requested_columns.difference(enriched.columns)
             selected_columns = [column for column in table_columns if column in needed_columns]
             if not selected_columns:
                 continue
@@ -414,6 +512,8 @@ def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False)
         return 1, 1
     if prefer_single_row and panel_count <= 4:
         return 1, panel_count
+    if panel_count == 12:
+        return 2, 6
     if panel_count in {5, 6}:
         return 2, 3
     if panel_count in {7, 8}:
@@ -425,6 +525,29 @@ def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False)
     return rows, columns
 
 
+def _default_projection_alt_text(
+    *,
+    panel_count: int,
+    hue_column: str | None,
+    axis_styles: dict[str, object] | None,
+    reference_set_id: str | None,
+    reference_label_count: int = 0,
+) -> str:
+    layout = "Single persisted projection" if panel_count == 1 else f"{panel_count}-panel persisted projection grid"
+    hue = (
+        f"colored by {display_hue_label(hue_column, axis_styles=axis_styles)}" if hue_column else "with no hue overlay"
+    )
+    if reference_set_id:
+        row_label = "row" if reference_label_count == 1 else "rows"
+        reference = (
+            f"reference labels overlay enabled for `{reference_set_id}` "
+            f"with {reference_label_count} matched {row_label}"
+        )
+    else:
+        reference = "reference labels overlay off"
+    return f"{layout} {hue}; {reference}; point positions use saved projection coordinates."
+
+
 def render_projection_grid(
     panel_specs: list[dict[str, object]],
     *,
@@ -432,14 +555,20 @@ def render_projection_grid(
     plot_id: str | None = None,
     hue_column: str | None,
     hue_kinds: dict[str, str] | None,
+    axis_styles: dict[str, object] | None = None,
     joinable_tables: list[dict[str, object]],
     reference_labels: list[str],
     output_root: Path,
     workspace_dir: Path,
+    reference_set_id: str | None = None,
+    reference_match_column: str = "usr_label__primary",
+    reference_display_labels: dict[str, str] | None = None,
+    reference_label_limit: int | None = None,
+    reference_hue_column: str | None = None,
+    hue_options: list[dict[str, object]] | None = None,
     alt_text: str | None = None,
     prefer_single_row: bool = False,
 ):
-    del workspace_dir
     if not panel_specs:
         return mo.callout("No persisted projection coordinates are available for this geometry layout.", kind="warn")
 
@@ -458,6 +587,27 @@ def render_projection_grid(
             "The selected geometry layout is declared, but none of its projections are materialized yet.",
             kind="warn",
         )
+    reference_warnings: list[str] = []
+    if reference_set_id is not None:
+        reference_annotation = resolve_reference_annotation(
+            reference_set_id,
+            resolved_frames,
+            workspace_dir=workspace_dir,
+            fallback_labels=reference_labels,
+            label_limit=reference_label_limit,
+        )
+        reference_labels = [str(value) for value in reference_annotation.get("labels", []) if str(value).strip()]
+        reference_match_column = str(reference_annotation.get("match_column") or "usr_label__primary")
+        reference_display_labels = {
+            str(key): str(value)
+            for key, value in dict(reference_annotation.get("display_labels", {}) or {}).items()
+            if str(key).strip() and str(value).strip()
+        }
+        resolved_label_limit = reference_annotation.get("label_limit")
+        reference_label_limit = resolved_label_limit if isinstance(resolved_label_limit, int) else None
+        reference_warnings = [
+            str(warning).strip() for warning in reference_annotation.get("warnings", []) if str(warning).strip()
+        ]
 
     effective_hue = hue_column
     if effective_hue:
@@ -469,6 +619,33 @@ def render_projection_grid(
         if effective_hue not in allowed:
             effective_hue = None
 
+    effective_reference_hue = str(reference_hue_column or "").strip()
+    if effective_reference_hue and reference_labels:
+        reference_warnings.extend(
+            reference_hue_coverage_warnings(
+                resolved_frames,
+                reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_hue_column=effective_reference_hue,
+            )
+        )
+    reference_hue_params = (
+        reference_hue_render_params(
+            resolved_frames,
+            reference_labels=reference_labels,
+            reference_match_column=reference_match_column,
+            reference_hue_column=effective_reference_hue,
+        )
+        if effective_reference_hue and reference_labels
+        else None
+    )
+    if reference_hue_params is None:
+        if effective_reference_hue and reference_labels:
+            reference_warnings.append(
+                f"reference hue `{effective_reference_hue}` has no finite values for selected reference rows"
+            )
+        effective_reference_hue = ""
+
     n_panels = len(panel_specs)
     nrows, ncols = _panel_grid_dimensions(n_panels, prefer_single_row=prefer_single_row)
     if n_panels == 1:
@@ -477,6 +654,9 @@ def render_projection_grid(
     elif prefer_single_row and n_panels <= 4:
         panel_width = 3.55
         panel_height = 4.0
+    elif n_panels == 12:
+        panel_width = 3.65
+        panel_height = 4.75
     else:
         panel_width = 3.65
         panel_height = 3.81
@@ -513,24 +693,32 @@ def render_projection_grid(
         else:
             effective_hue = None
             hue_kind = None
-
-    category_values = ordered_categories(
-        {
-            str(value)
-            for frame in resolved_frames
-            if effective_hue is not None and treat_as_categorical and effective_hue in frame.columns
-            for value in normalize_categorical_hue_series(effective_hue, frame[effective_hue]).unique()
-        },
-        column=effective_hue,
+    panel_scaled_continuous = (
+        effective_hue is not None
+        and hue_kind == "continuous"
+        and hue_option_scale(hue_options or [], effective_hue, panel_count=n_panels) == "panel"
     )
-    category_map = category_color_map(category_values, column=effective_hue)
+
+    raw_category_values = [
+        str(value)
+        for frame in resolved_frames
+        if effective_hue is not None and treat_as_categorical and effective_hue in frame.columns
+        for value in _categorical_hue_series(frame, effective_hue, axis_styles=axis_styles).unique()
+    ]
+    category_values = category_values_for_legend(
+        raw_category_values,
+        column=effective_hue,
+        axis_styles=axis_styles,
+    )
+    category_map = category_color_map(category_values, column=effective_hue, axis_styles=axis_styles)
+    style = axis_style_map_from_payload(axis_styles).get(str(effective_hue)) if effective_hue is not None else None
 
     scatter_artist = None
     max_title_lines = 1
     for axis_index, (ax, spec, frame) in enumerate(zip(panel_axes, panel_specs, resolved_frames, strict=True)):
         wrapped_title = wrap_plot_title(
             compact_candidate_title(str(spec.get("title") or spec.get("view_id") or f"Panel {axis_index + 1}")),
-            width=32 if n_panels == 1 else 22,
+            width=32 if n_panels == 1 else 28 if n_panels == 12 else 22,
             max_lines=3,
         )
         max_title_lines = max(max_title_lines, wrapped_title.count("\n") + 1)
@@ -548,72 +736,171 @@ def render_projection_grid(
             _render_projection_placeholder(ax, panel_title=wrapped_title, message="Projection missing")
             continue
 
-        point_style = shared_scatter_style(len(frame))
+        x_values = pd.to_numeric(frame["x"], errors="coerce").to_numpy(dtype=float)
+        y_values = pd.to_numeric(frame["y"], errors="coerce").to_numpy(dtype=float)
+        finite_xy = np.isfinite(x_values) & np.isfinite(y_values)
+        if not bool(np.any(finite_xy)):
+            _render_projection_placeholder(ax, panel_title=wrapped_title, message="Projection has no finite points")
+            continue
+        plot_frame = frame.loc[finite_xy].copy()
+        x_values = x_values[finite_xy]
+        y_values = y_values[finite_xy]
+        point_style = shared_scatter_style(len(plot_frame))
+        rasterize_panel = should_rasterize_scatter(len(plot_frame))
         if effective_hue is None or effective_hue not in frame.columns:
-            ax.scatter(
-                frame["x"].to_numpy(dtype=float),
-                frame["y"].to_numpy(dtype=float),
-                c=PUBLICATION_PALETTE[0],
-                s=point_style.point_size,
-                alpha=point_style.alpha,
-                linewidths=point_style.linewidths,
-                edgecolors=point_style.edgecolors,
-                rasterized=point_style.rasterized,
-            )
-        elif hue_kind == "continuous":
-            hue_series = pd.to_numeric(frame[effective_hue], errors="coerce")
-            valid = hue_series.notna()
-            scatter_artist = ax.scatter(
-                frame.loc[valid, "x"].to_numpy(dtype=float),
-                frame.loc[valid, "y"].to_numpy(dtype=float),
-                c=hue_series.loc[valid].to_numpy(dtype=float),
-                cmap=str(continuous_params["cmap"]),
-                norm=continuous_params["norm"],
-                vmin=None if continuous_params["norm"] is not None else continuous_params["vmin"],
-                vmax=None if continuous_params["norm"] is not None else continuous_params["vmax"],
-                s=point_style.point_size,
-                alpha=point_style.alpha,
-                linewidths=point_style.linewidths,
-                edgecolors=point_style.edgecolors,
-                rasterized=point_style.rasterized,
-            )
-        else:
-            hue_series = normalize_categorical_hue_series(effective_hue, frame[effective_hue])
-            for category in category_values:
-                mask = hue_series == category
-                if not mask.any():
-                    continue
+            if rasterize_panel:
+                draw_single_color_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    color=PUBLICATION_PALETTE[0],
+                    point_alpha=point_style.alpha,
+                )
+            else:
                 ax.scatter(
-                    frame.loc[mask, "x"].to_numpy(dtype=float),
-                    frame.loc[mask, "y"].to_numpy(dtype=float),
-                    c=category_map[category],
+                    x_values,
+                    y_values,
+                    c=PUBLICATION_PALETTE[0],
                     s=point_style.point_size,
                     alpha=point_style.alpha,
                     linewidths=point_style.linewidths,
                     edgecolors=point_style.edgecolors,
                     rasterized=point_style.rasterized,
-                    label=category,
                 )
+        elif hue_kind == "continuous":
+            hue_series = pd.to_numeric(plot_frame[effective_hue], errors="coerce")
+            valid = hue_series.notna()
+            missing = ~valid
+            panel_continuous_params = (
+                _continuous_params_for_frame(plot_frame, effective_hue, continuous_params)
+                if panel_scaled_continuous
+                else continuous_params
+            )
+            if missing.any():
+                draw_missing_hue_background(
+                    ax,
+                    x_values=plot_frame.loc[missing, "x"].to_numpy(dtype=float),
+                    y_values=plot_frame.loc[missing, "y"].to_numpy(dtype=float),
+                    point_style=point_style,
+                    rasterize_panel=rasterize_panel,
+                    raster_renderer=draw_single_color_raster_scatter,
+                )
+            if rasterize_panel and valid.any():
+                scatter_artist = draw_continuous_raster_scatter(
+                    ax,
+                    x_values=plot_frame.loc[valid, "x"].to_numpy(dtype=float),
+                    y_values=plot_frame.loc[valid, "y"].to_numpy(dtype=float),
+                    hue_values=hue_series.loc[valid].to_numpy(dtype=float),
+                    cmap=str(panel_continuous_params["cmap"]),
+                    norm=panel_continuous_params["norm"],
+                    vmin=panel_continuous_params["vmin"],
+                    vmax=panel_continuous_params["vmax"],
+                    point_alpha=point_style.alpha,
+                )
+            else:
+                scatter_artist = ax.scatter(
+                    plot_frame.loc[valid, "x"].to_numpy(dtype=float),
+                    plot_frame.loc[valid, "y"].to_numpy(dtype=float),
+                    c=hue_series.loc[valid].to_numpy(dtype=float),
+                    cmap=str(panel_continuous_params["cmap"]),
+                    norm=panel_continuous_params["norm"],
+                    vmin=None if panel_continuous_params["norm"] is not None else panel_continuous_params["vmin"],
+                    vmax=None if panel_continuous_params["norm"] is not None else panel_continuous_params["vmax"],
+                    s=point_style.point_size,
+                    alpha=point_style.alpha,
+                    linewidths=point_style.linewidths,
+                    edgecolors=point_style.edgecolors,
+                    rasterized=point_style.rasterized,
+                )
+        else:
+            hue_series = _categorical_hue_series(plot_frame, effective_hue, axis_styles=axis_styles)
+            if rasterize_panel:
+                raster_categories = list(category_values)
+                raster_category_colors = dict(category_map)
+                raster_alpha_multipliers: dict[str, float] = {}
+                if style is not None and style.noncanonical_bucket is not None:
+                    noncanonical_category = str(style.noncanonical_bucket)
+                    if (
+                        bool((hue_series == noncanonical_category).any())
+                        and noncanonical_category not in raster_categories
+                    ):
+                        raster_categories.append(noncanonical_category)
+                    raster_category_colors.setdefault(noncanonical_category, "#9AA5B1")
+                    raster_alpha_multipliers[noncanonical_category] = 0.55
+                draw_categorical_raster_scatter(
+                    ax,
+                    x_values=x_values,
+                    y_values=y_values,
+                    hue_values=hue_series.to_numpy(dtype=str),
+                    category_order=raster_categories,
+                    category_colors=raster_category_colors,
+                    category_alpha_multipliers=raster_alpha_multipliers,
+                    point_alpha=point_style.alpha,
+                )
+            else:
+                plotted_mask = pd.Series(False, index=plot_frame.index)
+                for category in category_values:
+                    mask = hue_series == category
+                    if not mask.any():
+                        continue
+                    plotted_mask |= mask
+                    ax.scatter(
+                        plot_frame.loc[mask, "x"].to_numpy(dtype=float),
+                        plot_frame.loc[mask, "y"].to_numpy(dtype=float),
+                        c=category_map[category],
+                        s=point_style.point_size,
+                        alpha=point_style.alpha,
+                        linewidths=point_style.linewidths,
+                        edgecolors=point_style.edgecolors,
+                        rasterized=point_style.rasterized,
+                        label=category,
+                    )
+                if style is not None and style.noncanonical_bucket is not None:
+                    noncanonical_mask = (~plotted_mask) & (hue_series == style.noncanonical_bucket)
+                    if noncanonical_mask.any():
+                        ax.scatter(
+                            plot_frame.loc[noncanonical_mask, "x"].to_numpy(dtype=float),
+                            plot_frame.loc[noncanonical_mask, "y"].to_numpy(dtype=float),
+                            c=category_map.get(style.noncanonical_bucket, "#9AA5B1"),
+                            s=point_style.point_size,
+                            alpha=max(point_style.alpha * 0.55, 0.08),
+                            linewidths=point_style.linewidths,
+                            edgecolors=point_style.edgecolors,
+                            rasterized=point_style.rasterized,
+                        )
 
-        ax.set_title(wrapped_title, fontweight="semibold", pad=10 if "\n" in wrapped_title else 8)
+        ax.set_title(
+            wrapped_title,
+            fontweight="semibold",
+            pad=7 if n_panels == 12 and "\n" in wrapped_title else 10 if "\n" in wrapped_title else 8,
+        )
         if artifact_warning:
             _render_projection_attention_badge(ax)
         ax.set_xlabel("Projection 1")
         ax.set_ylabel("Projection 2")
+        if rasterize_panel:
+            x_min, x_max, y_min, y_max = scatter_data_extent(x_values, y_values)
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
         ax.margins(x=0.06, y=0.06)
         style_notebook_axes(ax, grid=True, square=True)
+        if n_panels == 12:
+            ax.title.set_fontsize(PLOT_TITLE_FONT_SIZE - 1.25)
+            ax.title.set_linespacing(1.0)
 
     for ax in axes_array[n_panels:]:
         ax.set_axis_off()
 
     bottom_margin = 0.085
     if category_values and effective_hue is not None:
-        legend_labels = [display_category_text(category, column=effective_hue) for category in category_values]
+        legend_labels = [
+            axis_display_text(style, category) if style is not None else str(category) for category in category_values
+        ]
         layout = legend_layout(
             legend_labels,
             plot_id=plot_id,
-            default_anchor_y=0.006 if plot_id == "appendix_umap_gallery" else (0.012 if n_panels <= 1 else 0.008),
-            default_base_margin=0.11,
+            default_anchor_y=0.036 if plot_id == "appendix_umap_gallery" else (0.012 if n_panels <= 1 else 0.008),
+            default_base_margin=0.088 if plot_id == "appendix_umap_gallery" else 0.11,
             row_step=0.043,
         )
         legend = fig.legend(
@@ -639,28 +926,39 @@ def render_projection_grid(
         )
         style_notebook_legend(legend)
         bottom_margin = layout.bottom_margin
+        legend_rows = max(1, math.ceil(len(legend_labels) / max(layout.columns, 1)))
+        if n_panels == 2 and legend_rows >= 5:
+            extra_height = 0.36 * (legend_rows - 3)
+            fig.set_size_inches(fig.get_figwidth(), fig.get_figheight() + extra_height, forward=True)
+            bottom_margin = max(bottom_margin, min(0.2 + (0.052 * legend_rows), 0.56))
         if plot_id == "appendix_umap_gallery":
-            bottom_margin = max(bottom_margin, 0.12)
+            bottom_margin = max(bottom_margin, 0.088)
         if n_panels == 2:
             bottom_margin = max(bottom_margin, 0.34)
-        elif n_panels >= 8:
+        elif n_panels >= 8 and plot_id != "appendix_umap_gallery":
             bottom_margin = max(bottom_margin, 0.30)
 
     label_right_padding_px = 12.0
     colorbar_bottom = 0.0
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
-        colorbar_bottom = 0.12
+        colorbar_bottom = 0.08 if n_panels > 1 else 0.10
         label_right_padding_px = 28.0
+    if reference_hue_params is not None:
+        label_right_padding_px = max(label_right_padding_px, 42.0)
     top_margin = max(0.8, 0.96 - (0.042 * max(max_title_lines - 1, 0)))
     if colorbar_bottom > 0.0:
-        bottom_margin = max(bottom_margin, 0.2 if n_panels > 1 else 0.16)
+        bottom_margin = max(bottom_margin, 0.34 if n_panels == 2 else 0.24 if n_panels > 1 else 0.18)
     fig.subplots_adjust(
         left=0.1,
-        right=0.97,
+        right=0.92 if reference_hue_params is not None else 0.97,
         top=top_margin,
         bottom=bottom_margin,
         wspace=0.26 if n_panels > 1 else 0.2,
-        hspace=(0.62 + (0.04 * max(max_title_lines - 1, 0))) if n_panels > 1 else 0.3,
+        hspace=(0.24 + (0.025 * max(max_title_lines - 1, 0)))
+        if n_panels == 12
+        else (0.62 + (0.04 * max(max_title_lines - 1, 0)))
+        if n_panels > 1
+        else 0.3,
     )
     fig.canvas.draw()
 
@@ -670,22 +968,86 @@ def render_projection_grid(
                 ax,
                 frame,
                 reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_display_labels=reference_display_labels,
+                reference_label_limit=reference_label_limit,
                 right_padding_px=label_right_padding_px,
                 left_padding_px=28.0,
+                reference_hue_column=effective_reference_hue or None,
+                reference_hue_params=reference_hue_params,
             )
 
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
         colorbar_width = 0.66 if n_panels > 1 else 0.56
         colorbar_left = (1.0 - colorbar_width) / 2.0
         colorbar_height = 0.028
+        colorbar_artist = scatter_artist
+        if panel_scaled_continuous:
+            from matplotlib.cm import ScalarMappable
+            from matplotlib.colors import Normalize
+
+            colorbar_artist = ScalarMappable(
+                norm=Normalize(vmin=0.0, vmax=1.0),
+                cmap=str(continuous_params["cmap"]),
+            )
         colorbar = fig.colorbar(
-            scatter_artist,
+            colorbar_artist,
             cax=fig.add_axes([colorbar_left, colorbar_bottom, colorbar_width, colorbar_height]),
             orientation="horizontal",
         )
         colorbar.ax.tick_params(labelsize=10.5, colors=TEXT_COLOR)
-        colorbar.set_label(display_hue_label(effective_hue), fontsize=11.5, color=TEXT_COLOR)
+        if panel_scaled_continuous:
+            colorbar.set_ticks([0.0, 0.5, 1.0])
+            colorbar.set_ticklabels(["panel low", "mid", "panel high"])
+        colorbar.set_label(
+            continuous_hue_colorbar_label(
+                effective_hue,
+                axis_styles=axis_styles,
+                panel_scaled=panel_scaled_continuous,
+            ),
+            fontsize=11.5,
+            color=TEXT_COLOR,
+        )
         colorbar.ax.xaxis.set_label_position("bottom")
         colorbar.ax.xaxis.set_ticks_position("bottom")
 
-    return render_matplotlib_figure(fig, alt=str(alt_text or "Latent geometry projection grid"))
+    if reference_hue_params is not None and effective_reference_hue:
+        from matplotlib.cm import ScalarMappable
+        from matplotlib.colors import Normalize
+
+        reference_colorbar_bottom = max(bottom_margin + 0.035, 0.20 if colorbar_bottom > 0.0 else 0.16)
+        reference_colorbar_top = min(top_margin - 0.035, 0.90)
+        reference_colorbar_height = max(reference_colorbar_top - reference_colorbar_bottom, 0.18)
+        reference_norm = reference_hue_params.get("norm") or Normalize(
+            vmin=reference_hue_params.get("vmin"),
+            vmax=reference_hue_params.get("vmax"),
+        )
+        reference_colorbar = fig.colorbar(
+            ScalarMappable(norm=reference_norm, cmap=str(reference_hue_params["cmap"])),
+            cax=fig.add_axes([0.945, reference_colorbar_bottom, 0.012, reference_colorbar_height]),
+        )
+        reference_colorbar.ax.tick_params(labelsize=10.0, colors=TEXT_COLOR)
+        reference_colorbar.set_label(
+            display_hue_label(effective_reference_hue, axis_styles=axis_styles),
+            fontsize=11.0,
+            color=TEXT_COLOR,
+        )
+
+    default_alt_text = _default_projection_alt_text(
+        panel_count=n_panels,
+        hue_column=effective_hue,
+        axis_styles=axis_styles,
+        reference_set_id=reference_set_id,
+        reference_label_count=len(reference_labels),
+    )
+    figure_alt_text = default_alt_text if alt_text is None else f"{default_alt_text} {str(alt_text).strip()}"
+    rendered = render_matplotlib_figure(fig, alt=figure_alt_text)
+    if reference_warnings:
+        return mo.vstack(
+            [
+                mo.callout("Reference overlay warning: " + "; ".join(reference_warnings), kind="warn"),
+                rendered,
+            ],
+            gap=0.25,
+        )
+    return rendered

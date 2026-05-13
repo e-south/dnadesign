@@ -12,7 +12,6 @@ from pathlib import Path
 from types import ModuleType
 
 import marimo as mo
-import numpy as np
 import pandas as pd
 
 from ..labels import humanize_plot_title
@@ -42,18 +41,24 @@ from .browser_runtime_support import (
     notebook_theme,
     option_key_for_value,
     read_text,
-    render_math_markdown,
-    render_plot_asset,
-    select_plot_render_path,
+    reference_annotation_mode_options,
+    reference_label_limit_for_annotation_mode,
+    resolve_labeled_option_card,
     style_notebook_axes,
     table_from_records,
     unique_in_order,
 )
+from .rendering import render_math_markdown, render_plot_asset, select_plot_render_path
 
 __all__ = ["build_workspace_browser_runtime", "load_workspace_notebook_controls", "resolve_plot_doc_block"]
 
 
 _ALLOWED_RUNTIME_HUE_KINDS = {"categorical", "binary", "continuous", "ordinal"}
+_REFERENCE_HUE_OPTIONS = {
+    "Black stars": "",
+    "Reference strength": "promoter_standard__strength_value_numeric",
+    "SFXI metric": "sfxi_ref__metric_value",
+}
 _PLOT_REVIEW_LIVE_RENDER_KINDS = {
     "projection_grid",
     "xy_scatter_grid",
@@ -96,6 +101,8 @@ class BrowserCatalog:
 
 @dataclass(frozen=True)
 class BrowserGeometry:
+    axis_styles: dict[str, dict[str, object]]
+    candidate_sets: list[dict[str, object]]
     compare_left_default: str
     compare_metrics: dict[str, object]
     compare_right_default: str
@@ -114,7 +121,13 @@ class BrowserGeometry:
     model_values: list[str]
     preferred_hues: list[str]
     row_metadata_hues: list[str]
+    reference_annotation_default: str
+    reference_annotation_options: dict[str, str]
+    reference_hue_columns: list[str]
+    reference_hue_options: dict[str, str]
     reference_labels: list[str]
+    reference_required_columns: list[str]
+    reference_sets: list[dict[str, object]]
     selected_hue_default: str
 
 
@@ -141,7 +154,10 @@ class BrowserSupport:
     option_key_for_value: Callable[[dict[str, object], object], str | None]
     pd: ModuleType
     read_text: Callable[[str | None], str | None]
+    reference_annotation_mode_options: Callable[[], dict[str, str]]
+    reference_label_limit_for_annotation_mode: Callable[[str | None], int | None]
     render_math_markdown: Callable[[str], object]
+    resolve_labeled_option_card: Callable[..., dict[str, object] | None]
     select_plot_render_path: Callable[[list[Path]], Path | None]
     style_notebook_axes: Callable[..., None]
     table_from_records: Callable[..., object]
@@ -211,6 +227,97 @@ def _runtime_hue_columns(
     return [column for column in ordered_candidates if column in hue_kinds], hue_kinds
 
 
+def _candidate_inventory_from_control_plane(
+    *,
+    controls: dict[str, object],
+    catalog: dict[str, object],
+) -> list[dict[str, object]]:
+    control_rows = controls.get("candidate_inventory")
+    if isinstance(control_rows, list):
+        rows = [row for row in control_rows if isinstance(row, dict) and row.get("view_id")]
+        if rows:
+            return rows
+    catalog_rows = catalog.get("candidate_inventory")
+    if isinstance(catalog_rows, list):
+        return [row for row in catalog_rows if isinstance(row, dict) and row.get("view_id")]
+    return []
+
+
+def _matrix_shapes_from_control_plane(
+    *,
+    candidate_inventory: list[dict[str, object]],
+    geometry_rows: list[dict[str, object]],
+) -> list[dict[str, int | str]]:
+    shapes: list[dict[str, int | str]] = []
+    seen: set[str] = set()
+    for row in candidate_inventory:
+        view_id = str(row.get("view_id") or "").strip()
+        rows = row.get("n_rows")
+        dims = row.get("n_dims")
+        if (
+            not view_id
+            or view_id in seen
+            or str(row.get("modality") or "") != "vector"
+            or str(row.get("materialization_status") or "") != "materialized"
+            or rows is None
+            or dims is None
+        ):
+            continue
+        shapes.append({"view_id": view_id, "rows": int(rows), "dims": int(dims)})
+        seen.add(view_id)
+    if shapes:
+        return shapes
+    for row in geometry_rows:
+        view_id = str(row.get("view_id") or "").strip()
+        rows = row.get("rows")
+        dims = row.get("dims")
+        if not view_id or view_id in seen or rows is None or dims is None:
+            continue
+        shapes.append({"view_id": view_id, "rows": int(rows), "dims": int(dims)})
+        seen.add(view_id)
+    return shapes
+
+
+def _reference_set_option_label(row: dict[str, object]) -> str:
+    configured_label = str(row.get("label") or "").strip()
+    if configured_label:
+        return configured_label
+    return _humanize_plot_id(str(row.get("reference_set_id") or "reference_set"))
+
+
+def _reference_annotation_options(reference_sets: list[dict[str, object]]) -> dict[str, str]:
+    options = {"Off": ""}
+    seen_ids: set[str] = set()
+    for row in reference_sets:
+        if not isinstance(row, dict):
+            continue
+        reference_set_id = str(row.get("reference_set_id") or "").strip()
+        if not reference_set_id or reference_set_id in seen_ids:
+            continue
+        label = _reference_set_option_label(row)
+        if label in options:
+            label = f"{label} ({reference_set_id})"
+        options[label] = reference_set_id
+        seen_ids.add(reference_set_id)
+    return options
+
+
+def _reference_required_columns(reference_sets: list[dict[str, object]]) -> list[str]:
+    columns: list[str] = []
+    for row in reference_sets:
+        if not isinstance(row, dict):
+            continue
+        for column in [
+            row.get("match_column"),
+            row.get("label_column"),
+            *list(row.get("selector_columns") or []),
+        ]:
+            text = str(column or "").strip()
+            if text and text not in columns:
+                columns.append(text)
+    return columns
+
+
 def _live_plot_status_rows(catalog_plots: list[dict[str, object]] | None) -> dict[str, dict[str, object]]:
     return {
         str(row.get("plot_id")): row for row in (catalog_plots or []) if isinstance(row, dict) and row.get("plot_id")
@@ -239,6 +346,23 @@ def _resolve_plot_review_render_mode(
     return True, None
 
 
+def _markdown_heading_level(line: str) -> int | None:
+    hash_count = len(line) - len(line.lstrip("#"))
+    if hash_count == 0 or hash_count > 6:
+        return None
+    if len(line) <= hash_count or line[hash_count] != " ":
+        return None
+    return hash_count
+
+
+def _next_heading_at_or_above(lines: list[str], start: int, level: int) -> int:
+    for index in range(start + 1, len(lines)):
+        heading_level = _markdown_heading_level(lines[index])
+        if heading_level is not None and heading_level <= level:
+            return index
+    return len(lines)
+
+
 def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
     lines = markdown.splitlines()
     summary_lines: list[str] = []
@@ -249,14 +373,15 @@ def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
         index = first_h1 + 1
         while index < len(lines):
             line = lines[index]
-            if line.startswith("## "):
+            heading_level = _markdown_heading_level(line)
+            if heading_level is not None and heading_level <= 2:
                 break
             summary_lines.append(line)
             index += 1
 
-    heading_indices = [index for index, line in enumerate(lines) if line.startswith("### ")]
-    heading_indices.append(len(lines))
-    for start, end in zip(heading_indices, heading_indices[1:], strict=False):
+    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 3]
+    for start in heading_indices:
+        end = _next_heading_at_or_above(lines, start, 3)
         heading = lines[start][4:].strip()
         if "|" not in heading:
             continue
@@ -274,12 +399,12 @@ def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
 
 def _extract_plot_details(markdown: str) -> str:
     lines = markdown.splitlines()
-    heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
+    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 4]
     if not heading_indices:
         return ""
 
-    heading_indices.append(len(lines))
-    for start, end in zip(heading_indices, heading_indices[1:], strict=False):
+    for start in heading_indices:
+        end = _next_heading_at_or_above(lines, start, 4)
         title = lines[start][5:].strip()
         if title.casefold() != "plot details":
             continue
@@ -289,14 +414,14 @@ def _extract_plot_details(markdown: str) -> str:
 
 def _strip_plot_details(markdown: str) -> str:
     lines = markdown.splitlines()
-    heading_indices = [index for index, line in enumerate(lines) if line.startswith("#### ")]
+    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 4]
     if not heading_indices:
         return markdown.strip()
 
-    heading_indices.append(len(lines))
     kept_blocks: list[str] = []
     cursor = 0
-    for start, end in zip(heading_indices[:-1], heading_indices[1:], strict=False):
+    for start in heading_indices:
+        end = _next_heading_at_or_above(lines, start, 4)
         if cursor < start:
             kept_blocks.append("\n".join(lines[cursor:start]).strip())
         title = lines[start][5:].strip()
@@ -457,7 +582,7 @@ def _plot_review_sections(
             {
                 "plot_id": plot_id,
                 "deliverable_id": deliverable_id,
-                "title": str(doc_block.get("title") or _humanize_plot_id(plot_id)),
+                "title": str(semantics.get("title") or doc_block.get("title") or _humanize_plot_id(plot_id)),
                 "visibility_tier": visibility_tier,
                 "render_path": render_path,
                 "question": str(semantics.get("question") or "").strip(),
@@ -538,40 +663,7 @@ def build_workspace_browser_runtime(
         if default_deliverable_row is not None
         else (section_names[0] if section_names else "Unsectioned")
     )
-
-    source_labels = []
-    for source_id, source in context.config.sources.items():
-        if hasattr(source, "dataset"):
-            source_labels.append(f"{source_id}:{source.dataset}")
-        elif hasattr(source, "path"):
-            source_labels.append(f"{source_id}:{source.path}")
-        else:
-            source_labels.append(source_id)
-    vector_columns = sorted(
-        {
-            view.vector.name
-            for view in context.config.views.values()
-            if hasattr(view, "vector") and getattr(view.vector, "kind", None) == "column"
-        }
-    )
-    visual_families = unique_in_order(
-        getattr(view, "tags", {}).get("family")
-        for view in context.config.views.values()
-        if getattr(view, "tags", {}).get("family") is not None
-    )
-    matrix_shapes = []
-    for view_id in context.config.views:
-        matrix_path = output_root / "views" / view_id / "matrix.npy"
-        if not matrix_path.is_file():
-            continue
-        matrix = np.load(matrix_path, mmap_mode="r")
-        matrix_shapes.append({"view_id": view_id, "rows": int(matrix.shape[0]), "dims": int(matrix.shape[1])})
-    row_count_text = "unknown"
-    dimensionality_text = "unknown"
-    if matrix_shapes:
-        row_count_text = ", ".join(f"{row['view_id']}={row['rows']}" for row in matrix_shapes[:4])
-        dimensionality_text = ", ".join(f"{row['view_id']}={row['dims']}" for row in matrix_shapes[:4])
-
+    candidate_inventory = _candidate_inventory_from_control_plane(controls=controls, catalog=catalog)
     geometry_control = controls.get("geometry_controls", {})
     geometry_rows = [
         row for row in geometry_control.get("geometries", []) if isinstance(row, dict) and row.get("view_id")
@@ -595,7 +687,64 @@ def build_workspace_browser_runtime(
     preferred_hues = [str(item) for item in geometry_control.get("preferred_hues", []) if isinstance(item, str)]
     row_metadata_hues = [str(item) for item in geometry_control.get("row_metadata_hues", []) if isinstance(item, str)]
     configured_hue_kinds = geometry_control.get("hue_kinds", {})
+    axis_styles = {
+        str(column): style
+        for column, style in dict(geometry_control.get("axis_styles", {}) or {}).items()
+        if isinstance(style, dict)
+    }
     reference_labels = [str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)]
+    reference_sets = [
+        row
+        for row in geometry_control.get("reference_sets", [])
+        if isinstance(row, dict) and row.get("reference_set_id")
+    ]
+    candidate_sets = [
+        row
+        for row in geometry_control.get("candidate_sets", [])
+        if isinstance(row, dict) and row.get("candidate_set_id")
+    ]
+
+    source_labels = []
+    for source_id, source in context.config.sources.items():
+        if hasattr(source, "dataset"):
+            source_labels.append(f"{source_id}:{source.dataset}")
+        elif hasattr(source, "path"):
+            source_labels.append(f"{source_id}:{source.path}")
+        else:
+            source_labels.append(source_id)
+    vector_columns = sorted(
+        {
+            view.vector.name
+            for view in context.config.views.values()
+            if hasattr(view, "vector") and getattr(view.vector, "kind", None) == "column"
+        }
+    )
+    visual_families = unique_in_order(
+        getattr(view, "tags", {}).get("family")
+        for view in context.config.views.values()
+        if getattr(view, "tags", {}).get("family") is not None
+    )
+    matrix_shapes = _matrix_shapes_from_control_plane(
+        candidate_inventory=candidate_inventory,
+        geometry_rows=geometry_rows,
+    )
+    row_count_text = "unknown"
+    dimensionality_text = "unknown"
+    if matrix_shapes:
+        row_count_text = ", ".join(f"{row['view_id']}={row['rows']}" for row in matrix_shapes[:4])
+        dimensionality_text = ", ".join(f"{row['view_id']}={row['dims']}" for row in matrix_shapes[:4])
+    reference_annotation_options = _reference_annotation_options(reference_sets)
+    configured_default_reference_set = str(geometry_control.get("default_reference_set") or "").strip()
+    reference_annotation_default = (
+        configured_default_reference_set
+        if configured_default_reference_set in set(reference_annotation_options.values())
+        else ""
+    )
+    reference_hue_options = dict(_REFERENCE_HUE_OPTIONS)
+    reference_hue_columns = [value for value in reference_hue_options.values() if value]
+    reference_required_columns = list(
+        dict.fromkeys([*_reference_required_columns(reference_sets), *reference_hue_columns])
+    )
     global_hue_columns, hue_kinds = _runtime_hue_columns(
         joinable_tables=joinable_tables,
         preferred_hues=preferred_hues,
@@ -632,11 +781,13 @@ def build_workspace_browser_runtime(
         render_plot_review_surface,
         output_root=output_root,
         workspace_dir=workspace_dir,
+        axis_styles=axis_styles,
     )
     render_projection_grid_for_workspace = partial(
         render_projection_grid,
         output_root=output_root,
         workspace_dir=workspace_dir,
+        axis_styles=axis_styles,
     )
     compare_pair_payload_for_output = partial(compare_pair_payload, output_root=output_root)
     plot_review = _plot_review_sections(
@@ -673,6 +824,8 @@ def build_workspace_browser_runtime(
             section_names=section_names,
         ),
         geometry=BrowserGeometry(
+            axis_styles=axis_styles,
+            candidate_sets=candidate_sets,
             compare_left_default=str(geometry_control.get("default_compare_left") or ""),
             compare_metrics=compare_metrics if isinstance(compare_metrics, dict) else {},
             compare_right_default=str(geometry_control.get("default_compare_right") or ""),
@@ -691,15 +844,21 @@ def build_workspace_browser_runtime(
             model_values=model_values,
             preferred_hues=preferred_hues,
             row_metadata_hues=row_metadata_hues,
+            reference_annotation_default=reference_annotation_default,
+            reference_annotation_options=reference_annotation_options,
+            reference_hue_columns=reference_hue_columns,
+            reference_hue_options=reference_hue_options,
             reference_labels=reference_labels,
+            reference_required_columns=reference_required_columns,
+            reference_sets=reference_sets,
             selected_hue_default=selected_hue_default,
         ),
         plot_review=plot_review,
         support=BrowserSupport(
             available_hues_for_frames=available_hues_for_frames,
             candidate_hue_columns=candidate_hue_columns,
-            category_color_map=category_color_map,
-            display_hue_label=display_hue_label,
+            category_color_map=partial(category_color_map, axis_styles=axis_styles),
+            display_hue_label=partial(display_hue_label, axis_styles=axis_styles),
             json=json,
             key_value_table=key_value_table,
             load_json=load_json,
@@ -710,7 +869,10 @@ def build_workspace_browser_runtime(
             labeled_options=labeled_options,
             pd=pd,
             read_text=read_text,
+            reference_annotation_mode_options=reference_annotation_mode_options,
+            reference_label_limit_for_annotation_mode=reference_label_limit_for_annotation_mode,
             render_math_markdown=render_math_markdown,
+            resolve_labeled_option_card=resolve_labeled_option_card,
             select_plot_render_path=select_plot_render_path,
             style_notebook_axes=style_notebook_axes,
             table_from_records=table_from_records,

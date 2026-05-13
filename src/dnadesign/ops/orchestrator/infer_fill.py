@@ -346,14 +346,20 @@ def _classify_infer_lane(*, runbook_path: Path, runbook: OrchestrationRunbookV1)
     if totals["missing_products"] > 0:
         action = "blocked"
         reasons.append("missing sequence products block submit")
-    if totals["stale_vectors"] > 0 or totals["stale_scalars"] > 0:
+    if action == "run" and _completion_requires_repair_without_durable_plan(completion):
         action = "blocked"
-        reasons.append("stale feature sidecars require explicit repair before submit")
-    if action == "run" and totals["missing_vectors"] == 0 and totals["missing_scalars"] == 0:
+        reasons.append("Infer lane requires shard-level durability plan before submit")
+    if (
+        action == "run"
+        and totals["missing_vectors"] == 0
+        and totals["missing_scalars"] == 0
+        and totals["stale_vectors"] == 0
+        and totals["stale_scalars"] == 0
+    ):
         action = "skip_complete"
         reasons.append("feature sidecars already complete")
     if action == "run":
-        reasons.append("missing vectors or scalars remain")
+        reasons.append("missing or stale vectors/scalars remain")
     return InferFillLane(
         runbook_path=runbook_path,
         runbook_id=runbook.id,
@@ -371,6 +377,26 @@ def _classify_infer_lane(*, runbook_path: Path, runbook: OrchestrationRunbookV1)
         stale_vectors=totals["stale_vectors"],
         stale_scalars=totals["stale_scalars"],
     )
+
+
+def _completion_requires_repair_without_durable_plan(completion: tuple[Mapping[str, object], ...]) -> bool:
+    for plan in completion:
+        pending = (
+            _mapping_int(plan, "missing_vectors")
+            + _mapping_int(plan, "missing_scalars")
+            + _mapping_int(plan, "stale_vectors")
+            + _mapping_int(plan, "stale_scalars")
+        )
+        if pending <= 0:
+            continue
+        shard_plan = plan.get("shard_plan")
+        if not isinstance(shard_plan, Mapping):
+            return True
+        if str(shard_plan.get("commit_policy") or "") != "temp_validate_promote":
+            return True
+        if str(shard_plan.get("resume_policy") or "") != "skip_committed_retry_failed":
+            return True
+    return False
 
 
 def _skip_lane(*, runbook_path: Path, runbook: OrchestrationRunbookV1, reason: str) -> InferFillLane:

@@ -22,7 +22,7 @@ from ..runs.recorder import record_audit
 from ..sources.provenance import source_provenance_digest
 from ..version import __version__
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
-from ..workspaces.plot_semantics import resolve_plot_semantics
+from ..workspaces.plot_semantics import inline_plot_semantics, resolve_plot_semantics
 from ._plot_payloads import manifest_params_for_plot, plot_artifact_inputs, plot_input_payload
 from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 
@@ -205,10 +205,10 @@ def render_plot(
 
     staging_dir = _stage_plot_dir(context.output_root / "plots", plot_id)
     try:
-        semantics = resolve_plot_semantics(
-            context,
-            plot_id=spec.config_id or spec.plot_id,
-            allow_generated_fallback=spec.config_id is None,
+        semantics = (
+            inline_plot_semantics(spec.plot_id)
+            if spec.config_id is None
+            else resolve_plot_semantics(context, plot_id=spec.config_id)
         )
         source_provenance = [
             {

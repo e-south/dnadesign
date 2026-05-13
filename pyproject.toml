@@ -86,6 +86,7 @@ infer-evo2 = [
   # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0)
   "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "evo2>=0.5.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "transformers; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [dependency-groups]

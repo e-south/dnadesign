@@ -36,10 +36,12 @@ from ..datasets.core.ingest import (
 from ..datasets.lifecycle.materialize import materialize_dataset
 from ..datasets.maintenance.dedupe import dedupe_dataset
 from ..datasets.overlay import (
+    OverlayMetadataRefreshResult,
     attach_columns_dataset,
     attach_dataset,
     compact_overlay_namespace,
     list_overlay_infos,
+    refresh_compact_overlay_metadata,
     remove_overlay_namespace,
     write_overlay_dataset,
     write_overlay_digest_ledger_namespace,
@@ -665,6 +667,9 @@ class Dataset:
 
     def compact_overlay(self, namespace: str) -> Path:
         return compact_overlay_namespace(self, namespace, reserved_namespaces=RESERVED_NAMESPACES)
+
+    def refresh_overlay_metadata(self, namespace: str) -> OverlayMetadataRefreshResult:
+        return refresh_compact_overlay_metadata(self, namespace, reserved_namespaces=RESERVED_NAMESPACES)
 
     def write_overlay_digest_ledger(self, namespace: str) -> Path:
         return write_overlay_digest_ledger_namespace(self, namespace)

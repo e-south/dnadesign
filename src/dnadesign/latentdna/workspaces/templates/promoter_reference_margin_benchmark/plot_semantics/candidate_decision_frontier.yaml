@@ -2,7 +2,7 @@ plot_id: candidate_decision_frontier
 question: Which candidate best balances design structure, ordered Sigma-35 signal, and context retention without relying on UMAP aesthetics?
 decision_role: primary
 encoding: Single-panel decision frontier over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects effective rank, and each point is directly labeled with callout annotations.
-scope: The healthy 7B study-facing candidates summarized from the persisted health, design-structure, Sigma-35, and context-robustness scalar tables. Gate-failed pooled-logit candidates are adjudicated in the preceding health gate rather than repeated here.
+scope: The healthy 7B study-facing candidates summarized from the persisted health, design-structure, Sigma-35, and context-robustness scalar tables. Gate-failed output-layer-mean candidates are adjudicated in the preceding health gate rather than repeated here.
 guardrails:
   - Read this figure as a synthesis of the healthy-candidate review path, not a replacement for the health gate or the direct context comparison.
   - Read the row-level bridge plots before treating small point-to-point differences as meaningful.

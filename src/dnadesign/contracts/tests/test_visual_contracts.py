@@ -17,12 +17,255 @@ from dnadesign.contracts.visual import (
     CassetteViewsManifestV1,
     HairpinTopologyViewV1,
     LinearDuplexViewV1,
+    ScarNickVisualV1,
     SequenceEvidenceMapV1,
     SnapbackVisualV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
     YiuTopologyCartoonV1,
 )
+
+
+def _scar_nick_pair_classes(profile: str = "MXMX") -> list[dict[str, object]]:
+    base_rows = [
+        {
+            "position": 0,
+            "site": "S3",
+            "source_offset": 0,
+            "left_base": "G",
+            "right_base": "C",
+            "aligned_right_base": "G",
+        },
+        {
+            "position": 1,
+            "site": "S2",
+            "source_offset": 1,
+            "left_base": "C",
+            "right_base": "T",
+            "aligned_right_base": "A",
+        },
+        {
+            "position": 2,
+            "site": "S1",
+            "source_offset": 2,
+            "left_base": "C",
+            "right_base": "G",
+            "aligned_right_base": "C",
+        },
+        {
+            "position": 3,
+            "site": "S0",
+            "source_offset": 3,
+            "left_base": "C",
+            "right_base": "T",
+            "aligned_right_base": "A",
+        },
+    ]
+    return [{**row, "class_label": label} for row, label in zip(base_rows, profile, strict=True)]
+
+
+def _scar_nick_fill(panel: dict[str, object], semantic: str, fill_id: str, fill: str) -> dict[str, object]:
+    span = panel[f"{semantic}_span"] if semantic != "nickase_site" else panel["nickase_site_span"]
+    return {
+        "fill_id": fill_id,
+        "semantic": {
+            "release_site": "type_iis_release_site",
+            "type_iis_offset": "type_iis_offset_spacer",
+            "retained_scar": "retained_type_iis_scar",
+            "nickase_site": "nickase_footprint",
+        }[semantic],
+        "start": span["start"],
+        "end": span["end"],
+        "cover_rows": "both",
+        "fill": fill,
+        "alpha": {
+            "release_site": 0.34,
+            "type_iis_offset": 0.28,
+            "retained_scar": 0.36,
+            "nickase_site": 0.24,
+        }[semantic],
+        "corner_radius": 0.0,
+    }
+
+
+def _scar_nick_degenerate_nucleotide_fills(
+    panel: dict[str, object],
+    *,
+    motif_top_5to3: str,
+) -> list[dict[str, object]]:
+    span = panel["nickase_site_span"]
+    start = int(span["start"])
+    fills: list[dict[str, object]] = []
+    for offset, symbol in enumerate(motif_top_5to3):
+        if symbol.upper() != "N":
+            continue
+        position = start + offset
+        for row_id in ("primary", "complement"):
+            fills.append(
+                {
+                    "fill_id": f"{panel['panel_id']}_degenerate_nucleotide_{row_id}_{position}",
+                    "semantic": "degenerate_nucleotide",
+                    "start": position,
+                    "end": position + 1,
+                    "cover_rows": row_id,
+                    "fill": "#FDE68A",
+                    "alpha": 0.84,
+                    "corner_radius": 3.0,
+                    "edge_color": "#F59E0B",
+                    "edge_alpha": 0.80,
+                    "edge_linewidth": 0.36,
+                }
+            )
+    return fills
+
+
+def _scar_nick_visual_payload() -> dict[str, object]:
+    pre_sequence = "GGTCTCGGCCC"
+    pre_complement = "CCAGAGCCGGG"
+    post_complement = "CCAGAGCCTGT"
+    nickase_motif = "GGTCTCGNNNN"
+    spacer = "NNNN"
+    post_offset = len(pre_sequence) + len(spacer)
+    pre_panel = {
+        "panel_id": "pre_release",
+        "title": "before terminal nick",
+        "state_kind": "pre_terminal_nick",
+        "nick_state": "intact",
+        "start": 0,
+        "end": len(pre_sequence),
+        "terminal_boundary": 11,
+        "nick_boundary": 11,
+        "retained_product_span": {"start": 7, "end": 11},
+        "release_site_span": {"start": 0, "end": 6},
+        "type_iis_offset_span": {"start": 6, "end": 7},
+        "retained_scar_span": {"start": 7, "end": 11},
+        "nickase_site_span": {"start": 0, "end": 11},
+        "fragment_spans": [],
+    }
+    post_panel = {
+        "panel_id": "post_release",
+        "title": "after terminal nick",
+        "state_kind": "post_terminal_nick",
+        "nick_state": "nicked",
+        "start": post_offset,
+        "end": post_offset + len(pre_sequence),
+        "terminal_boundary": post_offset + 11,
+        "nick_boundary": post_offset + 11,
+        "retained_product_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "release_site_span": {"start": post_offset, "end": post_offset + 6},
+        "type_iis_offset_span": {"start": post_offset + 6, "end": post_offset + 7},
+        "retained_scar_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "nickase_site_span": {"start": post_offset, "end": post_offset + 11},
+        "fragment_spans": [{"row": "complement", "start": post_offset, "end": post_offset + 11}],
+    }
+    rectangular_fills = []
+    for panel in (pre_panel, post_panel):
+        prefix = panel["panel_id"]
+        rectangular_fills.extend(
+            [
+                _scar_nick_fill(panel, "release_site", f"{prefix}_type_iis_release_site", "#F0E442"),
+                _scar_nick_fill(panel, "type_iis_offset", f"{prefix}_type_iis_offset_spacer", "#FFF6B3"),
+                {
+                    **_scar_nick_fill(panel, "retained_scar", f"{prefix}_retained_type_iis_scar", "#009E73"),
+                    "cover_rows": "primary" if panel["panel_id"] == "post_release" else "both",
+                },
+            ]
+        )
+        if panel["panel_id"] == "pre_release":
+            rectangular_fills.append(_scar_nick_fill(panel, "nickase_site", f"{prefix}_nickase_footprint", "#56B4E9"))
+        if panel["panel_id"] == "post_release":
+            fragment_span = panel["fragment_spans"][0]
+            rectangular_fills.append(
+                {
+                    "fill_id": f"{prefix}_annealed_adapter_fragment_0",
+                    "semantic": "annealed_adapter_fragment",
+                    "start": fragment_span["start"],
+                    "end": fragment_span["end"],
+                    "cover_rows": fragment_span["row"],
+                    "fill": "#CBD5E1",
+                    "alpha": 0.48,
+                    "corner_radius": 4.0,
+                    "edge_color": "#94A3B8",
+                    "edge_alpha": 0.64,
+                    "edge_linewidth": 0.45,
+                }
+            )
+        rectangular_fills.extend(_scar_nick_degenerate_nucleotide_fills(panel, motif_top_5to3=nickase_motif))
+    return {
+        "contract_kind": "scar_nick_visual_v1",
+        "state_id": "candidate_01.pre_post_terminal_nick",
+        "state_kind": "pre_post_terminal_nick",
+        "event_scope": "terminal_nick",
+        "alphabet": "iupac_dna",
+        "primary_sequence": pre_sequence + spacer + pre_sequence,
+        "complement_sequence": pre_complement + spacer + post_complement,
+        "primary_row_label": "Top",
+        "complement_row_label": "Bottom",
+        "terminal_boundary": post_offset + 11,
+        "nick_boundary": post_offset + 11,
+        "retained_product_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "release_site_span": {"start": post_offset, "end": post_offset + 6},
+        "type_iis_offset_span": {"start": post_offset + 6, "end": post_offset + 7},
+        "retained_scar_span": {"start": post_offset + 7, "end": post_offset + 11},
+        "junction_partner_span": None,
+        "nickase_site_span": {"start": post_offset, "end": post_offset + 11},
+        "nickase_site_source_span": {"start": -7, "end": 4},
+        "nick_state": "pre_post",
+        "retained_scar": "GCCC",
+        "left_base": "GCCC",
+        "right_base": "TGTC",
+        "nicked_strand": "bottom",
+        "surviving_strand": "top",
+        "profile_s3s2s1s0": "MXMX",
+        "profile_payload_outward": "XMXM",
+        "pair_classes": _scar_nick_pair_classes(),
+        "panels": [pre_panel, post_panel],
+        "rectangular_fills": rectangular_fills,
+        "release_placement": {
+            "variant_id": "BsaI-HFv2",
+            "orientation": "forward",
+            "recognition_sequence": "GGTCTC",
+            "recognition_site_excised": True,
+            "source_catalog_id": "type_iis_release_v1",
+            "source_url": "https://www.neb.com/en-us/products/r3733-bsai-hf-v2",
+            "commercial_confidence": "primary_vendor_current",
+            "warning_codes": [],
+            "recognition_site_start": -7,
+            "recognition_site_end": -1,
+            "top_cut_boundary": 0,
+            "bottom_cut_boundary": 4,
+            "retained_scar_start": 0,
+            "retained_scar_end": 4,
+            "retained_scar_nt": 4,
+        },
+        "nickase": {
+            "variant_id": "Test.TerminalBottomNickase",
+            "specificity_id": "TerminalBottomNickase",
+            "orientation": "forward",
+            "canonical_read_row": "primary",
+            "motif_top_5to3": nickase_motif,
+            "canonical_motif_top_5to3": nickase_motif,
+            "recognition_nt": 7,
+            "vendor": "dnadesign test fixture",
+            "source_url": "https://example.invalid/dnadesign/scar-nick-terminal-fixture",
+            "source_family": "nicking_endonuclease",
+            "commercial_confidence": "primary_vendor_current",
+            "warning_codes": [],
+            "source_site_start": -7,
+            "source_site_end": 4,
+            "strand": "bottom",
+            "boundary": 4,
+            "terminal_boundary": 4,
+            "display_boundary": post_offset + 11,
+            "display_site_span": {"start": post_offset, "end": post_offset + 11},
+            "exact_terminal": True,
+            "site": "Test.TerminalBottomNickase:forward[-7,4)",
+        },
+        "meta": {
+            "panel_spacer_indices": list(range(len(pre_sequence), post_offset)),
+            "mismatch_indices": [post_offset + 8, post_offset + 10],
+        },
+    }
 
 
 def test_linear_duplex_view_contract_validates_example_payload() -> None:
@@ -110,6 +353,224 @@ def test_linear_duplex_view_contract_validates_example_payload() -> None:
     assert view.kind == "linear_duplex_v1"
     assert view.target_strand == "complement"
     assert view.bounded_segment.end_boundary - view.bounded_segment.start_boundary == 13
+
+
+def test_scar_nick_visual_contract_validates_nick_state_payload() -> None:
+    payload = _scar_nick_visual_payload()
+
+    contract = ScarNickVisualV1.model_validate(payload)
+
+    assert contract.contract_kind == "scar_nick_visual_v1"
+    assert contract.state_kind == "pre_post_terminal_nick"
+    assert [panel.panel_id for panel in contract.panels] == ["pre_release", "post_release"]
+    assert contract.rectangular_fills[2].corner_radius == 0.0
+    nickase_fills = [fill for fill in contract.rectangular_fills if fill.semantic == "nickase_footprint"]
+    assert len(nickase_fills) == 1
+    assert nickase_fills[0].start == contract.panels[0].nickase_site_span.start
+    fragment_span = contract.panels[1].fragment_spans[0]
+    assert fragment_span.end == contract.panels[1].nick_boundary
+    fragment_fill = next(fill for fill in contract.rectangular_fills if fill.semantic == "annealed_adapter_fragment")
+    assert fragment_fill.edge_color == "#94A3B8"
+    assert fragment_fill.edge_alpha == 0.64
+    assert fragment_fill.edge_linewidth == 0.45
+    post_scar_fill = next(
+        fill for fill in contract.rectangular_fills if fill.fill_id == "post_release_retained_type_iis_scar"
+    )
+    assert post_scar_fill.cover_rows == "primary"
+
+
+def test_scar_nick_visual_contract_requires_nickase_strand_and_fragment_row_consistency() -> None:
+    mismatched_strand = _scar_nick_visual_payload()
+    mismatched_strand["nickase"]["strand"] = "top"
+    with pytest.raises(ValueError, match="nickase strand must match nicked_strand"):
+        ScarNickVisualV1.model_validate(mismatched_strand)
+
+    wrong_fragment_row = _scar_nick_visual_payload()
+    wrong_fragment_row["panels"][1]["fragment_spans"][0]["row"] = "primary"
+    with pytest.raises(ValueError, match="fragment spans must be on the nicked strand"):
+        ScarNickVisualV1.model_validate(wrong_fragment_row)
+
+    fragment_stops_before_nick = _scar_nick_visual_payload()
+    fragment_stops_before_nick["panels"][1]["fragment_spans"][0]["end"] = fragment_stops_before_nick["panels"][1][
+        "retained_scar_span"
+    ]["start"]
+    with pytest.raises(ValueError, match="fragment spans must terminate at the nick boundary"):
+        ScarNickVisualV1.model_validate(fragment_stops_before_nick)
+
+    post_scar_covers_nicked_strand = _scar_nick_visual_payload()
+    for fill in post_scar_covers_nicked_strand["rectangular_fills"]:
+        if fill["fill_id"] == "post_release_retained_type_iis_scar":
+            fill["cover_rows"] = "both"
+    with pytest.raises(ValueError, match="post-release retained Type IIS scar fill must cover the surviving strand"):
+        ScarNickVisualV1.model_validate(post_scar_covers_nicked_strand)
+
+
+def test_scar_nick_visual_contract_accepts_catalog_type_iis_release_without_bsa_i_pin() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["release_placement"]["variant_id"] = "BbsI-HF"
+    payload["release_placement"]["source_url"] = "https://www.neb.com/en-us/products/r3539-bbsi-hf"
+
+    contract = ScarNickVisualV1.model_validate(payload)
+
+    assert contract.release_placement.variant_id == "BbsI-HF"
+    assert contract.release_placement.retained_scar_nt == 4
+
+
+def test_scar_nick_visual_contract_rejects_non_rectangular_scar_fill() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["rectangular_fills"][2]["corner_radius"] = 6.0
+
+    with pytest.raises(ValueError, match="retained Type IIS scar fill must be rectangular"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_complement_drift() -> None:
+    payload = _scar_nick_visual_payload()
+    complement = list(str(payload["complement_sequence"]))
+    complement[15] = "A"
+    payload["complement_sequence"] = "".join(complement)
+
+    with pytest.raises(ValueError, match="complement only inside post_release retained scar"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_pre_release_adapter_mismatch() -> None:
+    payload = _scar_nick_visual_payload()
+    complement = list(str(payload["complement_sequence"]))
+    complement[10] = "T"
+    payload["complement_sequence"] = "".join(complement)
+
+    with pytest.raises(ValueError, match="pre_release panel must be Watson-Crick paired"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_requires_release_sequence_identity() -> None:
+    payload = _scar_nick_visual_payload()
+    del payload["release_placement"]["recognition_sequence"]
+
+    with pytest.raises(ValueError, match="recognition_sequence"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_requires_nickase_catalog_identity_and_motif() -> None:
+    missing_motif = _scar_nick_visual_payload()
+    del missing_motif["nickase"]["motif_top_5to3"]
+    with pytest.raises(ValueError, match="motif_top_5to3"):
+        ScarNickVisualV1.model_validate(missing_motif)
+
+    missing_variant = _scar_nick_visual_payload()
+    del missing_variant["nickase"]["variant_id"]
+    with pytest.raises(ValueError, match="variant_id"):
+        ScarNickVisualV1.model_validate(missing_variant)
+
+
+def test_scar_nick_visual_contract_rejects_downstream_partner_span() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["junction_partner_span"] = {"start": 8, "end": 10}
+
+    with pytest.raises(ValueError, match="partner sequence downstream"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_requires_release_and_nickase_fills() -> None:
+    no_release_fill = _scar_nick_visual_payload()
+    no_release_fill["rectangular_fills"] = [
+        fill for fill in no_release_fill["rectangular_fills"] if fill["semantic"] != "type_iis_release_site"
+    ]
+    with pytest.raises(ValueError, match="type_iis_release_site"):
+        ScarNickVisualV1.model_validate(no_release_fill)
+
+    no_nickase_fill = _scar_nick_visual_payload()
+    no_nickase_fill["rectangular_fills"] = [
+        fill for fill in no_nickase_fill["rectangular_fills"] if fill["semantic"] != "nickase_footprint"
+    ]
+    with pytest.raises(ValueError, match="nickase_footprint"):
+        ScarNickVisualV1.model_validate(no_nickase_fill)
+
+
+def test_scar_nick_visual_contract_requires_post_release_fragment_fill() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["rectangular_fills"] = [
+        fill for fill in payload["rectangular_fills"] if fill["semantic"] != "annealed_adapter_fragment"
+    ]
+
+    with pytest.raises(ValueError, match="annealed_adapter_fragment"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_requires_canonical_nickase_read_row() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["nickase"]["orientation"] = "reverse"
+    payload["nickase"]["canonical_read_row"] = "complement"
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNCGAGACC"
+
+    ScarNickVisualV1.model_validate(payload)
+
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNCGAGACA"
+
+    with pytest.raises(ValueError, match="motif_top_5to3 must match canonical_motif_top_5to3"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_post_release_nickase_fill() -> None:
+    payload = _scar_nick_visual_payload()
+    post_panel = payload["panels"][1]
+    payload["rectangular_fills"].append(
+        _scar_nick_fill(post_panel, "nickase_site", "post_release_nickase_footprint", "#56B4E9")
+    )
+
+    with pytest.raises(ValueError, match="pre_release panel only"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_short_nickase_recognition_site() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["nickase"]["variant_id"] = "Nt.CviPII"
+    payload["nickase"]["specificity_id"] = "CviPII"
+    payload["nickase"]["motif_top_5to3"] = "NNNNHGGNNNN"
+    payload["nickase"]["canonical_motif_top_5to3"] = "NNNNHGGNNNN"
+    payload["nickase"]["recognition_nt"] = 3
+
+    with pytest.raises(ValueError, match="at least 4 nt"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_pair_class_drift() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["pair_classes"] = _scar_nick_pair_classes("MMXM")
+
+    with pytest.raises(ValueError, match="pair_classes class labels"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_wobble_label_without_gt_pair() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["profile_s3s2s1s0"] = "MWMX"
+    payload["profile_payload_outward"] = "XMWM"
+    payload["pair_classes"] = _scar_nick_pair_classes("MWMX")
+
+    with pytest.raises(ValueError, match="W pair_classes must be G:T or T:G physical pairs"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_terminal_boundary_off_scar_end() -> None:
+    payload = _scar_nick_visual_payload()
+    payload["terminal_boundary"] = 10
+    payload["nick_boundary"] = 10
+    payload["nickase"]["display_boundary"] = 10
+
+    with pytest.raises(ValueError, match="terminal_boundary must equal retained_scar_span.end"):
+        ScarNickVisualV1.model_validate(payload)
+
+
+def test_scar_nick_visual_contract_rejects_non_nucleotide_symbols() -> None:
+    payload = _scar_nick_visual_payload()
+    sequence_length = len(str(payload["primary_sequence"]))
+    payload["primary_sequence"] = "Z" * sequence_length
+    payload["complement_sequence"] = "Z" * sequence_length
+
+    with pytest.raises(ValueError, match="primary_sequence contains symbols outside iupac_dna"):
+        ScarNickVisualV1.model_validate(payload)
 
 
 def test_hairpin_topology_view_contract_validates_example_payload() -> None:

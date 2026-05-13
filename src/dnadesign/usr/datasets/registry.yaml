@@ -460,6 +460,70 @@ namespaces:
       type: string
     description: Source-backed synthetic promoter standard strength and collection metadata.
     owner: usr
+  sfxi_ref:
+    columns:
+    - name: sfxi_ref__reference_instance_id
+      type: string
+    - name: sfxi_ref__collection_id
+      type: string
+    - name: sfxi_ref__batch_id
+      type: string
+    - name: sfxi_ref__campaign_id
+      type: string
+    - name: sfxi_ref__reader_experiment_id
+      type: string
+    - name: sfxi_ref__reader_experiment_date
+      type: int64
+    - name: sfxi_ref__metric_id
+      type: string
+    - name: sfxi_ref__metric_value
+      type: float64
+    - name: sfxi_ref__metric_provenance
+      type: string
+    - name: sfxi_ref__source_ref
+      type: string
+    - name: sfxi_ref__score_ref
+      type: string
+    - name: sfxi_ref__objective_name
+      type: string
+    - name: sfxi_ref__api_version
+      type: string
+    - name: sfxi_ref__state_order
+      type: list<string>
+    - name: sfxi_ref__setpoint_name
+      type: string
+    - name: sfxi_ref__setpoint_vector
+      type: list<float64>
+    - name: sfxi_ref__denom_used
+      type: float64
+    - name: sfxi_ref__denom_percentile
+      type: int64
+    - name: sfxi_ref__logic_fidelity
+      type: float64
+    - name: sfxi_ref__effect_raw
+      type: float64
+    - name: sfxi_ref__effect_scaled
+      type: float64
+    - name: sfxi_ref__sfxi
+      type: float64
+    - name: sfxi_ref__r_logic
+      type: float64
+    - name: sfxi_ref__time_selected_h
+      type: float64
+    - name: sfxi_ref__reference_design_id
+      type: string
+    - name: sfxi_ref__sequence_source_id
+      type: string
+    - name: sfxi_ref__clip_lo_mask
+      type: bool
+    - name: sfxi_ref__clip_hi_mask
+      type: bool
+    - name: sfxi_ref__intensity_disabled
+      type: bool
+    - name: sfxi_ref__flat_logic
+      type: bool
+    description: Provenance-aware SFXI reference metrics for annotation overlays.
+    owner: usr
   regulondb:
     columns:
     - name: regulondb__release

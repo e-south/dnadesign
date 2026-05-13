@@ -15,8 +15,10 @@ from ..contracts.notebook import (
     WorkspaceNotebookRuntimePaths,
 )
 from ..io.json_io import read_json
+from .candidate_inventory_service import build_candidate_inventory
 from .notebook_context_audit import build_workspace_notebook_context_audit
 from .notebook_geometry_controls import build_workspace_geometry_controls
+from .view_shape_cache import ViewShapeCache, view_shape_cache_from_inventory
 
 
 def _runtime_paths(context, *, notebook_id: str) -> WorkspaceNotebookRuntimePaths:
@@ -89,19 +91,51 @@ def _plot_controls(
     )
 
 
+def _candidate_inventory_payload(
+    context,
+    *,
+    catalog_payload: dict[str, object] | None,
+    shape_cache: ViewShapeCache,
+) -> list[dict[str, object]]:
+    if isinstance(catalog_payload, dict):
+        rows = catalog_payload.get("candidate_inventory")
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, dict)]
+    return build_candidate_inventory(context, shape_cache=shape_cache)
+
+
 def build_workspace_notebook_controls_payload(
     context,
     *,
     notebook_id: str,
     catalog_payload: dict[str, object] | None = None,
 ) -> WorkspaceNotebookControls:
+    catalog_inventory = catalog_payload.get("candidate_inventory") if isinstance(catalog_payload, dict) else None
+    shape_cache = (
+        view_shape_cache_from_inventory(
+            context.output_root,
+            [row for row in catalog_inventory if isinstance(row, dict)],
+        )
+        if isinstance(catalog_inventory, list)
+        else ViewShapeCache(output_root=context.output_root)
+    )
+    candidate_inventory = _candidate_inventory_payload(
+        context,
+        catalog_payload=catalog_payload,
+        shape_cache=shape_cache,
+    )
     return WorkspaceNotebookControls(
         schema_version="latentdna.workspace_notebook_controls.v4",
         workspace_id=context.workspace_id,
         notebook_id=notebook_id,
         generated_at=datetime.now(UTC).isoformat(),
         runtime_paths=_runtime_paths(context, notebook_id=notebook_id),
+        candidate_inventory=candidate_inventory,
         plot_controls=_plot_controls(context, notebook_id=notebook_id, catalog_payload=catalog_payload),
-        geometry_controls=build_workspace_geometry_controls(context, notebook_id=notebook_id),
+        geometry_controls=build_workspace_geometry_controls(
+            context,
+            notebook_id=notebook_id,
+            shape_cache=shape_cache,
+        ),
         context_audit=build_workspace_notebook_context_audit(context),
     )

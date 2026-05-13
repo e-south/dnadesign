@@ -29,7 +29,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
         snapback_workspace / "configs" / "snapback",
         yiu_workspace / "configs" / "yiu",
         repo_root / "src" / "dnadesign" / "cruncher" / "docs" / "dev",
-        repo_root / ".agents" / "skills" / "snapback-hairpin-study",
+        repo_root / ".agents" / "skills" / "retron-hairpin-study",
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -52,7 +52,7 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
         "# yiu\n",
         encoding="utf-8",
     )
-    (repo_root / ".agents" / "skills" / "snapback-hairpin-study" / "SKILL.md").write_text(
+    (repo_root / ".agents" / "skills" / "retron-hairpin-study" / "SKILL.md").write_text(
         "# skill\n",
         encoding="utf-8",
     )
@@ -154,14 +154,14 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
                 ],
                 "native_agent_bootstrap": {
                     "open_first": [
-                        "repo:.agents/skills/snapback-hairpin-study/SKILL.md",
+                        "repo:.agents/skills/retron-hairpin-study/SKILL.md",
                         "manifest:status.md",
                         "manifest:routes.md",
                         "manifest:pipeline.yaml",
                     ],
                     "pair_with": [
                         "harness-engineering",
-                        "pragmatic-programming-principles",
+                        "code-change-discipline (pragmatic-programming-principles lane)",
                     ],
                     "must_preserve": [
                         "released-product Snapback is the active shortening lane",
@@ -415,14 +415,14 @@ def test_provide_cruncher_status_exposes_command_groups_and_agent_bootstrap(tmp_
         "yiu_boundary_check",
     ]
     assert evidence["native_agent_bootstrap"]["open_first"] == [
-        str(tmp_path / ".agents" / "skills" / "snapback-hairpin-study" / "SKILL.md"),
+        str(tmp_path / ".agents" / "skills" / "retron-hairpin-study" / "SKILL.md"),
         str(study_root / "status.md"),
         str(study_root / "routes.md"),
         str(study_root / "pipeline.yaml"),
     ]
     assert evidence["native_agent_bootstrap"]["pair_with"] == [
         "harness-engineering",
-        "pragmatic-programming-principles",
+        "code-change-discipline (pragmatic-programming-principles lane)",
     ]
     assert "skill_ref" not in evidence["record_sources"]
     assert "repo_local_skill" not in evidence["artifacts"]

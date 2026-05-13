@@ -21,6 +21,15 @@ This page does not own:
 - template realization with `construct`
 - downstream OPAL round logic
 
+### DNA case contract
+
+Evo2 uses a character-level tokenizer where uppercase and lowercase DNA bases
+are different symbols. All A/C/G/T biological model inputs must be uppercase
+at Infer execution. Infer canonicalizes incoming DNA strings to uppercase before
+adapter calls and feature-key construction. Lowercase or mixed-case source
+products still invalidate old `_derived/infer` sidecars; regenerate those
+sidecars instead of reusing old vectors.
+
 Use the current cross-tool promoter-study workflow only when the task is about
 that specific checked-in study:
 

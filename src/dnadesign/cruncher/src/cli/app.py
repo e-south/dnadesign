@@ -30,6 +30,7 @@ from dnadesign.cruncher.cli.commands.parse import parse as parse_cmd
 from dnadesign.cruncher.cli.commands.portfolio import app as portfolio_app
 from dnadesign.cruncher.cli.commands.runs import app as runs_app
 from dnadesign.cruncher.cli.commands.sample import sample as sample_cmd
+from dnadesign.cruncher.cli.commands.scar_nick import app as scar_nick_app
 from dnadesign.cruncher.cli.commands.snapback import app as snapback_app
 from dnadesign.cruncher.cli.commands.sources import app as sources_app
 from dnadesign.cruncher.cli.commands.status import status as status_cmd
@@ -121,6 +122,12 @@ app.add_typer(
     name="snapback",
     help="Scaffold, validate, design, solve, and inspect single-nick snapback workflows.",
     short_help="single-nick snapback workflows.",
+)
+app.add_typer(
+    scar_nick_app,
+    name="scar-nick",
+    help="Validate, design, and inspect terminal Type IIS scar plus bottom-nick processing candidates.",
+    short_help="terminal Type IIS scar plus bottom-nick processing.",
 )
 app.add_typer(
     yiu_app,

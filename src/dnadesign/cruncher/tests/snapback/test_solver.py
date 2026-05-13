@@ -157,8 +157,8 @@ def test_run_snapback_solve_defaults_to_compact_ranges_and_reports_frontier(tmp_
     payload.pop("goal")
     payload["search"].pop("retained_homology_length")
     payload["search"]["min_paired_bp"] = 3
-    payload["search"]["max_enumerated_candidates"] = 4096
-    payload["search"]["max_search_nodes"] = 4096
+    payload["search"]["max_enumerated_candidates"] = 8192
+    payload["search"]["max_search_nodes"] = 8192
     payload["constraints"].pop("terminal_ligatable_duplex_bp")
     payload["constraints"].pop("max_uninterrupted_duplex_bp")
     spec_path = _write_workspace(tmp_path, spec_payload=payload, catalog_entries=_catalog_entries())
@@ -284,9 +284,9 @@ def test_run_snapback_solve_broad_preset_catalog_respects_outside_site_feasibili
     payload.pop("goal")
     payload["search"].pop("retained_homology_length")
     payload["search"]["min_paired_bp"] = 3
-    payload["search"]["max_enumerated_candidates"] = 4096
-    payload["search"]["max_search_nodes"] = 4096
-    payload["search"]["max_hits"] = 8
+    payload["search"]["max_enumerated_candidates"] = 8192
+    payload["search"]["max_search_nodes"] = 8192
+    payload["search"]["max_hits"] = 16
     payload["search"]["materialize_top_k"] = 1
     payload["constraints"] = {}
     payload["catalog"] = {

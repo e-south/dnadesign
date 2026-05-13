@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from math import ceil
 from textwrap import wrap
 
-from .labels import humanize_label, sigma35_variant_display
+from .labels import humanize_label
 
 TEXT_COLOR = "#16202A"
 GRID_COLOR = "#D5DCE4"
@@ -43,6 +43,8 @@ PUBLICATION_PALETTE = [
     "#F0E442",
     "#111111",
 ]
+
+SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE = 0.42
 
 _SEMANTIC_CATEGORY_COLORS = {
     "background": "#56B4E9",
@@ -84,17 +86,7 @@ _SEMANTIC_CATEGORY_PRIORITY = {
     "whole_sequence_context": 10,
 }
 
-_SIG35_VARIANT_STRENGTH_ORDER = ["f", "e", "d", "c", "b", "a"]
-_SIG35_VARIANT_PRIORITY = {variant: index for index, variant in enumerate(_SIG35_VARIANT_STRENGTH_ORDER)}
-_SIG35_VARIANT_COLORS = {
-    "f": "#B2182B",
-    "e": "#D6604D",
-    "d": "#F4A582",
-    "c": "#92C5DE",
-    "b": "#2166AC",
-    "a": "#053061",
-}
-_SIG35_VARIANT_NEUTRAL_COLOR = "#7F8894"
+_DEFAULT_CATEGORY_NEUTRAL_COLOR = "#7F8894"
 _SPACER_LENGTH_COLOR_STOPS = ("#2C7BB6", "#ABD9E9", "#FEE090", "#F46D43", "#D73027")
 _SINGLE_ROW_LEGEND_PLOT_IDS = frozenset(
     {
@@ -102,8 +94,7 @@ _SINGLE_ROW_LEGEND_PLOT_IDS = frozenset(
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
-        "sigma35_stress_margin_gallery",
-        "appendix_geometry_audit",
+        "appendix_geometry_review",
         "appendix_umap_gallery",
     }
 )
@@ -113,9 +104,7 @@ _LOWERED_LEGEND_PLOT_IDS = frozenset(
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
         "representation_scree_diagnostic",
-        "sigma35_stress_margin_gallery",
-        "appendix_geometry_audit",
-        "appendix_umap_gallery",
+        "appendix_geometry_review",
     }
 )
 
@@ -154,16 +143,19 @@ def normalize_category_key(value: object) -> str:
     return str(value or "").strip().lower().replace(" ", "_")
 
 
-def _sig35_variant_sort_key(value: object) -> tuple[int, str]:
-    text = str(value)
+def reference_annotation_label(value: object) -> str:
+    text = " ".join(str(value or "").split()).strip()
+    if not text:
+        return ""
+    text = re.sub(r"(?:_core60)?_context1kb_(?:forward|rc)$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"_context1kb_rc$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"_core60$", "", text, flags=re.IGNORECASE)
     normalized = normalize_category_key(text)
-    if normalized in _SIG35_VARIANT_PRIORITY:
-        return _SIG35_VARIANT_PRIORITY[normalized], text.casefold()
-    if normalized == "control":
-        return len(_SIG35_VARIANT_PRIORITY), text.casefold()
-    if normalized in {"unknown", "na", "n/a"}:
-        return len(_SIG35_VARIANT_PRIORITY) + 1, text.casefold()
-    return len(_SIG35_VARIANT_PRIORITY) + 2, text.casefold()
+    return {
+        "spyp": "spyP",
+        "sulap": "sulAp",
+        "j23105": "J23105",
+    }.get(normalized, text)
 
 
 def _numeric_category_value(value: object) -> float | None:
@@ -205,6 +197,49 @@ def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
     return "#{:02X}{:02X}{:02X}".format(*rgb)
 
 
+def _linear_channel(value: float) -> float:
+    normalized = value / 255.0
+    if normalized <= 0.04045:
+        return normalized / 12.92
+    return ((normalized + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(rgb: tuple[int, int, int]) -> float:
+    red, green, blue = (_linear_channel(value) for value in rgb)
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+
+
+def _is_hex_color(value: object) -> bool:
+    text = str(value or "").strip()
+    if text.startswith("#"):
+        text = text[1:]
+    return len(text) == 6 and all(character in "0123456789abcdefABCDEF" for character in text)
+
+
+def contrast_safe_scatter_color(color: str) -> str:
+    """Darken very light hex colors for readable dense scatter overlays."""
+    if not _is_hex_color(color):
+        return color
+    rgb = _hex_to_rgb(color)
+    if _relative_luminance(rgb) <= SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE:
+        return _rgb_to_hex(rgb)
+
+    lower = 0.0
+    upper = 1.0
+    for _ in range(32):
+        factor = (lower + upper) / 2.0
+        candidate = tuple(int(round(channel * factor)) for channel in rgb)
+        if _relative_luminance(candidate) > SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE:
+            upper = factor
+        else:
+            lower = factor
+    return _rgb_to_hex(tuple(int(round(channel * lower)) for channel in rgb))
+
+
+def contrast_safe_scatter_color_map(color_map: dict[str, str]) -> dict[str, str]:
+    return {category: contrast_safe_scatter_color(color) for category, color in color_map.items()}
+
+
 def _interpolate_hex_color(left: str, right: str, fraction: float) -> str:
     left_rgb = _hex_to_rgb(left)
     right_rgb = _hex_to_rgb(right)
@@ -242,8 +277,6 @@ def _color_ramp(color_stops: tuple[str, ...], count: int) -> list[str]:
 
 def ordered_categories(values: Iterable[str], *, column: str | None = None) -> list[str]:
     unique = sorted({str(value) for value in values})
-    if str(column or "").strip() == "sig35_variant":
-        return sorted(unique, key=_sig35_variant_sort_key)
     if str(column or "").strip() == "spacer_length":
         return sorted(unique, key=_spacer_length_sort_key)
     return sorted(
@@ -266,19 +299,11 @@ def categorical_color_map(categories: Iterable[str], *, column: str | None = Non
             )
         }
         for category in non_numeric_categories:
-            color_map[category] = _SIG35_VARIANT_NEUTRAL_COLOR
+            color_map[category] = _DEFAULT_CATEGORY_NEUTRAL_COLOR
         return color_map
     color_map: dict[str, str] = {}
     fallback_index = 0
     for category in ordered:
-        normalized_category = normalize_category_key(category)
-        if str(column or "").strip() == "sig35_variant":
-            if normalized_category in _SIG35_VARIANT_COLORS:
-                color_map[category] = _SIG35_VARIANT_COLORS[normalized_category]
-                continue
-            if normalized_category in {"control", "unknown", "na", "n/a"}:
-                color_map[category] = _SIG35_VARIANT_NEUTRAL_COLOR
-                continue
         semantic_color = _SEMANTIC_CATEGORY_COLORS.get(normalize_category_key(category))
         if semantic_color is not None:
             color_map[category] = semantic_color
@@ -290,20 +315,22 @@ def categorical_color_map(categories: Iterable[str], *, column: str | None = Non
 
 def scatter_style(row_count: int) -> ScatterStyle:
     if row_count <= 250:
-        return ScatterStyle(point_size=30.0, alpha=0.84, edgecolors="white", linewidths=0.32, rasterized=False)
+        return ScatterStyle(point_size=38.0, alpha=0.92, edgecolors="white", linewidths=0.32, rasterized=False)
     if row_count <= 1_000:
-        return ScatterStyle(point_size=16.0, alpha=0.66, edgecolors="white", linewidths=0.16, rasterized=False)
+        return ScatterStyle(point_size=24.0, alpha=0.82, edgecolors="white", linewidths=0.16, rasterized=False)
     if row_count <= 5_000:
-        return ScatterStyle(point_size=6.6, alpha=0.34, edgecolors="none", linewidths=0.0, rasterized=True)
+        return ScatterStyle(point_size=16.0, alpha=0.76, edgecolors="none", linewidths=0.0, rasterized=True)
     if row_count <= 20_000:
-        return ScatterStyle(point_size=3.4, alpha=0.22, edgecolors="none", linewidths=0.0, rasterized=True)
-    return ScatterStyle(point_size=1.7, alpha=0.15, edgecolors="none", linewidths=0.0, rasterized=True)
+        return ScatterStyle(point_size=12.0, alpha=0.68, edgecolors="none", linewidths=0.0, rasterized=True)
+    return ScatterStyle(point_size=9.0, alpha=0.64, edgecolors="none", linewidths=0.0, rasterized=True)
 
 
 def humanize_display_text(value: object) -> str:
     text = " ".join(str(value or "").split())
     if not text:
         return ""
+    if re.fullmatch(r"[A-Z][A-Z0-9]*(?:\+[A-Z0-9]+)*", text):
+        return text.replace("+", " + ")
     normalized = text
     if normalized.startswith("log_likelihood_per_token_"):
         normalized = normalized.replace("log_likelihood_per_token_", "log likelihood per token ")
@@ -317,8 +344,6 @@ def _canonical_regulator_token(value: object) -> str | None:
     if not text:
         return None
     lowered = text.lower()
-    if lowered.startswith("sig35="):
-        return "background"
     if lowered in {"background", "background_only", "control"}:
         return lowered
     token = text.split("_", 1)[0].strip()
@@ -366,17 +391,6 @@ def display_category_text(value: object, *, column: str | None = None) -> str:
         return formatted or humanize_display_text(value)
     if normalized_column == "design_regulator_composition":
         return compact_design_regulator_composition(value)
-    if normalized_column == "sig35_variant":
-        text = str(value or "").strip()
-        normalized = normalize_category_key(text)
-        if normalized in {"", "na", "n/a"}:
-            return "NA"
-        if normalized in {"control", "unknown"}:
-            return humanize_display_text(text)
-        resolved = sigma35_variant_display(text)
-        if resolved is not None:
-            return resolved
-        return humanize_label(f"variant {text}")
     return humanize_display_text(value)
 
 
@@ -402,7 +416,7 @@ def legend_bottom_margin(
     if label_count <= 0:
         return 0.0
     rows = max(1, ceil(label_count / max(columns, 1)))
-    return min(base_margin + (row_step * max(rows - 1, 0)), 0.22)
+    return min(base_margin + (row_step * max(rows - 1, 0)), 0.36)
 
 
 def legend_layout(
@@ -445,7 +459,7 @@ def compact_candidate_title(value: object) -> str:
             "evo 2",
             "anchor",
             "context",
-            "pooled logits",
+            "output-layer mean",
             "intermediate block",
             "intermediate embedding",
             "concat",
@@ -464,7 +478,7 @@ def compact_candidate_title(value: object) -> str:
         (r"\bAnchor \+ 1\s*Kb Context Concat\b", "anchor + 1 kb ctx"),
         (r"\bIntermediate Block Mean\b", "Block"),
         (r"\bIntermediate Embedding\b", "Block"),
-        (r"\bPooled Logits\b", "Logits"),
+        (r"\bOutput[- ]Layer Mean\b", "Output"),
     ]
     for pattern, replacement in replacements:
         compact = re.sub(pattern, replacement, compact, flags=re.IGNORECASE)

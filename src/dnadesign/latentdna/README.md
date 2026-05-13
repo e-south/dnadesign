@@ -1,6 +1,10 @@
 ![latentdna banner](docs/assets/latentdna-banner.svg)
 
-`latentdna` is the comparison layer for `dnadesign`. It materializes study-neutral representation comparisons, persists artifact contracts, and exposes read-only QC surfaces. It does not own supervised benchmarking or final selection.
+`latentdna` is the comparison layer for `dnadesign`. It materializes
+sequence-family-agnostic representation comparisons, persists artifact
+contracts, and exposes read-only QC surfaces. Study-specific metadata
+derivations such as promoter annotations live in explicit workspace config. It
+does not own supervised benchmarking or final selection.
 
 ## Documentation
 

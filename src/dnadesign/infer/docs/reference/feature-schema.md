@@ -9,6 +9,15 @@ The repository supports two sibling surfaces:
 - context bundles driven by `context.kind` plus bundle-level pooling flags
 - explicit sequence-view bundles driven by `sequence_view_inputs[]`
 
+### DNA case contract
+
+For Evo2 DNA inference, biological A/C/G/T inputs must be uppercase before
+tokenization. Lowercase and uppercase bases are distinct Evo2 tokenizer symbols;
+lowercase or mixed-case model inputs invalidate geometry and rank diagnostics
+and require feature regeneration. `infer` canonicalizes incoming DNA strings to
+uppercase before adapter calls and feature-key construction; existing sidecars
+generated from lowercase or mixed-case inputs must be regenerated.
+
 The v1 schema literal is `evo2_sequence_feature_v1`. It describes the generic
 Evo2 sequence-feature contract used by both row-context and explicit
 sequence-view bundles; promoter studies are inputs to that contract, not a
@@ -73,9 +82,19 @@ Sequence-view rules:
 - `construct_insert` views map to `context_kind=anchor_only`; they are the
   merged construct-ready anchor handoff rows, not derived core60 rows
 - `seq_mean`, `anchor_mean`, and `core60_mean` are row-level pooling operations
+  over token-position vectors, not over embedding dimensions.
+- Evo2 outputs are causal. A token vector at position `t` is
+  prefix-conditioned on the emitted sequence through `x_{<=t}` in that
+  orientation. Mean-pooling a span therefore averages progressively
+  prefix-conditioned token states; it does not make each token state
+  bidirectional or downstream-aware.
 - `anchor_mean` does not shorten the model input. Infer sends the full emitted sequence to the
   provider, then mean-pools token features over the explicit emitted-orientation
   `pooling_start_0:pooling_end_0` span.
+- Reverse-complement `anchor_mean` is a separate full-sequence Evo2 pass over
+  the reverse-complement emitted sequence. Concatenating forward and
+  reverse-complement anchor-mean vectors is an external two-orientation
+  summary, not a native bidirectional Evo2 hidden state.
 - reverse-complement context rows must already contain reverse-complement sequences and
   reverse-complement-orientation pooling bounds; Infer must not apply a second `L-b, L-a`
   transform.
@@ -150,6 +169,8 @@ The v1 bundle persists these metadata out ids:
 - `metadata__intermediate_selector`
 - `metadata__pooling_modes`
 - `metadata__forward_pass_key`
+- `metadata__runtime_fingerprint_key`
+- `metadata__sequence_case_policy`
 - `metadata__feature_vector_key`
 - `metadata__parent_sequence_id`
 - `metadata__derivation_id`

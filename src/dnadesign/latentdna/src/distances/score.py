@@ -36,24 +36,6 @@ def _select_indices(rows: list[dict[str, Any]], where: dict[str, Any]) -> list[i
     raise ContractViolationError("landmark where clause requires either 'equals' or 'in'")
 
 
-def _fallback_control_indices(rows: list[dict[str, Any]]) -> list[int]:
-    indices: list[int] = []
-    for index, row in enumerate(rows):
-        label = str(row.get("usr_label__primary") or "").strip().lower()
-        if row.get("is_control") is True:
-            indices.append(index)
-            continue
-        if str(row.get("source_class") or "").strip() == "manual_or_wildtype":
-            indices.append(index)
-            continue
-        if str(row.get("design_family") or "").strip() == "control":
-            indices.append(index)
-            continue
-        if label in {"spyp", "sulap", "soxsp", "j23105"}:
-            indices.append(index)
-    return indices
-
-
 def _cosine_distances(matrix: np.ndarray, reference: np.ndarray) -> np.ndarray:
     matrix_norms = np.linalg.norm(matrix, axis=1)
     ref_norm = np.linalg.norm(reference)
@@ -144,8 +126,6 @@ def _alignment_projected_indices(
     matched_rows = matched_rows_table.to_pylist()
     matched_indices = _select_indices(matched_rows, where)
     if not matched_indices:
-        matched_indices = _fallback_control_indices(matched_rows)
-    if not matched_indices:
         raise ContractViolationError(f"landmark {landmark_id} matched no rows in alignment input for {alignment_id!r}")
 
     mapping_path = context.output_root / "alignments" / alignment_id / "mapping.parquet"
@@ -197,8 +177,6 @@ def score_distance_artifact(
         landmark = context.require_landmark(landmark_id)
         if landmark.source == view.source:
             indices = _select_indices(rows, landmark.where)
-            if not indices:
-                indices = _fallback_control_indices(rows)
         elif alignment_id is not None:
             indices = _alignment_projected_indices(
                 context,

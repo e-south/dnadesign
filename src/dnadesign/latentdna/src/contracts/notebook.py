@@ -6,7 +6,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .candidate_inventory import CandidateInventoryRow
+
 HueKind = Literal["categorical", "binary", "continuous", "ordinal"]
+NotebookSurface = Literal["plots", "geometry_browser"]
 
 
 class StrictNotebookModel(BaseModel):
@@ -18,12 +21,16 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     title: str
     description: str | None = None
     default_deliverable: str
-    default_surface: Literal["plots", "geometry_audit", "comparison_audit"] = "plots"
+    default_surface: NotebookSurface = "plots"
+    candidate_sets: list[str] = Field(default_factory=list)
+    default_candidate_set: str | None = None
+    default_reference_set: str | None = None
     ordered_plots: list[str] = Field(default_factory=list)
     context_audit_scalar_ids: list[str] = Field(default_factory=list)
     geometry_order: list[str] = Field(default_factory=list)
     candidate_grid_views: list[str] = Field(default_factory=list)
     candidate_grid_panel_titles: list[str] = Field(default_factory=list)
+    show_missing_projection_placeholders: bool = False
     preferred_hues: list[str] = Field(default_factory=list)
     preferred_hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
     default_layout: str | None = None
@@ -37,6 +44,9 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
             raise ValueError("candidate_grid_panel_titles must match candidate_grid_views length")
         if self.default_compare_views and len(self.default_compare_views) != 2:
             raise ValueError("default_compare_views must declare exactly two view ids when provided")
+        if self.default_candidate_set is not None and self.candidate_sets:
+            if self.default_candidate_set not in self.candidate_sets:
+                raise ValueError("default_candidate_set must be declared in candidate_sets when candidate_sets are set")
         return self
 
 
@@ -85,10 +95,66 @@ class WorkspaceNotebookComparisonBasis(StrictNotebookModel):
     label: str
 
 
+class WorkspaceNotebookReferenceSet(StrictNotebookModel):
+    reference_set_id: str
+    label: str | None = None
+    match_column: str
+    label_column: str | None = None
+    label_mode: Literal["label_and_highlight", "highlight_only"]
+    label_limit: int | None = Field(default=None, ge=0)
+    explicit_ids: list[str] = Field(default_factory=list)
+    selector_columns: list[str] = Field(default_factory=list)
+
+
 class WorkspaceNotebookCompareMetrics(StrictNotebookModel):
     sample_rows: int
     distance_pair_limit: int
     knn_k: int
+
+
+class WorkspaceNotebookAxisStyle(StrictNotebookModel):
+    axis_id: str
+    column: str
+    label: str | None = None
+    kind: HueKind | None = None
+    category_order: list[str] = Field(default_factory=list)
+    display_labels: dict[str, str] = Field(default_factory=dict)
+    compact_display_labels: dict[str, str] = Field(default_factory=dict)
+    category_colors: dict[str, str] = Field(default_factory=dict)
+    ordinal_subset: list[str] = Field(default_factory=list)
+    metric_labels: dict[str, str] = Field(default_factory=dict)
+    noncanonical_bucket: str | None = None
+    noncanonical_label: str | None = None
+    include_noncanonical_in_legend: bool = False
+    canonical_row_selectors: list[dict[str, object]] = Field(default_factory=list)
+    canonical_row_match: str = "any"
+    canonical_values: list[str] = Field(default_factory=list)
+
+
+class WorkspaceNotebookCandidateView(StrictNotebookModel):
+    view_id: str
+    label: str
+    panel_title: str
+    status: str
+    role: str | None = None
+    model: str | None = None
+    family: str | None = None
+    scope: str | None = None
+    coordinate_space_id: str | None = None
+    tags: dict[str, str] = Field(default_factory=dict)
+    materialized: bool
+    rows: int | None = None
+    dims: int | None = None
+
+
+class WorkspaceNotebookCandidateSet(StrictNotebookModel):
+    candidate_set_id: str
+    label: str
+    description: str | None = None
+    view_ids: list[str] = Field(default_factory=list)
+    available_view_ids: list[str] = Field(default_factory=list)
+    panel_titles: list[str] = Field(default_factory=list)
+    views: list[WorkspaceNotebookCandidateView] = Field(default_factory=list)
 
 
 class WorkspaceNotebookGeometryControls(StrictNotebookModel):
@@ -96,16 +162,20 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     default_family: str
     default_context: str
     default_layout: str
+    default_reference_set: str = ""
     default_compare_left: str | None = None
     default_compare_right: str | None = None
     geometries: list[WorkspaceNotebookGeometry]
     preferred_hues: list[str]
     row_metadata_hues: list[str] = Field(default_factory=list)
     hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
+    axis_styles: dict[str, WorkspaceNotebookAxisStyle] = Field(default_factory=dict)
     joinable_tables: list[WorkspaceNotebookTableRef]
     layout_presets: list[WorkspaceNotebookLayoutPreset]
     comparison_bases: list[WorkspaceNotebookComparisonBasis]
     reference_labels: list[str]
+    reference_sets: list[WorkspaceNotebookReferenceSet] = Field(default_factory=list)
+    candidate_sets: list[WorkspaceNotebookCandidateSet] = Field(default_factory=list)
     compare_metrics: WorkspaceNotebookCompareMetrics
 
 
@@ -137,7 +207,7 @@ class WorkspaceNotebookPlotEntry(StrictNotebookModel):
 
 
 class WorkspaceNotebookPlotControls(StrictNotebookModel):
-    default_surface: Literal["plots", "geometry_audit", "comparison_audit"]
+    default_surface: NotebookSurface
     ordered_plot_ids: list[str]
     plots: list[WorkspaceNotebookPlotEntry]
 
@@ -148,6 +218,7 @@ class WorkspaceNotebookControls(StrictNotebookModel):
     notebook_id: str
     generated_at: str
     runtime_paths: WorkspaceNotebookRuntimePaths
+    candidate_inventory: list[CandidateInventoryRow] = Field(default_factory=list)
     plot_controls: WorkspaceNotebookPlotControls
     geometry_controls: WorkspaceNotebookGeometryControls
     context_audit: WorkspaceNotebookContextAudit

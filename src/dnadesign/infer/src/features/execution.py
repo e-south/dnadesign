@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Optional
 
 import torch
@@ -22,27 +25,55 @@ from ..contracts import infer_usr_column_name
 from ..errors import CapabilityError, RuntimeOOMError
 from ..runtime.resume_planner import read_usr_columns
 from .aliases import (
+    compact_feature_sidecars_to_current_aliases,
     compute_feature_alias_id,
     compute_feature_scalar_alias_id,
     compute_feature_scalar_key,
+    load_feature_scalar_keys,
     load_feature_scalar_rows,
+    load_feature_vector_keys,
     load_feature_vector_rows,
     persist_feature_alias_rows,
     persist_feature_scalar_alias_rows,
     persist_feature_scalar_rows,
     persist_feature_vector_rows,
+    prune_stale_feature_alias_entries,
+    record_feature_bundle_complete,
+    record_feature_bundle_progress,
+    record_feature_bundle_shard_commit,
 )
-from .cache_keys import compute_feature_vector_key, compute_forward_pass_key
+from .cache_keys import (
+    DNA_SEQUENCE_CASE_POLICY,
+    build_runtime_fingerprint,
+    compute_feature_vector_key,
+    compute_forward_pass_key,
+    compute_runtime_fingerprint_key,
+)
 from .context import resolve_sequence_contexts
 from .contracts import SequenceContextRecord, SequenceFeatureBundleConfig
 from .selectors import canonical_selector_for_block, resolve_intermediate_selector
 from .sequence_views import bundle_uses_sequence_views, resolve_sequence_view_contexts
+from .shard_ledger import (
+    DEFAULT_FEATURE_SHARD_SIZE_VIEWS,
+    SHARD_STATUS_COMMITTED,
+    SHARD_STATUS_FAILED,
+    SHARD_STATUS_RUNNING,
+    FeatureShardLedger,
+    FeatureShardLedgerEntry,
+    load_shard_ledger,
+    mark_shard_status,
+    write_shard_ledger,
+)
 
 _LOG_LIKELIHOOD_TOTAL = "log_likelihood__total"
 _LOG_LIKELIHOOD_MEAN = "log_likelihood__mean_per_token"
 _OUTPUT_LAYER_SEQ_MEAN = "output_layer_mean__seq_mean"
 _OUTPUT_LAYER_ANCHOR_MEAN = "output_layer_mean__anchor_mean"
 _OUTPUT_LAYER_CORE60_MEAN = "output_layer_mean__core60_mean"
+_FEATURE_BUNDLE_PROGRESS_STEP_PCT_SMALL_TARGET = 25
+_FEATURE_BUNDLE_PROGRESS_STEP_PCT_LARGE_TARGET = 10
+_FEATURE_BUNDLE_SMALL_TARGET_CONTEXTS_THRESHOLD = 200
+_FEATURE_BUNDLE_PROGRESS_HEARTBEAT_SECONDS = 1800.0
 _METADATA_OUTPUT_FIELDS = (
     ("metadata__sequence_id", "sequence_id"),
     ("metadata__anchor_id", "anchor_id"),
@@ -67,6 +98,8 @@ _METADATA_OUTPUT_FIELDS = (
     ("metadata__intermediate_selector", "intermediate_selector"),
     ("metadata__pooling_modes", "pooling_modes"),
     ("metadata__forward_pass_key", "forward_pass_key"),
+    ("metadata__runtime_fingerprint_key", "runtime_fingerprint_key"),
+    ("metadata__sequence_case_policy", "sequence_case_policy"),
     ("metadata__feature_vector_key", "feature_vector_key"),
     ("metadata__parent_sequence_id", "parent_sequence_id"),
     ("metadata__derivation_id", "derivation_id"),
@@ -75,6 +108,21 @@ _METADATA_OUTPUT_FIELDS = (
     ("metadata__timestamp", "timestamp"),
     ("metadata__feature_request_digest", "feature_request_digest"),
 )
+
+
+@dataclass(frozen=True)
+class _FeatureSidecarCommitSummary:
+    row_indexes: tuple[int, ...]
+    vector_keys: tuple[str, ...]
+    scalar_keys: tuple[str, ...]
+    checksum: str
+
+
+@dataclass(frozen=True)
+class _FeatureShardLedgerState:
+    path: Path
+    ledger: FeatureShardLedger
+    next_shard_index: int
 
 
 def _templated_anchor_mean_enabled(bundle: SequenceFeatureBundleConfig) -> bool:
@@ -271,6 +319,10 @@ def _feature_pooling_identity(context: SequenceContextRecord) -> tuple[str, int 
 
 
 def _feature_bundle_log_likelihoods(adapter, seq_chunk: list[str]) -> tuple[list[float], list[float]]:
+    fused = getattr(adapter, "log_likelihood_total_and_mean", None)
+    if callable(fused):
+        totals, means = fused(seq_chunk, method="native")
+        return list(totals), list(means)
     totals = adapter.log_likelihood(
         seq_chunk,
         method="native",
@@ -295,6 +347,14 @@ def _feature_bundle_logits_and_embedding(
         logits_tensors, embedding_tensors = fused(seq_chunk, layer=selector, fmt="tensor")
         return list(logits_tensors), list(embedding_tensors)
     return None, None
+
+
+def _resolve_feature_bundle_adapter(adapter, adapter_factory: Callable[[], object] | None):
+    if adapter is not None:
+        return adapter
+    if adapter_factory is None:
+        raise CapabilityError("Feature bundle execution requires an adapter or adapter factory.")
+    return adapter_factory()
 
 
 def _stable_feature_bundle_eval_batch_size(
@@ -358,6 +418,7 @@ def _feature_request_digest(
     context: SequenceContextRecord,
     model_id: str,
     selector: str,
+    runtime_fingerprint_key: str | None = None,
 ) -> str:
     payload = {
         "feature_schema_version": bundle.feature_schema_version,
@@ -382,6 +443,7 @@ def _feature_request_digest(
             "seq_mean": bundle.pooling.seq_mean,
             "anchor_mean_for_templated": bundle.pooling.anchor_mean_for_templated,
         },
+        "runtime_fingerprint_key": runtime_fingerprint_key,
     }
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -393,6 +455,7 @@ def _forward_pass_key_for_context(
     model_id: str,
     selector: str,
     bundle: SequenceFeatureBundleConfig,
+    runtime_fingerprint: dict[str, object] | None = None,
 ) -> str:
     requested_layers = [selector] if bundle.collect_intermediate_embedding else []
     return compute_forward_pass_key(
@@ -404,6 +467,7 @@ def _forward_pass_key_for_context(
         normalized_input_sequence=context.resolved_sequence,
         provider_params={},
         orientation=str(context.orientation or context.anchor_orientation or "forward"),
+        runtime_fingerprint=runtime_fingerprint,
     )
 
 
@@ -465,65 +529,87 @@ def build_feature_metadata_rows(
     contexts: List[SequenceContextRecord],
     bundle: SequenceFeatureBundleConfig,
     model_id: str,
+    include_feature_request_digest: bool = True,
+    runtime_fingerprint: dict[str, object] | None = None,
 ) -> list[dict[str, object]]:
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
     timestamp = datetime.now(timezone.utc).isoformat()
-    return [
-        {
-            "sequence_id": context.sequence_id,
-            "anchor_id": context.anchor_id,
-            "is_wildtype": context.is_wildtype,
-            "context_id": context.context_id,
-            "context_kind": context.context_kind,
-            "view_id": context.view_id,
-            "view_name": context.view_name,
-            "product_kind": context.product_kind,
-            "orientation": context.orientation or context.anchor_orientation,
-            "template_id": context.template_id,
-            "resolved_length": context.resolved_length,
-            "anchor_start": context.anchor_start,
-            "anchor_end": context.anchor_end,
-            "pooling_operation": context.pooling_operation,
-            "pooling_start_0": context.pooling_start_0,
-            "pooling_end_0": context.pooling_end_0,
-            "model_name": model_id,
-            "provider_name": "evo2",
-            "provider_version": None,
-            "intermediate_block": selector.intermediate_block,
-            "intermediate_selector": selector.intermediate_selector,
-            "pooling_modes": _pooling_modes(bundle),
-            "forward_pass_key": _forward_pass_key_for_context(
+    rows: list[dict[str, object]] = []
+    requested_layers = (selector.intermediate_selector,) if bundle.collect_intermediate_embedding else ()
+    resolved_runtime_fingerprint = runtime_fingerprint or build_runtime_fingerprint(model_name=model_id)
+    runtime_fingerprint_key = compute_runtime_fingerprint_key(resolved_runtime_fingerprint)
+    forward_pass_key_cache: dict[tuple[str, str, tuple[str, ...], str], str] = {}
+    for context in contexts:
+        orientation = str(context.orientation or context.anchor_orientation or "forward")
+        forward_pass_cache_key = (
+            context.resolved_sequence,
+            orientation,
+            requested_layers,
+            runtime_fingerprint_key,
+        )
+        forward_pass_key = forward_pass_key_cache.get(forward_pass_cache_key)
+        if forward_pass_key is None:
+            forward_pass_key = _forward_pass_key_for_context(
                 context=context,
                 model_id=model_id,
                 selector=selector.intermediate_selector,
                 bundle=bundle,
-            ),
-            "feature_vector_key": _primary_feature_vector_key_for_context(
-                context=context,
-                model_id=model_id,
-                selector=selector.intermediate_selector,
-                bundle=bundle,
-                forward_pass_key=_forward_pass_key_for_context(
+                runtime_fingerprint=resolved_runtime_fingerprint,
+            )
+            forward_pass_key_cache[forward_pass_cache_key] = forward_pass_key
+        rows.append(
+            {
+                "sequence_id": context.sequence_id,
+                "anchor_id": context.anchor_id,
+                "is_wildtype": context.is_wildtype,
+                "context_id": context.context_id,
+                "context_kind": context.context_kind,
+                "view_id": context.view_id,
+                "view_name": context.view_name,
+                "product_kind": context.product_kind,
+                "orientation": context.orientation or context.anchor_orientation,
+                "template_id": context.template_id,
+                "resolved_length": context.resolved_length,
+                "anchor_start": context.anchor_start,
+                "anchor_end": context.anchor_end,
+                "pooling_operation": context.pooling_operation,
+                "pooling_start_0": context.pooling_start_0,
+                "pooling_end_0": context.pooling_end_0,
+                "model_name": model_id,
+                "provider_name": "evo2",
+                "provider_version": None,
+                "intermediate_block": selector.intermediate_block,
+                "intermediate_selector": selector.intermediate_selector,
+                "pooling_modes": _pooling_modes(bundle),
+                "forward_pass_key": forward_pass_key,
+                "runtime_fingerprint_key": runtime_fingerprint_key,
+                "sequence_case_policy": DNA_SEQUENCE_CASE_POLICY,
+                "feature_vector_key": _primary_feature_vector_key_for_context(
                     context=context,
                     model_id=model_id,
                     selector=selector.intermediate_selector,
                     bundle=bundle,
+                    forward_pass_key=forward_pass_key,
                 ),
-            ),
-            "parent_sequence_id": context.parent_sequence_id,
-            "derivation_id": context.derivation_id,
-            "feature_schema_version": bundle.feature_schema_version,
-            "construct_version": context.construct_version,
-            "timestamp": timestamp,
-            "feature_request_digest": _feature_request_digest(
-                bundle=bundle,
-                context=context,
-                model_id=model_id,
-                selector=selector.intermediate_selector,
-            ),
-        }
-        for context in contexts
-    ]
+                "parent_sequence_id": context.parent_sequence_id,
+                "derivation_id": context.derivation_id,
+                "feature_schema_version": bundle.feature_schema_version,
+                "construct_version": context.construct_version,
+                "timestamp": timestamp,
+                "feature_request_digest": (
+                    _feature_request_digest(
+                        bundle=bundle,
+                        context=context,
+                        model_id=model_id,
+                        selector=selector.intermediate_selector,
+                        runtime_fingerprint_key=runtime_fingerprint_key,
+                    )
+                    if include_feature_request_digest
+                    else None
+                ),
+            }
+        )
+    return rows
 
 
 def feature_metadata_output_ids() -> list[str]:
@@ -662,11 +748,15 @@ def _sequence_view_feature_alias_rows(
     bundle: SequenceFeatureBundleConfig,
     selector: str,
     model_id: str,
+    row_indexes: set[int] | None = None,
 ) -> list[dict[str, object]]:
     if not bundle.deduplicate.write_alias_map:
         return []
     alias_rows: list[dict[str, object]] = []
-    for context, metadata in zip(contexts, metadata_rows, strict=True):
+    selected_indexes = range(len(contexts)) if row_indexes is None else sorted(row_indexes)
+    for row_index in selected_indexes:
+        context = contexts[row_index]
+        metadata = metadata_rows[row_index]
         if context.view_id is None or context.source_dataset_id is None or context.source_dataset_root is None:
             continue
         forward_pass_key = str(metadata["forward_pass_key"])
@@ -682,14 +772,24 @@ def _sequence_view_feature_alias_rows(
             if context.pooling_operation is None:
                 continue
             pooling_operation, pooling_start_0, pooling_end_0 = _feature_pooling_identity(context)
-            feature_vector_key = compute_feature_vector_key(
-                forward_pass_key=forward_pass_key,
-                representation_kind=representation_kind,
-                layer_name=layer_name,
-                pooling_operation=pooling_operation,
-                pooling_start_0=pooling_start_0,
-                pooling_end_0=pooling_end_0,
-                dtype_or_storage_format="list<float64>",
+            feature_vector_key = (
+                str(metadata["feature_vector_key"])
+                if (
+                    metadata.get("feature_vector_key") is not None
+                    and (
+                        representation_kind == "intermediate_embedding"
+                        or (representation_kind == "output_layer_mean" and not bundle.collect_intermediate_embedding)
+                    )
+                )
+                else compute_feature_vector_key(
+                    forward_pass_key=forward_pass_key,
+                    representation_kind=representation_kind,
+                    layer_name=layer_name,
+                    pooling_operation=pooling_operation,
+                    pooling_start_0=pooling_start_0,
+                    pooling_end_0=pooling_end_0,
+                    dtype_or_storage_format="list<float64>",
+                )
             )
             alias_rows.append(
                 {
@@ -717,6 +817,8 @@ def _sequence_view_feature_alias_rows(
                     "orientation": context.orientation or context.anchor_orientation or "forward",
                     "source_dataset_id": context.source_dataset_id,
                     "feature_request_digest": str(metadata["feature_request_digest"]),
+                    "runtime_fingerprint_key": str(metadata.get("runtime_fingerprint_key") or ""),
+                    "sequence_case_policy": str(metadata.get("sequence_case_policy") or ""),
                     "created_at": created_at,
                 }
             )
@@ -741,16 +843,26 @@ def _sequence_view_feature_scalar_alias_rows(
     metadata_rows: list[dict[str, object]],
     bundle: SequenceFeatureBundleConfig,
     model_id: str,
+    row_indexes: set[int] | None = None,
 ) -> list[dict[str, object]]:
     if not bundle.deduplicate.write_alias_map or not bundle.collect_log_likelihood:
         return []
     alias_rows: list[dict[str, object]] = []
-    for context, metadata in zip(contexts, metadata_rows, strict=True):
+    scalar_key_cache: dict[tuple[str, str], str] = {}
+    selected_indexes = range(len(contexts)) if row_indexes is None else sorted(row_indexes)
+    for row_index in selected_indexes:
+        context = contexts[row_index]
+        metadata = metadata_rows[row_index]
         if context.view_id is None or context.source_dataset_id is None or context.source_dataset_root is None:
             continue
         created_at = str(metadata["timestamp"])
         for scalar_kind in (_LOG_LIKELIHOOD_TOTAL, _LOG_LIKELIHOOD_MEAN):
-            feature_scalar_key = _feature_scalar_key_for_context(metadata=metadata, scalar_kind=scalar_kind)
+            forward_pass_key = str(metadata["forward_pass_key"])
+            scalar_cache_key = (forward_pass_key, scalar_kind)
+            feature_scalar_key = scalar_key_cache.get(scalar_cache_key)
+            if feature_scalar_key is None:
+                feature_scalar_key = _feature_scalar_key_for_context(metadata=metadata, scalar_kind=scalar_kind)
+                scalar_key_cache[scalar_cache_key] = feature_scalar_key
             alias_rows.append(
                 {
                     "_dataset_root": context.source_dataset_root,
@@ -765,7 +877,7 @@ def _sequence_view_feature_scalar_alias_rows(
                     "view_name": context.view_name,
                     "sequence_id": context.sequence_id,
                     "feature_scalar_key": feature_scalar_key,
-                    "forward_pass_key": str(metadata["forward_pass_key"]),
+                    "forward_pass_key": forward_pass_key,
                     "provider": "evo2",
                     "model_name": model_id,
                     "model_revision": None,
@@ -773,6 +885,8 @@ def _sequence_view_feature_scalar_alias_rows(
                     "orientation": context.orientation or context.anchor_orientation or "forward",
                     "source_dataset_id": context.source_dataset_id,
                     "feature_request_digest": str(metadata["feature_request_digest"]),
+                    "runtime_fingerprint_key": str(metadata.get("runtime_fingerprint_key") or ""),
+                    "sequence_case_policy": str(metadata.get("sequence_case_policy") or ""),
                     "created_at": created_at,
                 }
             )
@@ -793,31 +907,41 @@ def _sequence_view_feature_vector_specs(
         forward_pass_key = str(metadata["forward_pass_key"])
         pool_scope = str(context.pooling_operation or "seq_mean")
         if bundle.collect_output_layer_mean:
+            feature_vector_key = (
+                str(metadata["feature_vector_key"])
+                if not bundle.collect_intermediate_embedding and metadata.get("feature_vector_key") is not None
+                else _feature_vector_key_for_representation(
+                    context=context,
+                    forward_pass_key=forward_pass_key,
+                    representation_kind="output_layer_mean",
+                    selector=selector,
+                )
+            )
             specs.append(
                 {
                     "row_index": row_index,
                     "out_id": _output_layer_out_id(pool_scope),
-                    "feature_vector_key": _feature_vector_key_for_representation(
-                        context=context,
-                        forward_pass_key=forward_pass_key,
-                        representation_kind="output_layer_mean",
-                        selector=selector,
-                    ),
+                    "feature_vector_key": feature_vector_key,
                     "dataset_root": context.source_dataset_root,
                     "dataset_id": context.source_dataset_id,
                 }
             )
         if bundle.collect_intermediate_embedding:
+            feature_vector_key = (
+                str(metadata["feature_vector_key"])
+                if metadata.get("feature_vector_key") is not None
+                else _feature_vector_key_for_representation(
+                    context=context,
+                    forward_pass_key=forward_pass_key,
+                    representation_kind="intermediate_embedding",
+                    selector=selector,
+                )
+            )
             specs.append(
                 {
                     "row_index": row_index,
                     "out_id": _intermediate_out_id(selector, pool_scope),
-                    "feature_vector_key": _feature_vector_key_for_representation(
-                        context=context,
-                        forward_pass_key=forward_pass_key,
-                        representation_kind="intermediate_embedding",
-                        selector=selector,
-                    ),
+                    "feature_vector_key": feature_vector_key,
                     "dataset_root": context.source_dataset_root,
                     "dataset_id": context.source_dataset_id,
                 }
@@ -834,15 +958,22 @@ def _sequence_view_feature_scalar_specs(
     if not bundle.collect_log_likelihood:
         return []
     specs: list[dict[str, object]] = []
+    scalar_key_cache: dict[tuple[str, str], str] = {}
     for row_index, (context, metadata) in enumerate(zip(contexts, metadata_rows, strict=True)):
         if context.source_dataset_id is None or context.source_dataset_root is None:
             continue
         for out_id in (_LOG_LIKELIHOOD_TOTAL, _LOG_LIKELIHOOD_MEAN):
+            forward_pass_key = str(metadata["forward_pass_key"])
+            scalar_cache_key = (forward_pass_key, out_id)
+            feature_scalar_key = scalar_key_cache.get(scalar_cache_key)
+            if feature_scalar_key is None:
+                feature_scalar_key = _feature_scalar_key_for_context(metadata=metadata, scalar_kind=out_id)
+                scalar_key_cache[scalar_cache_key] = feature_scalar_key
             specs.append(
                 {
                     "row_index": row_index,
                     "out_id": out_id,
-                    "feature_scalar_key": _feature_scalar_key_for_context(metadata=metadata, scalar_kind=out_id),
+                    "feature_scalar_key": feature_scalar_key,
                     "dataset_root": context.source_dataset_root,
                     "dataset_id": context.source_dataset_id,
                 }
@@ -952,25 +1083,667 @@ def _persist_sequence_view_feature_scalars(
         persist_feature_scalar_rows(rows)
 
 
+def _record_sequence_view_feature_bundle_complete(
+    *,
+    contexts: list[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+    job_id: str,
+    model_id: str,
+    run_elapsed_seconds: float | None = None,
+) -> None:
+    dataset_keys = {
+        (str(context.source_dataset_root), str(context.source_dataset_id))
+        for context in contexts
+        if context.source_dataset_root is not None and context.source_dataset_id is not None
+    }
+    for dataset_root, dataset_id in sorted(dataset_keys):
+        dataset_context_indexes = [
+            row_index
+            for row_index, context in enumerate(contexts)
+            if str(context.source_dataset_root) == dataset_root and str(context.source_dataset_id) == dataset_id
+        ]
+        dataset_row_indexes = set(dataset_context_indexes)
+        vector_keys = {
+            str(spec["feature_vector_key"])
+            for spec in vector_specs
+            if str(spec["dataset_root"]) == dataset_root and str(spec["dataset_id"]) == dataset_id
+        }
+        scalar_keys = {
+            str(spec["feature_scalar_key"])
+            for spec in scalar_specs
+            if str(spec["dataset_root"]) == dataset_root and str(spec["dataset_id"]) == dataset_id
+        }
+        forward_passes = {str(metadata_rows[row_index]["forward_pass_key"]) for row_index in dataset_row_indexes}
+        record_feature_bundle_complete(
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            job_id=job_id,
+            model_id=model_id,
+            contexts_completed=len(dataset_context_indexes),
+            unique_forward_passes=len(forward_passes),
+            required_vector_keys=len(vector_keys),
+            required_scalar_keys=len(scalar_keys),
+            run_elapsed_seconds=run_elapsed_seconds,
+        )
+
+
+def _sequence_view_dataset_key(context: SequenceContextRecord) -> tuple[str, str] | None:
+    if context.source_dataset_root is None or context.source_dataset_id is None:
+        return None
+    return (str(context.source_dataset_root), str(context.source_dataset_id))
+
+
+def _build_sequence_view_feature_progress_state(
+    *,
+    contexts: list[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+    need_idx: list[int],
+) -> dict[tuple[str, str], dict[str, object]]:
+    state: dict[tuple[str, str], dict[str, object]] = {}
+    need_set = {int(row_index) for row_index in need_idx}
+    for row_index in sorted(need_set):
+        key = _sequence_view_dataset_key(contexts[row_index])
+        if key is None:
+            continue
+        entry = state.setdefault(
+            key,
+            {
+                "contexts_total": 0,
+                "contexts_completed": 0,
+                "forward_total": set(),
+                "forward_completed": set(),
+                "required_vector_keys": set(),
+                "required_scalar_keys": set(),
+                "last_step": -1,
+                "last_emit_monotonic": None,
+            },
+        )
+        entry["contexts_total"] = int(entry["contexts_total"]) + 1
+        forward_total = entry["forward_total"]
+        if isinstance(forward_total, set):
+            forward_total.add(str(metadata_rows[row_index]["forward_pass_key"]))
+    for spec in vector_specs:
+        key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        entry = state.setdefault(
+            key,
+            {
+                "contexts_total": 0,
+                "contexts_completed": 0,
+                "forward_total": set(),
+                "forward_completed": set(),
+                "required_vector_keys": set(),
+                "required_scalar_keys": set(),
+                "last_step": -1,
+                "last_emit_monotonic": None,
+            },
+        )
+        required_vector_keys = entry.get("required_vector_keys")
+        if isinstance(required_vector_keys, set):
+            required_vector_keys.add(str(spec["feature_vector_key"]))
+    for spec in scalar_specs:
+        key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        entry = state.setdefault(
+            key,
+            {
+                "contexts_total": 0,
+                "contexts_completed": 0,
+                "forward_total": set(),
+                "forward_completed": set(),
+                "required_vector_keys": set(),
+                "required_scalar_keys": set(),
+                "last_step": -1,
+                "last_emit_monotonic": None,
+            },
+        )
+        required_scalar_keys = entry.get("required_scalar_keys")
+        if isinstance(required_scalar_keys, set):
+            required_scalar_keys.add(str(spec["feature_scalar_key"]))
+    return state
+
+
+def _maybe_record_sequence_view_feature_progress(
+    *,
+    progress_state: dict[tuple[str, str], dict[str, object]],
+    contexts: list[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    completed_row_indexes: list[int],
+    job_id: str,
+    model_id: str,
+    run_elapsed_seconds: float | None,
+) -> None:
+    touched: set[tuple[str, str]] = set()
+    for row_index in completed_row_indexes:
+        key = _sequence_view_dataset_key(contexts[row_index])
+        if key is None:
+            continue
+        entry = progress_state.get(key)
+        if entry is None:
+            continue
+        entry["contexts_completed"] = int(entry.get("contexts_completed", 0)) + 1
+        forward_completed = entry.get("forward_completed")
+        if isinstance(forward_completed, set):
+            forward_completed.add(str(metadata_rows[row_index]["forward_pass_key"]))
+        touched.add(key)
+
+    now = time.monotonic()
+    for dataset_root, dataset_id in sorted(touched):
+        entry = progress_state[(dataset_root, dataset_id)]
+        contexts_total = int(entry.get("contexts_total", 0))
+        if contexts_total <= 0:
+            continue
+        contexts_completed = int(entry.get("contexts_completed", 0))
+        progress_pct = float(contexts_completed) * 100.0 / float(contexts_total)
+        if progress_pct >= 100.0:
+            continue
+        step_pct = (
+            _FEATURE_BUNDLE_PROGRESS_STEP_PCT_SMALL_TARGET
+            if contexts_total <= _FEATURE_BUNDLE_SMALL_TARGET_CONTEXTS_THRESHOLD
+            else _FEATURE_BUNDLE_PROGRESS_STEP_PCT_LARGE_TARGET
+        )
+        progress_step = int(progress_pct // float(step_pct))
+        last_step = int(entry.get("last_step", -1))
+        last_emit = entry.get("last_emit_monotonic")
+        elapsed_since_emit = None if not isinstance(last_emit, float) else now - last_emit
+        first_emit = last_emit is None
+        step_emit = progress_step > last_step
+        heartbeat_emit = (
+            elapsed_since_emit is not None and elapsed_since_emit >= _FEATURE_BUNDLE_PROGRESS_HEARTBEAT_SECONDS
+        )
+        if not first_emit and not step_emit and not heartbeat_emit:
+            continue
+        entry["last_step"] = max(last_step, progress_step)
+        entry["last_emit_monotonic"] = now
+        forward_completed = entry.get("forward_completed")
+        forward_total = entry.get("forward_total")
+        required_vector_keys = entry.get("required_vector_keys")
+        required_scalar_keys = entry.get("required_scalar_keys")
+        record_feature_bundle_progress(
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            job_id=job_id,
+            model_id=model_id,
+            contexts_completed=contexts_completed,
+            contexts_total=contexts_total,
+            unique_forward_passes_completed=len(forward_completed) if isinstance(forward_completed, set) else 0,
+            unique_forward_passes_total=len(forward_total) if isinstance(forward_total, set) else 0,
+            required_vector_keys=len(required_vector_keys) if isinstance(required_vector_keys, set) else 0,
+            required_scalar_keys=len(required_scalar_keys) if isinstance(required_scalar_keys, set) else 0,
+            run_elapsed_seconds=run_elapsed_seconds,
+        )
+
+
+def _feature_sidecar_commit_checksum(
+    *,
+    row_indexes: tuple[int, ...],
+    vector_keys: tuple[str, ...],
+    scalar_keys: tuple[str, ...],
+) -> str:
+    payload = {
+        "row_indexes": list(row_indexes),
+        "vector_keys": list(vector_keys),
+        "scalar_keys": list(scalar_keys),
+    }
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _filter_specs_for_committed_rows(
+    *,
+    all_vals: Dict[str, List[object]],
+    specs: list[dict[str, object]],
+    row_indexes: set[int],
+    key_field: str,
+) -> list[dict[str, object]]:
+    filtered: list[dict[str, object]] = []
+    for spec in specs:
+        row_index = int(spec["row_index"])
+        if row_index not in row_indexes:
+            continue
+        if all_vals[str(spec["out_id"])][row_index] is None:
+            continue
+        if not str(spec.get(key_field) or "").strip():
+            continue
+        filtered.append(spec)
+    return filtered
+
+
+def _validate_sequence_view_sidecar_payloads(
+    *,
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+) -> None:
+    vector_keys_by_dataset: dict[tuple[str, str], set[str]] = {}
+    scalar_keys_by_dataset: dict[tuple[str, str], set[str]] = {}
+    for spec in vector_specs:
+        dataset_key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        vector_keys_by_dataset.setdefault(dataset_key, set()).add(str(spec["feature_vector_key"]))
+    for spec in scalar_specs:
+        dataset_key = (str(spec["dataset_root"]), str(spec["dataset_id"]))
+        scalar_keys_by_dataset.setdefault(dataset_key, set()).add(str(spec["feature_scalar_key"]))
+
+    for (dataset_root, dataset_id), expected_keys in vector_keys_by_dataset.items():
+        observed = load_feature_vector_keys(dataset_root=dataset_root, dataset_id=dataset_id, keys=expected_keys)
+        missing = sorted(expected_keys - observed)
+        if missing:
+            sample = ", ".join(missing[:3])
+            raise RuntimeError(f"Feature vector shard commit validation failed; missing key(s): {sample}")
+    for (dataset_root, dataset_id), expected_keys in scalar_keys_by_dataset.items():
+        observed = load_feature_scalar_keys(dataset_root=dataset_root, dataset_id=dataset_id, keys=expected_keys)
+        missing = sorted(expected_keys - observed)
+        if missing:
+            sample = ", ".join(missing[:3])
+            raise RuntimeError(f"Feature scalar shard commit validation failed; missing key(s): {sample}")
+
+
+def _persist_sequence_view_feature_sidecars(
+    *,
+    contexts: list[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    bundle: SequenceFeatureBundleConfig,
+    selector: str,
+    model_id: str,
+    job_id: str,
+    all_vals: Dict[str, List[object]],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+    row_indexes: set[int] | None = None,
+    record_complete: bool = True,
+    run_elapsed_seconds: float | None = None,
+) -> _FeatureSidecarCommitSummary:
+    selected_row_indexes = set(range(len(contexts))) if row_indexes is None else set(row_indexes)
+    selected_vector_specs = _filter_specs_for_committed_rows(
+        all_vals=all_vals,
+        specs=vector_specs,
+        row_indexes=selected_row_indexes,
+        key_field="feature_vector_key",
+    )
+    selected_scalar_specs = _filter_specs_for_committed_rows(
+        all_vals=all_vals,
+        specs=scalar_specs,
+        row_indexes=selected_row_indexes,
+        key_field="feature_scalar_key",
+    )
+    commit_row_indexes = tuple(sorted(selected_row_indexes))
+    vector_keys = tuple(sorted({str(spec["feature_vector_key"]) for spec in selected_vector_specs}))
+    scalar_keys = tuple(sorted({str(spec["feature_scalar_key"]) for spec in selected_scalar_specs}))
+    checksum = _feature_sidecar_commit_checksum(
+        row_indexes=commit_row_indexes,
+        vector_keys=vector_keys,
+        scalar_keys=scalar_keys,
+    )
+    alias_rows = _sequence_view_feature_alias_rows(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        selector=selector,
+        model_id=model_id,
+        row_indexes=selected_row_indexes,
+    )
+    scalar_alias_rows = _sequence_view_feature_scalar_alias_rows(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        bundle=bundle,
+        model_id=model_id,
+        row_indexes=selected_row_indexes,
+    )
+    if record_complete:
+        prune_stale_feature_alias_entries(
+            current_vector_alias_rows=_sequence_view_feature_alias_rows(
+                contexts=contexts,
+                metadata_rows=metadata_rows,
+                bundle=bundle,
+                selector=selector,
+                model_id=model_id,
+            ),
+            current_scalar_alias_rows=_sequence_view_feature_scalar_alias_rows(
+                contexts=contexts,
+                metadata_rows=metadata_rows,
+                bundle=bundle,
+                model_id=model_id,
+            ),
+        )
+    if alias_rows:
+        persist_feature_alias_rows(alias_rows)
+    if scalar_alias_rows:
+        persist_feature_scalar_alias_rows(scalar_alias_rows)
+    if bundle.deduplicate.by_feature_vector_key:
+        _persist_sequence_view_feature_vectors(
+            all_vals=all_vals,
+            specs=selected_vector_specs,
+            metadata_rows=metadata_rows,
+        )
+    _persist_sequence_view_feature_scalars(
+        all_vals=all_vals,
+        specs=selected_scalar_specs,
+        metadata_rows=metadata_rows,
+    )
+    _validate_sequence_view_sidecar_payloads(
+        vector_specs=selected_vector_specs if bundle.deduplicate.by_feature_vector_key else [],
+        scalar_specs=selected_scalar_specs,
+    )
+    if record_complete:
+        for dataset_root, dataset_id in sorted(
+            {
+                (str(context.source_dataset_root), str(context.source_dataset_id))
+                for context in contexts
+                if context.source_dataset_root is not None and context.source_dataset_id is not None
+            }
+        ):
+            compact_feature_sidecars_to_current_aliases(dataset_root=dataset_root, dataset_id=dataset_id)
+        _record_sequence_view_feature_bundle_complete(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            vector_specs=vector_specs,
+            scalar_specs=scalar_specs,
+            job_id=job_id,
+            model_id=model_id,
+            run_elapsed_seconds=run_elapsed_seconds,
+        )
+    return _FeatureSidecarCommitSummary(
+        row_indexes=commit_row_indexes,
+        vector_keys=vector_keys,
+        scalar_keys=scalar_keys,
+        checksum=checksum,
+    )
+
+
+def _feature_shard_ledger_path(*, dataset_root: str, dataset_id: str, job_id: str) -> Path:
+    return Path(dataset_root) / dataset_id / "_derived/infer/checkpoints" / job_id / "ledger.json"
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _row_indexes_by_dataset(
+    *,
+    contexts: list[SequenceContextRecord],
+    row_indexes: list[int] | set[int],
+) -> dict[tuple[str, str], list[int]]:
+    by_dataset: dict[tuple[str, str], list[int]] = {}
+    for row_index in sorted({int(value) for value in row_indexes}):
+        key = _sequence_view_dataset_key(contexts[row_index])
+        if key is None:
+            continue
+        by_dataset.setdefault(key, []).append(row_index)
+    return by_dataset
+
+
+def _spec_key_count_for_rows(
+    *,
+    specs: list[dict[str, object]],
+    row_indexes: set[int],
+    key_field: str,
+    dataset_key: tuple[str, str],
+) -> int:
+    keys = {
+        str(spec[key_field])
+        for spec in specs
+        if int(spec["row_index"]) in row_indexes and (str(spec["dataset_root"]), str(spec["dataset_id"])) == dataset_key
+    }
+    return len(keys)
+
+
+def _load_or_build_sequence_view_shard_ledger_state(
+    *,
+    dataset_root: str,
+    dataset_id: str,
+    job_id: str,
+    runtime_fingerprint_key: str,
+    shard_size_views: int,
+    pending_row_indexes: set[int],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+) -> _FeatureShardLedgerState:
+    dataset_key = (str(dataset_root), str(dataset_id))
+    path = _feature_shard_ledger_path(dataset_root=dataset_root, dataset_id=dataset_id, job_id=job_id)
+    ledger = _build_exact_sequence_view_shard_ledger(
+        bundle_id=job_id,
+        runtime_fingerprint_key=runtime_fingerprint_key,
+        shard_size_views=shard_size_views,
+        pending_row_indexes=pending_row_indexes,
+        dataset_key=dataset_key,
+        vector_specs=vector_specs,
+        scalar_specs=scalar_specs,
+    )
+    if path.exists():
+        try:
+            existing = load_shard_ledger(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            existing = None
+        if (
+            existing is not None
+            and existing.runtime_fingerprint_key == runtime_fingerprint_key
+            and existing.shard_size_views == ledger.shard_size_views
+            and existing.shard_count == ledger.shard_count
+        ):
+            ledger = existing
+    next_index = next(
+        (entry.shard_index for entry in ledger.shards if entry.status != SHARD_STATUS_COMMITTED),
+        ledger.shard_count,
+    )
+    write_shard_ledger(path, ledger)
+    return _FeatureShardLedgerState(path=path, ledger=ledger, next_shard_index=next_index)
+
+
+def _build_exact_sequence_view_shard_ledger(
+    *,
+    bundle_id: str,
+    runtime_fingerprint_key: str,
+    shard_size_views: int,
+    pending_row_indexes: set[int],
+    dataset_key: tuple[str, str],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+) -> FeatureShardLedger:
+    rows = sorted(pending_row_indexes)
+    shard_size = max(1, int(shard_size_views))
+    shards: list[FeatureShardLedgerEntry] = []
+    for shard_index, offset in enumerate(range(0, len(rows), shard_size)):
+        shard_rows = set(rows[offset : offset + shard_size])
+        shards.append(
+            FeatureShardLedgerEntry(
+                shard_index=shard_index,
+                input_selector={"view_offset": offset, "view_limit": len(shard_rows)},
+                expected_views=len(shard_rows),
+                expected_vector_keys=_spec_key_count_for_rows(
+                    specs=vector_specs,
+                    row_indexes=shard_rows,
+                    key_field="feature_vector_key",
+                    dataset_key=dataset_key,
+                ),
+                expected_scalar_keys=_spec_key_count_for_rows(
+                    specs=scalar_specs,
+                    row_indexes=shard_rows,
+                    key_field="feature_scalar_key",
+                    dataset_key=dataset_key,
+                ),
+            )
+        )
+    return FeatureShardLedger(
+        bundle_id=str(bundle_id),
+        runtime_fingerprint_key=str(runtime_fingerprint_key),
+        shard_size_views=shard_size,
+        shard_count=len(shards),
+        pending_view_estimate=len(rows),
+        pending_vector_keys=sum(entry.expected_vector_keys for entry in shards),
+        pending_scalar_keys=sum(entry.expected_scalar_keys for entry in shards),
+        shards=tuple(shards),
+    )
+
+
+def _initialize_sequence_view_shard_ledgers(
+    *,
+    contexts: list[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+    need_idx: list[int],
+    job_id: str,
+    shard_size_views: int,
+) -> dict[tuple[str, str], _FeatureShardLedgerState]:
+    if not need_idx:
+        return {}
+    runtime_fingerprint_key = str(metadata_rows[need_idx[0]].get("runtime_fingerprint_key") or "")
+    states: dict[tuple[str, str], _FeatureShardLedgerState] = {}
+    for (dataset_root, dataset_id), rows in _row_indexes_by_dataset(contexts=contexts, row_indexes=need_idx).items():
+        states[(dataset_root, dataset_id)] = _load_or_build_sequence_view_shard_ledger_state(
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            job_id=job_id,
+            runtime_fingerprint_key=runtime_fingerprint_key,
+            shard_size_views=shard_size_views,
+            pending_row_indexes=set(rows),
+            vector_specs=vector_specs,
+            scalar_specs=scalar_specs,
+        )
+    return states
+
+
+def _next_noncommitted_shard_index(ledger: FeatureShardLedger, *, after: int) -> int:
+    return next(
+        (
+            entry.shard_index
+            for entry in ledger.shards
+            if entry.shard_index > after and entry.status != SHARD_STATUS_COMMITTED
+        ),
+        ledger.shard_count,
+    )
+
+
+def _commit_sequence_view_feature_shard(
+    *,
+    contexts: list[SequenceContextRecord],
+    metadata_rows: list[dict[str, object]],
+    bundle: SequenceFeatureBundleConfig,
+    selector: str,
+    model_id: str,
+    job_id: str,
+    all_vals: Dict[str, List[object]],
+    vector_specs: list[dict[str, object]],
+    scalar_specs: list[dict[str, object]],
+    row_indexes: list[int],
+    ledger_states: dict[tuple[str, str], _FeatureShardLedgerState],
+    run_elapsed_seconds: float | None,
+) -> None:
+    for (dataset_root, dataset_id), dataset_row_indexes in _row_indexes_by_dataset(
+        contexts=contexts,
+        row_indexes=row_indexes,
+    ).items():
+        state = ledger_states.get((dataset_root, dataset_id))
+        if state is None:
+            continue
+        shard_index = state.next_shard_index
+        if shard_index >= state.ledger.shard_count:
+            continue
+        now = _iso_now()
+        running_ledger = mark_shard_status(
+            state.ledger,
+            shard_index=shard_index,
+            status=SHARD_STATUS_RUNNING,
+            last_heartbeat_at=now,
+            updated_at=now,
+            error=None,
+        )
+        write_shard_ledger(state.path, running_ledger)
+        try:
+            summary = _persist_sequence_view_feature_sidecars(
+                contexts=contexts,
+                metadata_rows=metadata_rows,
+                bundle=bundle,
+                selector=selector,
+                model_id=model_id,
+                job_id=job_id,
+                all_vals=all_vals,
+                vector_specs=vector_specs,
+                scalar_specs=scalar_specs,
+                row_indexes=set(dataset_row_indexes),
+                record_complete=False,
+                run_elapsed_seconds=run_elapsed_seconds,
+            )
+        except Exception as exc:
+            failed_ledger = mark_shard_status(
+                running_ledger,
+                shard_index=shard_index,
+                status=SHARD_STATUS_FAILED,
+                updated_at=_iso_now(),
+                error=str(exc),
+            )
+            write_shard_ledger(state.path, failed_ledger)
+            ledger_states[(dataset_root, dataset_id)] = _FeatureShardLedgerState(
+                path=state.path,
+                ledger=failed_ledger,
+                next_shard_index=shard_index,
+            )
+            raise
+        committed_at = _iso_now()
+        committed_ledger = mark_shard_status(
+            running_ledger,
+            shard_index=shard_index,
+            status=SHARD_STATUS_COMMITTED,
+            committed_views=len(summary.row_indexes),
+            committed_vector_keys=len(summary.vector_keys),
+            committed_scalar_keys=len(summary.scalar_keys),
+            checksum=summary.checksum,
+            last_heartbeat_at=committed_at,
+            updated_at=committed_at,
+            error=None,
+        )
+        write_shard_ledger(state.path, committed_ledger)
+        record_feature_bundle_shard_commit(
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            job_id=job_id,
+            model_id=model_id,
+            shard_index=shard_index,
+            shard_count=committed_ledger.shard_count,
+            contexts_committed=len(summary.row_indexes),
+            committed_vector_keys=len(summary.vector_keys),
+            committed_scalar_keys=len(summary.scalar_keys),
+            checksum=summary.checksum,
+            runtime_fingerprint_key=committed_ledger.runtime_fingerprint_key,
+            ledger_relative_path=state.path.relative_to(Path(dataset_root) / dataset_id).as_posix(),
+            run_elapsed_seconds=run_elapsed_seconds,
+        )
+        ledger_states[(dataset_root, dataset_id)] = _FeatureShardLedgerState(
+            path=state.path,
+            ledger=committed_ledger,
+            next_shard_index=_next_noncommitted_shard_index(committed_ledger, after=shard_index),
+        )
+
+
 def _execute_sequence_view_feature_bundle(
     *,
     seqs: List[str],
     records,
     model_id: str,
+    job_id: str,
     bundle: SequenceFeatureBundleConfig,
+    runtime_fingerprint: dict[str, object] | None,
     existing: Mapping[str, List[object]],
     need_idx: List[int],
     adapter,
     micro_batch_size: int,
     default_batch_size: int,
+    sequence_view_shard_size_views: int | None,
     auto_derate: bool,
     is_oom: Callable[[BaseException], bool],
     on_progress: Callable[[int], None],
+    adapter_factory: Callable[[], object] | None = None,
 ) -> tuple[Dict[str, List[object]], list[dict[str, object]]]:
     if records is None:
         raise CapabilityError("Sequence-view feature bundles require materialized record payloads.")
     contexts = resolve_sequence_view_contexts(records=list(records))
-    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id=model_id)
+    metadata_rows = build_feature_metadata_rows(
+        contexts=contexts,
+        bundle=bundle,
+        model_id=model_id,
+        runtime_fingerprint=runtime_fingerprint,
+    )
     metadata_columnar = build_feature_metadata_columnar(metadata_rows)
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
     all_vals: Dict[str, List[object]] = {key: list(value) for key, value in existing.items()}
@@ -1007,29 +1780,23 @@ def _execute_sequence_view_feature_bundle(
     else:
         need_idx = sorted(missing_feature_rows)
 
+    run_started_monotonic = time.monotonic()
     if not need_idx:
-        alias_rows = _sequence_view_feature_alias_rows(
+        _persist_sequence_view_feature_sidecars(
             contexts=contexts,
             metadata_rows=metadata_rows,
             bundle=bundle,
             selector=selector.intermediate_selector,
             model_id=model_id,
+            job_id=job_id,
+            all_vals=all_vals,
+            vector_specs=vector_specs,
+            scalar_specs=scalar_specs,
+            run_elapsed_seconds=time.monotonic() - run_started_monotonic,
         )
-        if alias_rows:
-            persist_feature_alias_rows(alias_rows)
-        scalar_alias_rows = _sequence_view_feature_scalar_alias_rows(
-            contexts=contexts,
-            metadata_rows=metadata_rows,
-            bundle=bundle,
-            model_id=model_id,
-        )
-        if scalar_alias_rows:
-            persist_feature_scalar_alias_rows(scalar_alias_rows)
-        if bundle.deduplicate.by_feature_vector_key:
-            _persist_sequence_view_feature_vectors(all_vals=all_vals, specs=vector_specs, metadata_rows=metadata_rows)
-        _persist_sequence_view_feature_scalars(all_vals=all_vals, specs=scalar_specs, metadata_rows=metadata_rows)
         return {**all_vals, **metadata_columnar}, metadata_rows
 
+    adapter = _resolve_feature_bundle_adapter(adapter, adapter_factory)
     stable_eval_batch_size = None
     start_bs = micro_batch_size if micro_batch_size > 0 else min(len(need_idx), default_batch_size)
     bs = start_bs
@@ -1049,6 +1816,24 @@ def _execute_sequence_view_feature_bundle(
             representative_group_keys.append(group_key)
             representative_forward_keys.append(forward_pass_key)
         members.append(row_index)
+    progress_state = _build_sequence_view_feature_progress_state(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        vector_specs=vector_specs,
+        scalar_specs=scalar_specs,
+        need_idx=unique_need,
+    )
+    shard_size_views = max(1, int(sequence_view_shard_size_views or DEFAULT_FEATURE_SHARD_SIZE_VIEWS))
+    ledger_states = _initialize_sequence_view_shard_ledgers(
+        contexts=contexts,
+        metadata_rows=metadata_rows,
+        vector_specs=vector_specs,
+        scalar_specs=scalar_specs,
+        need_idx=unique_need,
+        job_id=job_id,
+        shard_size_views=shard_size_views,
+    )
+    pending_shard_row_indexes: list[int] = []
 
     start = 0
     while start < len(representative_contexts):
@@ -1136,10 +1921,12 @@ def _execute_sequence_view_feature_bundle(
             raise RuntimeOOMError(str(exc)) from exc
 
         completed_rows = 0
+        completed_row_indexes: list[int] = []
         for position, group_key in enumerate(group_key_chunk):
             forward_pass_key = forward_key_chunk[position]
             row_indexes = forward_groups[group_key]
             completed_rows += len(row_indexes)
+            completed_row_indexes.extend(row_indexes)
             scalar_pair = scalar_by_position.get(position)
             if scalar_pair is not None:
                 total, mean = scalar_pair
@@ -1191,28 +1978,63 @@ def _execute_sequence_view_feature_bundle(
                         pooled_cache[cache_key] = _pool_tensor_for_context(embedding_tensor, context=context)
                     all_vals[intermediate_out_id][row_index] = pooled_cache[cache_key]
         on_progress(completed_rows)
+        _maybe_record_sequence_view_feature_progress(
+            progress_state=progress_state,
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            completed_row_indexes=completed_row_indexes,
+            job_id=job_id,
+            model_id=model_id,
+            run_elapsed_seconds=time.monotonic() - run_started_monotonic,
+        )
+        pending_shard_row_indexes.extend(completed_row_indexes)
+        while len(pending_shard_row_indexes) >= shard_size_views:
+            commit_row_indexes = pending_shard_row_indexes[:shard_size_views]
+            pending_shard_row_indexes = pending_shard_row_indexes[shard_size_views:]
+            _commit_sequence_view_feature_shard(
+                contexts=contexts,
+                metadata_rows=metadata_rows,
+                bundle=bundle,
+                selector=selector.intermediate_selector,
+                model_id=model_id,
+                job_id=job_id,
+                all_vals=all_vals,
+                vector_specs=vector_specs,
+                scalar_specs=scalar_specs,
+                row_indexes=commit_row_indexes,
+                ledger_states=ledger_states,
+                run_elapsed_seconds=time.monotonic() - run_started_monotonic,
+            )
         start += take
 
-    alias_rows = _sequence_view_feature_alias_rows(
+    if pending_shard_row_indexes:
+        _commit_sequence_view_feature_shard(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            selector=selector.intermediate_selector,
+            model_id=model_id,
+            job_id=job_id,
+            all_vals=all_vals,
+            vector_specs=vector_specs,
+            scalar_specs=scalar_specs,
+            row_indexes=pending_shard_row_indexes,
+            ledger_states=ledger_states,
+            run_elapsed_seconds=time.monotonic() - run_started_monotonic,
+        )
+
+    _persist_sequence_view_feature_sidecars(
         contexts=contexts,
         metadata_rows=metadata_rows,
         bundle=bundle,
         selector=selector.intermediate_selector,
         model_id=model_id,
+        job_id=job_id,
+        all_vals=all_vals,
+        vector_specs=vector_specs,
+        scalar_specs=scalar_specs,
+        run_elapsed_seconds=time.monotonic() - run_started_monotonic,
     )
-    if alias_rows:
-        persist_feature_alias_rows(alias_rows)
-    scalar_alias_rows = _sequence_view_feature_scalar_alias_rows(
-        contexts=contexts,
-        metadata_rows=metadata_rows,
-        bundle=bundle,
-        model_id=model_id,
-    )
-    if scalar_alias_rows:
-        persist_feature_scalar_alias_rows(scalar_alias_rows)
-    if bundle.deduplicate.by_feature_vector_key:
-        _persist_sequence_view_feature_vectors(all_vals=all_vals, specs=vector_specs, metadata_rows=metadata_rows)
-    _persist_sequence_view_feature_scalars(all_vals=all_vals, specs=scalar_specs, metadata_rows=metadata_rows)
     return {**all_vals, **metadata_columnar}, metadata_rows
 
 
@@ -1238,18 +2060,25 @@ def execute_feature_bundle(
     on_chunk_by_metadata: Mapping[str, Optional[Callable[..., None]]],
     on_chunk_output_group: Optional[Callable[..., None]] = None,
     on_chunk_metadata_group: Optional[Callable[..., None]] = None,
+    adapter_factory: Callable[[], object] | None = None,
+    runtime_fingerprint: dict[str, object] | None = None,
+    sequence_view_shard_size_views: int | None = None,
 ) -> tuple[Dict[str, List[object]], list[dict[str, object]]]:
     if bundle_uses_sequence_views(bundle):
         return _execute_sequence_view_feature_bundle(
             seqs=seqs,
             records=records,
             model_id=model_id,
+            job_id=job_id,
             bundle=bundle,
+            runtime_fingerprint=runtime_fingerprint,
             existing=existing,
             need_idx=need_idx,
             adapter=adapter,
+            adapter_factory=adapter_factory,
             micro_batch_size=micro_batch_size,
             default_batch_size=default_batch_size,
+            sequence_view_shard_size_views=sequence_view_shard_size_views,
             auto_derate=auto_derate,
             is_oom=is_oom,
             on_progress=on_progress,
@@ -1262,7 +2091,12 @@ def execute_feature_bundle(
         ds=ds,
         bundle=bundle,
     )
-    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id=model_id)
+    metadata_rows = build_feature_metadata_rows(
+        contexts=contexts,
+        bundle=bundle,
+        model_id=model_id,
+        runtime_fingerprint=runtime_fingerprint,
+    )
     metadata_columnar = build_feature_metadata_columnar(metadata_rows)
     selector = resolve_intermediate_selector(model_id=model_id, intermediate_block=bundle.intermediate_block)
 
@@ -1430,6 +2264,7 @@ def execute_feature_bundle(
     if len(need_idx) == 0:
         return {**all_vals, **metadata_columnar}, metadata_rows
 
+    adapter = _resolve_feature_bundle_adapter(adapter, adapter_factory)
     start_bs = (
         stable_eval_batch_size
         if stable_eval_batch_size is not None

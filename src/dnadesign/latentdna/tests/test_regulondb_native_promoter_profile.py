@@ -7,10 +7,19 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from dnadesign.latentdna.src.contracts.promoter_metadata import REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS
 from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.services.validation_service import validate_workspace
 from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
 
 
 def test_native_regulondb_promoter_cohorts_materialize_without_densegen_or_sig35(tmp_path: Path) -> None:
@@ -27,6 +36,7 @@ def test_native_regulondb_promoter_cohorts_materialize_without_densegen_or_sig35
                     [["sigma70"], ["sigma38", "sigma70"]],
                     type=pa.list_(pa.string()),
                 ),
+                "regulondb__sigma_factor_count": [1, 2],
                 "regulondb__regulator_composition": ["activator", "mixed"],
                 "regulondb__box_pattern": ["-35/-10", "-10_only"],
                 "regulondb__confidence_level_set": pa.array(
@@ -34,6 +44,11 @@ def test_native_regulondb_promoter_cohorts_materialize_without_densegen_or_sig35
                     type=pa.list_(pa.string()),
                 ),
                 "regulondb__metadata_completeness_class": ["complete", "partial"],
+                "regulondb__source_strata_set": pa.array(
+                    [["regulondb_13_promoter_set"], ["regulondb_11_promoter_set"]],
+                    type=pa.list_(pa.string()),
+                ),
+                "regulondb__primary_promoter_name": ["pA", "pB"],
             }
         ),
         source_path,
@@ -54,6 +69,16 @@ sources:
     path: inputs/native_promoters.parquet
     record_key: id
     subject_key: subject_id
+metadata:
+  include:
+    - regulondb__sigma_factor_set
+    - regulondb__sigma_factor_count
+    - regulondb__regulator_composition
+    - regulondb__box_pattern
+    - regulondb__confidence_level_set
+    - regulondb__metadata_completeness_class
+    - regulondb__source_strata_set
+    - regulondb__primary_promoter_name
 views:
   native_full_7b:
     source: native_full
@@ -61,27 +86,6 @@ views:
       kind: column
       name: embedding
     coordinate_space_id: evo2_7b_native_full
-cohorts:
-  regulondb__sigma_factor_set:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__sigma_factor_set
-  regulondb__regulator_composition:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__regulator_composition
-  regulondb__box_pattern:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__box_pattern
-  regulondb__confidence_level_set:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__confidence_level_set
-  regulondb__metadata_completeness_class:
-    kind: promoter_metadata
-    source: native_full
-    derive: regulondb__metadata_completeness_class
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -101,17 +105,61 @@ cohorts:
     rows = read_table(artifact_dir / "rows.parquet")
     assert "sig35_variant" not in rows.column_names
     assert "regulondb__sigma_factor_set" in rows.column_names
+    assert "regulondb__source_strata_set" in rows.column_names
     assert rows.column("regulondb__regulator_composition").to_pylist() == ["activator", "mixed"]
+    assert rows.column("regulondb__primary_promoter_name").to_pylist() == ["pA", "pB"]
     validation = validate_workspace(workspace_dir, deep=True)
     assert validation["status"] == "ok"
-    assert {
-        detail["derive"]
-        for detail in validation["cohort_details"]
-        if detail["source"] == "native_full" and detail["kind"] == "promoter_metadata"
-    } == {
-        "regulondb__sigma_factor_set",
-        "regulondb__regulator_composition",
-        "regulondb__box_pattern",
-        "regulondb__confidence_level_set",
-        "regulondb__metadata_completeness_class",
-    }
+    assert set(REGULONDB_NATIVE_PROMOTER_METADATA_COLUMNS).issubset(set(rows.column_names))
+
+
+def test_live_regulondb_workspace_declares_representation_health_review_path() -> None:
+    workspace = _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "regulondb_native_promoter_panel"
+    context = load_workspace_config(workspace)
+
+    notebook = context.config.notebooks["latent_geometry_browser"]
+    recipe_steps = {step.id: step for step in context.config.recipes["regulondb_review_recipe"].steps}
+
+    assert context.config.study_binding is not None
+    assert context.config.study_binding.record_root == "docs/studies/regulondb_native_promoter_panel"
+    assert context.config.study_binding.deliverable_docs_root == (
+        "src/dnadesign/studies/regulondb_native_promoter_panel"
+    )
+    assert notebook.default_deliverable == "representation_health_summary"
+    assert notebook.ordered_plots[:5] == [
+        "representation_health_summary",
+        "native_core60_shift_summary",
+        "sigma_factor_structure_summary",
+        "sigma_umap_intermediate_embedding_7b_native_source_record_seq_mean",
+        "sigma_umap_intermediate_embedding_7b_core60_tss_upstream",
+    ]
+    assert context.config.deliverables["representation_health_summary"].recipe == "regulondb_review_recipe"
+    assert context.config.deliverables["native_core60_shift_summary"].recipe == "regulondb_review_recipe"
+    assert context.config.deliverables["sigma_factor_structure_summary"].recipe == "regulondb_review_recipe"
+    assert context.config.deliverables["sigma_umap_panel"].recipe == "regulondb_review_recipe"
+    assert context.config.plots["representation_health_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["native_core60_shift_summary"].kind == "metric_panel_grid"
+    assert context.config.plots["sigma_factor_structure_summary"].kind == "metric_panel_grid"
+    assert context.config.alignments["intermediate_embedding_7b_native_to_core60"].left_on == [
+        "alignment_parent_sequence_id"
+    ]
+    assert context.config.alignments["output_layer_mean_7b_native_to_core60"].right_on == [
+        "alignment_parent_sequence_id"
+    ]
+    assert context.config.views["output_layer_mean_7b_native_source_record_seq_mean"].coordinate_space_id == (
+        "evo2_7b_output_layer_mean"
+    )
+    assert context.config.views["output_layer_mean_7b_core60_tss_upstream"].coordinate_space_id == (
+        "evo2_7b_output_layer_mean"
+    )
+    assert "materialize_native_source_record_output_layer" in recipe_steps
+    assert "materialize_core60_tss_upstream_output_layer" in recipe_steps
+    assert "build_representation_health_summary_metrics" in recipe_steps
+    assert recipe_steps["build_representation_health_summary_metrics"].params["pairwise_max_rows"] == 4096
+    assert recipe_steps["build_representation_health_summary_metrics"].params["pairwise_seed"] == 17
+    assert "build_sigma_factor_structure_summary_metrics" in recipe_steps
+    assert "build_native_core60_shift_summary_metrics" in recipe_steps
+    assert "render_representation_health_summary" in recipe_steps
+    assert "render_native_core60_shift_summary" in recipe_steps
+    assert "render_sigma_factor_structure_summary" in recipe_steps
+    assert "generate_latent_geometry_browser" in recipe_steps

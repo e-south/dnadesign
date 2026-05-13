@@ -22,6 +22,12 @@ from dnadesign.cruncher.app.analyze_score_space import _ScoreSpaceContext
 
 __all__ = ["_render_trajectory_analysis_plots", "_render_trajectory_video_plot"]
 
+_MISSING_FFMPEG_SKIP_REASON = "FFmpeg writer is not available to Matplotlib"
+
+
+def _is_missing_ffmpeg_schema_error(exc: Exception) -> bool:
+    return type(exc).__name__ == "SchemaError" and str(exc) == _MISSING_FFMPEG_SKIP_REASON
+
 
 def _resolve_trajectory_video_output_path(*, tmp_root: Path, output_name: str) -> Path:
     video_stem = Path(output_name).stem
@@ -210,19 +216,32 @@ def _render_trajectory_video_plot(
 
     from dnadesign.cruncher.analysis.trajectory_video import render_chain_trajectory_video
 
-    render_chain_trajectory_video(
-        trajectory_df=trajectory_df,
-        tf_names=tf_names,
-        pwms=pwms,
-        out_path=plot_video_path,
-        config=analysis_cfg.trajectory_video,
-        bidirectional=bidirectional,
-        pwm_pseudocounts=float(pwm_pseudocounts),
-        log_odds_clip=log_odds_clip,
-        tmp_root=tmp_root / "_trajectory_video_tmp",
-        polished_final_sequence=polished_final_sequence,
-        objective_from_manifest=objective_from_manifest,
-    )
+    try:
+        render_chain_trajectory_video(
+            trajectory_df=trajectory_df,
+            tf_names=tf_names,
+            pwms=pwms,
+            out_path=plot_video_path,
+            config=analysis_cfg.trajectory_video,
+            bidirectional=bidirectional,
+            pwm_pseudocounts=float(pwm_pseudocounts),
+            log_odds_clip=log_odds_clip,
+            tmp_root=tmp_root / "_trajectory_video_tmp",
+            polished_final_sequence=polished_final_sequence,
+            objective_from_manifest=objective_from_manifest,
+        )
+    except Exception as exc:
+        if not _is_missing_ffmpeg_schema_error(exc):
+            raise
+        _record_trajectory_video_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            output=plot_video_path,
+            generated=False,
+            skip_reason=_MISSING_FFMPEG_SKIP_REASON,
+            run_dir=run_dir,
+        )
+        return
     _record_trajectory_video_plot(
         plot_entries=plot_entries,
         plot_artifacts=plot_artifacts,

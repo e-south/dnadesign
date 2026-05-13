@@ -11,6 +11,8 @@ from ..contracts.errors import ArtifactConflictError, MissingArtifactError
 from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..io.manifest_io import write_manifest
+from ..io.parquet_io import read_table
+from ..metrics.definitions import metric_definition_digests
 from ..runs.recorder import record_audit
 from ..scalars.build import build_scalar_artifact
 from ..scalars.derive import derive_scalar_artifact
@@ -27,6 +29,18 @@ def _resolve_table_source(context, source_id: str) -> tuple[str, Path]:
     if distance_source_path.exists():
         return "distance_set", distance_source_path
     raise MissingArtifactError(f"scalar source table not found for {source_id!r}")
+
+
+def _scalar_metric_definition_digests(context, table_path: Path) -> dict[str, str]:
+    table = read_table(table_path)
+    if "metric_id" not in table.column_names:
+        return {}
+    metric_ids = {
+        str(value).strip() for value in table["metric_id"].to_pylist() if value is not None and str(value).strip()
+    }
+    if not metric_ids:
+        return {}
+    return metric_definition_digests(metric_ids, config=context.config)
 
 
 def derive_scalar(workspace: str | Path, scalar_id: str, *, force: bool = False) -> CommandResult:
@@ -102,6 +116,10 @@ def derive_scalar(workspace: str | Path, scalar_id: str, *, force: bool = False)
             "on": scalar.derive.on,
         }
 
+    metric_definition_map = _scalar_metric_definition_digests(context, artifact_dir / "table.parquet")
+    if metric_definition_map:
+        params["metric_definition_digests"] = metric_definition_map
+
     manifest = ArtifactManifest(
         artifact_kind="scalar_table",
         artifact_id=scalar_id,
@@ -112,7 +130,11 @@ def derive_scalar(workspace: str | Path, scalar_id: str, *, force: bool = False)
         inputs=input_entries,
         params=params,
         outputs=[ArtifactOutput(path="table.parquet", media_type="application/x-parquet")],
-        stats={"rows": rows, "columns": len(columns)},
+        stats={
+            "rows": rows,
+            "columns": len(columns),
+            **({"metric_definition_ids": sorted(metric_definition_map)} if metric_definition_map else {}),
+        },
     )
     write_manifest(artifact_dir / "manifest.json", manifest.model_dump(mode="json"))
     result = CommandResult(
@@ -158,6 +180,13 @@ def build_scalar(
         builder_kind=builder_kind,
         params=resolved_params,
     )
+    metric_definition_map = _scalar_metric_definition_digests(context, built.artifact_dir / "table.parquet")
+    manifest_params: dict[str, object] = {
+        "builder_kind": builder_kind,
+        **resolved_params,
+    }
+    if metric_definition_map:
+        manifest_params["metric_definition_digests"] = metric_definition_map
     manifest = ArtifactManifest(
         artifact_kind="scalar_table",
         artifact_id=scalar_id,
@@ -174,15 +203,17 @@ def build_scalar(
             )
             for entry in built.inputs
         ],
-        params={
-            "builder_kind": builder_kind,
-            **resolved_params,
-        },
+        params=manifest_params,
         outputs=[
             ArtifactOutput(path="table.parquet", media_type="application/x-parquet"),
             *[ArtifactOutput(path=relative_path, media_type=media_type) for relative_path, media_type in built.outputs],
         ],
-        stats={"rows": built.rows, "columns": len(built.columns), **built.stats},
+        stats={
+            "rows": built.rows,
+            "columns": len(built.columns),
+            **({"metric_definition_ids": sorted(metric_definition_map)} if metric_definition_map else {}),
+            **built.stats,
+        },
     )
     write_manifest(built.artifact_dir / "manifest.json", manifest.model_dump(mode="json"))
     result = CommandResult(

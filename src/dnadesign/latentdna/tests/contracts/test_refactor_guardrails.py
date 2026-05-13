@@ -87,3 +87,28 @@ def test_human_audience_flags_are_removed() -> None:
             path.as_posix() for path in checked_files if forbidden in path.read_text(encoding="utf-8", errors="ignore")
         ]
         assert hits == [], f"forbidden audience wording {forbidden!r} still present in: {hits}"
+
+
+def test_generic_runtime_modules_do_not_branch_on_sigma35_semantics() -> None:
+    repo_root = _repo_root()
+    runtime_paths = [
+        repo_root / "src/dnadesign/latentdna/src/labels.py",
+        repo_root / "src/dnadesign/latentdna/src/notebooks/browser_runtime_projection.py",
+        repo_root / "src/dnadesign/latentdna/src/notebooks/browser_runtime_plot_review.py",
+        repo_root / "src/dnadesign/latentdna/src/notebooks/browser_runtime_support.py",
+        repo_root / "src/dnadesign/latentdna/src/plots/render.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/build.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/common.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/preassay.py",
+        repo_root / "src/dnadesign/latentdna/src/visual_style.py",
+    ]
+    forbidden_tokens = ["sig35", "sigma35", "sigma-35", "promoter-specific"]
+
+    hits: dict[str, list[str]] = {}
+    for path in runtime_paths:
+        text = path.read_text(encoding="utf-8", errors="ignore").casefold()
+        path_hits = [token for token in forbidden_tokens if token in text]
+        if path_hits:
+            hits[path.relative_to(repo_root).as_posix()] = path_hits
+
+    assert hits == {}, f"generic runtime modules still carry Sigma-35 runtime coupling: {hits}"

@@ -661,7 +661,7 @@ def test_load_workspace_config_accepts_promoter_reference_margin_benchmark_templ
     assert "design_structure_summary" in context.config.deliverables
     assert "sigma35_ordinal_audit" in context.config.deliverables
     assert "context_robustness_summary" in context.config.deliverables
-    assert "appendix_geometry_audit" in context.config.deliverables
+    assert "appendix_geometry_review" in context.config.deliverables
     assert "appendix_umap_gallery" in context.config.deliverables
 
 
@@ -765,6 +765,112 @@ recipes:
     assert notebook.default_deliverable == "appendix_umap_gallery"
 
 
+def test_load_workspace_config_accepts_candidate_set_declarations(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "plot_semantics").mkdir()
+    (workspace_dir / "plot_semantics" / "appendix_umap_gallery.yaml").write_text(
+        """
+plot_id: appendix_umap_gallery
+question: What appendix projection is available for the demo notebook?
+decision_role: appendix
+encoding: Demo projection scatter plot for notebook wiring validation.
+scope: Full population.
+guardrails:
+  - This fixture only validates workspace loading.
+caption: Demo appendix plot semantics fixture.
+alt_text: Demo appendix plot semantics fixture.
+preprocessing_md: Fixture semantics do not declare additional preprocessing.
+math_md: Fixture semantics do not declare a mathematical definition.
+rationale_md: Fixture semantics exist only to validate workspace loading.
+limitations_md: Fixture semantics are not a study-facing scientific contract.
+failure_modes_md: Replace fixture semantics before using the plot outside tests.
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo, family: intermediate_embedding, scope: anchor_60bp}
+    role: primary
+candidate_sets:
+  demo_x:
+    label: Demo X
+    include_tags: {family: intermediate_embedding}
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    candidate_sets: [demo_x]
+    default_candidate_set: demo_x
+plots:
+  appendix_umap_gallery:
+    kind: projection_scatter
+    projection: umap_z20_60
+    semantics_ref: plot_semantics/appendix_umap_gallery.yaml
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      plots: [appendix_umap_gallery]
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: render_appendix
+        op: plot.render
+        params:
+          plot: appendix_umap_gallery
+      - id: generate_notebook
+        op: notebook.generate
+        depends_on: [render_appendix]
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+
+    assert context.config.candidate_sets["demo_x"].label == "Demo X"
+    assert context.require_notebook("latent_geometry_browser").default_candidate_set == "demo_x"
+
+
 def test_load_workspace_config_rejects_legacy_deliverable_shape(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -848,6 +954,263 @@ study_binding:
     )
 
     with pytest.raises(ValidationError):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_legacy_study_binding_docs_root(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+study_binding:
+  study_id: stress_ethanol_cipro_growth
+  docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_output_logit_family(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  old_output_surface:
+    source: anchor60
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: 7b, family: pooled_logits}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="retired representation family"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_output_logit_coordinate_space(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  output_layer_mean_7b_anchor_60bp:
+    source: anchor60
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_pooled_logits
+    tags: {model: 7b, family: output_layer_mean}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="retired representation term"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_output_logit_view_id(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  pooled_logits_7b_anchor_60bp:
+    source: anchor60
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: 7b, family: output_layer_mean}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="retired representation term"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_retired_family_candidate_selector(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+candidate_sets:
+  old_outputs:
+    label: Old outputs
+    include_tags: {family: pooled_logits}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="retired representation family"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_docs_ref_path_traversal(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    record_root = tmp_path / "docs" / "studies" / "demo_study"
+    record_root.mkdir(parents=True)
+    for file_name in ("campaign.yaml", "datasets.yaml", "ops.study.yaml"):
+        (record_root / file_name).write_text("version: 1\n", encoding="utf-8")
+    (record_root / "status.md").write_text("## Demo\n", encoding="utf-8")
+    deliverable_docs_root = tmp_path / "study_docs"
+    deliverable_docs_root.mkdir()
+    (deliverable_docs_root / "study.yaml").write_text("study_id: demo_study\n", encoding="utf-8")
+    (deliverable_docs_root / "deliverables").mkdir()
+    (deliverable_docs_root / "deliverables" / "review.md").write_text("# Review\n", encoding="utf-8")
+    (tmp_path / "outside.md").write_text("# Outside\n", encoding="utf-8")
+    (workspace_dir / "config.yaml").write_text(
+        f"""
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {{model: demo}}
+    role: primary
+recipes:
+  review_recipe:
+    steps:
+      - id: materialize_view
+        op: view.materialize
+        params:
+          view: z20_60
+deliverables:
+  review_bundle:
+    title: Demo deliverable
+    section: Review
+    question: Does the demo deliverable validate?
+    summary: Minimal deliverable fixture for docs-ref validation.
+    recipe: review_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      views: [z20_60]
+    docs_refs: [study:demo_study/../outside]
+    acceptance_checks: []
+study_binding:
+  study_id: demo_study
+  record_root: {record_root.as_posix()}
+  deliverable_docs_root: {deliverable_docs_root.as_posix()}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="stay under the study docs root"):
         load_workspace_config(workspace_dir)
 
 
@@ -1227,6 +1590,140 @@ recipes:
     )
 
     with pytest.raises(ValidationError, match="candidate_grid_panel_titles must match candidate_grid_views length"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_unknown_notebook_candidate_set(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    candidate_sets: [missing_x]
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: generate_notebook
+        op: notebook.generate
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="unknown candidate_set"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_unknown_notebook_default_reference_set(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: appendix_umap_gallery
+    default_reference_set: missing_reference_set
+deliverables:
+  appendix_umap_gallery:
+    title: Demo workspace deliverable
+    section: Appendix
+    question: Does the browser render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: notebook_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      notebooks: [latent_geometry_browser]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  notebook_recipe:
+    steps:
+      - id: generate_notebook
+        op: notebook.generate
+        params:
+          notebook: latent_geometry_browser
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="unknown default_reference_set"):
         load_workspace_config(workspace_dir)
 
 

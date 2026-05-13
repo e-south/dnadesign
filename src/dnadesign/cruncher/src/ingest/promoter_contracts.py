@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-PROMOTER_EXPORT_SCHEMA_VERSION = "cruncher.regulondb.promoter_export.v1"
+PROMOTER_EXPORT_SCHEMA_VERSION = "cruncher.regulondb.promoter_export.v2"
 PROMOTER_PARSER_VERSION = "cruncher.regulondb.promoter_parser.v1"
 _STRICT_DNA_RE = re.compile(r"^[ACGT]+$")
 _RELATION_NAMES = (
@@ -86,6 +86,19 @@ class PromoterSourceFile:
 
 
 @dataclass(frozen=True, slots=True)
+class PromoterAssociationSourceFile:
+    source_id: str
+    source: str
+    release: str
+    path: str
+    table: str
+    stratum: str
+    role: str
+    file_format: str
+    parser_hint: str
+
+
+@dataclass(frozen=True, slots=True)
 class SkippedPromoterSourceRow:
     source: str
     source_release: str
@@ -146,6 +159,41 @@ class PromoterRegulatorySite:
     confidence: str | None
     evidence: tuple[str, ...] = ()
     citation_refs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PromoterRegulatoryAssociation:
+    source: str
+    source_release: str
+    source_route: str
+    source_table: str | None
+    source_stratum: str
+    source_row_ref: str
+    regulatory_interaction_id: str
+    promoter_id: str | None
+    promoter_name: str | None
+    regulated_entity_name: str | None
+    regulator_id: str | None
+    regulator_name: str | None
+    regulator_abbrev: str | None
+    regulon_id: str | None
+    regulon_name: str | None
+    target_type: str | None
+    function: str | None
+    mechanism: str | None
+    confidence: str | None
+    evidence: tuple[str, ...] = ()
+    citation_refs: tuple[str, ...] = ()
+    binding_site_id: str | None = None
+    binding_site_sequence: str | None = None
+    binding_site_strand: str | None = None
+    binding_interval_0based: tuple[int, int] | None = None
+    binding_raw_coordinates: dict[str, Any] | None = None
+    raw_payload_sha256: str | None = None
+    query_sha256: str | None = None
+    parser_version: str = PROMOTER_PARSER_VERSION
+    export_schema_version: str = PROMOTER_EXPORT_SCHEMA_VERSION
+    source_release_date: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

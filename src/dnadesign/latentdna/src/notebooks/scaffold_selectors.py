@@ -70,7 +70,19 @@ def render_selector_cells() -> tuple[str, ...]:
                 _geometry = runtime.geometry
                 _support = runtime.support
 
-                _model_options = _support.labeled_options((value.upper(), value) for value in _geometry.model_values)
+                projected_geometry_rows = [
+                    row for row in _geometry.geometry_rows if row.get("projection_ids")
+                ]
+                _model_values = _support.unique_in_order(
+                    row.get("model") for row in projected_geometry_rows
+                ) or _geometry.model_values
+                def _model_label(value):
+                    _value = str(value)
+                    if _value.startswith("evo2_"):
+                        return "Evo 2 " + _value.removeprefix("evo2_").upper()
+                    return _value.upper()
+
+                _model_options = _support.labeled_options((_model_label(value), value) for value in _model_values)
                 model_selector = _support.mo.ui.dropdown(
                     options=_model_options,
                     value=(
@@ -85,22 +97,23 @@ def render_selector_cells() -> tuple[str, ...]:
                         _support.option_key_for_value(_geometry.layout_options, _geometry.layout_default)
                         or next(iter(_geometry.layout_options))
                     ),
-                    label="Layout",
+                    label="Candidate set / mode",
                 )
-                return (layout_selector, model_selector)
+                return (layout_selector, model_selector, projected_geometry_rows)
             """
         ),
         dedent(
             """\
             @app.cell
-            def _(model_selector, runtime):
+            def _(model_selector, projected_geometry_rows, runtime):
                 _geometry = runtime.geometry
                 _support = runtime.support
 
                 selected_model = str(model_selector.value)
+                _selector_rows = projected_geometry_rows or _geometry.geometry_rows
                 family_values = _support.unique_in_order(
                     row.get("family")
-                    for row in _geometry.geometry_rows
+                    for row in _selector_rows
                     if str(row.get("model")) == selected_model
                 ) or ["intermediate_embedding"]
                 family_default = (
@@ -112,7 +125,7 @@ def render_selector_cells() -> tuple[str, ...]:
                     (
                         {
                             "intermediate_embedding": "Intermediate block mean",
-                            "pooled_logits": "Pooled logits",
+                            "output_layer_mean": "Output-layer mean",
                         }.get(value, value.replace("_", " ")),
                         value,
                     )
@@ -132,16 +145,17 @@ def render_selector_cells() -> tuple[str, ...]:
         dedent(
             """\
             @app.cell
-            def _(family_selector, runtime, selected_model):
+            def _(family_selector, projected_geometry_rows, runtime, selected_model):
                 _geometry = runtime.geometry
                 _support = runtime.support
 
                 selected_family = str(family_selector.value)
+                _selector_rows = projected_geometry_rows or _geometry.geometry_rows
                 context_values = _support.unique_in_order(
                     row.get("context")
-                    for row in _geometry.geometry_rows
+                    for row in _selector_rows
                     if str(row.get("model")) == selected_model and str(row.get("family")) == selected_family
-                ) or ["anchor_60bp"]
+                ) or ["merged_anchor_insert_seq_mean"]
                 context_default = (
                     str(_geometry.geometry_control.get("default_context"))
                     if str(_geometry.geometry_control.get("default_context")) in context_values
@@ -150,7 +164,7 @@ def render_selector_cells() -> tuple[str, ...]:
                 _context_options = _support.labeled_options(
                     (
                         {
-                            "anchor_60bp": "60 bp anchor",
+                            "merged_anchor_insert_seq_mean": "Mixed-length anchor-source insert",
                             "full_context_1kb": "1 kb construct context",
                         }.get(value, value.replace("_", " ")),
                         value,
@@ -171,14 +185,15 @@ def render_selector_cells() -> tuple[str, ...]:
         dedent(
             """\
             @app.cell
-            def _(context_selector, layout_selector, runtime, selected_family, selected_model):
+            def _(context_selector, layout_selector, projected_geometry_rows, runtime, selected_family, selected_model):
                 _geometry = runtime.geometry
                 _support = runtime.support
 
                 _selected_context = str(context_selector.value)
+                _selector_rows = projected_geometry_rows or _geometry.geometry_rows
                 compatible_geometries = [
                     row
-                    for row in _geometry.geometry_rows
+                    for row in _selector_rows
                     if str(row.get("model")) == selected_model
                     and str(row.get("family")) == selected_family
                     and str(row.get("context")) == _selected_context
@@ -209,6 +224,34 @@ def render_selector_cells() -> tuple[str, ...]:
         dedent(
             """\
             @app.cell
+            def _(geometry_selector, runtime):
+                _geometry = runtime.geometry
+                _support = runtime.support
+
+                _selected_geometry = _geometry.geometry_rows_by_id.get(str(geometry_selector.value))
+                projection_ids = [
+                    str(projection_id)
+                    for projection_id in (_selected_geometry or {}).get("projection_ids", [])
+                    if str(projection_id).strip()
+                ]
+                projection_options = _support.labeled_options(
+                    (projection_id.replace("_", " "), projection_id)
+                    for projection_id in projection_ids
+                )
+                empty_projection_options = {"Default projection": ""}
+                projection_selector = _support.mo.ui.dropdown(
+                    options=projection_options or empty_projection_options,
+                    value=next(iter(projection_options or empty_projection_options)),
+                    label="Projection",
+                    searchable=True,
+                    full_width=True,
+                )
+                return (projection_selector,)
+            """
+        ),
+        dedent(
+            """\
+            @app.cell
             def _(runtime):
                 _geometry = runtime.geometry
                 _support = runtime.support
@@ -229,34 +272,41 @@ def render_selector_cells() -> tuple[str, ...]:
                 _geometry = runtime.geometry
                 _support = runtime.support
 
-                compare_options = _support.labeled_options(
-                    (
-                        str(row.get("label") or row["view_id"]),
-                        str(row["view_id"]),
-                    )
-                    for row in _geometry.geometry_rows
-                ) or {"No geometries": ""}
-                compare_left_selector = _support.mo.ui.dropdown(
-                    options=compare_options,
-                    value=(
-                        _support.option_key_for_value(compare_options, _geometry.compare_left_default)
-                        or next(iter(compare_options))
-                    ),
-                    label="Left geometry",
-                    searchable=True,
-                    full_width=True,
+                reference_values = set((_geometry.reference_annotation_options or {"Off": ""}).values())
+                default_reference = (
+                    _geometry.reference_annotation_default
+                    if _geometry.reference_annotation_default in reference_values
+                    else ""
                 )
-                compare_right_selector = _support.mo.ui.dropdown(
-                    options=compare_options,
-                    value=(
-                        _support.option_key_for_value(compare_options, _geometry.compare_right_default)
-                        or next(iter(compare_options))
-                    ),
-                    label="Right geometry",
-                    searchable=True,
-                    full_width=True,
+                get_requested_reference, set_requested_reference = _support.mo.state(default_reference)
+                return (get_requested_reference, set_requested_reference)
+            """
+        ),
+        dedent(
+            """\
+            @app.cell
+            def _(runtime):
+                _geometry = runtime.geometry
+                _support = runtime.support
+
+                reference_hue_values = set((_geometry.reference_hue_options or {"Black stars": ""}).values())
+                default_reference_hue = "" if "" in reference_hue_values else next(iter(reference_hue_values), "")
+                get_requested_reference_hue, set_requested_reference_hue = _support.mo.state(default_reference_hue)
+                return (get_requested_reference_hue, set_requested_reference_hue)
+            """
+        ),
+        dedent(
+            """\
+            @app.cell
+            def _(runtime):
+                _support = runtime.support
+
+                _annotation_modes = _support.reference_annotation_mode_options()
+                _default_annotation_mode = "auto"
+                get_requested_reference_annotation_mode, set_requested_reference_annotation_mode = _support.mo.state(
+                    _default_annotation_mode
                 )
-                return (compare_left_selector, compare_right_selector)
+                return (get_requested_reference_annotation_mode, set_requested_reference_annotation_mode)
             """
         ),
     )

@@ -1,14 +1,14 @@
 plot_id: sigma35_ordinal_audit
-question: Do the candidate spaces preserve a coherent ordered Sigma-35 design axis before assay data exists?
+question: Do the candidate spaces preserve a coherent ordered metadata axis before assay data exists?
 decision_role: primary
-encoding: Candidate-by-metric bar panels with bootstrap intervals for the Spearman summary rows, plus Kendall and permutation support for the Sigma-35 audit.
-scope: Stratified candidate samples over the synthetic promoter population using the declared Sigma-35 order mapping for the active study.
+encoding: Candidate-by-metric bar panels with bootstrap intervals for the Spearman summary rows, plus Kendall and permutation support for the DenseGen Sigma-35 audit group.
+scope: This scalar panel audits the DenseGen synthetic Sigma-35 f/e/d/c/b design ladder on the stratified candidate samples. W collection and Anderson iGEM standards are audited separately as collection-specific strength standards, and can also be inspected in the ordinal swarm gallery selector; their numeric scales are not pooled with Sigma-35.
 guardrails:
-  - Read this panel as an ordered Sigma-35 design-axis check across pooled sequence embeddings.
-  - Keep the exploratory label when the Sigma-35 order file is provisional.
+  - Read this panel as an ordered metadata-axis check, not as an activity estimate.
+  - Do not mix categorical ordinal labels and numeric strength metadata in one pooled score; use one selected group at a time.
 caption: Sigma-35 ordinal audit across candidate representations.
-alt_text: Bar-panel summary showing Sigma-35 ordinal correlation statistics and permutation support for each candidate representation.
-preprocessing_md: Sigma-35 centroid distances are computed after view-level standardization and row L2 normalization on the sampled candidate rows; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
+alt_text: Bar-panel summary showing Sigma-35 ordinal correlation statistics and permutation support for each candidate representation, with the declared DenseGen f/e/d/c/b ladder kept separate from reference-standard strength scales.
+preprocessing_md: Sigma-35 centroid distances are computed after view-level standardization and row L2 normalization on the sampled candidate rows; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0. The candidate rows are already stored summaries from causal Evo 2 token states or block-standardized forward/RC concat blocks, so the ordinal audit evaluates row-level latent geometry rather than tokenwise motifs.
 math_md: |
   The audit compares expected rank gaps
   $$
@@ -19,6 +19,6 @@ math_md: |
   d_{\mathrm{emb}}(g, h) = 1 - \cos(c_g, c_h).
   $$
   It reports global Spearman and Kendall correlations, a balanced Spearman, within-family and within-regulator mean Spearman summaries, and a shuffled-label permutation null for the global Spearman.
-rationale_md: Provides a focused pre-assay check for ordered Sigma-35 design-axis signal inside the synthetic design.
-limitations_md: The result depends on the declared ordinal prior and remains a design-annotation audit until assay labels exist.
-failure_modes_md: Uncertain rank order, family-specific confounding, or weak sample coverage for particular variants can make ordinal structure appear stronger or weaker than it is.
+rationale_md: Provides a focused pre-assay check for ordered metadata signal in the engineered Sigma-35 ladder. Anderson and W strength metadata require collection-specific audits rather than a pooled ordinal scale.
+limitations_md: This panel is Sigma-35-specific. Reference-standard ordinal groups with numeric strength metadata use the same broad metric family elsewhere, but should be selected explicitly so Anderson, W collection, and DenseGen priors are not pooled.
+failure_modes_md: Uncertain rank order, mixed strength scales, family-specific confounding, or weak sample coverage for particular variants can make ordinal structure appear stronger or weaker than it is.

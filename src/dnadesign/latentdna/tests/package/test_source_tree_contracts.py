@@ -74,6 +74,7 @@ def test_latentdna_internal_cli_is_nested_under_src() -> None:
     assert (notebook_dir / "browser_runtime_compare.py").is_file()
     assert (notebook_dir / "browser_runtime_projection.py").is_file()
     assert (notebook_dir / "browser_runtime_support.py").is_file()
+    assert (notebook_dir / "rendering.py").is_file()
     assert (notebook_dir / "scaffold.py").is_file()
     assert (notebook_dir / "scaffold_panels.py").is_file()
     assert (notebook_dir / "scaffold_pages.py").is_file()

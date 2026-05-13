@@ -11,9 +11,28 @@ Configured lanes:
 - `config.sequence_views.core60_tss_upstream.evo2_7b.yaml`: runs the
   materialized derived `analysis_window` views from
   `usr_regulondb_native_promoter_core60` with `core60_mean` pooling.
+- `config.sequence_views.native_full_plus_tss_upstream_core60.evo2_7b.yaml`:
+  additive dogfood lane that runs full 81 bp native `source_record` views once
+  and records both full-sequence `seq_mean` and explicit `[0,60)`
+  `core60_mean` pooled sidecars. This config is not part of the default
+  study-level `fill-infer` quota unless a runbook is promoted for it.
 
-Both lanes request the intermediate block mean, output-layer mean,
+All configs request the intermediate block mean, output-layer mean,
 mean-per-token log likelihood, and total log likelihood sidecars.
+
+Current local status as of 2026-04-30:
+
+- Standard `fill-infer` lanes are complete locally: native/full and derived
+  core60 both report zero missing products, vectors, scalars, or stale
+  sidecars.
+- The additive native/full plus `[0,60)` config is also complete locally:
+  6,364 contexts, 12,728 reusable vectors, and 6,364 reusable scalars.
+- A read-only Evo2 7B recompute check sampled 128 native records and 128
+  derived core60 views; fresh output-layer means, intermediate embedding means,
+  and log-likelihood scalars matched persisted sidecars exactly.
+- Direct reruns of a complete config still perform sidecar reconciliation. Use
+  the study-level `fill-infer` runbook path for batch operations so complete
+  lanes are skipped before GPU submission.
 
 Preflight commands:
 
@@ -24,6 +43,8 @@ uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/wor
 uv run infer validate config --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
 uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml --format json --mode inventory
 uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml --json
+uv run infer validate config --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full_plus_tss_upstream_core60.evo2_7b.yaml
+uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full_plus_tss_upstream_core60.evo2_7b.yaml --format json --mode inventory
 ```
 
 Study-level fill command:

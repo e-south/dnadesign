@@ -220,6 +220,16 @@ def test_discover_repo_tools_excludes_legacy_data_directories(tmp_path: Path) ->
     assert tool_names == {"densegen", "usr"}
 
 
+def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    (src_root / "latentdna").mkdir(parents=True, exist_ok=True)
+    (src_root / "latentdna" / "__init__.py").write_text("", encoding="utf-8")
+    (src_root / "stale_cache" / "__pycache__").mkdir(parents=True, exist_ok=True)
+
+    tool_names = discover_repo_tools(repo_root=tmp_path)
+    assert tool_names == {"latentdna"}
+
+
 def test_discover_external_integration_tools_ignores_marker_text_in_comments(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
     foo_test = src_root / "foo" / "tests" / "test_one.py"

@@ -35,6 +35,23 @@ def test_presentation_default_uses_solid_connectors() -> None:
     assert style.connector_dash == ()
 
 
+def test_style_accepts_separate_sequence_annotation_font_sizes() -> None:
+    style = resolve_style(
+        preset="presentation_default",
+        overrides={
+            "font_size_seq": 16,
+            "font_size_feature_label": 8,
+            "font_size_annotation_label": 9,
+            "font_size_span_link_label": 10,
+        },
+    )
+
+    assert style.font_size_seq == 16
+    assert style.font_size_feature_label == 8
+    assert style.font_size_annotation_label == 9
+    assert style.font_size_span_link_label == 10
+
+
 def test_default_workspaces_root_resolves_from_current_working_directory(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
     assert default_workspaces_root().resolve() == (tmp_path / "workspaces").resolve()

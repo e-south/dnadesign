@@ -738,7 +738,7 @@ job:
 
     assert result.records_total == 1
     frame = Dataset(usr_root, "anchors_constructed").head(n=5)
-    assert str(frame.iloc[0]["sequence"]).upper() == "AAAAGGCCCCGGGG"
+    assert str(frame.iloc[0]["sequence"]) == "AAAAGGCCCCGGGG"
 
 
 def test_run_construct_rejects_mismatched_expected_template_upstream_sequence(tmp_path: Path) -> None:

@@ -7,8 +7,8 @@ guardrails:
   - Use this panel to judge anchor-to-context geometry retention for matched promoters.
   - Reference-promoter alignment belongs in the appendix reference panel.
 caption: Context-robustness summary across aligned anchor and construct-context representations.
-alt_text: Bar-panel summary showing self-cosine stability and cohort-geometry retention between anchor and full-context representations.
-preprocessing_md: Anchor and context vectors are each standardized by view and row-normalized before self-cosine or centroid-distance retention is computed on the persisted 4,096-row design-family-stratified sample; zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
+alt_text: Bar-panel summary showing how much 1 kb context-derived sequence means and anchor-span means preserve the anchor-source geometry across design-family, regulator-composition, and Sigma-35 cohorts.
+preprocessing_md: Anchor and context vectors are each standardized by view and row-normalized before self-cosine or centroid-distance retention is computed on the persisted 4,096-row design-family-stratified sample. The anchor vector is a causal mean over the source insert; context vectors are causal means from full 1 kb emitted sequences, either over the whole emitted context or over the Construct-provided anchor span. Zero-variance columns are set to 0.0 after scaling and zero-norm rows remain 0.0.
 math_md: |
   Row-level stability uses
   $$
@@ -23,6 +23,6 @@ math_md: |
   \right),
   $$
   where each \(D_A\) is the cohort centroid-distance matrix for that view.
-rationale_md: Answers whether full-context mean pooling preserves or washes out the anchor-level design geometry.
+rationale_md: Answers whether adding a full 1 kb causal Evo 2 pass preserves anchor-level design geometry, and whether whole-sequence `seq_mean` dilutes anchor-local structure relative to bounded `anchor_mean`.
 limitations_md: This panel reports a sample estimate rather than the full aligned population, and high agreement can still preserve nuisance structure.
 failure_modes_md: The summary fails fast if anchor and context do not retain the same non-degenerate cohort pairs for a reported annotation axis. A family can still look stable overall while context preserves nuisance structure.

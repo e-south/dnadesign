@@ -24,7 +24,7 @@ from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
-from dnadesign.latentdna.src.views.derive import _project_matrix_to_reference_rows
+from dnadesign.latentdna.src.views.derive import _project_matrix_to_reference_rows, _write_block_normalized_matrix
 
 _RUNNER = CliRunner()
 
@@ -75,6 +75,73 @@ def _write_matrix_bundle(bundle_dir: Path, *, include_manifest: bool = True) -> 
             ),
             encoding="utf-8",
         )
+
+
+def _manual_block_normalized(matrix: np.ndarray) -> np.ndarray:
+    source = np.asarray(matrix, dtype=np.float64)
+    mean = source.mean(axis=0, keepdims=True)
+    std = source.std(axis=0, keepdims=True)
+    zero_mask = np.asarray(std[0] <= 1e-8, dtype=bool)
+    std[:, zero_mask] = 1.0
+    working = np.asarray((source - mean) / std, dtype=np.float32)
+    working[:, zero_mask] = 0.0
+    norms = np.linalg.norm(working, axis=1, keepdims=True)
+    return np.asarray(working / np.maximum(norms, 1e-8), dtype=np.float32)
+
+
+def test_block_normalized_concatenate_uses_stable_stats_for_large_offsets() -> None:
+    row_count = 20_000
+    positions = np.arange(row_count, dtype=np.float32)
+    matrix = np.column_stack(
+        [
+            np.float32(1_000_000.0) + np.mod(positions, 7.0),
+            np.float32(1_000_000.0) + np.mod(positions * 3.0, 11.0),
+        ]
+    ).astype(np.float32)
+    output = np.zeros_like(matrix)
+
+    _write_block_normalized_matrix(
+        matrix,
+        output,
+        column_start=0,
+        column_stop=matrix.shape[1],
+        projection_indices=None,
+        center=True,
+        scale=True,
+        nonfinite_policy="error",
+        zero_variance_policy="drop_or_zero",
+        zero_row_policy="zero",
+    )
+
+    np.testing.assert_allclose(output, _manual_block_normalized(matrix), rtol=2e-5, atol=2e-5)
+
+
+def test_block_normalized_concatenate_projection_indices_preserve_reference_row_axis() -> None:
+    matrix = np.asarray(
+        [
+            [10.0, 1.0, 0.0],
+            [20.0, 2.0, 1.0],
+            [30.0, 3.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    output = np.zeros_like(matrix)
+    projection_indices = np.asarray([2, 0, 1], dtype=np.int64)
+
+    _write_block_normalized_matrix(
+        matrix,
+        output,
+        column_start=0,
+        column_stop=matrix.shape[1],
+        projection_indices=projection_indices,
+        center=True,
+        scale=True,
+        nonfinite_policy="error",
+        zero_variance_policy="drop_or_zero",
+        zero_row_policy="zero",
+    )
+
+    np.testing.assert_allclose(output, _manual_block_normalized(matrix)[projection_indices])
 
 
 def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path: Path) -> None:
@@ -159,6 +226,15 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         },
                         "coordinate_space_id": "bundle_concat_space",
                         "tags": {"operation": "concatenate"},
+                        "role": "primary",
+                    },
+                    "bundle_block_concat": {
+                        "derive": {
+                            "kind": "block_normalized_concatenate",
+                            "inputs": ["bundle_view", "bundle_norm"],
+                        },
+                        "coordinate_space_id": "bundle_block_concat_space",
+                        "tags": {"operation": "block_normalized_concatenate"},
                         "role": "primary",
                     },
                 },
@@ -263,7 +339,14 @@ def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
         for detail in validate_payload["view_details"]
     )
 
-    for view_id in ["bundle_norm", "context_by_subject", "bundle_reduced", "bundle_reduced_norm", "bundle_concat"]:
+    for view_id in [
+        "bundle_norm",
+        "context_by_subject",
+        "bundle_reduced",
+        "bundle_reduced_norm",
+        "bundle_concat",
+        "bundle_block_concat",
+    ]:
         result = _RUNNER.invoke(
             app,
             ["view", "derive", view_id, "--workspace", workspace_dir.as_posix(), "--json"],
@@ -303,8 +386,44 @@ def test_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
 
     concatenated_matrix = np.load(outputs / "views" / "bundle_concat" / "matrix.npy")
     assert concatenated_matrix.shape == (3, 4)
+    block_concatenated_matrix = np.load(outputs / "views" / "bundle_block_concat" / "matrix.npy")
+    assert block_concatenated_matrix.shape == (3, 8)
+    assert np.allclose(np.linalg.norm(block_concatenated_matrix[:, :4], axis=1), 1.0)
+    assert np.allclose(np.linalg.norm(block_concatenated_matrix[:, 4:], axis=1), 1.0)
+    assert np.allclose(block_concatenated_matrix[:, :4], _manual_block_normalized(bundle_matrix))
+    assert np.allclose(block_concatenated_matrix[:, 4:], _manual_block_normalized(normalized_matrix))
     renamed_table = pq.read_table(outputs / "scalars" / "bundle_norm_renamed" / "table.parquet")
     assert "bundle_norm_value" in renamed_table.column_names
+
+
+def test_matrix_bundle_source_rejects_ambiguous_matrix_payloads(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    bundle_dir = tmp_path / "bundle_source"
+    _write_matrix_bundle(bundle_dir)
+    np.savez(bundle_dir / "matrix.npz", matrix=np.ones((3, 4), dtype=np.float32))
+    context_path = tmp_path / "inputs" / "context.parquet"
+    _write_parquet(
+        context_path,
+        [
+            {
+                "id": "ctx_01",
+                "subject_id": "subject_01",
+                "context_id": "a",
+                "label": "spyP",
+                "embedding_context": [1.0, 0.0],
+            }
+        ],
+    )
+    _write_workspace_config(workspace_dir, bundle_dir, context_path)
+
+    result = _RUNNER.invoke(
+        app,
+        ["inspect", "source", "bundle_source", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+
+    assert result.exit_code != 0
+    assert "ambiguous matrix payloads" in result.stdout
 
 
 def test_concatenate_rejects_non_unique_reference_join_keys() -> None:

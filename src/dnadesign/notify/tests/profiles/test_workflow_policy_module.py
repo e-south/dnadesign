@@ -55,9 +55,14 @@ def test_construct_policy_defaults_are_scoped_to_construct_events() -> None:
     assert defaults["only_tools"] == "construct"
 
 
-def test_infer_policy_defaults_include_overlay_part_progress_events() -> None:
+def test_infer_policy_defaults_include_overlay_and_feature_bundle_events() -> None:
     defaults = policy_defaults("infer")
-    assert defaults["only_actions"] == "attach,write_overlay_part,materialize"
+    actions = defaults["only_actions"].split(",")
+    assert actions[:3] == ["attach", "write_overlay_part", "materialize"]
+    assert "infer_feature_bundle_progress" in actions
+    assert "infer_feature_bundle_complete" in actions
+    assert "infer_feature_vectors_write" not in actions
+    assert "infer_feature_scalars_write" not in actions
     assert defaults["only_tools"] == "infer"
 
 

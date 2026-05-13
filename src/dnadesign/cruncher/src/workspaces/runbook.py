@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -249,7 +250,7 @@ def run_workspace_runbook(
     executed_step_ids: list[str] = []
     for step in steps:
         step_cwd = _resolve_step_cwd(workspace_root=workspace_root, step=step)
-        cmd = ["uv", "run", "cruncher", *step.run]
+        cmd = [sys.executable, "-m", "dnadesign.cruncher.cli.app", *step.run]
         if not dry_run:
             if resolved_output_log is None:
                 result = subprocess.run(

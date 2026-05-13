@@ -17,6 +17,7 @@ SUPPORTED_RECIPE_OPS: frozenset[str] = frozenset(
         "distance.score",
         "enrich.score",
         "export.matrix",
+        "export.anndata",
         "export.table",
         "neighbors.fit",
         "notebook.generate",
@@ -66,9 +67,7 @@ def expected_step_artifacts(op: str, params: dict[str, Any]) -> list[tuple[str, 
         return [("distance_set", str(require_param("distance_id", "distance")))]
     if op == "enrich.score":
         return [("enrichment_set", str(require_param("enrichment_id", "enrichment")))]
-    if op == "export.matrix":
-        return [("export_bundle", str(require_param("export_id", "export")))]
-    if op == "export.table":
+    if op in {"export.matrix", "export.anndata", "export.table"}:
         return [("export_bundle", str(require_param("export_id", "export")))]
     if op == "neighbors.fit":
         return [("neighbor_set", str(require_param("neighbor_id", "neighbors_id", "neighbors")))]

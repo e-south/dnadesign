@@ -2,11 +2,13 @@ workspace_id: stress_ethanol_cipro_growth
 workspace_ref: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
 snapshot_ref: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
 source_datasets:
-  anchor_60bp: usr_prom_eth_cip_anchor
+  merged_anchor_insert: usr_prom_eth_cip_anchor
   full_context_1kb: construct_prom_eth_cip_context
   reference_native: usr_promoter_references
   reference_core60: construct_prom_eth_cip_reference_core60
   reference_contexts: construct_prom_eth_cip_reference_contexts
+  regulondb_native_promoters: usr_regulondb_native_promoters
+  regulondb_native_core60: usr_regulondb_native_promoter_core60
 supported_model_families:
   - evo2_7b
   - evo2_20b
@@ -19,11 +21,8 @@ default_geometry_inventory:
   default_review_geometries:
     - intermediate_embedding_7b_anchor_60bp
     - intermediate_embedding_7b_full_context_anchor_mean
-  working_candidate: intermediate_embedding_7b_full_context_anchor_mean
-  conservative_baseline: intermediate_embedding_7b_anchor_60bp
-  challengers: []
-  planned_geometries:
     - intermediate_embedding_7b_full_context_1kb
+    - intermediate_embedding_7b_context_anchor_mean_bidir_concat
     - intermediate_embedding_7b_reverse_complement_context_1kb
     - intermediate_embedding_7b_reverse_complement_context_anchor_mean
     - intermediate_embedding_7b_reference_core60
@@ -31,9 +30,16 @@ default_geometry_inventory:
     - intermediate_embedding_7b_reference_context_forward_anchor_mean
     - intermediate_embedding_7b_reference_context_reverse_complement_1kb
     - intermediate_embedding_7b_reference_context_reverse_complement_anchor_mean
+  working_candidate: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+  conservative_baseline: intermediate_embedding_7b_anchor_60bp
+  interpretation_lenses:
+    densegen_plan_geometry: intermediate_embedding_7b_anchor_60bp
+    strength_standards: intermediate_embedding_7b_full_context_anchor_mean
+  diagnostic_geometries:
     - output_layer_mean_7b_anchor_60bp
     - output_layer_mean_7b_full_context_1kb
     - output_layer_mean_7b_full_context_anchor_mean
+    - output_layer_mean_7b_context_anchor_mean_bidir_concat
     - output_layer_mean_7b_reverse_complement_context_1kb
     - output_layer_mean_7b_reverse_complement_context_anchor_mean
     - output_layer_mean_7b_reference_core60
@@ -41,7 +47,7 @@ default_geometry_inventory:
     - output_layer_mean_7b_reference_context_forward_anchor_mean
     - output_layer_mean_7b_reference_context_reverse_complement_1kb
     - output_layer_mean_7b_reference_context_reverse_complement_anchor_mean
-  planned_scalar_diagnostics:
+  scalar_diagnostics:
     - log_likelihood_total_7b_anchor_60bp
     - log_likelihood_mean_per_token_7b_anchor_60bp
     - log_likelihood_total_7b_full_context_1kb
@@ -68,6 +74,8 @@ attention_deliverables:
   - design_structure_summary
   - sigma35_ordinal_audit
   - context_robustness_summary
+  - candidate_decision_frontier
+  - candidate_x_selection_scorecard
 gate_deliverables:
   - representation_health_summary
 decision_deliverables:
@@ -76,4 +84,6 @@ decision_deliverables:
   - sigma35_ordinal_audit
   - context_robustness_summary
   - candidate_decision_frontier
-planned_deliverables: []
+  - candidate_x_selection_scorecard
+planned_deliverables:
+  - native_tf_axis_orientation_audit

@@ -11,6 +11,7 @@ from ..contracts.errors import CoordinateSpaceError, WorkspaceValidationError
 from ..contracts.ids import validate_identifier
 from ..contracts.notebook import NotebookConfig, WorkspaceNotebookConfig
 from ..contracts.recipe import SUPPORTED_RECIPE_OPS, expected_step_artifacts, topological_step_order
+from ..contracts.representations import validate_representation_identity
 from ..contracts.workspace import (
     AcceptanceCheckConfig,
     DeliverableConfig,
@@ -19,6 +20,12 @@ from ..contracts.workspace import (
     RecipeConfig,
     SourceBackedViewConfig,
     WorkspaceConfig,
+)
+from ..studies.docs_refs import resolve_docs_ref_path
+from ..studies.study_binding import (
+    REQUIRED_STUDY_DELIVERABLE_DOC_FILES,
+    REQUIRED_STUDY_RECORD_FILES,
+    missing_required_files,
 )
 from .paths import resolve_repo_path
 
@@ -47,7 +54,7 @@ def _view_declares_reduced_space(config: WorkspaceConfig, view_id: str, *, _seen
             view.derive.right,
             _seen=set(_seen),
         )
-    if view.derive.kind == "concatenate":
+    if view.derive.kind in {"concatenate", "block_normalized_concatenate"}:
         return all(
             _view_declares_reduced_space(config, input_view, _seen=set(_seen)) for input_view in view.derive.inputs
         )
@@ -60,6 +67,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
         validate_identifier(source_id, label="source id")
     for view_id in config.views:
         validate_identifier(view_id, label="view id")
+        _validate_representation_identity(view_id, owner="view id")
     for alignment_id in config.alignments:
         validate_identifier(alignment_id, label="alignment id")
     for scalar_id in config.scalars:
@@ -78,6 +86,17 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
         validate_identifier(recipe_id, label="recipe id")
     for deliverable_id in config.deliverables:
         validate_identifier(deliverable_id, label="deliverable id")
+
+    for column_name, derivation in config.metadata.derivations.items():
+        validate_identifier(column_name, label="metadata derivation id")
+        if derivation.kind == "lookup" and derivation.source not in config.sources:
+            raise WorkspaceValidationError(
+                f"metadata derivation {column_name!r} lookup references unknown source {derivation.source!r}"
+            )
+    for axis_id, axis in config.metadata.axes.items():
+        validate_identifier(axis_id, label="metadata axis id")
+        if not axis.column.strip():
+            raise WorkspaceValidationError(f"metadata axis {axis_id!r} must declare a non-empty column")
 
     for alignment_id, alignment in config.alignments.items():
         if alignment.left not in config.views and alignment.left not in config.sources:
@@ -116,7 +135,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
                     raise WorkspaceValidationError(
                         f"derived view {view_id} references unknown alignment {derive.alignment!r}"
                     )
-            elif derive.kind == "concatenate":
+            elif derive.kind in {"concatenate", "block_normalized_concatenate"}:
                 missing = [input_view for input_view in derive.inputs if input_view not in config.views]
                 if missing:
                     raise WorkspaceValidationError(f"derived view {view_id} references unknown input views {missing!r}")
@@ -130,7 +149,7 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
                     rendered = ", ".join(f"{input_view}={space}" for input_view, space in input_spaces.items())
                     raise CoordinateSpaceError(
                         "derived view "
-                        f"{view_id} concatenate inputs must share one coordinate "
+                        f"{view_id} {derive.kind} inputs must share one coordinate "
                         f"space or all be reduced; got {rendered}"
                     )
             elif derive.kind in {"aggregate_by_key", "apply_reducer", "normalize"}:
@@ -171,6 +190,20 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
 
     for reference_set_id in config.reference_sets:
         validate_identifier(reference_set_id, label="reference_set id")
+
+    for candidate_set_id, candidate_set in config.candidate_sets.items():
+        validate_identifier(candidate_set_id, label="candidate_set id")
+        _validate_representation_identity(candidate_set_id, owner="candidate_set id")
+        for view_id in candidate_set.views:
+            validate_identifier(view_id, label=f"candidate_set {candidate_set_id} view")
+            if view_id not in config.views:
+                raise WorkspaceValidationError(f"candidate_set {candidate_set_id} references unknown view {view_id!r}")
+        for view_id in candidate_set.panel_titles:
+            validate_identifier(view_id, label=f"candidate_set {candidate_set_id} panel title view")
+            if view_id not in config.views:
+                raise WorkspaceValidationError(
+                    f"candidate_set {candidate_set_id} panel_titles references unknown view {view_id!r}"
+                )
 
     for plot_id, plot in config.plots.items():
         _validate_plot(config, plot_id, plot)
@@ -215,12 +248,24 @@ def validate_workspace_config(config: WorkspaceConfig) -> None:
             plot_owners[plot_id] = deliverable_id
 
     if config.study_binding is not None:
-        docs_root = resolve_repo_path(config.study_binding.docs_root)
-        study_yaml = docs_root / "study.yaml"
-        if not docs_root.is_dir():
-            raise WorkspaceValidationError(f"study docs_root does not exist: {docs_root}")
-        if not study_yaml.is_file():
-            raise WorkspaceValidationError(f"study docs_root is missing study.yaml: {docs_root}")
+        record_root = resolve_repo_path(config.study_binding.record_root)
+        missing_record_files = missing_required_files(record_root, REQUIRED_STUDY_RECORD_FILES)
+        if not record_root.is_dir():
+            raise WorkspaceValidationError(f"study record_root does not exist: {record_root}")
+        if missing_record_files:
+            raise WorkspaceValidationError(
+                "study record_root is missing required checked-in record files: "
+                f"{record_root} ({', '.join(sorted(missing_record_files))})"
+            )
+        deliverable_docs_root = resolve_repo_path(config.study_binding.deliverable_docs_root)
+        missing_docs_files = missing_required_files(deliverable_docs_root, REQUIRED_STUDY_DELIVERABLE_DOC_FILES)
+        if not deliverable_docs_root.is_dir():
+            raise WorkspaceValidationError(f"study deliverable_docs_root does not exist: {deliverable_docs_root}")
+        if missing_docs_files:
+            raise WorkspaceValidationError(
+                "study deliverable_docs_root is missing required files: "
+                f"{deliverable_docs_root} ({', '.join(sorted(missing_docs_files))})"
+            )
 
 
 def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
@@ -244,6 +289,13 @@ def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
         topological_step_order(recipe.steps)
     except ValueError as exc:
         raise WorkspaceValidationError(f"recipe {recipe_id} contains a cycle") from exc
+
+
+def _validate_representation_identity(value: str, *, owner: str) -> None:
+    try:
+        validate_representation_identity(value, owner=owner)
+    except ValueError as exc:
+        raise WorkspaceValidationError(str(exc)) from exc
 
 
 def _validate_notebook(config: WorkspaceConfig, notebook_id: str, notebook: NotebookConfig) -> None:
@@ -275,6 +327,24 @@ def _validate_notebook(config: WorkspaceConfig, notebook_id: str, notebook: Note
             validate_identifier(view_id, label=f"notebook {notebook_id} {label} view")
             if view_id not in config.views:
                 raise WorkspaceValidationError(f"notebook {notebook_id} references unknown view {view_id!r} in {label}")
+    for candidate_set_id in notebook.candidate_sets:
+        validate_identifier(candidate_set_id, label=f"notebook {notebook_id} candidate_set")
+        if candidate_set_id not in config.candidate_sets:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown candidate_set {candidate_set_id!r}"
+            )
+    if notebook.default_candidate_set is not None:
+        validate_identifier(notebook.default_candidate_set, label=f"notebook {notebook_id} default_candidate_set")
+        if notebook.default_candidate_set not in config.candidate_sets:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown default_candidate_set {notebook.default_candidate_set!r}"
+            )
+    if notebook.default_reference_set is not None:
+        validate_identifier(notebook.default_reference_set, label=f"notebook {notebook_id} default_reference_set")
+        if notebook.default_reference_set not in config.reference_sets:
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown default_reference_set {notebook.default_reference_set!r}"
+            )
 
 
 def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
@@ -378,22 +448,20 @@ def _validate_deliverable(config: WorkspaceConfig, deliverable_id: str, delivera
         if not ids:
             raise WorkspaceValidationError(f"deliverable {deliverable_id} declares an empty {category!r} list")
 
-    if not deliverable.docs_refs and config.study_binding is not None:
-        pass
     for docs_ref in deliverable.docs_refs:
-        prefix = f"study:{config.study_binding.study_id}/" if config.study_binding is not None else None
-        if prefix is None:
+        if config.study_binding is None:
             raise WorkspaceValidationError(f"deliverable {deliverable_id} uses docs_refs without study_binding")
-        if not docs_ref.startswith(prefix):
-            raise WorkspaceValidationError(
-                f"deliverable {deliverable_id} docs_ref must start with {prefix!r}: {docs_ref}"
+        try:
+            resolve_docs_ref_path(
+                study_id=config.study_binding.study_id,
+                deliverable_docs_root=config.study_binding.deliverable_docs_root,
+                docs_ref=docs_ref,
+                workspace_id=config.workspace.id,
             )
-        docs_root = resolve_repo_path(config.study_binding.docs_root)
-        relative_ref = docs_ref.removeprefix(prefix)
-        if not ((docs_root / f"{relative_ref}.md").is_file() or (docs_root / f"{relative_ref}.yaml").is_file()):
+        except WorkspaceValidationError as exc:
             raise WorkspaceValidationError(
-                f"deliverable {deliverable_id} docs_ref path does not exist under {docs_root}: {relative_ref}"
-            )
+                f"deliverable {deliverable_id} has invalid docs_ref {docs_ref!r}: {exc}"
+            ) from exc
 
     config_sections = {
         "sources": config.sources,
@@ -411,7 +479,12 @@ def _validate_deliverable(config: WorkspaceConfig, deliverable_id: str, delivera
             section = config_sections.get(category)
             artifact_kind = ARTIFACT_REFERENCE_CATEGORIES.get(category)
             for item_id in ids:
-                if section is not None and item_id not in section:
+                recipe_produces_output = (
+                    section_name == "outputs"
+                    and artifact_kind is not None
+                    and (artifact_kind, item_id) in expected_outputs
+                )
+                if section is not None and item_id not in section and not recipe_produces_output:
                     raise WorkspaceValidationError(
                         f"deliverable {deliverable_id} references unknown {category[:-1]} {item_id!r} in {section_name}"
                     )

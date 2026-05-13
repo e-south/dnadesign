@@ -43,6 +43,8 @@ _NON_TOOL_DIRS = {
     "evoinference",
     "sequences",
 }
+_GENERATED_ARTIFACT_DIRS = {"__pycache__", ".pytest_cache"}
+_GENERATED_ARTIFACT_SUFFIXES = {".pyc", ".pyo"}
 
 
 @dataclass(frozen=True)
@@ -112,8 +114,25 @@ def discover_repo_tools(*, repo_root: Path) -> set[str]:
     return {
         path.name
         for path in src_root.iterdir()
-        if path.is_dir() and path.name not in _NON_TOOL_DIRS and not path.name.startswith("_")
+        if path.is_dir()
+        and path.name not in _NON_TOOL_DIRS
+        and not path.name.startswith("_")
+        and not _is_generated_artifact_only_dir(path)
     }
+
+
+def _is_generated_artifact_only_dir(path: Path) -> bool:
+    descendants = list(path.rglob("*"))
+    if not descendants:
+        return False
+    for descendant in descendants:
+        relative_parts = descendant.relative_to(path).parts
+        if any(part in _GENERATED_ARTIFACT_DIRS for part in relative_parts):
+            continue
+        if descendant.is_file() and descendant.suffix in _GENERATED_ARTIFACT_SUFFIXES:
+            continue
+        return False
+    return True
 
 
 def _module_has_external_integration_markers(module: ast.Module, marker_names: set[str]) -> bool:

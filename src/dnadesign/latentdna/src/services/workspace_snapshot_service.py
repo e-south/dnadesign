@@ -26,6 +26,7 @@ from ..contracts.workspace_snapshot import (
     WorkspaceSnapshotSource,
 )
 from ..io.json_io import write_json
+from ..services.candidate_inventory_service import build_candidate_inventory
 from ..services.deliverable_service import deliverable_status_from_context
 from ..services.freshness_service import FreshnessCache
 from ..services.notebook_geometry_controls import build_workspace_geometry_controls
@@ -88,16 +89,27 @@ def _model_families(context) -> list[str]:
         encoder = str(tags.get("encoder") or "").strip().lower()
         model = str(tags.get("model") or "").strip().lower()
         if encoder and model:
-            families.add(f"{encoder}_{model}")
+            families.add(model if model.startswith(f"{encoder}_") else f"{encoder}_{model}")
+        elif model:
+            families.add(model)
     return sorted(families)
 
 
 def _browser_snapshot(context) -> WorkspaceSnapshotBrowser:
     geometry_controls = build_workspace_geometry_controls(context)
     geometry_ids = [row.view_id for row in geometry_controls.geometries]
+    candidate_sets = {
+        row.candidate_set_id: {
+            "label": row.label,
+            "view_ids": list(row.view_ids),
+            "available_view_ids": list(row.available_view_ids),
+        }
+        for row in geometry_controls.candidate_sets
+    }
     return WorkspaceSnapshotBrowser(
         default_geometry_ids=geometry_ids,
         preferred_hues=list(geometry_controls.preferred_hues),
+        candidate_sets=candidate_sets,
     )
 
 
@@ -179,6 +191,7 @@ def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
         sources=_source_snapshot(context),
         model_families=_model_families(context),
         canonical_views=list(context.config.views),
+        candidate_inventory=build_candidate_inventory(context),
         deliverables=_deliverable_snapshots(context),
         exports=_export_snapshots(context),
         browser=_browser_snapshot(context),

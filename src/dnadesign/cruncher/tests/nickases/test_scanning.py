@@ -108,3 +108,30 @@ def test_vendor_diagram_bottom_nick_tracks_recognition_boundary_across_orientati
     assert reverse_match.site.orientation == "reverse"
     assert reverse_match.nick.strand == "primary"
     assert reverse_match.nick.boundary_context == 2
+
+
+def test_motif_end_negative_bottom_nick_tracks_canonical_boundary_across_orientations() -> None:
+    entry = NickaseCatalogEntry(
+        id="Nb.BssSI",
+        specificity_id="BssSI",
+        motif_top_5to3="CACGAG",
+        bottom_cut_offset=5,
+    )
+
+    forward_match = enumerate_site_instances(
+        "CACGAG",
+        coordinate_offset=0,
+        entry=entry,
+    )[0]
+    reverse_match = enumerate_site_instances(
+        "CTCGTG",
+        coordinate_offset=0,
+        entry=entry,
+    )[0]
+
+    assert forward_match.site.orientation == "forward"
+    assert forward_match.nick.strand == "complement"
+    assert forward_match.nick.boundary_context == 5
+    assert reverse_match.site.orientation == "reverse"
+    assert reverse_match.nick.strand == "primary"
+    assert reverse_match.nick.boundary_context == 1

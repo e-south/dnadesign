@@ -9,12 +9,14 @@ from collections import Counter
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 import yaml
 from typer.testing import CliRunner
 
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.latentdna.src.cli import app
+from dnadesign.latentdna.src.services import freshness_service as freshness_module
 from dnadesign.latentdna.src.services.deliverable_service import deliverable_status
 from dnadesign.latentdna.src.services.freshness_service import FreshnessCache
 from dnadesign.latentdna.src.services.run_service import list_runs
@@ -233,6 +235,90 @@ def _build_projection_bundle_workspace(tmp_path: Path) -> Path:
                             "samples": ["all_rows"],
                             "projections": ["umap_z20_60"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [],
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return workspace_dir
+
+
+def _build_shared_source_views_workspace(tmp_path: Path) -> Path:
+    workspace_dir = tmp_path / "workspace"
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir(parents=True)
+    pq_path = inputs_dir / "anchor.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["row0", "row1", "row2"],
+                "subject_id": ["row0", "row1", "row2"],
+                "embedding_a": pa.array([[0.0, 0.1], [0.2, 0.3], [0.4, 0.5]], type=pa.list_(pa.float32())),
+                "embedding_b": pa.array([[1.0, 1.1], [1.2, 1.3], [1.4, 1.5]], type=pa.list_(pa.float32())),
+            }
+        ),
+        pq_path,
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "shared_source_workspace", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor60": {
+                        "kind": "parquet",
+                        "path": "inputs/anchor.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {"include": []},
+                "views": {
+                    "z_a": {
+                        "source": "anchor60",
+                        "vector": {"kind": "column", "name": "embedding_a"},
+                        "coordinate_space_id": "demo_space",
+                        "role": "primary",
+                    },
+                    "z_b": {
+                        "source": "anchor60",
+                        "vector": {"kind": "column", "name": "embedding_b"},
+                        "coordinate_space_id": "demo_space",
+                        "role": "diagnostic",
+                    },
+                },
+                "recipes": {
+                    "shared_source_views_recipe": {
+                        "steps": [
+                            {"id": "materialize_z_a", "op": "view.materialize", "params": {"view": "z_a"}},
+                            {"id": "materialize_z_b", "op": "view.materialize", "params": {"view": "z_b"}},
+                        ]
+                    }
+                },
+                "deliverables": {
+                    "shared_source_views": {
+                        "recipe": "shared_source_views_recipe",
+                        "title": "Shared source views",
+                        "section": "freshness",
+                        "question": "Do shared-source views reuse source schema inspection?",
+                        "summary": "Two source-backed views materialized from one table.",
+                        "requires": {
+                            "sources": ["anchor60"],
+                            "views": ["z_a", "z_b"],
+                            "recipes": ["shared_source_views_recipe"],
+                        },
+                        "outputs": {"views": ["z_a", "z_b"]},
                         "docs_refs": [],
                         "acceptance_checks": [],
                     }
@@ -567,6 +653,33 @@ def test_deliverable_status_reuses_shared_freshness_cache_across_calls(
     assert second.status == "ok"
     assert hash_counts
     assert max(hash_counts.values()) == 1
+
+
+def test_deliverable_status_reuses_source_schema_inspection_within_shared_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_dir = _build_shared_source_views_workspace(tmp_path)
+
+    run_result = _RUNNER.invoke(
+        app,
+        ["deliverable", "run", "shared_source_views", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    original_inspect_source_schema = freshness_module.inspect_source_schema
+    inspect_counts: Counter[str] = Counter()
+
+    def counting_inspect_source_schema(resolved):
+        inspect_counts[resolved.source_id] += 1
+        return original_inspect_source_schema(resolved)
+
+    monkeypatch.setattr(freshness_module, "inspect_source_schema", counting_inspect_source_schema)
+
+    status = deliverable_status(workspace_dir, "shared_source_views", freshness_cache=FreshnessCache())
+
+    assert status.status == "ok"
+    assert inspect_counts == Counter({"anchor60": 1})
 
 
 def test_runs_list_hashes_shared_freshness_paths_once_per_call(

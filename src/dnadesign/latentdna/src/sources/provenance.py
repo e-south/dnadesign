@@ -9,8 +9,8 @@ from typing import Mapping
 
 from dnadesign.usr import (
     OVERLAY_DIGEST_LEDGER_FILENAME,
+    OVERLAY_PART_PREFIX,
     build_overlay_digest_ledger,
-    overlay_parts,
 )
 
 from ..io.hashing import sha256_path, sha256_payload
@@ -24,7 +24,7 @@ def overlay_inventory_paths(path: Path) -> list[str]:
     if candidate.is_file():
         return [candidate.as_posix()]
     if candidate.is_dir():
-        return [part.resolve().as_posix() for part in overlay_parts(candidate)]
+        return [part.resolve().as_posix() for part in _uncached_overlay_parts(candidate)]
     raise FileNotFoundError(f"path not found for overlay inventory: {candidate}")
 
 
@@ -33,7 +33,7 @@ def overlay_inventory_digest(path: Path) -> str:
     if candidate.is_file():
         inventory = [candidate.name]
     elif candidate.is_dir():
-        inventory = [part.name for part in overlay_parts(candidate)]
+        inventory = [part.name for part in _uncached_overlay_parts(candidate)]
     else:
         raise FileNotFoundError(f"path not found for overlay inventory: {candidate}")
     return sha256_payload(
@@ -42,6 +42,10 @@ def overlay_inventory_digest(path: Path) -> str:
             "parts": inventory,
         }
     )
+
+
+def _uncached_overlay_parts(path: Path) -> list[Path]:
+    return sorted(path.glob(f"{OVERLAY_PART_PREFIX}*.parquet"))
 
 
 def overlay_ledger_payload_digest(path: Path) -> str:

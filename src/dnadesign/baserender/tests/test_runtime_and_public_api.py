@@ -20,13 +20,14 @@ import pytest
 import dnadesign.baserender as baserender
 from dnadesign.baserender import load_records_from_parquet, render_parquet_record_figure
 from dnadesign.baserender.src.core import ContractError, RenderingError
-from dnadesign.baserender.src.core.record import Display, Feature
+from dnadesign.baserender.src.core.record import Display, Feature, Record
 from dnadesign.baserender.src.core.registry import (
     clear_feature_effect_contracts,
     get_effect_contract,
     get_feature_contract,
 )
 from dnadesign.baserender.src.core.types import Span
+from dnadesign.baserender.src.outputs.images import _grid_max_rows_for_records, _grid_ncols_for_records
 from dnadesign.baserender.src.render.effects.registry import clear_effect_drawers, get_effect_drawer
 from dnadesign.baserender.src.runtime import initialize_runtime
 
@@ -84,6 +85,119 @@ def test_public_parquet_render_helper_renders_record_figure(tmp_path) -> None:
     )
     assert fig is not None
     plt.close(fig)
+
+
+def test_public_sequence_panel_contract_renders_image() -> None:
+    row = {
+        "id": "r1",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+            {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
+        ],
+    }
+
+    result = baserender.render_sequence_panel_image(
+        row,
+        adapter_kind="densegen_tfbs",
+        target_width_px=420,
+        target_height_px=140,
+    )
+
+    assert baserender.BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION == "1"
+    assert result.image.shape == (140, 420, 4)
+    assert result.diagnostics.contract_id == "dnadesign.baserender.sequence_panel.v1"
+    assert result.diagnostics.style_profile == "promoter_compact_slide.v1"
+    assert result.diagnostics.strand_count == 2
+
+
+def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
+    row = {
+        "id": "seq1",
+        "sequence": "AACCGGTTGACATTTTTTTTTATAATGGCC",
+        "usr_label__primary": "demoP",
+        "seq_annot__features": [
+            {
+                "feature_id": "feat_promoter",
+                "feature_order": 1,
+                "feature_type": "misc_feature",
+                "label": "pred. demoP",
+                "role_hint": None,
+                "start_0": 2,
+                "end_0": 28,
+                "strand": 1,
+                "confidence": "high",
+            },
+            {
+                "feature_id": "feat_m35",
+                "feature_order": 2,
+                "feature_type": "misc_feature",
+                "label": "-35",
+                "role_hint": "sigma70_minus35",
+                "start_0": 6,
+                "end_0": 12,
+                "strand": 1,
+                "confidence": "high",
+            },
+            {
+                "feature_id": "feat_tfbs",
+                "feature_order": 3,
+                "feature_type": "misc_feature",
+                "label": "LexA-",
+                "role_hint": "TFBS",
+                "start_0": 10,
+                "end_0": 18,
+                "strand": -1,
+                "confidence": "high",
+            },
+            {
+                "feature_id": "feat_m10",
+                "feature_order": 4,
+                "feature_type": "misc_feature",
+                "label": "-10",
+                "role_hint": "sigma70_minus10",
+                "start_0": 20,
+                "end_0": 26,
+                "strand": 1,
+                "confidence": "high",
+            },
+        ],
+    }
+
+    result = baserender.render_sequence_panel_image(
+        row,
+        adapter_kind="usr_genbank_annotations_v1",
+        target_width_px=420,
+        target_height_px=140,
+    )
+
+    assert result.image.shape == (140, 420, 4)
+    assert result.diagnostics.contract_id == "dnadesign.baserender.sequence_panel.v1"
+    assert result.diagnostics.adapter_kind == "usr_genbank_annotations_v1"
+    assert result.diagnostics.feature_count == 4
+    assert result.diagnostics.strand_count == 2
+
+
+def test_public_sequence_panel_contract_rejects_invalid_profile_and_adapter() -> None:
+    with pytest.raises(baserender.SchemaError, match="Unknown sequence panel profile"):
+        baserender.sequence_panel_config_for_adapter("densegen_tfbs", style_profile="missing_profile")
+
+    with pytest.raises(baserender.SchemaError, match="Unsupported sequence panel adapter kind"):
+        baserender.sequence_panel_config_for_adapter("missing_adapter")
+
+
+def test_public_style_helpers_are_root_exports() -> None:
+    assert "presentation_default" in baserender.list_style_presets()
+    style = baserender.resolve_style(preset=None, overrides={})
+    assert isinstance(style, baserender.Style)
+
+
+def test_image_grid_uses_record_max_rows_hint() -> None:
+    records = [Record(id=f"r{index}", alphabet="DNA", sequence="ACGT", meta={"grid_max_rows": 5}) for index in range(8)]
+
+    assert _grid_max_rows_for_records(records) == 5
+    assert _grid_ncols_for_records(records[:5], default_ncols=1) == 1
+    assert _grid_ncols_for_records(records, default_ncols=1) == 2
 
 
 def test_public_batch_parquet_record_loader_returns_requested_order(tmp_path) -> None:

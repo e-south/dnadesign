@@ -6,12 +6,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+from functools import lru_cache
 from pathlib import Path
 
 
 def sha256_file(path: Path) -> str:
+    candidate = path.resolve()
+    stat = candidate.stat()
+    return _sha256_file_for_stat(candidate.as_posix(), stat.st_mtime_ns, stat.st_size, stat.st_ino)
+
+
+@lru_cache(maxsize=512)
+def _sha256_file_for_stat(path: str, mtime_ns: int, size: int, inode: int) -> str:
+    del mtime_ns, size, inode
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
+    with Path(path).open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"

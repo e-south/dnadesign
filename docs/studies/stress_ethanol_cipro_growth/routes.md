@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-04-29
+**Last verified:** 2026-05-08
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
@@ -14,7 +14,7 @@ This page keeps the downstream handoff map in one place.
 ### Terminology guardrails
 
 - DenseGen generation plans are biological generation conditions such as `background_only`, `ethanol`, `ciprofloxacin`, and `ethanol_ciprofloxacin`.
-- Study lifecycle phases are record-plane state labels such as the current `infer_batch_preparation`; they are not DenseGen generation plans.
+- Study lifecycle phases are record-plane state labels such as the current `latentdna_reference_normalization_audit`; they are not DenseGen generation plans.
 - Infer lanes are model-family and dataset-target configs such as `anchor_only_20b` or `anchor_plus_template_7b`; they are not lifecycle phases.
 - Route `Plane` values use the repo-wide enum from `ARCHITECTURE.md`. If extra nuance is needed, use `Surface role` rather than inventing a new plane name.
 
@@ -24,7 +24,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `producer`
 - Owner-boundary: `densegen`
-- Current state: `parallel_optional`
+- Current state: `attention`; source rows are ready, but operator-visible plot artifacts are stale in the current snapshot
 - Entry artifact: `densegen_prom_eth_cip_source`
 - Exit artifact: `evidence.analysis_surfaces.densegen` plus `outputs/plots/current_inventory.json`
 - Primary doc/workspace: `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md`
@@ -37,17 +37,19 @@ This page keeps the downstream handoff map in one place.
 - Plane: `control-plane`
 - Surface role: `operator`
 - Owner-boundary: `infer`
-- Current state: `infer_batch_preparation`
+- Current state: `complete` for supported Evo2 7B sequence-view sidecars
 - Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`,
   `construct_prom_eth_cip_reference_core60`, and
   `construct_prom_eth_cip_reference_contexts`
-- Exit artifact: checked-in infer lane configs plus the next batch preset declared in `pipeline.yaml`
+- Exit artifact: dataset-local `_derived/infer/` sidecars plus checked-in infer lane configs
 - Primary doc/workspace: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md`
-- First command: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
+- First command: `uv run ops runbook fill-infer --study-dir docs/studies/stress_ethanol_cipro_growth --no-submit`
 - Route note: Infer lanes are execution configs layered on top of the current
-  study phase; they do not replace the study lifecycle record. Notify runbooks
-  are one USR event stream per lane, including the split reference core60,
-  reference-context-forward, and reference-context-reverse lanes.
+  study phase; they do not replace the study lifecycle record. The supported
+  Evo2 7B lanes now plan no runnable GPU work. Notify runbooks remain the
+  historical execution surfaces for one USR event stream per lane, including
+  the split reference core60, reference-context-forward, and
+  reference-context-reverse lanes.
 
 ### Construct anchor/context refresh
 
@@ -61,6 +63,7 @@ This page keeps the downstream handoff map in one place.
 - Primary workspace: `src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10`
 - First command: `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 --project reference_core60 --dry-run --format json`
 - Route note: Construct first derives fail-fast `analysis_window` reference views from native GenBank annotations, then emits paired forward and reverse-complement reference contexts. USR then converges DenseGen 60 bp anchors, native reference inserts, SFXI pDual rows, and reference core60 rows into the shared anchor dataset. After merge, `dnadesign.usr.scripts.materialize_promoter_anchor_sequence_views` writes one `construct_insert` anchor-only sequence view per merged row; native or designed exact-60 rows are not relabeled as `analysis_window`. The shared paired forward and reverse-complement pDual context refresh follows from that anchor handoff.
+- Planned native TF-axis extension: refresh `usr_regulondb_native_promoters`, project RegulonDB parent metadata to `usr_regulondb_native_promoter_core60`, merge that core60 source into `usr_prom_eth_cip_anchor`, and rerun the existing `forward_anchor_window` project to append paired pDual contexts into `construct_prom_eth_cip_context`. Do not create a separate `construct_prom_eth_cip_native_tf_contexts` universe for this audit.
 
 ### LatentDNA comparison surface
 
@@ -68,8 +71,8 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: 7B-first sidecar-backed browser posture from `latentdna_binding.yaml` plus the LatentDNA workspace-snapshot contract; the record-plane preferred infer family is now `evo2_7b`, with 20B retired from the active local workspace until a debug-required lane is reintroduced deliberately
-- Entry artifact: `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`
+- Current state: `attention`; the workspace config supports the planned native TF-axis overlay, but generated LatentDNA view rows/plots/notebook outputs need refresh after the lineage-metadata change
+- Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
@@ -85,28 +88,52 @@ This page keeps the downstream handoff map in one place.
   3. `sigma35_ordinal_audit`
   4. `context_robustness_summary`
   5. `candidate_decision_frontier`
+  6. `candidate_x_selection_scorecard`
 - Companion visuals:
   - `balanced_design_family_margin_gallery`
   - `sigma35_margin_ladder_gallery`
   - `sigma35_stress_margin_gallery`
   - `context_pair_summary`
+  - `reference_to_plan_centroid_heatmap`
+  - `reference_standard_strength_audit`
+- Planned calibration overlay:
+  - `native_tf_axis_orientation_audit` reuses the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat` view after the shared anchor/context quota is expanded with `usr_regulondb_native_promoter_core60`; it requires `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet` and is a LatentDNA axis-orientation audit, not an OPAL input.
 - Appendix deliverables:
   - `sigma35_centroid_distance_gallery`
-  - `appendix_geometry_audit`
+  - `appendix_geometry_review`
   - `appendix_umap_gallery`
-- Snapshot attention surfaces: none
-- Snapshot ok primary surfaces: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`
-- Snapshot ok appendix surfaces: `appendix_geometry_audit`, `appendix_umap_gallery`
+- Snapshot attention surfaces: none for LatentDNA decision deliverables; generated LatentDNA artifacts need refresh after the native lineage metadata/config update
+- Snapshot ok primary surfaces: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
+- Snapshot ok appendix surfaces: `appendix_geometry_review`, `appendix_umap_gallery`
+- Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
+- Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
+- Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
 - Sigma-35 ordinal interpretation for this study follows the reverse-alphabetical promoter ladder on the active subset: `f > e > d > c > b`
 - Notebook role: plot-first review surface for pre-assay representation triage; appendix and debug tabs are secondary audit material
-- Browser default geometry layout: candidate grid over the available 7B sequence-view sidecar geometries: construct-insert `seq_mean` and forward 1 kb context `anchor_mean`. Concat is retired from the current study plan. Forward full-context sequence mean, reverse-complement full-context sequence mean, reverse-complement context anchor mean, and reference-view features are planned until Infer sidecars exist. Mean-pooled output-layer logits and log-likelihoods are collected diagnostics, not current decision geometry.
+- Browser default geometry layout: candidate grid over the six available 7B
+  intermediate sequence-view sidecar geometries with persisted UMAPs: anchor
+  construct-insert `seq_mean`, forward full-context `seq_mean`, forward
+  full-context `anchor_mean`, controlled equal-block bidirectional forward/RC
+  `anchor_mean`, reverse-complement full-context `seq_mean`, and
+  reverse-complement full-context `anchor_mean`. Reference core60 and
+  reference-context views remain hidden audit geometries until promoted to a
+  study-facing projection layout. Output-layer mean views are mean-pooled
+  per-token output-logits diagnostics using the same pooling scopes, and
+  log-likelihoods are scalar diagnostics; neither family is current decision
+  geometry.
 - Browser hue controls are workspace-configured, not promoter hardcoded. The current browser promotes study metadata carried on materialized view rows, including `source_family`, `selection_basis`, `promoter_standard__collection_id`, and continuous `promoter_standard__strength_value_numeric` when those columns are present.
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
   - do not read anchor-local mechanism out of pooled full-sequence vectors
+  - describe `seq_mean`, `anchor_mean`, and `core60_mean` as token-position
+    means over causal Evo2 states in the emitted orientation, not as native bidirectional encodings
   - do not let reference-neighbor behavior replace synthetic internal-structure gates
+  - do not treat Anderson and W numeric strengths as one pooled biological scale
   - do not treat the notebook browser as the authoritative study-status surface
-- Route note: use this route for downstream comparison outputs after checking the study record.
+- Route note: use this route for downstream comparison outputs after checking
+  the study record. This is a 7B-first sidecar-backed browser posture; the
+  available 7B sequence-view sidecar geometries are the current review basis,
+  and the preferred infer family is now `evo2_7b`.
 
 ### Cluster exploration
 

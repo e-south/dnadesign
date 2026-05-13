@@ -362,6 +362,7 @@ def plan_sequence_view_feature_completion_from_config(
     job: str | None = None,
 ) -> tuple[dict[str, object], ...]:
     from .src.cli.config_inputs import resolve_config_sequence_view_roots
+    from .src.features.cache_keys import build_runtime_fingerprint
     from .src.features.completion_planner import plan_sequence_view_feature_completion
     from .src.features.sequence_views import bundle_uses_sequence_views
 
@@ -371,6 +372,11 @@ def plan_sequence_view_feature_completion_from_config(
         raise ValueError("No jobs selected. Check the job id or the config file.")
 
     plans: list[dict[str, object]] = []
+    runtime_fingerprint = build_runtime_fingerprint(
+        model_name=root.model.id,
+        precision=root.model.precision,
+        device=root.model.device,
+    )
     for selected_job in selected_jobs:
         if selected_job.feature_bundle is None or not bundle_uses_sequence_views(selected_job.feature_bundle):
             continue
@@ -383,6 +389,7 @@ def plan_sequence_view_feature_completion_from_config(
                 job_id=selected_job.id,
                 bundle_id=selected_job.id,
                 infer_command=command,
+                runtime_fingerprint=runtime_fingerprint,
             ).to_dict()
         )
 
@@ -397,6 +404,7 @@ def plan_sequence_view_feature_inventory_completion_from_config(
     job: str | None = None,
 ) -> tuple[dict[str, object], ...]:
     from .src.cli.config_inputs import resolve_config_sequence_view_roots
+    from .src.features.cache_keys import build_runtime_fingerprint
     from .src.features.completion_planner import plan_sequence_view_feature_inventory_completion
     from .src.features.sequence_views import bundle_uses_sequence_views
 
@@ -406,6 +414,11 @@ def plan_sequence_view_feature_inventory_completion_from_config(
         raise ValueError("No jobs selected. Check the job id or the config file.")
 
     plans: list[dict[str, object]] = []
+    runtime_fingerprint = build_runtime_fingerprint(
+        model_name=root.model.id,
+        precision=root.model.precision,
+        device=root.model.device,
+    )
     for selected_job in selected_jobs:
         if selected_job.feature_bundle is None or not bundle_uses_sequence_views(selected_job.feature_bundle):
             continue
@@ -418,6 +431,7 @@ def plan_sequence_view_feature_inventory_completion_from_config(
                 job_id=selected_job.id,
                 bundle_id=selected_job.id,
                 infer_command=command,
+                runtime_fingerprint=runtime_fingerprint,
             ).to_dict()
         )
 

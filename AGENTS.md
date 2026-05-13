@@ -48,7 +48,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Repo-local notify operator skill: `.agents/skills/notify-ops/SKILL.md`
 - Repo-local BU SCC USR sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
-- Repo-local snapback hairpin study skill: `.agents/skills/snapback-hairpin-study/SKILL.md`
+- Repo-local retron hairpin study skill: `.agents/skills/retron-hairpin-study/SKILL.md`
 - Critical reusable operational workflows live under `.agents/skills/`.
   Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the repo docs and explicit CLI entrypoints instead of assuming a repo-local skill will appear in the advertised skill list.
 - Checked-in live study records: `docs/studies/README.md`

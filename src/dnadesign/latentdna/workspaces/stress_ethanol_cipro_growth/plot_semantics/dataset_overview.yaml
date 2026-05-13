@@ -5,7 +5,7 @@ encoding: Multi-panel cohort inventory chart over provenance, generation plan, a
 scope: Full promoter population shared by the paired anchor and construct-context datasets. The displayed panels summarize provenance, generation plan, and Sigma-35 variant over that shared denominator.
 guardrails:
   - Inventory counts set the denominator only; they do not rank candidate representations.
-  - Treat `anchor_60bp` as the view name for the dominant synthetic cohort rather than a literal row-length guarantee.
+  - The merged anchor-source insert denominator is intentionally mixed-length because it carries raw reference inserts alongside the dominant 60 bp synthetic cohort.
 caption: Shared promoter inventory across provenance and trusted design annotations.
 alt_text: Multi-panel chart showing cohort fractions for the shared promoter population across provenance and promoter-design annotations.
 preprocessing_md: Uses the persisted dataset-overview scalar table without vector normalization or neighborhood construction.

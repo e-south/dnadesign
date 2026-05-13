@@ -6,15 +6,19 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .notebook import NotebookConfig
 from .plot import PlotConfig
+from .representations import validate_representation_family_tags, validate_representation_identity
 
 Identifier = Annotated[str, Field(min_length=1)]
 NonEmptyText = Annotated[str, Field(min_length=1)]
 AggregationMode = Literal["error", "first", "mean", "medoid"]
 AlignmentKeyBasis = Literal["record_key", "subject_key"]
+MetadataValueType = Literal["infer", "string", "int64", "float64", "bool"]
+MetadataAxisKind = Literal["categorical", "binary", "continuous", "ordinal"]
+MetricDirection = Literal["higher_is_better", "lower_is_better", "descriptive"]
 
 
 class StrictWorkspaceModel(BaseModel):
@@ -51,6 +55,7 @@ class MemoryPolicyConfig(StrictWorkspaceModel):
 class MetadataCopyDerivationConfig(StrictWorkspaceModel):
     kind: Literal["copy"]
     source: str
+    value_type: MetadataValueType | None = None
 
 
 class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
@@ -60,6 +65,7 @@ class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
     group: int = 1
     default: str | None = None
     normalize: Literal["lower", "upper"] | None = None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataMapValuesDerivationConfig(StrictWorkspaceModel):
@@ -67,17 +73,58 @@ class MetadataMapValuesDerivationConfig(StrictWorkspaceModel):
     source: str
     mapping: dict[str, str] = Field(min_length=1)
     default: str | None = None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataCoalesceDerivationConfig(StrictWorkspaceModel):
     kind: Literal["coalesce"]
     sources: list[str] = Field(min_length=1)
     default: str | None = None
+    value_type: MetadataValueType | None = None
 
 
 class MetadataConstantDerivationConfig(StrictWorkspaceModel):
     kind: Literal["constant"]
     value: str | int | float | bool | None
+    value_type: MetadataValueType | None = None
+
+
+class MetadataLookupDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["lookup"]
+    source: str
+    left_key: str
+    right_key: str
+    value_column: str
+    missing_policy: Literal["error", "null"] = "error"
+
+
+class MetadataAnnotationDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["annotation"]
+    source: Literal["row"] = "row"
+    handler: NonEmptyText
+    derive: NonEmptyText
+    required_columns: list[str] = Field(min_length=1)
+    any_required_column_groups: list[list[str]] = Field(default_factory=list)
+    missing_policy: Literal["error", "null"] = "error"
+    value_type: MetadataValueType | None = None
+
+    @field_validator("handler")
+    @classmethod
+    def _validate_handler_path(cls, value: str) -> str:
+        if ":" not in value:
+            raise ValueError("annotation metadata derivation handler must use 'module:function' syntax")
+        module_name, function_name = value.split(":", 1)
+        if not module_name.strip() or not function_name.strip():
+            raise ValueError("annotation metadata derivation handler must include module and function")
+        return value
+
+    @field_validator("any_required_column_groups")
+    @classmethod
+    def _validate_any_required_groups(cls, value: list[list[str]]) -> list[list[str]]:
+        empty_groups = [index for index, group in enumerate(value) if not group]
+        if empty_groups:
+            raise ValueError("annotation metadata derivation any_required_column_groups cannot contain empty groups")
+        return value
 
 
 MetadataDerivationConfig = Annotated[
@@ -85,14 +132,64 @@ MetadataDerivationConfig = Annotated[
     | MetadataRegexCaptureDerivationConfig
     | MetadataMapValuesDerivationConfig
     | MetadataCoalesceDerivationConfig
-    | MetadataConstantDerivationConfig,
+    | MetadataConstantDerivationConfig
+    | MetadataLookupDerivationConfig
+    | MetadataAnnotationDerivationConfig,
     Field(discriminator="kind"),
 ]
+
+
+class MetadataAxisRowSelectorConfig(StrictWorkspaceModel):
+    column: NonEmptyText
+    equals: str | int | float | bool | None = None
+    in_values: list[str | int | float | bool] = Field(default_factory=list)
+    non_null: bool = False
+
+    @model_validator(mode="after")
+    def _validate_selector(self) -> "MetadataAxisRowSelectorConfig":
+        if self.equals is None and not self.in_values and not self.non_null:
+            raise ValueError("metadata axis row selector requires equals, in_values, or non_null")
+        return self
+
+
+class MetadataAxisNoncanonicalPolicyConfig(StrictWorkspaceModel):
+    bucket: NonEmptyText = "__latentdna_noncanonical__"
+    label: NonEmptyText = "Other"
+    include_in_legend: bool = False
+    canonical_values: list[str] = Field(default_factory=list)
+    canonical_row_selectors: list[MetadataAxisRowSelectorConfig] = Field(default_factory=list)
+    canonical_row_match: Literal["any", "all"] = "any"
+
+
+class MetadataAxisConfig(StrictWorkspaceModel):
+    column: NonEmptyText
+    label: NonEmptyText | None = None
+    kind: MetadataAxisKind | None = None
+    category_order: list[str] = Field(default_factory=list)
+    display_labels: dict[str, str] = Field(default_factory=dict)
+    compact_display_labels: dict[str, str] = Field(default_factory=dict)
+    category_colors: dict[str, str] = Field(default_factory=dict)
+    noncanonical_policy: MetadataAxisNoncanonicalPolicyConfig | None = None
+    ordinal_subset: list[str] = Field(default_factory=list)
+    metric_labels: dict[str, str] = Field(default_factory=dict)
 
 
 class MetadataSection(StrictWorkspaceModel):
     include: list[str] = Field(default_factory=list)
     derivations: dict[str, MetadataDerivationConfig] = Field(default_factory=dict)
+    axes: dict[str, MetadataAxisConfig] = Field(default_factory=dict)
+
+
+class MetricDefinitionConfig(StrictWorkspaceModel):
+    display_name: NonEmptyText
+    mathematical_definition: NonEmptyText
+    metric_family: NonEmptyText
+    evidence_tier: NonEmptyText
+    unit: NonEmptyText
+    direction: MetricDirection
+    aggregation_level: NonEmptyText
+    task_id: str | None = None
+    definition_version: NonEmptyText = "workspace_config.v1"
 
 
 class SourceBase(StrictWorkspaceModel):
@@ -103,7 +200,22 @@ class SourceBase(StrictWorkspaceModel):
     role: str | None = None
     where: dict[str, Any] | None = None
     metadata_include: list[str] | None = None
+    metadata_include_mode: Literal["append", "replace"] = "append"
     vector_cache_policy: str | None = None
+    sequence_scope: str | None = None
+    emitted_length_bp: int | None = Field(default=None, gt=0)
+    source_interval_length_bp: int | str | None = None
+    pooling_span_bp: int | str | None = None
+    focal_rule: str | None = None
+    window_selection_rule: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_sequence_semantics(self) -> "SourceBase":
+        for field_name in ("source_interval_length_bp", "pooling_span_bp"):
+            value = getattr(self, field_name)
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(f"{field_name} must be positive when declared as an integer")
+        return self
 
 
 class USRSourceConfig(SourceBase):
@@ -165,6 +277,17 @@ class ConcatenateViewSpec(StrictWorkspaceModel):
     inputs: list[str] = Field(min_length=2)
 
 
+class BlockNormalizedConcatenateViewSpec(StrictWorkspaceModel):
+    kind: Literal["block_normalized_concatenate"]
+    inputs: list[str] = Field(min_length=2)
+    center: bool = True
+    scale: bool = True
+    block_norm: Literal["l2"] = "l2"
+    nonfinite_policy: Literal["error", "coerce"] = "error"
+    zero_variance_policy: Literal["error", "drop_or_zero"] = "drop_or_zero"
+    zero_row_policy: Literal["error", "zero"] = "zero"
+
+
 class AggregateByKeyViewSpec(StrictWorkspaceModel):
     kind: Literal["aggregate_by_key"]
     view: str
@@ -185,7 +308,12 @@ class NormalizeViewSpec(StrictWorkspaceModel):
 
 
 ViewDeriveSpec = Annotated[
-    VectorDifferenceSpec | ConcatenateViewSpec | AggregateByKeyViewSpec | ApplyReducerViewSpec | NormalizeViewSpec,
+    VectorDifferenceSpec
+    | ConcatenateViewSpec
+    | BlockNormalizedConcatenateViewSpec
+    | AggregateByKeyViewSpec
+    | ApplyReducerViewSpec
+    | NormalizeViewSpec,
     Field(discriminator="kind"),
 ]
 
@@ -197,12 +325,24 @@ class SourceBackedViewConfig(StrictWorkspaceModel):
     tags: dict[str, Any] = Field(default_factory=dict)
     role: str | None = None
 
+    @model_validator(mode="after")
+    def _validate_representation_family(self) -> "SourceBackedViewConfig":
+        validate_representation_identity(self.coordinate_space_id, owner="source-backed view coordinate_space_id")
+        validate_representation_family_tags(self.tags, owner="source-backed view")
+        return self
+
 
 class DerivedViewConfig(StrictWorkspaceModel):
     derive: ViewDeriveSpec
     coordinate_space_id: str
     tags: dict[str, Any] = Field(default_factory=dict)
     role: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_representation_family(self) -> "DerivedViewConfig":
+        validate_representation_identity(self.coordinate_space_id, owner="derived view coordinate_space_id")
+        validate_representation_family_tags(self.tags, owner="derived view")
+        return self
 
 
 ViewConfig = SourceBackedViewConfig | DerivedViewConfig
@@ -300,26 +440,7 @@ class ColumnCohortConfig(StrictWorkspaceModel):
     column: str
 
 
-class PromoterMetadataCohortConfig(StrictWorkspaceModel):
-    kind: Literal["promoter_metadata"]
-    source: str
-    derive: Literal[
-        "design_family",
-        "design_regulator_composition",
-        "sig35_variant",
-        "spacer_length",
-        "campaign_prior",
-        "is_control",
-        "source_class",
-        "regulondb__sigma_factor_set",
-        "regulondb__regulator_composition",
-        "regulondb__box_pattern",
-        "regulondb__confidence_level_set",
-        "regulondb__metadata_completeness_class",
-    ]
-
-
-CohortConfig = Annotated[ColumnCohortConfig | PromoterMetadataCohortConfig, Field(discriminator="kind")]
+CohortConfig = ColumnCohortConfig
 
 
 class ReducedViewExportBlockConfig(StrictWorkspaceModel):
@@ -358,12 +479,62 @@ class ExportConfig(StrictWorkspaceModel):
     metadata_columns: list[str] = Field(default_factory=list)
 
 
+class ReferenceSetSelectorConfig(StrictWorkspaceModel):
+    column: str
+    equals: str | int | float | bool | None = None
+    in_values: list[str | int | float | bool | None] = Field(default_factory=list)
+    regex: str | None = None
+    not_regex: str | None = None
+    non_null: bool = True
+
+    @model_validator(mode="after")
+    def _validate_selector(self) -> "ReferenceSetSelectorConfig":
+        has_selector = (
+            self.equals is not None
+            or bool(self.in_values)
+            or self.regex is not None
+            or self.not_regex is not None
+            or self.non_null
+        )
+        if not has_selector:
+            raise ValueError("reference_set selector must declare equals, in_values, regex, not_regex, or non_null")
+        return self
+
+
 class ReferenceSetConfig(StrictWorkspaceModel):
-    ids: list[str] = Field(min_length=1)
+    label: NonEmptyText | None = None
+    ids: list[str] = Field(default_factory=list)
     match_column: str = "id"
     label_column: str | None = None
     label_mode: Literal["label_and_highlight", "highlight_only"] = "label_and_highlight"
+    label_limit: int | None = Field(default=None, ge=0)
     display_labels: dict[str, str] = Field(default_factory=dict)
+    where: list[ReferenceSetSelectorConfig] = Field(default_factory=list)
+    where_all: list[ReferenceSetSelectorConfig] = Field(default_factory=list)
+    require_non_empty: bool = True
+    notebook_exposed: bool = True
+
+    @model_validator(mode="after")
+    def _validate_reference_membership(self) -> "ReferenceSetConfig":
+        if not self.ids and not self.where and not self.where_all:
+            raise ValueError("reference_sets must declare ids or where selectors")
+        return self
+
+
+class CandidateSetConfig(StrictWorkspaceModel):
+    label: NonEmptyText
+    description: str | None = None
+    views: list[Identifier] = Field(default_factory=list)
+    include_tags: dict[str, str] = Field(default_factory=dict)
+    exclude_roles: list[str] = Field(default_factory=lambda: ["hidden", "retired"])
+    panel_titles: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_membership_rule(self) -> "CandidateSetConfig":
+        if not self.views and not self.include_tags:
+            raise ValueError("candidate_sets must declare views or include_tags")
+        validate_representation_family_tags(self.include_tags, owner="candidate set")
+        return self
 
 
 class AcceptanceCheckConfig(StrictWorkspaceModel):
@@ -408,7 +579,8 @@ class DeliverableConfig(StrictWorkspaceModel):
 
 class StudyBindingConfig(StrictWorkspaceModel):
     study_id: NonEmptyText
-    docs_root: NonEmptyText
+    record_root: NonEmptyText
+    deliverable_docs_root: NonEmptyText
     readiness_vocabulary: list[Literal["missing", "attention", "ok"]] = Field(default_factory=list)
 
 
@@ -418,11 +590,13 @@ class WorkspaceConfig(StrictWorkspaceModel):
     defaults: DefaultsSection
     sources: dict[str, SourceConfig]
     metadata: MetadataSection = Field(default_factory=MetadataSection)
+    metric_definitions: dict[str, MetricDefinitionConfig] = Field(default_factory=dict)
     alignments: dict[str, AlignmentConfig] = Field(default_factory=dict)
     views: dict[str, ViewConfig] = Field(default_factory=dict)
     scalars: dict[str, ScalarConfig] = Field(default_factory=dict)
     landmarks: dict[str, LandmarkConfig] = Field(default_factory=dict)
     reference_sets: dict[str, ReferenceSetConfig] = Field(default_factory=dict)
+    candidate_sets: dict[str, CandidateSetConfig] = Field(default_factory=dict)
     plots: dict[str, PlotConfig] = Field(default_factory=dict)
     exports: dict[str, ExportConfig] = Field(default_factory=dict)
     cohorts: dict[str, CohortConfig] = Field(default_factory=dict)

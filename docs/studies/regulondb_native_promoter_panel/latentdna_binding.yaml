@@ -19,19 +19,21 @@ required_wildtype_references: []
 default_geometry_inventory:
   default_review_geometries:
     - intermediate_embedding_7b_native_source_record_seq_mean
-  working_candidate: intermediate_embedding_7b_native_source_record_seq_mean
-  conservative_baseline: intermediate_embedding_7b_native_source_record_seq_mean
-  challengers: []
-  planned_geometries:
     - output_layer_mean_7b_native_source_record_seq_mean
     - intermediate_embedding_7b_core60_tss_upstream
     - output_layer_mean_7b_core60_tss_upstream
-  planned_scalar_diagnostics:
+  working_candidate: intermediate_embedding_7b_native_source_record_seq_mean
+  conservative_baseline: intermediate_embedding_7b_native_source_record_seq_mean
+  challengers:
+    - output_layer_mean_7b_native_source_record_seq_mean
+    - intermediate_embedding_7b_core60_tss_upstream
+    - output_layer_mean_7b_core60_tss_upstream
+  scalar_diagnostics:
     - log_likelihood_total_7b_native_source_record_seq_mean
     - log_likelihood_mean_per_token_7b_native_source_record_seq_mean
     - log_likelihood_total_7b_core60_tss_upstream
     - log_likelihood_mean_per_token_7b_core60_tss_upstream
 decision_deliverables:
-  - dataset_overview
   - representation_health_summary
-  - regulondb_metadata_audit
+  - native_core60_shift_summary
+  - sigma_factor_structure_summary

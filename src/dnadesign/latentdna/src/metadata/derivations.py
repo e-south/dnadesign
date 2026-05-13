@@ -3,10 +3,28 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from functools import lru_cache
+from importlib import import_module
 from typing import Any
 
 from ..contracts.errors import ContractViolationError
 from ..contracts.workspace import MetadataDerivationConfig
+
+AnnotationHandler = Callable[..., object]
+
+
+@lru_cache(maxsize=32)
+def _annotation_handler(handler_path: str) -> AnnotationHandler:
+    module_name, function_name = handler_path.split(":", 1)
+    try:
+        module = import_module(module_name)
+        handler = getattr(module, function_name)
+    except (ImportError, AttributeError) as exc:
+        raise ContractViolationError(f"metadata annotation handler cannot be loaded: {handler_path}") from exc
+    if not callable(handler):
+        raise ContractViolationError(f"metadata annotation handler is not callable: {handler_path}")
+    return handler
 
 
 def _normalize(value: object, *, mode: str | None) -> object:
@@ -47,4 +65,12 @@ def derive_metadata_value(row: dict[str, Any], derivation: MetadataDerivationCon
         return derivation.default
     if derivation.kind == "constant":
         return derivation.value
+    if derivation.kind == "annotation":
+        handler = _annotation_handler(derivation.handler)
+        try:
+            return handler(row, derive=derivation.derive)
+        except ContractViolationError:
+            if derivation.missing_policy == "null":
+                return None
+            raise
     raise ContractViolationError(f"unsupported metadata derivation kind: {derivation.kind}")

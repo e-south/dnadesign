@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from dnadesign.latentdna.src.services.workspace_snapshot_service import _decision_ladder, workspace_snapshot
+from dnadesign.latentdna.src.services.workspace_snapshot_service import (
+    _decision_ladder,
+    _model_families,
+    workspace_snapshot,
+)
 
 
 def _deliverable(
@@ -26,7 +30,7 @@ def test_decision_ladder_excludes_appendix_only_deliverables() -> None:
         config=SimpleNamespace(
             deliverables={
                 "dataset_overview": _deliverable(plots=["dataset_overview"]),
-                "appendix_geometry_audit": _deliverable(
+                "appendix_geometry_review": _deliverable(
                     plots=["design_centroid_margin_gallery", "appendix_umap_gallery"],
                     section="Appendix",
                 ),
@@ -49,6 +53,20 @@ def test_decision_ladder_excludes_appendix_only_deliverables() -> None:
         "dataset_overview",
         "workspace_snapshot_export",
     ]
+
+
+def test_model_families_accept_encoder_model_and_fully_qualified_model_tags() -> None:
+    context = SimpleNamespace(
+        config=SimpleNamespace(
+            views={
+                "short_model": SimpleNamespace(tags={"encoder": "evo2", "model": "7b"}),
+                "qualified_model": SimpleNamespace(tags={"model": "evo2_7b"}),
+                "other_model": SimpleNamespace(tags={"model": "demo"}),
+            }
+        )
+    )
+
+    assert _model_families(context) == ["demo", "evo2_7b"]
 
 
 def test_workspace_snapshot_omits_missing_planned_sources(tmp_path) -> None:

@@ -30,6 +30,7 @@ from dnadesign.infer.src.features.aliases import (
     persist_feature_scalar_rows,
     persist_feature_vector_rows,
 )
+from dnadesign.infer.src.features.cache_keys import DNA_SEQUENCE_CASE_POLICY
 from dnadesign.latentdna.src.cli import app
 from dnadesign.usr import (
     Dataset,
@@ -42,6 +43,13 @@ from dnadesign.usr import (
 from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
 
 _RUNNER = CliRunner()
+
+
+def _runtime_contract_fields() -> dict[str, str]:
+    return {
+        "runtime_fingerprint_key": "runtime_fingerprint_fixture",
+        "sequence_case_policy": DNA_SEQUENCE_CASE_POLICY,
+    }
 
 
 def _build_overlay_usr_sources(tmp_path: Path) -> Path:
@@ -152,6 +160,7 @@ def _build_infer_feature_sidecar_usr_source(tmp_path: Path) -> tuple[Path, str]:
                 "orientation": "forward",
                 "source_dataset_id": dataset.name,
                 "feature_request_digest": "digest_fixture",
+                **_runtime_contract_fields(),
                 "created_at": created_at,
             }
         ]
@@ -184,6 +193,7 @@ def _build_infer_feature_sidecar_usr_source(tmp_path: Path) -> tuple[Path, str]:
                 "orientation": "forward",
                 "source_dataset_id": dataset.name,
                 "feature_request_digest": "digest_fixture",
+                **_runtime_contract_fields(),
                 "created_at": created_at,
             }
         ]
@@ -524,12 +534,15 @@ def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_templa
 
     config_payload = yaml.safe_load((workspace_dir / "config.yaml").read_text(encoding="utf-8"))
     expected_usr_root = Path(relpath(usr_root.resolve(), workspace_dir.resolve())).as_posix()
-    assert config_payload["sources"]["anchor_60bp"]["root"] == expected_usr_root
-    assert config_payload["sources"]["anchor_60bp"]["dataset"] == "promoter/test_anchor"
+    assert config_payload["sources"]["merged_anchor_insert"]["root"] == expected_usr_root
+    assert config_payload["sources"]["merged_anchor_insert"]["dataset"] == "promoter/test_anchor"
     assert config_payload["sources"]["full_context_1kb"]["root"] == expected_usr_root
     assert config_payload["sources"]["full_context_1kb"]["dataset"] == "promoter/test_contexts"
     assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
-    assert config_payload["study_binding"]["docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
+    assert config_payload["study_binding"]["record_root"] == study_dir.resolve().as_posix()
+    assert (
+        config_payload["study_binding"]["deliverable_docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
+    )
 
 
 def test_workspace_show_reports_workspace_summary(tmp_path: Path) -> None:
@@ -1256,7 +1269,7 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
                     "neighbor_backend": "auto",
                 },
                 "sources": {
-                    "anchor_60bp": {
+                    "merged_anchor_insert": {
                         "kind": "usr",
                         "root": usr_root.as_posix(),
                         "dataset": "promoter/demo_anchor_set",
@@ -1267,7 +1280,7 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
                 "metadata": {"include": ["usr_label__primary", "design_family", "sig35_variant"]},
                 "views": {
                     "intermediate_embedding_20b_anchor_60bp": {
-                        "source": "anchor_60bp",
+                        "source": "merged_anchor_insert",
                         "vector": {
                             "kind": "column",
                             "name": (
@@ -1280,7 +1293,7 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
                             "encoder": "evo2",
                             "model": "20b",
                             "family": "intermediate_embedding",
-                            "scope": "anchor_60bp",
+                            "scope": "merged_anchor_insert_seq_mean",
                         },
                     }
                 },
@@ -1336,8 +1349,8 @@ def test_workspace_snapshot_emits_machine_readable_status_contract(tmp_path: Pat
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["workspace_id"] == "demo_latentdna"
-    assert payload["sources"]["anchor_60bp"]["dataset_id"] == "promoter/demo_anchor_set"
-    assert payload["sources"]["anchor_60bp"]["row_count"] == 2
+    assert payload["sources"]["merged_anchor_insert"]["dataset_id"] == "promoter/demo_anchor_set"
+    assert payload["sources"]["merged_anchor_insert"]["row_count"] == 2
     assert payload["model_families"] == ["evo2_20b"]
     assert payload["canonical_views"] == ["intermediate_embedding_20b_anchor_60bp"]
     assert payload["browser"]["default_geometry_ids"] == ["intermediate_embedding_20b_anchor_60bp"]

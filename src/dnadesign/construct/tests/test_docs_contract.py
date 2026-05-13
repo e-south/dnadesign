@@ -58,6 +58,7 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" in outputs
     assert "construct__anchor_start" in outputs
     assert "construct__anchor_start" in template_contexts
+    assert "prefix-conditioned token" in config_doc
     assert "### Key docs" in readme
     assert "### Boundary reminders" in readme
     assert "demo_anchor_template_shared_dataset" in readme

@@ -25,6 +25,14 @@ _INFER_PROGRESS_STEP_PCT_LARGE_TARGET = 10
 _INFER_SMALL_TARGET_UNITS_THRESHOLD = 200
 _INFER_ATTACH_MIN_SECONDS_DEFAULT = 60.0
 _INFER_ATTACH_HEARTBEAT_SECONDS_DEFAULT = 1800.0
+_INFER_FEATURE_SIDECAR_ACTIONS = (
+    "infer_feature_aliases_write",
+    "infer_feature_vectors_write",
+    "infer_feature_scalar_aliases_write",
+    "infer_feature_scalars_write",
+)
+_INFER_FEATURE_BUNDLE_PROGRESS_ACTION = "infer_feature_bundle_progress"
+_INFER_FEATURE_BUNDLE_COMPLETE_ACTION = "infer_feature_bundle_complete"
 
 
 def _eta_to_overall_complete_seconds(
@@ -93,6 +101,23 @@ def _to_int_or_none(value: object) -> int | None:
 def _infer_args(event: dict[str, Any]) -> dict[str, Any]:
     args_raw = event.get("args")
     return args_raw if isinstance(args_raw, dict) else {}
+
+
+def _infer_metrics(event: dict[str, Any]) -> dict[str, Any]:
+    metrics_raw = event.get("metrics")
+    return metrics_raw if isinstance(metrics_raw, dict) else {}
+
+
+def _infer_run_elapsed_seconds(event: dict[str, Any], fallback: float | None) -> float | None:
+    args = _infer_args(event)
+    elapsed = _to_float_or_none(args.get("run_elapsed_seconds"))
+    if elapsed is None:
+        elapsed = _to_float_or_none(_infer_metrics(event).get("run_elapsed_seconds"))
+    if elapsed is None:
+        elapsed = fallback
+    if elapsed is None:
+        return None
+    return max(0.0, float(elapsed))
 
 
 def _infer_output(event: dict[str, Any]) -> dict[str, Any]:
@@ -211,6 +236,24 @@ def _infer_materialize_status_override(event: dict[str, Any]) -> str | None:
     return "success"
 
 
+def _infer_feature_sidecar_status_override(event: dict[str, Any]) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    return "running"
+
+
+def _infer_feature_bundle_progress_status_override(event: dict[str, Any]) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    return "running"
+
+
+def _infer_feature_bundle_complete_status_override(event: dict[str, Any]) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    return "success"
+
+
 def _infer_attach_message(
     event: dict[str, Any],
     *,
@@ -280,6 +323,118 @@ def _infer_attach_message(
     return "\n".join(lines)
 
 
+def _infer_feature_sidecar_message(
+    event: dict[str, Any],
+    *,
+    run_id: str,
+    duration_seconds: float | None,
+) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    dataset_raw = event.get("dataset")
+    dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
+    dataset_name = str(dataset.get("name") or "unknown-dataset")
+    args = _infer_args(event)
+    artifacts_raw = event.get("artifacts")
+    artifacts = artifacts_raw if isinstance(artifacts_raw, dict) else {}
+    action = str(event.get("action") or "").strip()
+    rows_written = _to_int_or_none(args.get("rows_written"))
+    path = artifacts.get("path")
+    lines = [f"Infer feature sidecar write | run={run_id} | dataset={dataset_name}"]
+    lines.append(f"- Action: {action}")
+    if rows_written is not None:
+        lines.append(f"- Rows written: {rows_written}")
+    if path:
+        lines.append(f"- Sidecar: {path}")
+    if duration_seconds is not None:
+        lines.append(f"- Elapsed: {_duration_hhmmss(duration_seconds)}")
+    return "\n".join(lines)
+
+
+def _infer_feature_bundle_progress_message(
+    event: dict[str, Any],
+    *,
+    run_id: str,
+    duration_seconds: float | None,
+) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    dataset_raw = event.get("dataset")
+    dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
+    dataset_name = str(dataset.get("name") or "unknown-dataset")
+    args = _infer_args(event)
+    job_id = str(args.get("job_id") or "").strip() or "unknown-job"
+    model_id = str(args.get("model_id") or "").strip()
+    progress_pct = _to_float_or_none(args.get("progress_pct"))
+    contexts_completed = _to_int_or_none(args.get("contexts_completed"))
+    contexts_total = _to_int_or_none(args.get("contexts_total"))
+    forward_completed = _to_int_or_none(args.get("unique_forward_passes_completed"))
+    forward_total = _to_int_or_none(args.get("unique_forward_passes_total"))
+    required_vector_keys = _to_int_or_none(args.get("required_vector_keys"))
+    required_scalar_keys = _to_int_or_none(args.get("required_scalar_keys"))
+    elapsed_seconds = _infer_run_elapsed_seconds(event, duration_seconds)
+
+    progress_label = f"{progress_pct:.1f}%" if progress_pct is not None else "progress"
+    lines = [f"Infer feature bundle {progress_label} | job={job_id} | dataset={dataset_name}"]
+    if model_id:
+        lines.append(f"- Model: {model_id}")
+    if contexts_completed is not None and contexts_total is not None:
+        work_line = f"- Views this run: {contexts_completed}/{contexts_total}"
+        if forward_completed is not None and forward_total is not None:
+            work_line += f" | forward passes: {forward_completed}/{forward_total}"
+        lines.append(work_line)
+        eta_seconds = _eta_to_overall_complete_seconds(
+            completed_units=contexts_completed,
+            target_units=contexts_total,
+            elapsed_seconds=elapsed_seconds,
+        )
+        if eta_seconds is not None:
+            lines.append(f"- ETA: {_duration_hhmmss(eta_seconds)}")
+    if required_vector_keys is not None or required_scalar_keys is not None:
+        vector_count = required_vector_keys if required_vector_keys is not None else 0
+        scalar_count = required_scalar_keys if required_scalar_keys is not None else 0
+        lines.append(f"- Sidecar keys: vectors={vector_count} scalars={scalar_count}")
+    if elapsed_seconds is not None:
+        lines.append(f"- Elapsed: {_duration_hhmmss(elapsed_seconds)}")
+    return "\n".join(lines)
+
+
+def _infer_feature_bundle_complete_message(
+    event: dict[str, Any],
+    *,
+    run_id: str,
+    duration_seconds: float | None,
+) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    dataset_raw = event.get("dataset")
+    dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
+    dataset_name = str(dataset.get("name") or "unknown-dataset")
+    args = _infer_args(event)
+    job_id = str(args.get("job_id") or "").strip() or "unknown-job"
+    model_id = str(args.get("model_id") or "").strip()
+    contexts_completed = _to_int_or_none(args.get("contexts_completed"))
+    unique_forward_passes = _to_int_or_none(args.get("unique_forward_passes"))
+    required_vector_keys = _to_int_or_none(args.get("required_vector_keys"))
+    required_scalar_keys = _to_int_or_none(args.get("required_scalar_keys"))
+    elapsed_seconds = _infer_run_elapsed_seconds(event, duration_seconds)
+    lines = [f"Infer feature bundle complete | job={job_id} | dataset={dataset_name}"]
+    lines.append(f"- Run: {run_id}")
+    if model_id:
+        lines.append(f"- Model: {model_id}")
+    if contexts_completed is not None:
+        lines.append(f"- Views: {contexts_completed}")
+    if unique_forward_passes is not None:
+        lines.append(f"- Forward passes: {unique_forward_passes}")
+    if required_vector_keys is not None or required_scalar_keys is not None:
+        vector_count = required_vector_keys if required_vector_keys is not None else 0
+        scalar_count = required_scalar_keys if required_scalar_keys is not None else 0
+        lines.append(f"- Sidecar keys: vectors={vector_count} scalars={scalar_count}")
+    if elapsed_seconds is not None:
+        lines.append(f"- Duration: {_duration_hhmmss(elapsed_seconds)}")
+    return "\n".join(lines)
+
+
 def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: ToolEventState) -> ToolEventDecision:
     if not _is_infer_actor(event):
         return ToolEventDecision(emit=True, duration_seconds=None)
@@ -343,6 +498,81 @@ def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: Tool
     return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
 
 
+def _evaluate_infer_sidecar_event(event: dict[str, Any], run_id: str, state: ToolEventState) -> ToolEventDecision:
+    del run_id
+    del state
+    if not _is_infer_actor(event):
+        return ToolEventDecision(emit=True, duration_seconds=None)
+    return ToolEventDecision(emit=True, duration_seconds=None)
+
+
+def _evaluate_infer_feature_bundle_event(
+    event: dict[str, Any], run_id: str, state: ToolEventState
+) -> ToolEventDecision:
+    if not _is_infer_actor(event):
+        return ToolEventDecision(emit=True, duration_seconds=None)
+    bucket = state.get_bucket("infer_feature_bundle")
+    per_run_raw = bucket.setdefault("per_run", {})
+    per_run = per_run_raw if isinstance(per_run_raw, dict) else {}
+    notify_config_raw = bucket.get("notify_config")
+    notify_config = notify_config_raw if isinstance(notify_config_raw, dict) else {}
+    min_seconds = _resolve_progress_min_seconds(notify_config)
+    heartbeat_seconds = _resolve_progress_heartbeat_seconds(notify_config)
+    now_seconds = _event_timestamp_seconds(event)
+    if now_seconds is None:
+        now_seconds = float(time.time())
+
+    action = str(event.get("action") or "").strip()
+    run_key = str(run_id)
+    entry_raw = per_run.get(run_key)
+    entry = entry_raw if isinstance(entry_raw, dict) else {}
+    started_at = _to_float_or_none(entry.get("started_at"))
+    if started_at is None:
+        started_at = now_seconds
+    last_sent = _to_float_or_none(entry.get("last_sent"))
+
+    if action == _INFER_FEATURE_BUNDLE_COMPLETE_ACTION:
+        per_run[run_key] = {
+            "started_at": started_at,
+            "last_sent": now_seconds,
+            "last_step": entry.get("last_step", -1),
+        }
+        return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
+
+    args = _infer_args(event)
+    progress_pct = _to_float_or_none(args.get("progress_pct"))
+    if progress_pct is None:
+        if last_sent is None:
+            per_run[run_key] = {"started_at": started_at, "last_sent": now_seconds}
+            return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
+        elapsed = now_seconds - last_sent
+        if elapsed >= heartbeat_seconds:
+            per_run[run_key] = {"started_at": started_at, "last_sent": now_seconds}
+            return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
+        return ToolEventDecision(emit=False, duration_seconds=None)
+
+    contexts_total = _to_int_or_none(args.get("contexts_total"))
+    progress_step_pct = _resolve_progress_step_pct({"overall_target_units": contexts_total}, notify_config)
+    progress_step = int(max(0.0, min(100.0, progress_pct)) // float(progress_step_pct))
+    last_step_raw = entry.get("last_step")
+    last_step = int(last_step_raw) if last_step_raw is not None else -1
+    elapsed = None if last_sent is None else (now_seconds - last_sent)
+    first_trigger = last_sent is None
+    step_trigger = progress_step > last_step
+    if step_trigger and elapsed is not None and elapsed < min_seconds:
+        step_trigger = False
+    heartbeat_trigger = elapsed is not None and elapsed >= heartbeat_seconds
+    if not first_trigger and not step_trigger and not heartbeat_trigger:
+        return ToolEventDecision(emit=False, duration_seconds=None)
+
+    per_run[run_key] = {
+        "started_at": started_at,
+        "last_sent": now_seconds,
+        "last_step": max(last_step, progress_step),
+    }
+    return ToolEventDecision(emit=True, duration_seconds=max(0.0, now_seconds - started_at))
+
+
 def register_infer_handlers(
     *,
     register_status_override: Callable[[str, Callable[[dict[str, Any]], str | None]], None],
@@ -360,3 +590,25 @@ def register_infer_handlers(
         register_message_override(action, _infer_attach_message)
         register_evaluator(action, _evaluate_infer_attach_event)
     register_status_override("materialize", _infer_materialize_status_override)
+    for action in _INFER_FEATURE_SIDECAR_ACTIONS:
+        register_status_override(action, _infer_feature_sidecar_status_override)
+        register_message_override(action, _infer_feature_sidecar_message)
+        register_evaluator(action, _evaluate_infer_sidecar_event)
+    register_status_override(
+        _INFER_FEATURE_BUNDLE_PROGRESS_ACTION,
+        _infer_feature_bundle_progress_status_override,
+    )
+    register_message_override(
+        _INFER_FEATURE_BUNDLE_PROGRESS_ACTION,
+        _infer_feature_bundle_progress_message,
+    )
+    register_evaluator(_INFER_FEATURE_BUNDLE_PROGRESS_ACTION, _evaluate_infer_feature_bundle_event)
+    register_status_override(
+        _INFER_FEATURE_BUNDLE_COMPLETE_ACTION,
+        _infer_feature_bundle_complete_status_override,
+    )
+    register_message_override(
+        _INFER_FEATURE_BUNDLE_COMPLETE_ACTION,
+        _infer_feature_bundle_complete_message,
+    )
+    register_evaluator(_INFER_FEATURE_BUNDLE_COMPLETE_ACTION, _evaluate_infer_feature_bundle_event)

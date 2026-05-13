@@ -44,6 +44,7 @@ class CliBindings:
     cmd_registry_freeze: CommandBinding
     cmd_overlay_compact: CommandBinding
     cmd_overlay_project: CommandBinding
+    cmd_overlay_refresh_metadata: CommandBinding
     cmd_overlay_remove: CommandBinding
     cmd_event_log_garden: CommandBinding
     cmd_events_tail: CommandBinding
@@ -155,6 +156,9 @@ def build_cli_bindings(
 
     def cmd_overlay_project(args):
         maintenance_commands.cmd_overlay_project(args, deps=maintenance_deps())
+
+    def cmd_overlay_refresh_metadata(args):
+        maintenance_commands.cmd_overlay_refresh_metadata(args, deps=maintenance_deps())
 
     def cmd_overlay_remove(args):
         maintenance_commands.cmd_overlay_remove(args, deps=maintenance_deps())
@@ -279,6 +283,7 @@ def build_cli_bindings(
         cmd_registry_freeze=cmd_registry_freeze,
         cmd_overlay_compact=cmd_overlay_compact,
         cmd_overlay_project=cmd_overlay_project,
+        cmd_overlay_refresh_metadata=cmd_overlay_refresh_metadata,
         cmd_overlay_remove=cmd_overlay_remove,
         cmd_event_log_garden=cmd_event_log_garden,
         cmd_events_tail=cmd_events_tail,

@@ -130,6 +130,46 @@ def test_shared_catalog_normalizes_vendor_cut_notation_from_motif_end_when_decla
     assert entry.resolved_vendor_diagram_top_5to3 == "GCAGTGNN"
 
 
+def test_shared_catalog_normalizes_negative_vendor_cut_notation_from_motif_end_when_declared(
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "nickases.yaml"
+    catalog_path.write_text(
+        yaml.safe_dump(
+            {
+                "nickases": {
+                    "schema_version": 1,
+                    "entries": [
+                        {
+                            "id": "Nb.BssSI",
+                            "specificity_id": "BssSI",
+                            "motif_top_5to3": "CACGAG",
+                            "raw_cut_notation": "CACGAG(none/-1)",
+                            "raw_cut_offset_reference": "motif_end",
+                            "source": "neb",
+                        },
+                        {
+                            "id": "Nt.BbvCI",
+                            "specificity_id": "BbvCI",
+                            "motif_top_5to3": "CCTCAGC",
+                            "raw_cut_notation": "CCTCAGC(-5/none)",
+                            "raw_cut_offset_reference": "motif_end",
+                            "source": "neb",
+                        },
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    catalog = load_nickase_catalog(catalog_path)
+    entries = catalog.by_id()
+
+    assert entries["Nb.BssSI"].bottom_cut_offset == 5
+    assert entries["Nt.BbvCI"].top_cut_offset == 2
+
+
 def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() -> None:
     catalog = load_builtin_nickase_catalog_preset("neb_nicking_v1")
 
@@ -141,8 +181,13 @@ def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() 
     assert "Nt.BbvCI" in entries
     assert entries["Nt.BstNBI"].vendor_catalog_number == "R0607"
     assert entries["Nt.BstNBI"].source_url == "https://www.neb.com/en-us/products/r0607-ntbstnbi"
+    assert entries["Nt.CviPII"].top_cut_offset == 0
     assert entries["Nb.BsrDI"].bottom_cut_offset == 6
     assert entries["Nb.BtsI"].bottom_cut_offset == 6
+    assert entries["Nb.BbvCI"].bottom_cut_offset == 5
+    assert entries["Nt.BbvCI"].top_cut_offset == 2
+    assert entries["Nb.BsmI"].bottom_cut_offset == 5
+    assert entries["Nb.BssSI"].bottom_cut_offset == 5
     assert entries["Nt.AlwI"].top_cut_offset == 9
     assert entries["Nt.BsmAI"].top_cut_offset == 6
     assert entries["Nt.BstNBI"].resolved_vendor_diagram_top_5to3 == "GAGTCNNNNN"
@@ -157,6 +202,45 @@ def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() 
     assert any(alias.alias_id == "WarmStart Nt.BstNBI" for alias in catalog.product_aliases)
     assert aliases["SibEnzyme N.Bst9 I"].canonical_variant_id == "Nt.BstNBI"
     assert aliases["SibEnzyme N.Bst9 I"].source_url == "https://sibenzyme.com/product/n-bst9-i/"
+
+
+def test_scar_nick_source_catalog_offsets_are_reviewed_against_vendor_notation(tmp_path: Path) -> None:
+    catalog, _resolved_paths = load_merged_nickase_catalog(
+        preset_id="neb_nicking_v1",
+        additional_preset_ids=["thermo_nicking_v1"],
+        additional_paths=[],
+        workspace_root=tmp_path,
+    )
+
+    expected = {
+        "Nb.BbvCI": ("CCTCAGC(none/-2)", "motif_end", None, 5, "CCTCAGC"),
+        "Nb.Bpu10I": ("CCTNAGC(none/-2)", "motif_end", None, 5, "CCTNAGC"),
+        "Nb.BsmI": ("GAATGC(none/-1)", "motif_end", None, 5, "GAATGC"),
+        "Nb.BsrDI": ("GCAATG(none/0)", "motif_end", None, 6, "GCAATGNN"),
+        "Nb.BssSI": ("CACGAG(none/-1)", "motif_end", None, 5, "CACGAG"),
+        "Nb.BtsI": ("GCAGTG(none/0)", "motif_end", None, 6, "GCAGTGNN"),
+        "Nb.Mva1269I": ("GAATGC(none/-1)", "motif_end", None, 5, "GAATGC"),
+        "Nt.AlwI": ("GGATC(4/none)", "motif_end", 9, None, "GGATCNNNNN"),
+        "Nt.BbvCI": ("CCTCAGC(-5/none)", "motif_end", 2, None, "CCTCAGC"),
+        "Nt.Bpu10I": ("CCTNAGC(2/none)", None, 2, None, "CCTNAGC"),
+        "Nt.BsmAI": ("GTCTC(1/none)", "motif_end", 6, None, "GTCTCNN"),
+        "Nt.BspQI": ("GCTCTTC(1/none)", "motif_end", 8, None, "GCTCTTCNN"),
+        "Nt.BstNBI": ("GAGTC(4/none)", "motif_end", 9, None, "GAGTCNNNNN"),
+        "Nt.CviPII": ("CCD(-3/none)", "motif_end", 0, None, "CCD"),
+    }
+
+    observed = {
+        entry.id: (
+            entry.raw_cut_notation,
+            entry.raw_cut_offset_reference,
+            entry.top_cut_offset,
+            entry.bottom_cut_offset,
+            entry.resolved_vendor_diagram_top_5to3,
+        )
+        for entry in catalog.entries
+    }
+
+    assert observed == expected
 
 
 def test_shared_preset_overlay_merge_rejects_duplicate_variant_ids(tmp_path: Path) -> None:
@@ -205,7 +289,8 @@ def test_shared_multiple_builtin_presets_merge_and_preserve_typed_selection_meta
     assert resolved_paths == []
     assert catalog.preset_ids == ["neb_nicking_v1", "thermo_nicking_v1"]
     assert entries["Nt.Bpu10I"].top_cut_offset == 2
-    assert entries["Nb.Bpu10I"].bottom_cut_offset == -2
+    assert entries["Nb.Bpu10I"].bottom_cut_offset == 5
+    assert entries["Nb.Mva1269I"].bottom_cut_offset == 5
     assert entries["Nb.Mva1269I"].operational is not None
     assert entries["Nb.Mva1269I"].operational.buffer_family == "O"
     assert entries["Nb.Mva1269I"].source_url == "https://www.thermofisher.com/order/catalog/product/ER2051"

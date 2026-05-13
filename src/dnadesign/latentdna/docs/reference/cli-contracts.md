@@ -57,6 +57,7 @@ Workspace-specific flags:
 - `latentdna distance score`
 - `latentdna enrich score`
 - `latentdna agreement compare`
+- `latentdna export anndata`
 - `latentdna export matrix`
 - `latentdna export table`
 - `latentdna plot render`
@@ -102,9 +103,11 @@ Workspace-specific flags:
 - `distance_set`: landmark distance tables over existing view artifacts
 - `enrichment_set`: landmark-neighborhood enrichment tables over configured cohort columns
 - `agreement_set`: persisted kNN-overlap rows plus optional cluster-agreement and landmark-neighborhood summary rows
-- `export_bundle`: deterministic numeric matrices or aligned tables plus row and feature ledgers, including alignment-backed block projection when the workspace declares it
+- `export_bundle`: deterministic numeric matrices, aligned tables, or AnnData
+  `.h5ad` bundles plus row and feature ledgers, including alignment-backed
+  block projection when the workspace declares it
 - `plot`: artifact-driven `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `xy_scatter`, `distribution`, `curve`, `correspondence_heatmap`, and `agreement_summary` outputs
-- `notebook`: generated read-only marimo artifact review apps over persisted outputs, including inline plot-file viewing, a workspace-wide plot browser over `outputs/plots`, and a persisted browser control plane in `outputs/notebooks/<id>/controls.json`
+- `notebook`: generated read-only marimo artifact review apps over persisted outputs, including inline plot-file viewing, a workspace-wide plot browser over `outputs/plots`, and a persisted browser control plane in `outputs/notebooks/<id>/controls.json`; the control plane carries the candidate X inventory ledger so notebook startup can describe candidate rows/dimensions without loading view matrices
 
 ### Plot render modes
 
@@ -117,7 +120,7 @@ Workspace-specific flags:
 
 ### Active promoter-study path
 
-- Use `latentdna workspace init --from-study-dir docs/studies/stress_ethanol_cipro_growth --template promoter_reference_margin_benchmark` to hydrate the promoter-study starter from the checked-in study record. The template id is legacy; the current scaffold is the pre-assay representation-triage ladder.
+- Use `latentdna workspace init --from-study-dir docs/studies/stress_ethanol_cipro_growth --template promoter_reference_margin_benchmark` to hydrate the promoter-study pre-assay representation-triage ladder from the checked-in study record.
 - Use `latentdna workspace refresh` to clear workspace-local LatentDNA artifacts without touching upstream `usr/datasets`.
 - Use `latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json` before study-status or promoter-study tooling inspects LatentDNA state.
 - Use `latentdna validate workspace --deep` to confirm the declared source keys, view vector columns, cohort columns, landmark selector columns, and study-binding files against the live study data without materializing embedding matrices.

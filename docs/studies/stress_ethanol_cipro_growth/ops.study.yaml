@@ -32,7 +32,7 @@ lifecycle:
     - infer_anchor_plus_template_20b
   current_phase:
     strategy: explicit
-    id: infer_batch_preparation
+    id: latentdna_reference_normalization_audit
 
 phases:
   - id: densegen_growth
@@ -48,16 +48,16 @@ phases:
     output_dataset: construct_prom_eth_cip_context
     next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
   - id: infer_batch_preparation
-    status: in_progress
+    status: complete
     next_surface: repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md
   - id: infer_sequence_views_anchor_construct_insert_7b
-    status: planned
+    status: complete
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml
   - id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
-    status: planned
+    status: complete
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
   - id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
-    status: planned
+    status: complete
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
   - id: genbank_reference_import
     status: complete
@@ -85,27 +85,28 @@ phases:
     output_dataset: construct_prom_eth_cip_reference_contexts
     next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/config.reference_core60_contexts.forward_rc.yaml
   - id: infer_reference_analysis_window_core60_7b
-    status: planned
+    status: complete
     required_for_main_study_state: false
     output_dataset: infer_prom_eth_cip_reference_views_7b
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml
   - id: infer_reference_context_forward_seq_and_anchor_mean_7b
-    status: planned
+    status: complete
     required_for_main_study_state: false
     output_dataset: infer_prom_eth_cip_reference_views_7b
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml
   - id: infer_reference_context_reverse_complement_seq_and_anchor_mean_7b
-    status: planned
+    status: complete
     required_for_main_study_state: false
     output_dataset: infer_prom_eth_cip_reference_views_7b
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
   - id: infer_reference_views_7b
-    status: planned
+    status: complete
     required_for_main_study_state: false
     output_dataset: infer_prom_eth_cip_reference_views_7b
     next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
+    notes: Logical planning surface only; materialized payloads live under the reference core60/context dataset `_derived/infer/` sidecars.
   - id: latentdna_reference_normalization_audit
-    status: planned
+    status: in_progress
     required_for_main_study_state: false
     next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
   - id: infer_anchor_only_20b
@@ -157,6 +158,12 @@ artifacts:
     artifact_type: dataset
     dataset_id: infer_prom_eth_cip_reference_views_7b
     ref: repo:src/dnadesign/usr/datasets/infer_prom_eth_cip_reference_views_7b
+  latentdna_binding:
+    artifact_type: file
+    ref: repo:docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
+  latentdna_workspace_snapshot:
+    artifact_type: file
+    ref: repo:src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
   infer_config_anchor_only_20b:
     artifact_type: file
     ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
@@ -222,6 +229,20 @@ execution_surfaces:
   infer_batch_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b:
     surface_type: runbook
     runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml
+  latentdna_workspace:
+    surface_type: workspace
+    workspace_ref: repo:src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
+  latentdna_workspace_snapshot:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - latentdna
+      - workspace
+      - snapshot
+      - --workspace
+      - stress_ethanol_cipro_growth
+      - --json
   scheduler_default:
     surface_type: scheduler
     backend: sge
@@ -525,6 +546,7 @@ preflight:
     densegen: densegen_growth
     construct: construct_context_expansion
     notify_environment: infer_batch_preparation
+    latentdna: latentdna_reference_normalization_audit
   checks:
     densegen_growth:
       - kind: runbook_plan
@@ -888,11 +910,31 @@ preflight:
         summary: Sequence-view reverse-complement-context sequence-mean plus anchor-mean 7B infer runbook renders cleanly.
         required: true
         surface: infer_batch_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+    latentdna_reference_normalization_audit:
+      - kind: path_exists
+        check_id: latentdna.binding.present
+        check_group: latentdna
+        summary: Stress LatentDNA binding is present.
+        required: true
+        artifact: latentdna_binding
+      - kind: workspace_layout
+        check_id: latentdna.workspace.layout
+        check_group: latentdna
+        summary: Stress LatentDNA workspace root is present.
+        required: true
+        surface: latentdna_workspace
+      - kind: command
+        check_id: latentdna.workspace.snapshot
+        check_group: latentdna
+        summary: Stress LatentDNA workspace snapshot completed.
+        required: true
+        surface: latentdna_workspace_snapshot
   next_scope:
     target_phase_groups:
       densegen_growth: [densegen]
       merged_anchor_set: []
       construct_context_expansion: [construct]
       infer_batch_preparation: [infer, notify_environment, notify, infer_batch_plan]
+      latentdna_reference_normalization_audit: [latentdna]
     runtime_phase_groups: [infer, notify, infer_batch_plan]
     runtime_shared_groups: [notify_environment]

@@ -1,0 +1,32 @@
+plot_id: native_core60_shift_summary
+question: Does moving from native source-record sequence mean to TSS-upstream core60 pooling preserve rowwise geometry?
+decision_role: primary
+encoding: Metric bar panels for paired native-vs-core60 self-cosine and L2 shift across intermediate embedding and output-layer mean views.
+scope: RegulonDB native promoter records aligned to their derived TSS-upstream core60 sequence views by parent promoter identity.
+guardrails:
+  - Treat this as a paired representation shift diagnostic, not as a sigma-factor biology claim.
+  - Compare intermediate and output-layer feature families separately.
+  - High self-cosine means the rowwise paired view is stable; it does not prove that cohort structure is useful.
+caption: Native source-record versus core60 paired-shift summary for RegulonDB promoter representation views.
+alt_text: Two metric panels compare native-to-core60 median self-cosine and median L2 shift for intermediate embedding and output-layer mean representation views.
+preprocessing_md: |
+  Materialized native and core60 views are aligned by parent promoter identity.
+  The native view is an Evo 2 causal `seq_mean` over the full 81 bp
+  source-record window; the core60 view is a causal mean over the derived
+  TSS-upstream 60 bp analysis window. Rows are standardized and L2-normalized
+  before paired cosine and L2-shift summaries are computed.
+math_md: |
+  For aligned native row \(x_i\) and core60 row \(y_i\), the self-cosine is
+  $$
+  \cos(\hat{x}_i, \hat{y}_i)
+  $$
+  and the shift is
+  $$
+  \lVert \hat{x}_i - \hat{y}_i \rVert_2.
+  $$
+  The plot reports medians across aligned rows for each representation family.
+rationale_md: Directly tests whether native length/source-record pooling and core60 TSS-upstream pooling appear to occupy compatible local geometry before downstream candidate selection.
+limitations_md: Alignment is by source-record identity only; it does not explain which bases or motifs caused any shift. Output-layer and intermediate spaces are not commensurate with each other.
+failure_modes_md: Missing parent identifiers, stale materialized rows, or non-unique alignment keys can invalidate the paired summary; workspace validation should fail before this plot is trusted.
+docs_refs:
+  - src/dnadesign/latentdna/docs/reference/artifact-manifests.md

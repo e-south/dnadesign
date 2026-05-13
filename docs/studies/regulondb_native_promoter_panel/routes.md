@@ -1,6 +1,6 @@
 ## regulondb_native_promoter_panel Routes
 
-**Last verified:** 2026-04-29
+**Last verified:** 2026-05-04
 
 Use this page after the checked-in study status establishes the current phase.
 This study remains inactive for production execution, but downstream
@@ -83,7 +83,7 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `configured_preflight_ready`
+- Current state: `local_complete`
 - Entry artifact: `usr_regulondb_native_promoters`
 - Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoters`
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml`
@@ -91,8 +91,8 @@ must not be used as automatic sequence deduplication rules.
 - Route note: This lane extracts native `source_record` views with
   `seq_mean` pooling and requests the intermediate block mean, output-layer
   mean, mean-per-token log likelihood, and total log likelihood sidecars.
-  Local preflight validates the config, resolves the Notify event path, and
-  reports all vectors/scalars missing as expected before Evo2 batch execution.
+  Local preflight validates the config, resolves the Notify event path, and the
+  current completion inventory reports zero missing vectors/scalars.
 
 ### Construct Native/Core60/Context
 
@@ -118,7 +118,7 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `control-plane`
 - Surface role: `feature-extraction`
 - Owner-boundary: `infer`
-- Current state: `configured_preflight_ready`
+- Current state: `local_complete`
 - Entry artifact: `usr_regulondb_native_promoter_core60`
 - Exit artifact: `_derived/infer` sidecars under `usr_regulondb_native_promoter_core60`
 - Config: `src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml`
@@ -127,6 +127,8 @@ must not be used as automatic sequence deduplication rules.
   `core60_mean` pooling from the materialized core60 dataset. It
   requests the same intermediate block mean, output-layer mean, mean-per-token
   log likelihood, and total log likelihood sidecars as the native/full lane.
+  The current completion inventory reports zero missing vectors/scalars; alias
+  rows remain view-level while duplicate physical 60 bp payload rows are reused.
 
 ### Fill Remaining Infer
 
@@ -152,15 +154,18 @@ must not be used as automatic sequence deduplication rules.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `configured_planned_features`
+- Current state: `local_feature_review_ready`
 - Entry artifact: native/full and later core60 7B vector and scalar feature surfaces
 - Workspace: `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel`
 - Binding: `docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml`
 - Route note: Native cohorts use `regulondb__*` fields. They must not derive
   DenseGen metadata or alias native sigma factors into `sig35_variant`.
-  Current feature views are declared as planned so workspace validation and the
-  partial workspace snapshot can run before Evo2 sidecars exist. The native/full
-  and core60 contracts both name intermediate embeddings, output-layer means,
-  and log-likelihood scalar diagnostics. The partial snapshot is metadata-valid
-  but should report core60 sources and decision deliverables as pending until
-  Construct and Infer outputs exist.
+  The native/full and core60 contracts both name intermediate embeddings,
+  output-layer means, and log-likelihood scalar diagnostics from Infer sidecars.
+  Native `seq_mean` and core60 mean are sequence-position means over
+  causal/prefix-conditioned Evo2 token states in the emitted forward
+  orientation: native rows pool the 81 bp source-record window, while core60
+  rows pool the derived 60 bp TSS-upstream analysis window.
+  The current local snapshot is feature-backed and reports the primary
+  decision deliverables as current; future missing sidecars must be expressed
+  through explicit planned source roles, not hidden fallback behavior.

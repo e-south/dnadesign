@@ -8,26 +8,32 @@ offline. It does not create USR datasets or study records.
 
 from __future__ import annotations
 
-import csv
 import json
-import re
 from dataclasses import asdict, fields, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from .promoter_associations import (
+    discover_dnadesign_data_promoter_association_sources,
+    parse_promoter_association_source_file,
+    parse_regulondb_network_tf_tu_associations,  # noqa: F401
+    parse_regulondb_tf_riset_associations,  # noqa: F401
+)
 from .promoter_contracts import (
     _RELATION_NAMES,
     PROMOTER_EXPORT_SCHEMA_VERSION,
     PROMOTER_PARSER_VERSION,
     GeneRef,
     OperonRef,
+    PromoterAssociationSourceFile,  # noqa: F401
     PromoterBox,
     PromoterCollectionSummary,
     PromoterDescriptor,
     PromoterExportManifest,
     PromoterQuery,
     PromoterRecord,
+    PromoterRegulatoryAssociation,
     PromoterRegulatorySite,
     PromoterSchemaError,
     PromoterSigmaAffiliation,
@@ -45,40 +51,7 @@ from .promoter_payloads import (
     _text_or_none,
     parse_regulondb_promoter_payload,
 )
-
-
-def _normalized_table_key(value: str) -> str:
-    normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
-    return re.sub(r"^\d+_", "", normalized)
-
-
-def _normalized_table_row(row: Mapping[str, Any]) -> dict[str, str]:
-    normalized: dict[str, str] = {}
-    for key, value in row.items():
-        norm = _normalized_table_key(str(key))
-        if norm:
-            normalized[norm] = "" if value is None else str(value)
-    return normalized
-
-
-def _table_value(row: Mapping[str, str], *aliases: str) -> str | None:
-    for alias in aliases:
-        value = _text_or_none(row.get(_normalized_table_key(alias)))
-        if value is not None:
-            return value
-    return None
-
-
-def _split_table_list(value: str | None) -> tuple[str, ...]:
-    text = _text_or_none(value)
-    if text is None:
-        return ()
-    return tuple(part.strip() for part in re.split(r"[;,|]", text) if part.strip())
-
-
-def _missing_table_value(value: str | None) -> bool:
-    text = str(value or "").strip()
-    return not text or text.casefold() in {"none", "null", "nan", "na"}
+from .promoter_tables import _iter_delimited_data_rows, _missing_table_value, _split_table_list, _table_value
 
 
 def _local_box_payload(row: Mapping[str, str], *, kind: str) -> dict[str, Any] | None:
@@ -160,28 +133,6 @@ def _local_promoter_payload(row: Mapping[str, str]) -> dict[str, Any]:
     if operon_id is not None or operon_name is not None:
         payload["operon"] = {"_id": operon_id, "name": operon_name}
     return payload
-
-
-def _iter_delimited_data_rows(path: Path, *, delimiter: str) -> Iterable[tuple[int, dict[str, str]]]:
-    header: list[str] | None = None
-    with path.open(encoding="utf-8", newline="") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            stripped = line.strip()
-            if not stripped or stripped.lstrip('"').startswith("#"):
-                continue
-            values = next(csv.reader([line], delimiter=delimiter))
-            if not values or str(values[0]).strip().startswith("#"):
-                continue
-            if header is None:
-                header = values
-                continue
-            if len(values) < len(header):
-                values = [*values, *([""] * (len(header) - len(values)))]
-            yield line_number, _normalized_table_row(dict(zip(header, values, strict=False)))
-
-
-def _iter_tsv_data_rows(path: Path) -> Iterable[tuple[int, dict[str, str]]]:
-    return _iter_delimited_data_rows(path, delimiter="\t")
 
 
 def _parse_regulondb_promoter_set_rows(
@@ -377,6 +328,8 @@ def export_dnadesign_data_promoter_superset(
     *,
     data_root: Path | None = None,
     provider: Any | None = None,
+    association_provider: Any | None = None,
+    require_association_sources: bool = False,
     fetched_at: datetime | None = None,
 ) -> PromoterExportManifest:
     """Export a single provenance-qualified promoter superset from dnadesign-data.
@@ -390,7 +343,13 @@ def export_dnadesign_data_promoter_superset(
 
     resolved_root = _resolve_dnadesign_data_root(data_root)
     sources = discover_dnadesign_data_promoter_sources(data_root=resolved_root, provider=provider)
+    association_sources = discover_dnadesign_data_promoter_association_sources(
+        data_root=resolved_root,
+        provider=association_provider,
+        required=require_association_sources,
+    )
     records: list[PromoterRecord] = []
+    associations: list[PromoterRegulatoryAssociation] = []
     skipped_source_rows: list[SkippedPromoterSourceRow] = []
     source_inventory_rows: list[dict[str, Any]] = []
     for source in sources:
@@ -421,6 +380,26 @@ def export_dnadesign_data_promoter_superset(
                 "skipped_reason": None,
             }
         )
+    for source in association_sources:
+        parsed_associations = parse_promoter_association_source_file(
+            source,
+            data_root=resolved_root,
+            fetched_at=fetched_at,
+        )
+        associations.extend(parsed_associations)
+        source_inventory_rows.append(
+            {
+                **_source_file_dict(source),
+                "parsed_record_count": 0,
+                "skipped_record_count": 0,
+                "parsed_association_count": len(parsed_associations),
+                "skipped_reason": None,
+            }
+        )
+    if require_association_sources and not associations:
+        raise PromoterSchemaError(
+            "No promoter regulatory associations were parsed from required promoter association sources."
+        )
     if not records:
         raise PromoterSchemaError(
             "No base-row-capable promoter records were parsed from dnadesign-data source descriptors."
@@ -431,7 +410,7 @@ def export_dnadesign_data_promoter_superset(
         destination,
         query=PromoterQuery(
             source_release_policy="declared",
-            routes=tuple(source.source_id for source in sources),
+            routes=tuple(source.source_id for source in (*sources, *association_sources)),
             include_relations=True,
             source_stratum="dnadesign_data_superset",
         ),
@@ -440,6 +419,13 @@ def export_dnadesign_data_promoter_superset(
         skipped_source_rows=skipped_source_rows,
     )
     _write_json(destination / "source_files.json", [_source_file_dict(source) for source in sources])
+    _write_json(
+        destination / "association_source_files.json", [_source_file_dict(source) for source in association_sources]
+    )
+    _write_jsonl(
+        destination / "promoter_regulatory_associations.jsonl",
+        (promoter_regulatory_association_to_dict(association) for association in associations),
+    )
     _write_json(destination / "source_file_inventory.json", source_inventory_rows)
     manifest = PromoterExportManifest(
         schema_version=manifest.schema_version,
@@ -453,6 +439,8 @@ def export_dnadesign_data_promoter_superset(
         artifacts={
             **manifest.artifacts,
             "source_files": "source_files.json",
+            "association_source_files": "association_source_files.json",
+            "promoter_regulatory_associations": "promoter_regulatory_associations.jsonl",
             "source_file_inventory": "source_file_inventory.json",
             "skipped_source_rows": "skipped_source_rows.jsonl",
         },
@@ -875,6 +863,10 @@ def skipped_source_row_to_dict(row: SkippedPromoterSourceRow) -> dict[str, Any]:
     return _jsonable(row)
 
 
+def promoter_regulatory_association_to_dict(row: PromoterRegulatoryAssociation) -> dict[str, Any]:
+    return _jsonable(row)
+
+
 def skipped_source_row_from_dict(data: Mapping[str, Any]) -> SkippedPromoterSourceRow:
     return SkippedPromoterSourceRow(
         source=str(data["source"]),
@@ -890,6 +882,42 @@ def skipped_source_row_from_dict(data: Mapping[str, Any]) -> SkippedPromoterSour
         source_row_ref=str(data["source_row_ref"]),
         raw_payload_sha256=str(data["raw_payload_sha256"]),
         query_sha256=str(data["query_sha256"]),
+        parser_version=str(data.get("parser_version") or PROMOTER_PARSER_VERSION),
+        export_schema_version=str(data.get("export_schema_version") or PROMOTER_EXPORT_SCHEMA_VERSION),
+    )
+
+
+def promoter_regulatory_association_from_dict(data: Mapping[str, Any]) -> PromoterRegulatoryAssociation:
+    return PromoterRegulatoryAssociation(
+        source=str(data["source"]),
+        source_release=str(data["source_release"]),
+        source_release_date=_text_or_none(data.get("source_release_date")),
+        source_route=str(data["source_route"]),
+        source_table=_text_or_none(data.get("source_table")),
+        source_stratum=str(data["source_stratum"]),
+        source_row_ref=str(data["source_row_ref"]),
+        regulatory_interaction_id=str(data["regulatory_interaction_id"]),
+        promoter_id=_text_or_none(data.get("promoter_id")),
+        promoter_name=_text_or_none(data.get("promoter_name")),
+        regulated_entity_name=_text_or_none(data.get("regulated_entity_name")),
+        regulator_id=_text_or_none(data.get("regulator_id")),
+        regulator_name=_text_or_none(data.get("regulator_name")),
+        regulator_abbrev=_text_or_none(data.get("regulator_abbrev")),
+        regulon_id=_text_or_none(data.get("regulon_id")),
+        regulon_name=_text_or_none(data.get("regulon_name")),
+        target_type=_text_or_none(data.get("target_type")),
+        function=_text_or_none(data.get("function")),
+        mechanism=_text_or_none(data.get("mechanism")),
+        confidence=_text_or_none(data.get("confidence")),
+        evidence=_tuple_str(data.get("evidence")),
+        citation_refs=_tuple_str(data.get("citation_refs")),
+        binding_site_id=_text_or_none(data.get("binding_site_id")),
+        binding_site_sequence=_text_or_none(data.get("binding_site_sequence")),
+        binding_site_strand=_text_or_none(data.get("binding_site_strand")),
+        binding_interval_0based=_tuple_interval(data.get("binding_interval_0based")),
+        binding_raw_coordinates=dict(data.get("binding_raw_coordinates") or {}),
+        raw_payload_sha256=_text_or_none(data.get("raw_payload_sha256")),
+        query_sha256=_text_or_none(data.get("query_sha256")),
         parser_version=str(data.get("parser_version") or PROMOTER_PARSER_VERSION),
         export_schema_version=str(data.get("export_schema_version") or PROMOTER_EXPORT_SCHEMA_VERSION),
     )
@@ -1098,6 +1126,23 @@ def load_skipped_promoter_source_rows(export_dir: Path) -> list[SkippedPromoterS
         return []
     return [
         skipped_source_row_from_dict(json.loads(line))
+        for line in artifact_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+def load_promoter_regulatory_associations(export_dir: Path) -> list[PromoterRegulatoryAssociation]:
+    manifest_path = export_dir / "manifest.json"
+    artifact_path = export_dir / "promoter_regulatory_associations.jsonl"
+    if manifest_path.exists():
+        manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        artifact_name = (manifest_payload.get("artifacts") or {}).get("promoter_regulatory_associations")
+        if artifact_name:
+            artifact_path = export_dir / str(artifact_name)
+    if not artifact_path.exists():
+        return []
+    return [
+        promoter_regulatory_association_from_dict(json.loads(line))
         for line in artifact_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]

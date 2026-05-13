@@ -4,6 +4,8 @@ Shared scoped-matrix helpers for latentdna view-backed artifacts.
 
 from __future__ import annotations
 
+from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +16,88 @@ from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_table
 from ..workspaces.loader import WorkspaceContext
+
+_SAMPLE_SCOPE_CACHE_MAX_ENTRY_BYTES = 128 * 1024**2
+_SAMPLE_SCOPE_CACHE_MAX_TOTAL_BYTES = 512 * 1024**2
+_SAMPLE_SCOPE_CACHE_MAX_ENTRIES = 16
+
+
+@dataclass(frozen=True, slots=True)
+class _PathStamp:
+    path: str
+    size: int
+    mtime_ns: int
+
+
+@dataclass(frozen=True, slots=True)
+class _SampleScopeCacheKey:
+    workspace_id: str
+    view_id: str
+    sample_id: str
+    record_key: str
+    matrix: _PathStamp
+    view_rows: _PathStamp
+    sample_rows: _PathStamp
+    manifest: _PathStamp
+
+
+_SAMPLE_SCOPE_CACHE: OrderedDict[_SampleScopeCacheKey, tuple[np.ndarray, pa.Table]] = OrderedDict()
+_SAMPLE_SCOPE_CACHE_BYTES = 0
+
+
+def _path_stamp(path: Path) -> _PathStamp:
+    stat = path.stat()
+    return _PathStamp(path=path.resolve().as_posix(), size=stat.st_size, mtime_ns=stat.st_mtime_ns)
+
+
+def _sample_scope_cache_key(
+    context: WorkspaceContext,
+    *,
+    view_id: str,
+    sample_id: str,
+    record_key: str,
+    matrix_path: Path,
+    rows_path: Path,
+    sample_rows_path: Path,
+    manifest_path: Path,
+) -> _SampleScopeCacheKey:
+    return _SampleScopeCacheKey(
+        workspace_id=context.workspace_id,
+        view_id=view_id,
+        sample_id=sample_id,
+        record_key=record_key,
+        matrix=_path_stamp(matrix_path),
+        view_rows=_path_stamp(rows_path),
+        sample_rows=_path_stamp(sample_rows_path),
+        manifest=_path_stamp(manifest_path),
+    )
+
+
+def _cache_sample_scope(key: _SampleScopeCacheKey, matrix: np.ndarray, rows: pa.Table) -> None:
+    global _SAMPLE_SCOPE_CACHE_BYTES
+    entry_bytes = int(matrix.nbytes)
+    if entry_bytes > _SAMPLE_SCOPE_CACHE_MAX_ENTRY_BYTES:
+        return
+    while _SAMPLE_SCOPE_CACHE and (
+        len(_SAMPLE_SCOPE_CACHE) >= _SAMPLE_SCOPE_CACHE_MAX_ENTRIES
+        or _SAMPLE_SCOPE_CACHE_BYTES + entry_bytes > _SAMPLE_SCOPE_CACHE_MAX_TOTAL_BYTES
+    ):
+        _, (evicted_matrix, _) = _SAMPLE_SCOPE_CACHE.popitem(last=False)
+        _SAMPLE_SCOPE_CACHE_BYTES -= int(evicted_matrix.nbytes)
+    if entry_bytes > _SAMPLE_SCOPE_CACHE_MAX_TOTAL_BYTES:
+        return
+    cached_matrix = np.ascontiguousarray(matrix, dtype=np.float32)
+    cached_matrix.setflags(write=False)
+    _SAMPLE_SCOPE_CACHE[key] = (cached_matrix, rows)
+    _SAMPLE_SCOPE_CACHE_BYTES += int(cached_matrix.nbytes)
+
+
+def clear_scope_caches() -> None:
+    """Clear process-local scoped matrix caches."""
+
+    global _SAMPLE_SCOPE_CACHE_BYTES
+    _SAMPLE_SCOPE_CACHE.clear()
+    _SAMPLE_SCOPE_CACHE_BYTES = 0
 
 
 def _ordered_indices(view_rows: list[dict], sample_rows: list[dict], *, record_key: str) -> list[int]:
@@ -56,6 +140,14 @@ def view_artifact_paths(context: WorkspaceContext, view_id: str) -> tuple[Path, 
     return matrix_path, rows_path, manifest
 
 
+def _view_artifact_paths_with_manifest_path(
+    context: WorkspaceContext,
+    view_id: str,
+) -> tuple[Path, Path, Path, dict[str, object]]:
+    matrix_path, rows_path, manifest, _, _ = _matrix_source_paths(context, view_id=view_id, reduced_view_id=None)
+    return matrix_path, rows_path, rows_path.parent / "manifest.json", manifest
+
+
 def matrix_input_digest_path(
     context: WorkspaceContext,
     *,
@@ -82,16 +174,35 @@ def _sample_scope(
     *,
     sample_id: str,
 ) -> tuple[np.ndarray, pa.Table, str, str | None]:
-    matrix_path, rows_path, manifest = view_artifact_paths(context, view_id)
+    matrix_path, rows_path, manifest_path, manifest = _view_artifact_paths_with_manifest_path(context, view_id)
     sample_rows_path = context.output_root / "samples" / sample_id / "rows.parquet"
     if not sample_rows_path.exists():
         raise MissingArtifactError(f"sample artifact is missing for scoped view access: {sample_id}")
+    record_key = str(manifest["params"]["record_key"])
+    cache_key = _sample_scope_cache_key(
+        context,
+        view_id=view_id,
+        sample_id=sample_id,
+        record_key=record_key,
+        matrix_path=matrix_path,
+        rows_path=rows_path,
+        sample_rows_path=sample_rows_path,
+        manifest_path=manifest_path,
+    )
+    cached = _SAMPLE_SCOPE_CACHE.get(cache_key)
+    if cached is not None:
+        _SAMPLE_SCOPE_CACHE.move_to_end(cache_key)
+        cached_matrix, cached_rows = cached
+        return cached_matrix, cached_rows, "sample_set", sample_id
+
     matrix = np.asarray(read_matrix(matrix_path), dtype=np.float32)
     view_rows = read_table(rows_path).to_pylist()
     sample_rows = read_table(sample_rows_path).to_pylist()
-    record_key = str(manifest["params"]["record_key"])
     indices = _ordered_indices(view_rows, sample_rows, record_key=record_key)
-    return np.asarray(matrix[indices], dtype=np.float32), pa.Table.from_pylist(sample_rows), "sample_set", sample_id
+    scoped_matrix = np.ascontiguousarray(np.asarray(matrix[indices], dtype=np.float32))
+    rows = pa.Table.from_pylist(sample_rows)
+    _cache_sample_scope(cache_key, scoped_matrix, rows)
+    return scoped_matrix, rows, "sample_set", sample_id
 
 
 def _group_candidate_rows(candidate_rows: pa.Table, *, key_columns: list[str]) -> dict[tuple[object, ...], list[int]]:

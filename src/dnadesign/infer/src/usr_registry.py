@@ -42,6 +42,8 @@ _FEATURE_BUNDLE_METADATA_TYPES: dict[str, str] = {
     "metadata__intermediate_selector": "string",
     "metadata__pooling_modes": "list<string>",
     "metadata__forward_pass_key": "string",
+    "metadata__runtime_fingerprint_key": "string",
+    "metadata__sequence_case_policy": "string",
     "metadata__feature_vector_key": "string",
     "metadata__parent_sequence_id": "string",
     "metadata__derivation_id": "string",

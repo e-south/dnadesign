@@ -175,9 +175,7 @@ def test_view_materialize_memory_preflight_override_records_attention(tmp_path: 
     assert manifest["params"]["memory_preflight"]["state"] == "blocked"
 
 
-def test_view_materialize_memory_preflight_keeps_streaming_full_population_batch_bounded(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_view_materialize_memory_preflight_accounts_for_resident_memmap_pages(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = _prepare_unmaterialized_workspace(tmp_path)
     context = load_workspace_config(workspace_dir)
     monkeypatch.setattr(memory_service, "system_ram_bytes", lambda: 16 * 1024**3)
@@ -191,9 +189,11 @@ def test_view_materialize_memory_preflight_keeps_streaming_full_population_batch
     preflight = memory_service.evaluate_materialize_preflight(context, view_id="z_demo")
 
     expected_batch_bytes = 2048 * 8192 * 4
-    assert preflight.estimated_peak_bytes == expected_batch_bytes * 2
-    assert preflight.state == "ok"
-    assert "disk-backed" in " ".join(preflight.notes)
+    expected_output_bytes = 157164 * 8192 * 4
+    expected_peak = int(expected_output_bytes * 2.25) + (expected_batch_bytes * 2)
+    assert preflight.estimated_peak_bytes == expected_peak
+    assert preflight.state == "warning"
+    assert "resident" in " ".join(preflight.notes)
 
 
 def test_recipe_run_passes_memory_override_to_view_materialize_step(tmp_path: Path, monkeypatch) -> None:

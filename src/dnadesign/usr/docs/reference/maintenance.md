@@ -1,7 +1,7 @@
 # USR maintenance patterns
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-26
+**Last verified:** 2026-04-29
 
 
 This page captures common maintenance commands that mutate or package dataset state.
@@ -50,6 +50,9 @@ uv run usr maintenance registry-freeze densegen_demo
 # Compact overlay parts for one namespace.
 uv run usr maintenance overlay-compact densegen_demo --namespace densegen
 
+# Refresh a compact overlay's registry metadata after registry-only drift.
+uv run usr maintenance overlay-refresh-metadata densegen_demo --namespace densegen
+
 # Project one namespace from a source dataset onto a downstream dataset by join key.
 uv run usr maintenance overlay-project \
   --src densegen_demo \
@@ -71,6 +74,19 @@ Compaction retention contract:
 - Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
 - Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run usr state ...`.
 - `overlay-project` is the safe repair path when downstream handoff datasets must inherit authoritative overlay metadata after merge, construct, or infer without rewriting `records.parquet` or disturbing unrelated namespaces such as `infer`.
+
+Registry-metadata refresh contract:
+
+- Use `overlay-refresh-metadata` only for compact overlays at `_derived/<namespace>.parquet`.
+- The command streams the existing overlay rows through the current registry metadata without changing base rows, overlay values, or join keys.
+- It fails fast for part-directory overlays at `_derived/<namespace>/`; run `overlay-compact` there because compaction changes artifact layout.
+- Before refreshing, confirm that namespace-level compatibility still holds:
+
+```bash
+uv run usr validate <dataset> --strict --registry-mode namespace-current
+```
+
+If namespace-current validation passes but default strict validation reports an `Overlay registry_hash mismatch`, the overlay data and namespace contract are compatible; the compact overlay is carrying a stale full-registry stamp and can be refreshed.
 
 ## Event-log gardening
 

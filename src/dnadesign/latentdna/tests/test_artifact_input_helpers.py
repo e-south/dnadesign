@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.latentdna.src.io.hashing import sha256_file
+from dnadesign.latentdna.src.metrics.definitions import metric_definition_digests
 from dnadesign.latentdna.src.services._artifact_inputs import (
     artifact_kind_for_input_dependency,
     dependency_artifact_input,
@@ -23,6 +24,142 @@ from dnadesign.latentdna.src.sources.provenance import (
     overlay_ledger_payload_digest,
 )
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
+
+
+def _write_metric_definition_workspace(workspace_dir: Path, *, display_name: str = "Demo workspace metric") -> None:
+    (workspace_dir / "config.yaml").write_text(
+        f"""
+schema_version: latentdna.workspace.v1
+workspace:
+  id: scalar_metric_definition_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+metadata:
+  include: []
+sources: {{}}
+metric_definitions:
+  demo_workspace_metric:
+    display_name: {display_name!r}
+    mathematical_definition: Mean configured demo score over materialized rows.
+    metric_family: demo
+    evidence_tier: appendix
+    unit: score
+    direction: descriptive
+    aggregation_level: scalar_summary
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_scalar_metric_artifact(
+    workspace_dir: Path,
+    *,
+    params: dict[str, object] | None = None,
+) -> Path:
+    stable_input = workspace_dir / "inputs" / "stable-source.txt"
+    stable_input.parent.mkdir(parents=True, exist_ok=True)
+    stable_input.write_text("stable\n", encoding="utf-8")
+    scalar_dir = workspace_dir / "outputs" / "scalars" / "demo_scalar"
+    scalar_dir.mkdir(parents=True, exist_ok=True)
+    pq.write_table(
+        pa.table(
+            {
+                "metric_id": ["demo_workspace_metric"],
+                "metric_value": [1.0],
+                "display_name": ["Demo workspace metric"],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    (scalar_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "scalar_table",
+                "artifact_id": "demo_scalar",
+                "status": "ok",
+                "inputs": [
+                    {
+                        "kind": "source",
+                        "id": "stable-source",
+                        "path": stable_input.as_posix(),
+                        "digest": sha256_file(stable_input),
+                    }
+                ],
+                "params": params or {},
+                "outputs": [{"path": "table.parquet", "media_type": "application/x-parquet"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return scalar_dir / "manifest.json"
+
+
+def _write_scalar_build_recipe_workspace(workspace_dir: Path, *, pairwise_max_rows: int) -> None:
+    (workspace_dir / "config.yaml").write_text(
+        f"""
+schema_version: latentdna.workspace.v1
+workspace:
+  id: scalar_build_freshness_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+sources: {{}}
+recipes:
+  demo_recipe:
+    steps:
+      - id: build_demo_scalar
+        op: scalar.build
+        params:
+          scalar: demo_scalar
+          kind: representation_health_summary
+          pairwise_max_rows: {pairwise_max_rows}
+          pairwise_seed: 17
+          candidates: []
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_scalar_build_artifact(workspace_dir: Path, *, pairwise_max_rows: int) -> Path:
+    stable_input = workspace_dir / "inputs" / "stable-source.txt"
+    stable_input.parent.mkdir(parents=True, exist_ok=True)
+    stable_input.write_text("stable\n", encoding="utf-8")
+    scalar_dir = workspace_dir / "outputs" / "scalars" / "demo_scalar"
+    scalar_dir.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.table({"label": ["demo"], "value": [1.0]}), scalar_dir / "table.parquet")
+    (scalar_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "scalar_table",
+                "artifact_id": "demo_scalar",
+                "status": "ok",
+                "inputs": [
+                    {
+                        "kind": "source",
+                        "id": "stable-source",
+                        "path": stable_input.as_posix(),
+                        "digest": sha256_file(stable_input),
+                    }
+                ],
+                "params": {
+                    "builder_kind": "representation_health_summary",
+                    "pairwise_max_rows": pairwise_max_rows,
+                    "pairwise_seed": 17,
+                    "candidates": [],
+                },
+                "outputs": [{"path": "table.parquet", "media_type": "application/x-parquet"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return scalar_dir / "manifest.json"
 
 
 def test_dependency_artifact_input_uses_manifest_for_managed_artifacts(tmp_path: Path) -> None:
@@ -65,6 +202,63 @@ def test_artifact_kind_for_input_dependency_maps_shared_input_kinds() -> None:
     assert artifact_kind_for_input_dependency("view_matrix") == "view"
     assert artifact_kind_for_input_dependency("neighbor_rows") == "neighbor_set"
     assert artifact_kind_for_input_dependency("landmark_source") is None
+
+
+def test_scalar_freshness_requires_metric_definition_provenance(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_metric_definition_workspace(workspace_dir)
+    _write_scalar_metric_artifact(workspace_dir)
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    freshness = evaluate_artifact_freshness(context, artifact_kind="scalar_table", artifact_id="demo_scalar")
+
+    assert freshness["status"] == "attention"
+    assert "metric definition provenance" in str(freshness["reason"])
+
+
+def test_scalar_freshness_detects_metric_definition_drift(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_metric_definition_workspace(workspace_dir)
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    _write_scalar_metric_artifact(
+        workspace_dir,
+        params={
+            "metric_definition_digests": metric_definition_digests(
+                ["demo_workspace_metric"],
+                config=context.config,
+            )
+        },
+    )
+
+    freshness = evaluate_artifact_freshness(context, artifact_kind="scalar_table", artifact_id="demo_scalar")
+    assert freshness["status"] == "ok"
+
+    _write_metric_definition_workspace(workspace_dir, display_name="Renamed demo workspace metric")
+    drifted_context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    drifted = evaluate_artifact_freshness(drifted_context, artifact_kind="scalar_table", artifact_id="demo_scalar")
+
+    assert drifted["status"] == "attention"
+    assert "demo_workspace_metric" in str(drifted["reason"])
+
+
+def test_scalar_freshness_detects_build_recipe_param_drift(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_scalar_build_recipe_workspace(workspace_dir, pairwise_max_rows=64)
+    _write_scalar_build_artifact(workspace_dir, pairwise_max_rows=64)
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    freshness = evaluate_artifact_freshness(context, artifact_kind="scalar_table", artifact_id="demo_scalar")
+    assert freshness["status"] == "ok"
+
+    _write_scalar_build_recipe_workspace(workspace_dir, pairwise_max_rows=128)
+    drifted_context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    drifted = evaluate_artifact_freshness(drifted_context, artifact_kind="scalar_table", artifact_id="demo_scalar")
+
+    assert drifted["status"] == "attention"
+    assert "stale scalar build config for scalar_table:demo_scalar" in str(drifted["reason"])
 
 
 def test_freshness_accepts_legacy_managed_input_paths_via_upstream_manifest(tmp_path: Path) -> None:
@@ -346,6 +540,9 @@ def test_view_freshness_detects_row_column_drift_from_workspace_config(tmp_path:
             {
                 "id": ["row_a"],
                 "subject_id": ["row_a"],
+                "usr_label__primary": ["row_a"],
+                "densegen__plan": ["ethanol__sig35=b"],
+                "densegen__used_tfbs_detail": ['[{"part_kind":"fixed_element","spacer_length":17}]'],
                 "embedding": [[0.1, 0.2]],
             }
         ),
@@ -369,6 +566,15 @@ sources:
     subject_key: subject_id
 metadata:
   include: [spacer_length]
+  derivations:
+    spacer_length:
+      kind: annotation
+      source: row
+      handler: dnadesign.latentdna.src.views.promoter_metadata:derive_promoter_metadata_value
+      derive: spacer_length
+      required_columns: [densegen__plan, densegen__used_tfbs_detail, usr_label__primary]
+      missing_policy: error
+      value_type: int64
 views:
   demo_view:
     source: anchor_60bp
@@ -376,11 +582,6 @@ views:
       kind: column
       name: embedding
     coordinate_space_id: demo_space
-cohorts:
-  spacer_length:
-    kind: promoter_metadata
-    source: anchor_60bp
-    derive: spacer_length
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -561,7 +762,7 @@ views:
     assert freshness["known"] is True
 
 
-def test_view_freshness_ignores_promoter_metadata_cohorts_from_other_sources(tmp_path: Path) -> None:
+def test_view_freshness_scopes_metadata_requirements_to_materialized_source(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     anchor_path = workspace_dir / "inputs" / "anchor.parquet"
@@ -619,11 +820,6 @@ views:
       kind: column
       name: embedding
     coordinate_space_id: demo_space
-cohorts:
-  spacer_length:
-    kind: promoter_metadata
-    source: anchor_60bp
-    derive: spacer_length
         """.strip()
         + "\n",
         encoding="utf-8",

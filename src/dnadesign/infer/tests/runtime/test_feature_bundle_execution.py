@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -27,18 +28,23 @@ from dnadesign.infer.src.features.aliases import (
     FEATURE_ALIAS_RELATIVE_PATH,
     FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
     FEATURE_SCALAR_RELATIVE_PATH,
+    FEATURE_VECTOR_RELATIVE_PATH,
 )
 from dnadesign.infer.src.features.context import resolve_sequence_contexts
+from dnadesign.infer.src.features.contracts import SequenceContextRecord
 from dnadesign.infer.src.features.execution import (
     _LOG_LIKELIHOOD_MEAN,
     _LOG_LIKELIHOOD_TOTAL,
     _OUTPUT_LAYER_SEQ_MEAN,
     _apply_digest_resume_guard,
     _existing_feature_metadata_values,
+    _feature_bundle_log_likelihoods,
+    _pool_tensor_for_context,
     build_feature_bundle_outputs,
     execute_feature_bundle,
     feature_metadata_output_ids,
 )
+from dnadesign.infer.src.features.shard_ledger import SHARD_STATUS_COMMITTED, load_shard_ledger
 from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 
@@ -88,6 +94,22 @@ class _CombinedFeatureAdapter(_FeatureAdapter):
         logits = [torch.arange(len(seq) * 2, dtype=torch.float32).reshape(len(seq), 2) for seq in seqs]
         embeddings = [torch.arange(len(seq) * 3, dtype=torch.float32).reshape(len(seq), 3) for seq in seqs]
         return logits, embeddings
+
+
+class _CombinedLogLikelihoodFeatureAdapter(_CombinedFeatureAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.combined_log_likelihood_batches: list[list[str]] = []
+
+    def log_likelihood(self, seqs, *, method: str = "native", reduction: str = "sum"):
+        raise AssertionError("feature bundle should use combined total/mean log-likelihood path when available")
+
+    def log_likelihood_total_and_mean(self, seqs, *, method: str = "native"):
+        assert method == "native"
+        self.combined_log_likelihood_batches.append(list(seqs))
+        totals = [float(len(seq) - 1) for seq in seqs]
+        means = [1.0 if len(seq) > 1 else float("nan") for seq in seqs]
+        return totals, means
 
 
 class _CountingFeatureAdapter(_FeatureAdapter):
@@ -161,6 +183,120 @@ def _anchor_only_bundle():
     return bundle
 
 
+def test_sequence_view_pooling_means_over_positions_not_features() -> None:
+    embeddings = torch.tensor(
+        [
+            [0.0, 1.0, 2.0],
+            [10.0, 11.0, 12.0],
+            [20.0, 21.0, 22.0],
+            [30.0, 31.0, 32.0],
+        ],
+        dtype=torch.float32,
+    )
+    context = SequenceContextRecord(
+        sequence_id="toy_forward_context",
+        anchor_id="toy_anchor",
+        context_id="toy_context",
+        context_kind="template_1kb",
+        template_id=None,
+        resolved_sequence="ACGT",
+        resolved_length=4,
+        anchor_start=1,
+        anchor_end=3,
+        anchor_orientation="forward",
+        construct_version=None,
+        is_wildtype=None,
+        pooling_operation="anchor_mean",
+        pooling_start_0=1,
+        pooling_end_0=3,
+    )
+
+    pooled = _pool_tensor_for_context(embeddings, context=context)
+
+    _assert_list_close(pooled, [15.0, 16.0, 17.0])
+
+
+def _sequence_context_record(
+    *,
+    sequence: str,
+    start_0: int,
+    end_0: int,
+    orientation: str = "forward",
+) -> SequenceContextRecord:
+    return SequenceContextRecord(
+        sequence_id=f"toy_{orientation}_context",
+        anchor_id="toy_anchor",
+        context_id=f"toy_{orientation}_context",
+        context_kind="template_1kb",
+        template_id=None,
+        resolved_sequence=sequence,
+        resolved_length=len(sequence),
+        anchor_start=start_0,
+        anchor_end=end_0,
+        anchor_orientation=orientation,
+        construct_version=None,
+        is_wildtype=None,
+        pooling_operation="anchor_mean",
+        pooling_start_0=start_0,
+        pooling_end_0=end_0,
+    )
+
+
+def _prefix_conditioned_toy_hidden_states(sequence: str) -> torch.Tensor:
+    totals = {"A": 0.0, "C": 0.0, "G": 0.0, "T": 0.0}
+    rows: list[list[float]] = []
+    for position, base in enumerate(sequence.upper(), start=1):
+        totals[base] += 1.0
+        rows.append([totals["A"], totals["C"], totals["G"], totals["T"], float(position)])
+    return torch.tensor(rows, dtype=torch.float32)
+
+
+def test_forward_anchor_pooling_is_downstream_blind_for_prefix_conditioned_states() -> None:
+    sequence = "ACGTACGTACGT"
+    mutated_downstream = sequence[:8] + "TTTT"
+    context = _sequence_context_record(sequence=sequence, start_0=2, end_0=8)
+    mutated_context = _sequence_context_record(sequence=mutated_downstream, start_0=2, end_0=8)
+
+    pooled = _pool_tensor_for_context(_prefix_conditioned_toy_hidden_states(sequence), context=context)
+    pooled_mutated = _pool_tensor_for_context(
+        _prefix_conditioned_toy_hidden_states(mutated_downstream),
+        context=mutated_context,
+    )
+
+    _assert_list_close(pooled, pooled_mutated)
+
+
+def test_reverse_complement_anchor_pooling_is_original_upstream_blind_for_prefix_conditioned_states() -> None:
+    sequence = "AACCGGTTAACCGGTT"
+    mutated_upstream = "TTTT" + sequence[4:]
+    start_0 = 4
+    end_0 = 10
+    rc_sequence = str(Seq(sequence).reverse_complement())
+    rc_mutated_upstream = str(Seq(mutated_upstream).reverse_complement())
+    rc_start_0 = len(sequence) - end_0
+    rc_end_0 = len(sequence) - start_0
+    context = _sequence_context_record(
+        sequence=rc_sequence,
+        start_0=rc_start_0,
+        end_0=rc_end_0,
+        orientation="reverse_complement",
+    )
+    mutated_context = _sequence_context_record(
+        sequence=rc_mutated_upstream,
+        start_0=rc_start_0,
+        end_0=rc_end_0,
+        orientation="reverse_complement",
+    )
+
+    pooled = _pool_tensor_for_context(_prefix_conditioned_toy_hidden_states(rc_sequence), context=context)
+    pooled_mutated = _pool_tensor_for_context(
+        _prefix_conditioned_toy_hidden_states(rc_mutated_upstream),
+        context=mutated_context,
+    )
+
+    _assert_list_close(pooled, pooled_mutated)
+
+
 def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(monkeypatch) -> None:
     adapter = _FeatureAdapter()
     monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
@@ -204,6 +340,8 @@ def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(mo
             "metadata__provider_name",
             "metadata__provider_version",
             "metadata__resolved_length",
+            "metadata__runtime_fingerprint_key",
+            "metadata__sequence_case_policy",
             "metadata__sequence_id",
             "metadata__template_id",
             "metadata__timestamp",
@@ -225,6 +363,8 @@ def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(mo
     assert out["metadata__pooling_modes"] == [["seq_mean"]]
     assert out["metadata__intermediate_selector"] == ["block26_mlp_out"]
     assert out["metadata__forward_pass_key"][0]
+    assert out["metadata__runtime_fingerprint_key"][0]
+    assert out["metadata__sequence_case_policy"] == ["upper_acgt"]
     assert out["metadata__feature_vector_key"][0]
 
 
@@ -325,6 +465,38 @@ def test_run_extract_job_feature_bundle_fused_outputs_match_unfused_exactly(monk
     assert fused_adapter.combined_forward_calls == 1
     assert fused_adapter.log_likelihood_reductions == ["sum", "sum", "mean", "mean"]
     assert separate_adapter.log_likelihood_reductions == ["sum", "sum", "mean", "mean"]
+
+
+def test_feature_bundle_log_likelihoods_prefers_combined_total_mean_path() -> None:
+    adapter = _CombinedLogLikelihoodFeatureAdapter()
+
+    totals, means = _feature_bundle_log_likelihoods(adapter, ["ACGT", "AAAAAA"])
+
+    assert totals == [3.0, 5.0]
+    assert means == [1.0, 1.0]
+    assert adapter.combined_log_likelihood_batches == [["ACGT", "AAAAAA"]]
+    assert adapter.log_likelihood_reductions == []
+
+
+def test_run_extract_job_feature_bundle_uses_combined_log_likelihood_path_when_available(monkeypatch) -> None:
+    adapter = _CombinedLogLikelihoodFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="anchor_only_bundle",
+        operation="extract",
+        ingest={"source": "sequences"},
+        feature_bundle={"context": {"kind": "anchor_only"}},
+    )
+
+    out = run_extract_job(inputs=["ACGT"], model=model, job=job, progress_factory=None)
+
+    assert adapter.combined_log_likelihood_batches == [["ACGT"]]
+    assert adapter.log_likelihood_reductions == []
+    assert adapter.combined_forward_calls == 1
+    assert out["log_likelihood__total"] == [3.0]
+    assert out["log_likelihood__mean_per_token"] == pytest.approx([1.0])
 
 
 def test_run_extract_job_feature_bundle_anchor_only_20b_uses_model_specific_selector(monkeypatch) -> None:
@@ -752,6 +924,313 @@ def test_run_extract_job_feature_bundle_sequence_views_share_forward_pass_for_di
     assert {row["representation_kind"] for row in alias_table} == {"output_layer_mean", "intermediate_embedding"}
     assert len({row["feature_vector_key"] for row in alias_table}) == 4
     assert {row["pooling_operation"] for row in alias_table} == {"core60_mean", "seq_mean"}
+    events = [json.loads(line) for line in dataset.events_path.read_text(encoding="utf-8").splitlines()]
+    complete_events = [event for event in events if event["action"] == "infer_feature_bundle_complete"]
+    assert complete_events[-1]["actor"]["tool"] == "infer"
+    assert complete_events[-1]["actor"]["run_id"] == "infer-reference_view_bundle"
+    assert complete_events[-1]["args"]["contexts_completed"] == 2
+    assert complete_events[-1]["args"]["unique_forward_passes"] == 1
+    assert complete_events[-1]["args"]["required_vector_keys"] == 4
+    assert complete_events[-1]["args"]["required_scalar_keys"] == 0
+
+
+def test_run_extract_job_feature_bundle_core60_explicit_bounds_pool_full_native_context_once(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "native_views")
+    dataset.init(source="test", notes="native source-record core60 pooling test")
+    sequence = ("ACGT" * 20) + "A"
+    add_result = dataset.add_sequences([sequence], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="native_source_record",
+                product_kind="source_record",
+                context_kind="native_reference",
+                orientation="unknown",
+                source_dataset_id=dataset.name,
+                recommended_pooling="seq_mean",
+                created_at="2026-04-30T00:00:00+00:00",
+                created_by="test",
+            )
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="native_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "native_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "source_record", "orientation": "unknown"},
+                    "pooling": {"operation": "seq_mean"},
+                },
+                {
+                    "dataset": "native_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "source_record", "orientation": "unknown"},
+                    "pooling": {"operation": "core60_mean", "start_0": 0, "end_0": 60},
+                },
+            ],
+        },
+    )
+
+    out = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    logits = torch.arange(len(sequence) * 2, dtype=torch.float32).reshape(len(sequence), 2)
+    embeddings = torch.arange(len(sequence) * 3, dtype=torch.float32).reshape(len(sequence), 3)
+    assert adapter.logits_call_count == 1
+    assert adapter.embedding_call_count == 1
+    assert len(out["metadata__view_id"]) == 2
+    assert out["metadata__forward_pass_key"][0] == out["metadata__forward_pass_key"][1]
+    assert out["metadata__pooling_operation"] == ["seq_mean", "core60_mean"]
+    assert out["metadata__pooling_start_0"] == [None, 0]
+    assert out["metadata__pooling_end_0"] == [None, 60]
+    _assert_list_close(out["output_layer_mean__seq_mean"][0], logits.mean(dim=0).tolist())
+    _assert_list_close(out["output_layer_mean__core60_mean"][1], logits[:60].mean(dim=0).tolist())
+    _assert_list_close(
+        out["intermediate_embedding__block26_mlp_out__core60_mean"][1],
+        embeddings[:60].mean(dim=0).tolist(),
+    )
+
+
+def test_run_extract_job_feature_bundle_progress_deduplicates_shared_scalar_keys(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "native_views")
+    dataset.init(source="test", notes="native source-record scalar progress test")
+    sequences = [("ACGT" * 20) + "A", ("TGCA" * 20) + "T"]
+    add_result = dataset.add_sequences(sequences, bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=sequence_id,
+                view_name=f"native_source_record_{index}",
+                product_kind="source_record",
+                context_kind="native_reference",
+                orientation="unknown",
+                source_dataset_id=dataset.name,
+                recommended_pooling="seq_mean",
+                created_at="2026-04-30T00:00:00+00:00",
+                created_by="test",
+            )
+            for index, sequence_id in enumerate(add_result.ids)
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna", batch_size=1)
+    job = JobConfig(
+        id="native_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "sequence_view_inputs": [
+                {
+                    "dataset": "native_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "source_record", "orientation": "unknown"},
+                    "pooling": {"operation": "seq_mean"},
+                },
+                {
+                    "dataset": "native_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "source_record", "orientation": "unknown"},
+                    "pooling": {"operation": "core60_mean", "start_0": 0, "end_0": 60},
+                },
+            ],
+        },
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    events = [json.loads(line) for line in dataset.events_path.read_text(encoding="utf-8").splitlines()]
+    progress_events = [event for event in events if event["action"] == "infer_feature_bundle_progress"]
+    complete_events = [event for event in events if event["action"] == "infer_feature_bundle_complete"]
+    assert progress_events[0]["args"]["contexts_completed"] == 2
+    assert progress_events[0]["args"]["contexts_total"] == 4
+    assert progress_events[0]["args"]["required_vector_keys"] == 8
+    assert progress_events[0]["args"]["required_scalar_keys"] == 4
+    assert complete_events[-1]["args"]["required_vector_keys"] == 8
+    assert complete_events[-1]["args"]["required_scalar_keys"] == 4
+
+
+def test_run_extract_job_feature_bundle_sequence_views_emit_sparse_progress_events(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer progress test")
+    add_result = dataset.add_sequences(["ACGT" * 15, "TGCA" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=add_result.ids[0],
+                view_name="view_a",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            ),
+            SequenceViewRecord(
+                sequence_id=add_result.ids[1],
+                view_name="view_b",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            ),
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna", batch_size=1)
+    job = JobConfig(
+        id="reference_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "collect_log_likelihood": False,
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "analysis_window"},
+                    "pooling": {"operation": "core60_mean"},
+                },
+            ],
+        },
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    events = [json.loads(line) for line in dataset.events_path.read_text(encoding="utf-8").splitlines()]
+    progress_events = [event for event in events if event["action"] == "infer_feature_bundle_progress"]
+    complete_events = [event for event in events if event["action"] == "infer_feature_bundle_complete"]
+    assert len(progress_events) == 1
+    assert progress_events[0]["actor"]["tool"] == "infer"
+    assert progress_events[0]["args"]["contexts_completed"] == 1
+    assert progress_events[0]["args"]["contexts_total"] == 2
+    assert progress_events[0]["args"]["progress_pct"] == 50.0
+    assert progress_events[0]["args"]["unique_forward_passes_completed"] == 1
+    assert progress_events[0]["args"]["unique_forward_passes_total"] == 2
+    assert progress_events[0]["args"]["required_vector_keys"] == 4
+    assert progress_events[0]["args"]["required_scalar_keys"] == 0
+    assert complete_events[-1]["args"]["contexts_completed"] == 2
+
+
+def test_run_extract_job_feature_bundle_sequence_views_commits_checkpoint_shards_during_execution(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "reference_views")
+    dataset.init(source="test", notes="sequence-view infer shard commit test")
+    sequences = ["ACGT" * 15, "TGCA" * 15, "GATT" * 15]
+    add_result = dataset.add_sequences(sequences, bio_type="dna", alphabet="dna_4", source="test")
+    write_sequence_views(
+        dataset,
+        [
+            SequenceViewRecord(
+                sequence_id=sequence_id,
+                view_name=f"view_{index}",
+                product_kind="analysis_window",
+                context_kind="analysis_window",
+                orientation="forward",
+                source_dataset_id=dataset.name,
+                anchor_start_0=0,
+                anchor_end_0=60,
+                recommended_pooling="core60_mean",
+                created_at="2026-04-25T00:00:00+00:00",
+                created_by="test",
+            )
+            for index, sequence_id in enumerate(add_result.ids)
+        ],
+        conflict_policy="error",
+    )
+
+    adapter = _CountingFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna", batch_size=1)
+    job = JobConfig(
+        id="reference_view_bundle",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "sequence_view_inputs": [
+                {
+                    "dataset": "reference_views",
+                    "root": usr_root.as_posix(),
+                    "view_selector": {"product_kind": "analysis_window"},
+                    "pooling": {"operation": "core60_mean"},
+                },
+            ],
+        },
+        io={"checkpoint": {"enabled": True, "every_n": 1}},
+    )
+
+    run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    events = [json.loads(line) for line in dataset.events_path.read_text(encoding="utf-8").splitlines()]
+    actions = [event["action"] for event in events]
+    shard_commit_events = [event for event in events if event["action"] == "infer_feature_bundle_shard_commit"]
+    complete_events = [event for event in events if event["action"] == "infer_feature_bundle_complete"]
+    assert len(shard_commit_events) == 3
+    assert actions.index("infer_feature_bundle_shard_commit") < actions.index("infer_feature_bundle_complete")
+    assert complete_events[-1]["args"]["contexts_completed"] == 3
+    assert {event["args"]["contexts_committed"] for event in shard_commit_events} == {1}
+    assert {event["args"]["committed_vector_keys"] for event in shard_commit_events} == {2}
+    assert {event["args"]["committed_scalar_keys"] for event in shard_commit_events} == {2}
+
+    ledger = load_shard_ledger(dataset.dir / "_derived/infer/checkpoints/reference_view_bundle/ledger.json")
+    assert ledger.shard_count == 3
+    assert {entry.status for entry in ledger.shards} == {SHARD_STATUS_COMMITTED}
+    assert [entry.committed_views for entry in ledger.shards] == [1, 1, 1]
+    assert [entry.expected_vector_keys for entry in ledger.shards] == [2, 2, 2]
+    assert [entry.expected_scalar_keys for entry in ledger.shards] == [2, 2, 2]
+    assert [entry.committed_vector_keys for entry in ledger.shards] == [2, 2, 2]
+    assert [entry.committed_scalar_keys for entry in ledger.shards] == [2, 2, 2]
+    assert (dataset.dir / FEATURE_VECTOR_RELATIVE_PATH).exists()
+    assert (dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).exists()
 
 
 def test_run_extract_job_feature_bundle_sequence_view_resume_skips_completed_vector_families(
@@ -932,6 +1411,11 @@ def test_run_extract_job_sequence_view_anchor_mean_uses_full_context_and_emitted
     forward_sequence = "AAAATTTTAGTCGGGG"
     reverse_complement_sequence = str(Seq(forward_sequence).reverse_complement())
     assert reverse_complement_sequence == "CCCCGACTAAAATTTT"
+    rc_start = len(forward_sequence) - 12
+    rc_end = len(forward_sequence) - 8
+    assert (rc_start, rc_end) == (4, 8)
+    assert rc_end - rc_start == 12 - 8
+    assert reverse_complement_sequence[rc_start:rc_end] == str(Seq(forward_sequence[8:12]).reverse_complement())
     add_result = dataset.add_sequences(
         [forward_sequence, reverse_complement_sequence],
         bio_type="dna",
@@ -1092,6 +1576,10 @@ def test_run_extract_job_feature_bundle_sequence_view_alias_map_is_idempotent(
     assert adapter.logits_call_count == 1
     assert adapter.embedding_call_count == 1
 
+    def _fail_adapter_load(_model):
+        raise AssertionError("completed sequence-view resume should not load the model adapter")
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", _fail_adapter_load)
     run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
     assert adapter.logits_call_count == 1
     assert adapter.embedding_call_count == 1

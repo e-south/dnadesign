@@ -23,6 +23,9 @@ _DENSEGEN_PROFILE_PRESET = {
     "include_context": False,
     "include_raw_event": False,
 }
+_INFER_PROFILE_ACTIONS = (
+    "attach,write_overlay_part,materialize,infer_feature_bundle_progress,infer_feature_bundle_complete"
+)
 _WORKFLOW_POLICY_DEFAULTS: dict[str, dict[str, Any]] = {}
 _WORKFLOW_POLICY_ALIASES: dict[str, str] = {}
 
@@ -104,7 +107,7 @@ register_workflow_policy(
 register_workflow_policy(
     policy="infer",
     defaults={
-        "only_actions": "attach,write_overlay_part,materialize",
+        "only_actions": _INFER_PROFILE_ACTIONS,
         "only_tools": "infer",
         "include_args": False,
         "include_context": False,

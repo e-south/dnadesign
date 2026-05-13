@@ -343,6 +343,9 @@ def test_qsub_script_applies_infer_policy_filters(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
     assert "--only-actions attach,write_overlay_part,materialize" in calls
+    assert "infer_feature_bundle_progress" in calls
+    assert "infer_feature_bundle_complete" in calls
+    assert "infer_feature_vectors_write" not in calls
     assert "--only-tools infer" in calls
 
 

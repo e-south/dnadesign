@@ -11,7 +11,7 @@ Current checked-in direction:
 
 - publish a sanctioned `workspace_snapshot.json` contract for study-facing status
 - keep latent-analysis primitives study-neutral and inject promoter-study semantics through `latentdna_binding.yaml`
-- restrict the active workspace to the canonical eight geometry spaces across `intermediate_embedding` and `pooled_logits`
+- restrict the active workspace to the canonical eight geometry spaces across `intermediate_embedding` and `output_layer_mean`
 - treat UMAP as appendix-only geometry context
 - keep plot semantics explicit and sidecar-backed
 

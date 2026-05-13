@@ -96,6 +96,9 @@ class Style:
     font_label: str = "DejaVu Sans"
     font_size_seq: int = 14
     font_size_label: int = 12
+    font_size_feature_label: int | None = None
+    font_size_annotation_label: int | None = None
+    font_size_span_link_label: int | None = None
 
     padding_x: float = 24.0
     padding_y: float = 20.0
@@ -200,6 +203,12 @@ class Style:
         ensure(self.figure_scale > 0, "style.figure_scale must be > 0", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
         ensure(self.font_size_label >= 6, "style.font_size_label must be >= 6", SchemaError)
+        if self.font_size_feature_label is not None:
+            ensure(self.font_size_feature_label >= 6, "style.font_size_feature_label must be >= 6", SchemaError)
+        if self.font_size_annotation_label is not None:
+            ensure(self.font_size_annotation_label >= 6, "style.font_size_annotation_label must be >= 6", SchemaError)
+        if self.font_size_span_link_label is not None:
+            ensure(self.font_size_span_link_label >= 6, "style.font_size_span_link_label must be >= 6", SchemaError)
         ensure(self.padding_x >= 0, "style.padding_x must be >= 0", SchemaError)
         ensure(self.padding_y >= 0, "style.padding_y must be >= 0", SchemaError)
         ensure(self.layout.outer_pad_cells >= 0, "style.layout.outer_pad_cells must be >= 0", SchemaError)
