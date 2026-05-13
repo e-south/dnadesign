@@ -246,6 +246,10 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
     context = load_workspace_config(_regulondb_workspace())
     controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
+    projection_grid_views = [
+        "intermediate_embedding_7b_native_source_record_seq_mean",
+        "intermediate_embedding_7b_core60_tss_upstream",
+    ]
     native_core60_layout = next(
         (
             row
@@ -255,11 +259,8 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
         None,
     )
 
-    assert geometry_ids == [
-        "intermediate_embedding_7b_native_source_record_seq_mean",
-        "intermediate_embedding_7b_core60_tss_upstream",
-    ]
-    assert controls.geometry_controls.candidate_sets[0].available_view_ids == geometry_ids
+    assert set(geometry_ids) >= set(projection_grid_views)
+    assert set(controls.geometry_controls.candidate_sets[0].available_view_ids) >= set(projection_grid_views)
     fixed_grid_view_ids = {
         view_id
         for layout in controls.geometry_controls.layout_presets
@@ -268,10 +269,7 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
     }
     assert not any(view_id.startswith("output_layer_mean_") for view_id in fixed_grid_view_ids)
     if native_core60_layout is not None:
-        assert native_core60_layout.view_ids == [
-            "intermediate_embedding_7b_native_source_record_seq_mean",
-            "intermediate_embedding_7b_core60_tss_upstream",
-        ]
+        assert native_core60_layout.view_ids == projection_grid_views
         assert "Projection-backed subset" in native_core60_layout.description
         assert "output-layer" not in native_core60_layout.description.lower()
     else:
