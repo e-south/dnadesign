@@ -102,7 +102,7 @@ This page keeps the downstream handoff map in one place.
   - `sigma35_centroid_distance_gallery`
   - `appendix_geometry_review`
   - `appendix_umap_gallery`
-- Snapshot attention surfaces: generated LatentDNA artifacts need refresh after the native lineage metadata/config update
+- Snapshot attention surfaces: none for LatentDNA decision deliverables; generated LatentDNA artifacts need refresh after the native lineage metadata/config update
 - Snapshot ok primary surfaces: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
 - Snapshot ok appendix surfaces: `appendix_geometry_review`, `appendix_umap_gallery`
 - Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
