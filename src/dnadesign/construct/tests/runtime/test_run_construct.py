@@ -23,9 +23,16 @@ from dnadesign.construct.src.api import preflight_from_config, run_from_config
 from dnadesign.construct.src.errors import ValidationError
 from dnadesign.construct.src.feature_retention import classify_feature_retention
 from dnadesign.construct.src.output_store import _ensure_construct_registry
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces, load_sequence_views, write_sequence_views
+from dnadesign.usr import (
+    Dataset,
+    SequenceViewRecord,
+    ensure_sequence_contract_namespaces,
+    load_sequence_views,
+    write_sequence_views,
+)
 from dnadesign.usr.src.registry.models import SEQ_ANNOT_COLUMNS
 from dnadesign.usr.src.registry.typespec import arrow_type_from_str
+from dnadesign.usr.src.sequence_views.store import _rows_to_table, _write_sequence_views_atomic, sequence_views_path
 
 
 def _write_registry(root: Path) -> None:
@@ -3083,6 +3090,80 @@ job:
     write_sequence_views(output_ds, [drifted_view], conflict_policy="replace")
     with pytest.raises(ValidationError, match="already exists with different metadata"):
         run_from_config(variant_config_path)
+
+
+def test_run_construct_on_conflict_ignore_does_not_duplicate_existing_sequence_id_views(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["GGGG"], bio_type="dna", alphabet="dna_4", source="test")
+
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    config_path = tmp_path / "construct_context.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: context
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAACCCCGGGGTTTT
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+  realize:
+    mode: full_construct
+  output_variants:
+    - product_kind: realized_context
+      orientation: forward
+      recommended_pooling: anchor_mean
+  output:
+    on_conflict: ignore
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+    [current_view] = load_sequence_views(output_ds)
+    legacy_payload = current_view.model_dump(mode="python")
+    legacy_payload.pop("view_id")
+    legacy_payload["derivation_spec_id"] = "legacy_spec"
+    legacy_view = SequenceViewRecord.model_validate(legacy_payload)
+    _write_sequence_views_atomic(sequence_views_path(output_ds), _rows_to_table([legacy_view]))
+
+    rerun = run_from_config(config_path)
+    views = load_sequence_views(output_ds)
+
+    assert rerun.records_written == 0
+    assert rerun.records_skipped_existing == 1
+    assert len(views) == 1
+    assert views[0].sequence_id == current_view.sequence_id
+    assert views[0].view_id == legacy_view.view_id
 
 
 def test_run_construct_output_variants_allow_same_sequence_with_distinct_views(tmp_path: Path) -> None:

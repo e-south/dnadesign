@@ -2427,10 +2427,13 @@ def _write_planned_sequence_views(output_ds: Dataset, *, cfg: JobConfig, records
     if not sequence_views:
         return
     existing_by_id = load_sequence_view_index(output_ds)
+    existing_sequence_ids = {str(row.get("sequence_id")) for row in existing_by_id.values() if row.get("sequence_id")}
     missing_sequence_views: list[SequenceViewRecord] = []
     for view in sequence_views:
         existing = existing_by_id.get(str(view.view_id))
         if existing is None:
+            if str(view.sequence_id) in existing_sequence_ids:
+                continue
             missing_sequence_views.append(view)
             continue
         comparable_view = view.model_dump(mode="python")

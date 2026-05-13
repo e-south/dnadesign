@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from .maintenance import SequenceViewAliasRepairResult, repair_sequence_view_alias_conflicts
 from .models import (
     SEQUENCE_VIEW_SIDECAR_RELATIVE_PATH,
     VIEW_ID_SCHEMA_VERSION,
@@ -60,6 +61,7 @@ __all__ = [
     "SequenceViewSelector",
     "SequenceViewContractExpectation",
     "SequenceViewContractReport",
+    "SequenceViewAliasRepairResult",
     "ViewSemanticsConflictPolicy",
     "ViewSemanticsRecord",
     "VIEW_ID_SCHEMA_VERSION",
@@ -69,6 +71,7 @@ __all__ = [
     "load_sequence_view_ids",
     "load_view_semantics",
     "load_view_semantics_index",
+    "repair_sequence_view_alias_conflicts",
     "select_sequence_views",
     "validate_sequence_view_contract",
     "view_semantics_path",
