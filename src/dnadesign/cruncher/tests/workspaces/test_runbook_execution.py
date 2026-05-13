@@ -159,8 +159,16 @@ def test_runbook_executes_selected_steps_in_runbook_order(tmp_path: Path, monkey
 
     assert result.executed_step_ids == ["lock", "parse"]
     assert calls == [
-        ["uv", "run", "cruncher", "lock", "-c", "configs/config.yaml"],
-        ["uv", "run", "cruncher", "parse", "--force-overwrite", "-c", "configs/config.yaml"],
+        [sys.executable, "-m", "dnadesign.cruncher.cli.app", "lock", "-c", "configs/config.yaml"],
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.cruncher.cli.app",
+            "parse",
+            "--force-overwrite",
+            "-c",
+            "configs/config.yaml",
+        ],
     ]
 
 
@@ -256,8 +264,16 @@ def test_runbook_fails_fast_on_step_error(tmp_path: Path, monkeypatch: pytest.Mo
         run_workspace_runbook(runbook_path)
 
     assert calls == [
-        ["uv", "run", "cruncher", "lock", "-c", "configs/config.yaml"],
-        ["uv", "run", "cruncher", "parse", "--force-overwrite", "-c", "configs/config.yaml"],
+        [sys.executable, "-m", "dnadesign.cruncher.cli.app", "lock", "-c", "configs/config.yaml"],
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.cruncher.cli.app",
+            "parse",
+            "--force-overwrite",
+            "-c",
+            "configs/config.yaml",
+        ],
     ]
 
 

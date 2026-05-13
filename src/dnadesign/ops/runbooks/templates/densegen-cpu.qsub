@@ -49,14 +49,16 @@ fi
 
 has_fresh=0
 has_resume=0
-for arg in "${RUN_ARGS[@]}"; do
-  if [[ "$arg" == "--fresh" ]]; then
-    has_fresh=1
-  fi
-  if [[ "$arg" == "--resume" ]]; then
-    has_resume=1
-  fi
-done
+if [[ "${#RUN_ARGS[@]}" -gt 0 ]]; then
+  for arg in "${RUN_ARGS[@]}"; do
+    if [[ "$arg" == "--fresh" ]]; then
+      has_fresh=1
+    fi
+    if [[ "$arg" == "--resume" ]]; then
+      has_resume=1
+    fi
+  done
+fi
 if [[ "$has_fresh" -eq "$has_resume" ]]; then
   echo "DENSEGEN_RUN_ARGS must include exactly one of --fresh or --resume." >&2
   echo "Received DENSEGEN_RUN_ARGS='${DENSEGEN_RUN_ARGS}'" >&2
