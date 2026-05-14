@@ -820,6 +820,25 @@ def _centroid_from_values(
     return centroid
 
 
+def _centroid_from_column_values(
+    normalized_rows: np.ndarray,
+    values: list[object],
+    *,
+    group_values: set[str],
+    group_name: str,
+    cohort_column: str,
+) -> np.ndarray:
+    indices = [index for index, value in enumerate(values) if str(value or "").strip() in group_values]
+    if not indices:
+        raise ContractViolationError(
+            f"tf_axis_orientation_audit centroid group {group_name!r} matched no rows on {cohort_column!r}"
+        )
+    centroid = try_l2_normalize_vector(np.asarray(normalized_rows[indices].mean(axis=0), dtype=np.float32))
+    if centroid is None:
+        raise ContractViolationError(f"tf_axis_orientation_audit centroid group {group_name!r} is degenerate")
+    return centroid
+
+
 def _tf_bin(row: dict[str, object], *, ethanol_columns: list[str], cipro_columns: list[str]) -> str:
     has_ethanol = any(_truthy_metadata_value(row.get(column)) for column in ethanol_columns)
     has_cipro = any(_truthy_metadata_value(row.get(column)) for column in cipro_columns)
@@ -850,6 +869,8 @@ _TF_AXIS_DERIVED_COLUMNS = (
     "distance_to_cipro_centroid",
     "distance_to_background_centroid",
 )
+_TF_AXIS_MATRIX_CHUNK_ROWS = 4096
+_TF_AXIS_EPS = 1e-8
 
 
 def _dedupe_columns(columns: Iterable[str]) -> list[str]:
@@ -861,6 +882,111 @@ def _dedupe_columns(columns: Iterable[str]) -> list[str]:
         seen.add(column)
         output.append(column)
     return output
+
+
+def _tf_axis_standardization_stats(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if matrix.ndim != 2:
+        raise ContractViolationError("tf_axis_orientation_audit expects a 2D matrix")
+    row_count, dims = matrix.shape
+    if row_count == 0:
+        raise ContractViolationError("tf_axis_orientation_audit cannot normalize an empty matrix")
+    total = np.zeros(dims, dtype=np.float64)
+    for start in range(0, row_count, _TF_AXIS_MATRIX_CHUNK_ROWS):
+        chunk = np.asarray(matrix[start : start + _TF_AXIS_MATRIX_CHUNK_ROWS], dtype=np.float32)
+        if not np.isfinite(chunk).all():
+            raise ContractViolationError("tf_axis_orientation_audit encountered non-finite matrix values")
+        total += np.sum(chunk, axis=0, dtype=np.float64)
+    mean = total / float(row_count)
+    squared = np.zeros(dims, dtype=np.float64)
+    for start in range(0, row_count, _TF_AXIS_MATRIX_CHUNK_ROWS):
+        chunk = np.asarray(matrix[start : start + _TF_AXIS_MATRIX_CHUNK_ROWS], dtype=np.float32)
+        diff = np.asarray(chunk, dtype=np.float64) - mean
+        squared += np.sum(diff * diff, axis=0, dtype=np.float64)
+    scales = np.asarray(np.sqrt(squared / float(row_count)), dtype=np.float32)
+    zero_mask = scales <= _TF_AXIS_EPS
+    scales = np.where(zero_mask, 1.0, scales).astype(np.float32, copy=False)
+    return mean.astype(np.float32, copy=False), scales, np.asarray(zero_mask, dtype=bool)
+
+
+def _tf_axis_normalize_chunk(
+    chunk: np.ndarray,
+    *,
+    mean: np.ndarray,
+    scales: np.ndarray,
+    zero_mask: np.ndarray,
+) -> np.ndarray:
+    working = np.asarray(
+        (np.asarray(chunk, dtype=np.float32) - mean) / np.maximum(scales, _TF_AXIS_EPS),
+        dtype=np.float32,
+    )
+    if np.any(zero_mask):
+        working[:, zero_mask] = 0.0
+    norms = np.linalg.norm(working, axis=1, keepdims=True)
+    normalized = np.asarray(working / np.maximum(norms, _TF_AXIS_EPS), dtype=np.float32)
+    zero_rows = np.asarray(norms[:, 0] <= _TF_AXIS_EPS, dtype=bool)
+    if np.any(zero_rows):
+        normalized[zero_rows] = 0.0
+    return normalized
+
+
+def _tf_axis_normalized_rows(
+    matrix: np.ndarray,
+    indices: list[int],
+    *,
+    stats: tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> np.ndarray:
+    if not indices:
+        return np.empty((0, matrix.shape[1]), dtype=np.float32)
+    mean, scales, zero_mask = stats
+    return _tf_axis_normalize_chunk(
+        np.asarray(matrix[np.asarray(indices, dtype=np.int64)], dtype=np.float32),
+        mean=mean,
+        scales=scales,
+        zero_mask=zero_mask,
+    )
+
+
+def _tf_axis_centroids_from_groups(
+    matrix: np.ndarray,
+    cohort_values: list[object],
+    *,
+    groups: dict[str, set[str]],
+    stats: tuple[np.ndarray, np.ndarray, np.ndarray],
+    cohort_column: str,
+) -> dict[str, np.ndarray]:
+    if len(cohort_values) != matrix.shape[0]:
+        raise ContractViolationError("tf_axis_orientation_audit centroid row count does not match matrix row count")
+    mean, scales, zero_mask = stats
+    dims = matrix.shape[1]
+    sums = {group: np.zeros(dims, dtype=np.float64) for group in groups}
+    counts = {group: 0 for group in groups}
+    labels = [str(value or "").strip() for value in cohort_values]
+    for start in range(0, matrix.shape[0], _TF_AXIS_MATRIX_CHUNK_ROWS):
+        end = min(start + _TF_AXIS_MATRIX_CHUNK_ROWS, matrix.shape[0])
+        normalized = _tf_axis_normalize_chunk(
+            np.asarray(matrix[start:end], dtype=np.float32),
+            mean=mean,
+            scales=scales,
+            zero_mask=zero_mask,
+        )
+        chunk_labels = labels[start:end]
+        for group, values in groups.items():
+            mask = np.asarray([label in values for label in chunk_labels], dtype=bool)
+            if not np.any(mask):
+                continue
+            sums[group] += np.sum(normalized[mask], axis=0, dtype=np.float64)
+            counts[group] += int(np.count_nonzero(mask))
+    centroids: dict[str, np.ndarray] = {}
+    for group, count in counts.items():
+        if count == 0:
+            raise ContractViolationError(
+                f"tf_axis_orientation_audit centroid group {group!r} matched no rows on {cohort_column!r}"
+            )
+        centroid = try_l2_normalize_vector(np.asarray(sums[group] / float(count), dtype=np.float32))
+        if centroid is None:
+            raise ContractViolationError(f"tf_axis_orientation_audit centroid group {group!r} is degenerate")
+        centroids[group] = centroid
+    return centroids
 
 
 def _tf_axis_audit_output_columns(
@@ -909,6 +1035,31 @@ def _validate_tf_columns_present(column_names: set[str], tf_columns: dict[str, o
     missing = sorted(column for column in _required_tf_columns(tf_columns) if column not in column_names)
     if missing:
         raise ContractViolationError(f"tf_axis_orientation_audit missing required tf columns: {missing}")
+
+
+def _filter_table_indices(
+    table: pa.Table,
+    where: object,
+    *,
+    contract_name: str,
+) -> list[int]:
+    if where is None:
+        return list(range(table.num_rows))
+    if not isinstance(where, dict):
+        raise ContractViolationError(f"{contract_name} where must be a mapping")
+    column = str(where.get("column") or "")
+    if not column:
+        raise ContractViolationError(f"{contract_name} where requires column")
+    if column not in set(table.column_names):
+        raise ContractViolationError(f"{contract_name} where column is missing: {column}")
+    values = table[column].to_pylist()
+    if "equals" in where:
+        expected = where["equals"]
+        return [index for index, value in enumerate(values) if value == expected]
+    if "in" in where:
+        expected_values = set(where["in"] or [])
+        return [index for index, value in enumerate(values) if value in expected_values]
+    raise ContractViolationError(f"{contract_name} where supports equals or in")
 
 
 def _apply_tf_association_overlay(
@@ -997,54 +1148,89 @@ def _tf_axis_orientation_audit_table(
     centroid_matrix_path, centroid_rows_path = _view_paths(context, view_id)
     centroid_matrix = np.asarray(read_matrix(centroid_matrix_path), dtype=np.float32)
     centroid_rows_table = read_table(centroid_rows_path)
-    centroid_row_dicts = centroid_rows_table.to_pylist()
-    normalized_centroid_rows = _normalized_geometry_rows(centroid_matrix)
+    if cohort_column not in set(centroid_rows_table.column_names):
+        raise ContractViolationError(f"tf_axis_orientation_audit cohort column is missing: {cohort_column}")
+    centroid_cohort_values = centroid_rows_table[cohort_column].to_pylist()
     resolved_audit_view_id = audit_view_id or view_id
     if resolved_audit_view_id == view_id:
         audit_matrix_path = centroid_matrix_path
         audit_rows_path = centroid_rows_path
         audit_matrix = centroid_matrix
         audit_rows_table = centroid_rows_table
-        audit_row_dicts = list(centroid_row_dicts)
     else:
         audit_matrix_path, audit_rows_path = _view_paths(context, resolved_audit_view_id)
         audit_matrix = np.asarray(read_matrix(audit_matrix_path), dtype=np.float32)
         audit_rows_table = read_table(audit_rows_path)
-        audit_row_dicts = audit_rows_table.to_pylist()
         if centroid_matrix.ndim != 2 or audit_matrix.ndim != 2 or centroid_matrix.shape[1] != audit_matrix.shape[1]:
             raise ContractViolationError(
                 "tf_axis_orientation_audit centroid and audit views must have the same vector dimension"
             )
-    normalized_audit_rows = _normalized_geometry_rows(audit_matrix)
     required_groups = ("background", "ethanol", "cipro")
     groups = {group: {str(value) for value in centroid_groups.get(group, [])} for group in required_groups}
     missing = [group for group, values in groups.items() if not values]
     if missing:
         raise ContractViolationError(f"tf_axis_orientation_audit missing centroid groups: {missing}")
-    centroids = {
-        group: _centroid_from_values(
-            normalized_centroid_rows,
-            centroid_row_dicts,
-            cohort_column=cohort_column,
-            values=values,
-            group_name=group,
-        )
-        for group, values in groups.items()
-    }
+    centroid_stats = _tf_axis_standardization_stats(centroid_matrix)
+    audit_stats = centroid_stats if resolved_audit_view_id == view_id else _tf_axis_standardization_stats(audit_matrix)
+    centroids = _tf_axis_centroids_from_groups(
+        centroid_matrix,
+        centroid_cohort_values,
+        groups=groups,
+        stats=centroid_stats,
+        cohort_column=cohort_column,
+    )
     ethanol_columns = [str(value) for value in tf_columns.get("ethanol", [])]
     cipro_columns = [str(value) for value in tf_columns.get("cipro", [])]
     if not ethanol_columns or not cipro_columns:
         raise ContractViolationError("tf_axis_orientation_audit requires ethanol and cipro tf_columns")
+
+    if output_filter is None:
+        raise ContractViolationError(
+            "tf_axis_orientation_audit requires output_filter so centroid rows and emitted audit rows are explicit"
+        )
+    audit_column_names = set(audit_rows_table.column_names)
+    if association_overlay is None:
+        _validate_tf_columns_present(audit_column_names, tf_columns)
+    projected_columns = _tf_axis_audit_output_columns(
+        row_column_names=audit_column_names,
+        tf_columns=tf_columns,
+        output_columns=output_columns,
+    )
+    audit_indices = _filter_table_indices(
+        audit_rows_table,
+        output_filter,
+        contract_name="tf_axis_orientation_audit output_filter",
+    )
+    if not audit_indices:
+        raise ContractViolationError("tf_axis_orientation_audit output_filter matched no rows")
+    row_columns_to_select = {
+        column
+        for column in projected_columns
+        if column in audit_column_names and column not in set(_TF_AXIS_DERIVED_COLUMNS)
+    }
+    if isinstance(output_filter, dict):
+        row_columns_to_select.add(str(output_filter.get("column") or ""))
+    if association_overlay is not None and isinstance(association_overlay, dict):
+        row_columns_to_select.add(str(association_overlay.get("row_key") or "id"))
+    if association_overlay is None:
+        row_columns_to_select.update(
+            column for column in _required_tf_columns(tf_columns) if column in audit_column_names
+        )
+    row_columns_to_select = {column for column in row_columns_to_select if column in audit_column_names}
+    filtered_audit_table = audit_rows_table.take(pa.array(audit_indices, type=pa.int64()))
+    audit_row_dicts = filtered_audit_table.select(sorted(row_columns_to_select)).to_pylist()
     audit_row_dicts, association_inputs, association_stats = _apply_tf_association_overlay(
         context,
         audit_row_dicts,
-        rows_column_names=set(audit_rows_table.column_names),
+        rows_column_names=set(filtered_audit_table.column_names),
         tf_columns=tf_columns,
         association_overlay=association_overlay,
     )
 
+    filtered_normalized_audit_rows = _tf_axis_normalized_rows(audit_matrix, audit_indices, stats=audit_stats)
     similarities = {
-        group: np.asarray(normalized_audit_rows @ centroid, dtype=np.float32) for group, centroid in centroids.items()
+        group: np.asarray(filtered_normalized_audit_rows @ centroid, dtype=np.float32)
+        for group, centroid in centroids.items()
     }
     metric_rows: list[dict[str, object]] = []
     for index, row in enumerate(audit_row_dicts):
@@ -1058,25 +1244,7 @@ def _tf_axis_orientation_audit_table(
         output["distance_to_cipro_centroid"] = float(1.0 - similarities["cipro"][index])
         output["distance_to_background_centroid"] = float(1.0 - similarities["background"][index])
         metric_rows.append(output)
-    if output_filter is None:
-        raise ContractViolationError(
-            "tf_axis_orientation_audit requires output_filter so centroid rows and emitted audit rows are explicit"
-        )
-    metric_column_names = set().union(*(row.keys() for row in metric_rows)) if metric_rows else set()
-    filtered_rows = _filter_rows(
-        metric_rows,
-        output_filter,
-        column_names=metric_column_names,
-        contract_name="tf_axis_orientation_audit output_filter",
-    )
-    if not filtered_rows:
-        raise ContractViolationError("tf_axis_orientation_audit output_filter matched no rows")
-    projected_columns = _tf_axis_audit_output_columns(
-        row_column_names=metric_column_names,
-        tf_columns=tf_columns,
-        output_columns=output_columns,
-    )
-    output_rows = [{column: row.get(column) for column in projected_columns} for row in filtered_rows]
+    output_rows = [{column: row.get(column) for column in projected_columns} for row in metric_rows]
     table = pa.Table.from_pylist(output_rows)
     input_refs = [
         ScalarInputRef(kind="view_matrix", artifact_id=view_id, path=centroid_matrix_path),
@@ -1096,8 +1264,9 @@ def _tf_axis_orientation_audit_table(
             "view_id": view_id,
             "centroid_view_id": view_id,
             "audit_view_id": resolved_audit_view_id,
-            "centroid_rows": len(centroid_row_dicts),
-            "input_rows": len(metric_rows),
+            "centroid_rows": centroid_rows_table.num_rows,
+            "input_rows": audit_rows_table.num_rows,
+            "filtered_rows": len(metric_rows),
             "rows": table.num_rows,
             "embedding_view": embedding_view or resolved_audit_view_id,
             "tf_bin_counts": dict(Counter(row["tf_bin"] for row in output_rows)),

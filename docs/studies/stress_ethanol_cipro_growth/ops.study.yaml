@@ -607,16 +607,16 @@ preflight:
         required: true
         artifact: merged_anchor_dataset
         expected:
-          total_records: 157279
-          total_views: 157279
+          total_records: 160460
+          total_views: 160460
           counts_by_product_kind:
-            construct_insert: 157279
+            construct_insert: 160460
           counts_by_orientation:
-            forward: 157279
+            forward: 160460
           counts_by_context_kind:
-            anchor_only: 157279
+            anchor_only: 160460
           counts_by_recommended_pooling:
-            seq_mean: 157279
+            seq_mean: 160460
       - kind: sequence_view_contract
         check_id: infer.sequence_views.context_contract
         check_group: infer
@@ -624,17 +624,17 @@ preflight:
         required: true
         artifact: construct_context_dataset
         expected:
-          total_records: 314558
-          total_views: 314558
+          total_records: 320920
+          total_views: 320920
           counts_by_product_kind:
-            realized_context: 314558
+            realized_context: 320920
           counts_by_orientation:
-            forward: 157279
-            reverse_complement: 157279
+            forward: 160460
+            reverse_complement: 160460
           counts_by_context_kind:
-            template_1kb: 314558
+            template_1kb: 320920
           counts_by_recommended_pooling:
-            anchor_mean: 314558
+            anchor_mean: 320920
           exact_lengths_by_product_kind:
             realized_context: 1000
       - kind: sequence_view_contract

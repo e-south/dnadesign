@@ -845,6 +845,8 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "reference_sfxi_archive",
         "reference_native_mg1655",
         "reference_native_mg1655_core60",
+        "reference_regulondb_native_core60_all",
+        "reference_regulondb_tf_axis_targets",
         "reference_anderson_igem",
         "reference_anderson_igem_core60",
         "reference_w_collection",
@@ -902,7 +904,16 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
 
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
-    scorecard_sample_filter = {"column": "source_class", "in": ["densegen", "manual_or_wildtype"]}
+    scorecard_sample_filter = {
+        "column": "source_class",
+        "in": [
+            "densegen",
+            "manual_or_wildtype",
+            "reference_control",
+            "construct_derived",
+            "legacy_construct_seed",
+        ],
+    }
     for view_id in _FIRST_CLASS_CANDIDATE_VIEWS:
         assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
         assert pre_assay_steps[f"build_scorecard_sample_{view_id}"].params["where"] == scorecard_sample_filter

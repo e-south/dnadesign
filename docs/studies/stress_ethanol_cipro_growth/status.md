@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-05-09
+- Last verified: 2026-05-13
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -8,7 +8,7 @@
 - LatentDNA binding: `latentdna_binding.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Snapshot posture: current after local pull from BU SCC `cluster`
-- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete, so the next execution-readiness question is downstream LatentDNA review or optional DenseGen plot refresh, not GPU Infer submission.
+- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete for the expanded RegulonDB-native audit quota, so the next execution-readiness question is downstream LatentDNA review or optional DenseGen plot refresh, not GPU Infer submission.
 
 ### Current Datasets
 
@@ -16,12 +16,12 @@
 - Native/reference promoter source: `usr_promoter_references` (`present`, 48 rows)
 - SFXI pDual-10 DenseGen source: `usr_sfxi_pdual10_densegen_promoters` (`present`, 23 rows)
 - Construct template seed: `usr_pdual10_plasmid_template` (`present`, 1 row)
-- Anchor-only handoff: `usr_prom_eth_cip_anchor` (`present`, 157279 rows)
-- Full-context handoff: `construct_prom_eth_cip_context` (`present`, 314558 rows)
+- Anchor-only handoff: `usr_prom_eth_cip_anchor` (`present`, 160460 rows)
+- Full-context handoff: `construct_prom_eth_cip_context` (`present`, 320920 rows)
 - Reference core60 handoff: `construct_prom_eth_cip_reference_core60` (`present`, 48 rows)
 - Reference context handoff: `construct_prom_eth_cip_reference_contexts` (`present`, 96 rows)
-- RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar must be refreshed before the TF-axis audit)
-- RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 rows; planned append into the existing `usr_prom_eth_cip_anchor` study quota)
+- RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar populated with 3426 rows)
+- RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 rows; appended into the existing `usr_prom_eth_cip_anchor` study quota)
 - Canonical consolidated feature dataset: `usr_prom_eth_cip_matrix` (`planned`)
 - Logical reference feature entry: `infer_prom_eth_cip_reference_views_7b` (`planned`, not separately materialized; current payloads live in dataset-local `_derived/infer/` sidecars)
 
@@ -50,9 +50,9 @@ a phenotype-validated final `X`.
 
 - Sequence-view product contracts: `4/4 ok`
 - Infer feature-completion checks: `2/2 ok`
-- Required 7B feature views: `786635`
-- Reusable 7B vectors: `1573270`
-- Reusable 7B scalars: `943962`
+- Required 7B feature views: `802540`
+- Reusable 7B vectors: `1605080`
+- Reusable 7B scalars: `963048`
 - Missing products: `0`
 - Missing vectors: `0`
 - Missing scalars: `0`
@@ -68,13 +68,13 @@ Completed 7B sidecar lanes:
 - `reference_context_forward_seq_and_anchor_mean_7b`
 - `reference_context_reverse_complement_seq_and_anchor_mean_7b`
 
-`fill-infer --no-submit` now skips the six supported complete lanes, skips the three unsupported or retired lanes, and plans no runnable GPU jobs for the current row quota. After the planned RegulonDB core60 append to `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, the same 7B sequence-view lanes should plan only the newly missing native audit rows.
+`fill-infer --no-submit` now skips the six supported complete lanes, skips the three unsupported or retired lanes, and plans no runnable GPU jobs for the expanded current row quota.
 
 ### Current Downstream Posture
 
 - DenseGen analysis surface: `attention`; the source dataset is ready, but the operator-visible plot inventory contains stale artifacts and should be refreshed before relying on DenseGen plots as current.
-- LatentDNA: `attention`; the native TF-axis route is now configured as a planned first-class overlay over the existing study context view, but generated view rows/plots/notebook outputs have not been regenerated after the lineage-metadata config change.
-- LatentDNA native TF-axis overlay: `planned`; the workspace now declares the first-class audit deliverable over the existing context-anchor bidirectional view, but it should render only after RegulonDB native core60 rows are appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions are populated, and matching 7B feature sidecars exist.
+- LatentDNA: `current`; the native TF-axis route is configured as a first-class appendix overlay over the existing study context view, and local view rows/plots/notebook outputs have been regenerated after the lineage-metadata config change.
+- LatentDNA native TF-axis overlay: `current`; the deliverable renders over the existing context-anchor bidirectional view after RegulonDB native core60 rows were appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions were populated, and matching 7B feature sidecars were filled.
 - Cluster: `planned`; use `routes.md` for the current exploratory-clustering handoff.
 - OPAL: `not_configured`; no active OPAL campaign has been chosen.
 
@@ -112,16 +112,15 @@ LatentDNA companion visuals:
 LatentDNA appendix support:
 
 - `sigma35_centroid_distance_gallery`
-- `native_tf_axis_orientation_audit` (`planned` until the RegulonDB core60 quota append and matching 7B sidecars are complete)
+- `native_tf_axis_orientation_audit`
 - `appendix_geometry_review`
 - `appendix_umap_gallery`
 
-The current checked-in browser artifacts are limited to the previously
-available 7B sequence-view feature sidecars. The default browser geometries
-include the controlled equal-block bidirectional forward/RC anchor-mean
-candidate. Appendix deliverables remain secondary review material, not the
-evidence source for selecting `X`. Regenerate LatentDNA outputs after the
-metadata/config update before treating the checked-in notebook as current.
+The current local browser artifacts include the expanded 7B sequence-view
+feature sidecars. The default browser geometries include the controlled
+equal-block bidirectional forward/RC anchor-mean candidate. Appendix
+deliverables remain secondary review material, not the evidence source for
+selecting `X`.
 
 Pooling semantics guardrail: Infer mean-pools over token positions. Because
 Evo2 token states are causal in the emitted orientation, `anchor_mean` is a
@@ -135,7 +134,7 @@ is not a native bidirectional Evo2 state or hidden state.
 
 - Use the candidate-X scorecard as the current pre-assay representation triage surface: bidirectional context-anchor mean is the working `X`, anchor-source insert mean is the DenseGen-plan baseline, and forward context anchor mean is the strength-standard lens.
 - Keep reference-to-plan behavior as a landmark sanity check, not a phenotype claim.
-- Refresh `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet`, append `usr_regulondb_native_promoter_core60` through the existing `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context` handoff, and then run `fill-infer --no-submit` to plan only the new 7B sidecar work before rendering `native_tf_axis_orientation_audit`.
-- Re-materialize the affected LatentDNA views and re-run `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json` after the native lineage metadata/config update.
+- Keep `native_tf_axis_orientation_audit` as an appendix axis-orientation audit: the current generated test supports the LexA/cipro direction and does not support the BaeR/CpxR ethanol direction.
+- If a linear readout/probe audit is added later, make it a LatentDNA appendix diagnostic with fold-safe preprocessing and no OPAL coupling.
 - Re-run `uv run ops progress show usr.data-plane.promoter-study-status --json` after regeneration and confirm the LatentDNA attention flag clears or is still explained by a concrete generated-artifact gap.
 - Refresh DenseGen plots/notebook if operator-visible DenseGen EDA is needed for current study interpretation.

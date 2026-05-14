@@ -63,7 +63,7 @@ This page keeps the downstream handoff map in one place.
 - Primary workspace: `src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10`
 - First command: `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 --project reference_core60 --dry-run --format json`
 - Route note: Construct first derives fail-fast `analysis_window` reference views from native GenBank annotations, then emits paired forward and reverse-complement reference contexts. USR then converges DenseGen 60 bp anchors, native reference inserts, SFXI pDual rows, and reference core60 rows into the shared anchor dataset. After merge, `dnadesign.usr.scripts.materialize_promoter_anchor_sequence_views` writes one `construct_insert` anchor-only sequence view per merged row; native or designed exact-60 rows are not relabeled as `analysis_window`. The shared paired forward and reverse-complement pDual context refresh follows from that anchor handoff.
-- Planned native TF-axis extension: refresh `usr_regulondb_native_promoters`, project RegulonDB parent metadata to `usr_regulondb_native_promoter_core60`, merge that core60 source into `usr_prom_eth_cip_anchor`, and rerun the existing `forward_anchor_window` project to append paired pDual contexts into `construct_prom_eth_cip_context`. Do not create a separate `construct_prom_eth_cip_native_tf_contexts` universe for this audit.
+- Native TF-axis extension: `usr_regulondb_native_promoters` has populated regulatory interactions, RegulonDB parent metadata is projected to `usr_regulondb_native_promoter_core60`, and that core60 source is merged into `usr_prom_eth_cip_anchor` before the existing `forward_anchor_window` project emits paired pDual contexts into `construct_prom_eth_cip_context`. Do not create a separate `construct_prom_eth_cip_native_tf_contexts` universe for this audit.
 
 ### LatentDNA comparison surface
 
@@ -71,7 +71,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `attention`; the workspace config supports the planned native TF-axis overlay, but generated LatentDNA view rows/plots/notebook outputs need refresh after the lineage-metadata change
+- Current state: `current`; the workspace config supports the native TF-axis overlay, and generated LatentDNA view rows/plots/notebook outputs have been refreshed after the lineage-metadata change
 - Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
@@ -96,15 +96,16 @@ This page keeps the downstream handoff map in one place.
   - `context_pair_summary`
   - `reference_to_plan_centroid_heatmap`
   - `reference_standard_strength_audit`
-- Planned calibration overlay:
+- Calibration overlay:
   - `native_tf_axis_orientation_audit` reuses the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat` view after the shared anchor/context quota is expanded with `usr_regulondb_native_promoter_core60`; it requires `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet` and is a LatentDNA axis-orientation audit, not an OPAL input.
 - Appendix deliverables:
   - `sigma35_centroid_distance_gallery`
+  - `native_tf_axis_orientation_audit`
   - `appendix_geometry_review`
   - `appendix_umap_gallery`
-- Snapshot attention surfaces: none for LatentDNA decision deliverables; generated LatentDNA artifacts need refresh after the native lineage metadata/config update
+- Snapshot attention surfaces: none for LatentDNA decision deliverables after the native lineage metadata/config update
 - Snapshot ok primary surfaces: `dataset_overview`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
-- Snapshot ok appendix surfaces: `appendix_geometry_review`, `appendix_umap_gallery`
+- Snapshot ok appendix surfaces: `native_tf_axis_orientation_audit`, `appendix_geometry_review`, `appendix_umap_gallery`
 - Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
 - Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
 - Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`

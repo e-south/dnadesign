@@ -99,7 +99,7 @@ study_pipeline:
         complete_reference_lanes: 3
         advisor: prefer array_or_dependency_chain for multi-lane fanout after verify gates
       latest_fill_infer_snapshot:
-        checked: 2026-05-07
+        checked: 2026-05-13
         lanes_total: 9
         runnable_lanes: 0
         blocked_lanes: 0
@@ -110,8 +110,8 @@ study_pipeline:
         missing_scalars: 0
         stale_vectors: 0
         stale_scalars: 0
-        reusable_vectors: 1573270
-        reusable_scalars: 943962
+        reusable_vectors: 1605080
+        reusable_scalars: 963048
       latest_live_submit:
         status: historical_pre_completion_submit
         current: false
@@ -172,19 +172,19 @@ study_pipeline:
           stale_vectors: 0
           stale_scalars: 0
       native_tf_axis_orientation_quota_extension:
-        status: planned
+        status: complete
         source_rows: usr_regulondb_native_promoter_core60
         target_anchor_dataset: usr_prom_eth_cip_anchor
         target_context_dataset: construct_prom_eth_cip_context
         infer_policy: >-
-          Reuse the existing anchor construct-insert and pDual context
-          forward/reverse-complement 7B sequence-view lanes. After the append,
-          `fill-infer --no-submit` should plan only the newly missing native
-          audit row products, not a replacement of existing sidecars.
+          Reuses the existing anchor construct-insert and pDual context
+          forward/reverse-complement 7B sequence-view lanes. After the append
+          and Infer fill, `fill-infer --no-submit` plans no runnable GPU work
+          for the expanded quota.
         latentdna_policy: >-
           Native rows are overlay/audit rows. Candidate scorecard samples filter
           to DenseGen plus manual/wildtype rows, while appendix/all-row views
-          may expose the native RegulonDB cohort once sidecars exist.
+          may expose the native RegulonDB cohort.
     quota_deduplication:
       last_checked: 2026-04-30
       verdict: expected_semantic_overlap_no_fidelity_blocker
@@ -202,7 +202,7 @@ study_pipeline:
         native_reference_rows: 48 variable-length source inserts are preserved in usr_promoter_references and merged into usr_prom_eth_cip_anchor without normalization.
         reference_core60_rows: 48 derived analysis-window rows are all 60 bp.
         merged_anchor_core60_rows: The same 48 derived core60 rows are intentionally included in usr_prom_eth_cip_anchor as construct_insert/seq_mean anchor views with analysis_only=true.
-        main_context_rows: 314558 construct_prom_eth_cip_context rows are all 1000 bp.
+        main_context_rows: 320920 construct_prom_eth_cip_context rows are all 1000 bp.
         reference_context_rows: 96 construct_prom_eth_cip_reference_contexts rows are all 1000 bp.
         reference_context_reverse_complement_pairs: 48 forward/reverse pairs validated as exact reverse complements with emitted-orientation anchor bounds.
       observed_cross_dataset_exact_sequence_overlaps:
@@ -231,9 +231,9 @@ study_pipeline:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
     latest_materialization:
-      checked: 2026-05-12
-      workspace_snapshot_state: needs_refresh_after_config_change
-      deep_validation: blocked_by_stale_generated_view_rows
+      checked: 2026-05-13
+      workspace_snapshot_state: current_after_native_tf_axis_refresh
+      deep_validation: passed
       ok_decision_deliverables:
         - dataset_overview
         - design_structure_summary
@@ -248,7 +248,7 @@ study_pipeline:
         conservative_baseline: intermediate_embedding_7b_anchor_60bp
         strength_standard_lens: intermediate_embedding_7b_full_context_anchor_mean
         note: Bidirectional context-anchor mean is the working pre-assay X because it best balances health, Sigma-35 ordering, DenseGen plan separation, and reference-to-plan margins. It is not phenotype-validated.
-      note: The native lineage metadata/config route is updated, but generated view rows, plots, snapshot, and notebook artifacts have not been regenerated after that change. Current candidate-X conclusions still refer to the previous completed 7B sidecar-backed materialization.
+      note: The native lineage metadata/config route is updated and local generated view rows, plots, snapshot, and notebook artifacts have been regenerated against the expanded 7B sidecar-backed materialization.
       reference_strength_probe:
         status: superseded_by_reference_standard_strength_audit
         root: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_standard_strength_audit

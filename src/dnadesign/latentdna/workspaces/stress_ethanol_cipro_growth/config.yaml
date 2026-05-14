@@ -27,6 +27,14 @@ sources:
       - sfxi_ref__metric_id
       - sfxi_ref__metric_value
       - sfxi_ref__metric_provenance
+      - sfxi_ref__objective_name
+      - sfxi_ref__setpoint_name
+      - sfxi_ref__logic_fidelity
+      - sfxi_ref__effect_raw
+      - sfxi_ref__effect_scaled
+      - sfxi_ref__sfxi
+      - sfxi_ref__reference_design_id
+      - sfxi_ref__sequence_source_id
       - derived__parent_id
       - derived__parent_dataset
       - derived__product_kind
@@ -112,6 +120,21 @@ sources:
     subject_key: construct__anchor_id
     context_key: construct__context_id
     metadata_include: &study_context_metadata
+      - sfxi_ref__reference_instance_id
+      - sfxi_ref__collection_id
+      - sfxi_ref__batch_id
+      - sfxi_ref__campaign_id
+      - sfxi_ref__metric_id
+      - sfxi_ref__metric_value
+      - sfxi_ref__metric_provenance
+      - sfxi_ref__objective_name
+      - sfxi_ref__setpoint_name
+      - sfxi_ref__logic_fidelity
+      - sfxi_ref__effect_raw
+      - sfxi_ref__effect_scaled
+      - sfxi_ref__sfxi
+      - sfxi_ref__reference_design_id
+      - sfxi_ref__sequence_source_id
       - derived__parent_id
       - derived__parent_dataset
       - derived__product_kind
@@ -765,16 +788,156 @@ metadata:
       kind: coalesce
       sources: [construct_template_id, template_id, construct__template_id]
       value_type: string
-    derived__parent_id: {kind: constant, value: null, value_type: string}
-    derived__parent_dataset: {kind: constant, value: null, value_type: string}
-    derived__product_kind: {kind: constant, value: null, value_type: string}
-    derived__analysis_only: {kind: constant, value: null, value_type: bool}
-    regulondb__release: {kind: constant, value: null, value_type: string}
-    regulondb__primary_source: {kind: constant, value: null, value_type: string}
-    regulondb__source_strata_set: {kind: constant, value: null, value_type: string}
-    regulondb__primary_promoter_id: {kind: constant, value: null, value_type: string}
-    regulondb__primary_promoter_name: {kind: constant, value: null, value_type: string}
-    regulondb__metadata_completeness_class: {kind: constant, value: null, value_type: string}
+    sfxi_ref__reference_instance_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__reference_instance_id
+    sfxi_ref__collection_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__collection_id
+    sfxi_ref__batch_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__batch_id
+    sfxi_ref__campaign_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__campaign_id
+    sfxi_ref__metric_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__metric_id
+    sfxi_ref__metric_value:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__metric_value
+    sfxi_ref__metric_provenance:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__metric_provenance
+    sfxi_ref__objective_name:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__objective_name
+    sfxi_ref__setpoint_name:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__setpoint_name
+    sfxi_ref__logic_fidelity:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__logic_fidelity
+    sfxi_ref__effect_raw:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__effect_raw
+    sfxi_ref__effect_scaled:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__effect_scaled
+    sfxi_ref__sfxi:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__sfxi
+    sfxi_ref__reference_design_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__reference_design_id
+    sfxi_ref__sequence_source_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: sfxi_ref__sequence_source_id
+    derived__parent_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: derived__parent_id
+    derived__parent_dataset:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: derived__parent_dataset
+    derived__product_kind:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: derived__product_kind
+    derived__analysis_only:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: derived__analysis_only
+    regulondb__release:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: regulondb__release
+    regulondb__primary_source:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: regulondb__primary_source
+    regulondb__source_strata_set:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: regulondb__source_strata_set
+    regulondb__primary_promoter_id:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: regulondb__primary_promoter_id
+    regulondb__primary_promoter_name:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: regulondb__primary_promoter_name
+    regulondb__metadata_completeness_class:
+      kind: lookup
+      source: merged_anchor_insert
+      left_key: construct__anchor_id
+      right_key: id
+      value_column: regulondb__metadata_completeness_class
     design_family:
       kind: annotation
       source: row
@@ -1262,13 +1425,12 @@ reference_sets:
     where:
       - column: usr_label__primary
   reference_sfxi_archive:
-    label: SFXI archive
-    match_column: usr_label__primary
-    label_column: usr_label__primary
+    label: SFXI-scored archive
+    match_column: sfxi_ref__reference_instance_id
+    label_column: sfxi_ref__reference_instance_id
     label_mode: highlight_only
     where:
-      - column: usr_label__primary
-        regex: '^pDual-10-ES[0-9]+p(?:_context1kb_(?:forward|rc))?$'
+      - column: sfxi_ref__reference_instance_id
   reference_spyp_sulap:
     label: spyP / sulAp
     match_column: usr_label__primary
@@ -1302,7 +1464,7 @@ reference_sets:
       spyp_core60_context1kb_rc: spyP
       sulAp_core60_context1kb_rc: sulAp
   reference_native_mg1655:
-    label: Native MG1655
+    label: Native MG1655 GenBank panel
     match_column: usr_label__primary
     label_column: usr_label__primary
     label_limit: 32
@@ -1310,13 +1472,37 @@ reference_sets:
       - column: usr_label__primary
         regex: '^(aceBp|alaSp|aldAp|araBADp|argCBHp|cpxPp|fadEp|inaAp|katGp|marRABp|micFp|phoAp|ppcp|pspAp|pspGp|spyp|sulAp|umuDCp)(?:_context1kb_(?:forward|rc))?$'
   reference_native_mg1655_core60:
-    label: Native MG1655 core60
+    label: Native MG1655 GenBank core60
     match_column: usr_label__primary
     label_column: usr_label__primary
     label_limit: 32
     where:
       - column: usr_label__primary
         regex: '^(aceBp|alaSp|aldAp|araBADp|argCBHp|cpxPp|fadEp|inaAp|katGp|marRABp|micFp|phoAp|ppcp|pspAp|pspGp|spyp|sulAp|umuDCp)_core60(?:_context1kb_(?:forward|rc))?$'
+  reference_regulondb_native_core60_all:
+    label: RegulonDB native core60 cohort
+    match_column: derived__parent_id
+    label_column: regulondb__primary_promoter_name
+    label_mode: highlight_only
+    label_limit: 0
+    where_all:
+      - column: source_class
+        equals: native_regulondb
+      - column: derived__parent_dataset
+        equals: usr_regulondb_native_promoters
+  reference_regulondb_tf_axis_targets:
+    label: RegulonDB BaeR/CpxR/LexA TF-axis subset
+    match_column: derived__parent_id
+    label_column: regulondb__primary_promoter_name
+    label_mode: highlight_only
+    label_limit: 0
+    where:
+      - column: has_BaeR
+        equals: true
+      - column: has_CpxR
+        equals: true
+      - column: has_LexA
+        equals: true
   reference_anderson_igem:
     label: Anderson iGEM
     match_column: usr_label__primary
@@ -1852,18 +2038,45 @@ notebooks:
     show_missing_projection_placeholders: false
     preferred_hues:
       - gc_fraction
-      - sfxi_ref__metric_value
+      - sfxi_ref__sfxi
       - sig35_variant
       - spacer_length
       - source_family
       - selection_basis
     preferred_hue_kinds:
       gc_fraction: continuous
-      sfxi_ref__metric_value: continuous
+      sfxi_ref__sfxi: continuous
       sig35_variant: categorical
       spacer_length: ordinal
       source_family: categorical
       selection_basis: categorical
+    reference_hue_options:
+      - label: SFXI score
+        column: sfxi_ref__sfxi
+        type: continuous
+        reference_set_ids: [reference_sfxi_archive]
+      - label: SFXI logic fidelity
+        column: sfxi_ref__logic_fidelity
+        type: continuous
+        reference_set_ids: [reference_sfxi_archive]
+      - label: SFXI effect scaled
+        column: sfxi_ref__effect_scaled
+        type: continuous
+        reference_set_ids: [reference_sfxi_archive]
+      - label: Reference strength
+        column: promoter_standard__strength_value_numeric
+        type: continuous
+        reference_set_ids:
+          - reference_anderson_igem
+          - reference_anderson_igem_core60
+          - reference_w_collection
+          - reference_w_collection_core60
+      - label: Native TF bin
+        column: tf_bin
+        type: categorical
+        reference_set_ids:
+          - reference_regulondb_native_core60_all
+          - reference_regulondb_tf_axis_targets
     default_layout: candidate_grid
     default_compare_views:
       - intermediate_embedding_7b_anchor_60bp
@@ -1961,7 +2174,7 @@ recipes:
       - &align_ie7_anchor_mean {id: build_alignment_intermediate_embedding_7b_anchor_to_anchor_mean, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {alignment: intermediate_embedding_7b_anchor_to_anchor_mean}}
       - &align_ie7_rev_context {id: build_alignment_intermediate_embedding_7b_anchor_to_reverse_complement_context, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {alignment: intermediate_embedding_7b_anchor_to_reverse_complement_context}}
       - &align_ie7_rev_anchor_mean {id: build_alignment_intermediate_embedding_7b_anchor_to_reverse_complement_anchor_mean, op: alignment.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp, materialize_intermediate_embedding_7b_reverse_complement_context_anchor_mean], params: {alignment: intermediate_embedding_7b_anchor_to_reverse_complement_anchor_mean}}
-      - &score_sample_ie7_anchor {id: build_scorecard_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: &candidate_scorecard_sample_filter {column: source_class, in: [densegen, manual_or_wildtype]}}}
+      - &score_sample_ie7_anchor {id: build_scorecard_sample_intermediate_embedding_7b_anchor_60bp, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_anchor_60bp], params: {sample: scorecard_sample_intermediate_embedding_7b_anchor_60bp, view: intermediate_embedding_7b_anchor_60bp, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: &candidate_scorecard_sample_filter {column: source_class, in: [densegen, manual_or_wildtype, reference_control, construct_derived, legacy_construct_seed]}}}
       - &score_sample_ie7_full_context {id: build_scorecard_sample_intermediate_embedding_7b_full_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_1kb, view: intermediate_embedding_7b_full_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
       - &score_sample_ie7_anchor_mean {id: build_scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_full_context_anchor_mean], params: {sample: scorecard_sample_intermediate_embedding_7b_full_context_anchor_mean, view: intermediate_embedding_7b_full_context_anchor_mean, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
       - &score_sample_ie7_rev_context {id: build_scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb, op: sample.build, depends_on: [materialize_intermediate_embedding_7b_reverse_complement_context_1kb], params: {sample: scorecard_sample_intermediate_embedding_7b_reverse_complement_context_1kb, view: intermediate_embedding_7b_reverse_complement_context_1kb, strategy: stratified, n: 2048, group_column: design_family, seed: 17, reference_set_id: reference_scorecard_preserve_all, where: *candidate_scorecard_sample_filter}}
@@ -2645,6 +2858,8 @@ recipes:
             - reference_sfxi_archive
             - reference_native_mg1655
             - reference_native_mg1655_core60
+            - reference_regulondb_native_core60_all
+            - reference_regulondb_tf_axis_targets
             - reference_anderson_igem
             - reference_anderson_igem_core60
             - reference_w_collection
