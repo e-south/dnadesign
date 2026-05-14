@@ -206,6 +206,28 @@ def test_regulondb_reference_sets_separate_full_native_cohort_from_tf_axis_subse
             has_LexA=False,
         ),
         _row(
+            "native_b_core60_context1kb_forward",
+            source_family="construct_derived",
+            source_class="manual_or_wildtype",
+            derived__parent_id="usr_native_b",
+            derived__parent_dataset="usr_regulondb_native_promoters",
+            regulondb__primary_promoter_name="nativeB",
+            has_BaeR=False,
+            has_CpxR=True,
+            has_LexA=False,
+        ),
+        _row(
+            "native_c_core60_context1kb_forward",
+            source_family="construct_derived",
+            source_class="manual_or_wildtype",
+            derived__parent_id="usr_native_c",
+            derived__parent_dataset="usr_regulondb_native_promoters",
+            regulondb__primary_promoter_name="nativeC",
+            has_BaeR=False,
+            has_CpxR=False,
+            has_LexA=False,
+        ),
+        _row(
             "densegen_control",
             source_family="densegen_generated",
             source_class="densegen",
@@ -218,7 +240,11 @@ def test_regulondb_reference_sets_separate_full_native_cohort_from_tf_axis_subse
         ),
     ]
 
-    assert _matched("reference_regulondb_native_core60_all", rows) == ["usr_native_a", "usr_native_b"]
+    assert _matched("reference_regulondb_native_core60_all", rows) == [
+        "usr_native_a",
+        "usr_native_b",
+        "usr_native_c",
+    ]
     assert _matched("reference_regulondb_tf_axis_targets", rows) == ["usr_native_b"]
 
 

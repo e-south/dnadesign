@@ -928,6 +928,40 @@ def available_hues_for_frames(
     return available
 
 
+def available_reference_hues_for_frames(
+    frames: list[pd.DataFrame],
+    *,
+    preferred_hues: list[str],
+    hue_kinds: dict[str, str],
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    axis_styles: dict[str, object] | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
+) -> list[str]:
+    available: list[str] = []
+    for hue in preferred_hues:
+        hue_column = str(hue or "").strip()
+        if not hue_column:
+            continue
+        hue_kind = normalize_hue_kind(hue_kinds.get(hue_column)) or "continuous"
+        if (
+            reference_hue_render_params(
+                frames,
+                reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_hue_column=hue_column,
+                reference_hue_kind=hue_kind,
+                axis_styles=axis_styles,
+                x_column=x_column,
+                y_column=y_column,
+            )
+            is not None
+        ):
+            available.append(hue_column)
+    return available
+
+
 def classify_hue_series(series: pd.Series, *, configured_kind: object = None) -> str:
     explicit_kind = normalize_hue_kind(configured_kind)
     if explicit_kind is not None:

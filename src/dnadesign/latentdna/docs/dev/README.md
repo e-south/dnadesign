@@ -7,3 +7,4 @@ The development journal tracks the active tracer-bullet scope, shipped slices, a
 
 - [expanded-reference-view-contract.md](expanded-reference-view-contract.md)
 - [journal.md](journal.md)
+- [native-regulator-plan-margin-enrichment.md](native-regulator-plan-margin-enrichment.md)

@@ -10,6 +10,7 @@ from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime
 from dnadesign.latentdna.src.notebooks import rendering as notebook_rendering
 from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     available_hues_for_frames,
+    available_reference_hues_for_frames,
     candidate_hue_columns,
     category_color_map,
     classify_hue_series,
@@ -834,6 +835,41 @@ def test_reference_hue_render_params_supports_categorical_tf_bins() -> None:
     assert params["kind"] == "categorical"
     assert params["categories"] == ["Ethanol TF", "Lexa TF"]
     assert set(params["color_map"]) == {"Ethanol TF", "Lexa TF"}
+
+
+def test_available_reference_hues_for_frames_filters_to_selected_reference_rows() -> None:
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["native_a", "native_b", "densegen_0", "densegen_1"],
+                "synthetic_margin_ethanol_vs_background": [0.1, 0.2, -0.3, 0.4],
+                "synthetic_margin_cipro_vs_background": [0.4, 0.2, 0.1, -0.5],
+                "promoter_standard__strength_value_numeric": [np.nan, np.nan, 1.0, 9.0],
+                "tf_bin": ["ethanol_TF", "lexA_TF", None, None],
+            }
+        )
+    ]
+
+    assert available_hues_for_frames(
+        frames,
+        preferred_hues=["promoter_standard__strength_value_numeric", "tf_bin"],
+        hue_kinds={
+            "promoter_standard__strength_value_numeric": "continuous",
+            "tf_bin": "categorical",
+        },
+    ) == ["promoter_standard__strength_value_numeric", "tf_bin"]
+
+    assert available_reference_hues_for_frames(
+        frames,
+        preferred_hues=["promoter_standard__strength_value_numeric", "tf_bin"],
+        hue_kinds={
+            "promoter_standard__strength_value_numeric": "continuous",
+            "tf_bin": "categorical",
+        },
+        reference_labels=["native_a", "native_b"],
+        x_column="synthetic_margin_ethanol_vs_background",
+        y_column="synthetic_margin_cipro_vs_background",
+    ) == ["tf_bin"]
 
 
 def test_display_hue_label_names_sfxi_reference_metric() -> None:

@@ -28,6 +28,7 @@ from .browser_runtime_plot_review import load_plot_review_frames, render_plot_re
 from .browser_runtime_projection import enrich_projection_frame, load_projection_frame, render_projection_grid
 from .browser_runtime_support import (
     available_hues_for_frames,
+    available_reference_hues_for_frames,
     candidate_hue_columns,
     category_color_map,
     display_hue_label,
@@ -44,6 +45,7 @@ from .browser_runtime_support import (
     reference_annotation_mode_options,
     reference_label_limit_for_annotation_mode,
     resolve_labeled_option_card,
+    resolve_reference_annotation,
     style_notebook_axes,
     table_from_records,
     unique_in_order,
@@ -145,6 +147,7 @@ class BrowserPlotReview:
 @dataclass(frozen=True)
 class BrowserSupport:
     available_hues_for_frames: Callable[..., list[str]]
+    available_reference_hues_for_frames: Callable[..., list[str]]
     candidate_hue_columns: Callable[[pd.DataFrame, list[str], set[str] | None], list[str]]
     category_color_map: Callable[[list[str]], dict[str, str]]
     display_hue_label: Callable[[str], str]
@@ -162,6 +165,7 @@ class BrowserSupport:
     reference_label_limit_for_annotation_mode: Callable[[str | None], int | None]
     render_math_markdown: Callable[[str], object]
     resolve_labeled_option_card: Callable[..., dict[str, object] | None]
+    resolve_reference_annotation: Callable[..., dict[str, object]]
     select_plot_render_path: Callable[[list[Path]], Path | None]
     style_notebook_axes: Callable[..., None]
     table_from_records: Callable[..., object]
@@ -942,6 +946,7 @@ def build_workspace_browser_runtime(
         plot_review=plot_review,
         support=BrowserSupport(
             available_hues_for_frames=available_hues_for_frames,
+            available_reference_hues_for_frames=available_reference_hues_for_frames,
             candidate_hue_columns=candidate_hue_columns,
             category_color_map=partial(category_color_map, axis_styles=axis_styles),
             display_hue_label=partial(display_hue_label, axis_styles=axis_styles),
@@ -959,6 +964,7 @@ def build_workspace_browser_runtime(
             reference_label_limit_for_annotation_mode=reference_label_limit_for_annotation_mode,
             render_math_markdown=render_math_markdown,
             resolve_labeled_option_card=resolve_labeled_option_card,
+            resolve_reference_annotation=resolve_reference_annotation,
             select_plot_render_path=select_plot_render_path,
             style_notebook_axes=style_notebook_axes,
             table_from_records=table_from_records,

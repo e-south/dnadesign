@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-05-08
+**Last verified:** 2026-05-14
 
 Use this page after the checked-in study status tells you where the record stands.
 Use preflight when you need blockers or next-run readiness.
@@ -63,7 +63,7 @@ This page keeps the downstream handoff map in one place.
 - Primary workspace: `src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10`
 - First command: `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 --project reference_core60 --dry-run --format json`
 - Route note: Construct first derives fail-fast `analysis_window` reference views from native GenBank annotations, then emits paired forward and reverse-complement reference contexts. USR then converges DenseGen 60 bp anchors, native reference inserts, SFXI pDual rows, and reference core60 rows into the shared anchor dataset. After merge, `dnadesign.usr.scripts.materialize_promoter_anchor_sequence_views` writes one `construct_insert` anchor-only sequence view per merged row; native or designed exact-60 rows are not relabeled as `analysis_window`. The shared paired forward and reverse-complement pDual context refresh follows from that anchor handoff.
-- Native TF-axis extension: `usr_regulondb_native_promoters` has populated regulatory interactions, RegulonDB parent metadata is projected to `usr_regulondb_native_promoter_core60`, and that core60 source is merged into `usr_prom_eth_cip_anchor` before the existing `forward_anchor_window` project emits paired pDual contexts into `construct_prom_eth_cip_context`. Do not create a separate `construct_prom_eth_cip_native_tf_contexts` universe for this audit.
+- Native regulator landmark extension: `usr_regulondb_native_promoters` has populated regulatory interactions, RegulonDB parent metadata is projected to `usr_regulondb_native_promoter_core60`, and that core60 source is merged into `usr_prom_eth_cip_anchor` before the existing `forward_anchor_window` project emits paired pDual contexts into `construct_prom_eth_cip_context`. The BaeR/CpxR/LexA landmark audit uses the 3180 unambiguous parent-resolved native core60 rows; one duplicate core60 sequence collapses two NhaR-only native parents and is excluded from the single-parent regulator overlay. Do not create a separate `construct_prom_eth_cip_native_tf_contexts` universe for this audit.
 
 ### LatentDNA comparison surface
 
@@ -71,7 +71,7 @@ This page keeps the downstream handoff map in one place.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `current`; the workspace config supports the native TF-axis overlay, and generated LatentDNA view rows/plots/notebook outputs have been refreshed after the lineage-metadata change
+- Current state: `current`; the workspace config supports the BaeR/CpxR/LexA regulator landmark overlay, and generated LatentDNA view rows/plots/notebook outputs have been refreshed after the lineage-metadata change
 - Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
@@ -96,11 +96,14 @@ This page keeps the downstream handoff map in one place.
   - `context_pair_summary`
   - `reference_to_plan_centroid_heatmap`
   - `reference_standard_strength_audit`
-- Calibration overlay:
-  - `native_tf_axis_orientation_audit` reuses the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat` view after the shared anchor/context quota is expanded with `usr_regulondb_native_promoter_core60`; it requires `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet` and is a LatentDNA axis-orientation audit, not an OPAL input.
+- Pre-specified regulator landmark overlay:
+  - `native_tf_axis_orientation_audit` is the stable artifact id for the BaeR/CpxR/LexA regulator landmark audit. It reuses the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat` view after the shared anchor/context quota is expanded with `usr_regulondb_native_promoter_core60`; it requires `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet` and is not an OPAL input.
+- Configured exploratory regulator appendix:
+  - `native_regulator_plan_margin_enrichment` is specified in `src/dnadesign/latentdna/docs/dev/native-regulator-plan-margin-enrichment.md`. It tests source-backed RegulonDB regulator enrichments in synthetic-plan margins and fixed 5%/10% native tails, while keeping the existing BaeR/CpxR/LexA landmark audit separate from post-hoc regulator discovery. The first implementation emits contract tables; static plot promotion remains a separate renderer/notebook slice.
 - Appendix deliverables:
   - `sigma35_centroid_distance_gallery`
   - `native_tf_axis_orientation_audit`
+  - `native_regulator_plan_margin_enrichment`
   - `appendix_geometry_review`
   - `appendix_umap_gallery`
 - Snapshot attention surfaces: none for LatentDNA decision deliverables after the native lineage metadata/config update
@@ -122,9 +125,22 @@ This page keeps the downstream handoff map in one place.
   per-token output-logits diagnostics using the same pooling scopes, and
   log-likelihoods are scalar diagnostics; neither family is current decision
   geometry.
-- Browser hue controls are workspace-configured, not promoter hardcoded. The current browser promotes study metadata carried on materialized view rows, including `source_family`, `selection_basis`, `promoter_standard__collection_id`, and continuous `promoter_standard__strength_value_numeric` when those columns are present.
+- Browser hue controls are workspace-configured, not promoter hardcoded. The
+  main `Hue` menu colors population rows by metadata carried on materialized
+  view rows, including `source_family`, `selection_basis`,
+  `promoter_standard__collection_id`, and continuous
+  `promoter_standard__strength_value_numeric` when those columns are present.
+  Reference overlays use separate `Reference labels`, `Reference annotations`,
+  and `Reference hue` controls. `Reference hue` options are conditional on the
+  selected reference cohort and visible plot frame: SFXI-scored archive rows
+  expose `SFXI score`, `SFXI logic fidelity`, and `SFXI effect scaled`;
+  RegulonDB native core60 and BaeR/CpxR/LexA TF-axis rows expose
+  `Native TF bin`; Anderson and W collection rows expose `Reference strength`;
+  native MG1655 GenBank and spyP/sulAp overlays do not expose unsupported
+  reference hues.
 - Interpretation guardrails:
   - do not choose `X` by UMAP aesthetics
+  - do not compare absolute UMAP coordinates across population refreshes; seeded UMAPs still refit when rows are appended
   - do not read anchor-local mechanism out of pooled full-sequence vectors
   - describe `seq_mean`, `anchor_mean`, and `core60_mean` as token-position
     means over causal Evo2 states in the emitted orientation, not as native bidirectional encodings

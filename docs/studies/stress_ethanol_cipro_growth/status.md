@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-05-13
+- Last verified: 2026-05-14
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -21,7 +21,7 @@
 - Reference core60 handoff: `construct_prom_eth_cip_reference_core60` (`present`, 48 rows)
 - Reference context handoff: `construct_prom_eth_cip_reference_contexts` (`present`, 96 rows)
 - RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar populated with 3426 rows)
-- RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 rows; appended into the existing `usr_prom_eth_cip_anchor` study quota)
+- RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 sequence rows; 3180 unambiguous parent-resolved rows feed the TF-axis audit after one duplicate core60 sequence collapses two NhaR-only native parents)
 - Canonical consolidated feature dataset: `usr_prom_eth_cip_matrix` (`planned`)
 - Logical reference feature entry: `infer_prom_eth_cip_reference_views_7b` (`planned`, not separately materialized; current payloads live in dataset-local `_derived/infer/` sidecars)
 
@@ -121,6 +121,22 @@ feature sidecars. The default browser geometries include the controlled
 equal-block bidirectional forward/RC anchor-mean candidate. Appendix
 deliverables remain secondary review material, not the evidence source for
 selecting `X`.
+
+UMAP coordinates are seeded but population-fit dependent. The current appendix
+UMAPs were fit with explicit recipe seeds over the expanded `160460`-row
+candidate population; adding the RegulonDB-native audit quota legitimately
+changes the fitted 2D coordinates even when the underlying Infer sidecars remain
+complete and non-stale. Treat UMAPs as orientation views only and compare
+high-dimensional scalar/neighbor metrics for study decisions.
+
+Browser reference overlay controls are cohort-gated. The main `Hue` menu colors
+the population rows, while `Reference labels`, `Reference annotations`, and the
+separate `Reference hue` menu control star overlays. SFXI-scored archive rows
+expose `SFXI score`, `SFXI logic fidelity`, and `SFXI effect scaled`; Anderson
+and W collection rows expose `Reference strength`; RegulonDB native core60 and
+BaeR/CpxR/LexA TF-axis rows expose `Native TF bin`; spyP/sulAp and native
+MG1655 GenBank panels currently remain label/highlight overlays without numeric
+reference hues.
 
 Pooling semantics guardrail: Infer mean-pools over token positions. Because
 Evo2 token states are causal in the emitted orientation, `anchor_mean` is a

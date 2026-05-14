@@ -1,12 +1,13 @@
 schema_version: 1
 catalog_order: 7
 tool: latentdna
-summary: Pre-assay triage workflows, workspace contracts, and read-only QC surfaces for promoter studies.
+summary: Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes.
 keywords:
-  - promoter
-  - pre-assay triage
+  - representations
+  - comparison
+  - plots
+  - notebooks
   - downstream
-  - qc
   - embeddings
 routes:
   - id: promoter-study-representation-comparison

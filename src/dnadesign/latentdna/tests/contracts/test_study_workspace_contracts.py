@@ -709,6 +709,12 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "native_tf_axis_orientation_audit",
         "native_tf_axis_orientation_tests",
     ]
+    assert context.config.deliverables["native_regulator_plan_margin_enrichment"].recipe == (
+        "native_regulator_plan_margin_enrichment_recipe"
+    )
+    assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["scalars"] == [
+        "native_regulator_plan_margin_enrichment"
+    ]
     assert context.config.exports == {}
 
 
@@ -718,6 +724,9 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     pre_assay_steps = {step.id: step for step in _recipe_steps(context, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
     native_tf_steps = {step.id: step for step in _recipe_steps(context, "native_tf_axis_orientation_audit_recipe")}
+    regulator_margin_steps = {
+        step.id: step for step in _recipe_steps(context, "native_regulator_plan_margin_enrichment_recipe")
+    }
 
     assert "materialize_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
     assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" not in pre_assay_steps
@@ -795,6 +804,7 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "column": "derived__parent_dataset",
         "equals": "usr_regulondb_native_promoters",
     }
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["expected_output_rows"] == 3180
     assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["association_overlay"]["row_key"] == (
         "derived__parent_id"
     )
@@ -802,6 +812,33 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "column": "derived__parent_dataset",
         "equals": "usr_regulondb_native_promoters",
     }
+    regulator_margin_params = regulator_margin_steps["build_native_regulator_plan_margin_enrichment"].params
+    assert regulator_margin_params["kind"] == "native_regulator_plan_margin_enrichment"
+    assert regulator_margin_params["view_id"] == "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    assert regulator_margin_params["native_filter"] == {
+        "column": "derived__parent_dataset",
+        "equals": "usr_regulondb_native_promoters",
+    }
+    assert regulator_margin_params["expected_output_rows"] == 3180
+    assert regulator_margin_params["native_metadata_columns"] == [
+        "alias_id",
+        "regulondb__primary_promoter_id",
+        "regulondb__primary_promoter_name",
+    ]
+    assert list(regulator_margin_params["centroid_groups"]) == ["background", "ethanol", "cipro", "dual"]
+    assert regulator_margin_params["thresholds"] == [0.05, 0.1]
+    assert regulator_margin_params["tail_modes"] == [
+        "margin_top_quantile",
+        "margin_top_quantile_nearest_plan_only",
+    ]
+    assert regulator_margin_params["regulatory_interactions"]["row_key"] == "derived__parent_id"
+    assert regulator_margin_params["regulatory_interactions"]["required_columns"] == [
+        "source_release",
+        "source_route",
+        "regulatory_interaction_id",
+        "confidence",
+        "evidence",
+    ]
     assert all(
         step.params.get("kind")
         not in {

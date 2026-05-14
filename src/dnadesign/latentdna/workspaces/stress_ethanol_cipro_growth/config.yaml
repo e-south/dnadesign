@@ -1486,8 +1486,6 @@ reference_sets:
     label_mode: highlight_only
     label_limit: 0
     where_all:
-      - column: source_class
-        equals: native_regulondb
       - column: derived__parent_dataset
         equals: usr_regulondb_native_promoters
   reference_regulondb_tf_axis_targets:
@@ -3468,6 +3466,7 @@ recipes:
               has_CpxR: [CpxR]
               has_LexA: [LexA]
           output_filter: {column: derived__parent_dataset, equals: usr_regulondb_native_promoters}
+          expected_output_rows: 3180
           output_columns:
             - alias_id
             - construct__anchor_id
@@ -3498,6 +3497,67 @@ recipes:
         op: plot.render
         depends_on: [build_native_tf_axis_orientation_tests]
         params: {plot_id: native_tf_axis_orientation_audit}
+  native_regulator_plan_margin_enrichment_recipe:
+    steps:
+      - id: materialize_regulator_margin_context_forward_anchor_mean
+        op: view.materialize
+        params: {view: intermediate_embedding_7b_full_context_anchor_mean}
+      - id: materialize_regulator_margin_context_reverse_complement_anchor_mean
+        op: view.materialize
+        params: {view: intermediate_embedding_7b_reverse_complement_context_anchor_mean}
+      - id: derive_regulator_margin_context_anchor_mean_bidir_concat
+        op: view.derive
+        depends_on:
+          - materialize_regulator_margin_context_forward_anchor_mean
+          - materialize_regulator_margin_context_reverse_complement_anchor_mean
+        params: {view: intermediate_embedding_7b_context_anchor_mean_bidir_concat}
+      - id: build_native_regulator_plan_margin_enrichment
+        op: scalar.build
+        depends_on:
+          - derive_regulator_margin_context_anchor_mean_bidir_concat
+        params:
+          scalar: native_regulator_plan_margin_enrichment
+          kind: native_regulator_plan_margin_enrichment
+          view_id: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+          cohort_column: design_family
+          centroid_groups:
+            background: [background_only]
+            ethanol: [ethanol]
+            cipro: [ciprofloxacin]
+            dual: [ethanol_ciprofloxacin]
+          native_filter: {column: derived__parent_dataset, equals: usr_regulondb_native_promoters}
+          expected_output_rows: 3180
+          native_metadata_columns:
+            - alias_id
+            - regulondb__primary_promoter_id
+            - regulondb__primary_promoter_name
+          regulatory_interactions:
+            path: ../../../usr/datasets/usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet
+            row_key: derived__parent_id
+            relation_key: usr_id
+            regulator_column: regulator_abbrev
+            required_columns:
+              - source_release
+              - source_route
+              - regulatory_interaction_id
+              - confidence
+              - evidence
+          thresholds: [0.05, 0.10]
+          tail_modes:
+            - margin_top_quantile
+            - margin_top_quantile_nearest_plan_only
+          min_global_promoters: 10
+          min_tail_hits: 3
+          fdr_method: benjamini_hochberg
+          common_regulators:
+            - CRP
+            - FNR
+            - Fis
+            - H-NS
+            - IHF
+            - Fur
+            - Lrp
+            - ArcA
 deliverables:
   dataset_overview:
     title: Dataset overview
@@ -3632,6 +3692,21 @@ deliverables:
         - native_tf_axis_orientation_audit
     docs_refs:
       - study:stress_ethanol_cipro_growth/deliverables/native_tf_axis_orientation_audit
+    acceptance_checks: []
+  native_regulator_plan_margin_enrichment:
+    title: Native regulator plan-margin enrichment
+    section: Appendix
+    question: Which source-backed RegulonDB regulator associations are enriched among native promoter-core60 rows with high synthetic-plan margins?
+    summary: Exploratory regulator-association enrichment over fixed native 5% and 10% synthetic-plan margin tails; not an OPAL input.
+    recipe: native_regulator_plan_margin_enrichment_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_context_anchor_mean_bidir_concat
+    outputs:
+      scalars:
+        - native_regulator_plan_margin_enrichment
+    docs_refs:
+      - study:stress_ethanol_cipro_growth/deliverables/native_regulator_plan_margin_enrichment
     acceptance_checks: []
   appendix_geometry_review:
     title: Appendix geometry review

@@ -78,3 +78,14 @@ def test_reference_annotation_mode_selector_controls_geometry_and_plot_label_lim
     assert "plot_reference_annotation_selector" in plot_review_cell
     assert "_support = runtime.support" in plot_review_cell
     assert "reference_label_limit=plot_reference_label_limit" in plot_review_cell
+
+
+def test_reference_hue_selector_depends_on_selected_reference_widget_value() -> None:
+    geometry_hue_cell = render_geometry_hue_selector_cell()
+    plot_review_cell = render_plot_review_cell()
+
+    assert "def _(\n    active_plot_frames," in plot_review_cell
+    assert "plot_reference_selector," in plot_review_cell
+    assert '_selected_reference = str(plot_reference_selector.value or "")' in plot_review_cell
+    assert "def _(\n    geometry_reference_selector," in geometry_hue_cell
+    assert '_selected_reference = str(geometry_reference_selector.value or "")' in geometry_hue_cell

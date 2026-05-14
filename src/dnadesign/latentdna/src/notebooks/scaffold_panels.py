@@ -145,13 +145,11 @@ def render_plot_review_cell() -> str:
             get_requested_plot_hue,
             get_requested_plot_reference,
             get_requested_plot_reference_annotation_mode,
-            get_requested_plot_reference_hue,
             runtime,
             selected_plot_card,
             set_requested_plot_hue,
             set_requested_plot_reference,
             set_requested_plot_reference_annotation_mode,
-            set_requested_plot_reference_hue,
             surface_selector,
         ):
             _renderers = runtime.renderers
@@ -162,7 +160,6 @@ def render_plot_review_cell() -> str:
             plot_filter_selector = None
             plot_hue_selector = None
             plot_reference_annotation_selector = None
-            plot_reference_hue_selector = None
             plot_reference_selector = None
             if (
                 str(surface_selector.value) == "plots"
@@ -275,42 +272,6 @@ def render_plot_review_cell() -> str:
                         label="Reference labels",
                         on_change=set_requested_plot_reference,
                     )
-                    _reference_hue_options = (
-                        runtime.geometry.reference_hue_options_by_reference_set.get(_selected_reference)
-                        or {"Black stars": ""}
-                    )
-                    _reference_hue_columns = [
-                        column for column in _reference_hue_options.values() if str(column).strip()
-                    ]
-                    _available_reference_hues = set(
-                        _support.available_hues_for_frames(
-                            active_plot_frames,
-                            preferred_hues=_reference_hue_columns,
-                            hue_kinds=runtime.geometry.reference_hue_kinds,
-                        )
-                    )
-                    _reference_hue_options = {
-                        label: column
-                        for label, column in _reference_hue_options.items()
-                        if not str(column).strip() or column in _available_reference_hues
-                    } or {"Black stars": ""}
-                    _reference_hue_values = set(_reference_hue_options.values())
-                    _requested_reference_hue = str(get_requested_plot_reference_hue() or "")
-                    _selected_reference_hue = (
-                        _requested_reference_hue if _requested_reference_hue in _reference_hue_values else ""
-                    )
-                    plot_reference_hue_selector = _support.mo.ui.dropdown(
-                        options=_reference_hue_options,
-                        value=(
-                            _support.option_key_for_value(
-                                _reference_hue_options,
-                                _selected_reference_hue,
-                            )
-                            or next(iter(_reference_hue_options))
-                        ),
-                        label="Reference hue",
-                        on_change=set_requested_plot_reference_hue,
-                    )
                     _annotation_mode_options = _support.reference_annotation_mode_options()
                     _annotation_mode_values = set(_annotation_mode_options.values())
                     _requested_annotation_mode = str(get_requested_plot_reference_annotation_mode() or "auto")
@@ -335,9 +296,97 @@ def render_plot_review_cell() -> str:
                 plot_filter_selector,
                 plot_hue_selector,
                 plot_reference_annotation_selector,
-                plot_reference_hue_selector,
                 plot_reference_selector,
             )
+
+
+        @app.cell
+        def _(
+            active_plot_frames,
+            get_requested_plot_reference_hue,
+            plot_reference_selector,
+            runtime,
+            selected_plot_card,
+            set_requested_plot_reference_hue,
+            surface_selector,
+        ):
+            _support = runtime.support
+
+            plot_reference_hue_selector = None
+            if (
+                str(surface_selector.value) == "plots"
+                and selected_plot_card is not None
+                and bool(selected_plot_card.get("live_render"))
+                and plot_reference_selector is not None
+            ):
+                _plot_spec = dict(selected_plot_card.get("plot_spec") or {})
+                _reference_enabled_kinds = {
+                    "projection_grid",
+                    "projection_scatter",
+                    "xy_scatter_grid",
+                    "paired_xy_scatter_grid",
+                }
+                if str(_plot_spec.get("kind") or "") in _reference_enabled_kinds:
+                    _selected_reference = str(plot_reference_selector.value or "")
+                    _reference_annotation = _support.resolve_reference_annotation(
+                        _selected_reference,
+                        active_plot_frames,
+                        workspace_dir=runtime.identity.workspace_dir,
+                        fallback_labels=[],
+                        label_limit=0,
+                    )
+                    _reference_labels = [
+                        str(value)
+                        for value in _reference_annotation.get("labels", [])
+                        if str(value).strip()
+                    ]
+                    _reference_match_column = str(
+                        _reference_annotation.get("match_column") or "usr_label__primary"
+                    )
+                    _reference_hue_options = (
+                        runtime.geometry.reference_hue_options_by_reference_set.get(_selected_reference)
+                        or {"Black stars": ""}
+                    )
+                    _reference_hue_columns = [
+                        column for column in _reference_hue_options.values() if str(column).strip()
+                    ]
+                    _reference_x_column = str(_plot_spec.get("x_column") or "x")
+                    _reference_y_column = str(_plot_spec.get("y_column") or "y")
+                    _available_reference_hues = set(
+                        _support.available_reference_hues_for_frames(
+                            active_plot_frames,
+                            preferred_hues=_reference_hue_columns,
+                            hue_kinds=runtime.geometry.reference_hue_kinds,
+                            reference_labels=_reference_labels,
+                            reference_match_column=_reference_match_column,
+                            axis_styles=runtime.geometry.axis_styles,
+                            x_column=_reference_x_column,
+                            y_column=_reference_y_column,
+                        )
+                    )
+                    _reference_hue_options = {
+                        label: column
+                        for label, column in _reference_hue_options.items()
+                        if not str(column).strip() or column in _available_reference_hues
+                    } or {"Black stars": ""}
+                    _reference_hue_values = set(_reference_hue_options.values())
+                    _requested_reference_hue = str(get_requested_plot_reference_hue() or "")
+                    _selected_reference_hue = (
+                        _requested_reference_hue if _requested_reference_hue in _reference_hue_values else ""
+                    )
+                    plot_reference_hue_selector = _support.mo.ui.dropdown(
+                        options=_reference_hue_options,
+                        value=(
+                            _support.option_key_for_value(
+                                _reference_hue_options,
+                                _selected_reference_hue,
+                            )
+                            or next(iter(_reference_hue_options))
+                        ),
+                        label="Reference hue",
+                        on_change=set_requested_plot_reference_hue,
+                    )
+            return (plot_reference_hue_selector,)
 
 
         @app.cell
@@ -739,12 +788,10 @@ def render_geometry_hue_selector_cell() -> str:
             get_requested_hue,
             get_requested_reference,
             get_requested_reference_annotation_mode,
-            get_requested_reference_hue,
             runtime,
             set_requested_hue,
             set_requested_reference,
             set_requested_reference_annotation_mode,
-            set_requested_reference_hue,
         ):
             _geometry = runtime.geometry
             _support = runtime.support
@@ -795,46 +842,6 @@ def render_geometry_hue_selector_cell() -> str:
                 if _has_reference_overlay_options
                 else None
             )
-            _reference_hue_options = (
-                _geometry.reference_hue_options_by_reference_set.get(_selected_reference)
-                or {"Black stars": ""}
-            )
-            _reference_hue_columns = [
-                column for column in _reference_hue_options.values() if str(column).strip()
-            ]
-            _available_reference_hues = set(
-                _support.available_hues_for_frames(
-                    projection_frames,
-                    preferred_hues=_reference_hue_columns,
-                    hue_kinds=_geometry.reference_hue_kinds,
-                )
-            )
-            _reference_hue_options = {
-                label: column
-                for label, column in _reference_hue_options.items()
-                if not str(column).strip() or column in _available_reference_hues
-            } or {"Black stars": ""}
-            _reference_hue_values = set(_reference_hue_options.values())
-            _requested_reference_hue = str(get_requested_reference_hue() or "")
-            _selected_reference_hue = (
-                _requested_reference_hue if _requested_reference_hue in _reference_hue_values else ""
-            )
-            geometry_reference_hue_selector = (
-                _support.mo.ui.dropdown(
-                    options=_reference_hue_options,
-                    value=(
-                        _support.option_key_for_value(
-                            _reference_hue_options,
-                            _selected_reference_hue,
-                        )
-                        or next(iter(_reference_hue_options))
-                    ),
-                    label="Reference hue",
-                    on_change=set_requested_reference_hue,
-                )
-                if _has_reference_overlay_options
-                else None
-            )
             _annotation_mode_options = _support.reference_annotation_mode_options()
             _annotation_mode_values = set(_annotation_mode_options.values())
             _requested_annotation_mode = str(get_requested_reference_annotation_mode() or "auto")
@@ -859,10 +866,80 @@ def render_geometry_hue_selector_cell() -> str:
             )
             return (
                 geometry_reference_annotation_selector,
-                geometry_reference_hue_selector,
                 geometry_reference_selector,
                 hue_selector,
             )
+
+
+        @app.cell
+        def _(
+            geometry_reference_selector,
+            get_requested_reference_hue,
+            projection_frames,
+            runtime,
+            set_requested_reference_hue,
+        ):
+            _geometry = runtime.geometry
+            _support = runtime.support
+
+            geometry_reference_hue_selector = None
+            if geometry_reference_selector is not None:
+                _selected_reference = str(geometry_reference_selector.value or "")
+                _reference_hue_options = (
+                    _geometry.reference_hue_options_by_reference_set.get(_selected_reference)
+                    or {"Black stars": ""}
+                )
+                _reference_annotation = _support.resolve_reference_annotation(
+                    _selected_reference,
+                    projection_frames,
+                    workspace_dir=runtime.identity.workspace_dir,
+                    fallback_labels=[],
+                    label_limit=0,
+                )
+                _reference_labels = [
+                    str(value)
+                    for value in _reference_annotation.get("labels", [])
+                    if str(value).strip()
+                ]
+                _reference_match_column = str(
+                    _reference_annotation.get("match_column") or "usr_label__primary"
+                )
+                _reference_hue_columns = [
+                    column for column in _reference_hue_options.values() if str(column).strip()
+                ]
+                _available_reference_hues = set(
+                    _support.available_reference_hues_for_frames(
+                        projection_frames,
+                        preferred_hues=_reference_hue_columns,
+                        hue_kinds=_geometry.reference_hue_kinds,
+                        reference_labels=_reference_labels,
+                        reference_match_column=_reference_match_column,
+                        axis_styles=_geometry.axis_styles,
+                    )
+                )
+                _reference_hue_options = {
+                    label: column
+                    for label, column in _reference_hue_options.items()
+                    if not str(column).strip() or column in _available_reference_hues
+                } or {"Black stars": ""}
+                _reference_hue_values = set(_reference_hue_options.values())
+                _requested_reference_hue = str(get_requested_reference_hue() or "")
+                _selected_reference_hue = (
+                    _requested_reference_hue if _requested_reference_hue in _reference_hue_values else ""
+                )
+                geometry_reference_hue_selector = _support.mo.ui.dropdown(
+                    options=_reference_hue_options,
+                    value=(
+                        _support.option_key_for_value(
+                            _reference_hue_options,
+                            _selected_reference_hue,
+                        )
+                        or next(iter(_reference_hue_options))
+                    ),
+                    label="Reference hue",
+                    on_change=set_requested_reference_hue,
+                )
+            return (geometry_reference_hue_selector,)
         """
     )
 

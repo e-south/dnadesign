@@ -175,7 +175,7 @@ def _fit_projection_step(
         projection_id=str(_require_param(params, "projection_id", "run_id")),
         sample_id=str(_require_param(params, "sample_id", "sample")),
         metric=_optional_param(params, "metric", default=None),
-        seed=int(_optional_param(params, "seed", default=17)),
+        seed=int(_require_param(params, "seed")),
         allow_memory_overage=allow_memory_overage,
         force=force,
     )

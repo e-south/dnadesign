@@ -277,6 +277,10 @@ def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
         step_ids.add(step.id)
         if step.op not in SUPPORTED_RECIPE_OPS:
             raise WorkspaceValidationError(f"recipe {recipe_id} uses unsupported op {step.op!r}")
+        if step.op == "projection.fit" and "seed" not in step.params:
+            raise WorkspaceValidationError(
+                f"recipe {recipe_id} step {step.id} projection.fit must declare an explicit seed"
+            )
 
     for step in recipe.steps:
         for dependency in step.depends_on:

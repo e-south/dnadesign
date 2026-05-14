@@ -27,6 +27,7 @@ from ..sources.resolver import inspect_source_schema, read_records_table, resolv
 from ..views.row_contracts import derivation_dependency_columns
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
+from .builders.regulatory_plan_margin import build_native_regulator_plan_margin_enrichment_scalar
 from .classification_metrics import binary_metrics, dual_joint_margin
 from .common import (
     BuiltScalarArtifact,
@@ -1015,15 +1016,21 @@ def _tf_axis_audit_output_columns(
     return _dedupe_columns([*base_columns, *required_tf_columns, *_TF_AXIS_DERIVED_COLUMNS])
 
 
-def _resolve_workspace_table_path(context: WorkspaceContext, raw_path: object, *, param_name: str) -> Path:
+def _resolve_workspace_table_path(
+    context: WorkspaceContext,
+    raw_path: object,
+    *,
+    param_name: str,
+    contract_name: str = "tf_axis_orientation_audit association_overlay",
+) -> Path:
     text = str(raw_path or "").strip()
     if not text:
-        raise ContractViolationError(f"tf_axis_orientation_audit association_overlay requires {param_name}")
+        raise ContractViolationError(f"{contract_name} requires {param_name}")
     path = Path(text)
     if not path.is_absolute():
         path = context.workspace_dir / path
     if not path.is_file():
-        raise MissingArtifactError(f"tf_axis_orientation_audit association overlay is missing: {path}")
+        raise MissingArtifactError(f"{contract_name} is missing: {path}")
     return path
 
 
@@ -1144,6 +1151,7 @@ def _tf_axis_orientation_audit_table(
     association_overlay: object,
     output_filter: object,
     output_columns: object,
+    expected_output_rows: int | None = None,
 ) -> tuple[pa.Table, list[ScalarInputRef], dict[str, object]]:
     centroid_matrix_path, centroid_rows_path = _view_paths(context, view_id)
     centroid_matrix = np.asarray(read_matrix(centroid_matrix_path), dtype=np.float32)
@@ -1246,6 +1254,11 @@ def _tf_axis_orientation_audit_table(
         metric_rows.append(output)
     output_rows = [{column: row.get(column) for column in projected_columns} for row in metric_rows]
     table = pa.Table.from_pylist(output_rows)
+    if expected_output_rows is not None and table.num_rows != expected_output_rows:
+        raise ContractViolationError(
+            "tf_axis_orientation_audit expected_output_rows mismatch: "
+            f"expected {expected_output_rows}, observed {table.num_rows}"
+        )
     input_refs = [
         ScalarInputRef(kind="view_matrix", artifact_id=view_id, path=centroid_matrix_path),
         ScalarInputRef(kind="view_rows", artifact_id=view_id, path=centroid_rows_path),
@@ -1268,6 +1281,7 @@ def _tf_axis_orientation_audit_table(
             "input_rows": audit_rows_table.num_rows,
             "filtered_rows": len(metric_rows),
             "rows": table.num_rows,
+            "expected_output_rows": expected_output_rows,
             "embedding_view": embedding_view or resolved_audit_view_id,
             "tf_bin_counts": dict(Counter(row["tf_bin"] for row in output_rows)),
             "output_columns": projected_columns,
@@ -2590,6 +2604,13 @@ def build_scalar_artifact(
             stats=stats,
         )
 
+    if builder_kind == "native_regulator_plan_margin_enrichment":
+        return build_native_regulator_plan_margin_enrichment_scalar(
+            context,
+            artifact_dir=artifact_dir,
+            params=params,
+        )
+
     if builder_kind == "tf_axis_orientation_audit":
         audit_view_raw = _optional_param(params, "audit_view_id", default=None)
         table, inputs, stats = _tf_axis_orientation_audit_table(
@@ -2603,6 +2624,11 @@ def build_scalar_artifact(
             association_overlay=_optional_param(params, "association_overlay", default=None),
             output_filter=_optional_param(params, "output_filter", default=None),
             output_columns=_optional_param(params, "output_columns", default=None),
+            expected_output_rows=(
+                int(_optional_param(params, "expected_output_rows", default=0))
+                if "expected_output_rows" in params
+                else None
+            ),
         )
         write_table(table, artifact_dir / "table.parquet")
         return BuiltScalarArtifact(
