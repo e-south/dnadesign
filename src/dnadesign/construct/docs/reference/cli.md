@@ -6,6 +6,9 @@
 ### Command map
 
 - `uv run construct run --config <path> [--dry-run] [--format text|json]`
+- `uv run construct compose validate --config <path> [--format text|json]`
+- `uv run construct compose run --config <path> [--format text|json]`
+- `uv run construct compose review --bundle <artifact-bundle> [--nucleotide-font-size-px <float>] [--format text|json]`
 - `uv run construct validate config --config <path> [--runtime] [--format text|json]`
 - `uv run construct seed import-manifest --manifest <path> [--root <usr-root>]`
 - `uv run construct seed anchor-template-demo [--root <usr-root>] [--manifest <path>]`
@@ -58,6 +61,32 @@ Run output reports:
 
 `--format json` emits the run summary as a machine-readable payload, including
 the dry-run flag, output root, and spec id.
+
+### `compose`
+
+`compose` is the workspace-less route for declared linear ssDNA segment specs.
+Use it when the caller has already selected the parts and wants Construct to
+emit a local artifact bundle rather than a USR-backed template/context run.
+
+- `compose validate` parses `linear_ssdna_composition_v1`, checks segment
+  transforms, span bounds, repeat policy, and planned sequence length, and
+  exits before writing outputs.
+- `compose run` writes the artifact bundle declared by the config, including
+  assembled sequence exports, manifest metadata, visual contracts, and optional
+  Folding/BaseRender handoff artifacts.
+- `compose review` reads an existing bundle and publishes the two-panel
+  composition review when the required structure and component-span artifacts
+  are present.
+
+Failure posture:
+
+- invalid YAML or schema fails before runtime work
+- annotations cannot create sequence and may only interpret validated spans
+- visual and folding evidence are generated for the canonical component unit
+  unless a future contract explicitly declares a repeat-expanded evidence
+  surface
+- Folding remains advisory or required according to the composition config, but
+  missing backend state is always explicit
 
 ### `seed anchor-template-demo`
 

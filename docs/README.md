@@ -16,7 +16,10 @@ Start with:
 
 ### Inspect available work
 
-Use this table when the first question is "what is available right now?" rather than "which workflow should I run?"
+Use this table when the first question is "what is available right now?"
+rather than "which workflow should I run?" It lists workspace and dataset
+roots only; stateless services such as Folding and BaseRender consume
+producer-owned artifacts instead of owning workspaces.
 
 | Tool | What it owns | First command | Next doc |
 | --- | --- | --- | --- |
@@ -36,6 +39,7 @@ Use these when one tool owns the next step.
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
 | Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Set up the SCC Evo2 infer GPU environment | [BU SCC install bootstrap](bu-scc/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Run Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
@@ -52,8 +56,7 @@ Use these when data moves through more than one tool and the shared record lives
 | Review the promoter-study Evo2 route before choosing the next step | [Promoter study Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter-evo2-journey.md) | Continue to [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared handoff. |
 | Check the current promoter-study record | [Promoter study status contract](../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md) | Read the active selector in [Promoter study index](studies/index.yaml), then open the matching study directory from [Study records](studies/README.md). Open `docs/studies/<study-id>/routes.md` when you need the current downstream owner handoff after the snapshot answer. |
 | Run the deeper promoter-study command preflight | [Promoter study preflight contract](../src/dnadesign/usr/docs/operations/promoter-study-preflight.md) | Start from [Study index](studies/index.yaml), use `ops.study.yaml` for lifecycle and scope posture, and use `pipeline.yaml` when present for the exact Construct, Infer, Notify, and runbook paths. Return to `routes.md` after the blocker answer when the next need is owner-surface navigation. |
-| Check the current Cruncher retron hairpin study | [Cruncher study status contract](../src/dnadesign/cruncher/docs/operations/cruncher-study-status.md) | Start from [Study records](studies/README.md), then open the checked-in [retron hairpin design study](studies/retron_hairpin_design/status.md) and its `routes.md` when you need the owner-surface handoff after the snapshot answer. |
-| Run the deeper Cruncher retron hairpin preflight | [Cruncher study preflight](../src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md) | Use the study's `ops.study.yaml` for scope posture and `pipeline.yaml` for the exact command groups, then return to `routes.md` after the blocker answer. |
+| Navigate a checked-in study without exposing study-specific routes here | [Study records index](studies/README.md) | Use the active selector or named study directory, then open that study's `routes.md`, `ops.study.yaml`, and `pipeline.yaml` for family-owned status, preflight, or compiler routes. |
 | Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active study selector, `family`, and `record_root` in [Study index](studies/index.yaml). |
 | Build a promoter-study feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
@@ -71,31 +74,45 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 
 ### Tool docs
 
-The CLI table includes both workflow-owning tools and stateless service
-surfaces. Prefer workspace/dataset routers for user work; call service CLIs
-such as `folding` only when a producer has already emitted the required
-contract artifacts or bundle manifest.
+These sections keep unlike package surfaces separate without adding more
+columns. Prefer workspace/dataset routers for user work; call service CLIs such
+as `folding` only when a producer has already emitted the required contract
+artifacts or bundle manifest.
+
+#### Workspace and analysis tools
 
 | Tool | CLI | Docs |
 | --- | --- | --- |
 | `aligner` | n/a | [aligner README](../src/dnadesign/aligner/README.md) |
-| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md) |
 | `billboard` | n/a | [billboard README](../src/dnadesign/billboard/README.md) |
 | `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
-| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); stateless service, no workspace |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `libshuffle` | n/a | [libshuffle README](../src/dnadesign/libshuffle/README.md) |
 | `nmf` | n/a | [nmf README](../src/dnadesign/nmf/README.md) |
-| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |
-| `notify` | `uv run notify --help` | [notify README](../src/dnadesign/notify/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter README](../src/dnadesign/permuter/README.md) |
 | `tfkdanalysis` | n/a | [tfkdanalysis README](../src/dnadesign/tfkdanalysis/README.md) |
 | `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
+
+#### Stateless services and operator surfaces
+
+| Tool | CLI | Docs |
+| --- | --- | --- |
+| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md); stateless renderer |
+| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); stateless service, no workspace |
+| `notify` | `uv run notify --help` | [notify README](../src/dnadesign/notify/README.md) |
+| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |
+
+#### Shared contracts and routing
+
+| Surface | CLI | Docs |
+| --- | --- | --- |
+| `contracts` | n/a | [contracts README](../src/dnadesign/contracts/README.md) |
+| `studies` | n/a | [studies README](../src/dnadesign/studies/README.md) |
 
 ### System records
 
