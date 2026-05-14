@@ -16,6 +16,13 @@ class StrictNotebookModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class WorkspaceNotebookReferenceHueOption(StrictNotebookModel):
+    label: str
+    column: str
+    type: HueKind = "continuous"
+    reference_set_ids: list[str] = Field(default_factory=list)
+
+
 class WorkspaceNotebookConfig(StrictNotebookModel):
     kind: Literal["workspace"]
     title: str
@@ -33,6 +40,7 @@ class WorkspaceNotebookConfig(StrictNotebookModel):
     show_missing_projection_placeholders: bool = False
     preferred_hues: list[str] = Field(default_factory=list)
     preferred_hue_kinds: dict[str, HueKind] = Field(default_factory=dict)
+    reference_hue_options: list["WorkspaceNotebookReferenceHueOption"] = Field(default_factory=list)
     default_layout: str | None = None
     default_compare_views: list[str] = Field(default_factory=list)
 
@@ -71,6 +79,7 @@ class WorkspaceNotebookTableRef(StrictNotebookModel):
     columns: list[str]
     manifest_path: str | None = None
     view_ids: list[str] = Field(default_factory=list)
+    compatible_view_ids: list[str] = Field(default_factory=list)
 
 
 class WorkspaceNotebookLayoutPreset(StrictNotebookModel):
@@ -175,6 +184,10 @@ class WorkspaceNotebookGeometryControls(StrictNotebookModel):
     comparison_bases: list[WorkspaceNotebookComparisonBasis]
     reference_labels: list[str]
     reference_sets: list[WorkspaceNotebookReferenceSet] = Field(default_factory=list)
+    reference_hue_options: list[WorkspaceNotebookReferenceHueOption] = Field(default_factory=list)
+    reference_hue_options_by_reference_set: dict[str, list[WorkspaceNotebookReferenceHueOption]] = Field(
+        default_factory=dict
+    )
     candidate_sets: list[WorkspaceNotebookCandidateSet] = Field(default_factory=list)
     compare_metrics: WorkspaceNotebookCompareMetrics
 

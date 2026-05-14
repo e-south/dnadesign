@@ -54,10 +54,12 @@ __all__ = ["build_workspace_browser_runtime", "load_workspace_notebook_controls"
 
 
 _ALLOWED_RUNTIME_HUE_KINDS = {"categorical", "binary", "continuous", "ordinal"}
-_REFERENCE_HUE_OPTIONS = {
+_LEGACY_REFERENCE_HUE_OPTIONS = {
     "Black stars": "",
     "Reference strength": "promoter_standard__strength_value_numeric",
-    "SFXI metric": "sfxi_ref__metric_value",
+    "SFXI score": "sfxi_ref__sfxi",
+    "SFXI logic fidelity": "sfxi_ref__logic_fidelity",
+    "SFXI effect scaled": "sfxi_ref__effect_scaled",
 }
 _PLOT_REVIEW_LIVE_RENDER_KINDS = {
     "projection_grid",
@@ -124,7 +126,9 @@ class BrowserGeometry:
     reference_annotation_default: str
     reference_annotation_options: dict[str, str]
     reference_hue_columns: list[str]
+    reference_hue_kinds: dict[str, str]
     reference_hue_options: dict[str, str]
+    reference_hue_options_by_reference_set: dict[str, dict[str, str]]
     reference_labels: list[str]
     reference_required_columns: list[str]
     reference_sets: list[dict[str, object]]
@@ -316,6 +320,81 @@ def _reference_required_columns(reference_sets: list[dict[str, object]]) -> list
             if text and text not in columns:
                 columns.append(text)
     return columns
+
+
+def _reference_hue_option_rows(geometry_control: dict[str, object]) -> list[dict[str, object]]:
+    configured = geometry_control.get("reference_hue_options", [])
+    rows: list[dict[str, object]] = []
+    if isinstance(configured, list):
+        for row in configured:
+            if isinstance(row, dict):
+                rows.append(row)
+    if rows:
+        return rows
+    return [
+        {"label": label, "column": column, "type": "continuous"}
+        for label, column in _LEGACY_REFERENCE_HUE_OPTIONS.items()
+    ]
+
+
+def _reference_hue_options(geometry_control: dict[str, object]) -> dict[str, str]:
+    configured = _reference_hue_option_rows(geometry_control)
+    options = {"Black stars": ""}
+    for row in configured:
+        column = str(row.get("column") or "").strip()
+        label = str(row.get("label") or "").strip()
+        if not column:
+            continue
+        if not label:
+            label = display_hue_label(column)
+        if label in options and options[label] != column:
+            label = f"{label} [{column}]"
+        options[label] = column
+    if len(options) > 1:
+        return options
+    return dict(_LEGACY_REFERENCE_HUE_OPTIONS)
+
+
+def _reference_hue_kinds(geometry_control: dict[str, object]) -> dict[str, str]:
+    kinds: dict[str, str] = {}
+    for row in _reference_hue_option_rows(geometry_control):
+        column = str(row.get("column") or "").strip()
+        kind = str(row.get("type") or "continuous").strip()
+        if column and kind:
+            kinds[column] = kind
+    return kinds
+
+
+def _reference_hue_options_by_reference_set(
+    geometry_control: dict[str, object],
+    reference_sets: list[dict[str, object]],
+) -> dict[str, dict[str, str]]:
+    configured = geometry_control.get("reference_hue_options_by_reference_set", {})
+    options_by_reference_set: dict[str, dict[str, str]] = {}
+    if isinstance(configured, dict):
+        for reference_set_id, rows in configured.items():
+            reference_options = {"Black stars": ""}
+            if isinstance(rows, list):
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    column = str(row.get("column") or "").strip()
+                    if not column:
+                        continue
+                    label = str(row.get("label") or "").strip() or display_hue_label(column)
+                    if label in reference_options and reference_options[label] != column:
+                        label = f"{label} [{column}]"
+                    reference_options[label] = column
+            options_by_reference_set[str(reference_set_id)] = reference_options
+    if options_by_reference_set:
+        return options_by_reference_set
+
+    all_options = _reference_hue_options(geometry_control)
+    return {
+        str(row.get("reference_set_id")): dict(all_options)
+        for row in reference_sets
+        if str(row.get("reference_set_id") or "").strip()
+    }
 
 
 def _live_plot_status_rows(catalog_plots: list[dict[str, object]] | None) -> dict[str, dict[str, object]]:
@@ -740,7 +819,12 @@ def build_workspace_browser_runtime(
         if configured_default_reference_set in set(reference_annotation_options.values())
         else ""
     )
-    reference_hue_options = dict(_REFERENCE_HUE_OPTIONS)
+    reference_hue_options = _reference_hue_options(geometry_control)
+    reference_hue_options_by_reference_set = _reference_hue_options_by_reference_set(
+        geometry_control,
+        reference_sets,
+    )
+    reference_hue_kinds = _reference_hue_kinds(geometry_control)
     reference_hue_columns = [value for value in reference_hue_options.values() if value]
     reference_required_columns = list(
         dict.fromkeys([*_reference_required_columns(reference_sets), *reference_hue_columns])
@@ -847,7 +931,9 @@ def build_workspace_browser_runtime(
             reference_annotation_default=reference_annotation_default,
             reference_annotation_options=reference_annotation_options,
             reference_hue_columns=reference_hue_columns,
+            reference_hue_kinds=reference_hue_kinds,
             reference_hue_options=reference_hue_options,
+            reference_hue_options_by_reference_set=reference_hue_options_by_reference_set,
             reference_labels=reference_labels,
             reference_required_columns=reference_required_columns,
             reference_sets=reference_sets,

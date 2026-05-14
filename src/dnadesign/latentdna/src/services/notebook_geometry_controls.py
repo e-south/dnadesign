@@ -13,6 +13,7 @@ from ..contracts.notebook import (
     WorkspaceNotebookGeometry,
     WorkspaceNotebookGeometryControls,
     WorkspaceNotebookLayoutPreset,
+    WorkspaceNotebookReferenceHueOption,
     WorkspaceNotebookReferenceSet,
     WorkspaceNotebookTableRef,
 )
@@ -20,6 +21,8 @@ from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..labels import humanize_candidate
 from ..metadata_axes import axis_style_map_from_config, axis_styles_payload
+from ..metadata_join_keys import JOINABLE_KEY_COLUMNS, candidate_join_key_pairs_for_columns
+from ..reference_sets import reference_set_required_columns
 from ..visual_style import reference_annotation_label
 from .candidate_set_service import build_workspace_candidate_sets, candidate_set_view_ids
 from .view_shape_cache import ViewShapeCache
@@ -44,14 +47,29 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "context_shift_l2": "continuous",
 }
 
-_JOINABLE_KEY_COLUMNS = {
-    "alias_id",
-    "construct__anchor_id",
-    "id",
-    "alignment_parent_sequence_id",
-    "subject_id",
-    "context_id",
-}
+_DEFAULT_REFERENCE_HUE_OPTIONS = [
+    WorkspaceNotebookReferenceHueOption(
+        label="Reference strength",
+        column="promoter_standard__strength_value_numeric",
+        type="continuous",
+    ),
+    WorkspaceNotebookReferenceHueOption(
+        label="SFXI score",
+        column="sfxi_ref__sfxi",
+        type="continuous",
+    ),
+    WorkspaceNotebookReferenceHueOption(
+        label="SFXI logic fidelity",
+        column="sfxi_ref__logic_fidelity",
+        type="continuous",
+    ),
+    WorkspaceNotebookReferenceHueOption(
+        label="SFXI effect scaled",
+        column="sfxi_ref__effect_scaled",
+        type="continuous",
+    ),
+]
+
 _DEFAULT_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {
@@ -210,6 +228,53 @@ def _preferred_hue_kind_defaults(context, *, notebook_id: str | None) -> dict[st
     }
 
 
+def _reference_hue_options(context, *, notebook_id: str | None) -> list[WorkspaceNotebookReferenceHueOption]:
+    notebook = _resolve_notebook(context, notebook_id)
+    configured = list(getattr(notebook, "reference_hue_options", []) or []) if notebook is not None else []
+    options = configured or list(_DEFAULT_REFERENCE_HUE_OPTIONS)
+    exposed_reference_set_ids = {
+        reference_set_id
+        for reference_set_id, reference_set in context.config.reference_sets.items()
+        if bool(getattr(reference_set, "notebook_exposed", True))
+    }
+    seen_keys: set[tuple[str, tuple[str, ...]]] = set()
+    resolved: list[WorkspaceNotebookReferenceHueOption] = []
+    for option in options:
+        column = str(option.column or "").strip()
+        label = str(option.label or "").strip()
+        if not column or not label:
+            continue
+        reference_set_ids = [str(value).strip() for value in option.reference_set_ids if str(value).strip()]
+        unknown_reference_set_ids = sorted(set(reference_set_ids) - exposed_reference_set_ids)
+        if unknown_reference_set_ids:
+            joined = ", ".join(unknown_reference_set_ids)
+            raise ValueError(
+                f"reference_hue_options for {column!r} reference unknown notebook reference_sets: {joined}"
+            )
+        key = (column, tuple(reference_set_ids))
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        resolved.append(
+            WorkspaceNotebookReferenceHueOption(
+                label=label,
+                column=column,
+                type=option.type,
+                reference_set_ids=reference_set_ids,
+            )
+        )
+    return resolved
+
+
+def _reference_required_columns_from_config(context) -> set[str]:
+    columns: set[str] = set()
+    for reference_set in context.config.reference_sets.values():
+        if not bool(getattr(reference_set, "notebook_exposed", True)):
+            continue
+        columns.update(reference_set_required_columns(reference_set))
+    return {column for column in columns if column}
+
+
 def _view_shape(view_id: str, *, shape_cache: ViewShapeCache) -> tuple[int, int] | None:
     rows, dims = shape_cache.get(view_id)
     if rows is None or dims is None:
@@ -315,11 +380,33 @@ def _table_targets_visible_views(
     return bool(manifest_view_ids.intersection(visible_view_ids))
 
 
+def _schema_field_names(schema: object) -> set[str]:
+    return {str(field.name) for field in schema}
+
+
+def _compatible_table_view_ids(
+    *,
+    table_columns: set[str],
+    view_row_schemas_by_id: dict[str, object],
+    visible_view_ids: set[str],
+) -> set[str]:
+    compatible_view_ids: set[str] = set()
+    for view_id, schema in view_row_schemas_by_id.items():
+        if view_id not in visible_view_ids:
+            continue
+        view_columns = _schema_field_names(schema)
+        if candidate_join_key_pairs_for_columns(view_columns, table_columns):
+            compatible_view_ids.add(view_id)
+    return compatible_view_ids
+
+
 def _table_inventory(
     context,
     *,
     visible_view_ids: set[str],
+    view_row_schemas_by_id: dict[str, object],
     joinable_value_columns: set[str],
+    cross_view_value_columns: set[str],
 ) -> tuple[list[WorkspaceNotebookTableRef], dict[str, object]]:
     inventory: list[WorkspaceNotebookTableRef] = []
     schemas: dict[str, object] = {}
@@ -353,14 +440,22 @@ def _table_inventory(
                 continue
             relative_path = table_path.relative_to(context.output_root).as_posix()
             schema = read_schema(table_path)
-            field_names = [field.name for field in schema]
-            if not _JOINABLE_KEY_COLUMNS.intersection(field_names):
+            field_names = [str(field.name) for field in schema]
+            field_name_set = set(field_names)
+            if not JOINABLE_KEY_COLUMNS.intersection(field_name_set):
                 continue
-            if not joinable_value_columns.intersection(field_names):
+            if not joinable_value_columns.intersection(field_name_set):
                 continue
             schemas[relative_path] = schema
             row_scope_view_ids = _manifest_view_ids(manifest, input_kinds={"view_rows"})
             table_view_ids = row_scope_view_ids or _manifest_view_ids(manifest)
+            compatible_view_ids: set[str] = set()
+            if cross_view_value_columns.intersection(field_name_set):
+                compatible_view_ids = _compatible_table_view_ids(
+                    table_columns=field_name_set,
+                    view_row_schemas_by_id=view_row_schemas_by_id,
+                    visible_view_ids=visible_view_ids,
+                )
             inventory.append(
                 WorkspaceNotebookTableRef(
                     kind=kind,
@@ -371,6 +466,7 @@ def _table_inventory(
                         manifest_path.relative_to(context.output_root).as_posix() if manifest_path.is_file() else None
                     ),
                     view_ids=sorted(table_view_ids),
+                    compatible_view_ids=sorted(compatible_view_ids),
                 )
             )
     return inventory, schemas
@@ -603,6 +699,20 @@ def _reference_set_controls(context) -> list[WorkspaceNotebookReferenceSet]:
     return controls
 
 
+def _reference_hue_options_by_reference_set(
+    reference_sets: list[WorkspaceNotebookReferenceSet],
+    reference_hue_options: list[WorkspaceNotebookReferenceHueOption],
+) -> dict[str, list[WorkspaceNotebookReferenceHueOption]]:
+    reference_set_ids = [row.reference_set_id for row in reference_sets]
+    options_by_reference_set = {reference_set_id: [] for reference_set_id in reference_set_ids}
+    for option in reference_hue_options:
+        scoped_reference_set_ids = [value for value in option.reference_set_ids if value in options_by_reference_set]
+        target_reference_set_ids = scoped_reference_set_ids or reference_set_ids
+        for reference_set_id in target_reference_set_ids:
+            options_by_reference_set[reference_set_id].append(option)
+    return options_by_reference_set
+
+
 def _comparison_bases(
     context, geometry_rows: list[WorkspaceNotebookGeometry]
 ) -> list[WorkspaceNotebookComparisonBasis]:
@@ -692,6 +802,7 @@ def build_workspace_geometry_controls(
     notebook = _resolve_notebook(context, notebook_id)
     preferred_hue_order = _preferred_hue_order(context, notebook_id=notebook_id)
     default_hue_kinds = _preferred_hue_kind_defaults(context, notebook_id=notebook_id)
+    reference_hue_options = _reference_hue_options(context, notebook_id=notebook_id)
     geometries = _geometry_inventory(
         context,
         projection_ids_by_view=projection_ids_by_view,
@@ -706,14 +817,25 @@ def build_workspace_geometry_controls(
         visible_view_ids=visible_view_ids,
         shape_cache=shapes,
     )
-    joinable_tables, schemas_by_path = _table_inventory(
-        context,
-        visible_view_ids=visible_view_ids,
-        joinable_value_columns=_DEFAULT_JOINABLE_VALUE_COLUMNS | set(preferred_hue_order),
-    )
     view_row_schemas_by_id = _view_row_schema_inventory(
         context,
         visible_view_ids=visible_view_ids,
+    )
+    reference_required_columns = _reference_required_columns_from_config(context)
+    reference_hue_columns = {option.column for option in reference_hue_options}
+    view_row_columns = {field.name for schema in view_row_schemas_by_id.values() for field in schema}
+    cross_view_value_columns = (reference_required_columns | reference_hue_columns).difference(view_row_columns)
+    joinable_tables, schemas_by_path = _table_inventory(
+        context,
+        visible_view_ids=visible_view_ids,
+        view_row_schemas_by_id=view_row_schemas_by_id,
+        joinable_value_columns=(
+            _DEFAULT_JOINABLE_VALUE_COLUMNS
+            | set(preferred_hue_order)
+            | reference_required_columns
+            | reference_hue_columns
+        ),
+        cross_view_value_columns=cross_view_value_columns,
     )
     hue_kinds = _preferred_hue_kinds(
         joinable_tables,
@@ -724,9 +846,9 @@ def build_workspace_geometry_controls(
     )
     preferred_hues = [column for column in preferred_hue_order if column in hue_kinds]
     axis_styles = _axis_style_controls(context)
-    view_row_columns = {field.name for schema in view_row_schemas_by_id.values() for field in schema}
     row_metadata_hues = [column for column in preferred_hue_order if column in hue_kinds and column in view_row_columns]
     comparison_bases = _comparison_bases(context, geometries)
+    reference_sets = _reference_set_controls(context)
     default_compare_left, default_compare_right = _default_compare_views(
         context,
         geometries,
@@ -757,7 +879,12 @@ def build_workspace_geometry_controls(
         layout_presets=layout_presets,
         comparison_bases=comparison_bases,
         reference_labels=_reference_labels(context),
-        reference_sets=_reference_set_controls(context),
+        reference_sets=reference_sets,
+        reference_hue_options=reference_hue_options,
+        reference_hue_options_by_reference_set=_reference_hue_options_by_reference_set(
+            reference_sets,
+            reference_hue_options,
+        ),
         candidate_sets=candidate_sets,
         compare_metrics=WorkspaceNotebookCompareMetrics(
             sample_rows=192,

@@ -809,8 +809,35 @@ def test_reference_hue_render_params_supports_semantic_xy_columns() -> None:
     assert params["cmap"] == "viridis"
 
 
+def test_reference_hue_render_params_supports_categorical_tf_bins() -> None:
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["bae", "lex", "densegen_0"],
+                "synthetic_margin_ethanol_vs_background": [0.3, 0.6, -0.2],
+                "synthetic_margin_cipro_vs_background": [0.1, 0.4, -0.3],
+                "tf_bin": ["ethanol_TF", "lexA_TF", "neither"],
+            }
+        )
+    ]
+
+    params = reference_hue_render_params(
+        frames,
+        reference_labels=["bae", "lex"],
+        reference_hue_column="tf_bin",
+        reference_hue_kind="categorical",
+        x_column="synthetic_margin_ethanol_vs_background",
+        y_column="synthetic_margin_cipro_vs_background",
+    )
+
+    assert params is not None
+    assert params["kind"] == "categorical"
+    assert params["categories"] == ["Ethanol TF", "Lexa TF"]
+    assert set(params["color_map"]) == {"Ethanol TF", "Lexa TF"}
+
+
 def test_display_hue_label_names_sfxi_reference_metric() -> None:
-    assert display_hue_label("sfxi_ref__metric_value") == "SFXI metric"
+    assert display_hue_label("sfxi_ref__metric_value") == "SFXI selected metric"
 
 
 def test_reference_label_limit_for_annotation_mode_maps_notebook_options() -> None:

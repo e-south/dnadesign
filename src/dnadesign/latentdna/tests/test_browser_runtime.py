@@ -291,7 +291,71 @@ def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monk
             "layout_presets": [],
             "comparison_bases": [],
             "reference_labels": [],
-            "reference_sets": [],
+            "reference_sets": [
+                {
+                    "reference_set_id": "reference_sfxi_archive",
+                    "label": "SFXI archive",
+                    "match_column": "usr_label__primary",
+                    "label_column": "promoter_standard__display_name",
+                    "label_mode": "label_and_highlight",
+                    "label_limit": 32,
+                    "explicit_ids": [],
+                    "selector_columns": [],
+                },
+                {
+                    "reference_set_id": "reference_native_mg1655",
+                    "label": "Native MG1655 GenBank panel",
+                    "match_column": "usr_label__primary",
+                    "label_column": "promoter_standard__display_name",
+                    "label_mode": "label_and_highlight",
+                    "label_limit": 32,
+                    "explicit_ids": [],
+                    "selector_columns": [],
+                },
+            ],
+            "reference_hue_options": [
+                {
+                    "label": "SFXI score",
+                    "column": "sfxi_ref__sfxi",
+                    "type": "continuous",
+                    "reference_set_ids": ["reference_sfxi_archive"],
+                },
+                {
+                    "label": "SFXI logic fidelity",
+                    "column": "sfxi_ref__logic_fidelity",
+                    "type": "continuous",
+                    "reference_set_ids": ["reference_sfxi_archive"],
+                },
+                {
+                    "label": "SFXI effect scaled",
+                    "column": "sfxi_ref__effect_scaled",
+                    "type": "continuous",
+                    "reference_set_ids": ["reference_sfxi_archive"],
+                },
+            ],
+            "reference_hue_options_by_reference_set": {
+                "reference_sfxi_archive": [
+                    {
+                        "label": "SFXI score",
+                        "column": "sfxi_ref__sfxi",
+                        "type": "continuous",
+                        "reference_set_ids": ["reference_sfxi_archive"],
+                    },
+                    {
+                        "label": "SFXI logic fidelity",
+                        "column": "sfxi_ref__logic_fidelity",
+                        "type": "continuous",
+                        "reference_set_ids": ["reference_sfxi_archive"],
+                    },
+                    {
+                        "label": "SFXI effect scaled",
+                        "column": "sfxi_ref__effect_scaled",
+                        "type": "continuous",
+                        "reference_set_ids": ["reference_sfxi_archive"],
+                    },
+                ],
+                "reference_native_mg1655": [],
+            },
             "candidate_sets": [],
             "compare_metrics": {},
         },
@@ -329,8 +393,18 @@ def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monk
     assert runtime.identity.dimensionality_text == "candidate_view=16"
     assert runtime.support.reference_annotation_mode_options()["Show text labels"] == "show_labels"
     assert runtime.support.reference_label_limit_for_annotation_mode("show_labels") == -1
-    assert runtime.geometry.reference_hue_options["SFXI metric"] == "sfxi_ref__metric_value"
-    assert "sfxi_ref__metric_value" in runtime.geometry.reference_required_columns
+    assert runtime.geometry.reference_hue_options["SFXI score"] == "sfxi_ref__sfxi"
+    assert runtime.geometry.reference_hue_kinds["sfxi_ref__sfxi"] == "continuous"
+    assert runtime.geometry.reference_hue_options_by_reference_set["reference_sfxi_archive"] == {
+        "Black stars": "",
+        "SFXI score": "sfxi_ref__sfxi",
+        "SFXI logic fidelity": "sfxi_ref__logic_fidelity",
+        "SFXI effect scaled": "sfxi_ref__effect_scaled",
+    }
+    assert runtime.geometry.reference_hue_options_by_reference_set["reference_native_mg1655"] == {"Black stars": ""}
+    assert "sfxi_ref__sfxi" in runtime.geometry.reference_required_columns
+    assert "sfxi_ref__logic_fidelity" in runtime.geometry.reference_required_columns
+    assert "sfxi_ref__effect_scaled" in runtime.geometry.reference_required_columns
 
 
 def test_reference_annotation_options_keep_label_selection_separate_from_hues() -> None:

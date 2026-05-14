@@ -45,6 +45,7 @@ from .browser_runtime_support import (
     load_artifact_manifest,
     load_table,
     normalize_categorical_hue_series,
+    normalize_hue_kind,
     reference_hue_coverage_warnings,
     reference_hue_render_params,
     resolve_reference_annotation,
@@ -437,6 +438,7 @@ def render_plot_review_surface(
     reference_set_id: str | None = None,
     reference_label_limit: int | None = None,
     reference_hue_column: str | None = None,
+    reference_hue_kind: str | None = None,
     joinable_tables: list[dict[str, object]],
     output_root: Path,
     workspace_dir: Path,
@@ -479,6 +481,7 @@ def render_plot_review_surface(
             reference_set_id=reference_set_id,
             reference_label_limit=reference_label_limit,
             reference_hue_column=reference_hue_column,
+            reference_hue_kind=reference_hue_kind,
             hue_options=list(resolved_plot_spec.get("hue_options", []) or []),
             output_root=output_root,
             workspace_dir=workspace_dir,
@@ -514,6 +517,7 @@ def render_plot_review_surface(
             reference_display_labels=reference_display_labels,
             reference_label_limit=reference_label_limit,
             reference_hue_column=reference_hue_column,
+            reference_hue_kind=reference_hue_kind,
             alt_text=plot_alt_text,
         )
     if kind == "categorical_count":
@@ -553,6 +557,7 @@ def _render_scatter_grid(
     reference_display_labels: dict[str, str],
     reference_label_limit: int | None,
     reference_hue_column: str | None,
+    reference_hue_kind: str | None,
     alt_text: str,
 ):
     if not frames or not any(not frame.empty for frame in frames):
@@ -566,6 +571,7 @@ def _render_scatter_grid(
     resolved_frames = [frame for frame in frames]
     hue_kinds = _configured_hue_kinds(plot_spec)
     effective_reference_hue = str(reference_hue_column or "").strip()
+    effective_reference_hue_kind = normalize_hue_kind(reference_hue_kind) or "continuous"
     reference_warnings: list[str] = []
     reference_hue_params: dict[str, object] | None = None
     if effective_reference_hue and reference_labels:
@@ -575,6 +581,7 @@ def _render_scatter_grid(
                 reference_labels=reference_labels,
                 reference_match_column=reference_match_column,
                 reference_hue_column=effective_reference_hue,
+                reference_hue_kind=effective_reference_hue_kind,
                 x_column=x_column,
                 y_column=y_column,
             )
@@ -584,12 +591,14 @@ def _render_scatter_grid(
             reference_labels=reference_labels,
             reference_match_column=reference_match_column,
             reference_hue_column=effective_reference_hue,
+            reference_hue_kind=effective_reference_hue_kind,
+            axis_styles=axis_styles,
             x_column=x_column,
             y_column=y_column,
         )
         if reference_hue_params is None:
             reference_warnings.append(
-                f"reference hue `{effective_reference_hue}` has no finite values for selected reference rows"
+                f"reference hue `{effective_reference_hue}` has no values for selected reference rows"
             )
             effective_reference_hue = ""
 
@@ -1007,6 +1016,9 @@ def _render_scatter_grid(
         bottom_margin = max(legend_bottom, 0.08)
         if has_long_explicit_axis_labels and panel_count > 1:
             bottom_margin = max(bottom_margin, 0.16)
+    reference_hue_params_kind = (
+        normalize_hue_kind(reference_hue_params.get("kind")) if reference_hue_params is not None else None
+    )
     if reference_hue_params is not None:
         label_right_padding_px = max(label_right_padding_px, 42.0)
 
@@ -1074,7 +1086,7 @@ def _render_scatter_grid(
                 reference_hue_column=effective_reference_hue or None,
                 reference_hue_params=reference_hue_params,
             )
-    if reference_hue_params is not None and effective_reference_hue:
+    if reference_hue_params is not None and effective_reference_hue and reference_hue_params_kind == "continuous":
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
 
@@ -1095,6 +1107,36 @@ def _render_scatter_grid(
             fontsize=11.0,
             color=TEXT_COLOR,
         )
+    elif reference_hue_params is not None and effective_reference_hue and reference_hue_params_kind != "continuous":
+        from matplotlib.lines import Line2D
+
+        categories = [str(value) for value in list(reference_hue_params.get("categories") or []) if str(value).strip()]
+        color_map = {str(key): str(value) for key, value in dict(reference_hue_params.get("color_map") or {}).items()}
+        if categories:
+            legend_handles = [
+                Line2D(
+                    [0],
+                    [0],
+                    marker="*",
+                    linestyle="",
+                    markersize=9.0,
+                    markerfacecolor=color_map.get(category, "#111111"),
+                    markeredgecolor="white",
+                    label=category,
+                )
+                for category in categories[:8]
+            ]
+            legend = fig.legend(
+                legend_handles,
+                [handle.get_label() for handle in legend_handles],
+                loc="center left",
+                bbox_to_anchor=(0.925, 0.5),
+                frameon=False,
+                title=display_hue_label(effective_reference_hue, axis_styles=axis_styles),
+                borderaxespad=0.0,
+                handletextpad=0.45,
+            )
+            style_notebook_legend(legend)
     rendered = render_matplotlib_figure(fig, alt=alt_text)
     if reference_warnings:
         return mo.vstack(

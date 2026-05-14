@@ -368,7 +368,7 @@ def test_render_projection_grid_surfaces_missing_reference_hue_values(monkeypatc
 
     assert isinstance(rendered, mo.Html)
     assert "Reference overlay warning" in rendered.text
-    assert "reference hue `promoter_standard__strength_value_numeric` has no finite values" in rendered.text
+    assert "reference hue `promoter_standard__strength_value_numeric` has no values" in rendered.text
 
 
 def test_render_projection_grid_forwards_reference_label_limit_override(
@@ -1241,6 +1241,125 @@ def test_load_projection_frame_reads_only_join_and_required_view_row_columns(mon
     assert frame["design_family"].tolist() == ["ethanol", "cipro"]
     assert "unused_large_metadata" not in frame.columns
     assert observed_columns_by_name["rows.parquet"] == ["design_family", "id"]
+
+
+def test_load_projection_frame_uses_table_compatible_view_ids_for_required_hue(tmp_path: Path) -> None:
+    output_root = tmp_path
+    _write_view_rows(
+        output_root,
+        "context_view",
+        pd.DataFrame({"construct__anchor_id": ["anchor0", "anchor1"]}),
+    )
+    projection_dir = output_root / "projections" / "proj_context"
+    _write_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id="proj_context",
+        status="ok",
+        inputs=[{"kind": "view_matrix", "id": "context_view"}],
+    )
+    pd.DataFrame(
+        {
+            "construct__anchor_id": ["anchor0", "anchor1"],
+            "x": [0.0, 1.0],
+            "y": [1.0, 0.0],
+        }
+    ).to_parquet(projection_dir / "coords.parquet", index=False)
+    _write_scalar_table(
+        output_root,
+        "native_tf_axis_orientation_audit",
+        pd.DataFrame(
+            {
+                "construct__anchor_id": ["anchor0", "anchor1"],
+                "tf_bin": ["neither", "ethanol_TF"],
+            }
+        ),
+    )
+
+    frame = projection_runtime.load_projection_frame(
+        "context_view",
+        "proj_context",
+        [
+            {
+                "artifact_id": "native_tf_axis_orientation_audit",
+                "relative_path": "scalars/native_tf_axis_orientation_audit/table.parquet",
+                "columns": ["construct__anchor_id", "tf_bin"],
+                "view_ids": ["source_view"],
+                "compatible_view_ids": ["context_view"],
+            }
+        ],
+        output_root=output_root,
+        required_columns=["tf_bin"],
+    )
+
+    assert not frame.empty
+    assert frame["tf_bin"].tolist() == ["neither", "ethanol_TF"]
+
+
+def test_load_projection_frame_preserves_sfxi_reference_hues_from_view_rows(tmp_path: Path) -> None:
+    output_root = tmp_path
+    _write_view_rows(
+        output_root,
+        "context_view",
+        pd.DataFrame(
+            {
+                "id": ["ctx0", "ctx1", "ctx2"],
+                "sfxi_ref__reference_instance_id": ["pDual-10-ES1p", "pDual-10-ES2p", None],
+                "sfxi_ref__sfxi": [0.056, 0.189, None],
+                "sfxi_ref__logic_fidelity": [0.4, 0.7, None],
+                "sfxi_ref__effect_scaled": [0.14, 0.27, None],
+            }
+        ),
+    )
+    projection_dir = output_root / "projections" / "proj_context"
+    _write_manifest(
+        projection_dir,
+        artifact_kind="projection",
+        artifact_id="proj_context",
+        status="ok",
+        inputs=[{"kind": "view_matrix", "id": "context_view"}],
+    )
+    pd.DataFrame(
+        {
+            "id": ["ctx0", "ctx1", "ctx2"],
+            "x": [0.0, 1.0, 2.0],
+            "y": [2.0, 1.0, 0.0],
+        }
+    ).to_parquet(projection_dir / "coords.parquet", index=False)
+
+    sfxi_hues = [
+        "sfxi_ref__sfxi",
+        "sfxi_ref__logic_fidelity",
+        "sfxi_ref__effect_scaled",
+    ]
+    frame = projection_runtime.load_projection_frame(
+        "context_view",
+        "proj_context",
+        [],
+        output_root=output_root,
+        required_columns=["sfxi_ref__reference_instance_id", *sfxi_hues],
+    )
+
+    assert not frame.empty
+    assert frame["sfxi_ref__reference_instance_id"].iloc[:2].tolist() == ["pDual-10-ES1p", "pDual-10-ES2p"]
+    assert pd.isna(frame["sfxi_ref__reference_instance_id"].iloc[2])
+    assert (
+        projection_runtime.available_hues_for_frames(
+            [frame],
+            preferred_hues=sfxi_hues,
+            hue_kinds={hue: "continuous" for hue in sfxi_hues},
+        )
+        == sfxi_hues
+    )
+    params = projection_runtime.reference_hue_render_params(
+        [frame],
+        reference_labels=["pDual-10-ES1p", "pDual-10-ES2p"],
+        reference_match_column="sfxi_ref__reference_instance_id",
+        reference_hue_column="sfxi_ref__logic_fidelity",
+        reference_hue_kind="continuous",
+    )
+    assert params is not None
+    assert params["kind"] == "continuous"
 
 
 def test_load_projection_frame_does_not_badge_warning_only_ok_manifest(tmp_path: Path) -> None:

@@ -28,6 +28,7 @@ from ..metadata_axes import (
     normalize_axis_category,
     ordered_categories_for_axis,
 )
+from ..metadata_join_keys import candidate_join_key_pairs_for_columns
 from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
@@ -576,7 +577,17 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
     if column == "promoter_standard__strength_value_numeric":
         return "Reference strength"
     if column == "sfxi_ref__metric_value":
-        return "SFXI metric"
+        return "SFXI selected metric"
+    if column == "sfxi_ref__sfxi":
+        return "SFXI score"
+    if column == "sfxi_ref__logic_fidelity":
+        return "SFXI logic fidelity"
+    if column == "sfxi_ref__effect_scaled":
+        return "SFXI effect scaled"
+    if column == "sfxi_ref__effect_raw":
+        return "SFXI raw effect"
+    if column == "tf_bin":
+        return "Native TF bin"
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
         scope = "1 kb construct context" if "__template_1kb_" in column else "anchor-source insert"
@@ -743,24 +754,7 @@ def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str
 
 
 def candidate_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> list[tuple[str, str]]:
-    candidate_pairs = [
-        ("alias_id", "alias_id"),
-        ("construct__anchor_id", "construct__anchor_id"),
-        ("construct__anchor_id", "id"),
-        # Anchor-only projection rows should join context summary tables by anchor id.
-        ("id", "construct__anchor_id"),
-        ("id", "id"),
-        ("alignment_parent_sequence_id", "alignment_parent_sequence_id"),
-        ("subject_id", "subject_id"),
-        ("context_id", "context_id"),
-    ]
-    left_columns = set(left.columns)
-    right_columns = set(right.columns)
-    return [
-        (left_key, right_key)
-        for left_key, right_key in candidate_pairs
-        if left_key in left_columns and right_key in right_columns
-    ]
+    return candidate_join_key_pairs_for_columns(left.columns, right.columns)
 
 
 def shared_join_key(left: pd.DataFrame, right: pd.DataFrame) -> str | None:
@@ -984,6 +978,16 @@ def continuous_hue_render_params(column: str | None, values: pd.Series) -> dict[
     }
 
 
+def _reference_categorical_hue_series(values: pd.Series) -> pd.Series:
+    labels: list[str] = []
+    for value in values.tolist():
+        if _is_missing_hue_value(value):
+            labels.append("")
+            continue
+        labels.append(_format_listlike_hue_value(value) or _format_hue_token(value))
+    return pd.Series(labels, index=values.index, dtype="string")
+
+
 def selected_reference_rows(
     frame: pd.DataFrame,
     *,
@@ -1017,12 +1021,15 @@ def reference_hue_render_params(
     reference_labels: list[str],
     reference_match_column: str = "usr_label__primary",
     reference_hue_column: str | None = None,
+    reference_hue_kind: str | None = None,
+    axis_styles: dict[str, object] | None = None,
     x_column: str = "x",
     y_column: str = "y",
 ) -> dict[str, object] | None:
     hue_column = str(reference_hue_column or "").strip()
     if not hue_column:
         return None
+    hue_kind = normalize_hue_kind(reference_hue_kind) or "continuous"
     series_parts: list[pd.Series] = []
     for frame in frames:
         if hue_column not in frame.columns:
@@ -1036,15 +1043,34 @@ def reference_hue_render_params(
         )
         if selected.empty or hue_column not in selected.columns:
             continue
-        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-        if not numeric.empty:
-            series_parts.append(numeric)
+        if hue_kind == "continuous":
+            numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            if not numeric.empty:
+                series_parts.append(numeric)
+        else:
+            categorical = _reference_categorical_hue_series(selected[hue_column])
+            categorical = categorical.loc[categorical.astype(str).str.strip() != ""]
+            if not categorical.empty:
+                series_parts.append(categorical)
     if not series_parts:
         return None
     combined = pd.concat(series_parts, ignore_index=True)
+    if hue_kind != "continuous":
+        categories = category_values_for_legend(
+            [str(value) for value in combined.tolist() if str(value).strip()],
+            column=hue_column,
+            axis_styles=axis_styles,
+        )
+        if not categories:
+            return None
+        return {
+            "kind": hue_kind,
+            "categories": categories,
+            "color_map": category_color_map(categories, column=hue_column, axis_styles=axis_styles),
+        }
     if combined.nunique() < 2:
         return None
-    return continuous_hue_render_params(hue_column, combined)
+    return {"kind": "continuous", **continuous_hue_render_params(hue_column, combined)}
 
 
 def reference_annotation_mode_options() -> dict[str, str]:
@@ -1070,12 +1096,14 @@ def reference_hue_coverage_warnings(
     reference_labels: list[str],
     reference_match_column: str = "usr_label__primary",
     reference_hue_column: str | None = None,
+    reference_hue_kind: str | None = None,
     x_column: str = "x",
     y_column: str = "y",
 ) -> list[str]:
     hue_column = str(reference_hue_column or "").strip()
     if not hue_column:
         return []
+    hue_kind = normalize_hue_kind(reference_hue_kind) or "continuous"
     missing_column_panels: list[str] = []
     empty_hue_panels: list[str] = []
     for index, frame in enumerate(frames):
@@ -1097,8 +1125,13 @@ def reference_hue_coverage_warnings(
         if hue_column not in selected.columns:
             missing_column_panels.append(panel_label)
             continue
-        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
-        if not bool(numeric.notna().any()):
+        if hue_kind == "continuous":
+            values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            has_values = bool(values.notna().any())
+        else:
+            values = _reference_categorical_hue_series(selected[hue_column])
+            has_values = bool((values.astype(str).str.strip() != "").any())
+        if not has_values:
             empty_hue_panels.append(panel_label)
 
     warnings: list[str] = []
@@ -1111,7 +1144,7 @@ def reference_hue_coverage_warnings(
         )
     if empty_hue_panels:
         warnings.append(
-            f"reference hue `{hue_column}` has no finite values for selected reference rows in "
+            f"reference hue `{hue_column}` has no values for selected reference rows in "
             f"{len(empty_hue_panels)} panel(s): "
             + ", ".join(empty_hue_panels[:4])
             + (" ..." if len(empty_hue_panels) > 4 else "")
@@ -1291,37 +1324,68 @@ def draw_reference_labels(
         bool(hue_column)
         and reference_hue_params is not None
         and hue_column in selected.columns
-        and reference_hue_params.get("cmap") is not None
+        and (reference_hue_params.get("cmap") is not None or reference_hue_params.get("color_map") is not None)
     )
     if can_color_by_reference_hue:
-        hue_values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
-        finite_hue = hue_values.notna()
-        if (~finite_hue).any():
-            ax.scatter(
-                selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
-                selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
-                c="#111111",
-                s=125,
-                marker="*",
-                linewidths=0.8,
-                edgecolors="white",
-                zorder=5,
-            )
-        if finite_hue.any():
-            ax.scatter(
-                selected.loc[finite_hue, x_column].to_numpy(dtype=float),
-                selected.loc[finite_hue, y_column].to_numpy(dtype=float),
-                c=hue_values.loc[finite_hue].to_numpy(dtype=float),
-                cmap=str(reference_hue_params["cmap"]),
-                norm=reference_hue_params.get("norm"),
-                vmin=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmin"),
-                vmax=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmax"),
-                s=132,
-                marker="*",
-                linewidths=0.85,
-                edgecolors="white",
-                zorder=5,
-            )
+        reference_hue_kind = normalize_hue_kind(reference_hue_params.get("kind")) or "continuous"
+        if reference_hue_kind == "continuous":
+            hue_values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            finite_hue = hue_values.notna()
+            if (~finite_hue).any():
+                ax.scatter(
+                    selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
+                    c="#111111",
+                    s=125,
+                    marker="*",
+                    linewidths=0.8,
+                    edgecolors="white",
+                    zorder=5,
+                )
+            if finite_hue.any():
+                ax.scatter(
+                    selected.loc[finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[finite_hue, y_column].to_numpy(dtype=float),
+                    c=hue_values.loc[finite_hue].to_numpy(dtype=float),
+                    cmap=str(reference_hue_params["cmap"]),
+                    norm=reference_hue_params.get("norm"),
+                    vmin=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmin"),
+                    vmax=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmax"),
+                    s=132,
+                    marker="*",
+                    linewidths=0.85,
+                    edgecolors="white",
+                    zorder=5,
+                )
+        else:
+            hue_values = _reference_categorical_hue_series(selected[hue_column])
+            finite_hue = hue_values.astype(str).str.strip() != ""
+            color_map = {
+                str(key): str(value) for key, value in dict(reference_hue_params.get("color_map") or {}).items()
+            }
+            if (~finite_hue).any():
+                ax.scatter(
+                    selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
+                    c="#111111",
+                    s=125,
+                    marker="*",
+                    linewidths=0.8,
+                    edgecolors="white",
+                    zorder=5,
+                )
+            if finite_hue.any():
+                colors = [color_map.get(str(value), "#111111") for value in hue_values.loc[finite_hue].tolist()]
+                ax.scatter(
+                    selected.loc[finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[finite_hue, y_column].to_numpy(dtype=float),
+                    c=colors,
+                    s=132,
+                    marker="*",
+                    linewidths=0.85,
+                    edgecolors="white",
+                    zorder=5,
+                )
     else:
         ax.scatter(
             selected[x_column].to_numpy(dtype=float),

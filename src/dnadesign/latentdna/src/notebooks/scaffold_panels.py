@@ -113,8 +113,7 @@ def render_plot_review_cell() -> str:
             _geometry = runtime.geometry
             _support = runtime.support
 
-            _reference_hue_values = set((_geometry.reference_hue_options or {"Black stars": ""}).values())
-            _default_reference_hue = "" if "" in _reference_hue_values else next(iter(_reference_hue_values), "")
+            _default_reference_hue = ""
             get_requested_plot_reference_hue, set_requested_plot_reference_hue = _support.mo.state(
                 _default_reference_hue
             )
@@ -276,7 +275,25 @@ def render_plot_review_cell() -> str:
                         label="Reference labels",
                         on_change=set_requested_plot_reference,
                     )
-                    _reference_hue_options = runtime.geometry.reference_hue_options or {"Black stars": ""}
+                    _reference_hue_options = (
+                        runtime.geometry.reference_hue_options_by_reference_set.get(_selected_reference)
+                        or {"Black stars": ""}
+                    )
+                    _reference_hue_columns = [
+                        column for column in _reference_hue_options.values() if str(column).strip()
+                    ]
+                    _available_reference_hues = set(
+                        _support.available_hues_for_frames(
+                            active_plot_frames,
+                            preferred_hues=_reference_hue_columns,
+                            hue_kinds=runtime.geometry.reference_hue_kinds,
+                        )
+                    )
+                    _reference_hue_options = {
+                        label: column
+                        for label, column in _reference_hue_options.items()
+                        if not str(column).strip() or column in _available_reference_hues
+                    } or {"Black stars": ""}
                     _reference_hue_values = set(_reference_hue_options.values())
                     _requested_reference_hue = str(get_requested_plot_reference_hue() or "")
                     _selected_reference_hue = (
@@ -464,6 +481,9 @@ def render_plot_review_cell() -> str:
                         reference_set_id=plot_selected_reference_set,
                         reference_label_limit=plot_reference_label_limit,
                         reference_hue_column=plot_selected_reference_hue_column or None,
+                        reference_hue_kind=runtime.geometry.reference_hue_kinds.get(
+                            plot_selected_reference_hue_column or "",
+                        ),
                         joinable_tables=runtime.geometry.joinable_tables,
                     )
                 else:
@@ -775,7 +795,25 @@ def render_geometry_hue_selector_cell() -> str:
                 if _has_reference_overlay_options
                 else None
             )
-            _reference_hue_options = _geometry.reference_hue_options or {"Black stars": ""}
+            _reference_hue_options = (
+                _geometry.reference_hue_options_by_reference_set.get(_selected_reference)
+                or {"Black stars": ""}
+            )
+            _reference_hue_columns = [
+                column for column in _reference_hue_options.values() if str(column).strip()
+            ]
+            _available_reference_hues = set(
+                _support.available_hues_for_frames(
+                    projection_frames,
+                    preferred_hues=_reference_hue_columns,
+                    hue_kinds=_geometry.reference_hue_kinds,
+                )
+            )
+            _reference_hue_options = {
+                label: column
+                for label, column in _reference_hue_options.items()
+                if not str(column).strip() or column in _available_reference_hues
+            } or {"Black stars": ""}
             _reference_hue_values = set(_reference_hue_options.values())
             _requested_reference_hue = str(get_requested_reference_hue() or "")
             _selected_reference_hue = (
@@ -888,6 +926,11 @@ def render_geometry_panel_cell() -> str:
                         else ""
                     )
                     or None,
+                    reference_hue_kind=_geometry.reference_hue_kinds.get(
+                        str(geometry_reference_hue_selector.value)
+                        if geometry_reference_hue_selector is not None
+                        else "",
+                    ),
                 )
                 if selected_layout is None or str(selected_layout.get("mode")) == "single_view":
                     _control_widgets = [layout_selector, model_selector, family_selector, context_selector]
