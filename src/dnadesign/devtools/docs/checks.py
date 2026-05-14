@@ -147,6 +147,25 @@ ENTRYPOINT_MARKDOWN_FILES = ("README.md", "docs/README.md")
 ENTRYPOINT_LOCAL_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_./-])(?P<path>(?:\.\./|\.\/)?(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+)(?![A-Za-z0-9_./-])"
 )
+AGENTS_CODE_SPAN_PATTERN = re.compile(r"`([^`\n]+)`")
+AGENTS_REPO_RELATIVE_PREFIXES = ("src/", "docs/", ".agents/", ".github/", "tests/", "scripts/")
+AGENTS_ROOT_FILENAMES = {
+    "AGENTS.md",
+    "ARCHITECTURE.md",
+    "DESIGN.md",
+    "README.md",
+    "RELIABILITY.md",
+    "SECURITY.md",
+    "PLANS.md",
+    "QUALITY_SCORE.md",
+    ".pre-commit-config.yaml",
+    "pyproject.toml",
+    "uv.lock",
+    "pixi.toml",
+    "pixi.lock",
+}
+AGENTS_PATH_LITERAL_EXCEPTIONS = {"./scripts/agent-verify", "scripts/agent-verify"}
+AGENTS_NEGATIVE_LINE_MARKERS = ("do not add", "does not ship", "does not exist")
 DENSEGEN_DOC_LANGUAGE_PATHS = (
     "src/dnadesign/densegen/README.md",
     "src/dnadesign/densegen/AGENTS.md",
@@ -712,6 +731,77 @@ def _find_entrypoint_local_path_literal_issues(repo_root: Path) -> list[str]:
                     f"{path}:{line_no}: local path literal '{token}' should be a markdown hyperlink for navigation."
                 )
     return issues
+
+
+def _find_agents_path_reference_issues(repo_root: Path) -> list[str]:
+    resolved_repo_root = repo_root.expanduser().resolve()
+    issues: list[str] = []
+    skipped_dir_names = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__"}
+    for agents_path in sorted(resolved_repo_root.rglob("AGENTS.md")):
+        relative_agents_path = agents_path.relative_to(resolved_repo_root)
+        if any(part in skipped_dir_names for part in relative_agents_path.parts):
+            continue
+        for line_no, line in enumerate(agents_path.read_text(encoding="utf-8").splitlines(), start=1):
+            line_lower = line.lower()
+            if any(marker in line_lower for marker in AGENTS_NEGATIVE_LINE_MARKERS):
+                continue
+            for raw_value in AGENTS_CODE_SPAN_PATTERN.findall(line):
+                target_literal = raw_value.strip().strip("()[]{}<>,:;!?")
+                if not target_literal or target_literal in AGENTS_PATH_LITERAL_EXCEPTIONS:
+                    continue
+                if _should_skip_agents_path_literal(target_literal):
+                    continue
+
+                target_path = _resolve_agents_path_literal(
+                    target_literal,
+                    agents_path=agents_path,
+                    repo_root=resolved_repo_root,
+                )
+                if target_path is None:
+                    continue
+                if not target_path.exists():
+                    issues.append(f"{agents_path}:{line_no}: referenced path does not exist: `{target_literal}`")
+    return issues
+
+
+def _should_skip_agents_path_literal(value: str) -> bool:
+    if value.startswith(("http://", "https://", "mailto:", "#", "/Users/", "/private/", "/tmp/", "/home/", "/var/")):
+        return True
+    if any(char.isspace() for char in value):
+        return True
+    if any(char in value for char in "*?[]{}<>$|;&="):
+        return True
+    if "://" in value or ":" in value:
+        return True
+
+    path_part = value.split("#", 1)[0]
+    if path_part.startswith(AGENTS_REPO_RELATIVE_PREFIXES):
+        return False
+    if path_part in AGENTS_ROOT_FILENAMES:
+        return False
+    if path_part.startswith("./") and path_part[2:] in AGENTS_ROOT_FILENAMES:
+        return False
+    return True
+
+
+def _resolve_agents_path_literal(value: str, *, agents_path: Path, repo_root: Path) -> Path | None:
+    path_part = value.split("#", 1)[0]
+    if path_part.startswith("./") and path_part[2:] in AGENTS_ROOT_FILENAMES:
+        path_part = path_part[2:]
+    if path_part.startswith(AGENTS_REPO_RELATIVE_PREFIXES):
+        repo_target = repo_root / path_part
+        relative_target = agents_path.parent / path_part
+        target = relative_target if relative_target.exists() else repo_target
+    elif path_part in AGENTS_ROOT_FILENAMES:
+        target = repo_root / path_part
+    else:
+        target = agents_path.parent / path_part
+    resolved_target = target.resolve()
+    try:
+        resolved_target.relative_to(repo_root)
+    except ValueError:
+        return None
+    return resolved_target
 
 
 def _find_densegen_disallowed_term_issues(repo_root: Path) -> list[str]:
@@ -2303,6 +2393,13 @@ def main(argv: list[str] | None = None) -> int:
     if entrypoint_local_path_issues:
         print("Entrypoint local path hyperlink check failed:")
         for issue in entrypoint_local_path_issues:
+            print(f" - {issue}")
+        return 1
+
+    agents_path_reference_issues = _find_agents_path_reference_issues(repo_root)
+    if agents_path_reference_issues:
+        print("AGENTS path reference check failed:")
+        for issue in agents_path_reference_issues:
             print(f" - {issue}")
         return 1
 

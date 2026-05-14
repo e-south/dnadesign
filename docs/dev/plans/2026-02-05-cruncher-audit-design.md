@@ -28,7 +28,7 @@ Out:
 
 ### Audit Method
 1. **Run Cruncher tests** and collect failures/warnings.
-2. **Run primary CLI flow** using `workspaces/demo_basics_two_tf` to verify artifacts, plots, and reporting.
+2. **Run primary CLI flow** using `workspaces/demo_pairwise` to verify artifacts, plots, and reporting.
 3. **Read docs** (guides, reference, demo) and check for mismatches against runtime behavior.
 4. **Profile demo run** to identify hot paths and opportunities for safe, explicit reuse.
 5. **File-organizer lens**: identify oversized modules and misplaced responsibilities, but do not move files without approval.
@@ -53,5 +53,5 @@ Out:
 
 ### Verification (expected)
 - `uv run pytest -q`
-- `uv run cruncher sample -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml`
-- `uv run cruncher analyze -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml`
+- `uv run cruncher sample --force-overwrite -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml`
+- `uv run cruncher analyze --summary -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml`

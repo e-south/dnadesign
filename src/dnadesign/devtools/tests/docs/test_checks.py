@@ -19,6 +19,7 @@ import yaml
 
 from dnadesign.devtools.docs.checks import (
     _find_active_shared_usr_dataset_id_issues,
+    _find_agents_path_reference_issues,
     _find_broken_links,
     _find_cross_tool_doc_metadata_issues,
     _find_densegen_disallowed_term_issues,
@@ -598,6 +599,38 @@ def test_entrypoint_local_path_link_check_allows_hyperlinked_local_paths(tmp_pat
     )
 
     issues = _find_entrypoint_local_path_literal_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_agents_path_reference_check_flags_missing_scoped_paths(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "cruncher" / "AGENTS.md",
+        "- Default config: `src/dnadesign/cruncher/workspaces/missing/config.yaml`\n",
+    )
+
+    issues = _find_agents_path_reference_issues(tmp_path)
+
+    assert any("src/dnadesign/cruncher/workspaces/missing/config.yaml" in issue for issue in issues)
+
+
+def test_agents_path_reference_check_allows_existing_and_non_path_spans(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "cruncher" / "workspaces" / "demo" / "configs" / "config.yaml", "{}\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "cruncher" / "AGENTS.md",
+        "\n".join(
+            [
+                "- Default config: `workspaces/demo/configs/config.yaml`",
+                "- Repo-root config: `src/dnadesign/cruncher/workspaces/demo/configs/config.yaml`",
+                "- This repo intentionally has no `./scripts/agent-verify`.",
+                "- Use command `uv run cruncher --help`.",
+                "- Template path: `workspaces/<id>/configs/config.yaml`.",
+                "",
+            ]
+        ),
+    )
+
+    issues = _find_agents_path_reference_issues(tmp_path)
 
     assert issues == []
 

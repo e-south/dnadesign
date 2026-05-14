@@ -1,5 +1,8 @@
 ## dnadesign Monorepo Organization Audit
 
+**Status:** historical audit; superseded for boundary policy by
+`ARCHITECTURE.md` and `DESIGN.md`
+**Last reviewed:** 2026-05-14
 
 ### Contents
 - [Executive summary](#executive-summary)
@@ -91,10 +94,15 @@ Risks:
 - Global dependencies increase coupling and make individual tools harder to evolve.
 
 Recommendations:
-- Define a formal boundary between “shared libraries” and “tool apps.”
-  - Example: `dnadesign/core/`, `dnadesign/algorithms/`, `dnadesign/io/` as shared libraries; tool packages import only from these shared packages.
-- Add a rule: tool-to-tool imports are not allowed except via shared packages.
-- If shared code is needed, move it to a common module and document it.
+- Define a formal boundary between shared packages and tool apps.
+  Current policy uses explicit shared surfaces such as `dnadesign.contracts`
+  and `dnadesign.devtools`; do not add generic `dnadesign/core`,
+  `dnadesign/algorithms`, or `dnadesign/io` namespaces without a new
+  architecture decision.
+- Add a rule: tool-to-tool imports are not allowed except via public facades,
+  declared contracts, or documented allowlisted edges.
+- If shared code is needed, move it to an owned shared package or contract and
+  document the consumer boundary.
 
 #### 2) Easier to change
 
@@ -214,7 +222,9 @@ Summary: uv already provides the standard aliasing mechanism for Python entry po
 #### Low-risk, near-term
 - Add a “Tool Layout Standard” doc with a canonical tree and naming conventions.
 - Add a “Tool Registry” doc listing tools, entry points, and where their code lives.
-- Establish one shared library namespace (example: `dnadesign/core`) and start moving shared code there.
+- Prefer explicit shared packages or contracts for reused surfaces; avoid
+  broad shared utility namespaces unless an ADR establishes ownership and exit
+  criteria.
 
 #### Medium-term
 - Introduce tool-specific dependency extras (e.g., `cruncher`, `opal`, `densegen`).
