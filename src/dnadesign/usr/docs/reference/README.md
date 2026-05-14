@@ -12,6 +12,7 @@ Reference pages define stable contracts for dataset shape, overlays, registry, e
 - [Schema contract](schema-contract.md)
 - [Overlay and registry contract](overlay-and-registry.md)
 - [SFXI reference overlay contract](sfxi-reference-overlay.md)
+- [RegulonDB functional annotation sidecars](regulondb-functional-annotations.md)
 - [Event log contract](event-log.md)
 - [Python API quickstart](python-api.md)
 - [Maintenance patterns](maintenance.md)

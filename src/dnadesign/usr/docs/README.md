@@ -50,6 +50,7 @@
 - [Dataset layout and code map](reference/dataset-layout-and-code-map.md): on-disk structure and source module map.
 - [Schema contract](reference/schema-contract.md): required columns, types, and metadata keys.
 - [Overlay and registry contract](reference/overlay-and-registry.md): merge semantics and namespace governance.
+- [RegulonDB functional annotation sidecars](reference/regulondb-functional-annotations.md): BioCyc GO projection contract for native RegulonDB promoter regulators.
 - [Event log contract](reference/event-log.md): `.events.log` payload fields and downstream integration boundary.
 - [Python API quickstart](reference/python-api.md): minimal `Dataset` usage flow for scripts and notebooks.
 - [Maintenance patterns](reference/maintenance.md): dedupe, merge, compaction, snapshot, and export routines.
