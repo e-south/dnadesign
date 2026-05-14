@@ -262,6 +262,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_reporting_module.py",
         "test_dataset_scan_projection.py",
         "test_dataset_views_module.py",
+        "test_sequence_view_alias_repair.py",
         "test_sequence_views.py",
     },
 }
