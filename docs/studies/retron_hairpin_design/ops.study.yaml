@@ -13,6 +13,7 @@ record_sources:
 lifecycle:
   phase_order:
     - context_consolidation
+    - msd_design_reference_catalog
     - scar_nick_base_junction_context
     - snapback_released_probe
     - snapback_released_solve
@@ -20,12 +21,15 @@ lifecycle:
     - sequence_trace_followup
   current_phase:
     strategy: explicit
-    id: snapback_released_solve
+    id: msd_design_reference_catalog
 
 phases:
   - id: context_consolidation
     status: complete
     next_surface: manifest:status.md
+  - id: msd_design_reference_catalog
+    status: in_progress
+    next_surface: manifest:routes.md
   - id: scar_nick_base_junction_context
     status: complete
     next_surface: manifest:scar-nick-base-junction.md
@@ -55,6 +59,21 @@ artifacts:
   scar_nick_base_junction_note:
     artifact_type: file
     ref: manifest:scar-nick-base-junction.md
+  linear_ssdna_composition_note:
+    artifact_type: file
+    ref: manifest:linear-ssdna-composition.md
+  msd_design_registry:
+    artifact_type: file
+    ref: manifest:msd_design_registry.yaml
+  msd_design_hit_labels:
+    artifact_type: file
+    ref: manifest:msd_design_hit_labels.txt
+  linear_ssdna_composition_dev_spec:
+    artifact_type: file
+    ref: repo:docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md
+  linear_ssdna_composition_exec_plan:
+    artifact_type: file
+    ref: repo:docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md
   snapback_released_runbook:
     artifact_type: file
     ref: repo:src/dnadesign/cruncher/workspaces/de033/runbook.md
@@ -110,6 +129,36 @@ execution_surfaces:
       - validate
       - --spec
       - configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+  msd_design_reference_lint:
+    surface_type: command
+    cwd_ref: repo:.
+    argv:
+      - uv
+      - run
+      - python
+      - -m
+      - dnadesign.studies.retron_hairpin_design.cli
+      - lint
+      - --id
+      - 'pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM'
+      - --format
+      - json
+  msd_design_reference_compile:
+    surface_type: command
+    cwd_ref: repo:.
+    argv:
+      - uv
+      - run
+      - python
+      - -m
+      - dnadesign.studies.retron_hairpin_design.cli
+      - compile
+      - --input
+      - docs/studies/retron_hairpin_design/msd_design_hit_labels.txt
+      - --out-dir
+      - /tmp/dnadesign_retron_msd_design_references
+      - --format
+      - json
 
 snapshot:
   summary_scope: repo
@@ -123,6 +172,7 @@ preflight:
       include_phases: [all]
   group_phase_bindings:
     study_record: context_consolidation
+    msd_reference_compile: msd_design_reference_catalog
     snapback_workspace: snapback_released_probe
     snapback_probe: snapback_released_probe
     yiu_workspace: yiu_boundary_check
@@ -160,11 +210,48 @@ preflight:
         required: true
         artifact: scar_nick_base_junction_note
       - kind: path_exists
+        check_id: study.linear_ssdna_composition.present
+        check_group: study_record
+        summary: Linear ssDNA composition handoff note is present.
+        required: true
+        artifact: linear_ssdna_composition_note
+      - kind: path_exists
+        check_id: study.msd_design_registry.present
+        check_group: study_record
+        summary: Study-owned MSD design registry is present.
+        required: true
+        artifact: msd_design_registry
+      - kind: path_exists
+        check_id: study.msd_design_hit_labels.present
+        check_group: study_record
+        summary: Study-selected MSD design labels are present.
+        required: true
+        artifact: msd_design_hit_labels
+      - kind: path_exists
+        check_id: study.linear_ssdna_composition_dev_spec.present
+        check_group: study_record
+        summary: Generic linear ssDNA composition dev spec is present.
+        required: true
+        artifact: linear_ssdna_composition_dev_spec
+      - kind: path_exists
+        check_id: study.linear_ssdna_composition_exec_plan.present
+        check_group: study_record
+        summary: Generic linear ssDNA composition execution plan is present.
+        required: true
+        artifact: linear_ssdna_composition_exec_plan
+      - kind: path_exists
         check_id: study.yiu_boundary_note.present
         check_group: study_record
         summary: YIU boundary note is present.
         required: true
         artifact: yiu_boundary_note
+    msd_design_reference_catalog:
+      - kind: command
+        check_id: study.msd_reference_lint
+        check_group: msd_reference_compile
+        summary: Retron MSD design-reference lint command completed.
+        required: true
+        surface: msd_design_reference_lint
     snapback_released_probe:
       - kind: workspace_layout
         check_id: de033.workspace
@@ -206,6 +293,7 @@ preflight:
   next_scope:
     target_phase_groups:
       context_consolidation: [study_record]
+      msd_design_reference_catalog: [study_record, msd_reference_compile]
       scar_nick_base_junction_context: [study_record]
       snapback_released_probe: [study_record, snapback_workspace, snapback_probe]
       snapback_released_solve: [study_record, snapback_workspace, snapback_probe]

@@ -1,0 +1,138 @@
+contract: retron_msd_design_registry_v1
+schema_version: 1
+
+payloads:
+  TetR:
+    display_name: TetR
+
+caps:
+  C26:
+    source_construct: retron-26
+    display_name: 26 cap
+  C172:
+    source_construct: retron-172
+    display_name: 172 cap
+
+constructs:
+  pES-retron-177:
+    source_notes: "26-derived base / 172-cap crossover; tests 172-cap permissiveness."
+    scar_nick:
+      route_status: note_only
+      route_note: "26-derived base / 172-cap crossover; tests 172-cap permissiveness."
+  pES-retron-178:
+    source_notes: "43-derived base / 26-cap crossover; tests whether the 43-like base drives failure."
+    scar_nick:
+      route_status: note_only
+      route_note: "43-derived base / 26-cap crossover; tests whether the 43-like base drives failure."
+  pES-retron-179:
+    source_notes: "43-like S2-hard comparator; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "43-like S2-hard comparator; bottom nick via Nb.BtsI."
+  pES-retron-180:
+    source_notes: "S3 hard plus S2 G:T wobble; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "S3 hard plus S2 G:T wobble; bottom nick via Nb.BtsI."
+  pES-retron-181:
+    source_notes: "S2 G:T wobble plus S1 hard; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "S2 G:T wobble plus S1 hard; bottom nick via Nb.BtsI."
+  pES-retron-182:
+    source_notes: "S2 hard plus S1 G:T wobble; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "S2 hard plus S1 G:T wobble; bottom nick via Nb.BtsI."
+  pES-retron-183:
+    source_notes: "S3 hard plus S1 G:T wobble; bottom nick via Nb.BsrDI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BsrDI
+      route_note: "S3 hard plus S1 G:T wobble; bottom nick via Nb.BsrDI."
+  pES-retron-184:
+    source_notes: "Single S2 G:T wobble control; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "Single S2 G:T wobble control; bottom nick via Nb.BtsI."
+  pES-retron-185:
+    source_notes: "Single S1 G:T wobble control; bottom nick via Nb.BsrDI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BsrDI
+      route_note: "Single S1 G:T wobble control; bottom nick via Nb.BsrDI."
+  pES-retron-186:
+    source_notes: "Two middle G:T wobbles; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "Two middle G:T wobbles; bottom nick via Nb.BtsI."
+  pES-retron-187:
+    source_notes: "S3/S2 double-hard challenge; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "S3/S2 double-hard challenge; bottom nick via Nb.BtsI."
+  pES-retron-188:
+    source_notes: "S3/S1 double-hard challenge; bottom nick via Nb.BsrDI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BsrDI
+      route_note: "S3/S1 double-hard challenge; bottom nick via Nb.BsrDI."
+  pES-retron-189:
+    source_notes: "MXMM comparator route replicate; bottom nick via Nb.BsrDI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BsrDI
+      route_note: "MXMM comparator route replicate; bottom nick via Nb.BsrDI."
+  pES-retron-190:
+    source_notes: "MXMM comparator route replicate; bottom nick via Nb.BtsI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+      route_note: "MXMM comparator route replicate; bottom nick via Nb.BtsI."
+  pES-retron-191:
+    source_notes: "MXMM comparator route replicate; bottom nick via Nb.BsrDI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BsrDI
+      route_note: "MXMM comparator route replicate; bottom nick via Nb.BsrDI."
+  pES-retron-192:
+    source_notes: "MXMM comparator route replicate; bottom nick via Nb.BsrDI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: bottom
+      nickase: Nb.BsrDI
+      route_note: "MXMM comparator route replicate; bottom nick via Nb.BsrDI."
+  pES-retron-193:
+    source_notes: "MXMM top-nick comparator route via Nt.BsmAI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: top
+      nickase: Nt.BsmAI
+      route_note: "MXMM top-nick comparator route via Nt.BsmAI."
+  pES-retron-194:
+    source_notes: "MXMM top-nick comparator route via Nt.BsmAI."
+    scar_nick:
+      route_status: resolved
+      nick_orientation: top
+      nickase: Nt.BsmAI
+      route_note: "MXMM top-nick comparator route via Nt.BsmAI."

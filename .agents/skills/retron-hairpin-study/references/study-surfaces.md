@@ -14,6 +14,14 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/scar-nick-base-junction.md`: the
   base-junction context for B26/B43 profile logic, strict terminal nick policy,
   retained scar families, and scar-nick schema implications
+- `docs/studies/retron_hairpin_design/linear-ssdna-composition.md`: the
+  study-owned handoff for whole-product multicopy ssDNA composition, including
+  scar-nick projection boundaries
+- `docs/studies/retron_hairpin_design/msd_design_registry.yaml`: study-owned
+  registry metadata for payloads, caps, construct route notes, nickase, and
+  nick orientation used by the MSD design-reference compiler
+- `docs/studies/retron_hairpin_design/msd_design_hit_labels.txt`: current
+  study-selected lab-facing MSD labels for `msd_design_catalog_v1` dogfood
 - `docs/studies/retron_hairpin_design/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need
@@ -27,6 +35,8 @@ base-junction scar-nick work.
 - `.agents/skills/retron-hairpin-study/SKILL.md`: study-specific shortcut that
   recovers the cap/shortening and base-junction context without rebuilding it by
   hand
+- `.agents/skills/retron-hairpin-study/references/msd-design-references.md`:
+  progressive-disclosure reference for the ID-to-catalog route
 
 ## Tool-owned detail
 
@@ -38,11 +48,26 @@ base-junction scar-nick work.
 - `src/dnadesign/cruncher/docs/guides/yiu_workflow.md` owns the YIU contract.
 - `src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md`
   owns the retron/P4 framing note.
+- `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md` owns
+  the generic Construct/folding/BaseRender/USR dev spec.
+- `docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md`
+  owns the current implementation checklist and completion state.
+- `src/dnadesign/studies/retron_hairpin_design/compiler.py` owns the study-local
+  MSD reference/catalog compiler API.
+- `src/dnadesign/studies/retron_hairpin_design/cli.py` is the thin Typer
+  command adapter for `msd_design_reference_v1` / `msd_design_catalog_v1`
+  records.
 
 ## Router rule
 
 When the next question needs exact commands or the next human step, use the
 study route map first.
+When the next question says "continue the dev spec" or concerns multicopy
+linear ssDNA assembly, open `linear-ssdna-composition.md`, then the dev spec,
+then the active execution plan.
+When the next question starts from an MSD shorthand ID or Reader-facing design
+reference, use the Study route for MSD design references in `routes.md`, then
+`references/msd-design-references.md`.
 When the next question needs machine-readable command groups or bootstrap
 metadata, open `pipeline.yaml`.
 When the next question needs harness or contract hardening, leave the study

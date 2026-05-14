@@ -1,17 +1,20 @@
 ## Retron Hairpin Design Effort Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-09
+**Last verified:** 2026-05-14
 
-Use this page after the tracked study status answers `where are we?`.
-Use preflight when you need blocker or command-readiness answers.
-This page keeps the study-owned handoff map in one place.
+Use this page to route Retron MSD product work. For compiler-style requests,
+start with the user's provided parts and desired output, not with study phase.
+Use status/preflight only for explicit progress or blocker questions. This page
+keeps the study-owned handoff map in one place.
 
 ### Quick route
 
-- Snapshot:
+- Compiler/product route:
+  `Study route: MSD design references` below.
+- Progress status route for explicit status/history questions only:
   `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
-- Preflight:
+- Execution preflight route for explicit blocker/readiness questions only:
   `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
 - Repo-local study shortcut:
   `.agents/skills/retron-hairpin-study/SKILL.md`
@@ -20,13 +23,16 @@ This page keeps the study-owned handoff map in one place.
   `code-change-discipline` in the `pragmatic-programming-principles` lane for
   boundary or contract changes.
 
-### Cold-start contract
+### Routing contract
 
-- If the request is explicitly about `retron_hairpin_design`, pin the
-  study with the two `cruncher-study-*` commands above even when
-  `docs/studies/index.yaml` names another repo-wide active study.
-- After study status or preflight answers the state or blocker question, stay
-  on this page for the ordered post-probe handoff.
+- If the request supplies an MSD label or explicit parts, start from the
+  compiler/product route. Do not run study status or preflight first.
+- If the request is explicitly about `retron_hairpin_design` progress,
+  history, or blockers, pin the study with the two `cruncher-study-*` commands
+  above even when `docs/studies/index.yaml` names another repo-wide active
+  study.
+- After study status or preflight answers a progress or blocker question, stay
+  on this page for primitive or compiler routing.
 - Open `pipeline.yaml` only when the task needs machine-readable command-group
   or automation bootstrap metadata.
 - Open `ops.study.yaml` only when the task needs lifecycle or preflight
@@ -43,11 +49,12 @@ This page keeps the study-owned handoff map in one place.
 - `YIU` means mismatch-centric payload rendering over a fixed 4 nt internal window; it is not the shortening topology engine here.
 - `retron context` means biological framing from the checked-in audit notes, not scoring hooks or implicit solver relaxations.
 
-### Ordered post-probe handoff
+### Primitive route handoff
 
-1. Recover state with the pinned snapshot command above, or use the pinned
-   preflight command above when the question is blocker or execution readiness.
-2. Stay on the primary route below for the read-only released-product probe in
+1. For complete MSD labels or complete explicit parts, use the study-owned MSD
+   design-reference route below and compile directly.
+2. For missing cap/shortening constraints, stay on the primary route below for
+   the read-only released-product probe in
    `de033` and inspect allowed exact-hit versus bounded near-hit posture against
    the real release-enzyme catalog with the default Type IIS release enzyme
    pinned to `BspQI`.
@@ -69,6 +76,10 @@ This page keeps the study-owned handoff map in one place.
 7. Use the scar-nick base-junction route below when the task is profile-diverse
    `S0=M` scar feasibility, top/bottom nick flexibility, strict terminal nick
    policy, or `scar_nick` schema evolution.
+8. Use the study-owned MSD design-reference route when a lab-facing shorthand
+   such as `pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM` needs to become a
+   frozen `msd_design_reference_v1` or `msd_design_catalog_v1` record. Do not
+   add a top-level `retron-msd` tool; invoke the module under studies.
 
 ### Primary route: released-product Snapback
 
@@ -138,29 +149,79 @@ flexibility, or schema work for the nick-disposal model.
 - Owner-boundary: `cruncher`
 - Current state: `context-ready`
 - Workspace: `src/dnadesign/cruncher/workspaces/scar_nick_teto`
+- Workspace runbook:
+  `src/dnadesign/cruncher/workspaces/scar_nick_teto/runbook.md`
 - Primary note:
   `docs/studies/retron_hairpin_design/scar-nick-base-junction.md`
 - Tool-owned detail:
   `src/dnadesign/cruncher/src/scar_nick/`
+- Same-workspace configs:
+  `configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml`
+  and
+  `configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml`
+- Follow-up mutating commands:
+  `uv run cruncher scar-nick design --spec src/dnadesign/cruncher/workspaces/scar_nick_teto/configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml --force-overwrite`
+  `uv run cruncher scar-nick design --spec src/dnadesign/cruncher/workspaces/scar_nick_teto/configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml --force-overwrite`
+  `uv run baserender job run src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf/baserender_jobs/scar_nick_terminal_nick.job.yaml`
+  `uv run baserender job run src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_paqci_core_panel/baserender_jobs/scar_nick_terminal_nick.job.yaml`
+- Bundle roots:
+  `src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf`
+  and
+  `src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_paqci_core_panel`
 - Route note:
   the strict study policy is exact terminal nick, top or bottom strand allowed,
   zero protected bases downstream of the nick, downstream degenerate `N` only,
-  and `S0=M` for ligation. The current context records that exact provided L/R
-  sequences cover `0/9`, unique provided profile classes cover `6/7`, and
-  provided constructs by profile analog cover `8/9`. BbsI-HF gives `10/256`
-  retained scars, PaqCI gives `14/256`, and BsaI-HFv2 gives `0/256`.
+  and `S0=M` for ligation. The same `scar_nick_teto` workspace can hold
+  multiple release-enzyme specs and output run dirs; these are not independent
+  workspaces. The current regenerated strict panel records BbsI-HF at `6/256`
+  retained scars, PaqCI at `10/256`, and BsaI-HFv2 at `0/256`.
   The study target is `scar_nick`-feasible profile coverage across `S3/S2/S1`
   with `S0=M`, no middle-middle hard `S2/S1` double mismatch, and single-hard,
   `X+W`, W-only, W+W, or S3-edge double-hard profiles such as `MXMM`,
   `WXMM`, `XWMM`, `MWXM`, `MXWM`, `XMWM`, `WMMM`, `MWMM`, `MMWM`, `WWMM`,
   `WMWM`, `MWWM`, `XXMM`, and `XMXM`;
   exact B26 sequence preservation is calibration context, not the selection
-  objective. Current `scar_nick` outputs treat `nicked_strand`,
+  objective. Current BbsI-HF plus PaqCI outputs cover 13 of those 14 active
+  buckets; `WMWM` remains uncovered under the current strict catalog policy.
+  Current `scar_nick` outputs treat `nicked_strand`,
   `surviving_strand`, retained scar source, and profile-bucket coverage as
   first-class schema/ranking fields for the checked-in BbsI-HF route. Use
   `export/table__scar_nick_candidate_pair_calls.csv` as the flat left/right
   pair-call handoff table, and rerun the route before making PaqCI-specific
   capacity claims.
+
+### Study route: MSD design references
+
+Use this route when the task starts from a lab-facing construct label and needs
+a frozen design reference for later visuals, GenBank/FASTA handoff, or Reader
+joins.
+
+- Type: `study-contract`
+- Plane: `record-plane`
+- Surface role: `design-reference-normalization`
+- Owner-boundary: `studies/retron_hairpin_design`
+- Current state: `compiler-ready`
+- Registry:
+  `docs/studies/retron_hairpin_design/msd_design_registry.yaml`
+- Study-selected label list:
+  `docs/studies/retron_hairpin_design/msd_design_hit_labels.txt`
+- Public module:
+  `src/dnadesign/studies/retron_hairpin_design/cli.py`
+- Lint command:
+  `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"`
+- Compile command:
+  `uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+- Route note:
+  this compiler is intentionally study-owned and is not registered as a top-level `uv run retron-msd` tool. It parses `construct_id`, payload/target,
+  cap id, left/right scar-nick bases, and optional profile code; then it
+  recomputes the `S3/S2/S1/S0` profile and fails fast if the provided code
+  drifts or `S0` is not ligatable. Registry metadata stores route notes,
+  nickase, and nick orientation when known. The emitted
+  `msd_design_catalog_v1` is the Reader-facing bridge; Reader should not parse Construct, Folding, BaseRender, or Cruncher internals. Ad hoc compiles should
+  write to explicit transient directories such as `/tmp/dnadesign_retron_msd_*`;
+  Reader-linked runs should snapshot the same catalog and `assets/<msd_id>/`
+  files into the owning Reader experiment `inputs/designs/` directory. Do not
+  add per-design Construct/Folding workspaces for this ID-to-reference path.
 
 ### Contrast route: YIU boundary check
 
@@ -199,6 +260,39 @@ reminder of what YIU does and does not model.
   `src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md`
 - Snapback phenomenology dev spec:
   `docs/studies/retron_hairpin_design/snapback-phenomenology-dev-spec.md`
+- Linear ssDNA composition handoff:
+  `docs/studies/retron_hairpin_design/linear-ssdna-composition.md`
+- Generic linear ssDNA composition dev spec:
+  `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md`
+- Generic linear ssDNA composition execution plan:
+  `docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md`
+- Construct linear ssDNA dogfood config:
+  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
+- Generated Construct/BaseRender dogfood bundle:
+  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
+  after `uv run construct compose run --config ...`; generated contents include
+  `visual/sequence_evidence_map_v1.json`,
+  `baserender_jobs/component_span_qa_svg.yaml`,
+  `folding/secondary_structure_prediction_request_v1.yaml`,
+  `folding/folding_preflight.json`,
+  `folding/secondary_structure_prediction_v1.json`,
+  `visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json`,
+  `visual/viennarna_secondary_structure/secondary_structure.annotated.svg`,
+  and the BaseRender SVG under `visual/renders/component_span_qa_svg/` after
+  the BaseRender job runs.
+- Folding dogfood commands:
+  `uv run folding preflight --request src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/folding/secondary_structure_prediction_request_v1.yaml`
+  `uv run folding run --request src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/folding/secondary_structure_prediction_request_v1.yaml`
+  `uv run folding plot --prediction src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/folding/secondary_structure_prediction_v1.json --assembled-sequence src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/folding/secondary_structure_input_sequence.json --visual-contract src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/sequence_evidence_map_v1.json --output-dir ../visual/viennarna_secondary_structure --layout naview`
+  Local status is `ok` through the uv-managed ViennaRNA Python API
+  (`backend.interface: python_api`, `python_module: RNA`). The external
+  `RNAfold` executable is still optional and not on the local PATH.
+- ViennaRNA-native plot dogfood:
+  the Construct run writes a native structure SVG, an annotated SVG, and an
+  annotation manifest under `visual/viennarna_secondary_structure/`. Current
+  dogfood QA records the canonical 88 nt component-unit prediction, 28 parsed
+  base pairs, no cross-copy pairings, and one recovered declared payload
+  pairing. BaseRender remains the separate linear component-span renderer.
 - Route note:
   `routes.md` is the canonical human handoff; the other notes are study
   context or machine-readable support, not replacement route maps.

@@ -15,6 +15,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
@@ -26,6 +28,14 @@ def _repo_root() -> Path:
 
 def _read(rel_path: str) -> str:
     return (_repo_root() / rel_path).read_text(encoding="utf-8")
+
+
+def _skill_frontmatter() -> dict[str, object]:
+    skill = _read(".agents/skills/retron-hairpin-study/SKILL.md")
+    frontmatter = skill.split("---", 2)[1]
+    payload = yaml.safe_load(frontmatter)
+    assert isinstance(payload, dict)
+    return payload
 
 
 def test_retron_hairpin_study_is_visible_through_docs_and_agents() -> None:
@@ -56,6 +66,21 @@ def test_retron_hairpin_study_is_visible_through_docs_and_agents() -> None:
     assert ".agents/skills/retron-hairpin-study/scripts/audit-retron-hairpin-study-skill.sh" in dev_docs
 
 
+def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() -> None:
+    frontmatter = _skill_frontmatter()
+    description = frontmatter["description"]
+    metadata = frontmatter["metadata"]
+
+    assert frontmatter["name"] == "retron-hairpin-study"
+    assert isinstance(description, str)
+    assert len(description) <= 220
+    assert "Use for MSD IDs" in description
+    assert "generic Cruncher/snapback" in description
+    assert "Snapback/scar-nick/YIU" not in description
+    assert isinstance(metadata, dict)
+    assert metadata["version"] == "0.7.2"
+
+
 def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit() -> None:
     skill = _read(".agents/skills/retron-hairpin-study/SKILL.md")
     route_matrix = _read(".agents/skills/retron-hairpin-study/references/route-matrix.md")
@@ -67,23 +92,31 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     pipeline = _read("docs/studies/retron_hairpin_design/pipeline.yaml")
     ops_study = _read("docs/studies/retron_hairpin_design/ops.study.yaml")
 
-    assert "released-product Snapback" in status
+    assert "Retron MSD product work as a genetic compiler" in status
     assert "scar-nick" in status
     assert "profile-diverse `S0=M` scar analogs" in status
+    assert "Complete labels or complete part sets should compile directly" in status
+    assert "caller-chosen transient directories" in status
     assert "retained-active released-product policy" in status
     assert "retained top and bottom product routes" in status
-    assert "Current phase: `snapback_released_solve`" in status
+    assert "Current phase:" not in status
+    assert "snapback_released_solve" not in status
     assert "src/dnadesign/cruncher/workspaces/de033/runbook.md" in status
-    assert "Next-scope preflight stays read-only" in status
     assert "FREQUENT_CUTTER" in status
     assert "YIU" in status
     assert "Repo-local study shortcut" in status
-    assert "canonical post-probe handoff" in status
     assert "released_snapback_artifacts.md" in status
-    assert "BbsI-HF retains 10/256 strict scars" in status
+    assert "BbsI-HF retains 6/256 strict scars" in status
     assert "Exact B26 `MXMX` remains a biological control architecture" in status
-    assert "This page keeps the study-owned handoff map in one place." in routes
-    assert "Ordered post-probe handoff" in routes
+    assert "docs/studies/retron_hairpin_design/msd_design_registry.yaml" in status
+    assert "docs/studies/retron_hairpin_design/msd_design_hit_labels.txt" in status
+    assert "start with the user's provided parts and desired output, not with study phase" in routes
+    assert "Primitive route handoff" in routes
+    assert "Do not run study status or preflight first." in routes
+    assert "### Study route: MSD design references" in routes
+    assert "msd_design_hit_labels.txt" in routes
+    assert "not registered as a top-level `uv run retron-msd` tool" in routes
+    assert "Reader should not parse Construct, Folding, BaseRender, or Cruncher internals" in routes
     assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes
     assert "### Context route: scar-nick base-junction" in routes
     assert "src/dnadesign/cruncher/workspaces/de033" in routes
@@ -100,32 +133,47 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "contiguous fully degenerate `N` block" in routes
     assert "Pair with:" in routes
     assert "repo:.agents/skills/retron-hairpin-study/SKILL.md" in pipeline
+    assert 'primary_lane: "study-owned Retron MSD design-reference compilation"' in pipeline
+    assert 'state_label: "product route"' in pipeline
+    assert "Do not answer compiler-style requests by defaulting to study phase" in pipeline
     assert "repo:docs/studies/retron_hairpin_design/scar-nick-base-junction.md" in pipeline
     assert "--nick-additional-preset thermo_nicking_v1" in pipeline
     assert "manifest:pipeline.yaml" not in pipeline
     assert "pair_with:" in pipeline
     assert "harness-engineering" in pipeline
-    assert "pragmatic-programming-principles" in pipeline
+    assert "pragmatic-programming-principles" not in pipeline
+    assert "id: msd_design_reference_catalog" in ops_study
+    assert "current_phase:\n    strategy: explicit\n    id: msd_design_reference_catalog" in ops_study
+    assert "msd_design_reference_catalog: [study_record, msd_reference_compile]" in ops_study
     assert "id: snapback_released_solve" in ops_study
     assert "id: scar_nick_base_junction_context" in ops_study
     assert "artifact: scar_nick_base_junction_note" in ops_study
     assert "status: in_progress" in ops_study
-    assert "snapback_released_solve: [study_record, snapback_workspace, snapback_probe]" in ops_study
     assert "skill_ref: repo:.agents/skills/retron-hairpin-study/SKILL.md" not in ops_study
     assert "repo_local_skill" not in ops_study
     assert "study.skill.present" not in ops_study
     assert "harness-engineering" in skill
     assert "code-change-discipline" in skill
+    assert "Route Retron MSD work as a genetic compiler" in skill
+    assert "Input completeness classification" in skill
+    assert 'Do not say "snapshot posture"' in skill
+    assert "whether the answer came from snapshot posture" not in skill
+    assert "current phase and next route" not in skill
     assert "scar-nick base-junction" in skill
     assert "S0=M" in skill
-    assert "FREQUENT_CUTTER" in skill
-    assert "docs/studies/retron_hairpin_design/status.md" in skill
-    assert "docs/studies/retron_hairpin_design/scar-nick-base-junction.md" in skill
-    assert "cruncher.data-plane.cruncher-study-status" in route_matrix
-    assert "cruncher.data-plane.cruncher-study-preflight" in route_matrix
+    assert "msd_design_registry.yaml" in skill
+    assert "src/dnadesign/studies/retron_hairpin_design/compiler.py" in study_surfaces
+    assert "msd_design_hit_labels.txt" in pipeline
+    assert "msd_design_reference_catalog" in pipeline
+    assert "msd_design_hit_labels" in ops_study
+    assert "Start with input completeness, not study phase" in route_matrix
+    assert "Complete labels should lint/compile directly." in route_matrix
+    assert "msd_design_reference_v1" in study_surfaces
     assert "scar-nick route in `routes.md`" in route_matrix
-    assert "Blank-thread bootstrap" in refresh_loop
-    assert "Open `routes.md` after the record or blocker answer is settled." in refresh_loop
+    assert "cruncher-study-status --study-dir docs/studies/retron_hairpin_design" in route_matrix
+    assert "cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design" in route_matrix
+    assert "Compiler Bootstrap" in refresh_loop
+    assert "Use study status only when the" in refresh_loop
     assert "Pair with `harness-engineering`" in refresh_loop
     assert "Pair with `code-change-discipline`" in refresh_loop
     assert "canonical" in study_surfaces

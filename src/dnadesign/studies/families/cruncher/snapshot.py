@@ -48,13 +48,14 @@ def build_cruncher_study_status(
         }
     )
 
-    summary_parts = [f"{study_context.study_id}: phase {study_context.current_phase or 'unknown'}"]
+    state_label = str(study_context.intent_payload.get("state_label") or "phase").strip() or "phase"
+    summary_parts = [f"{study_context.study_id}: {state_label} {study_context.current_phase or 'unknown'}"]
     primary_lane = str(study_context.intent_payload.get("primary_lane") or "").strip()
     if primary_lane:
         summary_parts.append(f"primary lane {primary_lane}")
-    if study_context.next_ready_phase is not None:
+    if state_label == "phase" and study_context.next_ready_phase is not None:
         summary_parts.append(f"next ready {study_context.next_ready_phase['id']}")
-    elif study_context.next_planned_phase is not None:
+    elif state_label == "phase" and study_context.next_planned_phase is not None:
         summary_parts.append(f"next planned {study_context.next_planned_phase['id']}")
     if study_context.command_groups:
         summary_parts.append("command groups " + ", ".join(group.id for group in study_context.command_groups))
