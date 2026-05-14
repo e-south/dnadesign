@@ -31,6 +31,12 @@ from .src import (
 _BUNDLE_MANIFEST = "manifest.json"
 _BUNDLE_PLOT_ARTIFACT = "viennarna_structure_plot"
 _BUNDLE_PLOT_DIR = Path("visual") / "viennarna_secondary_structure"
+_SUPPORTED_BUNDLE_CONTRACTS = frozenset(
+    {
+        "producer_folding_bundle_v1",
+        "linear_ssdna_composition_bundle_manifest_v1",
+    }
+)
 
 app = typer.Typer(
     add_completion=True,
@@ -73,6 +79,10 @@ def _load_bundle(bundle: Path) -> _FoldingBundle:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise FoldingConfigError(f"Folding bundle manifest is not valid JSON: {manifest_path}") from exc
+    contract = manifest.get("contract")
+    if contract not in _SUPPORTED_BUNDLE_CONTRACTS:
+        allowed = ", ".join(sorted(_SUPPORTED_BUNDLE_CONTRACTS))
+        raise FoldingConfigError(f"Folding bundle manifest contract must be one of {allowed}: {manifest_path}")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise FoldingConfigError(f"Folding bundle manifest has no artifacts map: {manifest_path}")
@@ -147,7 +157,7 @@ def preflight_command(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        help="Construct output bundle containing manifest.json and folding artifacts.",
+        help="Producer folding bundle containing manifest.json and folding artifacts.",
     ),
     output_dir: Path | None = typer.Option(None, "--output-dir", help="Directory for folding artifacts."),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
@@ -187,7 +197,7 @@ def run_command(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        help="Construct output bundle containing manifest.json and folding artifacts.",
+        help="Producer folding bundle containing manifest.json and folding artifacts.",
     ),
     output_dir: Path | None = typer.Option(None, "--output-dir", help="Directory for folding artifacts."),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
@@ -238,7 +248,7 @@ def plot_command(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        help="Construct output bundle containing manifest.json and folding/visual artifacts.",
+        help="Producer folding bundle containing manifest.json and folding/visual artifacts.",
     ),
     visual_contract: Path | None = typer.Option(
         None,

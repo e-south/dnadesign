@@ -1,13 +1,20 @@
 ## Generic Linear ssDNA Composition Dev Spec
 
-**Status:** implementation reference
+**Status:** accepted implementation reference
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-14
 **Primary study:** `retron_hairpin_design`
+**Current generic authority:** [Construct linear ssDNA composition reference](../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
+**Architecture decision:** [ADR 0002](../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
 **Study handoff:** [Retron linear ssDNA composition handoff](../../studies/retron_hairpin_design/linear-ssdna-composition.md)
-**Execution plan:** [Generic linear ssDNA composition](../../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md)
+**Implementation record:** [Generic linear ssDNA composition](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+**Follow-up plan:** [Linear ssDNA composition hardening follow-ups](../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 
 ### Executive Summary
+
+This spec is an accepted implementation reference and design history. Use the
+Construct reference doc above for current generic procedure and bundle-routing
+authority; use the Retron handoff only for Retron-specific study choices.
 
 Add a contract-first, generic linear ssDNA composition capability to
 `Construct` so it can assemble multicopy linear single-stranded DNA products
@@ -18,7 +25,7 @@ The current Retron product posture has a study-owned layer above the generic
 composition/folding stack: users provide or select primitive parts through a
 lab-facing MSD shorthand label, the Retron study validates and freezes that
 selection into `msd_design_reference_v1` / `msd_design_catalog_v1`, and only
-then do Construct/Folding/BaseRender act as stateless service surfaces for
+then do Construct/Folding/BaseRender act as service/rendering surfaces for
 assembly or visualization. This ID-to-reference layer is not a generic
 top-level tool and must not create one stale workspace per requested design.
 
@@ -76,7 +83,7 @@ from validated segment lengths instead of trusting handwritten spans.
 
 ### ADR-Style Decision
 
-**Status:** proposed
+**Status:** accepted
 
 #### Context
 
@@ -1230,10 +1237,12 @@ Architecture-boundary tests should fail if Construct imports
 the folding layer imports BaseRender internals, or a study selector imports
 private sibling modules instead of contracts/public APIs.
 
-### Execution Plan Summary
+### Implementation Plan Summary
 
-The living checklist is in the active execution plan:
-[Generic linear ssDNA composition](../../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md).
+The completed implementation checklist is in:
+[Generic linear ssDNA composition](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md).
+Remaining hardening work is tracked in:
+[Linear ssDNA composition hardening follow-ups](../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md).
 
 High-level phases:
 
@@ -1281,5 +1290,6 @@ Open questions:
 - Study handoff: [linear ssDNA composition](../../studies/retron_hairpin_design/linear-ssdna-composition.md)
 - Study routes: [Retron Hairpin routes](../../studies/retron_hairpin_design/routes.md)
 - Scar-nick context: [scar-nick base-junction](../../studies/retron_hairpin_design/scar-nick-base-junction.md)
-- Execution plan: [generic linear ssDNA composition](../../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md)
+- Implementation record: [generic linear ssDNA composition](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+- Follow-up plan: [linear ssDNA composition hardening follow-ups](../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 - Planning lifecycle: [PLANS](../../../PLANS.md)

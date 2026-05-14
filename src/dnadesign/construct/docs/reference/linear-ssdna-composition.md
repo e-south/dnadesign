@@ -2,10 +2,14 @@
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-14
+**Surface role:** tool-local reference; generic authority for
+`linear_ssdna_composition_v1` and producer-owned Folding/BaseRender handoffs
 
 Use `construct compose` when the caller already has the parts and wants
 Construct to assemble a declared linear ssDNA product into a local artifact
 bundle. This route is not a solver and does not create a Construct workspace.
+Retron study docs may dogfood this route, but they do not replace this generic
+authority.
 
 ### When To Use
 
@@ -54,6 +58,11 @@ stateless service that may read the bundle manifest and write
 `secondary_structure_prediction_v1` plus ViennaRNA plot artifacts back into the
 same bundle. BaseRender remains the linear/component evidence renderer and
 consumes the emitted visual contract or generated job handoff.
+
+Folding bundle consumers should treat Construct's
+`linear_ssdna_composition_bundle_manifest_v1` manifest as a
+`producer_folding_bundle_v1`-compatible handoff, not as a Construct-private
+workspace format.
 
 Do not create persistent Folding workspaces. Do not create one Construct
 workspace per ad hoc composition request. If a study needs a registry or

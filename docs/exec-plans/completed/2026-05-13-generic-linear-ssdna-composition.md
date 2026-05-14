@@ -1,9 +1,23 @@
 ## Exec plan: Generic linear ssDNA composition
 
-**Status:** active
+**Status:** completed
 **Owner:** Shockwing / Codex handoff
 **Created:** 2026-05-13
 **Last updated:** 2026-05-14
+**Authority:** historical implementation record; not an operator router
+
+### Completion Summary
+
+The main local artifact path is implemented through Phase 5: Construct
+composition, Benchling-oriented exports, BaseRender component-span QA, Folding
+with the uv-managed ViennaRNA Python API, ViennaRNA-native annotated structure
+SVG publication, and the two-row composition review.
+
+Open work was split into the active follow-up plan:
+[linear ssDNA composition hardening follow-ups](../active/2026-05-14-linear-ssdna-composition-hardening-followups.md).
+
+Progress entries below are implementation history, not the current study phase
+and not a reason to default Retron requests into status/preflight.
 
 ### Purpose / Big Picture
 
@@ -132,11 +146,9 @@ imports, and local artifact bundles before optional USR persistence.
   rendered their BaseRender terminal-nick QA PNGs, added a PaqCI core-panel
   spec, and recorded that current strict public catalogs cover 13/14 active
   profile buckets with `WMWM` still uncovered.
-- [ ] (2026-05-13 15:25Z) Phase 6: evaluate optional USR persistence after
-  local artifact contracts stabilize.
-- [ ] (2026-05-13 15:25Z) Phase 7: dogfood with manual retron-43/TetO and,
-  after fresh source outputs, optional `de033` plus `scar_nick_teto` source
-  refs.
+- [x] (2026-05-14 00:00Z) Deferred Phase 6 optional USR persistence and
+  remaining Phase 7 source-ref dogfood to the active follow-up plan so this
+  implementation record can close without carrying current-phase work.
 
 ### Surprises & Discoveries
 
@@ -175,10 +187,11 @@ than ideal because BaseRender writes non-workspace job outputs under
 teach BaseRender a first-class flat output mode or rename the job stem to a
 format-neutral `component_span_qa`; do not hand-move generated outputs.
 
-Folding now accepts Construct output bundles directly through `--bundle` for
-preflight, run, and plot commands. This is an operator-surface cleanup, not a
-new storage root: Folding still has no workspace, reads bundle-owned manifest
-entries, and writes plot artifacts under the same bundle's
+Folding now accepts producer-owned bundles directly through `--bundle` for
+preflight, run, and plot commands. Construct's bundle manifest is one supported
+producer contract, not a Folding storage model. This is an operator-surface
+cleanup, not a new storage root: Folding still has no workspace, reads
+bundle-owned manifest entries, and writes plot artifacts under the same bundle's
 `visual/viennarna_secondary_structure/` directory.
 
 The system `RNAfold` executable is not on the local PATH, but the official
@@ -575,12 +588,12 @@ hues, and emit a `viennarna_secondary_structure_svg_v1` manifest. Do not build
 a secondary-structure layout engine in BaseRender; keep BaseRender on the
 orthogonal linear component-span QA view.
 
-Phase 6: Optional USR persistence.
+Deferred Phase 6: Optional USR persistence.
 
 After local artifacts stabilize, add opt-in USR write behavior with conflict
 guards, digest refs, and only the overlays that carry concrete value.
 
-Phase 7: Study dogfooding and source refs.
+Deferred Phase 7: Study dogfooding and source refs.
 
 Link manual retron-43/TetO output into the study record. Add optional `de033`
 and `scar_nick_teto` source-ref demo only after rerunning current outputs that
@@ -663,6 +676,8 @@ Repo acceptance:
   [generic linear ssDNA composition spec](../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
 - Study handoff:
   [Retron linear ssDNA composition](../../studies/retron_hairpin_design/linear-ssdna-composition.md)
-- PR: pending
+- PR: https://github.com/e-south/dnadesign/pull/47
 - ADR:
   [ADR 0002: Generic linear ssDNA composition in Construct](../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
+- Follow-up plan:
+  [linear ssDNA composition hardening follow-ups](../active/2026-05-14-linear-ssdna-composition-hardening-followups.md)

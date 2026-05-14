@@ -121,7 +121,11 @@ def test_folding_preflight_cli_reports_json_status(tmp_path: Path) -> None:
     assert payload["backend"]["name"] == "ViennaRNA"
 
 
-def test_folding_preflight_cli_accepts_construct_bundle(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "contract",
+    ("producer_folding_bundle_v1", "linear_ssdna_composition_bundle_manifest_v1"),
+)
+def test_folding_preflight_cli_accepts_producer_bundle(tmp_path: Path, contract: str) -> None:
     bundle = tmp_path / "bundle"
     folding_dir = bundle / "folding"
     folding_dir.mkdir(parents=True)
@@ -129,7 +133,7 @@ def test_folding_preflight_cli_accepts_construct_bundle(tmp_path: Path) -> None:
     (bundle / "manifest.json").write_text(
         json.dumps(
             {
-                "contract": "linear_ssdna_composition_bundle_manifest_v1",
+                "contract": contract,
                 "status": "ok",
                 "artifacts": {"folding_request": "folding/folding_request.yaml"},
             }
@@ -144,6 +148,22 @@ def test_folding_preflight_cli_accepts_construct_bundle(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["status"] == "warning_optional_missing"
     assert payload["output_dir"] == folding_dir.resolve().as_posix()
+
+
+def test_folding_preflight_cli_rejects_uncontracted_bundle(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    folding_dir = bundle / "folding"
+    folding_dir.mkdir(parents=True)
+    _write_request(folding_dir)
+    (bundle / "manifest.json").write_text(
+        json.dumps({"status": "ok", "artifacts": {"folding_request": "folding/folding_request.yaml"}}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["preflight", "--bundle", bundle.as_posix()])
+
+    assert result.exit_code == 1
+    assert "Folding bundle manifest contract must be one of" in result.output
 
 
 def test_folding_plot_cli_enriches_prediction_and_writes_viennarna_svg(

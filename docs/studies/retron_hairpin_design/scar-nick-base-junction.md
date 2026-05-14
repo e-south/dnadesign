@@ -3,9 +3,9 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-14
 
-Use this page when the retron hairpin question is about the four-base stem base,
-Type IIS scar choice, `scar_nick` terminal nick geometry, or profile-diverse
-`S0=M` scar coverage. Use `routes.md` for the command ladder.
+Four-base stem bases, Type IIS scar choice, `scar_nick` terminal nick geometry,
+and profile-diverse `S0=M` scar coverage live here. Command routing stays in
+`routes.md`.
 
 ### Coordinate Convention
 

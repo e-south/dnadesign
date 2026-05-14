@@ -25,7 +25,7 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need
-- `docs/studies/retron_hairpin_design/ops.study.yaml`: lifecycle order,
+- `docs/studies/retron_hairpin_design/ops.study.yaml`: nonsequential track map,
   artifacts, execution surfaces, and preflight grouping
 - `docs/studies/retron_hairpin_design/campaign.yaml`: tracked status and
   preflight procedure bundle
@@ -50,8 +50,10 @@ base-junction scar-nick work.
   owns the retron/P4 framing note.
 - `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md` owns
   the generic Construct/folding/BaseRender/USR dev spec.
-- `docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md`
-  owns the current implementation checklist and completion state.
+- `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
+  owns the completed implementation checklist and validation evidence.
+- `docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md`
+  owns remaining USR/source-ref/module-split follow-up work.
 - `src/dnadesign/studies/retron_hairpin_design/compiler.py` owns the study-local
   MSD reference/catalog compiler API.
 - `src/dnadesign/studies/retron_hairpin_design/cli.py` is the thin Typer
@@ -64,7 +66,7 @@ When the next question needs exact commands or the next human step, use the
 study route map first.
 When the next question says "continue the dev spec" or concerns multicopy
 linear ssDNA assembly, open `linear-ssdna-composition.md`, then the dev spec,
-then the active execution plan.
+then the completed implementation record and current follow-up plan.
 When the next question starts from an MSD shorthand ID or Reader-facing design
 reference, use the Study route for MSD design references in `routes.md`, then
 `references/msd-design-references.md`.

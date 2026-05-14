@@ -1,7 +1,7 @@
 ## Folding Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-13
+**Last verified:** 2026-05-14
 
 Folding is the stateless secondary-structure service for dnadesign. Use it when
 a sequence producer has already emitted a folding request or bundle and you
@@ -12,8 +12,8 @@ module used by the uv-managed default backend.
 
 ### Choose a Path
 
-- **Producer bundle:** use `--bundle <construct-output-bundle>` when Construct
-  or another producer has already written `manifest.json`.
+- **Producer bundle:** use `--bundle <producer-folding-bundle>` when a
+  producer has already written a contract-bearing `manifest.json`.
 - **Direct request:** use `--request <request.yaml>` when you have an explicit
   `secondary_structure_prediction_request_v1` file.
 - **Plot an existing prediction:** use `plot` with a prediction, assembled
@@ -33,12 +33,12 @@ uv run folding plot \
   --output-dir <viennarna-plot-dir>
 ```
 
-For Construct composition bundles, prefer the manifest-backed surface:
+For producer-owned bundles, prefer the manifest-backed surface:
 
 ```bash
-uv run folding preflight --bundle <construct-output-bundle>
-uv run folding run --bundle <construct-output-bundle>
-uv run folding plot --bundle <construct-output-bundle>
+uv run folding preflight --bundle <producer-folding-bundle>
+uv run folding run --bundle <producer-folding-bundle>
+uv run folding plot --bundle <producer-folding-bundle>
 ```
 
 ### Where Outputs Live
@@ -47,6 +47,11 @@ Folding does not create a workspace. Bundle mode is only a path resolver:
 Folding reads the producer bundle's `manifest.json`, consumes artifacts under
 the bundle's `folding/` and `visual/` directories, and writes ViennaRNA plot
 outputs back under `visual/viennarna_secondary_structure/`.
+
+Bundle manifests must declare a Folding-readable producer contract. New
+producers should use `producer_folding_bundle_v1`; Construct composition
+bundles remain compatible through
+`linear_ssdna_composition_bundle_manifest_v1`.
 
 Direct request mode writes to the paths declared by the request or CLI flags.
 Keep those paths producer-owned; do not create long-lived Folding output roots

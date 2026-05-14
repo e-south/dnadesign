@@ -1,15 +1,16 @@
 ## Retron Linear ssDNA Composition Handoff
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-13
+**Last verified:** 2026-05-14
 **Status:** Construct tracer bullet, BaseRender component-span QA, uv-managed ViennaRNA folding, and ViennaRNA-native annotated structure SVG implemented
+**Generic authority:** [Construct linear ssDNA composition reference](../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
 **Dev spec:** [generic linear ssDNA composition](../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
-**Execution plan:** [active checklist](../../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md)
+**Implementation record:** [completed checklist](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 
-Use this page when the Retron Hairpin study question shifts from solving
+Retron Hairpin study questions shift here when the work moves from solving
 Snapback or scar-nick primitives to composing a whole multicopy linear ssDNA
-insert. It is intentionally a short study-owned handoff; the full design lives
-in developer docs.
+insert. This page is Retron-specific; use the Construct reference above for
+generic composition and bundle-routing procedure.
 
 The current product profile is an ID-to-reference compiler plus optional
 assembly/rendering handoff. The user provides or selects primitive parts
@@ -266,8 +267,8 @@ When returning to this work:
 1. Read this page for the study-specific boundary.
 2. Open the full dev spec:
    [generic linear ssDNA composition](../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md).
-3. Update the active execution checklist:
-   [generic linear ssDNA composition plan](../../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md).
+3. Use the completed implementation record for historical evidence:
+   [generic linear ssDNA composition plan](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md).
 4. Use `routes.md` for the existing Snapback, scar-nick, and YIU command
    routes.
 5. Rerun current Cruncher outputs before making exact-hit or PaqCI-capacity
@@ -301,4 +302,5 @@ When returning to this work:
 - [Retron status](status.md)
 - [Scar-nick base-junction context](scar-nick-base-junction.md)
 - [Generic linear ssDNA composition dev spec](../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
-- [Generic linear ssDNA composition execution plan](../../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md)
+- [Generic linear ssDNA composition implementation record](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+- [Linear ssDNA composition hardening follow-ups](../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)

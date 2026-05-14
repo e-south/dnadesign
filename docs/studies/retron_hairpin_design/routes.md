@@ -3,10 +3,9 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-14
 
-Use this page to route Retron MSD product work. For compiler-style requests,
-start with the user's provided parts and desired output, not with study phase.
-Use status/preflight only for explicit progress or blocker questions. This page
-keeps the study-owned handoff map in one place.
+Retron MSD product work starts from the user's provided parts and desired
+output, not from study phase. Status/preflight surfaces are only for explicit
+progress or blocker questions.
 
 ### Quick route
 
@@ -197,8 +196,8 @@ a frozen design reference for later visuals, GenBank/FASTA handoff, or Reader
 joins.
 
 - Type: `study-contract`
-- Plane: `record-plane`
-- Surface role: `design-reference-normalization`
+- Plane: `data-plane`
+- Surface role: `record-plane design-reference-normalization`
 - Owner-boundary: `studies/retron_hairpin_design`
 - Current state: `compiler-ready`
 - Registry:
@@ -265,7 +264,7 @@ reminder of what YIU does and does not model.
 - Generic linear ssDNA composition dev spec:
   `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md`
 - Generic linear ssDNA composition execution plan:
-  `docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md`
+  `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
 - Construct linear ssDNA dogfood config:
   `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
 - Generated Construct/BaseRender dogfood bundle:

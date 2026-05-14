@@ -18,7 +18,10 @@ from .commands import register_all
 app = typer.Typer(
     add_completion=True,
     no_args_is_help=True,
-    help="Create contextualized or multi-part DNA constructs and write them into USR datasets.",
+    help=(
+        "Realize template/part constructs into USR datasets, or compose declared "
+        "sequence products into explicit artifact bundles."
+    ),
 )
 
 register_all(app)

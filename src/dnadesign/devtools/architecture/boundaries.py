@@ -87,6 +87,9 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("studies", "usr"),
     ("usr", "ops"),
 }
+_ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("construct", "folding"): ("dnadesign.folding",),
+}
 _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
     ("usr", "cruncher"): ("dnadesign.cruncher.ingest.promoters",),
 }
@@ -259,8 +262,31 @@ def find_undeclared_cross_tool_imports(
                     )
                 )
                 continue
+            exact_targets = _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS.get((owner_tool, imported_tool), ())
+            if exact_targets:
+                if target in exact_targets:
+                    continue
+                violations.append(
+                    ImportViolation(
+                        owner_tool=owner_tool,
+                        imported_tool=imported_tool,
+                        file_path=file_path,
+                        import_target=target,
+                    )
+                )
+                continue
             target_prefixes = _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES.get((owner_tool, imported_tool), ())
-            if any(target == prefix or target.startswith(f"{prefix}.") for prefix in target_prefixes):
+            if target_prefixes:
+                if any(target == prefix or target.startswith(f"{prefix}.") for prefix in target_prefixes):
+                    continue
+                violations.append(
+                    ImportViolation(
+                        owner_tool=owner_tool,
+                        imported_tool=imported_tool,
+                        file_path=file_path,
+                        import_target=target,
+                    )
+                )
                 continue
             if (owner_tool, imported_tool) in allowed:
                 continue

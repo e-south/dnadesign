@@ -95,8 +95,10 @@ uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-int
    [2026-04-28 sequence-view ontology and Infer completion spec](plans/2026-04-28-sequence-view-ontology-and-infer-completion-hardening-spec.md)
 5. Generic linear ssDNA composition proposal for Construct, folding QA, BaseRender handoff, and Retron dogfooding:
    [2026-05-13 generic linear ssDNA composition spec](plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
-6. Active implementation checklist:
-   [generic linear ssDNA composition execution plan](../exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md)
+6. Completed implementation record:
+   [generic linear ssDNA composition execution plan](../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+7. Active follow-up checklist:
+   [linear ssDNA composition hardening follow-ups](../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 
 ### Naming and file layout
 

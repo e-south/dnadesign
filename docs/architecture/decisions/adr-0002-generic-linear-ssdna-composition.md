@@ -1,6 +1,6 @@
 ## ADR 0002: Generic linear ssDNA composition in Construct
 
-**Status:** proposed
+**Status:** accepted
 **Date:** 2026-05-13
 **Owner:** dnadesign-maintainers
 
@@ -18,6 +18,10 @@ and local handoff artifacts rather than anchor/window lineage.
 
 ### Decision
 Construct owns a new generic `linear_ssdna_composition_v1` workflow.
+
+The ADR records the architecture decision. The Construct reference doc is the
+current generic operator authority for commands, bundle ownership, and
+Construct/Folding/BaseRender handoff details.
 
 The workflow:
 
@@ -77,8 +81,10 @@ does not run folding or assemble sequences.
 ### Links
 - Proposal:
   `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md`
-- Execution plan:
-  `docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md`
+- Generic operator authority:
+  `src/dnadesign/construct/docs/reference/linear-ssdna-composition.md`
+- Implementation record:
+  `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
 - Study handoff:
   `docs/studies/retron_hairpin_design/linear-ssdna-composition.md`
 - Implementation:

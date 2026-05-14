@@ -156,7 +156,7 @@
 - Generic linear ssDNA composition dev spec:
   `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md`
 - Generic linear ssDNA composition execution plan:
-  `docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md`
+  `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
 - Construct dogfood config:
   `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
 - Generated Construct/BaseRender local bundle:

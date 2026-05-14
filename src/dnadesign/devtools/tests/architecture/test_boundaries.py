@@ -111,6 +111,27 @@ def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_construct_to_folding_public_facade(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "import dnadesign.folding as folding\n")
+    _write(tmp_path / "src" / "dnadesign" / "folding" / "__init__.py", "def run():\n    return 1\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_construct_to_folding_non_facade(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "from dnadesign.folding.cli import app\n")
+    _write(tmp_path / "src" / "dnadesign" / "folding" / "cli.py", "app = object()\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "construct"
+    assert violations[0].imported_tool == "folding"
+    assert violations[0].import_target == "dnadesign.folding.cli"
+
+
 def test_find_undeclared_cross_tool_imports_allows_latentdna_to_usr_default_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "latentdna" / "runtime.py", "from dnadesign.usr import Dataset\n")
     _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")

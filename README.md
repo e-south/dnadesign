@@ -20,9 +20,10 @@ Use the docs index to choose a workflow, inspect existing work, or jump to a too
 ## Available tools
 
 Use the tool READMEs below for task-specific docs and CLI entrypoints. The
-sections separate workflow-owning packages from stateless services and shared
-schema/routing surfaces. Individual study routes stay under `docs/studies/`;
-this top-level README intentionally does not list study-specific product names.
+sections separate workflow-owning packages, artifact services, operator
+surfaces, and shared schema/routing surfaces. Individual study routes stay under
+`docs/studies/`; this top-level README intentionally does not list
+study-specific product names.
 
 ### Workspace and analysis tools
 
@@ -43,14 +44,19 @@ this top-level README intentionally does not list study-specific product names.
 | [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md) | Analyze TFKD libraries in PPTP-seq context. | [![tfkdanalysis coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=tfkdanalysis)](https://codecov.io/gh/e-south/dnadesign?component=tfkdanalysis) |
 | [**aligner**](src/dnadesign/aligner/README.md) | Score global alignments with Biopython `PairwiseAligner`. | [![aligner coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=aligner)](https://codecov.io/gh/e-south/dnadesign?component=aligner) |
 
-### Stateless services and operator surfaces
+### Artifact services
+
+| Tool | Description | Coverage |
+| --- | --- | --- |
+| [**folding**](src/dnadesign/folding/README.md) | Predict secondary structure and publish ViennaRNA plots for producer-owned bundles without owning workspaces. | [![folding coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=folding)](https://codecov.io/gh/e-south/dnadesign?component=folding) |
+| [**baserender**](src/dnadesign/baserender/README.md) | Render schema-driven visual contracts from producer job files or optional demo/ad hoc workspaces. | [![baserender coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=baserender)](https://codecov.io/gh/e-south/dnadesign?component=baserender) |
+
+### Operator surfaces
 
 | Tool | Description | Coverage |
 | --- | --- | --- |
 | [**ops**](src/dnadesign/ops/README.md) | Plan, submit, and inspect batch runbooks across tools. | [![ops coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=ops)](https://codecov.io/gh/e-south/dnadesign?component=ops) |
 | [**notify**](src/dnadesign/notify/README.md) | Send webhook notifications for local runs and scheduler-backed jobs. | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
-| [**folding**](src/dnadesign/folding/README.md) | Predict secondary structure and publish ViennaRNA plots for producer-owned bundles. | [![folding coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=folding)](https://codecov.io/gh/e-south/dnadesign?component=folding) |
-| [**baserender**](src/dnadesign/baserender/README.md) | Render schema-driven visual contracts emitted by producer packages. | [![baserender coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=baserender)](https://codecov.io/gh/e-south/dnadesign?component=baserender) |
 
 ### Shared contracts and routing
 

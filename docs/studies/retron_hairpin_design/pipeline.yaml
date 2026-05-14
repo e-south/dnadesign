@@ -19,7 +19,7 @@ intent:
     - repo:docs/studies/retron_hairpin_design/msd_design_registry.yaml
     - repo:docs/studies/retron_hairpin_design/msd_design_hit_labels.txt
     - repo:docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md
-    - repo:docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md
+    - repo:docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md
     - repo:src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md
     - repo:src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md
     - repo:src/dnadesign/cruncher/docs/guides/yiu_workflow.md

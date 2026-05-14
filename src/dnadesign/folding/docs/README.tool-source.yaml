@@ -1,5 +1,5 @@
 schema_version: 1
-catalog_order: 11
+catalog_order: 12
 tool: folding
 summary: Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts.
 keywords:

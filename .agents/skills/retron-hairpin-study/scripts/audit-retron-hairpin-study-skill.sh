@@ -109,7 +109,8 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/linear-ssdna-composi
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/msd_design_registry.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/msd_design_hit_labels.txt"
 require_file "$REPO_ROOT/docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md"
-require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md"
+require_file "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md"
+require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/pipeline.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/ops.study.yaml"
 require_file "$REPO_ROOT/src/dnadesign/cruncher/docs/operations/cruncher-study-status.md"
@@ -148,7 +149,9 @@ done < <(find "$REFERENCE_DIR" -maxdepth 1 -type f -name '*.md' | sort)
   printf '\n'
   cat "$REPO_ROOT/docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md"
+  cat "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md"
+  printf '\n'
+  cat "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/pipeline.yaml"
   printf '\n'
@@ -172,7 +175,8 @@ require_pattern 'docs/studies/retron_hairpin_design/linear-ssdna-composition\.md
 require_pattern 'docs/studies/retron_hairpin_design/msd_design_registry\.yaml' "skill references MSD design registry"
 require_pattern 'docs/studies/retron_hairpin_design/msd_design_hit_labels\.txt' "skill references MSD selected labels"
 require_pattern 'docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec\.md' "skill references linear ssDNA dev spec"
-require_pattern 'docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition\.md' "skill references linear ssDNA execution plan"
+require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition\.md' "skill references linear ssDNA implementation record"
+require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
 require_pattern 'docs/studies/retron_hairpin_design/pipeline\.yaml' "skill references pinned study pipeline"
 require_pattern 'references/test-matrix\.md' "skill references test matrix for validation"
 require_pattern 'Start with input completeness, not study phase' "skill uses compiler-first routing"
