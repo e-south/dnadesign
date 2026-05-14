@@ -47,12 +47,12 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         ],
         label="src/dnadesign/ops/README.md",
     )
-    assert "Ops manages batch orchestration across tools." in text
+    assert "Ops manages batch orchestration and read-only status across tools." in text
     assert "Use Ops when:" in text
     assert "Do not use Ops when:" in text
     assert "shared command index" in text
     assert "uv run ops catalog list" in text
-    assert "shared command entrypoints below" in text
+    assert "does not keep a second registry" in text
     assert "uv run ops catalog show <registry-id>" in text
     assert "uv run ops progress explain <registry-id>" in text
     assert "docs/README.md" in text
@@ -79,7 +79,8 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         label="src/dnadesign/ops/docs/README.md",
     )
     assert "../../../../docs/runbooks/README.md" in text
-    assert "full command list" in text
+    assert "repo-wide" in text
+    assert "command list lives in `docs/runbooks/README.md`" in text
     assert "how-to-use-ops.md" in text
     assert "../../../../docs/operations/README.md" in text
     assert "../../../../docs/operations/orchestration-runbooks.md" in text
@@ -284,7 +285,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     text = _read(_repo_root() / "docs" / "runbooks" / "README.md")
 
     assert "## Runbook Catalog" in text
-    assert "Use this page when you want a command first." in text
+    assert "For command-first routing, start with `uv run ops catalog list --simple`" in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
     assert "### Command lookup" in text

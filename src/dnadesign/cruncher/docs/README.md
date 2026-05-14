@@ -29,11 +29,14 @@ and docs surfaces.
 - **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
 - **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Released-product Snapback Workflow](guides/snapback_released_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md), [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md), and the checked-in [de033 released-product workspace README](../workspaces/de033/README.md)
 - **Scar-nick workflows:** [Scar-Nick Workflow](guides/scar_nick_workflow.md), [scar_nick_teto runbook](../workspaces/scar_nick_teto/runbook.md), and the [scar_nick package map](../src/scar_nick/README.md)
-- **Tracked study surfaces:** [Cruncher Study Status](operations/cruncher-study-status.md), [Cruncher Study Preflight](operations/cruncher-study-preflight.md), the checked-in [retron hairpin study status](../../../../docs/studies/retron_hairpin_design/status.md), the study [route map](../../../../docs/studies/retron_hairpin_design/routes.md), and the repo-local [retron hairpin study skill](../../../../.agents/skills/retron-hairpin-study/SKILL.md)
 - **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 - **Study orchestration:** [Studies](guides/studies.md) and [Study Length vs Score](guides/study_length_vs_score.md)
 - **Portfolio orchestration:** [Portfolio Aggregation](guides/portfolio_aggregation.md)
 - **Tool-wide references:** [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), [Config Reference](reference/config.md), [Glossary](reference/glossary.md), and [Runbook Step Reference](reference/runbook_steps.md)
+
+### Related study records
+
+- [Retron hairpin study route map](../../../../docs/studies/retron_hairpin_design/routes.md): use when a named study task needs Cruncher primitives. Use [Cruncher Study Status](operations/cruncher-study-status.md) and [Cruncher Study Preflight](operations/cruncher-study-preflight.md) only for explicit status or readiness questions.
 
 <!-- docs:toc:off -->
 

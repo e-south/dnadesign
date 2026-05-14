@@ -1,25 +1,25 @@
 ![Ops banner](assets/ops-banner.svg)
 
-Ops manages batch orchestration across tools. It turns a runbook into preflight, verification, and submit steps with audit output, so scheduler work stays readable instead of turning into ad hoc shell commands.
-If you do not know a route id yet, start with `uv run ops catalog list --simple`.
-Study-family status and preflight implementations do not live in OPS core; the
-active stress-promoter study adapter and its runtime helpers live under
-`src/dnadesign/studies/families/promoter/`, while OPS keeps the neutral CLI,
-registry loading, path semantics, orchestration, and rendering surfaces.
-Status surfaces are published by boundary-owned `*/ops/status.registry.yaml`
-fragments under `src/dnadesign/`; OPS discovers those fragments recursively and
-imports provider code only for the selected surface.
-Study preflight is contract-driven too: `ops.study.yaml` now owns scope
-grouping, artifact refs, execution surfaces, and generic readiness checks.
-Family adapters normalize study-local paths and derived refs into that checked-in
-contract, and OPS executes only generic kinds such as `command`,
+Ops manages batch orchestration and read-only status across tools. It turns
+runbooks into preflight, verification, submit, and audit steps so scheduler work
+stays explicit.
+
+Start with `uv run ops catalog list --simple` when the route id is unknown.
+
+Ops core owns the neutral CLI, registry loading, path semantics, orchestration,
+and rendering surfaces. Boundary-owned `*/ops/status.registry.yaml` fragments
+publish status routes, and Ops imports provider code only for the selected
+route. Study-family implementation code stays under `src/dnadesign/studies/`.
+
+Study readiness is contract-driven: `ops.study.yaml` declares scope grouping,
+artifact refs, execution surfaces, and generic check kinds such as `command`,
 `workspace_layout`, `scheduler_queue`, `gpu_availability`, `path_exists`,
-`dataset_snapshot`, `sequence_view_contract`, and `runbook_plan`.
-Treat the command families as three neutral surfaces: `ops catalog` is the
-discovery plane, `ops progress` is the observation plane, and `ops runbook` is
-the control plane for deterministic batch execution.
-Within `ops progress`, study snapshots observe the record plane and study
-preflight surfaces observe the execution-readiness plane.
+`dataset_snapshot`, `sequence_view_contract`, and `runbook_plan`. The contract
+may describe a sequential phase ladder or a nonsequential track map; Ops should
+not assume one study introspection style.
+
+Command families are neutral surfaces: `ops catalog` is discovery, `ops
+progress` is observation, and `ops runbook` is deterministic batch control.
 
 ## Glossary
 
@@ -41,8 +41,8 @@ Do not use Ops when:
 - a tool already owns the durable dataset mutation, such as Construct -> USR -> Infer shared-dataset work
 - you need the boundary-local runtime semantics first; start from the tool docs or shared USR workflow docs, then return to Ops if you need orchestration around that route
 
-For repo-wide runbook discovery, start with `docs/runbooks/README.md`; `ops` does not keep a second registry.
-Use this README for package scope, the shared command entrypoints below, and links into the maintained Ops docs.
+For repo-wide runbook discovery, start with `docs/runbooks/README.md`; `ops`
+does not keep a second registry.
 
 ## Common entrypoints
 

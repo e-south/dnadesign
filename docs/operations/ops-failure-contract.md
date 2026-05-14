@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-This page defines the maintainer-facing CLI failure contract for `ops`.
+Maintainer-facing CLI failure contract for `ops`:
 
 ### Exit codes
 

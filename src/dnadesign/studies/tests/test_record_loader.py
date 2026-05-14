@@ -132,6 +132,76 @@ def test_load_study_ops_contract_accepts_valid_repo_scoped_surface_refs(tmp_path
     assert contract.phases[1].as_dict()["required_for_main_study_state"] is False
 
 
+def test_load_study_ops_contract_accepts_nonsequential_tracks(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["lifecycle"] = {
+        "mode": "tracks",
+        "current_track": {
+            "strategy": "explicit",
+            "id": "design_reference_catalog",
+        },
+        "track_order": [
+            "design_reference_catalog",
+            "source_ref_dogfood",
+        ],
+    }
+    payload["tracks"] = [
+        {
+            "id": "design_reference_catalog",
+            "status": "in_progress",
+            "next_surface": "repo:src/dnadesign/ops/runbooks/presets/demo.yaml",
+        },
+        {
+            "id": "source_ref_dogfood",
+            "status": "planned",
+            "next_surface": "repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+        },
+    ]
+    del payload["phases"]
+    payload["preflight"]["scopes"] = {
+        "next": {"include_tracks": ["current_track"]},
+        "full": {"include_tracks": ["all"]},
+    }
+    payload["preflight"]["group_track_bindings"] = {
+        "design_catalog": "design_reference_catalog",
+        "source_ref": "source_ref_dogfood",
+    }
+    del payload["preflight"]["group_phase_bindings"]
+    payload["preflight"]["checks"] = {
+        "design_reference_catalog": [
+            {
+                "kind": "runbook_plan",
+                "check_id": "design.catalog.plan",
+                "check_group": "design_catalog",
+                "summary": "Design catalog route renders cleanly.",
+                "required": True,
+                "surface": "densegen_batch",
+            }
+        ]
+    }
+    payload["preflight"]["next_scope"] = {
+        "target_track_groups": {
+            "design_reference_catalog": ["design_catalog"],
+            "source_ref_dogfood": ["source_ref"],
+        },
+        "runtime_track_groups": [],
+        "runtime_shared_groups": [],
+    }
+    study_root = _write_contract(tmp_path, payload)
+
+    contract = load_study_ops_contract(study_root)
+
+    assert contract.lifecycle_mode == "tracks"
+    assert contract.lifecycle_item_label == "track"
+    assert contract.current_phase_id == "design_reference_catalog"
+    assert contract.phase_order == ("design_reference_catalog", "source_ref_dogfood")
+    assert contract.preflight.group_phase_bindings == {
+        "design_catalog": "design_reference_catalog",
+        "source_ref": "source_ref_dogfood",
+    }
+    assert contract.preflight.next_scope.target_phase_groups["design_reference_catalog"] == ("design_catalog",)
+
+
 def test_supported_preflight_kinds_come_from_single_registry() -> None:
     from dnadesign.studies.core import record_loader
 

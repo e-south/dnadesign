@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Use this page to find the next task, command, or reference doc.
+Find the next task, command, or reference doc from the routes below.
 
 Start with:
 
@@ -17,9 +17,11 @@ Start with:
 ### Inspect available work
 
 Use this table when the first question is "what is available right now?"
-rather than "which workflow should I run?" It lists workspace and dataset
-roots only; stateless services such as Folding and BaseRender consume
-producer-owned artifacts instead of owning workspaces.
+rather than "which workflow should I run?" It lists durable workspace and
+dataset roots only. Folding is workspace-less and consumes producer-owned
+bundles. BaseRender can run optional demo/ad hoc workspaces, but most
+cross-tool use should target producer-emitted render job files or visual
+contracts.
 
 | Tool | What it owns | First command | Next doc |
 | --- | --- | --- | --- |
@@ -75,9 +77,9 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 ### Tool docs
 
 These sections keep unlike package surfaces separate without adding more
-columns. Prefer workspace/dataset routers for user work; call service CLIs such
-as `folding` only when a producer has already emitted the required contract
-artifacts or bundle manifest.
+columns. Prefer workspace/dataset routers for user work; call artifact services
+such as `folding` only when a producer has already emitted the required
+contract artifacts or bundle manifest.
 
 #### Workspace and analysis tools
 
@@ -98,12 +100,17 @@ artifacts or bundle manifest.
 | `tfkdanalysis` | n/a | [tfkdanalysis README](../src/dnadesign/tfkdanalysis/README.md) |
 | `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
 
-#### Stateless services and operator surfaces
+#### Artifact services
 
 | Tool | CLI | Docs |
 | --- | --- | --- |
-| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md); stateless renderer |
-| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); stateless service, no workspace |
+| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md); contract renderer, job files, optional demo/ad hoc workspaces |
+| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); workspace-less service |
+
+#### Operator surfaces
+
+| Tool | CLI | Docs |
+| --- | --- | --- |
 | `notify` | `uv run notify --help` | [notify README](../src/dnadesign/notify/README.md) |
 | `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |
 

@@ -3,8 +3,8 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Use this page when you need the exact contract for scheduler probes, active-job
-resolution, and degraded submit behavior in `ops runbook`.
+Scheduler probes, active-job resolution, and degraded submit behavior in
+`ops runbook` follow this contract.
 
 ### Why this exists
 

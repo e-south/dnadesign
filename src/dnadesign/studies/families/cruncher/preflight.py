@@ -94,16 +94,20 @@ def build_cruncher_preflight_progress(
         scope_plan=context.scope_plan,
     )
     state = "attention" if evaluation.blocker_checks or evaluation.nonblocking_attention_checks else "ok"
+    item_label = str(context.contract.lifecycle_item_label or "phase").strip() or "phase"
+    item_key = item_label.strip().lower().replace("-", "_").replace(" ", "_") or "phase"
     summary = (
         f"{context.study_context.study_id}: preflight {context.scope_plan.scope} "
-        f"for {context.scope_plan.target_phase_id or 'all'}; "
+        f"for {context.scope_plan.target_phase_id or f'all {item_label}s'}; "
         f"blockers {len(evaluation.blocker_checks)}"
     )
     evidence = dict(context.study_context.evidence)
     evidence.update(
         {
             "scope": context.scope_plan.scope,
-            "phase_id": context.scope_plan.target_phase_id,
+            "lifecycle_mode": context.contract.lifecycle_mode,
+            "lifecycle_item_label": item_label,
+            f"{item_key}_id": context.scope_plan.target_phase_id,
             "included_groups": list(context.scope_plan.included_groups),
             "phase_scoped_groups": list(context.scope_plan.phase_scoped_groups),
             "checks": [check.as_dict() for check in evaluation.scoped_checks],
@@ -114,6 +118,8 @@ def build_cruncher_preflight_progress(
             "effective_counts": dict(evaluation.effective_counts),
         }
     )
+    if item_key == "phase":
+        evidence["phase_id"] = context.scope_plan.target_phase_id
     return state, summary, evidence
 
 

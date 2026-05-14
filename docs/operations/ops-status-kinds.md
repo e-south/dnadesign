@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-This index summarizes the currently registered public OPS routes and the status kinds behind them.
+Registered public OPS routes and their status-kind adapters:
 
 | Registry id | Status kind | Observed plane | Surface type | Summary scope | Cost | Required inputs | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |

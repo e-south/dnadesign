@@ -3,7 +3,8 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-25
 
-Use this page when you want a command first. Start with `uv run ops catalog list --simple`, then open the linked runbook or tool doc once you know the route.
+For command-first routing, start with `uv run ops catalog list --simple`, then
+open the linked runbook or tool doc once you know the route.
 Treat the CLI surfaces explicitly: `ops catalog` is discovery, `ops progress` is observation, and `ops runbook` is the control plane that plans or executes deterministic batch work.
 
 Use the command table first. The generated tables later on are reference.
@@ -28,7 +29,7 @@ Use the command table first. The generated tables later on are reference.
 - `uv run ops catalog list --simple`: shorter inventory when you are new to the registry and do not need the taxonomy first.
 - `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: one procedure with its owner docs, related tool docs, linked deeper docs, required status inputs, and next commands.
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status view.
-- `uv run ops progress show usr.data-plane.promoter-study-status`: one checked-in active-study summary for current phase, dataset presence, and next ready surface. Add `--repo-root <repo-root> --study-dir docs/studies/<study-id>` to pin a different study or invoke it from outside the repo checkout.
+- `uv run ops progress show usr.data-plane.promoter-study-status`: one checked-in active-study summary for current record state, dataset presence, and next ready surface. Add `--repo-root <repo-root> --study-dir docs/studies/<study-id>` to pin a different study or invoke it from outside the repo checkout.
 - `uv run ops progress show usr.data-plane.promoter-study-preflight`: deeper read-only preflight across DenseGen, Construct, Infer, Notify, and batch-plan surfaces for the checked-in active study.
 - `uv run ops runbook fill-infer --study-dir docs/studies/regulondb_native_promoter_panel`: study-level Infer completion plan for all declared sequence-view runbooks; add `--submit` only from the target HPC batch environment after Notify is configured.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
@@ -50,7 +51,7 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 | `usr.data-plane.construct-infer-source-of-truth` | [Construct -> USR -> Infer Shared Dataset Runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff. |
 | `usr.data-plane.promoter-study-status` | [Promoter Study Status Contract](../../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md) | `contract` | `data-plane` | `iterative` | `promoter-study-status` | Read one checked-in promoter-study record and report the current phase, datasets, and handoff surfaces without reconstructing the workflow by hand. |
 | `usr.data-plane.promoter-study-preflight` | [Promoter Study Preflight](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md) | `contract` | `data-plane` | `iterative` | `promoter-study-preflight` | Run the active promoter-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan contracts without mutating data or submitting jobs. |
-| `cruncher.data-plane.cruncher-study-status` | [Cruncher Study Status Contract](../../src/dnadesign/cruncher/docs/operations/cruncher-study-status.md) | `contract` | `data-plane` | `iterative` | `cruncher-study-status` | Read one checked-in cruncher-study record and report the current phase, command groups, and context refs without reconstructing the study by hand. |
+| `cruncher.data-plane.cruncher-study-status` | [Cruncher Study Status Contract](../../src/dnadesign/cruncher/docs/operations/cruncher-study-status.md) | `contract` | `data-plane` | `iterative` | `cruncher-study-status` | Read one checked-in cruncher-study directory and summarize its declared route or track, command groups, and native-agent bootstrap context. |
 | `cruncher.data-plane.cruncher-study-preflight` | [Cruncher Study Preflight](../../src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md) | `contract` | `data-plane` | `iterative` | `cruncher-study-preflight` | Run the current cruncher-study preflight suite across declared workspace-layout and command-validation surfaces without mutating outputs. |
 | `usr.data-plane.promoter-feature-matrix` | [Promoter Characterization Feature Matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL. |
 | `cluster.downstream.exploratory-clustering` | [Exploratory clustering workflow](../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) | `workflow` | `downstream-tool` | `exploratory` | `cluster-run-index` | Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries. |
@@ -72,6 +73,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
 | `cruncher` | [Cruncher docs](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned design-family docs for optimization, cassettes, YIU, Snapback, scar-nick, studies, and portfolios. |
 | `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Ops commands, packaged presets, and runbook lifecycle docs. |
+| `baserender` | [baserender docs](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
 | `folding` | [Folding Docs](../../src/dnadesign/folding/docs/README.md) | Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts. |
 
 ### Status views
@@ -85,9 +87,9 @@ You only need this section after `uv run ops progress explain <registry-id>` or 
 | `ops-audit-json` | Workspace-scoped control-plane audit payload emitted by `ops runbook execute`. | Inspect `<workspace-root>/outputs/logs/ops/audit/*.json` plus the orchestration audit contract in [orchestration runbooks](../operations/orchestration-runbooks.md). |
 | `usr-sync-audit` | USR sync parity and drift review for iterative cross-host updates. | Inspect the linked USR sync runbook and the [USR sync audit loop](../../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | `usr-dataset-state` | Current USR dataset shape, overlays, and validation state after staged data-plane work. | Inspect the linked USR runbook plus `usr validate`, `usr head`, and related dataset-state checks named there. |
-| `promoter-study-status` | Checked-in promoter-study directory state, including source-dataset presence, current phase, and missing execution surfaces. | Inspect the linked study-status contract plus the checked-in `ops.study.yaml`, `datasets.yaml`, `status.md`, and `pipeline.yaml` when execution surfaces are present. |
+| `promoter-study-status` | Checked-in promoter-study directory state, including source-dataset presence, current record state, and missing execution surfaces. | Inspect the linked study-status contract plus the checked-in `ops.study.yaml`, `datasets.yaml`, `status.md`, and `pipeline.yaml` when execution surfaces are present. |
 | `promoter-study-preflight` | Checked-in promoter-study command-level preflight across DenseGen, Construct, Infer, Notify, and batch-plan surfaces. | Inspect the linked preflight contract plus the checked-in `ops.study.yaml`, `datasets.yaml`, `status.md`, and `pipeline.yaml` when execution surfaces are present. |
-| `cruncher-study-status` | Checked-in cruncher-study directory state, including current phase, command groups, and native-agent bootstrap context. | Inspect the linked study-status contract plus the checked-in `ops.study.yaml`, `status.md`, `routes.md`, and `pipeline.yaml` for the selected study. |
+| `cruncher-study-status` | Checked-in cruncher-study directory state, including declared route or track, command groups, and native-agent bootstrap context. | Inspect the linked study-status contract plus the checked-in `ops.study.yaml`, `status.md`, `routes.md`, and `pipeline.yaml` for the selected study. |
 | `cruncher-study-preflight` | Checked-in cruncher-study command-level preflight across declared workspace-layout and read-only validation-command surfaces. | Inspect the linked preflight contract plus the checked-in `ops.study.yaml`, `status.md`, `routes.md`, and `pipeline.yaml` for the selected study. |
 | `cluster-run-index` | Cluster workspace run records, embeddings, plots, and analysis outputs. | Inspect the linked cluster workflow and the cluster results root for the chosen workspace or direct run. |
 | `opal-campaign-state` | OPAL round state, run ledgers, and latest selection outputs. | Inspect the linked OPAL workflow and its `opal status`, `opal runs list`, and `opal ctx audit` commands. |

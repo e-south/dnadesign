@@ -11,7 +11,8 @@ record_sources:
   routes_ref: manifest:routes.md
 
 lifecycle:
-  phase_order:
+  mode: tracks
+  track_order:
     - context_consolidation
     - msd_design_reference_catalog
     - scar_nick_base_junction_context
@@ -19,11 +20,11 @@ lifecycle:
     - snapback_released_solve
     - yiu_boundary_check
     - sequence_trace_followup
-  current_phase:
+  current_track:
     strategy: explicit
     id: msd_design_reference_catalog
 
-phases:
+tracks:
   - id: context_consolidation
     status: complete
     next_surface: manifest:status.md
@@ -73,7 +74,7 @@ artifacts:
     ref: repo:docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md
   linear_ssdna_composition_exec_plan:
     artifact_type: file
-    ref: repo:docs/exec-plans/active/2026-05-13-generic-linear-ssdna-composition.md
+    ref: repo:docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md
   snapback_released_runbook:
     artifact_type: file
     ref: repo:src/dnadesign/cruncher/workspaces/de033/runbook.md
@@ -167,10 +168,10 @@ preflight:
   default_scope: next
   scopes:
     next:
-      include_phases: [current_phase]
+      include_tracks: [current_track]
     full:
-      include_phases: [all]
-  group_phase_bindings:
+      include_tracks: [all]
+  group_track_bindings:
     study_record: context_consolidation
     msd_reference_compile: msd_design_reference_catalog
     snapback_workspace: snapback_released_probe
@@ -291,7 +292,7 @@ preflight:
         required: true
         surface: yiu_direct_validate
   next_scope:
-    target_phase_groups:
+    target_track_groups:
       context_consolidation: [study_record]
       msd_design_reference_catalog: [study_record, msd_reference_compile]
       scar_nick_base_junction_context: [study_record]
@@ -299,5 +300,5 @@ preflight:
       snapback_released_solve: [study_record, snapback_workspace, snapback_probe]
       yiu_boundary_check: [study_record, yiu_workspace, yiu_validate]
       sequence_trace_followup: [study_record]
-    runtime_phase_groups: []
+    runtime_track_groups: []
     runtime_shared_groups: []

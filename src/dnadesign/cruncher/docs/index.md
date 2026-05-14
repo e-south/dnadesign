@@ -31,6 +31,8 @@ contracts.
 ### Documentation map
 <!-- docs:map:start -->
 #### Optimize Fixed-Length Sequences
+Run the fixed-length optimization lane from demos through analysis and export.
+
 - [Pairwise Demo](demos/demo_pairwise.md)
 - [MultiTF Demo](demos/demo_multitf.md)
 - [Project Workspace Demo](demos/project_all_tfs.md)
@@ -41,6 +43,9 @@ contracts.
 - [Artifacts Reference](reference/artifacts.md)
 
 #### Design and Search Cassettes
+Design or search cassettes through validated workspace inputs and explicit
+artifact contracts.
+
 - [Cassette Workspace Demo](demos/demo_cassette_workspace.md)
 - [Cassette Workflow](guides/cassette_workflow.md)
 - [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
@@ -50,11 +55,16 @@ contracts.
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
 #### Payload-Centric YIU Workflows
+Run YIU workflows against explicit source-family artifacts.
+Reuse explicit source-family outputs in YIU instead of treating YIU as a solver.
+
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)
+- [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md)
+- [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 
 #### Validate and Search Single-Nick Foldbacks
 - [Snapback Workflow](guides/snapback_workflow.md)

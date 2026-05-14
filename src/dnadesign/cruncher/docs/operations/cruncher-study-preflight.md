@@ -13,8 +13,8 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-21
 
-Use this route after the cheaper study snapshot when you need read-only
-command readiness for the current Cruncher study phase.
+Read-only command readiness follows the cheaper study snapshot and focuses the
+current actionable route, track, or phase declared by the study contract.
 
 ## Quick route
 
@@ -31,6 +31,6 @@ command readiness for the current Cruncher study phase.
 
 ## Notes
 
-- `next` scope focuses the current actionable phase and its shared study-record checks.
+- `next` scope focuses the current actionable route, track, or phase and its shared study-record checks.
 - `full` scope runs the whole declared suite.
 - This route does not submit jobs or write Cruncher outputs.

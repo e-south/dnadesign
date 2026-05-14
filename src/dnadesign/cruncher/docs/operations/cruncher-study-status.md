@@ -4,18 +4,17 @@
 **Plane:** data-plane
 **Owner-boundary:** cruncher
 **Entry artifact:** one checked-in cruncher-study directory with routes and pipeline context
-**Exit artifact:** a read-only snapshot of the current phase, command groups, and operator context
+**Exit artifact:** a read-only snapshot of the declared route or track, command groups, and operator context
 **Registry-id:** cruncher.data-plane.cruncher-study-status
-**Summary:** Read one checked-in cruncher-study record and report the current phase, command groups, and context refs without reconstructing the study by hand.
+**Summary:** Read one checked-in cruncher-study directory and summarize its declared route or track, command groups, and native-agent bootstrap context.
 **Execution-kind:** iterative
 **Status-kind:** cruncher-study-status
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-21
 
-Use this route when you want one checked-in status answer for a Cruncher study:
-current phase, command groups, operator context, and the
-study-owned paths that explain what to open next.
+Checked-in Cruncher study status reports the declared route or track, command
+groups, operator context, and study-owned paths that explain what to open next.
 
 ## Quick route
 

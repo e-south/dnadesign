@@ -3,7 +3,8 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Use this page for Ops package docs, packaged presets, and command reference. If you want the full command list, use `docs/runbooks/README.md`.
+Ops package docs cover packaged presets and command reference. The repo-wide
+command list lives in `docs/runbooks/README.md`.
 
 ### Start here
 

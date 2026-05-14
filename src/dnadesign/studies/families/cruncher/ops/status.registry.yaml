@@ -5,7 +5,7 @@ entries:
     owner_boundary: cruncher
     observes_plane: record
     provider_ref: dnadesign.studies.families.cruncher.ops.provider:provide_cruncher_status
-    description: Read one checked-in cruncher-study directory and summarize the current phase, command groups, and native-agent bootstrap context.
+    description: Read one checked-in cruncher-study directory and summarize its declared route or track, command groups, and native-agent bootstrap context.
     surface_type: study_snapshot
     cost_class: cheap
     summary_scope: repo
@@ -44,7 +44,8 @@ entries:
         placeholder: next
         summary: >-
           Preflight scope for cruncher-study-preflight surfaces: `full` runs
-          the whole suite; `next` focuses the current actionable phase.
+          the whole suite; `next` focuses the current actionable route, track,
+          or phase declared by the study contract.
         type: enum
         required: false
         default: next

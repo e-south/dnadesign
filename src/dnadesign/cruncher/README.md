@@ -1,5 +1,8 @@
 ![Cruncher banner](assets/cruncher-banner.svg)
 
+Cruncher is the DNA design package in `dnadesign`.
+Use it for workspace-based sequence optimization, cassette design, and YIU payload work.
+
 Cruncher solves bounded DNA design problems through explicit workflow
 families. Each family owns its command route, workspace contract, and artifact
 tree so studies can combine outputs without one monolithic run shape.
@@ -7,8 +10,8 @@ Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `st
 
 Use Cruncher when you need to solve for primitive design parts: fixed-length
 sequences, cassettes, YIU payload windows, Snapback foldbacks, or scar-nick
-retained-scar junctions. Study and portfolio flows orchestrate those outputs;
-they do not replace the primitive routes.
+retained-scar junctions. Downstream study and portfolio flows orchestrate
+those outputs; they do not replace the primitive routes.
 
 ### Start here
 

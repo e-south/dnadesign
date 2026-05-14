@@ -3391,8 +3391,8 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
             "cli_flag": "--scope",
             "summary": (
                 "Preflight scope for cruncher-study-preflight surfaces: "
-                "`full` runs the whole suite; `next` focuses the current actionable "
-                "phase."
+                "`full` runs the whole suite; `next` focuses the current actionable route, track, "
+                "or phase declared by the study contract."
             ),
         },
     ]

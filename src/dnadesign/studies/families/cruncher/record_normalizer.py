@@ -201,7 +201,14 @@ def _load_status_excerpt(path: Path, *, max_lines: int = 8) -> tuple[str, ...]:
     raw_lines = path.read_text(encoding="utf-8").splitlines()
     preferred = _extract_status_section_excerpt(
         raw_lines,
-        section_titles={"current phase and surfaces", "current phase"},
+        section_titles={
+            "current phase and surfaces",
+            "current phase",
+            "current route and surfaces",
+            "current route",
+            "current track and surfaces",
+            "current track",
+        },
         max_lines=max_lines,
     )
     if preferred:

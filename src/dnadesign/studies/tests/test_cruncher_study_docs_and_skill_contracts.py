@@ -48,19 +48,26 @@ def test_retron_hairpin_study_is_visible_through_docs_and_agents() -> None:
     dev_docs = _read("docs/dev/README.md")
     retired_study_id = "snapback" + "_shortening_effort"
 
-    assert "cruncher-study-status.md" in docs_index
-    assert "cruncher-study-preflight.md" in docs_index
-    assert "studies/retron_hairpin_design/status.md" in docs_index
+    assert "Navigate a checked-in study without exposing study-specific routes here" in docs_index
+    assert "docs/studies/<study-id>/routes.md" in docs_index
+    assert "cruncher-study-status.md" not in docs_index
+    assert "cruncher-study-preflight.md" not in docs_index
+    assert "studies/retron_hairpin_design/status.md" not in docs_index
     assert "study_id: retron_hairpin_design" in study_registry
     assert retired_study_id not in study_registry
     assert "pin the desired record with `--study-dir docs/studies/<study-id>`" in study_registry
     assert ".agents/skills/retron-hairpin-study/SKILL.md" in studies_index
     assert "docs/studies/retron_hairpin_design" in studies_index
+    assert "Study status and preflight surfaces" in studies_index
+    assert "Study record authoring" in studies_index
+    assert "`cruncher-study-status` and `cruncher-study-preflight` commands only for" in studies_index
+    assert "explicit status or readiness questions" in studies_index
     assert retired_study_id not in studies_index
-    assert "selector untouched and pin that study with `--study-dir docs/studies/<study-id>`" in studies_index
-    assert "retron_hairpin_design/status.md" in cruncher_docs
+    assert "keep the selector" in studies_index
+    assert "retron_hairpin_design/status.md" not in cruncher_docs
     assert "retron_hairpin_design/routes.md" in cruncher_docs
-    assert ".agents/skills/retron-hairpin-study/SKILL.md" in cruncher_docs
+    assert ".agents/skills/retron-hairpin-study/SKILL.md" not in cruncher_docs
+    assert "only for explicit status or readiness questions" in cruncher_docs
     assert ".agents/skills/retron-hairpin-study/SKILL.md" in root_agents
     assert ".agents/skills/retron-hairpin-study/SKILL.md" in cruncher_agents
     assert ".agents/skills/retron-hairpin-study/scripts/audit-retron-hairpin-study-skill.sh" in dev_docs
@@ -110,7 +117,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "Exact B26 `MXMX` remains a biological control architecture" in status
     assert "docs/studies/retron_hairpin_design/msd_design_registry.yaml" in status
     assert "docs/studies/retron_hairpin_design/msd_design_hit_labels.txt" in status
-    assert "start with the user's provided parts and desired output, not with study phase" in routes
+    assert "starts from the user's provided parts and desired" in routes
     assert "Primitive route handoff" in routes
     assert "Do not run study status or preflight first." in routes
     assert "### Study route: MSD design references" in routes
@@ -143,7 +150,16 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "harness-engineering" in pipeline
     assert "pragmatic-programming-principles" not in pipeline
     assert "id: msd_design_reference_catalog" in ops_study
-    assert "current_phase:\n    strategy: explicit\n    id: msd_design_reference_catalog" in ops_study
+    assert "mode: tracks" in ops_study
+    assert "track_order:" in ops_study
+    assert "current_track:\n    strategy: explicit\n    id: msd_design_reference_catalog" in ops_study
+    assert "group_track_bindings:" in ops_study
+    assert "target_track_groups:" in ops_study
+    assert "current_phase:" not in ops_study
+    assert "phase_order:" not in ops_study
+    assert "\nphases:" not in ops_study
+    assert "group_phase_bindings:" not in ops_study
+    assert "target_phase_groups:" not in ops_study
     assert "msd_design_reference_catalog: [study_record, msd_reference_compile]" in ops_study
     assert "id: snapback_released_solve" in ops_study
     assert "id: scar_nick_base_junction_context" in ops_study

@@ -3,7 +3,8 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Use this page when you need the shortest correct model for what OPS owns, what each command family does, and when to escalate from cheap record-backed status to deeper readiness checks.
+OPS owns neutral command routing, read-only observation, and deterministic
+runbook control. Tool and study-family runtime policy stays outside OPS core.
 
 ### What OPS is
 
@@ -44,10 +45,10 @@ OPS uses one global state lattice:
 - `attention`: evidence exists, but it shows an unsatisfactory or action-needed posture
 - `missing`: required evidence or artifact is absent or unreadable
 
-For snapshot-style study records, `ok` means the record-backed posture is
-coherent for the current phase. It does not imply that all future phases are
-complete. Planned future outputs and historical upstream targets can remain in
-evidence without escalating the current phase to `attention`.
+For study records, `ok` means the checked-in posture is coherent for the
+declared current item. That item may be a phase in a sequential study or a track
+in an open-ended study. Planned future outputs and historical upstream targets
+can remain in evidence without escalating the current item to `attention`.
 
 Severity order is global, not subsystem-local:
 
@@ -66,7 +67,7 @@ Snapshot answers record-backed questions:
 - which study is active
 - which datasets and row counts are checked in
 - which surfaces are declared
-- which phase is next according to the record
+- which phase, track, or route is current according to the record
 
 Escalate to preflight when the question is about blockers or readiness:
 
@@ -103,7 +104,7 @@ For runbook orchestration, keep runtime visibility explicit:
 | --- | --- |
 | registered procedures and route metadata | `ops catalog` plus checked-in `*.registry.yaml` files |
 | status-kind ontology | checked-in `*/ops/status.registry.yaml` files |
-| study lifecycle order and declared preflight checks | checked-in `docs/studies/<study-id>/ops.study.yaml` |
+| study lifecycle order, track map, and declared preflight checks | checked-in `docs/studies/<study-id>/ops.study.yaml` |
 | live study summary | `promoter-study-status` snapshot plus the checked-in study record |
 | execution blockers | `promoter-study-preflight` |
 | orchestration outcome | workspace-scoped audit JSON observed through `ops-audit-json` |

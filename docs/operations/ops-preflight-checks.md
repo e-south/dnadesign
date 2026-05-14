@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-This index summarizes the generic readiness check vocabulary that study contracts can declare in `ops.study.yaml`.
+Study contracts declare generic readiness checks in `ops.study.yaml`.
 
 | Check kind | What it verifies | Typical non-`ok` meaning | Inputs it needs | Typical cost | Example use |
 | --- | --- | --- | --- | --- | --- |

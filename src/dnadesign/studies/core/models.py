@@ -16,12 +16,14 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 StudyPhaseStatus = Literal["planned", "ready", "in_progress", "complete", "blocked", "blocked_gpu", "parallel_optional"]
+StudyLifecycleMode = Literal["sequential", "tracks"]
 StudySummaryScope = Literal["repo", "workspace", "host", "cluster"]
 StudyPreflightScope = Literal["next", "full"]
 
 STUDY_PHASE_STATUSES = frozenset(
     {"planned", "ready", "in_progress", "complete", "blocked", "blocked_gpu", "parallel_optional"}
 )
+STUDY_LIFECYCLE_MODES = frozenset({"sequential", "tracks"})
 STUDY_SUMMARY_SCOPES = frozenset({"repo", "workspace", "host", "cluster"})
 STUDY_PREFLIGHT_SCOPES = frozenset({"next", "full"})
 
@@ -97,6 +99,8 @@ class StudyOpsContract:
     phase_order: tuple[str, ...]
     snapshot_summary_scope: StudySummaryScope
     preflight: StudyPreflightContract
+    lifecycle_mode: StudyLifecycleMode = "sequential"
+    lifecycle_item_label: str = "phase"
     title: str | None = None
     record_sources: dict[str, str] = field(default_factory=dict)
     artifacts: dict[str, dict[str, object]] = field(default_factory=dict)
@@ -138,10 +142,12 @@ class StudyFamilyAdapter(Protocol):
 
 
 __all__ = [
+    "STUDY_LIFECYCLE_MODES",
     "STUDY_PHASE_STATUSES",
     "STUDY_PREFLIGHT_SCOPES",
     "STUDY_SUMMARY_SCOPES",
     "StudyFamilyAdapter",
+    "StudyLifecycleMode",
     "StudyOpsContract",
     "StudyPhaseContract",
     "StudyPhaseStatus",

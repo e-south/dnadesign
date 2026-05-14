@@ -434,6 +434,58 @@ def test_provide_cruncher_status_exposes_command_groups_and_agent_bootstrap(tmp_
     ]
 
 
+def test_provide_cruncher_status_uses_track_language_for_nonsequential_records(tmp_path: Path) -> None:
+    study_root = _write_cruncher_study_record(tmp_path)
+    contract_path = study_root / "ops.study.yaml"
+    payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    payload["lifecycle"] = {
+        "mode": "tracks",
+        "track_order": [
+            "context_consolidation",
+            "snapback_released_probe",
+            "snapback_released_solve",
+            "yiu_boundary_check",
+        ],
+        "current_track": {
+            "strategy": "explicit",
+            "id": "snapback_released_solve",
+        },
+    }
+    payload["tracks"] = payload.pop("phases")
+    payload["preflight"]["scopes"] = {
+        "next": {"include_tracks": ["current_track"]},
+        "full": {"include_tracks": ["all"]},
+    }
+    payload["preflight"]["group_track_bindings"] = payload["preflight"].pop("group_phase_bindings")
+    payload["preflight"]["next_scope"]["target_track_groups"] = payload["preflight"]["next_scope"].pop(
+        "target_phase_groups"
+    )
+    payload["preflight"]["next_scope"]["runtime_track_groups"] = payload["preflight"]["next_scope"].pop(
+        "runtime_phase_groups"
+    )
+    contract_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    state, summary, evidence = provide_cruncher_status(
+        repo_root=tmp_path,
+        inputs={"study_dir": study_root},
+    )
+
+    assert state == "ok"
+    assert "primary lane released-product snapback" in summary
+    assert evidence["lifecycle_mode"] == "tracks"
+    assert evidence["lifecycle_item_label"] == "track"
+    assert evidence["current_track"] == "snapback_released_solve"
+    assert "current_phase" not in evidence
+    assert "phase_states" not in evidence
+    assert [track["id"] for track in evidence["track_states"]] == [
+        "context_consolidation",
+        "snapback_released_probe",
+        "snapback_released_solve",
+        "yiu_boundary_check",
+    ]
+
+
 def test_cruncher_snapshot_reports_missing_required_record_files(tmp_path: Path) -> None:
     study_root = _write_cruncher_study_record(tmp_path)
     (study_root / "routes.md").unlink()

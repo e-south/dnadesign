@@ -20,6 +20,7 @@ from dnadesign.ops.preflight.models import supported_preflight_check_kinds
 from dnadesign.ops.status.path_ref import resolve_path_ref
 
 from .models import (
+    STUDY_LIFECYCLE_MODES,
     STUDY_PHASE_STATUSES,
     STUDY_PREFLIGHT_SCOPES,
     STUDY_SUMMARY_SCOPES,
@@ -62,53 +63,71 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     lifecycle_payload = payload.get("lifecycle") or {}
     if not isinstance(lifecycle_payload, dict):
         raise ValueError(f"ops.study.yaml lifecycle must be a mapping: {contract_path}")
-    phase_order_payload = lifecycle_payload.get("phase_order") or []
+    lifecycle_mode = str(lifecycle_payload.get("mode") or "sequential").strip().lower()
+    if lifecycle_mode not in STUDY_LIFECYCLE_MODES:
+        allowed_modes = ", ".join(sorted(STUDY_LIFECYCLE_MODES))
+        raise ValueError(f"ops.study.yaml lifecycle.mode must be one of: {allowed_modes}: {contract_path}")
+
+    uses_tracks = "tracks" in payload
+    if uses_tracks and "phases" in payload:
+        raise ValueError(f"ops.study.yaml must define either phases or tracks, not both: {contract_path}")
+    if uses_tracks and lifecycle_mode != "tracks":
+        raise ValueError(f"ops.study.yaml lifecycle.mode must be tracks when tracks are declared: {contract_path}")
+    if not uses_tracks and lifecycle_mode == "tracks":
+        raise ValueError(f"ops.study.yaml lifecycle.mode tracks requires a tracks list: {contract_path}")
+    lifecycle_item_label = "track" if uses_tracks else "phase"
+    order_key = "track_order" if uses_tracks else "phase_order"
+    current_key = "current_track" if uses_tracks else "current_phase"
+    collection_key = "tracks" if uses_tracks else "phases"
+
+    phase_order_payload = lifecycle_payload.get(order_key) or []
     if not isinstance(phase_order_payload, list) or not phase_order_payload:
-        raise ValueError(f"ops.study.yaml lifecycle.phase_order must define a non-empty list: {contract_path}")
+        raise ValueError(f"ops.study.yaml lifecycle.{order_key} must define a non-empty list: {contract_path}")
     phase_order = _string_sequence(
         phase_order_payload,
-        label="ops.study.yaml lifecycle.phase_order",
+        label=f"ops.study.yaml lifecycle.{order_key}",
         source=contract_path,
     )
 
-    current_phase_payload = lifecycle_payload.get("current_phase") or {}
+    current_phase_payload = lifecycle_payload.get(current_key) or {}
     if current_phase_payload and not isinstance(current_phase_payload, dict):
-        raise ValueError(f"ops.study.yaml lifecycle.current_phase must be a mapping: {contract_path}")
+        raise ValueError(f"ops.study.yaml lifecycle.{current_key} must be a mapping: {contract_path}")
     current_phase_strategy = str(current_phase_payload.get("strategy") or "explicit").strip().lower()
     if current_phase_strategy not in {"explicit", "derive_from_phase_status"}:
         raise ValueError(
-            "ops.study.yaml lifecycle.current_phase.strategy must be one of: "
+            f"ops.study.yaml lifecycle.{current_key}.strategy must be one of: "
             f"explicit, derive_from_phase_status: {contract_path}"
         )
     current_phase_id = str(current_phase_payload.get("id") or "").strip() or None
 
-    phases_payload = payload.get("phases") or []
+    phases_payload = payload.get(collection_key) or []
     if not isinstance(phases_payload, list) or not phases_payload:
-        raise ValueError(f"ops.study.yaml must define a non-empty phases list: {contract_path}")
+        raise ValueError(f"ops.study.yaml must define a non-empty {collection_key} list: {contract_path}")
     phases: list[StudyPhaseContract] = []
     seen_phase_ids: set[str] = set()
     for index, item in enumerate(phases_payload, start=1):
         if not isinstance(item, dict):
-            raise ValueError(f"ops.study.yaml phase entry {index} must be a mapping: {contract_path}")
+            raise ValueError(f"ops.study.yaml {lifecycle_item_label} entry {index} must be a mapping: {contract_path}")
         phase_id = str(item.get("id") or "").strip()
         phase_status = str(item.get("status") or "").strip()
         if not phase_id:
-            raise ValueError(f"ops.study.yaml phase entry {index} must define id: {contract_path}")
+            raise ValueError(f"ops.study.yaml {lifecycle_item_label} entry {index} must define id: {contract_path}")
         if not phase_status:
-            raise ValueError(f"ops.study.yaml phase {phase_id} must define status: {contract_path}")
+            raise ValueError(f"ops.study.yaml {lifecycle_item_label} {phase_id} must define status: {contract_path}")
         if phase_status not in STUDY_PHASE_STATUSES:
             allowed_statuses = ", ".join(sorted(STUDY_PHASE_STATUSES))
             raise ValueError(
-                f"ops.study.yaml phase {phase_id} has unsupported status {phase_status!r}; "
+                f"ops.study.yaml {lifecycle_item_label} {phase_id} has unsupported status {phase_status!r}; "
                 f"expected one of: {allowed_statuses}: {contract_path}"
             )
         if phase_id in seen_phase_ids:
-            raise ValueError(f"ops.study.yaml phases must not duplicate id {phase_id!r}: {contract_path}")
+            raise ValueError(f"ops.study.yaml {collection_key} must not duplicate id {phase_id!r}: {contract_path}")
         seen_phase_ids.add(phase_id)
         required_for_main_study_state = item.get("required_for_main_study_state", True)
         if not isinstance(required_for_main_study_state, bool):
             raise ValueError(
-                f"ops.study.yaml phase {phase_id} required_for_main_study_state must be boolean: {contract_path}"
+                f"ops.study.yaml {lifecycle_item_label} {phase_id} "
+                f"required_for_main_study_state must be boolean: {contract_path}"
             )
         phases.append(
             StudyPhaseContract(
@@ -118,7 +137,7 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
                     item.get("next_surface"),
                     repo_root=repo_root,
                     study_root=resolved_study_root,
-                    label=f"ops.study.yaml phase {phase_id} next_surface",
+                    label=f"ops.study.yaml {lifecycle_item_label} {phase_id} next_surface",
                 ),
                 blocker=_string_or_none(item.get("blocker")),
                 output_dataset=_string_or_none(item.get("output_dataset")),
@@ -130,17 +149,17 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     phase_ids = tuple(phase.id for phase in phases)
     if phase_order != phase_ids:
         raise ValueError(
-            f"ops.study.yaml lifecycle.phase_order must match phases ids in the same order: {contract_path}"
+            f"ops.study.yaml lifecycle.{order_key} must match {collection_key} ids in the same order: {contract_path}"
         )
     if current_phase_strategy == "explicit":
         if current_phase_id is None:
             raise ValueError(
-                f"ops.study.yaml lifecycle.current_phase.id must be defined for explicit strategy: {contract_path}"
+                f"ops.study.yaml lifecycle.{current_key}.id must be defined for explicit strategy: {contract_path}"
             )
         if current_phase_id not in seen_phase_ids:
             raise ValueError(
-                "ops.study.yaml lifecycle.current_phase.id "
-                f"{current_phase_id!r} is not declared under phases: {contract_path}"
+                f"ops.study.yaml lifecycle.{current_key}.id "
+                f"{current_phase_id!r} is not declared under {collection_key}: {contract_path}"
             )
     else:
         current_phase_id = _derive_current_phase_id(phases)
@@ -175,8 +194,11 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     scopes_payload = preflight_payload.get("scopes") or {}
     if scopes_payload and not isinstance(scopes_payload, dict):
         raise ValueError(f"ops.study.yaml preflight.scopes must be a mapping: {contract_path}")
-    if "group_phase_bindings" not in preflight_payload:
-        raise ValueError(f"ops.study.yaml preflight.group_phase_bindings must be defined: {contract_path}")
+    group_bindings_key = "group_track_bindings" if uses_tracks else "group_phase_bindings"
+    target_groups_key = "target_track_groups" if uses_tracks else "target_phase_groups"
+    runtime_groups_key = "runtime_track_groups" if uses_tracks else "runtime_phase_groups"
+    if group_bindings_key not in preflight_payload:
+        raise ValueError(f"ops.study.yaml preflight.{group_bindings_key} must be defined: {contract_path}")
     if "next_scope" not in preflight_payload:
         raise ValueError(f"ops.study.yaml preflight.next_scope must be defined: {contract_path}")
     checks_payload = preflight_payload.get("checks") or {}
@@ -185,34 +207,34 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     next_scope_payload = preflight_payload.get("next_scope") or {}
     if next_scope_payload and not isinstance(next_scope_payload, dict):
         raise ValueError(f"ops.study.yaml preflight.next_scope must be a mapping: {contract_path}")
-    if "target_phase_groups" not in next_scope_payload:
-        raise ValueError(f"ops.study.yaml preflight.next_scope.target_phase_groups must be defined: {contract_path}")
-    if "runtime_phase_groups" not in next_scope_payload:
-        raise ValueError(f"ops.study.yaml preflight.next_scope.runtime_phase_groups must be defined: {contract_path}")
+    if target_groups_key not in next_scope_payload:
+        raise ValueError(f"ops.study.yaml preflight.next_scope.{target_groups_key} must be defined: {contract_path}")
+    if runtime_groups_key not in next_scope_payload:
+        raise ValueError(f"ops.study.yaml preflight.next_scope.{runtime_groups_key} must be defined: {contract_path}")
     if "runtime_shared_groups" not in next_scope_payload:
         raise ValueError(f"ops.study.yaml preflight.next_scope.runtime_shared_groups must be defined: {contract_path}")
-    target_phase_groups_payload = next_scope_payload.get("target_phase_groups") or {}
+    target_phase_groups_payload = next_scope_payload.get(target_groups_key) or {}
     if target_phase_groups_payload and not isinstance(target_phase_groups_payload, dict):
-        raise ValueError(f"ops.study.yaml preflight.next_scope.target_phase_groups must be a mapping: {contract_path}")
-    group_phase_bindings_payload = preflight_payload.get("group_phase_bindings") or {}
+        raise ValueError(f"ops.study.yaml preflight.next_scope.{target_groups_key} must be a mapping: {contract_path}")
+    group_phase_bindings_payload = preflight_payload.get(group_bindings_key) or {}
     if group_phase_bindings_payload and not isinstance(group_phase_bindings_payload, dict):
-        raise ValueError(f"ops.study.yaml preflight.group_phase_bindings must be a mapping: {contract_path}")
+        raise ValueError(f"ops.study.yaml preflight.{group_bindings_key} must be a mapping: {contract_path}")
 
     target_phase_groups: dict[str, tuple[str, ...]] = {}
     for phase_id, groups_payload in target_phase_groups_payload.items():
         normalized_phase_id = str(phase_id or "").strip()
         if not normalized_phase_id:
             raise ValueError(
-                f"ops.study.yaml preflight.next_scope.target_phase_groups keys must be non-empty: {contract_path}"
+                f"ops.study.yaml preflight.next_scope.{target_groups_key} keys must be non-empty: {contract_path}"
             )
         if normalized_phase_id not in seen_phase_ids:
             raise ValueError(
-                f"ops.study.yaml preflight.next_scope.target_phase_groups references undeclared phase "
+                f"ops.study.yaml preflight.next_scope.{target_groups_key} references undeclared {lifecycle_item_label} "
                 f"{normalized_phase_id!r}: {contract_path}"
             )
         target_phase_groups[normalized_phase_id] = _string_sequence(
             groups_payload or [],
-            label=f"ops.study.yaml preflight.next_scope.target_phase_groups.{normalized_phase_id}",
+            label=f"ops.study.yaml preflight.next_scope.{target_groups_key}.{normalized_phase_id}",
             source=contract_path,
             allow_empty=True,
         )
@@ -222,21 +244,23 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         group = str(raw_group or "").strip()
         phase_id = str(raw_phase_id or "").strip()
         if not group:
-            raise ValueError(f"ops.study.yaml preflight.group_phase_bindings keys must be non-empty: {contract_path}")
+            raise ValueError(f"ops.study.yaml preflight.{group_bindings_key} keys must be non-empty: {contract_path}")
         if not phase_id:
             raise ValueError(
-                f"ops.study.yaml preflight.group_phase_bindings.{group} must be a non-empty phase id: {contract_path}"
+                f"ops.study.yaml preflight.{group_bindings_key}.{group} "
+                f"must be a non-empty {lifecycle_item_label} id: {contract_path}"
             )
         if phase_id not in seen_phase_ids:
             raise ValueError(
-                f"ops.study.yaml preflight.group_phase_bindings.{group} references undeclared phase "
+                f"ops.study.yaml preflight.{group_bindings_key}.{group} "
+                f"references undeclared {lifecycle_item_label} "
                 f"{phase_id!r}: {contract_path}"
             )
         group_phase_bindings[group] = phase_id
 
     runtime_phase_groups = _string_sequence(
-        next_scope_payload.get("runtime_phase_groups") or [],
-        label="ops.study.yaml preflight.next_scope.runtime_phase_groups",
+        next_scope_payload.get(runtime_groups_key) or [],
+        label=f"ops.study.yaml preflight.next_scope.{runtime_groups_key}",
         source=contract_path,
         allow_empty=True,
     )
@@ -276,6 +300,8 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         phase_order=phase_order,
         current_phase_id=current_phase_id,
         phases=tuple(phases),
+        lifecycle_mode=lifecycle_mode,
+        lifecycle_item_label=lifecycle_item_label,
         snapshot_summary_scope=summary_scope,
         preflight=StudyPreflightContract(
             default_scope=default_scope,
