@@ -333,6 +333,56 @@ def _iter_metadata_only_batches(
         yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
 
 
+def _record_batch_column(batch: pa.RecordBatch, column_name: str) -> pa.Array:
+    index = batch.schema.get_field_index(column_name)
+    if index < 0:
+        raise SourceResolutionError(f"payload batch is missing required column: {column_name}")
+    return batch.column(index)
+
+
+def _payload_batch_from_matches(
+    contract: InferSidecarJoinContract,
+    batch: pa.RecordBatch,
+    *,
+    selected: list[str],
+    output_schema: pa.Schema,
+    metadata_rows: list[dict[str, object]],
+    payload_indices: list[int],
+) -> pa.RecordBatch | None:
+    if not metadata_rows:
+        return None
+    index_array = pa.array(payload_indices, type=pa.int64())
+    arrays: list[pa.Array] = []
+    for column in selected:
+        field = output_schema.field(column)
+        if column == contract.payload_value_column:
+            arrays.append(pc.take(_record_batch_column(batch, contract.payload_value_column), index_array))
+            continue
+        if column == contract.payload_created_at_column:
+            arrays.append(pc.take(_record_batch_column(batch, "created_at"), index_array))
+            continue
+        arrays.append(pa.array([row.get(column) for row in metadata_rows], type=field.type))
+    return pa.record_batch(arrays, schema=output_schema)
+
+
+def _match_payload_batch_rows(
+    contract: InferSidecarJoinContract,
+    batch: pa.RecordBatch,
+    *,
+    metadata: dict[str, list[dict[str, object]]],
+) -> tuple[list[dict[str, object]], list[int]]:
+    matched_metadata_rows: list[dict[str, object]] = []
+    payload_indices: list[int] = []
+    for row_index, key_value in enumerate(_record_batch_column(batch, contract.payload_key_column).to_pylist()):
+        request_metadata_rows = metadata.get(str(key_value))
+        if not request_metadata_rows:
+            continue
+        for metadata_row in request_metadata_rows:
+            matched_metadata_rows.append(metadata_row)
+            payload_indices.append(row_index)
+    return matched_metadata_rows, payload_indices
+
+
 def iter_batches(
     contract: InferSidecarJoinContract,
     root: str,
@@ -385,7 +435,6 @@ def iter_batches(
         return
 
     payload_table_path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
-    wanted_keys = set(metadata)
     payload_columns = [contract.payload_key_column]
     if contract.payload_value_column in selected:
         payload_columns.append(contract.payload_value_column)
@@ -394,20 +443,19 @@ def iter_batches(
     if not payload_table_path.is_file():
         return
     for batch in pq.ParquetFile(payload_table_path).iter_batches(columns=payload_columns, batch_size=batch_size):
-        batch_rows = []
-        for payload_row in batch.to_pylist():
-            key = str(payload_row[contract.payload_key_column])
-            if key not in wanted_keys:
-                continue
-            for metadata_row in metadata[key]:
-                row = dict(metadata_row)
-                if contract.payload_value_column in selected:
-                    row[contract.payload_value_column] = payload_row[contract.payload_value_column]
-                if contract.payload_created_at_column in selected:
-                    row[contract.payload_created_at_column] = payload_row.get("created_at")
-                batch_rows.append({column: row.get(column) for column in selected})
-        if batch_rows:
-            yield pa.Table.from_pylist(batch_rows, schema=output_schema).to_batches()[0]
+        matched_metadata_rows, payload_indices = _match_payload_batch_rows(contract, batch, metadata=metadata)
+        if not matched_metadata_rows:
+            continue
+        batch_payload = _payload_batch_from_matches(
+            contract,
+            batch,
+            selected=selected,
+            output_schema=output_schema,
+            metadata_rows=matched_metadata_rows,
+            payload_indices=payload_indices,
+        )
+        if batch_payload is not None:
+            yield batch_payload
 
 
 def iter_grouped_batches(
@@ -516,33 +564,39 @@ def iter_grouped_batches(
     if needs_created_at_column:
         payload_columns.append("created_at")
     for batch in pq.ParquetFile(payload_table_path).iter_batches(columns=payload_columns, batch_size=batch_size):
-        grouped_rows: dict[str, list[dict[str, object]]] = {request_id: [] for request_id in request_state}
-        for payload_row in batch.to_pylist():
-            key = str(payload_row[contract.payload_key_column])
+        grouped_metadata_rows: dict[str, list[dict[str, object]]] = {request_id: [] for request_id in request_state}
+        grouped_payload_indices: dict[str, list[int]] = {request_id: [] for request_id in request_state}
+        for row_index, key_value in enumerate(_record_batch_column(batch, contract.payload_key_column).to_pylist()):
+            key = str(key_value)
             if key not in union_wanted_keys:
                 continue
             for request_id, state in request_state.items():
-                selected = state["selected"]
                 metadata = state["metadata"]
-                assert isinstance(selected, list)
                 assert isinstance(metadata, dict)
                 request_metadata_rows = metadata.get(key)
                 if not request_metadata_rows:
                     continue
                 for metadata_row in request_metadata_rows:
-                    row = dict(metadata_row)
-                    if contract.payload_value_column in selected:
-                        row[contract.payload_value_column] = payload_row[contract.payload_value_column]
-                    if contract.payload_created_at_column in selected:
-                        row[contract.payload_created_at_column] = payload_row.get("created_at")
-                    grouped_rows[request_id].append({column: row.get(column) for column in selected})
+                    grouped_metadata_rows[request_id].append(metadata_row)
+                    grouped_payload_indices[request_id].append(row_index)
         batch_payload: dict[str, pa.RecordBatch] = {}
-        for request_id, rows in grouped_rows.items():
-            if not rows:
+        for request_id, metadata_rows_for_request in grouped_metadata_rows.items():
+            if not metadata_rows_for_request:
                 continue
+            selected = request_state[request_id]["selected"]
             output_schema = request_state[request_id]["schema"]
+            assert isinstance(selected, list)
             assert isinstance(output_schema, pa.Schema)
-            batch_payload[request_id] = pa.Table.from_pylist(rows, schema=output_schema).to_batches()[0]
+            request_batch = _payload_batch_from_matches(
+                contract,
+                batch,
+                selected=selected,
+                output_schema=output_schema,
+                metadata_rows=metadata_rows_for_request,
+                payload_indices=grouped_payload_indices[request_id],
+            )
+            if request_batch is not None:
+                batch_payload[request_id] = request_batch
         if batch_payload:
             yield batch_payload
 

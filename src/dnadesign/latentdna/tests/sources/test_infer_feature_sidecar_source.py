@@ -404,6 +404,101 @@ def test_feature_sidecar_source_preserves_alias_rows_that_share_vector_keys(tmp_
     assert table["feature_vector_key"].to_pylist() == [vector_key, vector_key]
 
 
+def test_feature_sidecar_payload_join_does_not_convert_vector_batches_to_pylist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
+    created_at = "2026-04-28T00:00:00+00:00"
+    derived_dir = dataset.dir / "_derived" / "infer"
+    derived_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "alias_id": "alias_a",
+                    "view_id": "view_a",
+                    "view_name": "fixture_a",
+                    "sequence_id": sequence_id,
+                    "feature_vector_key": "fv_a",
+                    "forward_pass_key": "fp_a",
+                    "provider": "evo2",
+                    "model_name": "evo2_7b",
+                    "model_revision": None,
+                    "layer_name": "block26_mlp_out",
+                    "representation_kind": "intermediate_embedding",
+                    "pooling_operation": "core60_mean",
+                    "pooling_start_0": 0,
+                    "pooling_end_0": 60,
+                    "orientation": "forward",
+                    "source_dataset_id": dataset.name,
+                    "feature_request_digest": "digest_a",
+                    "created_at": created_at,
+                }
+            ],
+            schema=infer_feature_sidecar_source._ALIAS_SCHEMA,
+        ),
+        derived_dir / "feature_aliases.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"feature_vector_key": "fv_a", "value": [0.1, 0.2, 0.3], "created_at": created_at}],
+            schema=infer_feature_sidecar_source._VECTOR_SCHEMA,
+        ),
+        derived_dir / "feature_vectors.parquet",
+    )
+
+    real_parquet_file = infer_feature_sidecar_source.infer_sidecar_join.pq.ParquetFile
+
+    class PayloadBatchGuard:
+        def __init__(self, batch: pa.RecordBatch) -> None:
+            self._batch = batch
+            self.schema = batch.schema
+            self.num_rows = batch.num_rows
+
+        def column(self, name_or_index: str | int) -> pa.Array:
+            if isinstance(name_or_index, str):
+                index = self.schema.get_field_index(name_or_index)
+                if index < 0:
+                    raise KeyError(name_or_index)
+                return self._batch.column(index)
+            return self._batch.column(name_or_index)
+
+        def __len__(self) -> int:
+            return len(self._batch)
+
+        def to_pylist(self) -> list[dict[str, object]]:
+            raise AssertionError("vector payload batches must not be converted to Python row lists")
+
+    class PayloadGuardParquetFile:
+        def __init__(self, path, *args, **kwargs) -> None:
+            self.path = Path(path)
+            self.inner = real_parquet_file(path, *args, **kwargs)
+
+        def __getattr__(self, name: str):
+            return getattr(self.inner, name)
+
+        def iter_batches(self, *args, **kwargs):
+            for batch in self.inner.iter_batches(*args, **kwargs):
+                if self.path.name == "feature_vectors.parquet":
+                    yield PayloadBatchGuard(batch)
+                    continue
+                yield batch
+
+    monkeypatch.setattr(infer_feature_sidecar_source.infer_sidecar_join.pq, "ParquetFile", PayloadGuardParquetFile)
+
+    table = infer_feature_sidecar_source.read_table(
+        usr_root.as_posix(),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"pooling_operation": "core60_mean"},
+        columns=["alias_id", "feature_vector_key", "value", "feature_vector_created_at"],
+    )
+
+    assert table["alias_id"].to_pylist() == ["alias_a"]
+    assert table["value"].to_pylist() == [[0.1, 0.2, 0.3]]
+    assert table["feature_vector_created_at"].to_pylist() == [created_at]
+
+
 def test_feature_sidecar_numeric_where_uses_alias_column_type(tmp_path: Path) -> None:
     usr_root, dataset, sequence_id = _planned_dataset(tmp_path)
     created_at = "2026-04-28T00:00:00+00:00"

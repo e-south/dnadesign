@@ -13,6 +13,7 @@ from ..contracts.deliverable import (
     DeliverableEntryStatus,
     DeliverableStatusResult,
 )
+from ..contracts.recipe import expected_step_artifacts
 from ..contracts.result import CommandResult
 from ..runs.recorder import record_audit
 from ..studies.docs_refs import resolve_docs_ref
@@ -51,12 +52,13 @@ def _entry_status(
     item_id: str,
     *,
     freshness_cache: FreshnessCache | None = None,
+    allow_recipe_output: bool = False,
 ) -> DeliverableEntryStatus:
     label = SINGULAR_REFERENCE_NAMES.get(category, category.rstrip("s"))
     name = f"{label}:{item_id}"
     if category in ARTIFACT_REFERENCE_CATEGORIES:
         section = _config_section(context, category)
-        if section is not None and item_id not in section:
+        if section is not None and item_id not in section and not allow_recipe_output:
             return DeliverableEntryStatus(
                 name=name,
                 status="missing",
@@ -92,6 +94,14 @@ def _entry_status(
             reason=f"{label} is not declared in workspace config",
         )
     return DeliverableEntryStatus(name=name, status="ok")
+
+
+def _recipe_expected_outputs(context: WorkspaceContext, recipe_id: str) -> set[tuple[str, str]]:
+    recipe = context.require_recipe(recipe_id)
+    expected_outputs: set[tuple[str, str]] = set()
+    for step in recipe.steps:
+        expected_outputs.update(expected_step_artifacts(step.op, step.params))
+    return expected_outputs
 
 
 def _status_from_entries(checks: list[DeliverableEntryStatus], outputs: list[DeliverableEntryStatus]) -> str:
@@ -152,13 +162,20 @@ def deliverable_status_from_context(
     deliverable = context.require_deliverable(deliverable_id)
     if freshness_cache is None:
         freshness_cache = FreshnessCache()
+    expected_outputs = _recipe_expected_outputs(context, deliverable.recipe)
     checks = [
         _entry_status(context, category, item_id, freshness_cache=freshness_cache)
         for category, ids in deliverable.requires.items()
         for item_id in ids
     ]
     outputs = [
-        _entry_status(context, category, item_id, freshness_cache=freshness_cache)
+        _entry_status(
+            context,
+            category,
+            item_id,
+            freshness_cache=freshness_cache,
+            allow_recipe_output=(ARTIFACT_REFERENCE_CATEGORIES.get(category), item_id) in expected_outputs,
+        )
         for category, ids in deliverable.outputs.items()
         for item_id in ids
     ]

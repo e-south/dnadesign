@@ -461,6 +461,75 @@ def _scalar_build_recipe_freshness_reasons(
     ], True
 
 
+def _recipe_list_param(params: dict[str, object], *keys: str) -> list[object]:
+    for key in keys:
+        if key not in params:
+            continue
+        value = params[key]
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return list(value)
+        return [value]
+    return []
+
+
+def _sample_build_recipe_freshness_reasons(
+    context: WorkspaceContext,
+    *,
+    artifact_id: str,
+    manifest: dict[str, object],
+) -> tuple[list[str], bool]:
+    if not all(hasattr(context, attribute) for attribute in ("config",)):
+        return [], True
+
+    expected_params: list[tuple[str, dict[str, object]]] = []
+    for recipe_id, recipe in context.config.recipes.items():
+        for step in recipe.steps:
+            if step.op != "sample.build":
+                continue
+            step_params = dict(step.params)
+            step_sample = str(step_params.get("sample_id") or step_params.get("sample") or "").strip()
+            if step_sample != artifact_id:
+                continue
+            expected_params.append(
+                (
+                    f"{recipe_id}.{step.id}",
+                    {
+                        "strategy": str(step_params.get("strategy") or "all"),
+                        "n": step_params.get("n"),
+                        "group_column": step_params.get("group_column") or step_params.get("group_by"),
+                        "seed": int(step_params.get("seed") or 17),
+                        "reference_set": step_params.get("reference_set_id") or step_params.get("reference_set"),
+                        "explicit_ids": _recipe_list_param(step_params, "explicit_ids", "record_ids", "record_id"),
+                        "input_sample_ids": _recipe_list_param(
+                            step_params,
+                            "input_sample_ids",
+                            "input_samples",
+                            "input_sample",
+                        ),
+                        "where": step_params.get("where"),
+                    },
+                )
+            )
+
+    if not expected_params:
+        return [], True
+
+    recorded_params = manifest.get("params")
+    if not isinstance(recorded_params, dict):
+        return [f"freshness unknown: sample manifest lacks params for sample_set:{artifact_id}"], False
+
+    if any(recorded_params == expected for _, expected in expected_params):
+        return [], True
+
+    expected_locations = ", ".join(location for location, _ in expected_params)
+    return [
+        f"stale sample build config for sample_set:{artifact_id}: "
+        f"manifest params do not match current recipe step(s) {expected_locations}"
+    ], True
+
+
 def evaluate_artifact_freshness(
     context: WorkspaceContext,
     *,
@@ -636,6 +705,19 @@ def evaluate_manifest_freshness(
 
     if reasons:
         return {"status": "attention", "reason": reasons[0], "known": known, "reasons": reasons}
+    if artifact_kind == "sample_set":
+        sample_config_reasons, sample_config_known = _sample_build_recipe_freshness_reasons(
+            context,
+            artifact_id=artifact_id,
+            manifest=manifest,
+        )
+        if sample_config_reasons:
+            return {
+                "status": "attention",
+                "reason": sample_config_reasons[0],
+                "known": sample_config_known,
+                "reasons": sample_config_reasons,
+            }
     if artifact_kind == "scalar_table":
         scalar_config_reasons, scalar_config_known = _scalar_build_recipe_freshness_reasons(
             context,
