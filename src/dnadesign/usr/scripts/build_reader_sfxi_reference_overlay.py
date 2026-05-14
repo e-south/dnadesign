@@ -426,6 +426,8 @@ def build_overlay_from_reader(
     setpoint_name: str = DEFAULT_SETPOINT_NAME,
     setpoint_vector: Sequence[float] = DEFAULT_SETPOINT_VECTOR,
 ) -> pd.DataFrame:
+    reader_root = reader_root.expanduser().resolve()
+    vec8_path = vec8_path.expanduser().resolve()
     base_records = read_usr_base_records(usr_root, dataset_name)
     vec8 = read_reader_vec8(vec8_path)
     scored = score_reader_vec8(
