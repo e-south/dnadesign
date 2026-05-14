@@ -253,7 +253,7 @@ def discover_dnadesign_data_promoter_sources(
 
     if provider is None:
         try:
-            from dnadesign_data.regulatory_parts import iter_promoter_source_files
+            from dnadesign_data.catalog.regulatory_parts import iter_promoter_source_files
         except ModuleNotFoundError as exc:
             raise RuntimeError(
                 "dnadesign-data promoter source discovery requires the dnadesign_data package. "
@@ -311,7 +311,7 @@ def _resolve_dnadesign_data_root(data_root: Path | None) -> Path:
     if data_root is not None:
         return Path(data_root)
     try:
-        from dnadesign_data.regulatory_parts import default_data_root
+        from dnadesign_data.core.layout import default_data_root
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "dnadesign-data promoter source export requires an explicit data_root or the dnadesign_data package."

@@ -573,10 +573,10 @@ def test_write_import_plan_rejects_orphan_relation_rows(tmp_path: Path) -> None:
 
 def test_real_dnadesign_data_superset_dry_run_fidelity_contract(tmp_path: Path) -> None:
     data_root = Path("/Users/Shockwing/Dropbox/projects/phd/dnadesign-data")
-    if not (data_root / "RegulonDB_13/promoters/PromoterSet.tsv").exists():
+    if not (data_root / "sources/databases/regulondb/13.0/promoters/PromoterSet.tsv").exists():
         pytest.skip("sibling dnadesign-data checkout is not available")
     sys.path.insert(0, str(data_root / "src"))
-    from dnadesign_data.regulatory_parts import iter_promoter_source_files
+    from dnadesign_data.catalog.regulatory_parts import iter_promoter_source_files
 
     export_dir = tmp_path / "superset_export"
     export_dnadesign_data_promoter_superset(

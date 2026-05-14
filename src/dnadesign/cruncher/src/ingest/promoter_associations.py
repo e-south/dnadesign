@@ -242,7 +242,7 @@ def discover_dnadesign_data_promoter_association_sources(
 
     if provider is None:
         try:
-            from dnadesign_data.regulatory_parts import iter_promoter_association_source_files
+            from dnadesign_data.catalog.regulatory_parts import iter_promoter_association_source_files
         except (ImportError, ModuleNotFoundError) as exc:
             if required:
                 raise PromoterSchemaError(
