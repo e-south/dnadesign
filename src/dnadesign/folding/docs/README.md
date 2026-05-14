@@ -21,6 +21,13 @@ module used by the uv-managed default backend.
 - **Understand contracts:** read the contract flow below before adding a new
   producer or backend.
 
+### Related Design Docs
+
+- [Linear ssDNA composition handoff](../../../../docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md):
+  Construct, Folding, and BaseRender contract boundaries.
+- [Construct composition reference](../../construct/docs/reference/linear-ssdna-composition.md):
+  current generic assembly contract and bundle layout.
+
 ### Command Routes
 
 ```bash

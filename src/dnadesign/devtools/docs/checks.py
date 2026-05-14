@@ -38,6 +38,7 @@ LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
 TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+README_TOOL_CATALOG_EXCLUDED_TOOLS = {"studies"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 TOOL_README_TOP_LINK_SCAN_LINES = 80
 RUNBOOK_DEMO_SHELL_LANGS = {"bash", "sh", "zsh"}
@@ -546,7 +547,7 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
     if not readme_path.exists() or not src_root.exists():
         return []
 
-    repo_tools = discover_repo_tools(repo_root=repo_root)
+    repo_tools = discover_repo_tools(repo_root=repo_root) - README_TOOL_CATALOG_EXCLUDED_TOOLS
     if not repo_tools:
         return []
 

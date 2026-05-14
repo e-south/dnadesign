@@ -8,7 +8,7 @@
 
 ![dnadesign banner](assets/dnadesign-banner.svg)
 
-`dnadesign` is a Python toolkit for turning DNA design inputs into datasets, constructs, model outputs, plots, and batch-ready workflows.
+`dnadesign` is a modular bioinformatics toolkit for designing sequence libraries, assembling DNA constructs, running sequence models, and analyzing the resulting datasets.
 
 ---
 
@@ -25,8 +25,7 @@ Start with the docs index when you need a workflow, current study record, or too
 
 ## Available tools
 
-Choose the package that owns the artifact or workflow you need. Study-specific
-routes live under [docs/studies/](docs/studies/).
+Choose the package that owns the artifact, workspace, or workflow you need.
 
 ### Workspace and analysis tools
 
@@ -61,10 +60,9 @@ routes live under [docs/studies/](docs/studies/).
 | [**ops**](src/dnadesign/ops/README.md) | Plan, run, and inspect batch workflows. | [![ops coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=ops)](https://codecov.io/gh/e-south/dnadesign?component=ops) |
 | [**notify**](src/dnadesign/notify/README.md) | Send webhook notifications for local runs and scheduler-backed jobs. | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
 
-### Shared contracts and routing
+### Shared contracts
 
 | Tool | Description | Coverage |
 | --- | --- | --- |
 | [**contracts**](src/dnadesign/contracts/README.md) | Versioned schemas shared between tools. | [![contracts coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=contracts)](https://codecov.io/gh/e-south/dnadesign?component=contracts) |
-| [**studies**](src/dnadesign/studies/README.md) | Checked-in study records and adapters for long-running work. | [![studies coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=studies)](https://codecov.io/gh/e-south/dnadesign?component=studies) |
 ---

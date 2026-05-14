@@ -30,6 +30,7 @@ from dnadesign.devtools.docs.checks import (
     _find_operational_runbook_path_issues,
     _find_ops_deprecated_semantics_issues,
     _find_packaged_runbook_variant_issues,
+    _find_readme_tool_catalog_issues,
     _find_root_docs_entrypoint_issues,
     _find_runbook_catalog_issues,
     _find_runbook_demo_snippet_issues,
@@ -1512,6 +1513,31 @@ def test_main_fails_when_readme_tool_catalog_missing_repo_tool(tmp_path: Path) -
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 1
+
+
+def test_readme_tool_catalog_does_not_require_studies_row(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "aligner" / "__init__.py", "")
+    _write(tmp_path / "src" / "dnadesign" / "studies" / "__init__.py", "")
+    _write(tmp_path / "src" / "dnadesign" / "aligner" / "README.md", "# aligner\n")
+    _write(tmp_path / "src" / "dnadesign" / "studies" / "README.md", "# studies\n")
+    _write(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "# dnadesign",
+                "",
+                "## Available tools",
+                "",
+                "| Tool | Description | Coverage |",
+                "| --- | --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
+                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
+                "",
+            ]
+        ),
+    )
+
+    assert _find_readme_tool_catalog_issues(tmp_path) == []
 
 
 def test_main_fails_when_readme_tool_catalog_row_has_too_few_columns(tmp_path: Path) -> None:
