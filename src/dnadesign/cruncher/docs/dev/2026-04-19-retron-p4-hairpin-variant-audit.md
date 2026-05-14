@@ -140,7 +140,8 @@ The data support a compact rule:
 - avoid simple P4 stem extension
 - preserve WT-like architecture where possible
 - use bulges or mismatches only as targeted processivity interventions
-- judge success by RT-DNA or reporter output, not by RNAfold appearance alone
+- judge success by RT-DNA or reporter output, not by ViennaRNA-predicted fold
+  appearance alone
 
 The most defensible route to success is to stay close to a `26`-like scaffold and introduce only minimal, hypothesis-driven irregularity.
 

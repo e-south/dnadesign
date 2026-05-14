@@ -47,12 +47,13 @@ def test_top_level_docs_match_registered_workflow_family_ids() -> None:
     assert _documented_family_ids(_read_package("docs/guides/intent_and_lifecycle.md")) == expected
 
 
-def test_architecture_reference_keeps_six_peer_workflow_families_explicit() -> None:
+def test_architecture_reference_keeps_registered_peer_workflow_families_explicit() -> None:
     expected = tuple(descriptor.id for descriptor in workflow_family_descriptors())
     architecture = _read_package("docs/reference/architecture.md")
 
     assert _documented_family_ids(architecture) == expected
-    assert "Cruncher is organized as six peer workflow families" in architecture
+    assert "Cruncher is organized as seven peer workflow families" in architecture
+    assert "**Scar-nick workspaces** use `scar-nick validate|design|show`" in architecture
     assert "**Study workspaces** use `study list|run|summarize|show`" in architecture
     assert "**Portfolio workspaces** use `portfolio run|show`" in architecture
     assert "#### Study lifecycle" in architecture
@@ -99,13 +100,13 @@ def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit(
     routes = _read_repo("docs/studies/retron_hairpin_design/routes.md")
     skill = _read_repo(".agents/skills/retron-hairpin-study/SKILL.md")
 
-    assert "The active cap/shortening execution lane is `released-product Snapback` in" in status
-    assert "The active base-junction context lane is scar-nick through the `scar_nick`" in status
-    assert "subpackage. It owns Type IIS retained scar space" in status
+    assert "This study now routes Retron MSD product work as a genetic compiler" in status
+    assert "Released-product Snapback in `de033` remains the primitive owner" in status
+    assert "Scar-nick through the `scar_nick` subpackage remains the primitive owner" in status
     assert "### Primary route: released-product Snapback" in routes
     assert "### Context route: scar-nick base-junction" in routes
     assert "This is the active study lane." in routes
     assert "### Contrast route: YIU boundary check" in routes
-    assert "released-product Snapback remains the active shortening lane" in skill
-    assert "scar-nick context preserves the strict terminal nick rule" in skill
-    assert "YIU remains mismatch-centric and contrast-only" in skill
+    assert 'Do not say "snapshot posture" or lead with current phase' in skill
+    assert "Routing missing stem-base or terminal-nick constraints to scar-nick" in skill
+    assert "YIU as contrast only" in skill

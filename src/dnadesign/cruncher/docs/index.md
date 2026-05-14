@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-23
 
-**Last updated by:** cruncher-maintainers on 2026-04-23
+**Last updated by:** cruncher-maintainers on 2026-05-14
 
 ### Contents
 - [Workflow families](#workflow-families)
@@ -11,24 +11,26 @@
 
 ### Workflow families
 
-Cruncher currently registers six peer workflow families.
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`.
+Cruncher currently registers seven peer workflow families.
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`.
 
 - `sample` owns fixed-length optimization, artifact-only analysis, and export
 - `cassette` owns cassette validation, design, solve, and show surfaces
 - `yiu` owns payload-centric validation, render, and show surfaces
 - `snapback` owns preserved-site and released-product single-nick foldback surfaces
+- `scar_nick` owns retained-scar terminal-nick validation, design, and show surfaces
 - `study` owns study orchestration over explicit source-family runs
 - `portfolio` owns cross-study aggregation and reporting
 
 The `study` and `portfolio` families orchestrate explicit source-family runs.
 The currently shipped examples are sample-backed, but they are still separate
 command families rather than hidden submodes of `sample`.
+They aggregate explicit source-family outputs instead of redefining source
+contracts.
 
 ### Documentation map
 <!-- docs:map:start -->
 #### Optimize Fixed-Length Sequences
-Run the fixed-length optimization lane for pairwise, multitf, and project workspaces.
 - [Pairwise Demo](demos/demo_pairwise.md)
 - [MultiTF Demo](demos/demo_multitf.md)
 - [Project Workspace Demo](demos/project_all_tfs.md)
@@ -39,7 +41,6 @@ Run the fixed-length optimization lane for pairwise, multitf, and project worksp
 - [Artifacts Reference](reference/artifacts.md)
 
 #### Design and Search Cassettes
-Design or search cassettes, then inspect the emitted artifact surface.
 - [Cassette Workspace Demo](demos/demo_cassette_workspace.md)
 - [Cassette Workflow](guides/cassette_workflow.md)
 - [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
@@ -49,14 +50,11 @@ Design or search cassettes, then inspect the emitted artifact surface.
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
 #### Payload-Centric YIU Workflows
-Run YIU workflows. Reuse explicit source-family outputs in YIU when the payload comes from a selected hit.
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)
-- [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md)
-- [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 
 #### Validate and Search Single-Nick Foldbacks
 - [Snapback Workflow](guides/snapback_workflow.md)
@@ -67,8 +65,12 @@ Run YIU workflows. Reuse explicit source-family outputs in YIU when the payload 
 - [de033 README](../workspaces/de033/README.md)
 - [de033 runbook](../workspaces/de033/runbook.md)
 
+#### Design Retained-Scar Terminal Nicks
+- [Scar-Nick Workflow](guides/scar_nick_workflow.md)
+- [scar_nick_teto runbook](../workspaces/scar_nick_teto/runbook.md)
+- [scar_nick Package Map](../src/scar_nick/README.md)
+
 #### Run Studies and Portfolio Aggregation
-Run study and portfolio orchestration across explicit source-family outputs.
 - [Studies](guides/studies.md)
 - [Study Length vs Score](guides/study_length_vs_score.md)
 - [Study Diversity vs Score](guides/study_diversity_vs_score.md)

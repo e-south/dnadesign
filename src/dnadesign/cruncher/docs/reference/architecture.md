@@ -4,7 +4,7 @@
 **Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-23
+**Last updated by:** cruncher-maintainers on 2026-05-14
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
@@ -13,6 +13,7 @@
 - [Cassette lifecycle](#cassette-lifecycle)
 - [YIU lifecycle](#yiu-lifecycle)
 - [Snapback lifecycle](#snapback-lifecycle)
+- [Scar-nick lifecycle](#scar-nick-lifecycle)
 - [Study lifecycle](#study-lifecycle)
 - [Portfolio lifecycle](#portfolio-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
@@ -20,6 +21,7 @@
 - [Run artifacts](#run-artifacts)
 - [Cassette artifacts](#cassette-artifacts)
 - [YIU artifacts](#yiu-artifacts)
+- [Scar-nick artifacts](#scar-nick-artifacts)
 - [Study artifacts](#study-artifacts)
 - [Portfolio artifacts](#portfolio-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
@@ -30,18 +32,19 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 
 #### Workflow families
 
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`
 
-Cruncher is organized as six peer workflow families, not one monolithic run shape:
+Cruncher is organized as seven peer workflow families, not one monolithic run shape:
 
 - **Sample workspaces** (fixed-length optimization) use `fetch -> lock -> parse -> sample -> analyze -> export` and publish sequence-centric run artifacts for downstream operators.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
 - **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
 - **Snapback workspaces** use `snapback init-workspace|validate|design|target-search|solve|show` plus the released-product `released-design|released-target-search|released-solve|released-show` lane and publish snapback-specific reports, candidate tables, and QA views.
+- **Scar-nick workspaces** use `scar-nick validate|design|show` and publish retained-scar terminal-nick candidate tables, geometry audits, and BaseRender job handoffs.
 - **Study workspaces** use `study list|run|summarize|show` to orchestrate sweep-owned manifests, trial tables, and aggregate plots over explicit source-family artifacts without redefining those source contracts.
 - **Portfolio workspaces** use `portfolio run|show` to aggregate explicit source runs into one handoff package without implicit latest-run fallback.
 
-These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, `yiu`, `snapback`, `study`, or `portfolio`.
+These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, or `portfolio`.
 
 #### Fixed-length optimization lifecycle
 
@@ -95,6 +98,20 @@ The snapback workflow is a peer lane, not a cassette or YIU submode:
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.
 
 For operator-facing usage, start with [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md) and [`../guides/snapback_released_workflow.md`](../guides/snapback_released_workflow.md). For the file-by-file output contracts, use [`snapback_artifacts.md`](snapback_artifacts.md) and [`released_snapback_artifacts.md`](released_snapback_artifacts.md).
+
+#### Scar-nick lifecycle
+
+The scar-nick workflow is a peer lane, not a Snapback or YIU submode:
+
+1. author `<workspace>/configs/scar_nick/<name>.scar_nick.yaml`
+2. **scar-nick validate** -> strict schema, release-enzyme, nickase, and pair-profile checks
+3. **scar-nick design** -> deterministic run bundle with candidate tables, geometry audit, provenance snapshots, QA views, and BaseRender jobs
+4. **scar-nick show** -> inspect one explicit run and fail fast on missing or drifted artifacts
+
+This workflow does not solve cap geometry, assemble Retron MSD products, run
+YIU payload rendering, or create one workspace per hit.
+
+For operator-facing usage, start with [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md) and the checked-in [`scar_nick_teto` runbook](../../workspaces/scar_nick_teto/runbook.md). For module ownership, use the [`scar_nick` package map](../../src/scar_nick/README.md).
 
 #### Study lifecycle
 
@@ -495,6 +512,29 @@ Snapback runs are intentionally isolated from `sample`, `cassette`, and `yiu` ru
 
 ---
 
+#### Scar-nick artifacts
+
+A typical **scar-nick** run directory at `<workspace>/outputs/scar_nick/<name>/` contains:
+
+- `meta/scar_nick_manifest.json`, `meta/scar_nick_status.json` - run metadata and status
+- `provenance/spec.snapshot.yaml` - frozen spec snapshot
+- `analysis/reports/report.md` - deterministic operator report
+- `export/table__scar_nick_candidates.csv` - accepted and reserve candidate table
+- `export/table__scar_nick_candidate_pair_calls.csv` - per-S-site pair calls
+- `export/table__scar_nick_nickase_geometry_audit.csv` - release/nickase geometry audit rows
+- `analysis/views/*.scar_nick_visual.v1.json` - producer-owned terminal-nick visual contracts
+- `baserender_jobs/scar_nick_terminal_nick.job.yaml` - optional downstream BaseRender job
+
+Scar-nick runs are intentionally isolated from `sample`, `cassette`, `yiu`, and
+`snapback` runs:
+
+- they do not write `meta/run_manifest.json`
+- they do not append to workspace `run_index.json`
+- they do not solve Snapback cap geometry
+- they do not assemble Retron MSD products
+
+---
+
 #### Study artifacts
 
 Study runs are aggregate sweep workflows that keep deterministic workspace config separate from sweep intent.
@@ -582,6 +622,7 @@ Key points:
 
 - [Intent + lifecycle](../guides/intent_and_lifecycle.md)
 - [Snapback workflow](../guides/snapback_workflow.md)
+- [Scar-nick workflow](../guides/scar_nick_workflow.md)
 - [Portfolio aggregation](../guides/portfolio_aggregation.md)
 - [Config reference](config.md)
 - [Snapback artifacts](snapback_artifacts.md)

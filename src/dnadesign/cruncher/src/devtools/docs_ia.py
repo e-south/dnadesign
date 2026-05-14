@@ -154,6 +154,14 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "../workspaces/de033/runbook.md",
             ),
         ),
+        "scar_nick": (
+            "Design Retained-Scar Terminal Nicks",
+            (
+                "guides/scar_nick_workflow.md",
+                "../workspaces/scar_nick_teto/runbook.md",
+                "../src/scar_nick/README.md",
+            ),
+        ),
         "yiu": (
             "Payload-Centric YIU Workflows",
             (

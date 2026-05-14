@@ -248,7 +248,8 @@ The v1 lane introduces only the following first-class primitives:
 
 V1 does not model:
 
-- Vienna/RNAfold energetics
+- ViennaRNA Package energetics, including either the `RNA` Python module or
+  the `RNAfold` CLI program
 - RT pausing or RNase H processing
 - TetR binding affinity
 - bulge energetics

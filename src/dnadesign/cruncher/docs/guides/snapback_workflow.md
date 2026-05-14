@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** snapback workflow users and maintainers
-**Last updated by:** cruncher-maintainers on 2026-04-21
+**Last updated by:** cruncher-maintainers on 2026-05-14
 **Applies to:** `uv run cruncher snapback init-workspace|validate|design|solve|target-search|show`
 **Last verified:** 2026-04-21
 **Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/solve_report.json`, `analysis/views/views_manifest.v1.json`, `analysis/materialized_hits/hit_<rank>/`
@@ -26,7 +26,7 @@
 
 > given one authored top strand and an allowed nickase catalog, can Cruncher validate one single-nick foldback design or search a bounded space of single-nick foldback candidates under an explicit geometry contract?
 
-It is separate from `sample`, `cassette`, and `yiu`.
+It is separate from `sample`, `cassette`, `scar_nick`, and `yiu`.
 
 Use `snapback` when you need:
 
@@ -54,7 +54,7 @@ Current non-scope:
 - no thermodynamic folding prediction
 - no RT/processivity, ligation-yield, or in vivo scoring
 - no retron, bulge-topology, or protein-binding interpretation layer
-- no fallback to `sample`, `cassette`, or `yiu`
+- no fallback to `sample`, `cassette`, `scar_nick`, or `yiu`
 - no multi-nick or excision workflow
 
 The lane is geometry-first. It answers whether a design satisfies the declared single-nick foldback contract and how accepted candidates rank under the current deterministic policy.

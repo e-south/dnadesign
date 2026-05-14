@@ -4,7 +4,7 @@
 **Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-23
+**Last updated by:** cruncher-maintainers on 2026-05-14
 
 ### Contents
 - [Cruncher CLI](#cruncher-cli)
@@ -13,6 +13,7 @@
 - [Core lifecycle commands](#core-lifecycle-commands)
 - [Cassette workflows](#cassette-workflows)
 - [Snapback workflows](#snapback-workflows)
+- [Scar-nick workflows](#scar-nick-workflows)
 - [YIU workflows](#yiu-workflows)
 - [Study workflows](#study-workflows)
 - [Portfolio workflows](#portfolio-workflows)
@@ -21,16 +22,17 @@
 
 This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow family.
 
-> **Workflow families:** Cruncher currently registers six peer command families.
+> **Workflow families:** Cruncher currently registers seven peer command families.
 >
 > - `fetch|lock|parse|sample|analyze|export` cover the `sample` family. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
 > - `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|released-solve|show|released-show` cover single-nick foldback workspaces. This lane uses explicit geometry contracts, bounded deterministic search, a strict QA triptych publication surface for preserved-site explicit bundles, and a separate released-product precursor contract.
+> - `scar-nick validate|design|show` cover retained-scar terminal-nick workspaces. This lane uses explicit Type IIS scar and nickase geometry contracts, deterministic candidate ranking, and BaseRender-ready QA handoffs.
 > - `yiu init-workspace|validate|render|show` cover payload-centric YIU workflows. This lane uses the strict `split_yiu_payload_rendering_v4` contract, deterministic exhaustive optimization over a 4 nt junction, three published payload views, and one bundle-local `visual_inventory.json`.
 > - `study run|summarize|show` cover the `study` family. This lane orchestrates aggregate sweeps over workspace outputs rather than defining a new design topology.
 > - `portfolio run|show` cover the `portfolio` family. This lane aggregates study-ready workspaces into cross-study tables and plots.
 >
-> Choose the command family by the workspace contract you need. `cassette`, `snapback`, `yiu`, `study`, and `portfolio` do not fall back to `sample`, and `sample` runs do not reuse their artifacts.
+> Choose the command family by the workspace contract you need. `cassette`, `snapback`, `scar-nick`, `yiu`, `study`, and `portfolio` do not fall back to `sample`, and `sample` runs do not reuse their artifacts.
 >
 > For Snapback specifically, `cli/commands/snapback.py` is the registry surface only. Subcommand handlers are split across `snapback_workspace.py`, `snapback_explicit.py`, `snapback_released.py`, and `snapback_show.py`, while typed request construction lives in `app/snapback_cli_requests.py`.
 
@@ -63,6 +65,7 @@ cruncher study list
 * **Analyze optimization runs** → `analyze`, `notebook`
 * **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
 * **Validate and search single-nick foldbacks** → `snapback init-workspace|validate|design|solve|target-search|released-design|released-target-search|released-solve|show|released-show`
+* **Evaluate retained-scar terminal nicks** → `scar-nick validate|design|show`
 * **Render split YIU payloads** → `yiu init-workspace|validate|render|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
@@ -551,7 +554,7 @@ Current non-scope:
 
 * no thermodynamic folding prediction
 * no ligation-yield or retron/processivity scoring
-* no fallback to `sample`, `cassette`, or `yiu`
+* no fallback to `sample`, `cassette`, `scar-nick`, or `yiu`
 
 Deep contracts live in:
 
@@ -785,6 +788,79 @@ Notes:
 * `show` accepts explicit or solve bundle roots only
 * the command fails fast on manifest/status drift, visual drift, and materialized-hit drift
 * `show` is an integrity check, not a best-effort artifact browser
+
+---
+
+#### Scar-nick workflows
+
+The scar-nick workflow is separate from `sample`, `cassette`, `snapback`, and
+`yiu`. It expects one retained-scar spec at
+`<workspace>/configs/scar_nick/<name>.scar_nick.yaml` and writes a deterministic
+bundle under `<workspace>/outputs/scar_nick/<name>/`.
+
+Deep contracts live in:
+
+* [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md)
+* [`../../workspaces/scar_nick_teto/runbook.md`](../../workspaces/scar_nick_teto/runbook.md)
+* [`../../src/scar_nick/README.md`](../../src/scar_nick/README.md)
+* [`nickase_catalog.md`](nickase_catalog.md)
+* [`architecture.md`](architecture.md)
+
+#### `cruncher scar-nick validate`
+
+Validate one scar-nick spec and print a deterministic feasibility report.
+
+Examples:
+
+* `uv run cruncher scar-nick validate --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml`
+* `uv run cruncher scar-nick validate --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml --json`
+
+Notes:
+
+* `--spec` must point to a `.scar_nick.yaml` file under a workspace
+  `configs/scar_nick/` tree
+* validation is read-only
+* failures are strict schema, geometry, or policy blockers rather than
+  best-effort warnings
+
+#### `cruncher scar-nick design`
+
+Validate one scar-nick spec and write the design bundle.
+
+Examples:
+
+* `uv run cruncher scar-nick design --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml`
+* `uv run cruncher scar-nick design --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/scar_nick/<name>/`
+* writes `meta/scar_nick_manifest.json` and `meta/scar_nick_status.json`
+* writes candidate, pair-call, and nickase-geometry audit tables under
+  `export/`
+* writes terminal-nick visual contracts under `analysis/views/`
+* writes `baserender_jobs/scar_nick_terminal_nick.job.yaml`
+
+Notes:
+
+* unsatisfied specs fail without writing a misleading success bundle
+* related panels should stay in one workspace as separate specs
+
+#### `cruncher scar-nick show`
+
+Read one scar-nick run directory and print a path-oriented summary with drift
+checks.
+
+Examples:
+
+* `uv run cruncher scar-nick show --run outputs/scar_nick/teto_upstream_processing_bbsI_hf`
+* `uv run cruncher scar-nick show --run outputs/scar_nick/teto_upstream_processing_bbsI_hf --json`
+
+Notes:
+
+* `show` accepts explicit scar-nick run roots only
+* the command fails fast on missing reports, visual artifacts, manifest drift,
+  and BaseRender job drift
 
 ---
 

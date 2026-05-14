@@ -4,7 +4,7 @@
 **Last verified:** 2026-04-23
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-23
+**Last updated by:** cruncher-maintainers on 2026-05-14
 
 ### Contents
 - [Intent](#intent)
@@ -28,7 +28,7 @@
 
 Cruncher is an artifact-first, reproducible DNA design platform organized as
 peer workflow families rather than one monolithic optimizer.
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `study`, `portfolio`.
+Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`.
 
 The package favors:
 
@@ -48,6 +48,8 @@ artifact-native analysis.
 - `yiu` owns payload-centric validation, render, and show surfaces.
 - `snapback` owns preserved-site and released-product single-nick foldback
   validation, search, solve, and show surfaces.
+- `scar_nick` owns retained-scar terminal-nick validation, design, and show
+  surfaces.
 - `study` owns study orchestration across workspace outputs.
 - `portfolio` owns cross-study aggregation and portfolio handoff tables.
 
@@ -57,6 +59,8 @@ artifact-native analysis.
   objectives.
 - Use `cassette` or `snapback` when the contract is geometry-first and
   recognition-site-aware rather than PWM-first.
+- Use `scar_nick` when the contract is a retained Type IIS scar plus exact
+  terminal nick feasibility panel.
 - Use `yiu` when the task is payload-centric mismatch rendering over a fixed
   internal window.
 - Use `study` and `portfolio` when the task is orchestration or aggregation over
@@ -64,8 +68,8 @@ artifact-native analysis.
 
 ### Non-goals
 
-- **No hidden family fallback:** `snapback`, `cassette`, `yiu`, `study`, and
-  `portfolio` are not secret modes of `sample`.
+- **No hidden family fallback:** `cassette`, `yiu`, `snapback`, `scar_nick`,
+  `study`, and `portfolio` are not secret modes of `sample`.
 - **No one-size-fits-all run shape:** each family keeps its own command roots,
   output tree, and orchestration seam.
 - **No silent recovery:** invariant violations fail fast instead of downgrading
@@ -79,6 +83,7 @@ artifact-native analysis.
 - `cassette` -> `cassette init-workspace|validate|design|solve|show`
 - `yiu` -> `yiu init-workspace|validate|render|show`
 - `snapback` -> `snapback init-workspace|validate|design|released-design|solve|released-target-search|released-solve|show|released-show`
+- `scar_nick` -> `scar-nick validate|design|show`
 - `study` -> `study run|summarize|show`
 - `portfolio` -> `portfolio run|show`
 
