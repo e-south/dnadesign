@@ -48,6 +48,7 @@ dependencies = [
   "fastparquet>=2025.12.0",
   "marimo>=0.23.0",
   "openai>=2.14.0",
+  "viennarna>=2.7.2",
 ]
 
 [project.scripts]
@@ -58,6 +59,7 @@ dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
 construct  = "dnadesign.construct.cli:main"
+folding    = "dnadesign.folding.cli:main"
 cluster    = "dnadesign.cluster.cli:main"
 latentdna  = "dnadesign.latentdna.src:main"
 permuter   = "dnadesign.permuter.cli:main"

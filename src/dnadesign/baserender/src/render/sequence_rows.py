@@ -1399,7 +1399,7 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
         x = x0 + i * cw + cw / 2.0
         if i in cross_indices:
             dx = max(2.1, cw * 0.20)
-            ax.plot(
+            (cross_a,) = ax.plot(
                 [x - dx, x + dx],
                 [y1, y2],
                 color=cross_color,
@@ -1407,7 +1407,8 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 alpha=cross_alpha,
                 zorder=1.6,
             )
-            ax.plot(
+            cross_a.set_gid(f"sequence_pair_connector_cross:{i}:a")
+            (cross_b,) = ax.plot(
                 [x - dx, x + dx],
                 [y2, y1],
                 color=cross_color,
@@ -1415,9 +1416,10 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 alpha=cross_alpha,
                 zorder=1.6,
             )
+            cross_b.set_gid(f"sequence_pair_connector_cross:{i}:b")
             continue
         if i in emphasis_indices:
-            ax.plot(
+            (emphasis_line,) = ax.plot(
                 [x, x],
                 [y1, y2],
                 color=emphasis_color,
@@ -1425,6 +1427,7 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 alpha=0.98,
                 zorder=1.8,
             )
+            emphasis_line.set_gid(f"sequence_pair_connector_emphasis:{i}")
             continue
         (ln,) = ax.plot(
             [x, x],
@@ -1434,6 +1437,7 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
             alpha=style.connector_alpha,
             zorder=1,
         )
+        ln.set_gid(f"sequence_pair_connector:{i}")
         if dash_pattern:
             ln.set_dashes(dash_pattern)
     if overhang_spans:
@@ -1673,12 +1677,27 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
         )
 
 
+def _meta_float(meta: Mapping[str, object], key: str, *, default: float | None) -> float | None:
+    raw = meta.get(key)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except Exception:
+        return default
+    if not math.isfinite(value):
+        return default
+    return value
+
+
 def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
     segment_labels = record.meta.get("segment_labels") if isinstance(record.meta, Mapping) else None
     if not isinstance(segment_labels, Sequence) or isinstance(segment_labels, (str, bytes)):
         return
     font_size = style.display_font_size() if bool(style.uniform_display_font_size) else max(9, style.font_size_label)
     line_height = max(10.0, (float(font_size) / 72.0) * float(style.dpi))
+    label_gap = _meta_float(record.meta, "segment_label_gap_px", default=None)
+    tier_gap = _meta_float(record.meta, "segment_label_tier_gap_px", default=None)
     horizontal_gap = max(6.0, layout.cw * 0.25)
     top_tiers: list[list[tuple[float, float]]] = []
     bottom_tiers: list[list[tuple[float, float]]] = []
@@ -1722,15 +1741,19 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
             tiers.append([(x0, x1)])
         placements.append((side, text, x, tier_index, color, label_offset_px))
 
-    top_base_y = layout.y_forward + layout.sequence_extent_up + max(18.0, style.font_size_label * 1.4)
-    bottom_base_y = layout.y_reverse - layout.sequence_extent_down - max(16.0, style.font_size_label * 1.2)
+    top_gap = max(0.0, label_gap if label_gap is not None else max(18.0, style.font_size_label * 1.4))
+    bottom_gap = max(0.0, label_gap if label_gap is not None else max(16.0, style.font_size_label * 1.2))
+    requested_tier_step = tier_gap if tier_gap is not None else line_height * 1.05
+    tier_step = max(line_height * 1.05, requested_tier_step)
+    top_base_y = layout.y_forward + layout.sequence_extent_up + top_gap
+    bottom_base_y = layout.y_reverse - layout.sequence_extent_down - bottom_gap
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
     for side, text, x, tier_index, color, label_offset_px in placements:
         if side == "below" and show_two:
-            y = bottom_base_y - tier_index * line_height * 1.05 + label_offset_px
+            y = bottom_base_y - tier_index * tier_step + label_offset_px
             va = "top"
         else:
-            y = top_base_y + tier_index * line_height * 1.05 + label_offset_px
+            y = top_base_y + tier_index * tier_step + label_offset_px
             va = "bottom"
         ax.text(
             x,

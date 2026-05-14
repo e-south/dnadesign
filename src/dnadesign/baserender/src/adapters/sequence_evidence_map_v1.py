@@ -244,6 +244,12 @@ def _normalize_span_backdrops(
             "corner_radius": corner_radius,
             "cover_rows": cover_rows,
         }
+        semantic = entry.get("semantic")
+        if semantic is not None:
+            semantic_text = str(semantic).strip()
+            if not semantic_text:
+                raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries semantic must be non-empty")
+            normalized_entry["semantic"] = semantic_text
         coordinate_space_raw = entry.get("coordinate_space")
         if coordinate_space_raw is not None:
             coordinate_space = str(coordinate_space_raw).strip()
@@ -252,8 +258,68 @@ def _normalize_span_backdrops(
                     "sequence_evidence_map_v1 meta.span_backdrops entries coordinate_space must be non-empty"
                 )
             normalized_entry["coordinate_space"] = coordinate_space
+        edge_color = entry.get("edge_color")
+        if edge_color is not None:
+            edge_text = str(edge_color).strip()
+            if not edge_text:
+                raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries edge_color must be non-empty")
+            normalized_entry["edge_color"] = edge_text
+        if "edge_alpha" in entry:
+            try:
+                edge_alpha = float(entry.get("edge_alpha"))
+            except Exception as exc:
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.span_backdrops entries edge_alpha must be numeric"
+                ) from exc
+            if not math.isfinite(edge_alpha) or edge_alpha < 0.0 or edge_alpha > 1.0:
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.span_backdrops entries edge_alpha must be within [0, 1]"
+                )
+            normalized_entry["edge_alpha"] = edge_alpha
+        if "edge_linewidth" in entry:
+            try:
+                edge_linewidth = float(entry.get("edge_linewidth"))
+            except Exception as exc:
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.span_backdrops entries edge_linewidth must be numeric"
+                ) from exc
+            if not math.isfinite(edge_linewidth) or edge_linewidth < 0.0:
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.span_backdrops entries edge_linewidth must be finite and >= 0"
+                )
+            normalized_entry["edge_linewidth"] = edge_linewidth
         normalized.append(normalized_entry)
     return tuple(normalized)
+
+
+def _normalize_interval_annotation_policy(meta: Mapping[str, Any]) -> str:
+    raw = meta.get("interval_annotation_policy", "interval_features")
+    policy = str(raw).strip().lower()
+    if policy not in {"interval_features", "span_backdrops_only"}:
+        raise SchemaError(
+            "sequence_evidence_map_v1 meta.interval_annotation_policy must be interval_features or span_backdrops_only"
+        )
+    return policy
+
+
+def _normalize_render_pairing_links(meta: Mapping[str, Any]) -> bool:
+    raw = meta.get("render_pairing_links", True)
+    if not isinstance(raw, bool):
+        raise SchemaError("sequence_evidence_map_v1 meta.render_pairing_links must be a boolean")
+    return raw
+
+
+def _normalize_optional_positive_float(meta: Mapping[str, Any], *, key: str) -> float | None:
+    raw = meta.get(key)
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except Exception as exc:
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must be numeric") from exc
+    if not math.isfinite(value) or value < 0.0:
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must be finite and >= 0")
+    return value
 
 
 def _normalize_segment_labels(meta: Mapping[str, Any], *, primary_length: int) -> tuple[dict[str, object], ...]:
@@ -276,7 +342,35 @@ def _normalize_segment_labels(meta: Mapping[str, Any], *, primary_length: int) -
             raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries require integer start/end") from exc
         if start < 0 or end > primary_length or end <= start:
             raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries must be within primary bounds")
-        normalized.append({"text": text, "start": start, "end": end, "row_id": "primary"})
+        row_id = str(entry.get("row_id", "primary")).strip().lower() or "primary"
+        if row_id not in {"primary", "complement"}:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.segment_labels entries row_id must be primary or complement"
+            )
+        label_side = str(entry.get("label_side", "")).strip().lower()
+        if label_side and label_side not in {"above", "below"}:
+            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries label_side must be above or below")
+        label: dict[str, object] = {"text": text, "start": start, "end": end, "row_id": row_id}
+        if label_side:
+            label["label_side"] = label_side
+        color = entry.get("color")
+        if color is not None:
+            color_text = str(color).strip()
+            if not color_text:
+                raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries color must be non-empty")
+            label["color"] = color_text
+        offset = entry.get("label_offset_px")
+        if offset is not None:
+            try:
+                offset_value = float(offset)
+            except Exception as exc:
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.segment_labels entries label_offset_px must be numeric"
+                ) from exc
+            if not math.isfinite(offset_value):
+                raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries label_offset_px must be finite")
+            label["label_offset_px"] = offset_value
+        normalized.append(label)
     return tuple(normalized)
 
 
@@ -292,12 +386,23 @@ class SequenceEvidenceMapV1Adapter:
         except Exception as exc:
             raise SchemaError(f"Invalid sequence_evidence_map_v1 contract at row {row_index}: {exc}") from exc
 
+        meta = dict(contract.meta)
+        if "boundary_marker_style" in meta:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.boundary_marker_style is no longer "
+                "supported; encode semantics in boundaries.boundary_kind"
+            )
+        interval_annotation_policy = _normalize_interval_annotation_policy(meta)
+        render_interval_features = interval_annotation_policy == "interval_features"
+        render_pairing_links = _normalize_render_pairing_links(meta)
         features: list[Feature] = []
         tag_labels: dict[str, str] = {}
 
         for owner in contract.owners:
             tag = f"owner:{owner.owner_id}"
             tag_labels[tag] = owner.display_label
+            if not render_interval_features:
+                continue
             features.append(
                 Feature(
                     id=f"{owner.row_id}:{owner.owner_id}:{owner.start}:{owner.end}",
@@ -319,6 +424,8 @@ class SequenceEvidenceMapV1Adapter:
         for tag in contract.effect_tags:
             feature_tag = f"effect:{tag.tag_kind}"
             tag_labels[feature_tag] = tag.display_label
+            if not render_interval_features:
+                continue
             features.append(
                 Feature(
                     id=f"{tag.row_id}:{tag.tag_id}:{tag.start}:{tag.end}",
@@ -337,12 +444,6 @@ class SequenceEvidenceMapV1Adapter:
                 )
             )
 
-        meta = dict(contract.meta)
-        if "boundary_marker_style" in meta:
-            raise SchemaError(
-                "sequence_evidence_map_v1 meta.boundary_marker_style is no longer "
-                "supported; encode semantics in boundaries.boundary_kind"
-            )
         effects: list[Effect] = []
         for boundary in contract.boundaries:
             effects.append(
@@ -359,29 +460,36 @@ class SequenceEvidenceMapV1Adapter:
             )
         pairing_lane = "bottom" if contract.topology_kind == "hairpin_folded" else "top"
         pairing_track = 0 if contract.topology_kind == "hairpin_folded" else 4
-        for pairing in contract.pairings:
-            pairing_label = (
-                "" if contract.topology_kind == "hairpin_folded" else pairing.short_label or pairing.display_label or ""
-            )
-            effects.append(
-                Effect(
-                    kind="span_link",
-                    target={
-                        "from_span": {"start": pairing.primary_start, "end": pairing.primary_end, "strand": "fwd"},
-                        "to_span": {
-                            "start": pairing.complement_start,
-                            "end": pairing.complement_end,
-                            "strand": "rev",
-                        },
-                    },
-                    params={
-                        "label": pairing_label,
-                        "lane": pairing_lane,
-                        "inner_margin_bp": 0.0,
-                    },
-                    render={"track": pairing_track},
+        if render_pairing_links:
+            for pairing in contract.pairings:
+                pairing_label = (
+                    ""
+                    if contract.topology_kind == "hairpin_folded"
+                    else pairing.short_label or pairing.display_label or ""
                 )
-            )
+                effects.append(
+                    Effect(
+                        kind="span_link",
+                        target={
+                            "from_span": {
+                                "start": pairing.primary_start,
+                                "end": pairing.primary_end,
+                                "strand": "fwd",
+                            },
+                            "to_span": {
+                                "start": pairing.complement_start,
+                                "end": pairing.complement_end,
+                                "strand": "rev",
+                            },
+                        },
+                        params={
+                            "label": pairing_label,
+                            "lane": pairing_lane,
+                            "inner_margin_bp": 0.0,
+                        },
+                        render={"track": pairing_track},
+                    )
+                )
         legend_exclude_tags_raw = meta.get("legend_exclude_tags", ())
         if isinstance(legend_exclude_tags_raw, Mapping):
             raise SchemaError("sequence_evidence_map_v1 meta.legend_exclude_tags must be a list of tag ids")
@@ -423,6 +531,11 @@ class SequenceEvidenceMapV1Adapter:
             primary_length=len(contract.primary_sequence),
             complement_length=complement_length,
         )
+        if interval_annotation_policy == "span_backdrops_only" and not span_backdrops:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.interval_annotation_policy=span_backdrops_only "
+                "requires meta.span_backdrops"
+            )
         if connector_overhang_spans:
             overhang_indices = {
                 index for span in connector_overhang_spans for index in range(span["start"], span["end"])
@@ -440,6 +553,8 @@ class SequenceEvidenceMapV1Adapter:
                 "sequence_evidence_map_v1 connector hidden/cross indices require connector_overhang_spans"
             )
         segment_labels = _normalize_segment_labels(meta, primary_length=len(contract.primary_sequence))
+        segment_label_gap_px = _normalize_optional_positive_float(meta, key="segment_label_gap_px")
+        segment_label_tier_gap_px = _normalize_optional_positive_float(meta, key="segment_label_tier_gap_px")
 
         record = Record(
             id=contract.state_id,
@@ -461,8 +576,12 @@ class SequenceEvidenceMapV1Adapter:
                 "connector_overhang_spans": connector_overhang_spans,
                 "span_backdrops": span_backdrops,
                 "segment_labels": segment_labels,
+                "segment_label_gap_px": segment_label_gap_px,
+                "segment_label_tier_gap_px": segment_label_tier_gap_px,
                 "legend_exclude_tags": legend_exclude_tags,
                 "row_labels": dict(row_labels),
+                "interval_annotation_policy": interval_annotation_policy,
+                "render_pairing_links": render_pairing_links,
                 "show_reverse_complement": contract.complement_sequence is not None,
             },
         )

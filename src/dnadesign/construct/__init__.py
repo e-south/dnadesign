@@ -15,9 +15,31 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .src.api import PreflightResult, RunResult, load_job_config, preflight_from_config, run_from_config
+    from .src.api import (
+        LinearSsdnaCompositionResult,
+        LinearSsdnaCompositionSummary,
+        PreflightResult,
+        RunResult,
+        load_job_config,
+        load_linear_ssdna_composition_config,
+        preflight_from_config,
+        run_from_config,
+        run_linear_ssdna_composition,
+        summarize_linear_ssdna_composition,
+    )
 
-__all__ = ["PreflightResult", "RunResult", "load_job_config", "preflight_from_config", "run_from_config"]
+__all__ = [
+    "LinearSsdnaCompositionResult",
+    "LinearSsdnaCompositionSummary",
+    "PreflightResult",
+    "RunResult",
+    "load_job_config",
+    "load_linear_ssdna_composition_config",
+    "preflight_from_config",
+    "run_from_config",
+    "run_linear_ssdna_composition",
+    "summarize_linear_ssdna_composition",
+]
 
 _API_EXPORTS = frozenset(__all__)
 

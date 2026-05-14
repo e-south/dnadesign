@@ -71,6 +71,11 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 
 ### Tool docs
 
+The CLI table includes both workflow-owning tools and stateless service
+surfaces. Prefer workspace/dataset routers for user work; call service CLIs
+such as `folding` only when a producer has already emitted the required
+contract artifacts or bundle manifest.
+
 | Tool | CLI | Docs |
 | --- | --- | --- |
 | `aligner` | n/a | [aligner README](../src/dnadesign/aligner/README.md) |
@@ -80,6 +85,7 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
+| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); stateless service, no workspace |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `libshuffle` | n/a | [libshuffle README](../src/dnadesign/libshuffle/README.md) |

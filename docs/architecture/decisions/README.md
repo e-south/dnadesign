@@ -24,3 +24,7 @@ Use this directory for new decisions going forward.
 
 ### Template
 - `../../templates/adr.md`
+
+### Records
+- [ADR 0001: Namespace-scoped compatibility hashes for USR overlays](adr-0001-usr-namespace-contract-hash.md)
+- [ADR 0002: Generic linear ssDNA composition in Construct](adr-0002-generic-linear-ssdna-composition.md)

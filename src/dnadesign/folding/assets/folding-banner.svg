@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-labelledby="title desc">
+  <title id="title">folding banner</title>
+  <desc id="desc">Banner for the dnadesign folding package.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12332f" />
+      <stop offset="100%" stop-color="#2d6f66" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="240" fill="url(#bg)" />
+  <g fill="none" stroke="#a7f3d0" stroke-width="5" opacity="0.8">
+    <path d="M120 168 C180 72 300 72 360 168 S540 264 600 168 S780 72 840 168 S1020 264 1080 168" />
+    <path d="M195 128 L285 128 M435 128 L525 128 M675 128 L765 128 M915 128 L1005 128" />
+  </g>
+  <g fill="#ecfdf5" font-family="Helvetica, Arial, sans-serif">
+    <text x="88" y="108" font-size="28" opacity="0.85">dnadesign</text>
+    <text x="88" y="160" font-size="68" font-weight="700">folding</text>
+    <text x="88" y="198" font-size="24" opacity="0.9">Secondary-structure prediction contracts and runners</text>
+  </g>
+</svg>

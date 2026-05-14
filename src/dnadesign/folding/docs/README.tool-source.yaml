@@ -1,0 +1,10 @@
+schema_version: 1
+catalog_order: 11
+tool: folding
+summary: Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts.
+keywords:
+  - folding
+  - ViennaRNA
+  - RNAfold
+  - secondary structure
+  - stateless service

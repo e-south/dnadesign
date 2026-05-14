@@ -1,0 +1,188 @@
+contract: linear_ssdna_composition_v1
+schema_version: 1
+
+composition_id: retron43_teto_manual_x8
+alphabet: dna
+topology: linear_ssdna
+coordinate_system: zero_based_half_open
+case_policy: preserve_input_display_case
+canonicalization:
+  compare_sequences_case_insensitive: true
+  output_sequence_preserves_case: true
+
+units:
+  - unit_id: retron43_teto_unit
+    repeat_count: 8
+    segments:
+      - segment_id: flank_5p
+        role: flank_5p
+        sequence: gtcagaaaaaaCAAG
+        source:
+          kind: literal
+          label: manual_retron43_example
+
+      - segment_id: payload_primary
+        role: payload_primary
+        sequence: tccctatcagtgatagaga
+        source:
+          kind: literal
+          label: manual_teto_payload
+
+      - segment_id: snapback_cap_segment
+        role: snapback_cap_segment
+        sequence: tCCTCAGcccGCTGAGGa
+        source:
+          kind: literal
+          label: manual_snapback_43_cap
+
+      - segment_id: payload_complement
+        role: payload_complement
+        sequence: tctctatcactgataggga
+        transform:
+          kind: reverse_complement
+          source_segment_id: payload_primary
+          assert_expected_sequence: true
+        source:
+          kind: derived
+          from_segment_id: payload_primary
+
+      - segment_id: flank_3p
+        role: flank_3p
+        sequence: CTCGacagtaactcaga
+        source:
+          kind: literal
+          label: manual_retron43_example
+
+    annotations:
+      - annotation_id: stem_base_left
+        role: stem_base_left
+        location:
+          basis: segment
+          segment_id: flank_5p
+          start: 11
+          end: 15
+
+      - annotation_id: teto_primary
+        role: payload
+        semantic_label: TetO
+        location:
+          basis: segment
+          segment_id: payload_primary
+          start: 0
+          end: 19
+
+      - annotation_id: snapback_cap
+        role: snapback_cap
+        location:
+          basis: segment
+          segment_id: snapback_cap_segment
+          start: 0
+          end: 18
+
+      - annotation_id: teto_complement
+        role: payload_complement
+        semantic_label: TetO_reverse_complement
+        location:
+          basis: segment
+          segment_id: payload_complement
+          start: 0
+          end: 19
+
+      - annotation_id: stem_base_right
+        role: stem_base_right
+        location:
+          basis: segment
+          segment_id: flank_3p
+          start: 0
+          end: 4
+
+    assertions:
+      - assertion_id: payload_rc
+        kind: reverse_complement
+        left_segment_id: payload_primary
+        right_segment_id: payload_complement
+        severity: error
+
+qa:
+  require_no_unknown_bases: true
+  allow_degenerate_bases: false
+  require_segment_span_coverage: true
+  require_non_overlapping_physical_segments: true
+  require_annotation_bounds: true
+  require_declared_transform_checks: true
+  allow_cross_copy_intended_pairings: false
+
+folding:
+  enabled: true
+  required: false
+  scope: canonical_component_unit
+  backend:
+    name: ViennaRNA
+    interface: python_api
+    python_module: RNA
+    backend_contract: secondary_structure_prediction_v1
+    parameters:
+      temperature_c: 37.0
+  dna_policy:
+    mode: convert_t_to_u_for_rna_backend
+
+visual:
+  emit:
+    - sequence_evidence_map_v1
+    - viennarna_secondary_structure_svg_v1
+  display_profile:
+    title: Retron 43 TetO x8
+    component_labels:
+      flank_5p: "5' flank"
+      payload_primary: TetO primary
+      snapback_cap_segment: Snapback cap
+      payload_complement: TetO complement
+      flank_3p: "3' flank"
+    annotation_labels:
+      stem_base_left: Left stem base
+      stem_base_right: Right stem base
+    component_hues:
+      flank_5p: "#4C78A8"
+      flank_3p: "#72B7B2"
+      payload_primary: "#F58518"
+      payload_complement: "#E45756"
+      snapback_cap_segment: "#54A24B"
+      stem_base_left: "#B279A2"
+      stem_base_right: "#9D755D"
+    component_styles:
+      flank_5p:
+        fill: "#CBD5E1"
+        alpha: 0.70
+        edge_color: "#94A3B8"
+      payload_primary:
+        fill: "#34D399"
+        alpha: 0.58
+        edge_color: "#059669"
+      snapback_cap_segment:
+        fill: "#F472B6"
+        alpha: 0.56
+        edge_color: "#DB2777"
+      payload_complement:
+        fill: "#60A5FA"
+        alpha: 0.58
+        edge_color: "#2563EB"
+      flank_3p:
+        fill: "#CBD5E1"
+        alpha: 0.70
+        edge_color: "#94A3B8"
+    base_highlight_color: "#111827"
+  viennarna_structure_plot:
+    layout_algorithm: naview
+    emphasize_stem_base_nucleotides: true
+  render_exports:
+    formats: [svg]
+
+benchling_export:
+  enabled: true
+  primary_format: genbank
+  sidecars: [fasta, features_csv]
+
+output:
+  artifact_bundle: outputs/retron43_teto_manual_x8
+  usr:
+    enabled: false

@@ -1126,6 +1126,7 @@ def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:
             "meta": {
                 "span_backdrops": [
                     {
+                        "semantic": "stem_base_left",
                         "start": 9,
                         "end": 13,
                         "coordinate_space": "payload_forward",
@@ -1133,6 +1134,9 @@ def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:
                         "alpha": 0.3,
                         "corner_radius": 8.0,
                         "cover_rows": "both",
+                        "edge_color": "#2563EB",
+                        "edge_alpha": 0.72,
+                        "edge_linewidth": 0.5,
                     }
                 ]
             },
@@ -1142,6 +1146,7 @@ def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:
 
     assert record.meta["span_backdrops"] == (
         {
+            "semantic": "stem_base_left",
             "start": 9,
             "end": 13,
             "coordinate_space": "payload_forward",
@@ -1149,6 +1154,9 @@ def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:
             "alpha": 0.3,
             "corner_radius": 8.0,
             "cover_rows": "both",
+            "edge_color": "#2563EB",
+            "edge_alpha": 0.72,
+            "edge_linewidth": 0.5,
         },
     )
 

@@ -67,6 +67,10 @@ component_management:
       name: construct
       paths:
         - src/dnadesign/construct/**
+    - component_id: folding
+      name: folding
+      paths:
+        - src/dnadesign/folding/**
     - component_id: opal
       name: opal
       paths:

@@ -16,6 +16,14 @@ from typing import NoReturn
 
 from dnadesign.usr import SequencesError as USRSequencesError
 
+from .composition import (
+    LinearSsdnaCompositionResult,
+    LinearSsdnaCompositionSummary,
+    load_linear_ssdna_composition_config,
+    run_linear_ssdna_composition,
+    summarize_linear_ssdna_composition,
+)
+from .composition_review import publish_composition_review_svg
 from .config import JobConfig
 from .config import load_job_config as _load_job_config
 from .errors import ExecutionError, ValidationError
@@ -79,10 +87,16 @@ def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
 
 __all__ = [
     "JobConfig",
+    "LinearSsdnaCompositionResult",
+    "LinearSsdnaCompositionSummary",
     "PreflightResult",
     "RunResult",
     "load_job_config",
+    "load_linear_ssdna_composition_config",
     "preflight_from_config",
+    "publish_composition_review_svg",
     "run_from_config",
+    "run_linear_ssdna_composition",
+    "summarize_linear_ssdna_composition",
     "Path",
 ]
