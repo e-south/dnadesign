@@ -1,0 +1,61 @@
+plot_id: native_regulator_plan_margin_enrichment
+question: Which source-backed RegulonDB regulator associations are enriched among native promoter-core60 rows with high synthetic-plan margins?
+decision_role: appendix
+scope: Parent-resolved native RegulonDB core60 promoters transferred into the study pDual10 1 kb context, embedded in the same bidirectional context-anchor view used for pre-assay synthetic promoter triage.
+encoding: Four plan panels show the top configured regulator associations in the 10% native margin tail after support filters; bar length is enrichment ratio over native-background prevalence and the dashed line marks no enrichment.
+guardrails:
+  - Treat this as exploratory regulator-association enrichment, not as a candidate-selection rule.
+  - Do not use the enriched regulators as mechanistic labels for synthetic promoters.
+  - Interpret common regulators through enrichment over background prevalence, not raw count.
+caption: Native regulator enrichment among fixed synthetic-plan margin tails.
+alt_text: Four-panel bar chart showing background, ethanol, cipro, and dual synthetic-plan margin tails. Each panel lists top RegulonDB regulator associations with bar length indicating enrichment ratio over native background prevalence.
+preprocessing_md: >-
+  The table is built from the same pDual10-transferred native core60 rows used
+  by the BaeR/CpxR/LexA landmark audit. DenseGen synthetic plan centroids define
+  the plan geometry, native rows are scored against those centroids, and
+  regulator memberships are joined from the USR regulatory-interaction sidecar
+  at promoter-parent granularity.
+math_md: |
+  For native row \(i\) and configured synthetic plan \(p\):
+
+  $$
+  \mathrm{sim}(i,p)=\cos(x_i,\mu_p)
+  $$
+
+  $$
+  \mathrm{margin}(i,p)=\mathrm{sim}(i,p)-\max_{q \neq p}\mathrm{sim}(i,q)
+  $$
+
+  $$
+  \mathrm{nearest\_plan}(i)=\arg\max_p \mathrm{sim}(i,p)
+  $$
+
+  For each plan-tail set and regulator, enrichment uses a promoter-level 2x2
+  table. A native promoter counts once for a regulator even when the source
+  sidecar contains multiple interaction rows for that regulator-promoter pair.
+rationale_md: >-
+  This appendix asks whether curated native regulator associations are
+  overrepresented in the native rows that are most specific to each synthetic
+  plan centroid. Tails are rank-based top 5% and top 10% sets in the scalar
+  artifact because margin distributions are not assumed normal and thresholds
+  must not be tuned after inspecting biology. The plot displays the top 10%
+  margin-tail summary for readability; the full table preserves both 5% and
+  10% tests.
+plot_details_md: >-
+  The plotted surface uses `tail_mode == margin_top_quantile`,
+  `threshold == 0.10`, `passes_min_support == true`, and
+  `passes_min_tail_hits == true`. Each label includes tail hits over total
+  native promoter support. Text annotations report q-values where available.
+  Common/global regulators are shown with a neutral bar color so their raw
+  abundance is not visually confused with specificity.
+limitations_md: >-
+  The core60 sequences have been moved from native genomic context into the
+  study pDual10 template. Regulatory sites outside the 60 bp window, condition
+  specificity, genomic context, and indirect regulatory logic may be absent.
+  Therefore the result is source-backed association enrichment in latent tails,
+  not a statement that DenseGen discovered a causal stress mechanism.
+failure_modes_md: >-
+  Missing regulatory sidecars, duplicate native parent IDs, silent row-count
+  drift, row-level rather than promoter-level regulator counting, threshold
+  tuning after inspection, or treating q-value-limited exploratory hits as
+  validated biology would invalidate the appendix claim.

@@ -1834,6 +1834,28 @@ plots:
       - {column: has_LexA, label: LexA-associated, type: binary}
     shape_column: tf_bin
     semantics_ref: plot_semantics/native_tf_axis_orientation_audit.yaml
+  native_regulator_plan_margin_enrichment:
+    kind: categorical_enrichment_summary
+    visibility_tier: appendix
+    scalar: native_regulator_plan_margin_enrichment
+    group_column: plan
+    feature_column: regulator_abbrev
+    value_column: enrichment_ratio
+    count_column: n_regulator_tail
+    total_column: n_regulator_total
+    p_value_column: p_value
+    q_value_column: q_value
+    common_feature_column: is_common_regulator
+    static_filters:
+      - {column: threshold, equals: 0.10}
+      - {column: tail_mode, equals: margin_top_quantile}
+      - {column: passes_min_support, equals: true}
+      - {column: passes_min_tail_hits, equals: true}
+    group_order: [background, ethanol, cipro, dual]
+    max_features_per_group: 8
+    reference_line: 1.0
+    x_axis_label: Enrichment ratio versus native background prevalence
+    semantics_ref: plot_semantics/native_regulator_plan_margin_enrichment.yaml
   design_centroid_margin_gallery:
     kind: xy_scatter_grid
     visibility_tier: appendix
@@ -2094,6 +2116,7 @@ notebooks:
       - reference_to_plan_centroid_heatmap
       - reference_standard_strength_audit
       - native_tf_axis_orientation_audit
+      - native_regulator_plan_margin_enrichment
       - sigma35_centroid_distance_gallery
       - design_centroid_margin_gallery
       - reference_alignment_summary
@@ -3558,6 +3581,10 @@ recipes:
             - Fur
             - Lrp
             - ArcA
+      - id: render_native_regulator_plan_margin_enrichment
+        op: plot.render
+        depends_on: [build_native_regulator_plan_margin_enrichment]
+        params: {plot_id: native_regulator_plan_margin_enrichment}
 deliverables:
   dataset_overview:
     title: Dataset overview
@@ -3704,6 +3731,8 @@ deliverables:
         - intermediate_embedding_7b_context_anchor_mean_bidir_concat
     outputs:
       scalars:
+        - native_regulator_plan_margin_enrichment
+      plots:
         - native_regulator_plan_margin_enrichment
     docs_refs:
       - study:stress_ethanol_cipro_growth/deliverables/native_regulator_plan_margin_enrichment

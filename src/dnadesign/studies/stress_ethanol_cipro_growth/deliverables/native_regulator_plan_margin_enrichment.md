@@ -42,6 +42,39 @@ The enrichment table reports raw counts, tail fraction, background fraction,
 enrichment ratio, odds ratio, one-sided hypergeometric survival p-value,
 Benjamini-Hochberg q-value, and min-support flags.
 
+The companion plot is a static appendix summary over the configured top 10%
+margin tail. It shows support-filtered top regulator associations per plan as
+enrichment-ratio bars, with q-values annotated where available and common
+global regulators visually separated from other regulators.
+
+### native_regulator_plan_margin_enrichment | Native regulator plan-margin enrichment
+
+#### Plot details
+
+**Data.** Parent-resolved RegulonDB native core60 rows embedded in the study
+pDual10 context-anchor view, joined to promoter-level regulator memberships
+from `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet`.
+
+**Preprocessing.** Synthetic plan centroids are computed from DenseGen plan
+groups. Native rows are scored by plan margin, assigned to fixed 5% and 10%
+rank tails, and regulator enrichment is counted once per native promoter per
+regulator.
+
+**Definition.** The plotted bar length is enrichment ratio: tail regulator
+prevalence divided by native-background regulator prevalence. The plot uses the
+configured 10% `margin_top_quantile` tail and displays rows passing the
+minimum-support and minimum-tail-hit filters.
+
+**Decision use.** This is an appendix interpretation surface. It can suggest
+which curated native regulator associations are overrepresented in synthetic
+plan-margin tails, but it is not an OPAL input and not a candidate-selection
+rule.
+
+**Limits.** The plot does not claim that a transferred core60 sequence retains
+complete native regulatory logic. q-values, support counts, and the common
+regulator flag must be read with the table before making any biology-facing
+claim.
+
 ## Interpretation
 
 Use this as a hypothesis-generating biology-facing appendix. A result such as
@@ -56,7 +89,7 @@ over background prevalence, not raw counts alone.
 
 ## Current State
 
-The table-builder and workspace recipe are configured. Static plot promotion
-and notebook-panel wiring should be implemented as a later renderer/notebook
-slice that consumes the emitted tables instead of recomputing statistics in
-Marimo.
+The scalar table-builder, static plot renderer, workspace recipe, and generated
+notebook plot-review panel are configured. Marimo consumes the persisted table,
+plot artifact, and plot-semantics sidecar; it does not recompute enrichment
+statistics inline.

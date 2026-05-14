@@ -20,7 +20,7 @@
 - Full-context handoff: `construct_prom_eth_cip_context` (`present`, 320920 rows)
 - Reference core60 handoff: `construct_prom_eth_cip_reference_core60` (`present`, 48 rows)
 - Reference context handoff: `construct_prom_eth_cip_reference_contexts` (`present`, 96 rows)
-- RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar populated with 3426 rows)
+- RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar populated with 3426 rows; BioCyc GO sidecars populated for 203/205 interacting regulators)
 - RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 sequence rows; 3180 unambiguous parent-resolved rows feed the TF-axis audit after one duplicate core60 sequence collapses two NhaR-only native parents)
 - Canonical consolidated feature dataset: `usr_prom_eth_cip_matrix` (`planned`)
 - Logical reference feature entry: `infer_prom_eth_cip_reference_views_7b` (`planned`, not separately materialized; current payloads live in dataset-local `_derived/infer/` sidecars)
@@ -75,6 +75,7 @@ Completed 7B sidecar lanes:
 - DenseGen analysis surface: `attention`; the source dataset is ready, but the operator-visible plot inventory contains stale artifacts and should be refreshed before relying on DenseGen plots as current.
 - LatentDNA: `current`; the native TF-axis route is configured as a first-class appendix overlay over the existing study context view, and local view rows/plots/notebook outputs have been regenerated after the lineage-metadata config change.
 - LatentDNA native TF-axis overlay: `current`; the deliverable renders over the existing context-anchor bidirectional view after RegulonDB native core60 rows were appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions were populated, and matching 7B feature sidecars were filled.
+- RegulonDB functional annotation sidecars: `current`; `usr_regulondb_native_promoters/_relations/` now carries BioCyc KB 29.6 regulator GO terms, promoter-regulator-GO term rows, and regulator coverage rows. These are source-backed annotation sidecars for interpretation, not OPAL inputs or mechanistic labels.
 - Cluster: `planned`; use `routes.md` for the current exploratory-clustering handoff.
 - OPAL: `not_configured`; no active OPAL campaign has been chosen.
 
@@ -113,11 +114,12 @@ LatentDNA appendix support:
 
 - `sigma35_centroid_distance_gallery`
 - `native_tf_axis_orientation_audit`
+- `native_regulator_plan_margin_enrichment`
 - `appendix_geometry_review`
 - `appendix_umap_gallery`
 
-The current local browser artifacts include the expanded 7B sequence-view
-feature sidecars. The default browser geometries include the controlled
+The current local browser artifacts include the available 7B sequence-view feature
+sidecars. The default browser geometries include the controlled
 equal-block bidirectional forward/RC anchor-mean candidate. Appendix
 deliverables remain secondary review material, not the evidence source for
 selecting `X`.
@@ -151,6 +153,7 @@ is not a native bidirectional Evo2 state or hidden state.
 - Use the candidate-X scorecard as the current pre-assay representation triage surface: bidirectional context-anchor mean is the working `X`, anchor-source insert mean is the DenseGen-plan baseline, and forward context anchor mean is the strength-standard lens.
 - Keep reference-to-plan behavior as a landmark sanity check, not a phenotype claim.
 - Keep `native_tf_axis_orientation_audit` as an appendix axis-orientation audit: the current generated test supports the LexA/cipro direction and does not support the BaeR/CpxR ethanol direction.
+- Use the BioCyc GO sidecars only for source-backed regulator interpretation in appendix enrichment surfaces; keep downstream claims at the level of RegulonDB-associated regulator terms.
 - If a linear readout/probe audit is added later, make it a LatentDNA appendix diagnostic with fold-safe preprocessing and no OPAL coupling.
 - Re-run `uv run ops progress show usr.data-plane.promoter-study-status --json` after regeneration and confirm the LatentDNA attention flag clears or is still explained by a concrete generated-artifact gap.
 - Refresh DenseGen plots/notebook if operator-visible DenseGen EDA is needed for current study interpretation.

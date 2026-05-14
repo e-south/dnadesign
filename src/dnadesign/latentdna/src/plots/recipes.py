@@ -213,6 +213,29 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
+    if config.kind == "categorical_enrichment_summary":
+        return ResolvedPlotSpec(
+            plot_id=plot_id,
+            kind=config.kind,
+            scalar_id=config.scalar,
+            row_column=config.group_column,
+            column_column=config.feature_column,
+            value_column=config.value_column,
+            label_column=config.feature_column,
+            count_column=config.count_column,
+            total_column=config.total_column,
+            p_value_column=config.p_value_column,
+            q_value_column=config.q_value_column,
+            common_feature_column=config.common_feature_column,
+            reference_line=config.reference_line,
+            static_filters=list(config.static_filters),
+            group_order=list(config.group_order),
+            max_features_per_group=config.max_features_per_group,
+            **_resolved_label_fields(config),
+            **_resolved_layout_fields(config),
+            config_id=config_id,
+            semantics_ref=config.semantics_ref,
+        )
     if config.kind == "metric_panel_grid":
         return ResolvedPlotSpec(
             plot_id=plot_id,

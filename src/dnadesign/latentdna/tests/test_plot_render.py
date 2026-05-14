@@ -40,6 +40,9 @@ from dnadesign.latentdna.src.plots.renderers.distribution import (
     render_distribution_panel,
     render_distribution_plot,
 )
+from dnadesign.latentdna.src.plots.renderers.enrichment_summary import (
+    render_categorical_enrichment_summary_plot,
+)
 from dnadesign.latentdna.src.plots.renderers.heatmap import (
     heatmap_grid_from_rows as _heatmap_grid_from_rows,
 )
@@ -626,6 +629,109 @@ def test_metric_panel_input_requires_configured_value_column(tmp_path: Path) -> 
 
     with pytest.raises(ContractViolationError, match="missing_score"):
         load_metric_panel_grid_input(SimpleNamespace(output_root=tmp_path), spec)
+
+
+def test_categorical_enrichment_summary_filters_and_orders_groups(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "fixture_enrichment"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "plan": ["cipro", "ethanol", "ethanol", "ethanol", "background"],
+                "regulator_abbrev": ["LexA", "CsgD", "Lrp", "FliZ", "CRP"],
+                "threshold": [0.10, 0.10, 0.10, 0.05, 0.10],
+                "tail_mode": ["margin_top_quantile"] * 5,
+                "passes_min_support": [True, True, True, True, True],
+                "passes_min_tail_hits": [True, True, True, True, False],
+                "n_regulator_tail": [9, 5, 11, 3, 3],
+                "n_regulator_total": [32, 11, 44, 10, 222],
+                "enrichment_ratio": [2.8, 4.5, 2.5, 6.0, 0.27],
+                "p_value": [0.003, 0.002, 0.003, 0.011, 0.99],
+                "q_value": [0.54, 0.54, 0.54, 1.0, 1.0],
+                "is_common_regulator": [False, False, True, False, True],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_enrichment",
+            "kind": "categorical_enrichment_summary",
+            "scalar_id": "fixture_enrichment",
+            "row_column": "plan",
+            "column_column": "regulator_abbrev",
+            "value_column": "enrichment_ratio",
+            "count_column": "n_regulator_tail",
+            "total_column": "n_regulator_total",
+            "p_value_column": "p_value",
+            "q_value_column": "q_value",
+            "common_feature_column": "is_common_regulator",
+            "static_filters": [
+                {"column": "threshold", "equals": 0.10},
+                {"column": "tail_mode", "equals": "margin_top_quantile"},
+                {"column": "passes_min_support", "equals": True},
+                {"column": "passes_min_tail_hits", "equals": True},
+            ],
+            "group_order": ["ethanol", "cipro", "background"],
+            "max_features_per_group": 2,
+            "reference_line": 1.0,
+        }
+    )
+
+    result = render_categorical_enrichment_summary_plot(
+        SimpleNamespace(output_root=tmp_path),
+        spec,
+        pyplot=plt,
+    )
+
+    try:
+        assert result.metadata["source_rows"] == 5
+        assert result.metadata["filtered_rows"] == 3
+        assert result.metadata["rendered_groups"] == 2
+        assert [panel["group"] for panel in result.metadata["panels"]] == ["ethanol", "cipro"]
+        assert result.metadata["panels"][0]["features"] == ["CsgD", "Lrp"]
+    finally:
+        plt.close(result.figure)
+
+
+def test_categorical_enrichment_summary_records_empty_filtered_surface(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "fixture_enrichment"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "plan": ["ethanol"],
+                "regulator_abbrev": ["CsgD"],
+                "threshold": [0.05],
+                "enrichment_ratio": [4.5],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_enrichment",
+            "kind": "categorical_enrichment_summary",
+            "scalar_id": "fixture_enrichment",
+            "row_column": "plan",
+            "column_column": "regulator_abbrev",
+            "value_column": "enrichment_ratio",
+            "static_filters": [{"column": "threshold", "equals": 0.10}],
+        }
+    )
+
+    result = render_categorical_enrichment_summary_plot(
+        SimpleNamespace(output_root=tmp_path),
+        spec,
+        pyplot=plt,
+    )
+
+    try:
+        assert result.metadata["source_rows"] == 1
+        assert result.metadata["filtered_rows"] == 0
+        assert result.metadata["rendered_groups"] == 0
+    finally:
+        plt.close(result.figure)
 
 
 def testrender_metric_panel_ignores_nan_values_when_setting_limits_and_annotations() -> None:

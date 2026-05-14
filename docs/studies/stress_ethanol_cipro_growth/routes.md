@@ -99,7 +99,12 @@ This page keeps the downstream handoff map in one place.
 - Pre-specified regulator landmark overlay:
   - `native_tf_axis_orientation_audit` is the stable artifact id for the BaeR/CpxR/LexA regulator landmark audit. It reuses the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat` view after the shared anchor/context quota is expanded with `usr_regulondb_native_promoter_core60`; it requires `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet` and is not an OPAL input.
 - Configured exploratory regulator appendix:
-  - `native_regulator_plan_margin_enrichment` is specified in `src/dnadesign/latentdna/docs/dev/native-regulator-plan-margin-enrichment.md`. It tests source-backed RegulonDB regulator enrichments in synthetic-plan margins and fixed 5%/10% native tails, while keeping the existing BaeR/CpxR/LexA landmark audit separate from post-hoc regulator discovery. The first implementation emits contract tables; static plot promotion remains a separate renderer/notebook slice.
+  - `native_regulator_plan_margin_enrichment` is specified in `src/dnadesign/latentdna/docs/dev/native-regulator-plan-margin-enrichment.md`. It tests source-backed RegulonDB regulator enrichments in synthetic-plan margins and fixed 5%/10% native tails, while keeping the existing BaeR/CpxR/LexA landmark audit separate from post-hoc regulator discovery. It now emits contract tables plus a static appendix plot surfaced in the `latent_geometry_browser` plot-review notebook panel.
+- RegulonDB regulator functional terms:
+  - BioCyc KB 29.6 SmartTable GO terms are projected onto `usr_regulondb_native_promoters` through `src/dnadesign/usr/scripts/project_regulondb_functional_annotations.py`.
+  - The method contract is `src/dnadesign/usr/docs/reference/regulondb-functional-annotations.md`.
+  - The public source descriptors live in `dnadesign-data` as `biocyc_29_6_smarttable_regulator_go_terms` and `biocyc_29_6_smarttable_regulator_go_coverage`; downstream code should use `dnadesign_data.catalog.sources.resolve_source_record` or `dnadesign-data-sources resolve`, not private path guesses.
+  - Materialized sidecars are `_relations/regulator_go_terms.parquet`, `_relations/promoter_regulator_go_terms.parquet`, and `_relations/regulator_go_coverage.parquet`. They support appendix interpretation only and are not OPAL/candidate-selection inputs.
 - Appendix deliverables:
   - `sigma35_centroid_distance_gallery`
   - `native_tf_axis_orientation_audit`

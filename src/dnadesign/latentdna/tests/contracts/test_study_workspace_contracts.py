@@ -126,6 +126,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "reference_to_plan_centroid_heatmap",
         "reference_standard_strength_audit",
         "native_tf_axis_orientation_audit",
+        "native_regulator_plan_margin_enrichment",
         "sigma35_centroid_distance_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
@@ -624,6 +625,15 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert native_tf_audit.x_column == "ethanolness"
     assert native_tf_audit.y_column == "ciproness"
     assert native_tf_audit.default_hue == "tf_bin"
+    regulator_margin_plot = context.config.plots["native_regulator_plan_margin_enrichment"]
+    assert regulator_margin_plot.kind == "categorical_enrichment_summary"
+    assert regulator_margin_plot.scalar == "native_regulator_plan_margin_enrichment"
+    assert regulator_margin_plot.group_column == "plan"
+    assert regulator_margin_plot.feature_column == "regulator_abbrev"
+    assert regulator_margin_plot.value_column == "enrichment_ratio"
+    assert regulator_margin_plot.static_filters[0].column == "threshold"
+    assert regulator_margin_plot.static_filters[0].equals == 0.10
+    assert [group for group in regulator_margin_plot.group_order] == ["background", "ethanol", "cipro", "dual"]
     assert "native_tf_context_1kb" not in context.config.sources
     assert {
         source.dataset
@@ -713,6 +723,9 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "native_regulator_plan_margin_enrichment_recipe"
     )
     assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["scalars"] == [
+        "native_regulator_plan_margin_enrichment"
+    ]
+    assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["plots"] == [
         "native_regulator_plan_margin_enrichment"
     ]
     assert context.config.exports == {}
@@ -839,6 +852,9 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "confidence",
         "evidence",
     ]
+    assert regulator_margin_steps["render_native_regulator_plan_margin_enrichment"].params == {
+        "plot_id": "native_regulator_plan_margin_enrichment"
+    }
     assert all(
         step.params.get("kind")
         not in {

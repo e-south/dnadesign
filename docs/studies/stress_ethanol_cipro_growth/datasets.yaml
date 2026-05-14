@@ -91,7 +91,10 @@ datasets:
       axis-orientation audit. It is not a broad native-promoter EDA input for
       the stress study. The `_relations/regulatory_interactions.parquet`
       sidecar is the required TF-association join surface and must be
-      refreshed/populated before the LatentDNA audit is rendered.
+      refreshed/populated before the LatentDNA audit is rendered. BioCyc KB
+      29.6 GO sidecars under `_relations/` provide source-backed functional
+      terms for interacting regulators; they are appendix interpretation
+      sidecars, not OPAL/candidate-selection inputs.
     sync:
       enabled: false
       remote_name: n/a

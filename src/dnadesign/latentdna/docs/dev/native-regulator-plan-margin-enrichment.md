@@ -1,7 +1,7 @@
 # Native Regulator Plan-Margin Enrichment
 
 **Owner:** dnadesign-maintainers
-**Status:** table-builder implemented; static plot planned
+**Status:** scalar tables implemented; static plot and notebook plot-review panel implemented
 **Last verified:** 2026-05-14
 **Study:** `stress_ethanol_cipro_growth`
 
@@ -20,9 +20,9 @@ Current implementation posture:
   `table.parquet` for regulator enrichment plus
   `native_plan_margin_scores.parquet` and
   `native_plan_margin_tail_membership.parquet` side tables.
-- Static plot promotion and notebook panel wiring should consume those tables
-  in a later renderer/notebook slice. The notebook must not recompute the
-  statistics inline.
+- Static plot promotion uses the generic `categorical_enrichment_summary`
+  renderer. The generated notebook consumes the persisted plot artifact and
+  plot-semantics sidecar; it must not recompute enrichment statistics inline.
 
 ## Purpose
 
@@ -375,8 +375,8 @@ src/dnadesign/latentdna/src/enrichments/
 src/dnadesign/latentdna/src/scalars/builders/
   regulatory_plan_margin.py            # scalar I/O orchestration for the artifact
 
-src/dnadesign/latentdna/src/plots/
-  regulatory_plan_margin_enrichment.py  # plot table transforms/rendering helpers
+src/dnadesign/latentdna/src/plots/renderers/
+  enrichment_summary.py                 # generic categorical-enrichment summary renderer
 ```
 
 `scalars/build.py` may own a thin dispatch entry only. It must not parse this
@@ -398,6 +398,11 @@ The scalar builder module owns:
 
 Notebook code must only render configured artifacts and explanatory text. It
 must not compute enrichment statistics inline.
+
+Plot code must stay generic. The `categorical_enrichment_summary` renderer owns
+only table-backed categorical-feature enrichment visualization. RegulonDB,
+native-promoter, plan-margin, and stress-study vocabulary stay in workspace
+config and plot-semantics sidecars.
 
 ## Workspace Config Shape
 
@@ -451,6 +456,26 @@ native_regulator_plan_margin_enrichment_recipe:
     - Fur
     - Lrp
     - ArcA
+
+native_regulator_plan_margin_enrichment:
+  kind: categorical_enrichment_summary
+  scalar: native_regulator_plan_margin_enrichment
+  group_column: plan
+  feature_column: regulator_abbrev
+  value_column: enrichment_ratio
+  count_column: n_regulator_tail
+  total_column: n_regulator_total
+  p_value_column: p_value
+  q_value_column: q_value
+  common_feature_column: is_common_regulator
+  static_filters:
+    - {column: threshold, equals: 0.10}
+    - {column: tail_mode, equals: margin_top_quantile}
+    - {column: passes_min_support, equals: true}
+    - {column: passes_min_tail_hits, equals: true}
+  group_order: [background, ethanol, cipro, dual]
+  max_features_per_group: 8
+  reference_line: 1.0
 ```
 
 ## Acceptance Checks
@@ -477,6 +502,8 @@ Contract tests:
 - unsupported threshold config fails
 - unsupported FDR method fails
 - output rows carry method metadata
+- missing plot columns, static-filter edge cases, group ordering, common-feature
+  display metadata, and no-rows plot placeholder behavior
 
 Workspace checks:
 

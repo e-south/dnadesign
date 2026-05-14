@@ -397,6 +397,9 @@ def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
     if plot.kind == "categorical_count":
         validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
         return
+    if plot.kind == "categorical_enrichment_summary":
+        validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
+        return
     if plot.kind == "metric_panel_grid":
         validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
         return

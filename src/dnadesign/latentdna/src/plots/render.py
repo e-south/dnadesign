@@ -29,6 +29,7 @@ from .renderers.agreement import render_agreement_summary_plot, render_correspon
 from .renderers.categorical import render_categorical_count_plot
 from .renderers.curve import render_curve_plot
 from .renderers.distribution import render_distribution_plot
+from .renderers.enrichment_summary import render_categorical_enrichment_summary_plot
 from .renderers.heatmap import render_heatmap_grid_plot, render_heatmap_plot
 from .renderers.metric import (
     load_metric_panel_grid_input,
@@ -118,6 +119,8 @@ def render_plot_artifact(
         raise ContractViolationError("categorical_count rendering requires a scalar artifact")
     if spec.kind == "metric_panel_grid" and spec.scalar_id is None:
         raise ContractViolationError("metric_panel_grid rendering requires a scalar artifact")
+    if spec.kind == "categorical_enrichment_summary" and spec.scalar_id is None:
+        raise ContractViolationError("categorical_enrichment_summary rendering requires a scalar artifact")
     if spec.kind == "curve" and spec.reducer_id is None:
         raise ContractViolationError("curve rendering requires a reducer artifact")
     if spec.kind == "distribution_grid" and not spec.scalar_ids:
@@ -156,6 +159,10 @@ def render_plot_artifact(
         plot_metadata.update(count_result.metadata)
         layout_reservation.reserve_bottom(count_result.layout_reservation.legend_bottom)
         layout_reservation.reserve_right(count_result.layout_reservation.legend_right)
+    elif spec.kind == "categorical_enrichment_summary":
+        enrichment_result = render_categorical_enrichment_summary_plot(context, spec, pyplot=plt)
+        fig = enrichment_result.figure
+        plot_metadata.update(enrichment_result.metadata)
     elif spec.kind == "metric_panel_grid":
         metric_input = load_metric_panel_grid_input(context, spec)
         rows = metric_input.rows
