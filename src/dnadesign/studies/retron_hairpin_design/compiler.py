@@ -15,7 +15,7 @@ import csv
 import json
 import shlex
 import shutil
-import textwrap
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -120,6 +120,7 @@ def materialize_msd_design_artifacts(
 
     rows: list[dict[str, object]] = []
     updated_records: list[MsdDesignReferenceV1] = []
+    producer_render_formats = _render_formats_for_review(formats)
     for record in catalog.records:
         variant_dir = variants_dir / record.msd_design_id
         artifact_bundle = variant_dir / VARIANT_RUNTIME_DIRNAME / CONSTRUCT_RUNTIME_DIRNAME
@@ -131,7 +132,7 @@ def materialize_msd_design_artifacts(
             cap_sequence=cap_sequences[record.cap.id],
             flank_5p_prefix=flank_5p_prefix,
             flank_3p_suffix=flank_3p_suffix,
-            render_formats=formats,
+            render_formats=producer_render_formats,
         )
         config_path.write_text(yaml.safe_dump(config_payload, sort_keys=False), encoding="utf-8")
         try:
@@ -140,11 +141,14 @@ def materialize_msd_design_artifacts(
             raise RetronMsdCompilerError(
                 f"Construct failed to emit Retron MSD unit '{record.msd_design_id}': {exc}"
             ) from exc
-        rendered = _run_baserender_jobs(composition.artifact_bundle, formats=formats, enabled=run_baserender)
+        _run_baserender_jobs(
+            composition.artifact_bundle,
+            formats=producer_render_formats,
+            enabled=run_baserender,
+        )
         curated = _publish_variant_outputs(
             variant_dir,
             construct_bundle=composition.artifact_bundle,
-            rendered=rendered,
             root=root,
         )
         row = _sequence_index_row(
@@ -164,7 +168,12 @@ def materialize_msd_design_artifacts(
     updated_catalog = MsdDesignCatalogV1(records=updated_records)
     _write_materialized_catalog(updated_catalog, root=root, manifest_dir=manifest_dir)
     _write_sequence_index(manifest_dir / SEQUENCE_INDEX_FILENAME, rows)
-    _write_sequence_manifest(manifest_dir / SEQUENCE_MANIFEST_FILENAME, rows=rows, render_formats=formats, root=root)
+    _write_sequence_manifest(
+        manifest_dir / SEQUENCE_MANIFEST_FILENAME,
+        rows=rows,
+        render_formats=producer_render_formats,
+        root=root,
+    )
     _write_bundle_readme(root / BUNDLE_README_FILENAME, catalog=updated_catalog, sequence_rows=rows)
     return MsdSequenceBundleResult(
         catalog=updated_catalog,
@@ -203,11 +212,11 @@ def _write_msd_design_catalog(
     reference_rows: list[dict[str, object]] = []
     for record, reference_filename in zip(catalog.records, reference_filenames, strict=True):
         reference_path = references_dir / reference_filename
-        reference_path.write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        reference_path.write_text(record.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
         reference_rows.append(_reference_index_row(record, reference_path=reference_path, root=root))
 
     catalog_path = root / CATALOG_FILENAME
-    catalog_path.write_text(catalog.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    catalog_path.write_text(catalog.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
     _write_reference_index(root / REFERENCE_INDEX_FILENAME, reference_rows)
     _write_bundle_manifest(root / BUNDLE_MANIFEST_FILENAME, catalog=catalog, reference_rows=reference_rows)
     _write_bundle_readme(root / BUNDLE_README_FILENAME, catalog=catalog)
@@ -234,11 +243,11 @@ def _write_materialized_catalog(
     reference_rows: list[dict[str, object]] = []
     for record, reference_filename in zip(catalog.records, reference_filenames, strict=True):
         reference_path = references_dir / reference_filename
-        reference_path.write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        reference_path.write_text(record.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
         reference_rows.append(_reference_index_row(record, reference_path=reference_path, root=root))
 
     catalog_path = manifest_dir / CATALOG_FILENAME
-    catalog_path.write_text(catalog.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    catalog_path.write_text(catalog.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
     _write_reference_index(manifest_dir / REFERENCE_INDEX_FILENAME, reference_rows)
     _write_bundle_manifest(
         manifest_dir / BUNDLE_MANIFEST_FILENAME,
@@ -394,6 +403,11 @@ def _guard_materialize_output_layout(
         VARIANT_SEQUENCES_DIRNAME,
         *IGNORED_OUTPUT_FILENAMES,
     }
+    allowed_plot_entries = {
+        "composition_overview.svg",
+        "secondary_structure.native.png",
+        *IGNORED_OUTPUT_FILENAMES,
+    }
     for variant_dir in variants_dir.iterdir():
         if variant_dir.name in IGNORED_OUTPUT_FILENAMES or not variant_dir.is_dir():
             continue
@@ -405,6 +419,16 @@ def _guard_materialize_output_layout(
                 f"Unexpected MSD variant output entries at {variant_dir}: {', '.join(stale_variant_entries)}. "
                 "Choose a fresh --out-dir or archive/remove stale generated variant output first."
             )
+        plots_dir = variant_dir / VARIANT_PLOTS_DIRNAME
+        if plots_dir.exists():
+            stale_plot_entries = sorted(
+                item.name for item in plots_dir.iterdir() if item.name not in allowed_plot_entries
+            )
+            if stale_plot_entries:
+                raise RetronMsdCompilerError(
+                    f"Stale MSD plot output at {plots_dir}: {', '.join(stale_plot_entries)}. "
+                    "Choose a fresh --out-dir or archive/remove stale plot artifacts before materializing."
+                )
 
 
 def _require_sequence_subcomponents(
@@ -444,6 +468,13 @@ def _normalize_render_formats(render_formats: Sequence[str]) -> list[str]:
             raise RetronMsdCompilerError(f"Unsupported render format '{raw_format}'. Expected png, svg, or pdf.")
         if fmt not in formats:
             formats.append(fmt)
+    return formats
+
+
+def _render_formats_for_review(render_formats: Sequence[str]) -> list[str]:
+    formats = list(render_formats)
+    if "svg" not in formats:
+        formats.append("svg")
     return formats
 
 
@@ -701,7 +732,6 @@ def _publish_variant_outputs(
     variant_dir: Path,
     *,
     construct_bundle: Path,
-    rendered: Mapping[str, str],
     root: Path,
 ) -> dict[str, object]:
     sequences_dir = variant_dir / VARIANT_SEQUENCES_DIRNAME
@@ -722,27 +752,18 @@ def _publish_variant_outputs(
     _copy_required_file(construct_bundle / "sequence.reverse_complement.fa", reverse_complement_fasta)
     _copy_required_file(construct_bundle / "features.csv", features_csv)
 
-    component_png_source = Path(str(rendered.get("component_span_png") or construct_bundle / "component_span_qa.png"))
-    component_png = plots_dir / "component_span.png"
-    _copy_required_file(component_png_source, component_png)
-    for fmt in ("svg", "pdf"):
-        raw_path = rendered.get(f"component_span_{fmt}")
-        if raw_path:
-            _copy_required_file(Path(raw_path), plots_dir / f"component_span.{fmt}")
-
     folding_prediction = construct_bundle / "folding" / "secondary_structure_prediction_v1.json"
     folding_status = _folding_prediction_status(folding_prediction)
-    folding_png = plots_dir / "secondary_structure.png"
-    _write_folding_prediction_png(folding_prediction, folding_png)
     structure_plot_dir = construct_bundle / "visual" / "viennarna_secondary_structure"
     structure_manifest = structure_plot_dir / "viennarna_secondary_structure_svg_v1.json"
     structure_annotation_manifest = structure_plot_dir / "secondary_structure.annotation_manifest.json"
-    secondary_structure_svg = plots_dir / "secondary_structure.svg"
-    secondary_structure_native_svg = plots_dir / "secondary_structure.native.svg"
-    _copy_required_file(structure_plot_dir / "secondary_structure.annotated.svg", secondary_structure_svg)
-    _copy_required_file(structure_plot_dir / "secondary_structure.native.svg", secondary_structure_native_svg)
-    combined_png = plots_dir / "component_span_and_folding.png"
-    _write_combined_png(component_png, folding_png, combined_png)
+    native_structure_svg = structure_plot_dir / "secondary_structure.native.svg"
+    native_structure_png = plots_dir / "secondary_structure.native.png"
+    _rasterize_svg_to_png(native_structure_svg, native_structure_png)
+
+    review_manifest = _publish_composition_review(construct_bundle)
+    composition_overview_svg = plots_dir / "composition_overview.svg"
+    _copy_required_file(construct_bundle / review_manifest.artifacts.review_svg, composition_overview_svg)
 
     manifest_sources = [
         (construct_bundle / "manifest.json", manifest_dir / "construct_manifest.json"),
@@ -763,6 +784,15 @@ def _publish_variant_outputs(
         ),
         (structure_manifest, manifest_dir / "viennarna_secondary_structure_svg_v1.json"),
         (structure_annotation_manifest, manifest_dir / "secondary_structure.annotation_manifest.json"),
+        (native_structure_svg, manifest_dir / "secondary_structure.native.svg"),
+        (
+            structure_plot_dir / "secondary_structure.annotated.svg",
+            manifest_dir / "secondary_structure.annotated.svg",
+        ),
+        (
+            construct_bundle / "visual" / "reviews" / "composition_review_svg_v1.json",
+            manifest_dir / "composition_review_svg_v1.json",
+        ),
     ]
     for source, destination in manifest_sources:
         _copy_required_file(source, destination)
@@ -777,11 +807,204 @@ def _publish_variant_outputs(
         "construct_manifest": (manifest_dir / "construct_manifest.json").relative_to(root).as_posix(),
         "folding_prediction": (manifest_dir / "folding_prediction.json").relative_to(root).as_posix(),
         "folding_status": folding_status,
-        "component_span_png": component_png.relative_to(root).as_posix(),
-        "secondary_structure_svg": secondary_structure_svg.relative_to(root).as_posix(),
-        "folding_png": folding_png.relative_to(root).as_posix(),
-        "combined_plot_png": combined_png.relative_to(root).as_posix(),
+        "composition_overview_svg": composition_overview_svg.relative_to(root).as_posix(),
+        "secondary_structure_native_png": native_structure_png.relative_to(root).as_posix(),
     }
+
+
+def _publish_composition_review(construct_bundle: Path):
+    import dnadesign.construct as construct
+
+    try:
+        return construct.publish_composition_review_svg(construct_bundle)
+    except Exception as exc:  # pragma: no cover - depends on producer validation failure mode.
+        raise RetronMsdCompilerError(
+            f"Construct failed to publish Retron MSD composition review for '{construct_bundle}': {exc}"
+        ) from exc
+
+
+def _rasterize_svg_to_png(source_svg: Path, output_png: Path) -> None:
+    if not source_svg.is_file():
+        raise RetronMsdCompilerError(f"Expected ViennaRNA native SVG artifact is missing: {source_svg}")
+    try:
+        _write_viennarna_native_svg_png(source_svg, output_png)
+    except Exception as exc:
+        if isinstance(exc, RetronMsdCompilerError):
+            raise
+        raise RetronMsdCompilerError(
+            f"Failed to rasterize ViennaRNA native SVG '{source_svg}' to PNG with the built-in renderer: {exc}"
+        ) from exc
+
+
+def _write_viennarna_native_svg_png(source_svg: Path, output_png: Path) -> None:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError as exc:  # pragma: no cover - dependency is pinned in the managed environment.
+        raise RetronMsdCompilerError("Pillow is required to publish ViennaRNA native PNG artifacts.") from exc
+
+    tree = ET.parse(source_svg)
+    root = tree.getroot()
+    width, height = _svg_dimensions(root)
+    raster_scale = 2
+    image = Image.new("RGB", (width * raster_scale, height * raster_scale), color="white")
+    draw = ImageDraw.Draw(image)
+    font_size = 12 * raster_scale
+    try:
+        font = ImageFont.load_default(size=font_size)
+    except TypeError:  # pragma: no cover - old Pillow compatibility.
+        font = ImageFont.load_default()
+
+    def render(element: ET.Element, transforms: list[tuple[str, tuple[float, ...]]]) -> None:
+        tag = _svg_tag(element)
+        next_transforms = [*transforms, *_parse_svg_transform(element.get("transform", ""))]
+        if tag == "polyline":
+            points = [
+                _scale_point(_apply_svg_transform(point, next_transforms), raster_scale)
+                for point in _svg_points(element)
+            ]
+            if len(points) >= 2:
+                draw.line(points, fill=_svg_stroke(element), width=_scaled_stroke_width(element, raster_scale))
+        elif tag == "line":
+            start = _apply_svg_transform(
+                (_float_attr(element, "x1"), _float_attr(element, "y1")),
+                next_transforms,
+            )
+            end = _apply_svg_transform(
+                (_float_attr(element, "x2"), _float_attr(element, "y2")),
+                next_transforms,
+            )
+            draw.line(
+                [_scale_point(start, raster_scale), _scale_point(end, raster_scale)],
+                fill=_svg_stroke(element),
+                width=_scaled_stroke_width(element, raster_scale),
+            )
+        elif tag == "text":
+            point = _apply_svg_transform(
+                (_float_attr(element, "x"), _float_attr(element, "y")),
+                next_transforms,
+            )
+            x, y = _scale_point(point, raster_scale)
+            draw.text((x, y - font_size), element.text or "", fill="#000000", font=font)
+        elif tag in {"rect", "script", "style"}:
+            pass
+
+        for child in element:
+            render(child, next_transforms)
+
+    render(root, [])
+    if raster_scale != 1:
+        image = image.resize((width, height), Image.Resampling.LANCZOS)
+    output_png.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output_png)
+
+
+def _svg_dimensions(root: ET.Element) -> tuple[int, int]:
+    width = _optional_svg_float(root.get("width"))
+    height = _optional_svg_float(root.get("height"))
+    if width is not None and height is not None:
+        return max(1, round(width)), max(1, round(height))
+    view_box = root.get("viewBox")
+    if view_box:
+        parts = [float(part) for part in view_box.replace(",", " ").split()]
+        if len(parts) == 4:
+            return max(1, round(parts[2])), max(1, round(parts[3]))
+    raise RetronMsdCompilerError("ViennaRNA native SVG is missing width/height or viewBox dimensions.")
+
+
+def _svg_tag(element: ET.Element) -> str:
+    return element.tag.rsplit("}", maxsplit=1)[-1]
+
+
+def _parse_svg_transform(value: str) -> list[tuple[str, tuple[float, ...]]]:
+    transforms: list[tuple[str, tuple[float, ...]]] = []
+    for chunk in value.replace(",", " ").split(")"):
+        chunk = chunk.strip()
+        if not chunk or "(" not in chunk:
+            continue
+        name, raw_args = chunk.split("(", 1)
+        args = tuple(float(part) for part in raw_args.split())
+        transform_name = name.strip()
+        if transform_name in {"translate", "scale"}:
+            transforms.append((transform_name, args))
+    return transforms
+
+
+def _apply_svg_transform(
+    point: tuple[float, float],
+    transforms: Sequence[tuple[str, tuple[float, ...]]],
+) -> tuple[float, float]:
+    x, y = point
+    for name, args in reversed(transforms):
+        if name == "translate":
+            x += args[0] if args else 0.0
+            y += args[1] if len(args) > 1 else 0.0
+        elif name == "scale":
+            sx = args[0] if args else 1.0
+            sy = args[1] if len(args) > 1 else sx
+            x *= sx
+            y *= sy
+    return x, y
+
+
+def _scale_point(point: tuple[float, float], scale: int) -> tuple[float, float]:
+    return point[0] * scale, point[1] * scale
+
+
+def _svg_points(element: ET.Element) -> list[tuple[float, float]]:
+    raw_points = str(element.get("points") or "").replace(",", " ").split()
+    numbers = [float(value) for value in raw_points]
+    return list(zip(numbers[0::2], numbers[1::2], strict=False))
+
+
+def _svg_stroke(element: ET.Element) -> str:
+    class_name = str(element.get("class") or "")
+    if class_name == "basepairs":
+        return "#ff0000"
+    if class_name == "backbone":
+        return "#808080"
+    style = _style_map(element)
+    return style.get("stroke") or "#000000"
+
+
+def _scaled_stroke_width(element: ET.Element, raster_scale: int) -> int:
+    class_name = str(element.get("class") or "")
+    if class_name == "basepairs":
+        width = 2.5
+    elif class_name == "backbone":
+        width = 1.5
+    else:
+        width = _optional_svg_float(_style_map(element).get("stroke-width")) or 1.0
+    return max(1, round(width * raster_scale))
+
+
+def _style_map(element: ET.Element) -> dict[str, str]:
+    style: dict[str, str] = {}
+    for part in str(element.get("style") or "").split(";"):
+        if ":" not in part:
+            continue
+        key, value = part.split(":", 1)
+        style[key.strip()] = value.strip()
+    return style
+
+
+def _float_attr(element: ET.Element, name: str) -> float:
+    value = _optional_svg_float(element.get(name))
+    if value is None:
+        raise RetronMsdCompilerError(f"ViennaRNA native SVG element is missing numeric '{name}' attribute.")
+    return value
+
+
+def _optional_svg_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    text = value.strip()
+    for suffix in ("px", "pt"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)]
+    try:
+        return float(text)
+    except ValueError:
+        return None
 
 
 def _copy_required_file(source: Path, destination: Path) -> None:
@@ -807,148 +1030,6 @@ def _folding_prediction_status(path: Path) -> str:
             f"{path} reported {status}."
         )
     return status
-
-
-def _write_folding_prediction_png(prediction_path: Path, output_path: Path) -> None:
-    payload = json.loads(prediction_path.read_text(encoding="utf-8"))
-    status = str(payload.get("status") or "unknown")
-    if status != "ok":
-        raise RetronMsdCompilerError(
-            f"Refusing to publish secondary-structure plot because folding status is {status}: {prediction_path}"
-        )
-    input_payload = payload.get("input") if isinstance(payload.get("input"), dict) else {}
-    result_payload = payload.get("result") if isinstance(payload.get("result"), dict) else {}
-    dot_bracket = str(result_payload.get("dot_bracket") or "")
-    mfe = result_payload.get("mfe_kcal_mol")
-    pair_map = result_payload.get("pair_map") if isinstance(result_payload.get("pair_map"), list) else []
-    if not dot_bracket:
-        raise RetronMsdCompilerError(f"Folding prediction artifact is missing dot-bracket output: {prediction_path}")
-    sequence_id = str(input_payload.get("sequence_id") or "")
-    sequence_length = int(input_payload.get("length") or len(dot_bracket))
-    _write_structure_prediction_png(
-        output_path,
-        sequence_id=sequence_id,
-        sequence_length=sequence_length,
-        dot_bracket=dot_bracket,
-        mfe=mfe,
-        pair_map=pair_map,
-    )
-
-
-def _prediction_pairs(pair_map: Sequence[object], dot_bracket: str) -> list[tuple[int, int]]:
-    pairs: list[tuple[int, int]] = []
-    for item in pair_map:
-        if not isinstance(item, Mapping):
-            continue
-        try:
-            left = int(item["left"])
-            right = int(item["right"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if 0 <= left < right < len(dot_bracket):
-            pairs.append((left, right))
-    if pairs:
-        return sorted(set(pairs))
-
-    stack: list[int] = []
-    for index, char in enumerate(dot_bracket):
-        if char == "(":
-            stack.append(index)
-        elif char == ")" and stack:
-            pairs.append((stack.pop(), index))
-    return sorted(set(pairs))
-
-
-def _write_structure_prediction_png(
-    output_path: Path,
-    *,
-    sequence_id: str,
-    sequence_length: int,
-    dot_bracket: str,
-    mfe: object,
-    pair_map: Sequence[object],
-) -> None:
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-    except ImportError as exc:  # pragma: no cover - dependency is pinned in the managed environment.
-        raise RetronMsdCompilerError("Pillow is required to publish Retron MSD PNG plot artifacts.") from exc
-
-    pairs = _prediction_pairs(pair_map, dot_bracket)
-    nucleotide_count = len(dot_bracket)
-    width = max(1100, 140 + 12 * nucleotide_count)
-    height = 380
-    margin_x = 70
-    base_y = 245
-    step = (width - 2 * margin_x) / max(1, nucleotide_count - 1)
-    image = Image.new("RGB", (width, height), color="white")
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
-    title = f"ViennaRNA secondary structure: {sequence_id}"
-    subtitle = f"length: {sequence_length}  predicted pairs: {len(pairs)}"
-    if mfe is not None:
-        subtitle += f"  mfe_kcal_mol: {mfe}"
-    draw.text((24, 20), title, fill="#111827", font=font)
-    draw.text((24, 42), subtitle, fill="#374151", font=font)
-    draw.line((margin_x, base_y, width - margin_x, base_y), fill="#9ca3af", width=2)
-
-    for left, right in pairs:
-        x1 = margin_x + left * step
-        x2 = margin_x + right * step
-        arc_height = min(160, max(24, (x2 - x1) * 0.35))
-        draw.arc((x1, base_y - arc_height, x2, base_y + arc_height), start=180, end=360, fill="#2563eb", width=2)
-
-    for index, char in enumerate(dot_bracket):
-        x = margin_x + index * step
-        fill = "#111827" if char in "()" else "#6b7280"
-        draw.ellipse((x - 3, base_y - 3, x + 3, base_y + 3), fill=fill)
-        if step >= 10:
-            draw.text((x - 3, base_y + 10), char, fill=fill, font=font)
-
-    wrapped = textwrap.wrap(dot_bracket, width=120)
-    y = 305
-    for line in wrapped[:3]:
-        draw.text((24, y), line, fill="#374151", font=font)
-        y += 18
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output_path)
-
-
-def _write_text_png(lines: Sequence[str], output_path: Path) -> None:
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-    except ImportError as exc:  # pragma: no cover - dependency is pinned in the managed environment.
-        raise RetronMsdCompilerError("Pillow is required to publish Retron MSD PNG plot artifacts.") from exc
-
-    font = ImageFont.load_default()
-    line_height = 18
-    width = 1200
-    height = max(240, 32 + line_height * len(lines))
-    image = Image.new("RGB", (width, height), color="white")
-    draw = ImageDraw.Draw(image)
-    y = 16
-    for line in lines:
-        draw.text((18, y), line, fill="#111827", font=font)
-        y += line_height
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output_path)
-
-
-def _write_combined_png(component_png: Path, folding_png: Path, output_path: Path) -> None:
-    try:
-        from PIL import Image
-    except ImportError as exc:  # pragma: no cover - dependency is pinned in the managed environment.
-        raise RetronMsdCompilerError("Pillow is required to publish Retron MSD PNG plot artifacts.") from exc
-
-    component = Image.open(component_png).convert("RGB")
-    folding = Image.open(folding_png).convert("RGB")
-    gutter = 24
-    width = max(component.width, folding.width)
-    height = component.height + folding.height + gutter
-    image = Image.new("RGB", (width, height), color="white")
-    image.paste(component, ((width - component.width) // 2, 0))
-    image.paste(folding, ((width - folding.width) // 2, component.height + gutter))
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output_path)
 
 
 def _sequence_index_row(
@@ -983,10 +1064,8 @@ def _sequence_index_row(
         "construct_manifest": curated["construct_manifest"],
         "folding_prediction": curated["folding_prediction"],
         "folding_status": curated["folding_status"],
-        "component_span_png": curated["component_span_png"],
-        "secondary_structure_svg": curated["secondary_structure_svg"],
-        "folding_png": curated["folding_png"],
-        "combined_plot_png": curated["combined_plot_png"],
+        "composition_overview_svg": curated["composition_overview_svg"],
+        "secondary_structure_native_png": curated["secondary_structure_native_png"],
         "finder_reveal": f"open -R {shlex.quote(genbank_path.as_posix())}",
     }
     return row
@@ -1012,11 +1091,8 @@ def _record_with_sequence_artifacts(record: MsdDesignReferenceV1, *, row: Mappin
         "folding_prediction": row["folding_prediction"],
     }
     for field in (
-        "component_span_png",
-        "component_span_svg",
-        "secondary_structure_svg",
-        "folding_png",
-        "combined_plot_png",
+        "composition_overview_svg",
+        "secondary_structure_native_png",
     ):
         value = row.get(field)
         if value:
@@ -1065,11 +1141,8 @@ def _write_sequence_index(path: Path, rows: list[dict[str, object]]) -> None:
         "construct_manifest",
         "folding_prediction",
         "folding_status",
-        "component_span_png",
-        "component_span_svg",
-        "secondary_structure_svg",
-        "folding_png",
-        "combined_plot_png",
+        "composition_overview_svg",
+        "secondary_structure_native_png",
         "finder_reveal",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -1166,8 +1239,14 @@ def _write_bundle_readme(
                 f"- `{first_variant}/{VARIANT_SEQUENCES_DIRNAME}/reverse_complement.gb`: "
                 "first reverse-complement GenBank export."
             ),
-            f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/component_span_and_folding.png`: first combined plot.",
-            f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/secondary_structure.svg`: ViennaRNA structure plot.",
+            (
+                f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/secondary_structure.native.png`: "
+                "first native ViennaRNA structure plot."
+            ),
+            (
+                f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/composition_overview.svg`: "
+                "first two-row structure/component review."
+            ),
             "",
             f"Record count: {len(catalog.records)}",
             "",

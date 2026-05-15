@@ -37,7 +37,7 @@ command_groups:
       - uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --spec path/to/retron_msd_compiler_spec.yaml --format json
       - uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json
   - id: msd_single_unit_materialize
-    purpose: Materialize selected Retron MSD labels into transient single-unit GenBank, FASTA/CSV, and PNG visual bundles after concrete payload and cap sequence subcomponents are supplied.
+    purpose: Materialize selected Retron MSD labels into transient single-unit GenBank, FASTA/CSV, native secondary-structure PNG, and composition-review SVG bundles after concrete payload and cap sequence subcomponents are supplied.
     workspace_ref: repo:.
     mutates_outputs: true
     commands:
@@ -103,10 +103,11 @@ native_agent_bootstrap:
       complement, right base plus 3-prime flank
     - Retron MSD materialization has no repeat-count flag and must not chain
       complete MSD units together
-    - GenBank/PNG output writes sequence_manifest.json, sequence_index.tsv,
+    - GenBank/structure-review output writes sequence_manifest.json, sequence_index.tsv,
       generated single-unit composition configs, GenBank/FASTA/CSV sidecars, and
-      component_span_qa.png visuals, and must fail before placeholders when
-      payload or cap sequences are absent
+      secondary_structure.native.png plus composition_overview.svg plot
+      deliverables, and must fail before placeholders when payload or cap
+      sequences are absent
     - released-product Snapback is the active shortening architecture
     - scar-nick owns base-junction retained-scar feasibility and top-or-bottom terminal nick context
     - strict scar-nick policy is exact terminal nick, zero protected downstream bases, downstream N only, and S0=M

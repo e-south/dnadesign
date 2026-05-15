@@ -545,7 +545,7 @@ def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
     assert Path(payload["manifest_path"]) == out_dir / "manifest.json"
     assert Path(payload["readme_path"]) == out_dir / "README.md"
     assert "run materialize with explicit payload/cap sequences" in payload["next_step"]
-    assert "one GenBank/PNG sequence bundle per MSD design" in payload["next_step"]
+    assert "one GenBank/structure-review sequence bundle per MSD design" in payload["next_step"]
     assert not (out_dir / "assets").exists()
     assert reference_path.is_file()
 
@@ -758,7 +758,7 @@ def test_retron_msd_materialize_requires_viennarna_for_deliverable_plots(
     payload = json.loads(result.stdout)
     assert payload["status"] == "error"
     assert "Folding backend Python module 'RNA' is not available" in payload["error"]
-    assert "Retron MSD GenBank/PNG/SVG deliverables require folding status ok" in payload["next_step"]
+    assert "Retron MSD GenBank/structure/review deliverables require folding status ok" in payload["next_step"]
 
 
 def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_complement(
@@ -766,6 +766,7 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_fake_viennarna_python_api(tmp_path, monkeypatch)
+    monkeypatch.setenv("DNADESIGN_INKSCAPE", "__must_not_be_used__")
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "sequence_bundle"
 
@@ -807,43 +808,43 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     genbank_path = variant_dir / "sequences" / "forward.gb"
     revcom_genbank_path = variant_dir / "sequences" / "reverse_complement.gb"
     features_path = variant_dir / "sequences" / "features.csv"
-    png_path = variant_dir / "plots" / "component_span.png"
-    folding_png_path = variant_dir / "plots" / "secondary_structure.png"
-    secondary_structure_svg_path = variant_dir / "plots" / "secondary_structure.svg"
-    combined_png_path = variant_dir / "plots" / "component_span_and_folding.png"
+    composition_overview_svg_path = variant_dir / "plots" / "composition_overview.svg"
+    secondary_structure_native_png_path = variant_dir / "plots" / "secondary_structure.native.png"
     construct_bundle = variant_dir / "runtime" / "construct"
     assert sorted(item.name for item in variant_dir.iterdir()) == ["manifest", "plots", "runtime", "sequences"]
+    assert sorted(item.name for item in (variant_dir / "plots").iterdir()) == [
+        "composition_overview.svg",
+        "secondary_structure.native.png",
+    ]
     assert variant["unit_count"] == 1
     assert Path(variant["genbank"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb")
     assert Path(variant["reverse_complement_genbank"]) == Path(
         "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
     )
-    assert Path(variant["component_span_png"]) == Path(
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
+    assert Path(variant["composition_overview_svg"]) == Path(
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/composition_overview.svg"
     )
-    assert Path(variant["folding_png"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.png")
-    assert Path(variant["secondary_structure_svg"]) == Path(
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.svg"
+    assert Path(variant["secondary_structure_native_png"]) == Path(
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.native.png"
     )
-    assert Path(variant["combined_plot_png"]) == Path(
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span_and_folding.png"
-    )
+    assert "component_span_png" not in variant
+    assert "folding_png" not in variant
+    assert "combined_plot_png" not in variant
     assert genbank_path.is_file()
     assert revcom_genbank_path.is_file()
     assert features_path.is_file()
-    assert png_path.is_file()
-    assert folding_png_path.is_file()
-    assert secondary_structure_svg_path.is_file()
-    assert combined_png_path.is_file()
+    assert composition_overview_svg_path.is_file()
+    assert secondary_structure_native_png_path.is_file()
     assert (construct_bundle / "manifest.json").is_file()
     assert (construct_bundle / "folding" / "secondary_structure_prediction_v1.json").is_file()
     assert (
         construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg"
     ).is_file()
-    assert png_path.stat().st_size > 0
-    assert folding_png_path.stat().st_size > 0
-    assert secondary_structure_svg_path.stat().st_size > 0
-    assert combined_png_path.stat().st_size > 0
+    assert (construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.native.svg").is_file()
+    assert (construct_bundle / "visual" / "reviews" / "composition_overview.svg").is_file()
+    assert (construct_bundle / "visual" / "reviews" / "composition_review_svg_v1.json").is_file()
+    assert composition_overview_svg_path.stat().st_size > 0
+    assert secondary_structure_native_png_path.stat().st_size > 0
 
     rows = list(
         csv.DictReader(
@@ -856,10 +857,15 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert rows[0]["reverse_complement_genbank"] == (
         "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
     )
-    assert rows[0]["component_span_png"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
-    assert rows[0]["secondary_structure_svg"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.svg"
+    assert rows[0]["composition_overview_svg"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/composition_overview.svg"
     )
+    assert rows[0]["secondary_structure_native_png"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.native.png"
+    )
+    assert "component_span_png" not in rows[0]
+    assert "folding_png" not in rows[0]
+    assert "combined_plot_png" not in rows[0]
     assert rows[0]["folding_status"] == "ok"
     assert rows[0]["finder_reveal"].startswith("open -R ")
 
@@ -874,12 +880,15 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert record["artifacts"]["reverse_complement_genbank"] == (
         "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
     )
-    assert record["artifacts"]["component_span_png"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
+    assert record["artifacts"]["composition_overview_svg"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/composition_overview.svg"
     )
-    assert record["artifacts"]["secondary_structure_svg"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.svg"
+    assert record["artifacts"]["secondary_structure_native_png"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.native.png"
     )
+    assert "component_span_png" not in record["artifacts"]
+    assert "folding_png" not in record["artifacts"]
+    assert "combined_plot_png" not in record["artifacts"]
 
     genbank_record = next(SeqIO.parse(genbank_path, "genbank"))
     revcom_record = next(SeqIO.parse(revcom_genbank_path, "genbank"))
@@ -1021,6 +1030,40 @@ def test_retron_msd_materialize_refuses_flat_legacy_sequence_layout(tmp_path: Pa
     assert "fresh --out-dir" in payload["next_step"]
 
 
+def test_retron_msd_materialize_refuses_stale_legacy_plot_deliverables(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "sequence_bundle"
+    stale_plots_dir = out_dir / "variants" / "msd-tetr-c172-lcggt-racag-mxmm" / "plots"
+    stale_plots_dir.mkdir(parents=True)
+    (stale_plots_dir / "component_span_and_folding.png").write_text("stale\n", encoding="utf-8")
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "materialize",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--payload-sequence",
+            f"TetR={_TETO_PAYLOAD}",
+            "--cap-sequence",
+            f"C172={_SNAPBACK_CAP}",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "Stale MSD plot output" in payload["error"]
+    assert "component_span_and_folding.png" in payload["error"]
+    assert "archive/remove stale plot artifacts" in payload["next_step"]
+
+
 def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[4]
     study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
@@ -1095,3 +1138,13 @@ def test_retron_msd_study_uses_public_tool_apis_only() -> None:
     assert not any(name == "dnadesign.cruncher" or name.startswith("dnadesign.cruncher.src") for name in imports)
     assert not any(name.startswith("dnadesign.cruncher.workspaces") for name in imports)
     assert not any(name.startswith("dnadesign.folding.src") for name in imports)
+
+
+def test_retron_msd_materialize_does_not_shell_out_to_inkscape() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    compiler_source = (repo_root / "src" / "dnadesign" / "studies" / "retron_hairpin_design" / "compiler.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "inkscape" not in compiler_source.lower()
+    assert "subprocess.run" not in compiler_source

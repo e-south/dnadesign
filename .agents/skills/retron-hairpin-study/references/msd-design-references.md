@@ -78,7 +78,7 @@ uv run python -m dnadesign.studies.retron_hairpin_design.cli compile \
   --format json
 ```
 
-Materialize single-unit GenBank/PNG outputs after concrete sequence
+Materialize single-unit GenBank/structure-review outputs after concrete sequence
 subcomponents are available:
 
 ```bash
@@ -136,7 +136,7 @@ limited to `README.md`, `manifest/`, and `variants/`. Machine-readable
 catalogs, indexes, generated composition configs, and provenance live under
 `manifest/`. Each `variants/<msd_design_id>/` directory is grouped into
 `sequences/` for forward and reverse-complement GenBank/FASTA plus feature CSV,
-`plots/` for component-span, folding, and combined PNG deliverables,
+`plots/` for `secondary_structure.native.png` and `composition_overview.svg`,
 `manifest/` for curated per-variant metadata, and `runtime/construct/` for the
 producer bundle. `manifest/sequence_index.tsv` carries the `open -R` Finder
 reveal command for each forward GenBank file.
@@ -146,14 +146,15 @@ count and at least these per-design artifacts:
 
 - `sequences/forward.gb`
 - `sequences/reverse_complement.gb`
-- `plots/component_span.png`
-- `plots/secondary_structure.png`
-- `plots/secondary_structure.svg`
-- `plots/component_span_and_folding.png`
+- `plots/secondary_structure.native.png`
+- `plots/composition_overview.svg`
 
-`secondary_structure.svg` and `secondary_structure.png` must come from a
-ViennaRNA folding status of `ok`; a warning image about a missing backend is a
-blocker, not a deliverable.
+`secondary_structure.native.png` must be rasterized from the ViennaRNA native
+secondary-structure SVG after folding status `ok`. `composition_overview.svg`
+must be the two-row review with secondary structure first and the BaseRender
+component span second. Legacy `component_span.png`,
+`secondary_structure.png`, `secondary_structure.svg`, and
+`component_span_and_folding.png` files are stale/wrong curated deliverables.
 
 ## Service Handoff
 

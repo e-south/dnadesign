@@ -243,9 +243,9 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   `variants/`. Catalogs, `manifest/sequence_manifest.json`,
   `manifest/sequence_index.tsv`, generated composition configs, and provenance
   live under `manifest/`; each `variants/<msd_design_id>/` directory groups
-  forward/reverse-complement GenBank and FASTA under `sequences/`, component
-  span (`component_span.png`), folding, and combined PNGs under `plots/`,
-  curated metadata under `manifest/`, and raw producer output under
+  forward/reverse-complement GenBank and FASTA under `sequences/`,
+  `secondary_structure.native.png` plus `composition_overview.svg` under
+  `plots/`, curated metadata under `manifest/`, and raw producer output under
   `runtime/construct/`. Visible GenBank/CSV labels should be display labels
   such as `msd[teto]`, `Cap`, `Left Base`, and `Right Base`; raw ids remain
   machine metadata, not operator-facing labels.

@@ -106,7 +106,7 @@ def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract(
         "Use for MSD IDs",
         "single-unit MSD sequence bundles",
         "design catalogs",
-        "GenBank/PNG",
+        "GenBank/native-structure PNG",
         "missing MSD parts",
         "generic Cruncher/snapback",
     ):
@@ -182,7 +182,8 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "Materialize command" in routes
     assert "manifest/sequence_manifest.json" in routes
     assert "manifest/sequence_index.tsv" in routes
-    assert "component_span.png" in routes
+    assert "secondary_structure.native.png" in routes
+    assert "composition_overview.svg" in routes
     assert "Visible GenBank/CSV labels should be display labels" in routes
     assert "repeat-count flag" in routes
     assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes
@@ -250,10 +251,11 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "flat references" in pipeline
     assert "id: msd_single_unit_materialize" in pipeline
     assert "sequence_manifest.json" in pipeline
-    assert "component_span_qa.png" in pipeline
+    assert "secondary_structure.native.png" in pipeline
+    assert "composition_overview.svg" in pipeline
     assert "shallow output-bundle layout" in study_surfaces
     assert "single-unit sequence artifact generation" in study_surfaces
-    assert "materialize` GenBank/PNG route" in study_surfaces
+    assert "materialize` GenBank/native-structure-PNG route" in study_surfaces
     assert "full component spans" in skill
     assert "same-span annotations" in skill
     assert "scar-nick route in `routes.md`" in route_matrix

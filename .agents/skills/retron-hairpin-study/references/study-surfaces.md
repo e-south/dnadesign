@@ -62,7 +62,7 @@ base-junction scar-nick work.
   public primitive-source selector checks.
 - `src/dnadesign/studies/retron_hairpin_design/cli.py` is the thin Typer
   command adapter for `msd_design_reference_v1` / `msd_design_catalog_v1`
-  records plus the `materialize` GenBank/PNG route.
+  records plus the `materialize` GenBank/native-structure-PNG route.
 - `dnadesign.cruncher.snapback` and `dnadesign.cruncher.scar_nick` expose the
   public primitive-export APIs used by compiler specs; study code must not
   import Cruncher nested `src` modules directly.

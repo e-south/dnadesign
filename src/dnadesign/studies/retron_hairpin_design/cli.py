@@ -142,12 +142,14 @@ def _next_step_for_error(exc: Exception) -> str:
         return "Choose a fresh --out-dir or explicitly archive/remove the old generated assets directory."
     if "Unexpected MSD materialize output entries" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove stale flat materialize output first."
+    if "Stale MSD plot output" in message:
+        return "Choose a fresh --out-dir or explicitly archive/remove stale plot artifacts before materializing."
     if "Unexpected MSD compiler output entries" in message or "Stale MSD design reference output" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove unrelated generated output before compiling."
     if "MSD sequence artifact generation requires concrete sequence subcomponents" in message:
         return (
             "Provide literal subcomponents with --payload-sequence ID=ACGT and --cap-sequence ID=ACGT, "
-            "or route missing cap/shortening inputs to Snapback before generating GenBank/PNG artifacts."
+            "or route missing cap/shortening inputs to Snapback before generating GenBank/plot artifacts."
         )
     if (
         "ViennaRNA" in message
@@ -157,7 +159,7 @@ def _next_step_for_error(exc: Exception) -> str:
     ):
         return (
             "Install the ViennaRNA Python bindings (importable as RNA) or run from an environment with that "
-            "backend available, then rerun materialize into a fresh --out-dir. Retron MSD GenBank/PNG/SVG "
+            "backend available, then rerun materialize into a fresh --out-dir. Retron MSD GenBank/structure/review "
             "deliverables require folding status ok."
         )
     if "compiler spec" in message or "selector" in message or "primitive" in message:
@@ -177,7 +179,7 @@ def _lint_next_step() -> str:
 def _compile_next_step() -> str:
     return (
         "Catalog bundle emitted with flat references; run materialize with explicit payload/cap sequences "
-        "when one GenBank/PNG sequence bundle per MSD design is needed."
+        "when one GenBank/structure-review sequence bundle per MSD design is needed."
     )
 
 
@@ -203,7 +205,7 @@ def _materialize_next_step(out_dir: Path, *, warnings: list[str]) -> str:
             f"open {out_dir.as_posix()} or inspect manifest/sequence_index.tsv for folding status."
         )
     return (
-        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, folding, and plot artifacts; "
+        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, native structure PNG, and review SVG; "
         f"open {out_dir.as_posix()} or use manifest/sequence_index.tsv for programmatic handoff."
     )
 
@@ -408,7 +410,7 @@ def materialize_command(
             "composition_configs_dir": str(result.bundle_root / MANIFEST_DIRNAME / COMPOSITION_CONFIG_DIRNAME),
             "record_count": len(result.catalog.records),
             "variants": result.variants,
-            "records": [record.model_dump(mode="json") for record in result.catalog.records],
+            "records": [record.model_dump(mode="json", exclude_none=True) for record in result.catalog.records],
             "finder_open": f"open {result.bundle_root.as_posix()}",
             "warnings": warnings,
             "next_step": _materialize_next_step(result.bundle_root, warnings=warnings),

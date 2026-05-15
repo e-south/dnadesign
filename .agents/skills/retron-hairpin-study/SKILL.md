@@ -1,6 +1,6 @@
 ---
 name: retron-hairpin-study
-description: "Compile/route Retron MSD compiler requests. Use for MSD IDs, single-unit MSD sequence bundles, design catalogs, GenBank/PNG/Finder outputs, or missing MSD parts. Not for generic Cruncher/snapback or bench protocols."
+description: "Compile/route Retron MSD compiler requests. Use for MSD IDs, single-unit MSD sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Not for generic Cruncher/snapback."
 metadata:
   version: 0.7.5
   category: workflow-automation
@@ -11,8 +11,7 @@ metadata:
 
 ## Purpose
 
-Route Retron MSD work as a genetic compiler. The default job decides whether to
-compile a reference, materialize one MSD sequence unit, or route missing constraints to a primitive solver.
+Route Retron MSD work as a genetic compiler: compile a reference, materialize one MSD unit, or route missing constraints to a primitive solver.
 
 ## Scope
 
@@ -37,11 +36,9 @@ Out of scope:
 
 ## Success Criteria
 
-- The first decision is input completeness: compile now, or route missing
-  constraints.
+- The first decision is input completeness: compile now, or route missing constraints.
 - Complete user-provided parts are validated and compiled without solver work.
-- Compiler specs are parsed at the boundary, then compile from trusted part
-  structures rather than manual label syntax alone.
+- Compiler specs are parsed at the boundary, then compile from trusted part structures.
 - Incomplete parts route to the smallest primitive: Snapback, scar-nick, or
   YIU contrast.
 - Solved primitive inputs come through public Snapback/scar-nick APIs; selectors
@@ -50,7 +47,9 @@ Out of scope:
   payload primary, cap geometry, payload complement, right base + 3' flank.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
-- Materialized plot deliverables require a ViennaRNA-backed folding status of `ok`; do not accept warning placeholder images as structure plots.
+- Materialized plot deliverables require ViennaRNA status `ok`; publish
+  `secondary_structure.native.png` and two-row `composition_overview.svg`
+  (secondary structure first, BaseRender component span second), not composites.
 - No user-facing repeat count; do not chain complete MSD units together.
 - GenBank/CSV output uses display labels for visible feature names, keeps raw
   ids in machine qualifiers, and does not duplicate full component spans as
@@ -95,11 +94,12 @@ Out of scope:
 
 3. Execute or report the route.
 - For complete reference inputs, run `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint|compile`.
-- For GenBank/PNG output, run the same module's `materialize` command with
+- For GenBank/structure-review output, run the same module's `materialize` command with
   `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
-- If the user asked to open outputs in Finder, do not stop after `compile`.
-  After `materialize`, open the root and verify `manifest/sequence_index.tsv`,
-  per-design `sequences/forward.gb`, and PNGs under `variants/*/plots/`.
+- If the user asked to open outputs in Finder, do not stop after `compile`;
+  after `materialize`, open the root and verify `manifest/sequence_index.tsv`,
+  per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`,
+  and `plots/composition_overview.svg`.
 - If sequence subcomponents are missing, report the exact missing
   `--payload-sequence` / `--cap-sequence` IDs or the primitive route needed;
   do not present catalog JSONs as the requested deliverables.
@@ -138,7 +138,8 @@ Out of scope:
 - Selected route: compile, Snapback, scar-nick, YIU contrast, or status.
 - Exact command or next file to open.
 - Output directory/contract posture.
-- Deliverable verification for materialize requests: record count, bundle root, GenBank/PNG/SVG counts or exact missing sequence/backend blockers.
+- Deliverable verification for materialize requests: record count, bundle root,
+  GenBank/native-structure-PNG/review-SVG counts, or exact blockers.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.
@@ -175,6 +176,5 @@ Should not trigger:
 - [route-matrix.md](references/route-matrix.md)
 - [study-surfaces.md](references/study-surfaces.md)
 - [refresh-loop.md](references/refresh-loop.md)
-- [origin-033-hits.md](references/origin-033-hits.md)
 - [test-matrix.md](references/test-matrix.md)
 - [external-sources.md](references/external-sources.md)

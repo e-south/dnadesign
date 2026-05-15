@@ -196,7 +196,7 @@ require_pattern 'one MSD unit|single-unit' "skill preserves single-unit material
 require_pattern '5'\'' flank \+ left base' "skill names the MSD unit composition"
 require_pattern 'Do not add `--repeat-count`|reject `--repeat-count`|does not expose `--repeat-count`' "skill records repeat-count footgun guard"
 require_pattern 'sequence_manifest\.json' "skill preserves sequence manifest language"
-require_pattern 'component_span_qa\.png' "skill preserves PNG visual handoff"
+require_pattern 'secondary_structure\.native\.png.*composition_overview\.svg|composition_overview\.svg.*secondary_structure\.native\.png' "skill preserves structure/review visual handoff"
 require_pattern 'concrete .*sequence' "skill preserves missing-subcomponent fail-fast language"
 require_pattern 'top-level `retron-msd`' "skill rejects top-level retron-msd leakage"
 require_pattern 'Do not say "snapshot posture"' "skill rejects snapshot-posture output"

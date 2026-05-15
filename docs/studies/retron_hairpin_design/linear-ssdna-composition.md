@@ -244,13 +244,13 @@ that agents need before opening the full spec:
   `sequence.gb` path plus an `open -R .../sequence.gb` Finder reveal command
   for local review.
 - Retron MSD ID lists should use the study CLI `materialize` route for
-  single-unit GenBank/PNG output after concrete payload and cap sequences are
+  single-unit GenBank/structure-review output after concrete payload and cap sequences are
   supplied through `--spec` or explicit overrides. It keeps top-level output limited to `README.md`, `manifest/`, and
   `variants/`; writes sequence indexes, catalogs, provenance, and generated
   single-unit composition configs under `manifest/`; and groups each
   `variants/<design-id>/` bundle into `sequences/`, `plots/`, `manifest/`, and
   `runtime/construct/`. If payload or cap sequences are missing, the route must
-  fail before generating placeholder GenBank or PNG files. The CLI does not
+  fail before generating placeholder GenBank or plot files. The CLI does not
   expose `--repeat-count`.
 - BaseRender consumes only the generated canonical visual contract through
   generated job YAML for linear component-span QA; Construct does not render
@@ -328,8 +328,9 @@ When returning to this work:
   subcomponent and routes back to Snapback or scar-nick. Materialized output
   uses top-level `README.md`, `manifest/`, and `variants/`; each variant groups
   forward/reverse-complement GenBank and FASTA under `sequences/`,
-  component-span/folding/combined PNGs under `plots/`, curated metadata under
-  `manifest/`, and raw Construct output under `runtime/construct/`.
+  `secondary_structure.native.png` plus `composition_overview.svg` under
+  `plots/`, curated metadata under `manifest/`, and raw Construct output under
+  `runtime/construct/`.
 
 ### Links
 
