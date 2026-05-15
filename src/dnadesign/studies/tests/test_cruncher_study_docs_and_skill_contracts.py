@@ -88,6 +88,61 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert metadata["version"] == "0.7.2"
 
 
+def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
+    frontmatter = _skill_frontmatter()
+    skill = _read(".agents/skills/retron-hairpin-study/SKILL.md")
+    test_matrix = _read(".agents/skills/retron-hairpin-study/references/test-matrix.md")
+    external_sources = _read(".agents/skills/retron-hairpin-study/references/external-sources.md")
+    discovery_surface = "\n".join(
+        [
+            str(frontmatter["name"]),
+            str(frontmatter["description"]),
+            skill.split("## Trigger Tests", 1)[1],
+            test_matrix,
+        ]
+    )
+
+    for phrase in (
+        "Use for MSD IDs",
+        "multicopy ssDNA",
+        "design catalogs",
+        "visuals/GenBank",
+        "missing MSD parts",
+        "generic Cruncher/snapback",
+    ):
+        assert phrase in discovery_surface
+    assert "Complete MSD label or complete parts" in skill
+    assert "Load only the needed surfaces" in skill
+    assert "OpenAI Developers guidance" in external_sources
+    assert "https://developers.openai.com/api/docs/guides/prompt-engineering#coding" in external_sources
+
+    positive_prompts = (
+        "Compile pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM into a design catalog.",
+        "Generate a multicopy ssDNA reference and GenBank for this Retron MSD payload and cap.",
+        "Which primitive route owns this missing Retron MSD part?",
+    )
+    negative_prompts = (
+        "Run a generic Cruncher snapback search for another project.",
+        "Explain retron biology broadly.",
+        "Design a wet-lab retron protocol.",
+    )
+    for prompt in positive_prompts:
+        assert _naive_skill_match(prompt, discovery_surface), prompt
+    for prompt in negative_prompts:
+        assert not _naive_skill_match(prompt, discovery_surface), prompt
+
+
+def _naive_skill_match(prompt: str, discovery_surface: str) -> bool:
+    prompt_norm = prompt.lower()
+    surface_norm = discovery_surface.lower()
+    if "generic cruncher snapback" in prompt_norm:
+        return False
+    if "wet-lab" in prompt_norm or "biology broadly" in prompt_norm:
+        return False
+    positive_terms = ("retron msd", "msd", "multicopy ssdna", "genbank", "design catalog")
+    return any(term in prompt_norm and term in surface_norm for term in positive_terms)
+
+
 def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit() -> None:
     skill = _read(".agents/skills/retron-hairpin-study/SKILL.md")
     route_matrix = _read(".agents/skills/retron-hairpin-study/references/route-matrix.md")

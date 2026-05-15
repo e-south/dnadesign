@@ -2,7 +2,8 @@
 
 This skill is primarily grounded in repo-local study and Cruncher surfaces.
 Vendor pages are used only to ground canonical enzyme orientation in study
-reference notes.
+reference notes. OpenAI Developers guidance is used only for agent-facing
+prompt-surface pressure tests.
 
 | Source | Retrieved | Mapped update |
 | --- | --- | --- |
@@ -16,6 +17,7 @@ reference notes.
 | `src/dnadesign/cruncher/workspaces/scar_nick_teto/` | repo-local | Current scar-nick TetO workspace and BbsI-HF route context. |
 | `src/dnadesign/cruncher/docs/guides/yiu_workflow.md` | repo-local | YIU mismatch-centric boundary and non-topology stance. |
 | `src/dnadesign/cruncher/workspaces/de033/outputs/released_solve/export/table__hits.csv` | repo-local | Regenerable current 0/3/3 exact-hit snapshot for the de033 retained-active screen. |
+| https://developers.openai.com/api/docs/guides/prompt-engineering#coding | 2026-05-15 | Agent-facing prompt-surface rubric: explicit role/workflow, structured tool use, testing/validation, and clean output contracts. |
 | https://www.neb.com/en-us/products/r3712-bspqi-hf | 2026-04-25 | Vendor canonical BspQI-HF Type IIS release-enzyme orientation for the de033 default release pin. |
 | https://www.neb.com/en-us/products/r0607-ntbstnbi | 2026-04-25 | Vendor canonical Nt.BstNBI recognition/cut-site orientation for reverse-complement visual semantics. |
 | https://www.neb.com/en-us/products/r0121-ntbsmai | 2026-04-25 | Vendor canonical Nt.BsmAI recognition/cut-site orientation for retained-active examples. |

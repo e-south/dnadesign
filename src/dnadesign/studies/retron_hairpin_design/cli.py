@@ -55,14 +55,66 @@ def _emit(payload: dict[str, Any], *, output_format: str) -> None:
     if payload.get("catalog_path") is not None:
         typer.echo(f"catalog_path: {payload['catalog_path']}")
         typer.echo(f"record_count: {payload.get('record_count')}")
+    if payload.get("output_dir") is not None:
+        typer.echo(f"output_dir: {payload['output_dir']}")
+    if payload.get("assets_dir") is not None:
+        typer.echo(f"assets_dir: {payload['assets_dir']}")
+    if payload.get("next_step") is not None:
+        typer.echo(f"next_step: {payload['next_step']}")
 
 
 def _exit_with_error(exc: Exception, *, output_format: str) -> None:
+    next_step = _next_step_for_error(exc)
     if output_format == "json":
-        _emit({"status": "error", "error": str(exc)}, output_format=output_format)
+        _emit(
+            {
+                "status": "error",
+                "error": str(exc),
+                "error_type": exc.__class__.__name__,
+                "next_step": next_step,
+            },
+            output_format=output_format,
+        )
     else:
         typer.echo(f"error: {exc}", err=True)
+        typer.echo(f"next_step: {next_step}", err=True)
     raise typer.Exit(code=1) from exc
+
+
+def _next_step_for_error(exc: Exception) -> str:
+    message = str(exc)
+    if "provided profile" in message:
+        return "Correct the declared -MWX profile or omit it so the compiler derives S3/S2/S1/S0 from the bases."
+    if "S0" in message:
+        return (
+            "Route the left/right base feasibility question to scar-nick before compiling; the compiler requires S0=M."
+        )
+    if "Unknown cap" in message:
+        return (
+            "Route missing cap or shortening constraints to Snapback, "
+            "or add the validated cap to msd_design_registry.yaml."
+        )
+    if "Unknown payload" in message:
+        return "Add the validated payload to msd_design_registry.yaml before compiling a frozen design reference."
+    if "registry" in message:
+        return (
+            "Open docs/studies/retron_hairpin_design/msd_design_registry.yaml "
+            "and fix the registry before rerunning lint."
+        )
+    if "Duplicate construct label" in message:
+        return "Deduplicate the input labels, then rerun compile with the same explicit --out-dir."
+    return "Run lint on one complete MSD label first; route missing biological constraints before generating a catalog."
+
+
+def _lint_next_step() -> str:
+    return "Input is complete; run compile with an explicit --out-dir when a design-reference catalog is needed."
+
+
+def _compile_next_step() -> str:
+    return (
+        "Catalog emitted; use Construct/Folding/BaseRender service routes only if sequence, "
+        "GenBank, or visuals are requested."
+    )
 
 
 def _collect_labels(ids: list[str], input_file: Path | None) -> list[str]:
@@ -107,6 +159,7 @@ def lint_command(
         {
             "status": "ok",
             "reference": reference.model_dump(mode="json"),
+            "next_step": _lint_next_step(),
         },
         output_format=format_norm,
     )
@@ -138,8 +191,11 @@ def compile_command(
         {
             "status": "ok",
             "catalog_path": str(catalog_path),
+            "output_dir": str(catalog_path.parent),
+            "assets_dir": str(catalog_path.parent / "assets"),
             "record_count": len(catalog.records),
             "records": [record.model_dump(mode="json") for record in catalog.records],
+            "next_step": _compile_next_step(),
         },
         output_format=format_norm,
     )

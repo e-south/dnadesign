@@ -123,6 +123,7 @@ def test_retron_msd_lint_cli_reports_reference_json(tmp_path: Path) -> None:
     assert payload["status"] == "ok"
     assert payload["reference"]["msd_design_id"] == "msd-tetr-c172-lcggt-racag-mxmm"
     assert payload["reference"]["scar_nick"]["route_status"] == "note_only"
+    assert payload["next_step"].startswith("Input is complete")
 
 
 def test_retron_msd_lint_cli_fails_fast_on_wrong_profile(tmp_path: Path) -> None:
@@ -144,7 +145,9 @@ def test_retron_msd_lint_cli_fails_fast_on_wrong_profile(tmp_path: Path) -> None
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert payload["status"] == "error"
+    assert payload["error_type"] == "MsdIdError"
     assert "provided profile" in payload["error"]
+    assert "Correct the declared -MWX profile" in payload["next_step"]
 
 
 def test_retron_msd_lint_cli_fails_fast_on_unknown_registry_part(tmp_path: Path) -> None:
@@ -167,6 +170,7 @@ def test_retron_msd_lint_cli_fails_fast_on_unknown_registry_part(tmp_path: Path)
     payload = json.loads(result.stdout)
     assert payload["status"] == "error"
     assert "Unknown cap 'C999'" in payload["error"]
+    assert "Route missing cap or shortening constraints to Snapback" in payload["next_step"]
 
 
 def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
@@ -193,9 +197,35 @@ def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
     catalog_path = Path(payload["catalog_path"])
     reference_path = out_dir / "assets" / "msd-tetr-c172-lcggt-racag-mxmm" / "msd_design_reference_v1.json"
     assert catalog_path == out_dir / "msd_design_catalog_v1.json"
+    assert Path(payload["output_dir"]) == out_dir
+    assert Path(payload["assets_dir"]) == out_dir / "assets"
+    assert "sequence, GenBank, or visuals" in payload["next_step"]
     assert reference_path.is_file()
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     assert catalog["records"][0]["construct_id"] == "pES-retron-177"
+
+
+def test_retron_msd_compile_text_reports_output_nudges(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "compiled"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "compile",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert f"output_dir: {out_dir}" in result.stdout
+    assert f"assets_dir: {out_dir / 'assets'}" in result.stdout
+    assert "next_step: Catalog emitted" in result.stdout
 
 
 def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> None:

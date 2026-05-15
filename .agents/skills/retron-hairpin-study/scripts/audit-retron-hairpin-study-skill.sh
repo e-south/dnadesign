@@ -179,6 +179,7 @@ require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-compo
 require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
 require_pattern 'docs/studies/retron_hairpin_design/pipeline\.yaml' "skill references pinned study pipeline"
 require_pattern 'references/test-matrix\.md' "skill references test matrix for validation"
+require_pattern 'developers\.openai\.com/api/docs/guides/prompt-engineering#coding' "skill records OpenAI Developers prompt-surface source"
 require_pattern 'Start with input completeness, not study phase' "skill uses compiler-first routing"
 require_pattern 'status command output' "skill keeps status as optional progress evidence"
 require_pattern 'released-product Snapback' "skill preserves released-product boundary"
@@ -200,6 +201,8 @@ reject_pattern 'whether the answer came from snapshot posture' "top-level skill 
 reject_pattern 'current phase and next route' "top-level skill no longer reports phase by default" "$SKILL_FILE"
 require_pattern 'Pair with `harness-engineering`' "skill explains harness pairing" "$SKILL_FILE"
 require_pattern 'Pair with `code-change-discipline`' "skill explains code-change pairing" "$SKILL_FILE"
+require_pattern 'Fresh/naive agent' "test matrix covers naive-agent discovery"
+require_pattern 'Finder reveal command' "test matrix covers GenBank Finder handoff"
 
 if [[ $failures -eq 0 ]]; then
   printf 'Audit finished with no failures.\n'
