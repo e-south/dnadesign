@@ -1854,8 +1854,29 @@ plots:
     group_order: [background, ethanol, cipro, dual]
     max_features_per_group: 8
     reference_line: 1.0
-    x_axis_label: Enrichment ratio versus native background prevalence
+    x_axis_label: Enrichment ratio vs native background
     semantics_ref: plot_semantics/native_regulator_plan_margin_enrichment.yaml
+  native_regulator_go_bp_plan_margin_enrichment:
+    kind: categorical_enrichment_summary
+    visibility_tier: appendix
+    scalar: native_regulator_go_bp_plan_margin_enrichment
+    group_column: plan
+    feature_column: feature_label
+    value_column: enrichment_ratio
+    count_column: n_feature_tail
+    total_column: n_feature_total
+    p_value_column: p_value
+    q_value_column: q_value
+    static_filters:
+      - {column: threshold, equals: 0.10}
+      - {column: tail_mode, equals: margin_top_quantile}
+      - {column: passes_min_support, equals: true}
+      - {column: passes_min_tail_hits, equals: true}
+    group_order: [background, ethanol, cipro, dual]
+    max_features_per_group: 6
+    reference_line: 1.0
+    x_axis_label: GO BP enrichment ratio vs native background
+    semantics_ref: plot_semantics/native_regulator_go_bp_plan_margin_enrichment.yaml
   design_centroid_margin_gallery:
     kind: xy_scatter_grid
     visibility_tier: appendix
@@ -2117,6 +2138,7 @@ notebooks:
       - reference_standard_strength_audit
       - native_tf_axis_orientation_audit
       - native_regulator_plan_margin_enrichment
+      - native_regulator_go_bp_plan_margin_enrichment
       - sigma35_centroid_distance_gallery
       - design_centroid_margin_gallery
       - reference_alignment_summary
@@ -3554,9 +3576,9 @@ recipes:
             - alias_id
             - regulondb__primary_promoter_id
             - regulondb__primary_promoter_name
+          native_parent_column: derived__parent_id
           regulatory_interactions:
             path: ../../../usr/datasets/usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet
-            row_key: derived__parent_id
             relation_key: usr_id
             regulator_column: regulator_abbrev
             required_columns:
@@ -3572,6 +3594,7 @@ recipes:
           min_global_promoters: 10
           min_tail_hits: 3
           fdr_method: benjamini_hochberg
+          rank_test_alternative: greater
           common_regulators:
             - CRP
             - FNR
@@ -3585,6 +3608,34 @@ recipes:
         op: plot.render
         depends_on: [build_native_regulator_plan_margin_enrichment]
         params: {plot_id: native_regulator_plan_margin_enrichment}
+      - id: build_native_regulator_go_bp_plan_margin_enrichment
+        op: scalar.build
+        depends_on: [build_native_regulator_plan_margin_enrichment]
+        params:
+          scalar: native_regulator_go_bp_plan_margin_enrichment
+          kind: plan_margin_feature_enrichment
+          source_scalar: native_regulator_plan_margin_enrichment
+          scores_table: native_plan_margin_scores.parquet
+          tail_membership_table: native_plan_margin_tail_membership.parquet
+          feature_membership:
+            path: ../../../usr/datasets/usr_regulondb_native_promoters/_relations/promoter_regulator_go_terms.parquet
+            subject_column: usr_id
+            feature_id_column: go_id
+            feature_label_column: go_name
+            feature_namespace_column: go_namespace
+            namespace_filter: biological_process
+            exclude_label_prefixes: ["obsolete "]
+            source_metadata_columns:
+              - biocyc_kb_version
+              - smarttable_id
+              - source_terms_sha256
+          min_global_subjects: 10
+          min_tail_hits: 3
+          rank_test_alternative: greater
+      - id: render_native_regulator_go_bp_plan_margin_enrichment
+        op: plot.render
+        depends_on: [build_native_regulator_go_bp_plan_margin_enrichment]
+        params: {plot_id: native_regulator_go_bp_plan_margin_enrichment}
 deliverables:
   dataset_overview:
     title: Dataset overview
@@ -3732,8 +3783,10 @@ deliverables:
     outputs:
       scalars:
         - native_regulator_plan_margin_enrichment
+        - native_regulator_go_bp_plan_margin_enrichment
       plots:
         - native_regulator_plan_margin_enrichment
+        - native_regulator_go_bp_plan_margin_enrichment
     docs_refs:
       - study:stress_ethanol_cipro_growth/deliverables/native_regulator_plan_margin_enrichment
     acceptance_checks: []

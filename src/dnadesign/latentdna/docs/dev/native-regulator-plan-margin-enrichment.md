@@ -1,8 +1,8 @@
 # Native Regulator Plan-Margin Enrichment
 
 **Owner:** dnadesign-maintainers
-**Status:** scalar tables implemented; static plot and notebook plot-review panel implemented
-**Last verified:** 2026-05-14
+**Status:** regulator rank/tail scalar tables and BioCyc GO biological-process companion implemented; static plots and notebook plot-review panels implemented
+**Last verified:** 2026-05-15
 **Study:** `stress_ethanol_cipro_growth`
 
 This spec defines a LatentDNA appendix deliverable for exploratory RegulonDB
@@ -16,21 +16,30 @@ margin between a native row and the synthetic-plan centroids.
 
 Current implementation posture:
 
-- The first code slice emits the contract tables as one scalar artifact:
-  `table.parquet` for regulator enrichment plus
-  `native_plan_margin_scores.parquet` and
-  `native_plan_margin_tail_membership.parquet` side tables.
+- The scalar artifact emits the margin contract tables:
+  `table.parquet` for tail enrichment plus
+  `native_plan_margin_scores.parquet`,
+  `native_plan_margin_tail_membership.parquet`, and
+  `native_regulator_plan_rank_tests.parquet` side tables.
+- The rank-test side table is the continuous statistical backbone. Tail
+  enrichment remains the readable appendix summary, not the only statistical
+  claim surface.
 - Static plot promotion uses the generic `categorical_enrichment_summary`
   renderer. The generated notebook consumes the persisted plot artifact and
   plot-semantics sidecar; it must not recompute enrichment statistics inline.
+- The BioCyc GO biological-process companion reuses the persisted plan-margin
+  score and tail-membership side tables; it emits both GO term rank tests and
+  tail summaries without recomputing embeddings or inferring new ontology
+  labels.
 
 ## Purpose
 
 Ask this narrow question:
 
 > Among parent-resolved native RegulonDB core60 promoters embedded in pDual10
-> context, which curated regulator associations are overrepresented in the
-> native rows most specific to each synthetic plan centroid?
+> context, which curated regulator associations show positive rank shifts along
+> synthetic-plan margins, and which of those associations are also
+> overrepresented in fixed native margin tails?
 
 This is an exploratory interpretation layer for the existing LatentDNA
 representation-triage surface. It is not an OPAL input and must not be used as
@@ -53,16 +62,16 @@ the historical motivation.
 
 | Surface | Artifact id | Reviewer-facing label | Semantics |
 | --- | --- | --- | --- |
-| Existing pre-specified landmark audit | `native_tf_axis_orientation_audit` for backward compatibility; future alias may be `native_stress_regulator_landmark_audit` | BaeR/CpxR/LexA regulator landmark audit | Tests only the pre-specified BaeR/CpxR ethanol-side and LexA SOS-side landmark bins. |
-| New exploratory appendix | `native_regulator_plan_margin_enrichment` | Native regulator enrichment in synthetic-plan margins | Tests all source-backed RegulonDB regulators for enrichment in plan-specific native margins and tails. |
+| Existing pre-specified landmark audit | `native_tf_axis_orientation_audit` | BaeR/CpxR/LexA regulator landmark audit | Tests only the pre-specified BaeR/CpxR ethanol-side and LexA SOS-side landmark bins. |
+| New exploratory appendix | `native_regulator_plan_margin_enrichment` | Native regulator enrichment in synthetic-plan margins | Tests all source-backed RegulonDB regulators for rank shifts in plan-specific native margins and enrichment in fixed native tails. |
 
 Do not collapse these surfaces. The first asks whether pre-specified landmark
 regulators land in expected directions. The second asks which regulator
 associations appear after selecting native rows by synthetic-plan geometry.
 
-If the existing landmark artifact is renamed later, do it as a compatibility
-migration with an alias and route/status update. Do not rename generated
-artifacts in the same slice as the new enrichment feature.
+If the existing landmark artifact is renamed later, do it as an explicit
+contract migration with route/status updates and regenerated artifacts. Do not
+ship runtime alias shims or silent fallback paths.
 
 ## Non-Goals
 
@@ -122,6 +131,9 @@ Required validation:
 - Missing required columns are hard errors.
 - Zero matched regulators is a hard error.
 - Unsupported threshold, FDR, or permutation configuration is a hard error.
+- `native_parent_column`, regulatory `relation_key`, and
+  `regulator_column` are explicit config fields. Legacy `row_key` and
+  `join_key` aliases are forbidden.
 - Silent fallback to the old BaeR/CpxR/LexA-only audit is forbidden.
 
 ## Artifact Ontology
@@ -189,10 +201,42 @@ Minimum columns:
 - `is_common_regulator`
 - `notes`
 
-Future-only artifact:
+### `native_regulator_plan_rank_tests`
 
-- `native_regulator_function_enrichment`, only after source-backed functional
-  tags or an external ontology mapping are introduced by contract.
+One row per regulator and plan margin. This table is emitted as
+`native_regulator_plan_rank_tests.parquet` and is the primary continuous/rank
+test surface.
+
+Minimum columns:
+
+- `regulator_abbrev`
+- `plan`
+- `n_total_native`
+- `n_with_regulator`
+- `n_without_regulator`
+- `median_margin_with_regulator`
+- `median_margin_without_regulator`
+- `u_statistic`
+- `auc`
+- `rank_biserial`
+- `p_value`
+- `q_value`
+- `p_value_method`
+- `p_value_alternative`
+- `fdr_method`
+- `passes_min_support`
+- `is_common_regulator`
+- `notes`
+
+Companion functional-term artifact:
+
+- `native_regulator_go_bp_plan_margin_enrichment`, one row per BioCyc GO
+  biological-process term, plan, threshold, and tail-mode test. The term
+  membership source is
+  `usr_regulondb_native_promoters/_relations/promoter_regulator_go_terms.parquet`.
+  Each native promoter counts at most once per GO term.
+- `plan_margin_feature_rank_tests.parquet`, one row per GO term and
+  plan margin, emitted inside the GO companion scalar artifact.
 
 ## Math Contract
 
@@ -245,6 +289,44 @@ invite post-hoc tuning.
 
 ## Enrichment Contract
 
+### Rank Test Backbone
+
+For each regulator and plan, compare the plan margins for native promoters
+with that regulator against native promoters without that regulator.
+
+```text
+with_R = { margin(i, p) | promoter i has regulator R }
+without_R = { margin(i, p) | promoter i does not have regulator R }
+```
+
+Use a one-sided Mann-Whitney U test for the primary positive-enrichment
+question:
+
+```text
+alternative = greater
+```
+
+The configured implementation uses SciPy's
+`mannwhitneyu(method="asymptotic", use_continuity=True)`, which applies the
+asymptotic tie-corrected path. The output records
+`p_value_method = scipy_mannwhitneyu_asymptotic` and
+`p_value_alternative = greater` so reviewer-facing tables do not hide the test
+choice.
+
+Report effect size, not just p-value:
+
+```text
+AUC = U / (n_with_regulator * n_without_regulator)
+rank_biserial = 2 * AUC - 1
+```
+
+Interpretation is rank/distributional separation, not a pure median test. A
+positive result supports the bounded claim that regulator-associated native
+promoters rank higher on a synthetic-plan margin; it does not assign
+mechanistic labels to synthetic promoters.
+
+### Tail Enrichment Summary
+
 For each regulator and each plan-tail set, build a promoter-level 2x2 table:
 
 | | In tail | Not in tail |
@@ -268,6 +350,7 @@ Default primary filters:
 - `min_tail_hits = 3`
 - thresholds `[0.05, 0.10]`
 - FDR method `benjamini_hochberg`
+- rank-test alternative `greater`
 
 Rare regulators can remain in the output table with
 `passes_min_support == false`, but they should not be promoted as primary
@@ -308,6 +391,36 @@ Recommended surface:
 
 Do not make the enrichment plot look like a candidate-selection chart. It is an
 appendix interpretation surface.
+
+Functional companion surface:
+
+- Use a separate plot id, `native_regulator_go_bp_plan_margin_enrichment`.
+- Source terms from BioCyc KB 29.6 SmartTable GO sidecars projected into
+  `usr_regulondb_native_promoters/_relations/promoter_regulator_go_terms.parquet`.
+- The companion scalar must read `native_plan_margin_scores.parquet` and
+  `native_plan_margin_tail_membership.parquet` from the declared source-scalar
+  manifest. The source manifest must be a `scalar_table`, must match the
+  configured `source_scalar`, and must declare both side-table outputs.
+- The `margin_<plan>` columns in the score table must match the plan labels in
+  tail membership exactly. Extra score-table margin columns are hard errors
+  because they silently widen the statistical family.
+- Default to `go_namespace == biological_process` for the reviewer-facing
+  surface. Molecular-function terms are valid source data, but many are broad
+  transcription-factor or DNA-binding terms and should remain a support table
+  unless explicitly promoted.
+- Exclude source labels with configured obsolete prefixes such as `obsolete `
+  from reviewer-facing term plots, and record the excluded row count in scalar
+  stats.
+- Count promoter-level binary GO term membership. A promoter associated with
+  multiple regulators that share the same GO term still counts once for that
+  term.
+- Emit the same rank-test side table shape for terms that the regulator
+  artifact emits for regulators, with feature-level column names. The static
+  plot can remain tail-summary-first, but reviewer interpretation should know
+  whether a displayed term also has a broad rank shift.
+- Render functional terms as a sibling appendix plot, not as labels inside the
+  regulator plot. The separation keeps regulator discovery and ontology-level
+  interpretation auditable.
 
 ## Notebook Accordion Requirements
 
@@ -369,11 +482,14 @@ src/dnadesign/latentdna/src/enrichments/
   table_contracts.py                   # generic table/config validation helpers
   enrichment_stats.py                  # generic hypergeometric, odds-ratio, and FDR helpers
   categorical_enrichment.py            # generic categorical-feature enrichment primitive
+  rank_association.py                  # generic Mann-Whitney feature/axis rank-test primitive
+  plan_margin_feature_enrichment.py    # generic feature-term enrichment over persisted plan tails
   regulatory_plan_margin.py            # artifact-specific plan/tail adapter
   regulatory_plan_margin_contracts.py  # artifact config/schema helpers and output dataclasses
 
 src/dnadesign/latentdna/src/scalars/builders/
   regulatory_plan_margin.py            # scalar I/O orchestration for the artifact
+  plan_margin_feature_enrichment.py    # scalar I/O for source-backed term companions
 
 src/dnadesign/latentdna/src/plots/renderers/
   enrichment_summary.py                 # generic categorical-enrichment summary renderer
@@ -422,6 +538,7 @@ native_regulator_plan_margin_enrichment_recipe:
     - alias_id
     - regulondb__primary_promoter_id
     - regulondb__primary_promoter_name
+  native_parent_column: derived__parent_id
   centroid_groups:
     background: [background_only]
     ethanol: [ethanol]
@@ -432,7 +549,7 @@ native_regulator_plan_margin_enrichment_recipe:
   regulatory_interactions:
     dataset: usr_regulondb_native_promoters
     path: _relations/regulatory_interactions.parquet
-    join_key: derived__parent_id
+    relation_key: usr_id
     regulator_column: regulator_abbrev
     required_columns:
       - source_release
@@ -444,6 +561,7 @@ native_regulator_plan_margin_enrichment_recipe:
   min_global_promoters: 10
   min_tail_hits: 3
   fdr_method: benjamini_hochberg
+  rank_test_alternative: greater
   tail_modes:
     - margin_top_quantile
     - margin_top_quantile_nearest_plan_only
@@ -488,6 +606,8 @@ Unit tests:
 - nearest-plan-only sensitivity tail membership
 - promoter-level regulator deduplication
 - Fisher or hypergeometric p-value calculation
+- Mann-Whitney U rank-test calculation, AUC, rank-biserial effect size, method
+  metadata, and degenerate comparison handling
 - Benjamini-Hochberg q-value calculation
 - min-support and min-tail-hit flags
 - zero-regulator and rare-regulator behavior

@@ -8,7 +8,7 @@ guardrails:
   - Do not use the enriched regulators as mechanistic labels for synthetic promoters.
   - Interpret common regulators through enrichment over background prevalence, not raw count.
 caption: Native regulator enrichment among fixed synthetic-plan margin tails.
-alt_text: Four-panel bar chart showing background, ethanol, cipro, and dual synthetic-plan margin tails. Each panel lists top RegulonDB regulator associations with bar length indicating enrichment ratio over native background prevalence.
+alt_text: Four-panel bar chart showing background, ethanol, ciprofloxacin, and dual synthetic-plan margin tails. Each panel lists top RegulonDB regulator associations with bar length indicating enrichment ratio over native background prevalence.
 preprocessing_md: >-
   The table is built from the same pDual10-transferred native core60 rows used
   by the BaeR/CpxR/LexA landmark audit. DenseGen synthetic plan centroids define
@@ -33,6 +33,29 @@ math_md: |
   For each plan-tail set and regulator, enrichment uses a promoter-level 2x2
   table. A native promoter counts once for a regulator even when the source
   sidecar contains multiple interaction rows for that regulator-promoter pair.
+
+  Let \(T_p\) be the fixed tail for plan \(p\), \(U\) be all parent-resolved
+  native promoters, and \(R\) be the set of promoters associated with a
+  regulator. The plotted count table is:
+
+  $$
+  a=|T_p \cap R|,\quad b=|R \setminus T_p|,\quad
+  c=|T_p \setminus R|,\quad d=|U|-a-b-c
+  $$
+
+  $$
+  \mathrm{tail\_fraction}=\frac{a}{|T_p|},\quad
+  \mathrm{background\_fraction}=\frac{|R|}{|U|}
+  $$
+
+  $$
+  \mathrm{enrichment\_ratio}=
+  \frac{\mathrm{tail\_fraction}}{\mathrm{background\_fraction}}
+  $$
+
+  The one-sided hypergeometric p-value asks how surprising \(a\) or more
+  regulator-positive promoters would be in a tail of size \(|T_p|\), given
+  \(|R|\) regulator-positive promoters in \(U\).
 rationale_md: >-
   This appendix asks whether curated native regulator associations are
   overrepresented in the native rows that are most specific to each synthetic
