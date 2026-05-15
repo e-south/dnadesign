@@ -230,7 +230,9 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   sequence bundle adds `sequence_manifest.json`, `sequence_index.tsv`,
   `composition_configs/`, and `variants/`; each variant root exposes
   `sequence.gb`, `sequence.fa`, `features.csv`, and `component_span_qa.png` for
-  Finder review.
+  Finder review. Visible GenBank/CSV labels should be display labels such as
+  `msd[teto]`, `Cap`, `Left Base`, and `Right Base`; raw ids remain machine
+  metadata, not operator-facing labels.
 
 ### Contrast route: YIU boundary check
 

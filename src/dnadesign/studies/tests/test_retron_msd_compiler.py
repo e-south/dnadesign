@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 import json
 import tomllib
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -63,7 +64,7 @@ contract: retron_msd_design_registry_v1
 schema_version: 1
 payloads:
   TetR:
-    display_name: TetR
+    display_name: msd[teto]
 caps:
   C172:
     source_construct: retron-172
@@ -426,18 +427,54 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     features_by_label = {
         feature.qualifiers["label"][0]: feature for feature in genbank_record.features if "label" in feature.qualifiers
     }
-    payload_complement = features_by_label["payload_complement copy 0"]
+    assert "payload_complement" not in features_by_label
+    assert "snapback_cap" not in features_by_label
+    assert not any("copy 0" in label for label in features_by_label)
+    assert {"5' Flanking", "msd[teto]", "Cap", "msd[teto] complement"} <= set(features_by_label)
+    features_by_id = {
+        feature.qualifiers["dnadesign_feature_id"][0]: feature
+        for feature in genbank_record.features
+        if "dnadesign_feature_id" in feature.qualifiers
+    }
+    payload_complement = features_by_id["payload_complement"]
     assert int(payload_complement.location.start) == flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP)
     assert int(payload_complement.location.end) == (
         flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP) + len(_TETO_PAYLOAD)
     )
     assert payload_complement.location.strand == -1
+    assert payload_complement.qualifiers["label"] == ["msd[teto] complement"]
+    assert payload_complement.qualifiers["dnadesign_copy_index"] == ["0"]
+    assert payload_complement.qualifiers["dnadesign_transform"] == ["reverse_complement"]
     assert str(payload_complement.extract(genbank_record.seq)).upper() == _TETO_PAYLOAD.upper()
 
     feature_rows = list(csv.DictReader(features_path.read_text(encoding="utf-8").splitlines()))
-    payload_complement_rows = [
-        row for row in feature_rows if row["feature_kind"] == "annotation" and row["feature_id"] == "payload_complement"
+    annotation_ids = {row["feature_id"] for row in feature_rows if row["feature_kind"] == "annotation"}
+    assert annotation_ids == {"stem_base_left", "stem_base_right"}
+    assert {
+        "5' Flanking",
+        "Left Base",
+        "msd[teto]",
+        "Cap",
+        "msd[teto] complement",
+        "Right Base",
+        "3' Flanking",
+    } <= {row["display_label"] for row in feature_rows}
+    assert not {"flank_5p", "payload_primary", "snapback_cap_segment", "payload_complement"} & {
+        row["display_label"] for row in feature_rows
+    }
+    duplicate_display_spans = [
+        key
+        for key, count in Counter(
+            (row["display_label"], row["start_0"], row["end_0"], row["strand"]) for row in feature_rows
+        ).items()
+        if count > 1
     ]
+    assert duplicate_display_spans == []
+    payload_complement_rows = [
+        row for row in feature_rows if row["feature_kind"] == "segment" and row["feature_id"] == "payload_complement"
+    ]
+    assert len(payload_complement_rows) == 1
+    assert payload_complement_rows[0]["display_label"] == "msd[teto] complement"
     assert payload_complement_rows[0]["strand"] == "-1"
     assert payload_complement_rows[0]["source_segment_id"] == "payload_primary"
     assert payload_complement_rows[0]["transform_kind"] == "reverse_complement"

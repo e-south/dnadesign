@@ -3,7 +3,7 @@ schema_version: 1
 
 payloads:
   TetR:
-    display_name: TetR
+    display_name: msd[teto]
 
 caps:
   C26:

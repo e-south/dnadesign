@@ -287,8 +287,10 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     with (bundle / "features.csv").open(newline="", encoding="utf-8") as handle:
         features = list(csv.DictReader(handle))
     assert features[0]["feature_id"] == "flank_5p"
+    assert features[0]["display_label"] == "5' flank"
     assert features[0]["genbank_location"] == "1..15"
     assert features[1]["feature_id"] == "payload_primary"
+    assert features[1]["display_label"] == "TetO primary"
     assert features[1]["genbank_location"] == "16..34"
     features_by_id = {(row["feature_kind"], row["feature_id"], int(row["copy_index"])): row for row in features}
     payload_complement_row = features_by_id[("segment", "payload_complement", 0)]
@@ -303,27 +305,38 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
 
     genbank = (bundle / "sequence.gb").read_text(encoding="utf-8")
     assert "LOCUS       retron43_teto_manual_x8 704 bp ss-DNA linear SYN" in genbank
-    assert '/label="stem_base_left copy 0"' in genbank
+    assert '/label="Left stem base"' in genbank
+    assert '/dnadesign_feature_id="stem_base_left"' in genbank
+    assert '/dnadesign_copy_index="0"' in genbank
     assert "12..15" in genbank
     assert "complement(53..71)" in genbank
     with warnings.catch_warnings():
         warnings.simplefilter("error", BiopythonParserWarning)
         genbank_record = SeqIO.read(bundle / "sequence.gb", "genbank")
     assert str(genbank_record.seq).upper() == (RETRON43_UNIT * 8).upper()
-    genbank_features = {feature.qualifiers["label"][0]: feature for feature in genbank_record.features}
-    payload_primary = genbank_features["payload_primary copy 0"]
+    genbank_features = {
+        (feature.qualifiers["label"][0], feature.qualifiers["dnadesign_copy_index"][0]): feature
+        for feature in genbank_record.features
+    }
+    payload_primary = genbank_features[("TetO primary", "0")]
     assert int(payload_primary.location.start) == 15
     assert int(payload_primary.location.end) == 34
     assert payload_primary.location.strand == 1
-    payload_complement = genbank_features["payload_complement copy 0"]
+    assert payload_primary.qualifiers["dnadesign_feature_id"] == ["payload_primary"]
+    assert payload_primary.qualifiers["dnadesign_copy_index"] == ["0"]
+    payload_complement = genbank_features[("TetO complement", "0")]
     assert int(payload_complement.location.start) == 52
     assert int(payload_complement.location.end) == 71
     assert payload_complement.location.strand == -1
+    assert payload_complement.qualifiers["dnadesign_feature_id"] == ["payload_complement"]
+    assert payload_complement.qualifiers["dnadesign_copy_index"] == ["0"]
     assert str(payload_complement.extract(genbank_record.seq)).upper() == "TCCCTATCAGTGATAGAGA"
-    teto_complement = genbank_features["teto_complement copy 0"]
+    teto_complement = genbank_features[("TetO reverse complement", "0")]
     assert int(teto_complement.location.start) == 52
     assert int(teto_complement.location.end) == 71
     assert teto_complement.location.strand == -1
+    assert teto_complement.qualifiers["dnadesign_feature_id"] == ["teto_complement"]
+    assert teto_complement.qualifiers["dnadesign_copy_index"] == ["0"]
     assert str(teto_complement.extract(genbank_record.seq)).upper() == "TCCCTATCAGTGATAGAGA"
 
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))

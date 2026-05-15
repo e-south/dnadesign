@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,7 @@ def _write_features_csv(path: Path, composed: Any) -> None:
                 "feature_kind",
                 "feature_id",
                 "role",
+                "display_label",
                 "semantic_label",
                 "start_0",
                 "end_0",
@@ -57,6 +59,12 @@ def _write_features_csv(path: Path, composed: Any) -> None:
                     "segment",
                     span.segment_id,
                     span.role,
+                    _feature_display_label(
+                        composed,
+                        feature_kind="segment",
+                        feature_id=span.segment_id,
+                        role=span.role,
+                    ),
                     None,
                     span.start,
                     span.end,
@@ -71,6 +79,13 @@ def _write_features_csv(path: Path, composed: Any) -> None:
                     "annotation",
                     span.annotation_id,
                     span.role,
+                    _feature_display_label(
+                        composed,
+                        feature_kind="annotation",
+                        feature_id=span.annotation_id,
+                        role=span.role,
+                        semantic_label=span.semantic_label,
+                    ),
                     span.semantic_label,
                     span.start,
                     span.end,
@@ -90,22 +105,43 @@ def _write_genbank(path: Path, composed: Any) -> None:
         "FEATURES             Location/Qualifiers",
     ]
     for span in composed.segment_spans:
+        display_label = _feature_display_label(
+            composed,
+            feature_kind="segment",
+            feature_id=span.segment_id,
+            role=span.role,
+        )
         lines.extend(
             _genbank_feature_lines(
                 "misc_feature",
                 span.start,
                 span.end,
-                f"{span.segment_id} copy {span.copy_index}",
+                display_label,
+                feature_kind_id="segment",
+                feature_id=span.segment_id,
+                role=span.role,
+                copy_index=span.copy_index,
                 **_segment_export_metadata(composed, unit_id=span.unit_id, segment_id=span.segment_id),
             )
         )
     for span in composed.annotation_spans:
+        display_label = _feature_display_label(
+            composed,
+            feature_kind="annotation",
+            feature_id=span.annotation_id,
+            role=span.role,
+            semantic_label=span.semantic_label,
+        )
         lines.extend(
             _genbank_feature_lines(
                 "misc_feature",
                 span.start,
                 span.end,
-                f"{span.annotation_id} copy {span.copy_index}",
+                display_label,
+                feature_kind_id="annotation",
+                feature_id=span.annotation_id,
+                role=span.role,
+                copy_index=span.copy_index,
                 **_annotation_export_metadata(composed, unit_id=span.unit_id, annotation_id=span.annotation_id),
             )
         )
@@ -123,6 +159,7 @@ def _feature_row(
     feature_kind: str,
     feature_id: str,
     role: str,
+    display_label: str,
     semantic_label: str | None,
     start: int,
     end: int,
@@ -136,6 +173,7 @@ def _feature_row(
         "feature_kind": feature_kind,
         "feature_id": feature_id,
         "role": role,
+        "display_label": display_label,
         "semantic_label": semantic_label or "",
         "start_0": start,
         "end_0": end,
@@ -152,11 +190,21 @@ def _genbank_feature_lines(
     start: int,
     end: int,
     label: str,
+    feature_kind_id: str,
+    feature_id: str,
+    role: str,
+    copy_index: int,
     strand: int = 1,
     source_segment_id: str | None = None,
     transform_kind: str | None = None,
 ) -> list[str]:
-    qualifiers = [f'                     /label="{label}"']
+    qualifiers = [
+        f'                     /label="{label}"',
+        f'                     /dnadesign_feature_kind="{feature_kind_id}"',
+        f'                     /dnadesign_feature_id="{feature_id}"',
+        f'                     /dnadesign_role="{role}"',
+        f'                     /dnadesign_copy_index="{copy_index}"',
+    ]
     if strand == -1:
         qualifiers.append('                     /strand="-1"')
     if source_segment_id:
@@ -164,6 +212,40 @@ def _genbank_feature_lines(
     if transform_kind:
         qualifiers.append(f'                     /dnadesign_transform="{transform_kind}"')
     return [f"     {feature_kind:<16}{_genbank_location(start, end, strand=strand)}", *qualifiers]
+
+
+def _feature_display_label(
+    composed: Any,
+    *,
+    feature_kind: str,
+    feature_id: str,
+    role: str,
+    semantic_label: str | None = None,
+) -> str:
+    display_profile = composed.config.visual.display_profile
+    if feature_kind == "segment":
+        return _display_label(feature_id, display_profile.component_labels, fallback=role)
+    return _display_label(
+        feature_id,
+        display_profile.annotation_labels,
+        fallback=semantic_label or role,
+    )
+
+
+def _display_label(raw: str, mapping: dict[str, str], *, fallback: str | None = None) -> str:
+    label = mapping.get(raw)
+    if label is not None:
+        return label
+    return _pretty_display_label(fallback or raw)
+
+
+def _pretty_display_label(raw: str) -> str:
+    text = re.sub(r"\s+", " ", str(raw).replace("_", " ").replace("-", " ")).strip()
+    if not text:
+        return str(raw)
+    if any(character.isupper() for character in text[1:]):
+        return text
+    return text[:1].upper() + text[1:]
 
 
 def _genbank_location(start: int, end: int, *, strand: int = 1) -> str:

@@ -234,6 +234,9 @@ that agents need before opening the full spec:
   Reverse-complement-derived segments and annotations should appear as
   `complement(...)` GenBank features, with matching `strand`,
   `source_segment_id`, and `transform_kind` columns in `features.csv`.
+  Visible GenBank/CSV names should come from the display profile; raw segment
+  and annotation ids stay in `dnadesign_*` qualifiers or machine columns.
+  Do not duplicate full component spans as same-span annotations.
   Composition CLI output and bundle manifests should expose the generated
   `sequence.gb` path plus an `open -R .../sequence.gb` Finder reveal command
   for local review.

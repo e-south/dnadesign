@@ -85,7 +85,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.3"
+    assert metadata["version"] == "0.7.4"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -183,6 +183,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "sequence_manifest.json" in routes
     assert "sequence_index.tsv" in routes
     assert "component_span_qa.png" in routes
+    assert "Visible GenBank/CSV labels should be display labels" in routes
     assert "repeat-count flag" in routes
     assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes
     assert "### Context route: scar-nick base-junction" in routes
@@ -253,6 +254,8 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "shallow output-bundle layout" in study_surfaces
     assert "single-unit sequence artifact generation" in study_surfaces
     assert "materialize` GenBank/PNG route" in study_surfaces
+    assert "full component spans" in skill
+    assert "same-span annotations" in skill
     assert "scar-nick route in `routes.md`" in route_matrix
     assert "cruncher-study-status --study-dir docs/studies/retron_hairpin_design" in route_matrix
     assert "cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design" in route_matrix

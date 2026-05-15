@@ -346,6 +346,112 @@ def _reference_index_row(
     }
 
 
+def _msd_unit_segments(
+    record: MsdDesignReferenceV1,
+    *,
+    flank_5p: str,
+    flank_3p: str,
+    payload_sequence: str,
+    cap_sequence: str,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "segment_id": "flank_5p",
+            "role": "flank_5p",
+            "sequence": flank_5p,
+            "source": {
+                "kind": "study_record",
+                "study_id": "retron_hairpin_design",
+                "ref": record.construct_label,
+            },
+        },
+        {
+            "segment_id": "payload_primary",
+            "role": "payload_primary",
+            "sequence": payload_sequence,
+            "source": {"kind": "literal", "label": f"{record.payload_or_target.id} override"},
+        },
+        {
+            "segment_id": "snapback_cap_segment",
+            "role": "cap",
+            "sequence": cap_sequence,
+            "source": {"kind": "literal", "label": f"{record.cap.id} override"},
+        },
+        {
+            "segment_id": "payload_complement",
+            "role": "payload_complement",
+            "transform": {
+                "kind": "reverse_complement",
+                "source_segment_id": "payload_primary",
+                "assert_expected_sequence": True,
+            },
+            "source": {"kind": "derived", "from_segment_id": "payload_primary"},
+        },
+        {
+            "segment_id": "flank_3p",
+            "role": "flank_3p",
+            "sequence": flank_3p,
+            "source": {
+                "kind": "study_record",
+                "study_id": "retron_hairpin_design",
+                "ref": record.construct_label,
+            },
+        },
+    ]
+
+
+def _msd_unit_annotations(*, flank_5p_prefix: str, flank_5p: str, right_base: str) -> list[dict[str, object]]:
+    return [
+        {
+            "annotation_id": "stem_base_left",
+            "role": "stem_base_left",
+            "location": {
+                "basis": "segment",
+                "segment_id": "flank_5p",
+                "start": len(flank_5p_prefix),
+                "end": len(flank_5p),
+            },
+        },
+        {
+            "annotation_id": "stem_base_right",
+            "role": "stem_base_right",
+            "location": {
+                "basis": "segment",
+                "segment_id": "flank_3p",
+                "start": 0,
+                "end": len(right_base),
+            },
+        },
+    ]
+
+
+def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) -> dict[str, object]:
+    return {
+        "title": f"{record.construct_id} {payload_label}",
+        "component_labels": {
+            "flank_5p": "5' Flanking",
+            "payload_primary": payload_label,
+            "snapback_cap_segment": "Cap",
+            "payload_complement": f"{payload_label} complement",
+            "flank_3p": "3' Flanking",
+        },
+        "annotation_labels": {
+            "stem_base_left": "Left Base",
+            "stem_base_right": "Right Base",
+        },
+        "component_hues": {
+            "flank_5p": "#4C78A8",
+            "flank_3p": "#72B7B2",
+            "payload_primary": "#F58518",
+            "payload_complement": "#E45756",
+            "snapback_cap_segment": "#54A24B",
+            "stem_base_left": "#B279A2",
+            "stem_base_right": "#9D755D",
+        },
+        "base_highlight_color": "#111827",
+    }
+
+
 def _composition_config_payload(
     record: MsdDesignReferenceV1,
     *,
@@ -361,7 +467,6 @@ def _composition_config_payload(
     flank_5p = f"{flank_5p_prefix}{left_base}"
     flank_3p = f"{right_base}{flank_3p_suffix}"
     payload_label = record.payload_or_target.display_name or record.payload_or_target.id
-    cap_label = record.cap.display_name or record.cap.id
     return {
         "contract": "linear_ssdna_composition_v1",
         "schema_version": 1,
@@ -378,105 +483,18 @@ def _composition_config_payload(
             {
                 "unit_id": f"{record.msd_design_id}_unit",
                 "repeat_count": _MSD_UNIT_REPEAT_COUNT,
-                "segments": [
-                    {
-                        "segment_id": "flank_5p",
-                        "role": "flank_5p",
-                        "sequence": flank_5p,
-                        "source": {
-                            "kind": "study_record",
-                            "study_id": "retron_hairpin_design",
-                            "ref": record.construct_label,
-                        },
-                    },
-                    {
-                        "segment_id": "payload_primary",
-                        "role": "payload_primary",
-                        "sequence": payload_sequence,
-                        "source": {"kind": "literal", "label": f"{record.payload_or_target.id} override"},
-                    },
-                    {
-                        "segment_id": "snapback_cap_segment",
-                        "role": "snapback_cap_segment",
-                        "sequence": cap_sequence,
-                        "source": {"kind": "literal", "label": f"{record.cap.id} override"},
-                    },
-                    {
-                        "segment_id": "payload_complement",
-                        "role": "payload_complement",
-                        "transform": {
-                            "kind": "reverse_complement",
-                            "source_segment_id": "payload_primary",
-                            "assert_expected_sequence": True,
-                        },
-                        "source": {"kind": "derived", "from_segment_id": "payload_primary"},
-                    },
-                    {
-                        "segment_id": "flank_3p",
-                        "role": "flank_3p",
-                        "sequence": flank_3p,
-                        "source": {
-                            "kind": "study_record",
-                            "study_id": "retron_hairpin_design",
-                            "ref": record.construct_label,
-                        },
-                    },
-                ],
-                "annotations": [
-                    {
-                        "annotation_id": "stem_base_left",
-                        "role": "stem_base_left",
-                        "location": {
-                            "basis": "segment",
-                            "segment_id": "flank_5p",
-                            "start": len(flank_5p_prefix),
-                            "end": len(flank_5p),
-                        },
-                    },
-                    {
-                        "annotation_id": "payload_primary",
-                        "role": "payload",
-                        "semantic_label": payload_label,
-                        "location": {
-                            "basis": "segment",
-                            "segment_id": "payload_primary",
-                            "start": 0,
-                            "end": len(payload_sequence),
-                        },
-                    },
-                    {
-                        "annotation_id": "snapback_cap",
-                        "role": "snapback_cap",
-                        "semantic_label": cap_label,
-                        "location": {
-                            "basis": "segment",
-                            "segment_id": "snapback_cap_segment",
-                            "start": 0,
-                            "end": len(cap_sequence),
-                        },
-                    },
-                    {
-                        "annotation_id": "payload_complement",
-                        "role": "payload_complement",
-                        "semantic_label": f"{payload_label}_reverse_complement",
-                        "location": {
-                            "basis": "segment",
-                            "segment_id": "payload_complement",
-                            "start": 0,
-                            "end": len(payload_sequence),
-                        },
-                    },
-                    {
-                        "annotation_id": "stem_base_right",
-                        "role": "stem_base_right",
-                        "location": {
-                            "basis": "segment",
-                            "segment_id": "flank_3p",
-                            "start": 0,
-                            "end": len(right_base),
-                        },
-                    },
-                ],
+                "segments": _msd_unit_segments(
+                    record,
+                    flank_5p=flank_5p,
+                    flank_3p=flank_3p,
+                    payload_sequence=payload_sequence,
+                    cap_sequence=cap_sequence,
+                ),
+                "annotations": _msd_unit_annotations(
+                    flank_5p_prefix=flank_5p_prefix,
+                    flank_5p=flank_5p,
+                    right_base=right_base,
+                ),
                 "assertions": [
                     {
                         "assertion_id": "payload_rc",
@@ -500,30 +518,7 @@ def _composition_config_payload(
         "folding": {"enabled": False, "required": False, "scope": "canonical_component_unit"},
         "visual": {
             "emit": ["sequence_evidence_map_v1"],
-            "display_profile": {
-                "title": f"{record.construct_id} {payload_label}",
-                "component_labels": {
-                    "flank_5p": "5' flank",
-                    "payload_primary": f"{payload_label} primary",
-                    "snapback_cap_segment": "Snapback cap",
-                    "payload_complement": f"{payload_label} complement",
-                    "flank_3p": "3' flank",
-                },
-                "annotation_labels": {
-                    "stem_base_left": "Left stem base",
-                    "stem_base_right": "Right stem base",
-                },
-                "component_hues": {
-                    "flank_5p": "#4C78A8",
-                    "flank_3p": "#72B7B2",
-                    "payload_primary": "#F58518",
-                    "payload_complement": "#E45756",
-                    "snapback_cap_segment": "#54A24B",
-                    "stem_base_left": "#B279A2",
-                    "stem_base_right": "#9D755D",
-                },
-                "base_highlight_color": "#111827",
-            },
+            "display_profile": _msd_display_profile(record, payload_label=payload_label),
             "render_exports": {"formats": list(render_formats)},
         },
         "benchling_export": {

@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: "Compile or route Retron MSD genetic-compiler requests. Use for MSD IDs, single-unit MSD sequence bundles, design catalogs, GenBank/PNG, or missing MSD parts. Do not use for generic Cruncher/snapback or bench protocols."
 metadata:
-  version: 0.7.3
+  version: 0.7.4
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -46,6 +46,9 @@ Out of scope:
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
   payload primary, cap geometry, payload complement, right base + 3' flank.
 - No user-facing repeat count; do not chain complete MSD units together.
+- GenBank/CSV output uses display labels for visible feature names, keeps raw
+  ids in machine qualifiers, and does not duplicate full component spans as
+  same-span annotations.
 - Outputs go to explicit transient or caller-owned directories; no workspace
   sprawl.
 - Contracts fail fast on profile drift, non-ligatable `S0=M` violations, unknown registry
