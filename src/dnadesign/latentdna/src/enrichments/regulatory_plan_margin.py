@@ -16,6 +16,7 @@ from .categorical_enrichment import (
     CategoricalEnrichmentGroup,
     categorical_enrichment_rows,
 )
+from .rank_association import RankAssociationConfig, rank_association_rows
 from .regulatory_plan_margin_contracts import (
     EPS,
     RegulatoryPlanMarginArtifacts,
@@ -286,6 +287,75 @@ def _enrichment_rows(
     return output_rows
 
 
+def _margin_scores_by_parent(
+    *,
+    native_parent_ids: list[str],
+    margin_by_plan: dict[str, np.ndarray],
+    plan_order: list[str],
+) -> dict[str, dict[str, float]]:
+    return {
+        parent_id: {plan: float(margin_by_plan[plan][index]) for plan in plan_order}
+        for index, parent_id in enumerate(native_parent_ids)
+    }
+
+
+def _rank_test_rows(
+    *,
+    plan_order: list[str],
+    native_parent_ids: list[str],
+    margin_by_plan: dict[str, np.ndarray],
+    regulators_by_parent: dict[str, set[str]],
+    labels_by_normalized: dict[str, str],
+    min_global_promoters: int,
+    common_regulators: set[str],
+    alternative: str,
+) -> list[dict[str, object]]:
+    generic_rows = rank_association_rows(
+        universe_ids=native_parent_ids,
+        score_by_subject=_margin_scores_by_parent(
+            native_parent_ids=native_parent_ids,
+            margin_by_plan=margin_by_plan,
+            plan_order=plan_order,
+        ),
+        features_by_subject=regulators_by_parent,
+        feature_labels=labels_by_normalized,
+        axis_ids=plan_order,
+        config=RankAssociationConfig(
+            min_feature_support=min_global_promoters,
+            alternative=alternative,
+        ),
+        common_features=common_regulators,
+    )
+    output_rows: list[dict[str, object]] = []
+    for row in generic_rows:
+        notes = str(row["notes"])
+        notes = notes.replace("below_min_feature_support", "below_min_support")
+        notes = notes.replace("common_feature", "common_regulator")
+        output_rows.append(
+            {
+                "regulator_abbrev": row["feature"],
+                "plan": row["axis"],
+                "n_total_native": row["n_total"],
+                "n_with_regulator": row["n_with"],
+                "n_without_regulator": row["n_without"],
+                "median_margin_with_regulator": row["median_with"],
+                "median_margin_without_regulator": row["median_without"],
+                "u_statistic": row["u_statistic"],
+                "auc": row["auc"],
+                "rank_biserial": row["rank_biserial"],
+                "p_value": row["p_value"],
+                "q_value": row["q_value"],
+                "p_value_method": row["p_value_method"],
+                "p_value_alternative": row["p_value_alternative"],
+                "fdr_method": row["fdr_method"],
+                "passes_min_support": row["passes_min_feature_support"],
+                "is_common_regulator": row["is_common_feature"],
+                "notes": notes,
+            }
+        )
+    return output_rows
+
+
 def build_regulatory_plan_margin_artifacts(
     *,
     matrix: np.ndarray,
@@ -307,6 +377,7 @@ def build_regulatory_plan_margin_artifacts(
     native_metadata_columns: Iterable[object] = (),
     required_relation_columns: Iterable[object] = (),
     fdr_method: str = "benjamini_hochberg",
+    rank_test_alternative: str = "greater",
     expected_output_rows: int | None = None,
 ) -> RegulatoryPlanMarginArtifacts:
     """Build plan-margin score, tail-membership, and regulator-enrichment tables."""
@@ -383,6 +454,9 @@ def build_regulatory_plan_margin_artifacts(
         thresholds=thresholds_list,
         tail_modes=tail_modes_list,
     )
+    normalized_common_regulators = {
+        value.casefold() for value in string_values(common_regulators, field_name="common_regulators")
+    }
     enrichment_rows = _enrichment_rows(
         plan_order=ordered_plans,
         native_parent_ids=parent_ids,
@@ -393,13 +467,22 @@ def build_regulatory_plan_margin_artifacts(
         tail_modes=tail_modes_list,
         min_global_promoters=min_global_promoters,
         min_tail_hits=min_tail_hits,
-        common_regulators={
-            value.casefold() for value in string_values(common_regulators, field_name="common_regulators")
-        },
+        common_regulators=normalized_common_regulators,
+    )
+    rank_test_rows = _rank_test_rows(
+        plan_order=ordered_plans,
+        native_parent_ids=parent_ids,
+        margin_by_plan=margin_by_plan,
+        regulators_by_parent=regulators_by_parent,
+        labels_by_normalized=labels_by_normalized,
+        min_global_promoters=min_global_promoters,
+        common_regulators=normalized_common_regulators,
+        alternative=rank_test_alternative,
     )
     return RegulatoryPlanMarginArtifacts(
         scores_table=pa.Table.from_pylist(score_rows),
         tail_membership_table=pa.Table.from_pylist(tail_rows),
+        rank_tests_table=pa.Table.from_pylist(rank_test_rows),
         enrichment_table=pa.Table.from_pylist(enrichment_rows),
         stats={
             "view_id": view_id,
@@ -414,8 +497,10 @@ def build_regulatory_plan_margin_artifacts(
             "min_global_promoters": min_global_promoters,
             "min_tail_hits": min_tail_hits,
             "fdr_method": fdr_method,
+            "rank_test_alternative": rank_test_alternative,
             "score_rows": len(score_rows),
             "tail_membership_rows": len(tail_rows),
+            "rank_test_rows": len(rank_test_rows),
             "enrichment_rows": len(enrichment_rows),
             **relation_stats,
         },

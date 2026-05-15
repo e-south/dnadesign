@@ -100,6 +100,11 @@ def test_generic_runtime_modules_do_not_branch_on_sigma35_semantics() -> None:
         repo_root / "src/dnadesign/latentdna/src/scalars/build.py",
         repo_root / "src/dnadesign/latentdna/src/scalars/common.py",
         repo_root / "src/dnadesign/latentdna/src/scalars/preassay.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/preassay_common.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/preassay_ordinal.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/preassay_reference.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/preassay_selection.py",
+        repo_root / "src/dnadesign/latentdna/src/scalars/preassay_summary.py",
         repo_root / "src/dnadesign/latentdna/src/visual_style.py",
     ]
     forbidden_tokens = ["sig35", "sigma35", "sigma-35", "promoter-specific"]

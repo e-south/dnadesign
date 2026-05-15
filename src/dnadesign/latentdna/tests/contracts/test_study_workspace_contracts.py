@@ -127,6 +127,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "reference_standard_strength_audit",
         "native_tf_axis_orientation_audit",
         "native_regulator_plan_margin_enrichment",
+        "native_regulator_go_bp_plan_margin_enrichment",
         "sigma35_centroid_distance_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
@@ -634,6 +635,13 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert regulator_margin_plot.static_filters[0].column == "threshold"
     assert regulator_margin_plot.static_filters[0].equals == 0.10
     assert [group for group in regulator_margin_plot.group_order] == ["background", "ethanol", "cipro", "dual"]
+    go_bp_plot = context.config.plots["native_regulator_go_bp_plan_margin_enrichment"]
+    assert go_bp_plot.kind == "categorical_enrichment_summary"
+    assert go_bp_plot.scalar == "native_regulator_go_bp_plan_margin_enrichment"
+    assert go_bp_plot.feature_column == "feature_label"
+    assert go_bp_plot.count_column == "n_feature_tail"
+    assert go_bp_plot.total_column == "n_feature_total"
+    assert [group for group in go_bp_plot.group_order] == ["background", "ethanol", "cipro", "dual"]
     assert "native_tf_context_1kb" not in context.config.sources
     assert {
         source.dataset
@@ -723,10 +731,12 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "native_regulator_plan_margin_enrichment_recipe"
     )
     assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["scalars"] == [
-        "native_regulator_plan_margin_enrichment"
+        "native_regulator_plan_margin_enrichment",
+        "native_regulator_go_bp_plan_margin_enrichment",
     ]
     assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["plots"] == [
-        "native_regulator_plan_margin_enrichment"
+        "native_regulator_plan_margin_enrichment",
+        "native_regulator_go_bp_plan_margin_enrichment",
     ]
     assert context.config.exports == {}
 
@@ -844,7 +854,9 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "margin_top_quantile",
         "margin_top_quantile_nearest_plan_only",
     ]
-    assert regulator_margin_params["regulatory_interactions"]["row_key"] == "derived__parent_id"
+    assert regulator_margin_params["rank_test_alternative"] == "greater"
+    assert regulator_margin_params["native_parent_column"] == "derived__parent_id"
+    assert "row_key" not in regulator_margin_params["regulatory_interactions"]
     assert regulator_margin_params["regulatory_interactions"]["required_columns"] == [
         "source_release",
         "source_route",
@@ -854,6 +866,26 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     ]
     assert regulator_margin_steps["render_native_regulator_plan_margin_enrichment"].params == {
         "plot_id": "native_regulator_plan_margin_enrichment"
+    }
+    go_bp_params = regulator_margin_steps["build_native_regulator_go_bp_plan_margin_enrichment"].params
+    assert go_bp_params["kind"] == "plan_margin_feature_enrichment"
+    assert go_bp_params["source_scalar"] == "native_regulator_plan_margin_enrichment"
+    assert go_bp_params["scores_table"] == "native_plan_margin_scores.parquet"
+    assert go_bp_params["tail_membership_table"] == "native_plan_margin_tail_membership.parquet"
+    assert go_bp_params["feature_membership"]["subject_column"] == "usr_id"
+    assert go_bp_params["feature_membership"]["feature_id_column"] == "go_id"
+    assert go_bp_params["feature_membership"]["feature_label_column"] == "go_name"
+    assert go_bp_params["feature_membership"]["feature_namespace_column"] == "go_namespace"
+    assert go_bp_params["feature_membership"]["namespace_filter"] == "biological_process"
+    assert go_bp_params["feature_membership"]["exclude_label_prefixes"] == ["obsolete "]
+    assert go_bp_params["feature_membership"]["source_metadata_columns"] == [
+        "biocyc_kb_version",
+        "smarttable_id",
+        "source_terms_sha256",
+    ]
+    assert go_bp_params["rank_test_alternative"] == "greater"
+    assert regulator_margin_steps["render_native_regulator_go_bp_plan_margin_enrichment"].params == {
+        "plot_id": "native_regulator_go_bp_plan_margin_enrichment"
     }
     assert all(
         step.params.get("kind")

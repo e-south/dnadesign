@@ -29,6 +29,7 @@ class RegulatoryPlanMarginArtifacts:
 
     scores_table: pa.Table
     tail_membership_table: pa.Table
+    rank_tests_table: pa.Table
     enrichment_table: pa.Table
     stats: dict[str, object]
 

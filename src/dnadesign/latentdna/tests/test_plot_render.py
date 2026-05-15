@@ -56,6 +56,7 @@ from dnadesign.latentdna.src.plots.renderers.metric import (
     metric_panel_uses_grouped_family_bars,
     render_metric_panel,
 )
+from dnadesign.latentdna.src.plots.renderers.metric_labels import candidate_tick_label
 from dnadesign.latentdna.src.plots.renderers.projection import render_projection_plot
 from dnadesign.latentdna.src.plots.renderers.scatter import axis_category_value as _axis_category_value
 from dnadesign.latentdna.src.plots.renderers.scatter import category_color_map as _category_color_map
@@ -598,9 +599,10 @@ def test_metric_panel_disables_grouped_family_bars_when_keys_would_overwrite_row
             square=False,
         )
 
-        tick_labels = [label.get_text().replace("\n", " ") for label in ax.get_xticklabels()]
-        assert any("Anchor Vs Context" in label for label in tick_labels)
-        assert any("Anchor Vs Full" in label for label in tick_labels)
+        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        assert "Fwd\nanchor" in tick_labels
+        assert "Fwd\nseq" in tick_labels
+        assert all("7B Intermediate" not in label for label in tick_labels)
     finally:
         plt.close(fig)
 
@@ -1162,7 +1164,10 @@ def test_render_distribution_panel_ordinal_swarm_draws_sampled_points_and_rank_a
         line_labels = {line.get_label() for line in ax.lines}
         assert "_ordinal_linear_fit" in line_labels
         assert "_ordinal_class_median_connector" in line_labels
-        assert any("Ordinal-order rho" in text.get_text() and "R^2" in text.get_text() for text in ax.texts)
+        assert any(
+            "Ordinal-order rho" in text.get_text() and "Kendall tau-b" in text.get_text() and "R^2" in text.get_text()
+            for text in ax.texts
+        )
     finally:
         plt.close(fig)
 
@@ -1203,6 +1208,91 @@ def test_render_distribution_panel_ordinal_swarm_does_not_draw_singleton_whisker
         plt.close(fig)
 
 
+def test_render_metric_panel_compacts_context_pair_tick_labels() -> None:
+    rows = [
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "1 kb anchor mean",
+            "comparison_role": "context_anchor_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.12,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "1 kb sequence mean",
+            "comparison_role": "context_full_sequence_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.07,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "RC 1 kb anchor mean",
+            "comparison_role": "reverse_complement_anchor_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.01,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "RC 1 kb sequence mean",
+            "comparison_role": "reverse_complement_full_sequence_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.02,
+        },
+    ]
+    spec = _metric_spec(plot_id="context_pair_summary", color_column="comparison_role").model_copy(
+        update={"label_column": "label", "sort_rule": "label_asc"}
+    )
+    color_map, _ = _category_color_map([rows], spec.color_column)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    try:
+        render_metric_panel(
+            ax,
+            rows=rows,
+            spec=spec,
+            panel_title="Context self cosine",
+            color_map=color_map,
+            square=True,
+        )
+
+        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        assert tick_labels == [
+            "Fwd\nanchor",
+            "Fwd\nseq",
+            "RC\nanchor",
+            "RC\nseq",
+        ]
+        assert all(label.get_rotation() == 0.0 for label in ax.get_xticklabels())
+    finally:
+        plt.close(fig)
+
+
+def test_metric_context_label_compaction_is_plot_scoped() -> None:
+    row = {"label": "1 kb anchor mean"}
+    labeled_candidate = {
+        "candidate_label": "7B intermediate: anchor vs full 1 kb context",
+        "candidate_model": "7b",
+        "candidate_scope": "anchor_vs_context",
+        "candidate_family": "intermediate_embedding",
+        "label": "context_self_cosine_median",
+    }
+
+    assert candidate_tick_label(row, fallback_column="label", plot_id="context_pair_summary") == "Fwd\nanchor"
+    assert candidate_tick_label(row, fallback_column="label", plot_id="context_robustness_summary") == "Fwd\nanchor"
+    assert (
+        candidate_tick_label(labeled_candidate, fallback_column="label", plot_id="context_robustness_summary")
+        == "Fwd\nseq"
+    )
+    assert candidate_tick_label(row, fallback_column="label", plot_id="design_structure_summary") == "1 kb Anchor\nMean"
+
+
 def test_render_distribution_panel_ordinal_swarm_skips_trend_for_degenerate_rank() -> None:
     rows = [
         {
@@ -1228,6 +1318,43 @@ def test_render_distribution_panel_ordinal_swarm_skips_trend_for_degenerate_rank
         assert "_ordinal_linear_fit" not in line_labels
         assert "_ordinal_class_median_connector" not in line_labels
         assert "_ordinal_class_median_tick" in line_labels
+    finally:
+        plt.close(fig)
+
+
+def test_render_distribution_panel_ordinal_swarm_preserves_zero_rank_order() -> None:
+    rows = [
+        {
+            "ordinal_label": "weak",
+            "ordinal_plot_order": 0,
+            "ordinal_margin": -0.3,
+        },
+        {
+            "ordinal_label": "middle",
+            "ordinal_plot_order": 1,
+            "ordinal_margin": 0.0,
+        },
+        {
+            "ordinal_label": "strong",
+            "ordinal_plot_order": 2,
+            "ordinal_margin": 0.3,
+        },
+    ]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    try:
+        render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="ordinal_margin",
+            color_column="ordinal_label",
+            render_mode="ordinal_swarm",
+            panel_title="Zero-based ladder",
+            square=False,
+        )
+
+        assert [label.get_text() for label in ax.get_xticklabels()] == ["Weak", "Middle", "Strong"]
+        assert any("Ordinal-order rho=1.00" in text.get_text() for text in ax.texts)
+        assert any("Kendall tau-b=1.00" in text.get_text() for text in ax.texts)
     finally:
         plt.close(fig)
 

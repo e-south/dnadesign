@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
 import marimo as mo
@@ -29,22 +28,32 @@ from ..visual_style import (
     wrap_plot_title,
 )
 from ..visual_style import scatter_style as shared_scatter_style
+from .browser_runtime_plot_review_axes import categorical_hue_series as _categorical_hue_series
+from .browser_runtime_plot_review_axes import categorical_hue_values as _categorical_hue_values
+from .browser_runtime_plot_review_axes import configured_hue_kinds as _configured_hue_kinds
+from .browser_runtime_plot_review_axes import continuous_hue_params as _continuous_hue_params
+from .browser_runtime_plot_review_axes import continuous_hue_params_for_frame as _continuous_hue_params_for_frame
+from .browser_runtime_plot_review_axes import panel_figure_size as _panel_figure_size
+from .browser_runtime_plot_review_axes import panel_grid_dimensions as _panel_grid_dimensions
+from .browser_runtime_plot_review_axes import plot_panel_title as _plot_panel_title
+from .browser_runtime_plot_review_axes import prefer_single_row_panel_layout as _prefer_single_row_panel_layout
+from .browser_runtime_plot_review_axes import resolved_axis_label as _resolved_axis_label
+from .browser_runtime_plot_review_axes import scatter_axis_label as _scatter_axis_label
+from .browser_runtime_plot_review_axes import scatter_grid_axis_label_texts as _scatter_grid_axis_label_texts
+from .browser_runtime_plot_review_axes import shared_numeric_bounds as _shared_numeric_bounds
 from .browser_runtime_projection import enrich_projection_frame, load_projection_frame, render_projection_grid
 from .browser_runtime_support import (
     category_color_map as notebook_category_color_map,
 )
 from .browser_runtime_support import (
-    category_values_for_legend,
     classify_hue_series,
     continuous_hue_colorbar_label,
-    continuous_hue_render_params,
     display_hue_label,
     draw_missing_hue_background,
     draw_reference_labels,
     hue_option_scale,
     load_artifact_manifest,
     load_table,
-    normalize_categorical_hue_series,
     normalize_hue_kind,
     reference_hue_coverage_warnings,
     reference_hue_render_params,
@@ -60,15 +69,6 @@ from .raster_scatter import (
     should_rasterize_scatter,
 )
 from .rendering import render_matplotlib_figure
-
-_SINGLE_ROW_PANEL_PLOT_IDS = frozenset(
-    {
-        "balanced_design_family_margin_gallery",
-        "design_centroid_margin_gallery",
-        "representation_scree_diagnostic",
-        "appendix_umap_gallery",
-    }
-)
 
 
 def _load_error_frame(message: str) -> pd.DataFrame:
@@ -253,178 +253,6 @@ def load_plot_review_frames(
             frame = _load_error_frame(str(exc))
         return [frame]
     return []
-
-
-def _prefer_single_row_panel_layout(plot_id: str | None, panel_count: int, *, configured: object = None) -> bool:
-    if configured is not None:
-        return bool(configured) and 1 < panel_count <= 6
-    return bool(plot_id in _SINGLE_ROW_PANEL_PLOT_IDS and 1 < panel_count <= 6)
-
-
-def _panel_grid_dimensions(panel_count: int, *, prefer_single_row: bool = False) -> tuple[int, int]:
-    if panel_count <= 1:
-        return 1, 1
-    if prefer_single_row and panel_count <= 6:
-        return 1, panel_count
-    if panel_count == 12:
-        return 2, 6
-    if panel_count == 5:
-        return 2, 3
-    if panel_count == 6:
-        return 2, 3
-    if panel_count in {7, 8}:
-        return 2, 4
-    if panel_count == 4:
-        return 2, 2
-    columns = min(4, panel_count)
-    rows = int(math.ceil(panel_count / columns))
-    return rows, columns
-
-
-def _panel_figure_size(panel_count: int, *, prefer_single_row: bool = False) -> tuple[float, float]:
-    rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=prefer_single_row)
-    if panel_count == 12:
-        return ((4.15 * columns) + 0.35, (5.3 * rows) + 0.2)
-    panel_width = 3.55 if prefer_single_row and columns >= 4 else 4.15
-    panel_height = 4.2 if prefer_single_row and panel_count > 1 else 4.35
-    return ((panel_width * columns) + 0.35, (panel_height * rows) + 0.2)
-
-
-def _configured_hue_kinds(plot_spec: dict[str, object]) -> dict[str, str]:
-    options = plot_spec.get("hue_options", [])
-    return {
-        str(option.get("column")): str(option.get("type"))
-        for option in options
-        if isinstance(option, dict) and option.get("column") and option.get("type")
-    }
-
-
-def _scatter_axis_label(frame: pd.DataFrame, *, value_column: str, label_column: str) -> str:
-    if label_column in frame.columns:
-        labels = {
-            str(value).strip() for value in frame[label_column].dropna().astype(str).tolist() if str(value).strip()
-        }
-        if len(labels) == 1:
-            return humanize_display_text(next(iter(labels)))
-    return humanize_display_text(value_column)
-
-
-def _contains_math_text(value: object) -> bool:
-    text = str(value or "")
-    return "$" in text or "\\(" in text or "\\[" in text
-
-
-def _resolved_axis_label(
-    *,
-    explicit_label: object | None,
-    fallback_label: object,
-    width: int = 28,
-    max_lines: int | None = 2,
-) -> str:
-    text = " ".join(str(explicit_label or "").split()).strip()
-    if text:
-        if _contains_math_text(text):
-            return text
-        return wrap_plot_title(text, width=width, max_lines=max_lines)
-    return wrap_plot_title(humanize_display_text(str(fallback_label)), width=width, max_lines=max_lines)
-
-
-def _scatter_grid_axis_label_texts(
-    plot_spec: dict[str, object],
-    *,
-    frame: pd.DataFrame,
-    x_column: str,
-    y_column: str,
-) -> tuple[str, str]:
-    return (
-        _resolved_axis_label(
-            explicit_label=plot_spec.get("x_axis_label"),
-            fallback_label=_scatter_axis_label(frame, value_column=x_column, label_column="x_display_name"),
-            width=28,
-            max_lines=2,
-        ),
-        _resolved_axis_label(
-            explicit_label=plot_spec.get("y_axis_label"),
-            fallback_label=_scatter_axis_label(frame, value_column=y_column, label_column="y_display_name"),
-            width=28,
-            max_lines=2,
-        ),
-    )
-
-
-def _shared_numeric_bounds(frames: list[pd.DataFrame], hue_column: str) -> tuple[float | None, float | None]:
-    values = [
-        pd.to_numeric(frame[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-        for frame in frames
-        if hue_column in frame.columns
-    ]
-    if not values:
-        return None, None
-    combined = pd.concat(values, ignore_index=True)
-    if combined.empty or combined.nunique() < 2:
-        return None, None
-    return float(combined.min()), float(combined.max())
-
-
-def _continuous_hue_params(frames: list[pd.DataFrame], hue_column: str) -> dict[str, object]:
-    values = [
-        pd.to_numeric(frame[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-        for frame in frames
-        if hue_column in frame.columns
-    ]
-    combined = pd.concat(values, ignore_index=True) if values else pd.Series(dtype=float)
-    if combined.empty or combined.nunique() < 2:
-        return {"cmap": "viridis", "norm": None, "vmin": None, "vmax": None}
-    return continuous_hue_render_params(hue_column, combined)
-
-
-def _continuous_hue_params_for_frame(
-    frame: pd.DataFrame,
-    hue_column: str,
-    fallback: dict[str, object],
-) -> dict[str, object]:
-    if hue_column not in frame.columns:
-        return fallback
-    values = pd.to_numeric(frame[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-    if values.empty or values.nunique() < 2:
-        return fallback
-    return continuous_hue_render_params(hue_column, values)
-
-
-def _categorical_hue_values(
-    frames: list[pd.DataFrame],
-    hue_column: str,
-    *,
-    axis_styles: dict[str, object] | None = None,
-) -> list[str]:
-    categories = [
-        str(value)
-        for frame in frames
-        if hue_column in frame.columns
-        for value in _categorical_hue_series(frame, hue_column, axis_styles=axis_styles).unique()
-    ]
-    return category_values_for_legend(categories, column=hue_column, axis_styles=axis_styles)
-
-
-def _categorical_hue_series(
-    frame: pd.DataFrame,
-    hue_column: str,
-    *,
-    axis_styles: dict[str, object] | None = None,
-) -> pd.Series:
-    return normalize_categorical_hue_series(
-        hue_column,
-        frame[hue_column],
-        axis_styles=axis_styles,
-        frame=frame,
-    )
-
-
-def _plot_panel_title(plot_spec: dict[str, object], index: int, fallback: str) -> str:
-    titles = plot_spec.get("panel_titles", [])
-    if isinstance(titles, list) and index < len(titles):
-        return str(titles[index])
-    return fallback
 
 
 def render_plot_review_surface(

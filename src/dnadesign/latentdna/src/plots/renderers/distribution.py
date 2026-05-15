@@ -12,6 +12,7 @@ from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
 from ...labels import humanize_candidate
 from ...metadata_axes import AxisStyle, normalize_axis_categories
+from ...stats.rank import kendall_tau_b, linear_r2, spearman_correlation
 from ...visual_style import PUBLICATION_PALETTE, humanize_display_text, wrap_plot_title
 from ...workspaces.loader import WorkspaceContext
 from ..axes import (
@@ -67,49 +68,8 @@ def _coerce_float(value: object) -> float | None:
     return coerced if np.isfinite(coerced) else None
 
 
-def _rankdata(values: np.ndarray) -> np.ndarray:
-    order = np.argsort(values, kind="mergesort")
-    ranks = np.empty(values.size, dtype=np.float64)
-    sorted_values = values[order]
-    start = 0
-    while start < values.size:
-        end = start + 1
-        while end < values.size and sorted_values[end] == sorted_values[start]:
-            end += 1
-        ranks[order[start:end]] = (start + end - 1) / 2.0
-        start = end
-    return ranks
-
-
-def _spearman_rho(x_values: list[float], y_values: list[float]) -> float | None:
-    if len(x_values) < 3 or len(y_values) < 3:
-        return None
-    x = np.asarray(x_values, dtype=np.float64)
-    y = np.asarray(y_values, dtype=np.float64)
-    finite = np.isfinite(x) & np.isfinite(y)
-    if int(finite.sum()) < 3:
-        return None
-    x_ranks = _rankdata(x[finite])
-    y_ranks = _rankdata(y[finite])
-    if np.std(x_ranks) == 0.0 or np.std(y_ranks) == 0.0:
-        return None
-    return float(np.corrcoef(x_ranks, y_ranks)[0, 1])
-
-
-def _linear_r2(x_values: list[float], y_values: list[float]) -> float | None:
-    if len(x_values) < 3 or len(y_values) < 3:
-        return None
-    x = np.asarray(x_values, dtype=np.float64)
-    y = np.asarray(y_values, dtype=np.float64)
-    finite = np.isfinite(x) & np.isfinite(y)
-    if int(finite.sum()) < 3:
-        return None
-    x = x[finite]
-    y = y[finite]
-    if np.std(x) == 0.0 or np.std(y) == 0.0:
-        return None
-    pearson = float(np.corrcoef(x, y)[0, 1])
-    return pearson * pearson
+def _finite_statistic(value: float) -> float | None:
+    return float(value) if np.isfinite(value) else None
 
 
 def _linear_fit_coefficients(x_values: list[float], y_values: list[float]) -> tuple[float, float] | None:
@@ -186,7 +146,9 @@ def _render_ordinal_swarm(
             dtype=np.float32,
         )
         rank_values = [
-            _coerce_float(row.get("ordinal_plot_order")) or float(category_to_position[category])
+            order_value
+            if (order_value := _coerce_float(row.get("ordinal_plot_order"))) is not None
+            else float(category_to_position[category])
             for row in category_rows
             if _coerce_float(row.get(metric_column)) is not None
         ]
@@ -279,10 +241,13 @@ def _render_ordinal_swarm(
         ha="center" if len(categories) <= 9 else "right",
     )
     ax.set_xlim(0.35, len(categories) + 0.65)
-    rho = _spearman_rho(stat_x, stat_y)
-    r2 = _linear_r2(stat_x, stat_y)
+    rho = _finite_statistic(spearman_correlation(stat_x, stat_y, min_pairs=3))
+    tau_b = _finite_statistic(kendall_tau_b(stat_x, stat_y, min_pairs=3))
+    r2 = _finite_statistic(linear_r2(stat_x, stat_y, min_pairs=3))
     if rho is not None:
         stat_label = f"Ordinal-order rho={rho:.2f}"
+        if tau_b is not None:
+            stat_label = f"{stat_label}\nKendall tau-b={tau_b:.2f}"
         if r2 is not None:
             stat_label = f"{stat_label}\nlinear R^2={r2:.2f}"
         ax.text(

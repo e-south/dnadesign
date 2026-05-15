@@ -154,7 +154,18 @@ def test_regulatory_plan_margin_artifacts_dedupe_regulators_and_report_enrichmen
     assert crp["is_common_regulator"] is True
     assert crp["n_regulator_total"] == 2
     assert crp["q_value"] >= crp["p_value"]
+    rank_rows = artifacts.rank_tests_table.to_pylist()
+    by_rank_key = {(row["regulator_abbrev"], row["plan"]): row for row in rank_rows}
+    cpxr_rank = by_rank_key[("CpxR", "ethanol")]
+    assert cpxr_rank["n_with_regulator"] == 1
+    assert cpxr_rank["n_without_regulator"] == 5
+    assert cpxr_rank["rank_biserial"] > 0.0
+    assert cpxr_rank["p_value_method"] == "scipy_mannwhitneyu_asymptotic"
+    assert cpxr_rank["p_value_alternative"] == "greater"
+    crp_rank = by_rank_key[("CRP", "background")]
+    assert crp_rank["is_common_regulator"] is True
     assert artifacts.stats["matched_regulators"] == 4
+    assert artifacts.stats["rank_test_rows"] == 16
 
 
 def test_regulatory_plan_margin_artifacts_support_configured_plan_ids() -> None:
@@ -185,6 +196,7 @@ def test_regulatory_plan_margin_artifacts_support_configured_plan_ids() -> None:
     assert "sim_axis_a" in score_row
     assert "margin_axis_b" in score_row
     assert set(artifacts.enrichment_table.column("plan").to_pylist()) == {"axis_a", "axis_b"}
+    assert set(artifacts.rank_tests_table.column("plan").to_pylist()) == {"axis_a", "axis_b"}
 
 
 def test_regulatory_plan_margin_artifacts_fail_fast_on_duplicate_native_parent_ids() -> None:

@@ -353,7 +353,8 @@ def test_notebook_generation_flow(tmp_path: Path) -> None:
     assert 'label="Candidate set / mode"' in notebook_text
     assert 'label="Geometry"' in notebook_text
     assert 'label="Projection"' in notebook_text
-    assert 'label="Hue"' in notebook_text
+    assert 'label="Population hue"' in notebook_text
+    assert 'label="Reference color"' in notebook_text
     assert notebook_text.count("searchable=True") == 2
     assert "on_change=set_requested_hue" in notebook_text
     assert 'label="Left geometry"' not in notebook_text

@@ -9,10 +9,8 @@ import numpy as np
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...labels import humanize_candidate
 from ...metadata_axes import AxisStyle, ordered_categories_for_axis
 from ...visual_style import (
-    PLOT_TICK_FONT_SIZE,
     PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
@@ -25,6 +23,7 @@ from ..axes import apply_axes_style, wrapped_axis_label
 from ..layout import _HORIZONTAL_GROUPED_METRIC_PLOT_IDS
 from ..panels import render_placeholder_panel
 from ..tables import read_table_rows, require_row_columns
+from .metric_labels import candidate_tick_label, metric_tick_labels_need_rotation, style_metric_tick_labels
 from .scatter import axis_category_value, coerce_finite_float
 
 
@@ -44,214 +43,6 @@ class MetricPanelGridInput:
     rows: list[dict[str, object]]
     resolved_spec: ResolvedPlotSpec
     groups: list[MetricPanelGroup]
-
-
-def _wrapped_tick_label(value: object, *, width: int = 16, max_lines: int | None = None) -> str:
-    return wrap_plot_title(humanize_display_text(str(value)), width=width, max_lines=max_lines)
-
-
-def _candidate_row_label(
-    row: dict[str, object],
-    *,
-    fallback_column: str,
-    include_family: bool = True,
-) -> str:
-    candidate_fields = {
-        key: str(row.get(key) or "").strip()
-        for key in ("candidate_model", "candidate_scope", "candidate_family")
-        if str(row.get(key) or "").strip()
-    }
-    if not include_family:
-        candidate_fields.pop("candidate_family", None)
-    if candidate_fields:
-        return humanize_candidate(candidate_fields)
-    return humanize_display_text(str(row.get(fallback_column) or ""))
-
-
-def _short_candidate_model(value: object) -> str:
-    text = humanize_display_text(value)
-    normalized = text.casefold()
-    if "20b" in normalized:
-        return "20B"
-    if "7b" in normalized:
-        return "7B"
-    return text
-
-
-def _short_candidate_scope(value: object) -> str:
-    text = humanize_display_text(value)
-    normalized = text.casefold()
-    if normalized in {
-        "60 bp anchor",
-        "anchor-source insert",
-        "merged anchor insert seq mean",
-        "mixed-length anchor-source insert",
-        "anchor-source insert mean",
-    }:
-        return "anchor insert"
-    if normalized == "1 kb construct context":
-        return "1 kb ctx"
-    if normalized in {"1 kb context anchor mean", "full context anchor mean"}:
-        return "1 kb anchor mean"
-    if normalized in {"context anchor mean bidir concat", "context anchor mean bidirectional concat"}:
-        return "bidir anchor mean"
-    if normalized == "reverse complement context 1 kb":
-        return "RC 1 kb ctx"
-    if normalized == "reverse complement context anchor mean":
-        return "RC 1 kb anchor mean"
-    if normalized == "reference core60":
-        return "ref core60"
-    if normalized == "reference context forward 1 kb":
-        return "ref forward 1 kb"
-    if normalized == "reference context forward anchor mean":
-        return "ref forward anchor mean"
-    if normalized == "reference context reverse complement 1 kb":
-        return "ref RC 1 kb"
-    if normalized == "reference context reverse complement anchor mean":
-        return "ref RC anchor mean"
-    if normalized == "anchor + anchor-mean concat":
-        return "anchor + anchor-mean"
-    if normalized == "anchor + 1 kb context concat":
-        return "anchor + 1 kb ctx"
-    if normalized == "native source record":
-        return "native 81 bp"
-    if normalized in {"core60 tss upstream", "core60 tss-upstream"}:
-        return "core60 TSS"
-    return text
-
-
-def _compact_candidate_scope(value: object) -> str:
-    text = humanize_display_text(value)
-    normalized = text.casefold()
-    if normalized in {
-        "60 bp anchor",
-        "anchor-source insert",
-        "merged anchor insert seq mean",
-        "mixed-length anchor-source insert",
-        "anchor-source insert mean",
-    }:
-        return "anchor insert"
-    if normalized == "1 kb construct context":
-        return "1kb ctx"
-    if normalized in {"1 kb context anchor mean", "full context anchor mean"}:
-        return "1kb anchor mean"
-    if normalized in {"context anchor mean bidir concat", "context anchor mean bidirectional concat"}:
-        return "bidir anchor mean"
-    if normalized == "reverse complement context 1 kb":
-        return "RC 1kb ctx"
-    if normalized == "reverse complement context anchor mean":
-        return "RC 1kb anchor"
-    if normalized == "reference core60":
-        return "ref core60"
-    if normalized == "reference context forward 1 kb":
-        return "ref fwd 1kb"
-    if normalized == "reference context forward anchor mean":
-        return "ref fwd anchor"
-    if normalized == "reference context reverse complement 1 kb":
-        return "ref RC 1kb"
-    if normalized == "reference context reverse complement anchor mean":
-        return "ref RC anchor"
-    if normalized == "anchor + anchor-mean concat":
-        return "anchor+anchor-mean"
-    if normalized == "anchor + 1 kb context concat":
-        return "anchor+1kb ctx"
-    if normalized == "native source record":
-        return "native81"
-    if normalized in {"core60 tss upstream", "core60 tss-upstream"}:
-        return "core60 TSS"
-    return text
-
-
-def _tick_labels_need_rotation(labels: list[str], *, grouped_family_bars: bool, plot_id: str | None) -> bool:
-    """Return whether metric-panel x tick labels need angled placement.
-
-    This keeps dense biological labels readable without plot-id-specific pixel tuning. The
-    grouped-family path is always rotated because the labels are compact semantic groups;
-    non-grouped bars rotate only when a short grid contains long candidate descriptions.
-    """
-
-    if grouped_family_bars or plot_id == "context_pair_summary":
-        return True
-    if not labels:
-        return False
-    max_line_length = max(len(line) for label in labels for line in str(label).splitlines())
-    return len(labels) <= 6 and max_line_length > 14
-
-
-def _short_candidate_family(value: object) -> str:
-    text = humanize_display_text(value)
-    normalized = text.casefold()
-    if normalized == "intermediate block mean":
-        return "Block"
-    if normalized == "output-layer mean":
-        return "Output"
-    return text
-
-
-def _candidate_tick_label(
-    row: dict[str, object],
-    *,
-    fallback_column: str,
-    include_family: bool = True,
-    include_scope: bool = True,
-    multiline: bool = True,
-    force_fallback: bool = False,
-) -> str:
-    model = str(row.get("candidate_model") or "").strip()
-    scope = str(row.get("candidate_scope") or "").strip()
-    family = str(row.get("candidate_family") or "").strip()
-    if model and not force_fallback:
-        short_model = _short_candidate_model(model)
-        parts = [short_model]
-        if include_scope and scope:
-            scope_label = _compact_candidate_scope(scope) if not multiline else _short_candidate_scope(scope)
-            parts[-1] = f"{short_model} {scope_label}"
-        if include_family and family:
-            short_family = _short_candidate_family(family)
-            parts.append(short_family)
-        separator = "\n" if multiline else " "
-        return separator.join(part for part in parts if part)
-    if force_fallback:
-        base_label = humanize_display_text(str(row.get(fallback_column) or row.get("candidate_label") or ""))
-    else:
-        base_label = _candidate_row_label(
-            row,
-            fallback_column=fallback_column,
-            include_family=include_family,
-        )
-    if multiline:
-        return _wrapped_tick_label(base_label, width=12, max_lines=4)
-    return base_label
-
-
-def _style_metric_tick_labels(
-    ax: Any,
-    *,
-    label_count: int,
-    axis: str = "x",
-    rotation: float = 0.0,
-    ha: str | None = None,
-    va: str | None = None,
-) -> None:
-    if label_count >= 8:
-        font_size = PLOT_TICK_FONT_SIZE - 3.1
-    elif label_count >= 6:
-        font_size = PLOT_TICK_FONT_SIZE - 1.4
-    else:
-        font_size = PLOT_TICK_FONT_SIZE - 0.6
-    if axis == "x" and rotation:
-        font_size -= 0.8
-    tick_labels = ax.get_xticklabels() if axis == "x" else ax.get_yticklabels()
-    default_ha = "right" if axis == "y" or rotation else "center"
-    default_va = "center" if axis == "y" else "top"
-    for label in tick_labels:
-        label.set_fontsize(font_size)
-        label.set_linespacing(0.95)
-        label.set_multialignment("right" if rotation else "center")
-        label.set_rotation(rotation)
-        label.set_rotation_mode("anchor")
-        label.set_ha(ha or default_ha)
-        label.set_va(va or default_va)
 
 
 def _add_metric_uncertainty_note(ax: Any, *, ci_enabled: bool) -> None:
@@ -504,9 +295,10 @@ def render_metric_panel(
     use_candidate_label_ticks = metric_panel_needs_candidate_label_ticks(ordered_rows, spec)
     tick_fallback_column = "candidate_label" if use_candidate_label_ticks else label_column
     labels = [
-        _candidate_tick_label(
+        candidate_tick_label(
             row,
             fallback_column=tick_fallback_column,
+            plot_id=spec.plot_id,
             include_family=include_family,
             multiline=not horizontal_metric,
             force_fallback=use_candidate_label_ticks,
@@ -541,12 +333,13 @@ def render_metric_panel(
         }
         include_scope = len(shared_scope) > 1
         group_labels = [
-            _candidate_tick_label(
+            candidate_tick_label(
                 {
                     "candidate_model": model,
                     "candidate_scope": scope,
                 },
                 fallback_column=label_column,
+                plot_id=spec.plot_id,
                 include_family=False,
                 include_scope=include_scope,
                 multiline=False,
@@ -615,7 +408,7 @@ def render_metric_panel(
         if group_positions.size:
             ax.set_ylim(float(group_positions.min()) - 0.55, float(group_positions.max()) + 0.55)
         ax.tick_params(axis="y", pad=6)
-        _style_metric_tick_labels(ax, label_count=max(len(group_labels), len(bar_value_pairs)), axis="y")
+        style_metric_tick_labels(ax, label_count=max(len(group_labels), len(bar_value_pairs)), axis="y")
         finite_values = [value for _, value in bar_value_pairs]
         finite_value_array = np.asarray(finite_values, dtype=np.float64)
         if spec.reference_line is not None:
@@ -734,7 +527,7 @@ def render_metric_panel(
                 )
         ax.set_yticks(positions, labels)
         ax.tick_params(axis="y", pad=6)
-        _style_metric_tick_labels(ax, label_count=len(labels), axis="y")
+        style_metric_tick_labels(ax, label_count=len(labels), axis="y")
         finite_value_array = np.asarray(finite_values, dtype=np.float64)
         if spec.reference_line is not None:
             ax.axvline(float(spec.reference_line), color=SPINE_COLOR, linewidth=0.9, linestyle="--", alpha=0.9)
@@ -813,12 +606,13 @@ def render_metric_panel(
         }
         include_scope = len(shared_scope) > 1
         group_labels = [
-            _candidate_tick_label(
+            candidate_tick_label(
                 {
                     "candidate_model": model,
                     "candidate_scope": scope,
                 },
                 fallback_column=label_column,
+                plot_id=spec.plot_id,
                 include_family=False,
                 include_scope=include_scope,
                 multiline=False,
@@ -928,14 +722,14 @@ def render_metric_panel(
     tick_labels_for_count = group_labels if grouped_family_bars else labels
     tick_rotation = (
         32.0
-        if _tick_labels_need_rotation(
+        if metric_tick_labels_need_rotation(
             tick_labels_for_count,
             grouped_family_bars=grouped_family_bars,
             plot_id=spec.plot_id,
         )
         else 0.0
     )
-    _style_metric_tick_labels(
+    style_metric_tick_labels(
         ax,
         label_count=max(len(tick_labels_for_count), len(bar_value_pairs)),
         rotation=tick_rotation,

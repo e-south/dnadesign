@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pyarrow as pa
 
 from dnadesign.latentdna.src.io.parquet_io import write_table
-from dnadesign.latentdna.src.scalars.build import _representation_scorecard_table
+from dnadesign.latentdna.src.scalars.builders.representation_scorecard import _representation_scorecard_table
 
 
 def test_representation_scorecard_keeps_dual_promoters_positive_and_emits_joint_dual_metrics(tmp_path) -> None:

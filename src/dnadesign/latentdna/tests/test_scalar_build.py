@@ -12,11 +12,8 @@ import pytest
 import yaml
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
-from dnadesign.latentdna.src.scalars.build import (
-    _cosine_distance_correlation,
-    _reference_neighbor_metrics,
-    build_scalar_artifact,
-)
+from dnadesign.latentdna.src.scalars.build import _cosine_distance_correlation, build_scalar_artifact
+from dnadesign.latentdna.src.scalars.builders.representation_scorecard import _reference_neighbor_metrics
 from dnadesign.latentdna.src.scalars.common import _normalized_geometry_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
@@ -332,6 +329,26 @@ def _write_margin_workspace_config(workspace_dir: Path) -> None:
     )
 
 
+def _write_scalar_manifest(scalar_dir: Path, *, scalar_id: str, outputs: list[str]) -> None:
+    (scalar_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "latentdna.manifest.v1",
+                "artifact_kind": "scalar_table",
+                "artifact_id": scalar_id,
+                "workspace_id": "test",
+                "created_at": "2026-05-15T00:00:00+00:00",
+                "tool_version": "test",
+                "command": "scalar build",
+                "status": "ok",
+                "outputs": [{"path": output, "media_type": "application/x-parquet"} for output in outputs],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_view_artifact(
     workspace_dir: Path,
     *,
@@ -593,6 +610,7 @@ def test_dataset_overview_includes_annotated_sigma35_categories_outside_named_la
         "id": "sfxi_archive_row",
         "subject_id": "sfxi_archive_row",
         "usr_label__primary": "pDual-10-ES3p",
+        "source_family": "densegen",
         "sequence": None,
         "densegen__plan": "ethanol_ciprofloxacin",
         "densegen__required_regulators": ["cpxR", "lexA"],
@@ -619,6 +637,7 @@ def test_dataset_overview_includes_annotated_sigma35_categories_outside_named_la
         "id": "projected_reference_row",
         "subject_id": "projected_reference_row",
         "usr_label__primary": "J23104",
+        "source_family": "reference_control",
         "sequence": "TTGACATATGCTAGCTAGCTAGCTAGCTAGCTAGC",
         "densegen__plan": None,
         "densegen__required_regulators": None,
@@ -663,6 +682,7 @@ def test_dataset_overview_can_limit_sigma35_panel_to_configured_ladder(tmp_path:
             "id": "projected_reference_row",
             "subject_id": "projected_reference_row",
             "usr_label__primary": "J23104",
+            "source_family": "reference_control",
             "sequence": "TTGACATATGCTAGCTAGCTAGCTAGCTAGCTAGC",
             "densegen__plan": None,
             "densegen__required_regulators": None,
@@ -1557,6 +1577,88 @@ def test_tf_axis_orientation_audit_can_join_generic_tf_association_overlay(tmp_p
     assert artifact.stats["association_overlay_rows"] == 2
 
 
+def test_tf_axis_orientation_audit_requires_explicit_association_overlay_keys(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "bg_1", "subject_id": "bg_1", "source": "densegen", "design_family": "background"},
+        {"id": "eth_1", "subject_id": "eth_1", "source": "densegen", "design_family": "ethanol"},
+        {"id": "cip_1", "subject_id": "cip_1", "source": "densegen", "design_family": "ciprofloxacin"},
+        {"id": "native_cpx", "subject_id": "native_cpx", "source": "regulondb", "design_family": "native"},
+    ]
+    _write_view_artifact(
+        workspace_dir,
+        view_id="tf_view",
+        rows=rows,
+        matrix=np.asarray([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0], [0.1, 1.0]], dtype=np.float32),
+        record_key="id",
+    )
+    overlay_path = workspace_dir / "inputs" / "regulatory_interactions.parquet"
+    overlay_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist([{"usr_id": "native_cpx", "regulator_abbrev": "CpxR"}]),
+        overlay_path,
+    )
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+
+    with pytest.raises(ContractViolationError, match="association_overlay requires row_key"):
+        build_scalar_artifact(
+            context,
+            scalar_id="tf_axis_orientation_audit",
+            builder_kind="tf_axis_orientation_audit",
+            params={
+                "view_id": "tf_view",
+                "cohort_column": "design_family",
+                "centroid_groups": {
+                    "background": ["background"],
+                    "ethanol": ["ethanol"],
+                    "cipro": ["ciprofloxacin"],
+                },
+                "tf_columns": {
+                    "ethanol": ["has_CpxR"],
+                    "cipro": ["has_LexA"],
+                },
+                "association_overlay": {
+                    "path": "inputs/regulatory_interactions.parquet",
+                    "relation_key": "usr_id",
+                    "regulator_column": "regulator_abbrev",
+                    "tf_aliases": {"has_CpxR": ["CpxR"], "has_LexA": ["LexA"]},
+                },
+                "output_filter": {"column": "source", "equals": "regulondb"},
+            },
+        )
+
+    with pytest.raises(ContractViolationError, match="legacy keys"):
+        build_scalar_artifact(
+            context,
+            scalar_id="tf_axis_orientation_audit",
+            builder_kind="tf_axis_orientation_audit",
+            params={
+                "view_id": "tf_view",
+                "cohort_column": "design_family",
+                "centroid_groups": {
+                    "background": ["background"],
+                    "ethanol": ["ethanol"],
+                    "cipro": ["ciprofloxacin"],
+                },
+                "tf_columns": {
+                    "ethanol": ["has_CpxR"],
+                    "cipro": ["has_LexA"],
+                },
+                "association_overlay": {
+                    "path": "inputs/regulatory_interactions.parquet",
+                    "join_key": "usr_id",
+                    "row_key": "id",
+                    "relation_key": "usr_id",
+                    "regulator_column": "regulator_abbrev",
+                    "tf_aliases": {"has_CpxR": ["CpxR"], "has_LexA": ["LexA"]},
+                },
+                "output_filter": {"column": "source", "equals": "regulondb"},
+            },
+        )
+
+
 def test_tf_axis_orientation_audit_can_use_separate_centroid_and_audit_views(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -1923,16 +2025,270 @@ def test_native_regulator_plan_margin_enrichment_scalar_writes_contract_tables(t
     assert {"regulator_abbrev", "plan", "threshold", "enrichment_ratio", "q_value"}.issubset(table.column_names)
     score_table = pq.read_table(artifact.artifact_dir / "native_plan_margin_scores.parquet")
     tail_table = pq.read_table(artifact.artifact_dir / "native_plan_margin_tail_membership.parquet")
+    rank_table = pq.read_table(artifact.artifact_dir / "native_regulator_plan_rank_tests.parquet")
     assert "regulondb__primary_promoter_id" in score_table.column_names
     assert score_table.num_rows == 3
     assert tail_table.num_rows > 0
+    assert {"regulator_abbrev", "plan", "auc", "rank_biserial", "p_value_method"}.issubset(rank_table.column_names)
+    assert rank_table.num_rows == 12
     assert ("native_plan_margin_scores.parquet", "application/x-parquet") in artifact.outputs
+    assert ("native_regulator_plan_rank_tests.parquet", "application/x-parquet") in artifact.outputs
     assert artifact.stats["native_rows"] == 3
+    assert artifact.stats["rank_test_rows"] == 12
     assert artifact.stats["native_metadata_columns"] == [
         "alias_id",
         "regulondb__primary_promoter_id",
         "regulondb__primary_promoter_name",
     ]
+
+    with pytest.raises(ContractViolationError, match="legacy regulatory_interactions keys"):
+        build_scalar_artifact(
+            context,
+            scalar_id="native_regulator_plan_margin_enrichment_legacy",
+            builder_kind="native_regulator_plan_margin_enrichment",
+            params={
+                "view_id": "bidir_context",
+                "cohort_column": "design_family",
+                "centroid_groups": {
+                    "background": ["background_only"],
+                    "ethanol": ["ethanol"],
+                    "cipro": ["ciprofloxacin"],
+                    "dual": ["ethanol_ciprofloxacin"],
+                },
+                "native_filter": {
+                    "column": "derived__parent_dataset",
+                    "equals": "usr_regulondb_native_promoters",
+                },
+                "regulatory_interactions": {
+                    "path": "inputs/regulatory_interactions.parquet",
+                    "row_key": "derived__parent_id",
+                    "relation_key": "usr_id",
+                    "regulator_column": "regulator_abbrev",
+                },
+                "thresholds": [0.5],
+                "tail_modes": ["margin_top_quantile"],
+                "min_global_promoters": 1,
+                "min_tail_hits": 1,
+            },
+        )
+
+
+def test_plan_margin_feature_enrichment_scalar_reuses_source_side_tables(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    source_dir = workspace_dir / "outputs" / "scalars" / "native_regulator_plan_margin_enrichment"
+    source_dir.mkdir(parents=True)
+    _write_scalar_manifest(
+        source_dir,
+        scalar_id="native_regulator_plan_margin_enrichment",
+        outputs=[
+            "table.parquet",
+            "native_plan_margin_scores.parquet",
+            "native_plan_margin_tail_membership.parquet",
+        ],
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "native_parent_id": "rp_eth",
+                    "nearest_plan": "ethanol",
+                    "margin_background": -0.2,
+                    "margin_cipro": -0.3,
+                    "margin_dual": -0.1,
+                    "margin_ethanol": 0.8,
+                },
+                {
+                    "native_parent_id": "rp_cipro",
+                    "nearest_plan": "cipro",
+                    "margin_background": -0.1,
+                    "margin_cipro": 0.7,
+                    "margin_dual": -0.2,
+                    "margin_ethanol": -0.3,
+                },
+                {
+                    "native_parent_id": "rp_bg",
+                    "nearest_plan": "background",
+                    "margin_background": 0.6,
+                    "margin_cipro": -0.2,
+                    "margin_dual": -0.3,
+                    "margin_ethanol": -0.4,
+                },
+                {
+                    "native_parent_id": "rp_dual",
+                    "nearest_plan": "dual",
+                    "margin_background": -0.4,
+                    "margin_cipro": -0.1,
+                    "margin_dual": 0.5,
+                    "margin_ethanol": -0.2,
+                },
+            ]
+        ),
+        source_dir / "native_plan_margin_scores.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "native_parent_id": "rp_eth",
+                    "plan": "ethanol",
+                    "threshold": 0.5,
+                    "tail_mode": "margin_top_quantile",
+                },
+                {
+                    "native_parent_id": "rp_cipro",
+                    "plan": "cipro",
+                    "threshold": 0.5,
+                    "tail_mode": "margin_top_quantile",
+                },
+                {
+                    "native_parent_id": "rp_bg",
+                    "plan": "background",
+                    "threshold": 0.5,
+                    "tail_mode": "margin_top_quantile",
+                },
+                {
+                    "native_parent_id": "rp_dual",
+                    "plan": "dual",
+                    "threshold": 0.5,
+                    "tail_mode": "margin_top_quantile",
+                },
+            ]
+        ),
+        source_dir / "native_plan_margin_tail_membership.parquet",
+    )
+    feature_path = workspace_dir / "inputs" / "promoter_regulator_go_terms.parquet"
+    feature_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "usr_id": "rp_eth",
+                    "go_id": "GO:stress",
+                    "go_name": "response to stress",
+                    "go_namespace": "biological_process",
+                    "biocyc_kb_version": "29.6",
+                    "smarttable_id": "st-1",
+                    "source_terms_sha256": "abc",
+                },
+                {
+                    "usr_id": "rp_eth",
+                    "go_id": "GO:stress",
+                    "go_name": "response to stress",
+                    "go_namespace": "biological_process",
+                    "biocyc_kb_version": "29.6",
+                    "smarttable_id": "st-1",
+                    "source_terms_sha256": "abc",
+                },
+                {
+                    "usr_id": "rp_cipro",
+                    "go_id": "GO:sos",
+                    "go_name": "SOS response",
+                    "go_namespace": "biological_process",
+                    "biocyc_kb_version": "29.6",
+                    "smarttable_id": "st-1",
+                    "source_terms_sha256": "abc",
+                },
+                {
+                    "usr_id": "rp_bg",
+                    "go_id": "GO:dna",
+                    "go_name": "DNA binding",
+                    "go_namespace": "molecular_function",
+                    "biocyc_kb_version": "29.6",
+                    "smarttable_id": "st-1",
+                    "source_terms_sha256": "abc",
+                },
+            ]
+        ),
+        feature_path,
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="native_regulator_go_bp_plan_margin_enrichment",
+        builder_kind="plan_margin_feature_enrichment",
+        params={
+            "source_scalar": "native_regulator_plan_margin_enrichment",
+            "scores_table": "native_plan_margin_scores.parquet",
+            "tail_membership_table": "native_plan_margin_tail_membership.parquet",
+            "feature_membership": {
+                "path": "inputs/promoter_regulator_go_terms.parquet",
+                "subject_column": "usr_id",
+                "feature_id_column": "go_id",
+                "feature_label_column": "go_name",
+                "feature_namespace_column": "go_namespace",
+                "namespace_filter": "biological_process",
+                "exclude_label_prefixes": ["obsolete "],
+                "source_metadata_columns": ["biocyc_kb_version", "smarttable_id", "source_terms_sha256"],
+            },
+            "min_global_subjects": 1,
+            "min_tail_hits": 1,
+            "rank_test_alternative": "greater",
+        },
+    )
+
+    table = pq.read_table(artifact.artifact_dir / "table.parquet")
+    rank_table = pq.read_table(artifact.artifact_dir / "plan_margin_feature_rank_tests.parquet")
+    assert {"feature_id", "feature_label", "feature_namespace", "n_feature_tail"}.issubset(table.column_names)
+    assert {"feature_id", "feature_label", "plan", "auc", "rank_biserial", "p_value_method"}.issubset(
+        rank_table.column_names
+    )
+    rows = table.to_pylist()
+    stress_ethanol = next(row for row in rows if row["feature_id"] == "GO:stress" and row["plan"] == "ethanol")
+    assert stress_ethanol["feature_label"] == "response to stress"
+    assert stress_ethanol["n_feature_tail"] == 1
+    rank_rows = rank_table.to_pylist()
+    stress_ethanol_rank = next(
+        row for row in rank_rows if row["feature_id"] == "GO:stress" and row["plan"] == "ethanol"
+    )
+    assert stress_ethanol_rank["rank_biserial"] > 0.0
+    assert artifact.stats["source_scalar"] == "native_regulator_plan_margin_enrichment"
+    assert artifact.stats["matched_features"] == 2
+    assert artifact.stats["rank_test_rows"] == 8
+    assert artifact.stats["excluded_label_prefixes"] == ["obsolete "]
+    assert ("plan_margin_feature_rank_tests.parquet", "application/x-parquet") in artifact.outputs
+
+
+def test_plan_margin_feature_enrichment_scalar_requires_matching_source_manifest(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    source_dir = workspace_dir / "outputs" / "scalars" / "native_regulator_plan_margin_enrichment"
+    source_dir.mkdir(parents=True)
+    _write_scalar_manifest(
+        source_dir,
+        scalar_id="wrong_source",
+        outputs=[
+            "table.parquet",
+            "native_plan_margin_scores.parquet",
+            "native_plan_margin_tail_membership.parquet",
+        ],
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    with pytest.raises(ContractViolationError, match="manifest id mismatch"):
+        build_scalar_artifact(
+            context,
+            scalar_id="native_regulator_go_bp_plan_margin_enrichment",
+            builder_kind="plan_margin_feature_enrichment",
+            params={
+                "source_scalar": "native_regulator_plan_margin_enrichment",
+                "scores_table": "native_plan_margin_scores.parquet",
+                "tail_membership_table": "native_plan_margin_tail_membership.parquet",
+                "feature_membership": {
+                    "path": "inputs/promoter_regulator_go_terms.parquet",
+                    "subject_column": "usr_id",
+                    "feature_id_column": "go_id",
+                    "feature_label_column": "go_name",
+                    "feature_namespace_column": "go_namespace",
+                    "namespace_filter": "biological_process",
+                },
+                "min_global_subjects": 1,
+                "min_tail_hits": 1,
+            },
+        )
 
 
 def test_cohort_similarity_margin_honors_sample_scope(tmp_path: Path) -> None:

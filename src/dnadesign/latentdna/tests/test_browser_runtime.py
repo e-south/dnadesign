@@ -396,12 +396,14 @@ def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monk
     assert runtime.geometry.reference_hue_options["SFXI score"] == "sfxi_ref__sfxi"
     assert runtime.geometry.reference_hue_kinds["sfxi_ref__sfxi"] == "continuous"
     assert runtime.geometry.reference_hue_options_by_reference_set["reference_sfxi_archive"] == {
-        "Black stars": "",
+        "Single-color markers": "",
         "SFXI score": "sfxi_ref__sfxi",
         "SFXI logic fidelity": "sfxi_ref__logic_fidelity",
         "SFXI effect scaled": "sfxi_ref__effect_scaled",
     }
-    assert runtime.geometry.reference_hue_options_by_reference_set["reference_native_mg1655"] == {"Black stars": ""}
+    assert runtime.geometry.reference_hue_options_by_reference_set["reference_native_mg1655"] == {
+        "Single-color markers": ""
+    }
     assert "sfxi_ref__sfxi" in runtime.geometry.reference_required_columns
     assert "sfxi_ref__logic_fidelity" in runtime.geometry.reference_required_columns
     assert "sfxi_ref__effect_scaled" in runtime.geometry.reference_required_columns

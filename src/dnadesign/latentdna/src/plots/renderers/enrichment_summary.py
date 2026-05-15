@@ -141,7 +141,7 @@ def _render_group_panel(
             panel_title=humanize_display_text(group_value),
             message="No enriched categories",
             detail="No rows pass the configured support filters",
-            square=False,
+            square=True,
         )
         return {"group": group_value, "rows_rendered": 0}
 
@@ -190,6 +190,7 @@ def _render_group_panel(
                 fontsize=7.4,
                 color=SPINE_COLOR,
             )
+    axis.set_box_aspect(1)
     apply_axes_style(axis, grid=True, square=False)
     return {
         "group": group_value,
@@ -221,8 +222,9 @@ def render_categorical_enrichment_summary_plot(
     group_values = _ordered_group_values(filtered_rows, spec) if filtered_rows else []
     panel_count = max(len(group_values), 1)
     rows_count, columns = _panel_grid_dimensions(panel_count, prefer_single_row=False)
-    figure_width = max(6.4, columns * 4.9)
-    figure_height = max(3.8, rows_count * 3.15)
+    panel_size = 4.6
+    figure_width = max(5.2, columns * panel_size)
+    figure_height = max(5.2, rows_count * panel_size)
     figure, axes = pyplot.subplots(rows_count, columns, figsize=(figure_width, figure_height), squeeze=False)
     panel_metadata: list[dict[str, object]] = []
     if not group_values:
@@ -231,7 +233,7 @@ def render_categorical_enrichment_summary_plot(
             panel_title=spec.plot_id,
             message="No enrichment rows",
             detail="No rows pass the configured static filters",
-            square=False,
+            square=True,
         )
     for axis, group_value in zip(axes.ravel(), group_values, strict=False):
         panel_metadata.append(_render_group_panel(axis, filtered_rows, spec, group_value=group_value))

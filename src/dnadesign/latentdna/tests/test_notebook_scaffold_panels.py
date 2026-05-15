@@ -4,12 +4,12 @@ Contract tests for generated marimo browser scaffold cells.
 
 from __future__ import annotations
 
-from dnadesign.latentdna.src.notebooks.scaffold_panels import (
+from dnadesign.latentdna.src.notebooks.scaffold_geometry_panels import (
     render_geometry_frames_cell,
     render_geometry_hue_selector_cell,
     render_geometry_panel_cell,
-    render_plot_review_cell,
 )
+from dnadesign.latentdna.src.notebooks.scaffold_plot_review import render_plot_review_cell
 from dnadesign.latentdna.src.notebooks.scaffold_selectors import render_selector_cells
 
 
@@ -72,7 +72,7 @@ def test_reference_annotation_mode_selector_controls_geometry_and_plot_label_lim
 
     assert "get_requested_reference_annotation_mode" in selector_cells
     assert "set_requested_reference_annotation_mode" in selector_cells
-    assert "Reference annotations" in geometry_hue_cell
+    assert "Label text" in geometry_hue_cell
     assert "geometry_reference_annotation_selector" in geometry_panel_cell
     assert "reference_label_limit=" in geometry_panel_cell
     assert "plot_reference_annotation_selector" in plot_review_cell
@@ -89,3 +89,13 @@ def test_reference_hue_selector_depends_on_selected_reference_widget_value() -> 
     assert '_selected_reference = str(plot_reference_selector.value or "")' in plot_review_cell
     assert "def _(\n    geometry_reference_selector," in geometry_hue_cell
     assert '_selected_reference = str(geometry_reference_selector.value or "")' in geometry_hue_cell
+
+
+def test_reference_hue_selector_is_hidden_when_only_fallback_is_available() -> None:
+    geometry_hue_cell = render_geometry_hue_selector_cell()
+    plot_review_cell = render_plot_review_cell()
+
+    assert 'label="Population hue"' in geometry_hue_cell
+    assert 'label="Population hue"' in plot_review_cell
+    assert "if len(_reference_hue_options) > 1:" in geometry_hue_cell
+    assert "if len(_reference_hue_options) > 1:" in plot_review_cell

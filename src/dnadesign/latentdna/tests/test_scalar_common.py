@@ -1,24 +1,16 @@
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
+from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.scalars.common import (
     _pairwise_cosine_distance_summary,
-    _pearson_correlation,
-    _spearman_correlation,
+    _workspace_input_path,
 )
-
-
-def test_pearson_correlation_returns_nan_for_degenerate_inputs() -> None:
-    assert math.isnan(_pearson_correlation(np.asarray([1.0]), np.asarray([1.0])))
-    assert math.isnan(_pearson_correlation(np.asarray([1.0, 1.0]), np.asarray([2.0, 2.0])))
-
-
-def test_spearman_correlation_returns_nan_for_degenerate_inputs() -> None:
-    assert math.isnan(_spearman_correlation(np.asarray([1.0]), np.asarray([1.0])))
-    assert math.isnan(_spearman_correlation(np.asarray([1.0, 1.0]), np.asarray([2.0, 2.0])))
 
 
 def test_pairwise_cosine_distance_summary_caps_rows_deterministically() -> None:
@@ -46,3 +38,18 @@ def test_pairwise_cosine_distance_summary_uses_exact_pairs_under_cap() -> None:
     assert summary.evaluated_rows == 3
     assert summary.pair_count == 3
     assert not math.isnan(summary.median)
+
+
+def test_workspace_input_path_rejects_paths_outside_allowed_roots(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    allowed = workspace_dir / "inputs" / "table.parquet"
+    allowed.parent.mkdir()
+    allowed.write_text("placeholder", encoding="utf-8")
+    outside = tmp_path / "outside.parquet"
+    outside.write_text("placeholder", encoding="utf-8")
+    context = SimpleNamespace(workspace_dir=workspace_dir)
+
+    assert _workspace_input_path(context, "inputs/table.parquet") == allowed.resolve()
+    with pytest.raises(ContractViolationError, match="escapes allowed scalar.build roots"):
+        _workspace_input_path(context, "../outside.parquet")
