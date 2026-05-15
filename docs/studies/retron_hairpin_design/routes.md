@@ -227,12 +227,16 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   MSD unit per design: 5' flank plus left base, payload primary, cap geometry,
   payload complement, right base plus 3' flank. The CLI does not expose a
   repeat-count flag, so it cannot chain complete MSD units together. The
-  sequence bundle adds `sequence_manifest.json`, `sequence_index.tsv`,
-  `composition_configs/`, and `variants/`; each variant root exposes
-  `sequence.gb`, `sequence.fa`, `features.csv`, and `component_span_qa.png` for
-  Finder review. Visible GenBank/CSV labels should be display labels such as
-  `msd[teto]`, `Cap`, `Left Base`, and `Right Base`; raw ids remain machine
-  metadata, not operator-facing labels.
+  sequence bundle keeps the top level to `README.md`, `manifest/`, and
+  `variants/`. Catalogs, `manifest/sequence_manifest.json`,
+  `manifest/sequence_index.tsv`, generated composition configs, and provenance
+  live under `manifest/`; each `variants/<msd_design_id>/` directory groups
+  forward/reverse-complement GenBank and FASTA under `sequences/`, component
+  span (`component_span.png`), folding, and combined PNGs under `plots/`,
+  curated metadata under `manifest/`, and raw producer output under
+  `runtime/construct/`. Visible GenBank/CSV labels should be display labels
+  such as `msd[teto]`, `Cap`, `Left Base`, and `Right Base`; raw ids remain
+  machine metadata, not operator-facing labels.
 
 ### Contrast route: YIU boundary check
 

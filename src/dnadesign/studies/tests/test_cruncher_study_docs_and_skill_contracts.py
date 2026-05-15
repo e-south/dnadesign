@@ -180,9 +180,9 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "not registered as a top-level `uv run retron-msd` tool" in routes
     assert "Reader should not parse Construct, Folding, BaseRender, or Cruncher internals" in routes
     assert "Materialize command" in routes
-    assert "sequence_manifest.json" in routes
-    assert "sequence_index.tsv" in routes
-    assert "component_span_qa.png" in routes
+    assert "manifest/sequence_manifest.json" in routes
+    assert "manifest/sequence_index.tsv" in routes
+    assert "component_span.png" in routes
     assert "Visible GenBank/CSV labels should be display labels" in routes
     assert "repeat-count flag" in routes
     assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes

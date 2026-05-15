@@ -87,16 +87,18 @@ The compiler emits a shallow bundle: top-level `README.md`, `manifest.json`,
 `msd_design_catalog_v1.json`, `reference_index.tsv`, and one flat
 `references/` directory containing per-design `*.msd_design_reference_v1.json`
 files. Do not create one directory per MSD ID for reference-only catalogs, and
-use a fresh output directory instead of mixing new output into the legacy
-`assets/` layout or stale `references/` files from a different catalog.
+use a fresh output directory instead of mixing new output into the legacy `assets/`
+layout or stale `references/` files from a different catalog.
 
-The `materialize` route extends the same transient root with
-`sequence_manifest.json`, `sequence_index.tsv`, `composition_configs/`, and
-`variants/`. Each variant bundle keeps operator-facing files such as
-`sequence.gb`, `sequence.fa`, `features.csv`, and `component_span_qa.png`
-discoverable at the variant root while retaining service-owned nested visual
-contracts for BaseRender. `sequence_index.tsv` carries the `open -R` Finder
-reveal command for each GenBank file.
+The `materialize` route uses a headful bundle layout that keeps the top level
+limited to `README.md`, `manifest/`, and `variants/`. Machine-readable
+catalogs, indexes, generated composition configs, and provenance live under
+`manifest/`. Each `variants/<msd_design_id>/` directory is grouped into
+`sequences/` for forward and reverse-complement GenBank/FASTA plus feature CSV,
+`plots/` for component-span, folding, and combined PNG deliverables,
+`manifest/` for curated per-variant metadata, and `runtime/construct/` for the
+producer bundle. `manifest/sequence_index.tsv` carries the `open -R` Finder
+reveal command for each forward GenBank file.
 
 ## Service Handoff
 

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 import csv
 import json
 import tomllib
@@ -383,47 +384,81 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
     assert payload["record_count"] == 1
-    assert Path(payload["sequence_manifest_path"]) == out_dir / "sequence_manifest.json"
-    assert Path(payload["sequence_index_path"]) == out_dir / "sequence_index.tsv"
+    assert sorted(item.name for item in out_dir.iterdir()) == ["README.md", "manifest", "variants"]
+    assert Path(payload["sequence_manifest_path"]) == out_dir / "manifest" / "sequence_manifest.json"
+    assert Path(payload["sequence_index_path"]) == out_dir / "manifest" / "sequence_index.tsv"
     assert Path(payload["variants_dir"]) == out_dir / "variants"
-    assert Path(payload["composition_configs_dir"]) == out_dir / "composition_configs"
+    assert Path(payload["composition_configs_dir"]) == out_dir / "manifest" / "composition_configs"
     assert payload["finder_open"] == f"open {out_dir}"
     assert "Single-unit MSD sequence bundle emitted" in payload["next_step"]
 
     variant = payload["variants"][0]
     variant_dir = out_dir / "variants" / "msd-tetr-c172-lcggt-racag-mxmm"
-    genbank_path = variant_dir / "sequence.gb"
-    features_path = variant_dir / "features.csv"
-    png_path = variant_dir / "component_span_qa.png"
+    genbank_path = variant_dir / "sequences" / "forward.gb"
+    revcom_genbank_path = variant_dir / "sequences" / "reverse_complement.gb"
+    features_path = variant_dir / "sequences" / "features.csv"
+    png_path = variant_dir / "plots" / "component_span.png"
+    folding_png_path = variant_dir / "plots" / "secondary_structure.png"
+    combined_png_path = variant_dir / "plots" / "component_span_and_folding.png"
+    construct_bundle = variant_dir / "runtime" / "construct"
+    assert sorted(item.name for item in variant_dir.iterdir()) == ["manifest", "plots", "runtime", "sequences"]
     assert variant["unit_count"] == 1
-    assert Path(variant["genbank"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/sequence.gb")
-    assert Path(variant["component_span_png"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/component_span_qa.png")
+    assert Path(variant["genbank"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb")
+    assert Path(variant["reverse_complement_genbank"]) == Path(
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
+    )
+    assert Path(variant["component_span_png"]) == Path(
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
+    )
+    assert Path(variant["folding_png"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.png")
+    assert Path(variant["combined_plot_png"]) == Path(
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span_and_folding.png"
+    )
     assert genbank_path.is_file()
+    assert revcom_genbank_path.is_file()
     assert features_path.is_file()
     assert png_path.is_file()
+    assert folding_png_path.is_file()
+    assert combined_png_path.is_file()
+    assert (construct_bundle / "manifest.json").is_file()
+    assert (construct_bundle / "folding" / "secondary_structure_prediction_v1.json").is_file()
     assert png_path.stat().st_size > 0
+    assert folding_png_path.stat().st_size > 0
+    assert combined_png_path.stat().st_size > 0
 
     rows = list(
-        csv.DictReader((out_dir / "sequence_index.tsv").read_text(encoding="utf-8").splitlines(), delimiter="\t")
+        csv.DictReader(
+            (out_dir / "manifest" / "sequence_index.tsv").read_text(encoding="utf-8").splitlines(),
+            delimiter="\t",
+        )
     )
     assert rows[0]["unit_count"] == "1"
-    assert rows[0]["genbank"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/sequence.gb"
-    assert rows[0]["component_span_png"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/component_span_qa.png"
+    assert rows[0]["genbank"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb"
+    assert rows[0]["reverse_complement_genbank"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
+    )
+    assert rows[0]["component_span_png"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
+    assert rows[0]["folding_status"] in {"ok", "warning_optional_missing"}
     assert rows[0]["finder_reveal"].startswith("open -R ")
 
-    catalog = json.loads((out_dir / "msd_design_catalog_v1.json").read_text(encoding="utf-8"))
+    catalog = json.loads((out_dir / "manifest" / "msd_design_catalog_v1.json").read_text(encoding="utf-8"))
     record = catalog["records"][0]
     flank_5p_len = len("gtcagaaaaaa") + 4
     flank_3p_len = 4 + len("acagtaactcaga")
     unit_len = flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP) + len(_TETO_PAYLOAD) + flank_3p_len
     assert record["sequence"]["length"] == unit_len
     assert record["source"]["dnadesign_bundle"] == "variants/msd-tetr-c172-lcggt-racag-mxmm"
-    assert record["artifacts"]["genbank"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/sequence.gb"
+    assert record["artifacts"]["genbank"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb"
+    assert record["artifacts"]["reverse_complement_genbank"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
+    )
     assert record["artifacts"]["component_span_png"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/component_span_qa.png"
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
     )
 
     genbank_record = next(SeqIO.parse(genbank_path, "genbank"))
+    revcom_record = next(SeqIO.parse(revcom_genbank_path, "genbank"))
+    assert str(revcom_record.seq).upper() == str(genbank_record.seq.reverse_complement()).upper()
     features_by_label = {
         feature.qualifiers["label"][0]: feature for feature in genbank_record.features if "label" in feature.qualifiers
     }
@@ -481,6 +516,31 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert payload_complement_rows[0]["genbank_location"].startswith("complement(")
     assert payload_complement_rows[0]["sequence"].upper() == str(Seq(_TETO_PAYLOAD).reverse_complement()).upper()
 
+    forward_by_key = {
+        (
+            feature.qualifiers["dnadesign_feature_kind"][0],
+            feature.qualifiers["dnadesign_feature_id"][0],
+        ): feature
+        for feature in genbank_record.features
+        if "dnadesign_feature_kind" in feature.qualifiers and "dnadesign_feature_id" in feature.qualifiers
+    }
+    revcom_by_key = {
+        (
+            feature.qualifiers["dnadesign_feature_kind"][0],
+            feature.qualifiers["dnadesign_feature_id"][0],
+        ): feature
+        for feature in revcom_record.features
+        if "dnadesign_feature_kind" in feature.qualifiers and "dnadesign_feature_id" in feature.qualifiers
+    }
+    assert set(forward_by_key) == set(revcom_by_key)
+    for key, feature in forward_by_key.items():
+        revcom_feature = revcom_by_key[key]
+        assert int(revcom_feature.location.start) == unit_len - int(feature.location.end)
+        assert int(revcom_feature.location.end) == unit_len - int(feature.location.start)
+        assert revcom_feature.location.strand == -feature.location.strand
+        assert revcom_feature.qualifiers["label"] == feature.qualifiers["label"]
+        assert revcom_feature.qualifiers["dnadesign_orientation"] == ["reverse_complement"]
+
 
 def test_retron_msd_materialize_rejects_repeat_count_flag(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
@@ -502,6 +562,38 @@ def test_retron_msd_materialize_rejects_repeat_count_flag(tmp_path: Path) -> Non
 
     assert result.exit_code != 0
     assert "repeat-count" in result.output
+
+
+def test_retron_msd_materialize_refuses_flat_legacy_sequence_layout(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "sequence_bundle"
+    out_dir.mkdir()
+    (out_dir / "sequence_manifest.json").write_text("{}\n", encoding="utf-8")
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "materialize",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--payload-sequence",
+            f"TetR={_TETO_PAYLOAD}",
+            "--cap-sequence",
+            f"C172={_SNAPBACK_CAP}",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "Unexpected MSD materialize output entries" in payload["error"]
+    assert "fresh --out-dir" in payload["next_step"]
 
 
 def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> None:
@@ -559,3 +651,20 @@ def test_retron_msd_compiler_is_not_exposed_as_top_level_project_script() -> Non
 
     assert "retron-msd" not in scripts
     assert all("retron_hairpin_design.cli" not in target for target in scripts.values())
+
+
+def test_retron_msd_study_uses_public_tool_apis_only() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    compiler_path = repo_root / "src" / "dnadesign" / "studies" / "retron_hairpin_design" / "compiler.py"
+    tree = ast.parse(compiler_path.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module)
+
+    assert "dnadesign.construct" in imports
+    assert "dnadesign.construct.src.composition" not in imports
+    assert not any(name == "dnadesign.cruncher" or name.startswith("dnadesign.cruncher.") for name in imports)
+    assert not any(name.startswith("dnadesign.folding.src") for name in imports)

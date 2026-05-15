@@ -169,17 +169,25 @@ class MsdDesignArtifactsV1(MsdDesignContractModel):
     features_csv: str | None = None
     visual_contract: str | None = None
     genbank: str | None = None
+    reverse_complement_genbank: str | None = None
     forward_fasta: str | None = None
     reverse_complement_fasta: str | None = None
+    folding_prediction: str | None = None
+    folding_png: str | None = None
+    combined_plot_png: str | None = None
 
     @field_validator(
         "composition_overview_svg",
         "secondary_structure_svg",
         "component_span_png",
         "component_span_svg",
+        "combined_plot_png",
         "features_csv",
+        "folding_png",
+        "folding_prediction",
         "visual_contract",
         "genbank",
+        "reverse_complement_genbank",
         "forward_fasta",
         "reverse_complement_fasta",
     )

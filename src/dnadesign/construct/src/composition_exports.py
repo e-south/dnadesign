@@ -16,17 +16,48 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .orientation import reverse_complement
+
 
 def write_sequence_exports(artifact_bundle: Path, composed: Any) -> None:
-    _write_fasta(artifact_bundle / "sequence.fa", composed)
+    _write_fasta(
+        artifact_bundle / "sequence.fa",
+        composed,
+        sequence=composed.sequence,
+        sequence_id=composed.config.composition_id,
+        orientation="forward",
+    )
     _write_features_csv(artifact_bundle / "features.csv", composed)
-    _write_genbank(artifact_bundle / "sequence.gb", composed)
+    _write_genbank(
+        artifact_bundle / "sequence.gb",
+        composed,
+        sequence=composed.sequence,
+        locus_id=composed.config.composition_id,
+        orientation="forward",
+    )
+    _write_fasta(
+        artifact_bundle / "sequence.reverse_complement.fa",
+        composed,
+        sequence=reverse_complement(composed.sequence),
+        sequence_id=f"{composed.config.composition_id}_reverse_complement",
+        orientation="reverse_complement",
+    )
+    _write_genbank(
+        artifact_bundle / "sequence.reverse_complement.gb",
+        composed,
+        sequence=reverse_complement(composed.sequence),
+        locus_id=f"{composed.config.composition_id}_reverse_complement",
+        orientation="reverse_complement",
+    )
 
 
-def _write_fasta(path: Path, composed: Any) -> None:
+def _write_fasta(path: Path, composed: Any, *, sequence: str, sequence_id: str, orientation: str) -> None:
+    header = f">{sequence_id} length={len(sequence)} topology={composed.config.topology}"
+    if orientation != "forward":
+        header = f"{header} orientation={orientation}"
     lines = [
-        f">{composed.config.composition_id} length={len(composed.sequence)} topology={composed.config.topology}",
-        composed.sequence,
+        header,
+        sequence,
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -99,9 +130,9 @@ def _write_features_csv(path: Path, composed: Any) -> None:
             )
 
 
-def _write_genbank(path: Path, composed: Any) -> None:
+def _write_genbank(path: Path, composed: Any, *, sequence: str, locus_id: str, orientation: str) -> None:
     lines = [
-        f"LOCUS       {composed.config.composition_id} {len(composed.sequence)} bp ss-DNA linear SYN",
+        f"LOCUS       {locus_id} {len(sequence)} bp ss-DNA linear SYN",
         "FEATURES             Location/Qualifiers",
     ]
     for span in composed.segment_spans:
@@ -114,13 +145,15 @@ def _write_genbank(path: Path, composed: Any) -> None:
         lines.extend(
             _genbank_feature_lines(
                 "misc_feature",
-                span.start,
-                span.end,
+                *_feature_location_for_orientation(span.start, span.end, len(composed.sequence), orientation),
                 display_label,
                 feature_kind_id="segment",
                 feature_id=span.segment_id,
                 role=span.role,
                 copy_index=span.copy_index,
+                orientation=orientation,
+                forward_start=span.start,
+                forward_end=span.end,
                 **_segment_export_metadata(composed, unit_id=span.unit_id, segment_id=span.segment_id),
             )
         )
@@ -135,19 +168,21 @@ def _write_genbank(path: Path, composed: Any) -> None:
         lines.extend(
             _genbank_feature_lines(
                 "misc_feature",
-                span.start,
-                span.end,
+                *_feature_location_for_orientation(span.start, span.end, len(composed.sequence), orientation),
                 display_label,
                 feature_kind_id="annotation",
                 feature_id=span.annotation_id,
                 role=span.role,
                 copy_index=span.copy_index,
+                orientation=orientation,
+                forward_start=span.start,
+                forward_end=span.end,
                 **_annotation_export_metadata(composed, unit_id=span.unit_id, annotation_id=span.annotation_id),
             )
         )
     lines.append("ORIGIN")
-    for offset in range(0, len(composed.sequence), 60):
-        chunk = composed.sequence[offset : offset + 60].lower()
+    for offset in range(0, len(sequence), 60):
+        chunk = sequence[offset : offset + 60].lower()
         grouped = " ".join(chunk[index : index + 10] for index in range(0, len(chunk), 10))
         lines.append(f"{offset + 1:>9} {grouped}")
     lines.append("//")
@@ -194,24 +229,46 @@ def _genbank_feature_lines(
     feature_id: str,
     role: str,
     copy_index: int,
+    orientation: str = "forward",
+    forward_start: int | None = None,
+    forward_end: int | None = None,
     strand: int = 1,
     source_segment_id: str | None = None,
     transform_kind: str | None = None,
 ) -> list[str]:
+    display_strand = strand if orientation == "forward" else -strand
     qualifiers = [
         f'                     /label="{label}"',
         f'                     /dnadesign_feature_kind="{feature_kind_id}"',
         f'                     /dnadesign_feature_id="{feature_id}"',
         f'                     /dnadesign_role="{role}"',
         f'                     /dnadesign_copy_index="{copy_index}"',
+        f'                     /dnadesign_orientation="{orientation}"',
     ]
-    if strand == -1:
+    if forward_start is not None:
+        qualifiers.append(f'                     /dnadesign_forward_start_0="{forward_start}"')
+    if forward_end is not None:
+        qualifiers.append(f'                     /dnadesign_forward_end_0="{forward_end}"')
+    if display_strand == -1:
         qualifiers.append('                     /strand="-1"')
     if source_segment_id:
         qualifiers.append(f'                     /dnadesign_source_segment="{source_segment_id}"')
     if transform_kind:
         qualifiers.append(f'                     /dnadesign_transform="{transform_kind}"')
-    return [f"     {feature_kind:<16}{_genbank_location(start, end, strand=strand)}", *qualifiers]
+    return [f"     {feature_kind:<16}{_genbank_location(start, end, strand=display_strand)}", *qualifiers]
+
+
+def _feature_location_for_orientation(
+    forward_start: int,
+    forward_end: int,
+    sequence_length: int,
+    orientation: str,
+) -> tuple[int, int]:
+    if orientation == "forward":
+        return forward_start, forward_end
+    if orientation == "reverse_complement":
+        return sequence_length - forward_end, sequence_length - forward_start
+    raise ValueError(f"Unsupported sequence export orientation: {orientation}")
 
 
 def _feature_display_label(

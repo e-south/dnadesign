@@ -22,6 +22,7 @@ from .compiler import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,
     COMPOSITION_CONFIG_DIRNAME,
+    MANIFEST_DIRNAME,
     REFERENCE_DIRNAME,
     REFERENCE_INDEX_FILENAME,
     SEQUENCE_INDEX_FILENAME,
@@ -84,6 +85,10 @@ def _emit(payload: dict[str, Any], *, output_format: str) -> None:
         typer.echo(f"composition_configs_dir: {payload['composition_configs_dir']}")
     if payload.get("finder_open") is not None:
         typer.echo(f"finder_open: {payload['finder_open']}")
+    warnings = payload.get("warnings")
+    if isinstance(warnings, list):
+        for warning in warnings:
+            typer.echo(f"warning: {warning}")
     if payload.get("next_step") is not None:
         typer.echo(f"next_step: {payload['next_step']}")
 
@@ -132,6 +137,8 @@ def _next_step_for_error(exc: Exception) -> str:
         return "Deduplicate equivalent MSD design IDs before writing a catalog bundle."
     if "Legacy MSD compiler output layout" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove the old generated assets directory."
+    if "Unexpected MSD materialize output entries" in message:
+        return "Choose a fresh --out-dir or explicitly archive/remove stale flat materialize output first."
     if "Unexpected MSD compiler output entries" in message or "Stale MSD design reference output" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove unrelated generated output before compiling."
     if "MSD sequence artifact generation requires concrete sequence subcomponents" in message:
@@ -155,10 +162,30 @@ def _compile_next_step() -> str:
     )
 
 
-def _materialize_next_step(out_dir: Path) -> str:
+def _materialize_warnings(variants: list[dict[str, Any]]) -> list[str]:
+    folding_warning_count = sum(1 for variant in variants if variant.get("folding_status") != "ok")
+    if folding_warning_count == 0:
+        return []
+    statuses = sorted(
+        {str(variant.get("folding_status")) for variant in variants if variant.get("folding_status") != "ok"}
+    )
+    return [
+        "Folding was attempted for every variant, but "
+        f"{folding_warning_count} variant(s) reported {', '.join(statuses)}. "
+        "Install ViennaRNA RNAfold or run on a PATH that exposes RNAfold to get structure predictions; "
+        "no fallback prediction was used."
+    ]
+
+
+def _materialize_next_step(out_dir: Path, *, warnings: list[str]) -> str:
+    if warnings:
+        return (
+            "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, and plot/status artifacts; "
+            f"open {out_dir.as_posix()} or inspect manifest/sequence_index.tsv for folding status."
+        )
     return (
-        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, and visual artifacts; "
-        f"open {out_dir.as_posix()} or use sequence_index.tsv for programmatic handoff."
+        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, folding, and plot artifacts; "
+        f"open {out_dir.as_posix()} or use manifest/sequence_index.tsv for programmatic handoff."
     )
 
 
@@ -266,24 +293,26 @@ def materialize_command(
         )
     except (MsdIdError, RetronMsdRegistryError, RetronMsdCompilerError, OSError, ValueError) as exc:
         _exit_with_error(exc, output_format=format_norm)
+    warnings = _materialize_warnings(result.variants)
     _emit(
         {
             "status": "ok",
-            "catalog_path": str(result.bundle_root / "msd_design_catalog_v1.json"),
+            "catalog_path": str(result.bundle_root / MANIFEST_DIRNAME / "msd_design_catalog_v1.json"),
             "output_dir": str(result.bundle_root),
-            "references_dir": str(result.bundle_root / REFERENCE_DIRNAME),
-            "index_path": str(result.bundle_root / REFERENCE_INDEX_FILENAME),
-            "manifest_path": str(result.bundle_root / BUNDLE_MANIFEST_FILENAME),
+            "references_dir": str(result.bundle_root / MANIFEST_DIRNAME / REFERENCE_DIRNAME),
+            "index_path": str(result.bundle_root / MANIFEST_DIRNAME / REFERENCE_INDEX_FILENAME),
+            "manifest_path": str(result.bundle_root / MANIFEST_DIRNAME / BUNDLE_MANIFEST_FILENAME),
             "readme_path": str(result.bundle_root / BUNDLE_README_FILENAME),
-            "sequence_manifest_path": str(result.bundle_root / SEQUENCE_MANIFEST_FILENAME),
-            "sequence_index_path": str(result.bundle_root / SEQUENCE_INDEX_FILENAME),
+            "sequence_manifest_path": str(result.bundle_root / MANIFEST_DIRNAME / SEQUENCE_MANIFEST_FILENAME),
+            "sequence_index_path": str(result.bundle_root / MANIFEST_DIRNAME / SEQUENCE_INDEX_FILENAME),
             "variants_dir": str(result.bundle_root / VARIANT_DIRNAME),
-            "composition_configs_dir": str(result.bundle_root / COMPOSITION_CONFIG_DIRNAME),
+            "composition_configs_dir": str(result.bundle_root / MANIFEST_DIRNAME / COMPOSITION_CONFIG_DIRNAME),
             "record_count": len(result.catalog.records),
             "variants": result.variants,
             "records": [record.model_dump(mode="json") for record in result.catalog.records],
             "finder_open": f"open {result.bundle_root.as_posix()}",
-            "next_step": _materialize_next_step(result.bundle_root),
+            "warnings": warnings,
+            "next_step": _materialize_next_step(result.bundle_root, warnings=warnings),
         },
         output_format=format_norm,
     )

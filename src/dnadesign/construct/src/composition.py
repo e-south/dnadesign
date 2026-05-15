@@ -497,6 +497,8 @@ def _assembled_sequence_payload(composed: _ComposedLinearSsdna) -> dict[str, obj
         "artifacts": {
             "fasta": "sequence.fa",
             "genbank": "sequence.gb",
+            "reverse_complement_fasta": "sequence.reverse_complement.fa",
+            "reverse_complement_genbank": "sequence.reverse_complement.gb",
             "features_csv": "features.csv",
             "segment_spans": "segment_spans.json",
             "annotation_spans": "annotation_spans.json",
@@ -796,6 +798,8 @@ def _manifest_payload(composed: _ComposedLinearSsdna, *, artifact_bundle: Path) 
             "validation_report": "validation_report.json",
             "fasta": "sequence.fa",
             "genbank": "sequence.gb",
+            "reverse_complement_fasta": "sequence.reverse_complement.fa",
+            "reverse_complement_genbank": "sequence.reverse_complement.gb",
             "features_csv": "features.csv",
             **_folding_artifact_refs(composed),
             **_viennarna_structure_plot_artifacts(artifact_bundle),

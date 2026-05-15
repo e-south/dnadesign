@@ -242,12 +242,13 @@ that agents need before opening the full spec:
   for local review.
 - Retron MSD ID lists should use the study CLI `materialize` route for
   single-unit GenBank/PNG output after concrete payload and cap sequences are
-  supplied. It writes `sequence_manifest.json`, `sequence_index.tsv`, generated
-  single-unit composition configs, and one `variants/<design-id>/` bundle per
-  variant with `sequence.gb`, FASTA/CSV sidecars, and `component_span_qa.png`
-  visible at the variant root. If payload or cap sequences are missing, the
-  route must fail before generating placeholder GenBank or PNG files. The CLI
-  does not expose `--repeat-count`.
+  supplied. It keeps top-level output limited to `README.md`, `manifest/`, and
+  `variants/`; writes sequence indexes, catalogs, provenance, and generated
+  single-unit composition configs under `manifest/`; and groups each
+  `variants/<design-id>/` bundle into `sequences/`, `plots/`, `manifest/`, and
+  `runtime/construct/`. If payload or cap sequences are missing, the route must
+  fail before generating placeholder GenBank or PNG files. The CLI does not
+  expose `--repeat-count`.
 - BaseRender consumes only the generated canonical visual contract through
   generated job YAML for linear component-span QA; Construct does not render
   directly.
@@ -318,7 +319,11 @@ When returning to this work:
   rather than manually creating Construct workspaces. Provide complete
   subcomponents with `--payload-sequence ID=ACGT`, `--cap-sequence ID=ACGT`,
   and no repeat-count flag; otherwise the compiler reports the missing
-  subcomponent and routes back to Snapback or scar-nick.
+  subcomponent and routes back to Snapback or scar-nick. Materialized output
+  uses top-level `README.md`, `manifest/`, and `variants/`; each variant groups
+  forward/reverse-complement GenBank and FASTA under `sequences/`,
+  component-span/folding/combined PNGs under `plots/`, curated metadata under
+  `manifest/`, and raw Construct output under `runtime/construct/`.
 
 ### Links
 
