@@ -489,6 +489,8 @@ def plot_layout_circular(structure):
     return {"layout": "circular", "structure": structure}
 
 def plot_structure_svg(filename, sequence, structure, layout=None):
+    if "U" in sequence or "T" not in sequence:
+        return 0
     if layout != {"layout": "circular", "structure": structure}:
         return 0
     with open(filename, "w", encoding="utf-8") as handle:

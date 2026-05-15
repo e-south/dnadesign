@@ -180,6 +180,8 @@ def plot_layout_circular(structure):
     return {"layout": "circular", "structure": structure}
 
 def plot_structure_svg(filename, sequence, structure, layout=None):
+    if sequence != "GCAT":
+        return 0
     if layout != {"layout": "circular", "structure": structure}:
         return 0
     with open(filename, "w", encoding="utf-8") as handle:
@@ -312,7 +314,9 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert payload["qa"]["cross_copy_pair_count"] == 2
     enriched_prediction = json.loads(prediction.read_text(encoding="utf-8"))
     assert enriched_prediction["qa"]["pairing_summary"]["intended_recovered_count"] == 1
-    assert (tmp_path / "visual" / "secondary_structure.annotated.svg").is_file()
+    annotated = (tmp_path / "visual" / "secondary_structure.annotated.svg").read_text(encoding="utf-8")
+    assert ">T<" in annotated
+    assert ">U<" not in annotated
 
 
 def test_folding_plot_cli_accepts_construct_bundle(
@@ -329,6 +333,8 @@ def plot_layout_naview(structure):
     return {"layout": "naview", "structure": structure}
 
 def plot_structure_svg(filename, sequence, structure, layout=None):
+    if sequence != "GCAT":
+        return 0
     with open(filename, "w", encoding="utf-8") as handle:
         handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
         handle.write('<svg xmlns="http://www.w3.org/2000/svg">\\n')

@@ -57,6 +57,9 @@ recomputes the scar-nick `S3/S2/S1/S0` profile, fails fast on drift, joins
 study registry metadata, and writes `msd_design_reference_v1` /
 `msd_design_catalog_v1` records. The materialize route then emits one MSD unit
 per design and attaches sequence digests plus artifact paths to those records.
+Typed `retron_msd_compiler_spec_v1` files now provide the same boundary for
+explicit parts and selected primitive ranks, so the compiler does not depend on
+manual label syntax alone.
 
 For the manual retron-43/TetO dogfood unit, the physical segments are:
 
@@ -242,7 +245,7 @@ that agents need before opening the full spec:
   for local review.
 - Retron MSD ID lists should use the study CLI `materialize` route for
   single-unit GenBank/PNG output after concrete payload and cap sequences are
-  supplied. It keeps top-level output limited to `README.md`, `manifest/`, and
+  supplied through `--spec` or explicit overrides. It keeps top-level output limited to `README.md`, `manifest/`, and
   `variants/`; writes sequence indexes, catalogs, provenance, and generated
   single-unit composition configs under `manifest/`; and groups each
   `variants/<design-id>/` bundle into `sequences/`, `plots/`, `manifest/`, and
@@ -294,7 +297,10 @@ When returning to this work:
 
 - Composition belongs in Construct if the contract stays generic.
 - Retron-specific selector/ranking logic starts as study config/rationale and
-  becomes code only after repeated selection behavior justifies it.
+  becomes code only after repeated selection behavior justifies it. Current
+  compiler specs allow selected Snapback cap and scar-nick stem-base primitive
+  ranks through public tool APIs, but multi-rank combinatorics intentionally
+  fail fast until a separate expansion contract exists.
 - Folding preflight and ViennaRNA runner behavior now lives in the separate
   `dnadesign.folding` package and is invoked through `uv run folding` or
   Construct's public folding handoff. `RNAfold` is the optional ViennaRNA CLI
@@ -317,8 +323,8 @@ When returning to this work:
 - Naive sequence-artifact Retron MSD requests should start with
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize`
   rather than manually creating Construct workspaces. Provide complete
-  subcomponents with `--payload-sequence ID=ACGT`, `--cap-sequence ID=ACGT`,
-  and no repeat-count flag; otherwise the compiler reports the missing
+  subcomponents with `--spec` or with `--payload-sequence ID=ACGT`,
+  `--cap-sequence ID=ACGT`, and no repeat-count flag; otherwise the compiler reports the missing
   subcomponent and routes back to Snapback or scar-nick. Materialized output
   uses top-level `README.md`, `manifest/`, and `variants/`; each variant groups
   forward/reverse-complement GenBank and FASTA under `sequences/`,

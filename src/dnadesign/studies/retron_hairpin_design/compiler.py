@@ -643,18 +643,18 @@ def _composition_config_payload(
         },
         "folding": {
             "enabled": True,
-            "required": False,
+            "required": True,
             "scope": "canonical_component_unit",
             "backend": {
                 "name": "ViennaRNA",
-                "interface": "cli",
-                "executable": "RNAfold",
+                "interface": "python_api",
+                "python_module": "RNA",
                 "backend_contract": "secondary_structure_prediction_v1",
             },
             "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
         },
         "visual": {
-            "emit": ["sequence_evidence_map_v1"],
+            "emit": ["sequence_evidence_map_v1", "viennarna_secondary_structure_svg_v1"],
             "display_profile": _msd_display_profile(record, payload_label=payload_label),
             "render_exports": {"formats": list(render_formats)},
         },
@@ -734,6 +734,13 @@ def _publish_variant_outputs(
     folding_status = _folding_prediction_status(folding_prediction)
     folding_png = plots_dir / "secondary_structure.png"
     _write_folding_prediction_png(folding_prediction, folding_png)
+    structure_plot_dir = construct_bundle / "visual" / "viennarna_secondary_structure"
+    structure_manifest = structure_plot_dir / "viennarna_secondary_structure_svg_v1.json"
+    structure_annotation_manifest = structure_plot_dir / "secondary_structure.annotation_manifest.json"
+    secondary_structure_svg = plots_dir / "secondary_structure.svg"
+    secondary_structure_native_svg = plots_dir / "secondary_structure.native.svg"
+    _copy_required_file(structure_plot_dir / "secondary_structure.annotated.svg", secondary_structure_svg)
+    _copy_required_file(structure_plot_dir / "secondary_structure.native.svg", secondary_structure_native_svg)
     combined_png = plots_dir / "component_span_and_folding.png"
     _write_combined_png(component_png, folding_png, combined_png)
 
@@ -754,6 +761,8 @@ def _publish_variant_outputs(
             construct_bundle / "folding" / "secondary_structure_prediction_request_v1.yaml",
             manifest_dir / "folding_request.yaml",
         ),
+        (structure_manifest, manifest_dir / "viennarna_secondary_structure_svg_v1.json"),
+        (structure_annotation_manifest, manifest_dir / "secondary_structure.annotation_manifest.json"),
     ]
     for source, destination in manifest_sources:
         _copy_required_file(source, destination)
@@ -769,6 +778,7 @@ def _publish_variant_outputs(
         "folding_prediction": (manifest_dir / "folding_prediction.json").relative_to(root).as_posix(),
         "folding_status": folding_status,
         "component_span_png": component_png.relative_to(root).as_posix(),
+        "secondary_structure_svg": secondary_structure_svg.relative_to(root).as_posix(),
         "folding_png": folding_png.relative_to(root).as_posix(),
         "combined_plot_png": combined_png.relative_to(root).as_posix(),
     }
@@ -791,40 +801,116 @@ def _folding_prediction_status(path: Path) -> str:
     status = str(payload.get("status") or "").strip()
     if not status:
         raise RetronMsdCompilerError(f"Folding prediction artifact is missing status: {path}")
+    if status != "ok":
+        raise RetronMsdCompilerError(
+            f"Retron MSD materialize requires a ViennaRNA-backed folding prediction with status ok: "
+            f"{path} reported {status}."
+        )
     return status
 
 
 def _write_folding_prediction_png(prediction_path: Path, output_path: Path) -> None:
     payload = json.loads(prediction_path.read_text(encoding="utf-8"))
     status = str(payload.get("status") or "unknown")
+    if status != "ok":
+        raise RetronMsdCompilerError(
+            f"Refusing to publish secondary-structure plot because folding status is {status}: {prediction_path}"
+        )
     input_payload = payload.get("input") if isinstance(payload.get("input"), dict) else {}
     result_payload = payload.get("result") if isinstance(payload.get("result"), dict) else {}
-    qa_payload = payload.get("qa") if isinstance(payload.get("qa"), dict) else {}
     dot_bracket = str(result_payload.get("dot_bracket") or "")
     mfe = result_payload.get("mfe_kcal_mol")
     pair_map = result_payload.get("pair_map") if isinstance(result_payload.get("pair_map"), list) else []
-    warnings = qa_payload.get("warnings") if isinstance(qa_payload.get("warnings"), list) else []
-    errors = qa_payload.get("errors") if isinstance(qa_payload.get("errors"), list) else []
-    lines = [
-        "Secondary structure prediction",
-        f"status: {status}",
-        f"sequence: {input_payload.get('sequence_id', '')}",
-        f"length: {input_payload.get('length', '')}",
-    ]
+    if not dot_bracket:
+        raise RetronMsdCompilerError(f"Folding prediction artifact is missing dot-bracket output: {prediction_path}")
+    sequence_id = str(input_payload.get("sequence_id") or "")
+    sequence_length = int(input_payload.get("length") or len(dot_bracket))
+    _write_structure_prediction_png(
+        output_path,
+        sequence_id=sequence_id,
+        sequence_length=sequence_length,
+        dot_bracket=dot_bracket,
+        mfe=mfe,
+        pair_map=pair_map,
+    )
+
+
+def _prediction_pairs(pair_map: Sequence[object], dot_bracket: str) -> list[tuple[int, int]]:
+    pairs: list[tuple[int, int]] = []
+    for item in pair_map:
+        if not isinstance(item, Mapping):
+            continue
+        try:
+            left = int(item["left"])
+            right = int(item["right"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if 0 <= left < right < len(dot_bracket):
+            pairs.append((left, right))
+    if pairs:
+        return sorted(set(pairs))
+
+    stack: list[int] = []
+    for index, char in enumerate(dot_bracket):
+        if char == "(":
+            stack.append(index)
+        elif char == ")" and stack:
+            pairs.append((stack.pop(), index))
+    return sorted(set(pairs))
+
+
+def _write_structure_prediction_png(
+    output_path: Path,
+    *,
+    sequence_id: str,
+    sequence_length: int,
+    dot_bracket: str,
+    mfe: object,
+    pair_map: Sequence[object],
+) -> None:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError as exc:  # pragma: no cover - dependency is pinned in the managed environment.
+        raise RetronMsdCompilerError("Pillow is required to publish Retron MSD PNG plot artifacts.") from exc
+
+    pairs = _prediction_pairs(pair_map, dot_bracket)
+    nucleotide_count = len(dot_bracket)
+    width = max(1100, 140 + 12 * nucleotide_count)
+    height = 380
+    margin_x = 70
+    base_y = 245
+    step = (width - 2 * margin_x) / max(1, nucleotide_count - 1)
+    image = Image.new("RGB", (width, height), color="white")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+    title = f"ViennaRNA secondary structure: {sequence_id}"
+    subtitle = f"length: {sequence_length}  predicted pairs: {len(pairs)}"
     if mfe is not None:
-        lines.append(f"mfe_kcal_mol: {mfe}")
-    if pair_map:
-        lines.append(f"predicted_pair_count: {len(pair_map)}")
-    if dot_bracket:
-        lines.append("dot_bracket:")
-        lines.extend(textwrap.wrap(dot_bracket, width=96))
-    if warnings:
-        lines.append("warnings:")
-        lines.extend(textwrap.wrap("; ".join(str(item) for item in warnings), width=96))
-    if errors:
-        lines.append("errors:")
-        lines.extend(textwrap.wrap("; ".join(str(item) for item in errors), width=96))
-    _write_text_png(lines, output_path)
+        subtitle += f"  mfe_kcal_mol: {mfe}"
+    draw.text((24, 20), title, fill="#111827", font=font)
+    draw.text((24, 42), subtitle, fill="#374151", font=font)
+    draw.line((margin_x, base_y, width - margin_x, base_y), fill="#9ca3af", width=2)
+
+    for left, right in pairs:
+        x1 = margin_x + left * step
+        x2 = margin_x + right * step
+        arc_height = min(160, max(24, (x2 - x1) * 0.35))
+        draw.arc((x1, base_y - arc_height, x2, base_y + arc_height), start=180, end=360, fill="#2563eb", width=2)
+
+    for index, char in enumerate(dot_bracket):
+        x = margin_x + index * step
+        fill = "#111827" if char in "()" else "#6b7280"
+        draw.ellipse((x - 3, base_y - 3, x + 3, base_y + 3), fill=fill)
+        if step >= 10:
+            draw.text((x - 3, base_y + 10), char, fill=fill, font=font)
+
+    wrapped = textwrap.wrap(dot_bracket, width=120)
+    y = 305
+    for line in wrapped[:3]:
+        draw.text((24, y), line, fill="#374151", font=font)
+        y += 18
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output_path)
 
 
 def _write_text_png(lines: Sequence[str], output_path: Path) -> None:
@@ -898,6 +984,7 @@ def _sequence_index_row(
         "folding_prediction": curated["folding_prediction"],
         "folding_status": curated["folding_status"],
         "component_span_png": curated["component_span_png"],
+        "secondary_structure_svg": curated["secondary_structure_svg"],
         "folding_png": curated["folding_png"],
         "combined_plot_png": curated["combined_plot_png"],
         "finder_reveal": f"open -R {shlex.quote(genbank_path.as_posix())}",
@@ -924,7 +1011,13 @@ def _record_with_sequence_artifacts(record: MsdDesignReferenceV1, *, row: Mappin
         "visual_contract": row["visual_contract"],
         "folding_prediction": row["folding_prediction"],
     }
-    for field in ("component_span_png", "component_span_svg", "folding_png", "combined_plot_png"):
+    for field in (
+        "component_span_png",
+        "component_span_svg",
+        "secondary_structure_svg",
+        "folding_png",
+        "combined_plot_png",
+    ):
         value = row.get(field)
         if value:
             artifacts[field] = value
@@ -974,6 +1067,7 @@ def _write_sequence_index(path: Path, rows: list[dict[str, object]]) -> None:
         "folding_status",
         "component_span_png",
         "component_span_svg",
+        "secondary_structure_svg",
         "folding_png",
         "combined_plot_png",
         "finder_reveal",
@@ -1073,6 +1167,7 @@ def _write_bundle_readme(
                 "first reverse-complement GenBank export."
             ),
             f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/component_span_and_folding.png`: first combined plot.",
+            f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/secondary_structure.svg`: ViennaRNA structure plot.",
             "",
             f"Record count: {len(catalog.records)}",
             "",

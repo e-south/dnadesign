@@ -240,6 +240,8 @@ def plot_layout_naview(structure):
     return {"layout": "naview", "structure": structure}
 
 def plot_structure_svg(filename, sequence, structure, layout=None):
+    if sequence != "GCAT":
+        return 0
     with open(filename, "w", encoding="utf-8") as handle:
         handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
         handle.write('<svg xmlns="http://www.w3.org/2000/svg">\\n')
@@ -328,6 +330,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert 'data-dnadesign-owner-ids="demo.0.payload_primary"' in annotated
     assert 'data-dnadesign-effect-tags="payload"' in annotated
     assert 'data-dnadesign-left-index0="0"' in annotated
+    assert ">T<" in annotated
+    assert ">U<" not in annotated
     assert 'id="dnadesign-secondary-structure-labels"' in annotated
     assert 'data-dnadesign-section-label="Payload primary"' in annotated
     annotation_manifest_path = (
@@ -335,6 +339,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     )
     annotation_manifest = json.loads(annotation_manifest_path.read_text(encoding="utf-8"))
     assert annotation_manifest["nucleotides"][0]["display_index_1"] == 1
+    assert annotation_manifest["nucleotides"][3]["base_dna"] == "T"
+    assert annotation_manifest["nucleotides"][3]["base_submitted"] == "U"
     assert annotation_manifest["nucleotides"][0]["owner_ids"] == ["demo.0.payload_primary"]
     assert annotation_manifest["basepairs"][0]["is_cross_copy"] is True
     assert annotation_manifest["basepairs"][0]["left_copy_index"] == 0

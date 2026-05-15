@@ -89,9 +89,11 @@ def publish_viennarna_structure_svg(
     manifest_path = output_path / _VIENNARNA_PLOT_MANIFEST_FILENAME
 
     module = importlib.import_module(python_module)
+    # Folding may use a U-substituted RNA surrogate, but the published plot is a
+    # DNA artifact whose coordinates map to the original assembled sequence.
     command = _write_native_viennarna_svg(
         module,
-        sequence=submitted_sequence,
+        sequence=assembled.sequence,
         structure=prediction_model.result.dot_bracket,
         output_path=native_svg_path,
         layout_algorithm=layout_algorithm,

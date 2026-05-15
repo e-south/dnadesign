@@ -205,18 +205,30 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   `docs/studies/retron_hairpin_design/msd_design_hit_labels.txt`
 - Public module:
   `src/dnadesign/studies/retron_hairpin_design/cli.py`
+- Typed compiler spec:
+  `retron_msd_compiler_spec_v1` YAML/JSON accepted by `lint`, `compile`, and
+  `materialize` through `--spec`
 - Lint command:
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"`
+- Spec lint command:
+  `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --spec path/to/retron_msd_compiler_spec.yaml --format json`
 - Compile command:
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - Materialize command:
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Route note:
-  this compiler is intentionally study-owned and is not registered as a top-level `uv run retron-msd` tool. It parses `construct_id`, payload/target,
-  cap id, left/right scar-nick bases, and optional profile code; then it
-  recomputes the `S3/S2/S1/S0` profile and fails fast if the provided code
-  drifts or `S0` is not ligatable. Registry metadata stores route notes,
-  nickase, and nick orientation when known. The emitted
+  this compiler is intentionally study-owned and is not registered as a top-level `uv run retron-msd` tool. It parses lab-facing labels or typed
+  `retron_msd_compiler_spec_v1` design parts into the same trusted structure:
+  `construct_id`, payload/target, cap id, left/right scar-nick bases, and
+  optional profile code; then it recomputes the `S3/S2/S1/S0` profile and
+  fails fast if the provided code drifts or `S0` is not ligatable. Compiler
+  specs may point at solved Snapback cap primitives or scar-nick stem-base
+  primitives only through public `dnadesign.cruncher.snapback` and
+  `dnadesign.cruncher.scar_nick` APIs. `selector.mode=rank` is the preferred
+  explicit combination surface; rank lists, ranges, and all-hit selectors must
+  fail instead of silently running combinatorics until an expansion contract is
+  deliberately added. Registry metadata stores route notes, nickase, and nick
+  orientation when known. The emitted
   `msd_design_catalog_v1` is the Reader-facing bridge; Reader should not parse Construct, Folding, BaseRender, or Cruncher internals. Ad hoc compiles should
   write to explicit transient directories such as `/tmp/dnadesign_retron_msd_*`;
   Reader-linked runs should snapshot the same shallow bundle into the owning

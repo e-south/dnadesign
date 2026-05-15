@@ -36,8 +36,25 @@ class RetronMsdRegistry:
     constructs: dict[str, dict[str, Any]]
 
     def build_reference(self, parsed: ParsedMsdConstructLabel) -> MsdDesignReferenceV1:
+        return self.build_reference_from_parts(parsed)
+
+    def build_reference_from_parts(
+        self,
+        parsed: ParsedMsdConstructLabel,
+        *,
+        cap_metadata: dict[str, Any] | None = None,
+        scar_nick_metadata: dict[str, Any] | None = None,
+        source_notes: str | None = None,
+    ) -> MsdDesignReferenceV1:
         payload = self._require_mapping(self.payloads, parsed.payload_id, label="payload")
-        cap = self._require_mapping(self.caps, parsed.cap_id, label="cap")
+        cap = self._optional_mapping(self.caps, parsed.cap_id, label="cap")
+        if cap is None and cap_metadata is None:
+            self._require_mapping(self.caps, parsed.cap_id, label="cap")
+        cap = dict(cap or {})
+        if cap_metadata is not None:
+            if not isinstance(cap_metadata, dict):
+                raise RetronMsdRegistryError(f"cap metadata must be a mapping: {parsed.cap_id}")
+            cap.update(cap_metadata)
         construct = self.constructs.get(parsed.construct_id, {})
         if not isinstance(construct, dict):
             raise RetronMsdRegistryError(f"construct registry entry must be a mapping: {parsed.construct_id}")
@@ -46,6 +63,11 @@ class RetronMsdRegistry:
             scar_nick = {}
         if not isinstance(scar_nick, dict):
             raise RetronMsdRegistryError(f"construct scar_nick entry must be a mapping: {parsed.construct_id}")
+        scar_nick = dict(scar_nick)
+        if scar_nick_metadata is not None:
+            if not isinstance(scar_nick_metadata, dict):
+                raise RetronMsdRegistryError(f"scar_nick metadata must be a mapping: {parsed.construct_id}")
+            scar_nick.update(scar_nick_metadata)
         return MsdDesignReferenceV1.model_validate(
             {
                 "construct_id": parsed.construct_id,
@@ -69,7 +91,7 @@ class RetronMsdRegistry:
                     "nickase": scar_nick.get("nickase"),
                     "route_note": scar_nick.get("route_note"),
                 },
-                "source_notes": construct.get("source_notes"),
+                "source_notes": source_notes or construct.get("source_notes"),
             }
         )
 
@@ -79,6 +101,15 @@ class RetronMsdRegistry:
         if not isinstance(value, dict):
             available = ", ".join(sorted(source)) or "(none)"
             raise RetronMsdRegistryError(f"Unknown {label} '{key}' in MSD construct label. Available: {available}.")
+        return value
+
+    @staticmethod
+    def _optional_mapping(source: dict[str, dict[str, Any]], key: str, *, label: str) -> dict[str, Any] | None:
+        value = source.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise RetronMsdRegistryError(f"{label} registry entry must be a mapping: {key}")
         return value
 
 

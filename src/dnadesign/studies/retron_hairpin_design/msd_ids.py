@@ -51,6 +51,16 @@ class ParsedMsdConstructLabel:
         )
 
 
+@dataclass(frozen=True)
+class MsdDesignPartInput:
+    construct_id: str
+    payload_id: str
+    cap_id: str
+    left_base: str
+    right_base: str
+    profile_s3s2s1s0: str | None = None
+
+
 def _slug_token(value: str) -> str:
     text = str(value).strip().lower()
     text = re.sub(r"[^a-z0-9]+", "-", text)
@@ -59,6 +69,26 @@ def _slug_token(value: str) -> str:
 
 def compute_scar_nick_profile(*, left_base: str, right_base: str) -> str:
     return compute_scar_nick_profile_s3s2s1s0(left_base=left_base, right_base=right_base)
+
+
+def canonical_msd_construct_label(parts: MsdDesignPartInput) -> str:
+    construct_id = _not_blank(parts.construct_id, label="construct_id")
+    payload_id = _not_blank(parts.payload_id, label="payload_id")
+    cap_id = _not_blank(parts.cap_id, label="cap_id")
+    left_base = _dna4(parts.left_base, label="left_base")
+    right_base = _dna4(parts.right_base, label="right_base")
+    observed_profile = compute_scar_nick_profile(left_base=left_base, right_base=right_base)
+    declared_profile = parts.profile_s3s2s1s0
+    if declared_profile is not None and declared_profile.upper() != observed_profile:
+        raise MsdIdError(
+            f"MSD design parts provided profile {declared_profile.upper()} but left/right bases imply "
+            f"{observed_profile}."
+        )
+    return f"{construct_id}-msd[{payload_id}]; {cap_id}-L{left_base}-R{right_base}-{observed_profile}"
+
+
+def parse_msd_design_parts(parts: MsdDesignPartInput) -> ParsedMsdConstructLabel:
+    return parse_msd_construct_label(canonical_msd_construct_label(parts))
 
 
 def parse_msd_construct_label(label: str) -> ParsedMsdConstructLabel:
@@ -90,9 +120,26 @@ def parse_msd_construct_label(label: str) -> ParsedMsdConstructLabel:
     )
 
 
+def _not_blank(value: str, *, label: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise MsdIdError(f"MSD design part {label} cannot be empty.")
+    return text
+
+
+def _dna4(value: str, *, label: str) -> str:
+    text = _not_blank(value, label=label).upper()
+    if not re.fullmatch(r"[ACGT]{4}", text):
+        raise MsdIdError(f"MSD design part {label} must contain exactly four A/C/G/T bases.")
+    return text
+
+
 __all__ = [
     "MsdIdError",
+    "MsdDesignPartInput",
     "ParsedMsdConstructLabel",
+    "canonical_msd_construct_label",
     "compute_scar_nick_profile",
+    "parse_msd_design_parts",
     "parse_msd_construct_label",
 ]

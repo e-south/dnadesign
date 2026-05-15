@@ -34,6 +34,7 @@ from .compiler import (
     materialize_msd_design_artifacts,
     write_msd_design_catalog,
 )
+from .compiler_spec import MsdCompilerSpecError, load_msd_compiler_spec
 from .msd_ids import MsdIdError
 from .registry import RetronMsdRegistryError
 
@@ -64,6 +65,8 @@ def _emit(payload: dict[str, Any], *, output_format: str) -> None:
         typer.echo(f"construct_id: {reference.get('construct_id')}")
     if payload.get("catalog_path") is not None:
         typer.echo(f"catalog_path: {payload['catalog_path']}")
+        typer.echo(f"record_count: {payload.get('record_count')}")
+    elif payload.get("record_count") is not None:
         typer.echo(f"record_count: {payload.get('record_count')}")
     if payload.get("output_dir") is not None:
         typer.echo(f"output_dir: {payload['output_dir']}")
@@ -146,6 +149,22 @@ def _next_step_for_error(exc: Exception) -> str:
             "Provide literal subcomponents with --payload-sequence ID=ACGT and --cap-sequence ID=ACGT, "
             "or route missing cap/shortening inputs to Snapback before generating GenBank/PNG artifacts."
         )
+    if (
+        "ViennaRNA" in message
+        or "RNAfold" in message
+        or "Folding backend Python module" in message
+        or "folding failed" in message
+    ):
+        return (
+            "Install the ViennaRNA Python bindings (importable as RNA) or run from an environment with that "
+            "backend available, then rerun materialize into a fresh --out-dir. Retron MSD GenBank/PNG/SVG "
+            "deliverables require folding status ok."
+        )
+    if "compiler spec" in message or "selector" in message or "primitive" in message:
+        return (
+            "Fix the retron_msd_compiler_spec_v1 file so every design has complete explicit parts, "
+            "and use selector mode=rank for each public primitive source unless a future expansion contract is added."
+        )
     if "Stale MSD sequence output" in message or "Stale MSD composition config output" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove stale generated sequence outputs first."
     return "Run lint on one complete MSD label first; route missing biological constraints before generating a catalog."
@@ -172,7 +191,7 @@ def _materialize_warnings(variants: list[dict[str, Any]]) -> list[str]:
     return [
         "Folding was attempted for every variant, but "
         f"{folding_warning_count} variant(s) reported {', '.join(statuses)}. "
-        "Install ViennaRNA RNAfold or run on a PATH that exposes RNAfold to get structure predictions; "
+        "Install ViennaRNA or run where the configured ViennaRNA backend is available; "
         "no fallback prediction was used."
     ]
 
@@ -216,6 +235,25 @@ def _read_input_labels(input_file: Path) -> list[str]:
     return [line.strip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
 
 
+def _reject_mixed_design_sources(*, ids: list[str], input_file: Path | None, spec_file: Path | None) -> None:
+    if spec_file is not None and (ids or input_file is not None):
+        raise RetronMsdCompilerError("Use either --spec or --id/--input, not both.")
+
+
+def _merge_sequence_maps(
+    spec_values: dict[str, str],
+    cli_values: dict[str, str],
+    *,
+    label: str,
+) -> dict[str, str]:
+    duplicates = sorted(set(spec_values) & set(cli_values))
+    if duplicates:
+        raise RetronMsdCompilerError(
+            f"{label} sequence(s) declared in both --spec and CLI overrides: {', '.join(duplicates)}"
+        )
+    return {**spec_values, **cli_values}
+
+
 def _sequence_override_map(values: list[str], *, label: str) -> dict[str, str]:
     overrides: dict[str, str] = {}
     for raw in values:
@@ -231,14 +269,45 @@ def _sequence_override_map(values: list[str], *, label: str) -> dict[str, str]:
 
 @app.command("lint")
 def lint_command(
-    label: str = typer.Option(..., "--id", help="Retron MSD construct label to parse and validate."),
+    label: str | None = typer.Option(None, "--id", help="Retron MSD construct label to parse and validate."),
+    spec_file: Path | None = typer.Option(
+        None,
+        "--spec",
+        exists=True,
+        readable=True,
+        dir_okay=False,
+        help="Typed retron_msd_compiler_spec_v1 YAML/JSON file to parse and validate.",
+    ),
     study_dir: Path = typer.Option(_DEFAULT_STUDY_DIR, "--study-dir", help="Retron hairpin study directory."),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_norm = _format_option(output_format)
     try:
+        if spec_file is not None:
+            if label is not None:
+                raise RetronMsdCompilerError("Use either lint --spec or lint --id, not both.")
+            resolved = load_msd_compiler_spec(spec_file, study_dir=study_dir)
+            _emit(
+                {
+                    "status": "ok",
+                    "record_count": len(resolved.catalog.records),
+                    "records": [record.model_dump(mode="json") for record in resolved.catalog.records],
+                    "next_step": _lint_next_step(),
+                },
+                output_format=format_norm,
+            )
+            return
+        if label is None:
+            raise RetronMsdCompilerError("Provide --id or --spec for lint.")
         reference = build_msd_design_reference(label, study_dir=study_dir)
-    except (MsdIdError, RetronMsdRegistryError, RetronMsdCompilerError, OSError, ValueError) as exc:
+    except (
+        MsdIdError,
+        RetronMsdRegistryError,
+        RetronMsdCompilerError,
+        MsdCompilerSpecError,
+        OSError,
+        ValueError,
+    ) as exc:
         _exit_with_error(exc, output_format=format_norm)
     _emit(
         {
@@ -261,6 +330,14 @@ def materialize_command(
         dir_okay=False,
         help="Plain-text, CSV, or TSV list of Retron MSD construct labels.",
     ),
+    spec_file: Path | None = typer.Option(
+        None,
+        "--spec",
+        exists=True,
+        readable=True,
+        dir_okay=False,
+        help="Typed retron_msd_compiler_spec_v1 YAML/JSON file with labels/designs and optional sequences.",
+    ),
     study_dir: Path = typer.Option(_DEFAULT_STUDY_DIR, "--study-dir", help="Retron hairpin study directory."),
     out_dir: Path = typer.Option(..., "--out-dir", help="Transient directory for the sequence artifact bundle."),
     payload_sequence: list[str] = typer.Option(
@@ -282,16 +359,38 @@ def materialize_command(
 ) -> None:
     format_norm = _format_option(output_format)
     try:
-        labels = _collect_labels(ids, input_file)
-        catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+        _reject_mixed_design_sources(ids=ids, input_file=input_file, spec_file=spec_file)
+        cli_payload_sequences = _sequence_override_map(payload_sequence, label="payload sequence")
+        cli_cap_sequences = _sequence_override_map(cap_sequence, label="cap sequence")
+        if spec_file is None:
+            labels = _collect_labels(ids, input_file)
+            catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+            resolved_payload_sequences: dict[str, str] = {}
+            resolved_cap_sequences: dict[str, str] = {}
+        else:
+            resolved = load_msd_compiler_spec(spec_file, study_dir=study_dir)
+            catalog = resolved.catalog
+            resolved_payload_sequences = resolved.payload_sequences
+            resolved_cap_sequences = resolved.cap_sequences
         result = materialize_msd_design_artifacts(
             catalog,
             out_dir=out_dir,
-            payload_sequences=_sequence_override_map(payload_sequence, label="payload sequence"),
-            cap_sequences=_sequence_override_map(cap_sequence, label="cap sequence"),
+            payload_sequences=_merge_sequence_maps(
+                resolved_payload_sequences,
+                cli_payload_sequences,
+                label="payload",
+            ),
+            cap_sequences=_merge_sequence_maps(resolved_cap_sequences, cli_cap_sequences, label="cap"),
             render_formats=render_format,
         )
-    except (MsdIdError, RetronMsdRegistryError, RetronMsdCompilerError, OSError, ValueError) as exc:
+    except (
+        MsdIdError,
+        RetronMsdRegistryError,
+        RetronMsdCompilerError,
+        MsdCompilerSpecError,
+        OSError,
+        ValueError,
+    ) as exc:
         _exit_with_error(exc, output_format=format_norm)
     warnings = _materialize_warnings(result.variants)
     _emit(
@@ -329,16 +428,35 @@ def compile_command(
         dir_okay=False,
         help="Plain-text, CSV, or TSV list of Retron MSD construct labels.",
     ),
+    spec_file: Path | None = typer.Option(
+        None,
+        "--spec",
+        exists=True,
+        readable=True,
+        dir_okay=False,
+        help="Typed retron_msd_compiler_spec_v1 YAML/JSON file with labels or explicit designs.",
+    ),
     study_dir: Path = typer.Option(_DEFAULT_STUDY_DIR, "--study-dir", help="Retron hairpin study directory."),
     out_dir: Path = typer.Option(..., "--out-dir", help="Directory for emitted design-reference catalog."),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_norm = _format_option(output_format)
     try:
-        labels = _collect_labels(ids, input_file)
-        catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+        _reject_mixed_design_sources(ids=ids, input_file=input_file, spec_file=spec_file)
+        if spec_file is None:
+            labels = _collect_labels(ids, input_file)
+            catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+        else:
+            catalog = load_msd_compiler_spec(spec_file, study_dir=study_dir).catalog
         catalog_path = write_msd_design_catalog(catalog, out_dir=out_dir)
-    except (MsdIdError, RetronMsdRegistryError, RetronMsdCompilerError, OSError, ValueError) as exc:
+    except (
+        MsdIdError,
+        RetronMsdRegistryError,
+        RetronMsdCompilerError,
+        MsdCompilerSpecError,
+        OSError,
+        ValueError,
+    ) as exc:
         _exit_with_error(exc, output_format=format_norm)
     _emit(
         {

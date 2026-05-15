@@ -1,8 +1,8 @@
 ---
 name: retron-hairpin-study
-description: "Compile or route Retron MSD genetic-compiler requests. Use for MSD IDs, single-unit MSD sequence bundles, design catalogs, GenBank/PNG, or missing MSD parts. Do not use for generic Cruncher/snapback or bench protocols."
+description: "Compile/route Retron MSD compiler requests. Use for MSD IDs, single-unit MSD sequence bundles, design catalogs, GenBank/PNG/Finder outputs, or missing MSD parts. Not for generic Cruncher/snapback or bench protocols."
 metadata:
-  version: 0.7.4
+  version: 0.7.5
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -11,21 +11,20 @@ metadata:
 
 ## Purpose
 
-Route Retron MSD work as a genetic compiler. The default job is not to report
-study phase. It is to decide whether the user has provided enough parts to
-compile a design reference or one MSD sequence unit, or whether missing
-constraints must route to a primitive solver.
+Route Retron MSD work as a genetic compiler. The default job decides whether to
+compile a reference, materialize one MSD sequence unit, or route missing constraints to a primitive solver.
 
 ## Scope
 
 In scope:
 - Retron MSD shorthand IDs and explicit part sets.
+- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, and
+  selected public primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
 - Routing mismatch-display questions to YIU as contrast only.
-- Construct/BaseRender service calls for one MSD unit per design after parts are
-  selected.
+- Construct/BaseRender service calls for one MSD unit per design after parts are selected.
 - Skill, route-map, and compiler-harness hardening.
 
 Out of scope:
@@ -41,10 +40,17 @@ Out of scope:
 - The first decision is input completeness: compile now, or route missing
   constraints.
 - Complete user-provided parts are validated and compiled without solver work.
+- Compiler specs are parsed at the boundary, then compile from trusted part
+  structures rather than manual label syntax alone.
 - Incomplete parts route to the smallest primitive: Snapback, scar-nick, or
   YIU contrast.
+- Solved primitive inputs come through public Snapback/scar-nick APIs; selectors
+  must be explicit and multi-option selections must not expand silently.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
   payload primary, cap geometry, payload complement, right base + 3' flank.
+- Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
+  "open in Finder" must run `materialize`; a reference catalog is not enough.
+- Materialized plot deliverables require a ViennaRNA-backed folding status of `ok`; do not accept warning placeholder images as structure plots.
 - No user-facing repeat count; do not chain complete MSD units together.
 - GenBank/CSV output uses display labels for visible feature names, keeps raw
   ids in machine qualifiers, and does not duplicate full component spans as
@@ -61,8 +67,14 @@ Out of scope:
 1. Classify the request.
 - Complete MSD label or complete parts: use
   [msd-design-references.md](references/msd-design-references.md).
+- Complete MSD labels plus "outputs", "deliverables", "exports", "plots",
+  "GenBank", or "open in Finder": materialize, not compile-only.
+- Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
+  and use `selector.mode=rank` for the preferred explicit primitive
+  combination.
 - Need sequence, visual, or GenBank from selected parts: compile a reference
-  first, then materialize a single-unit sequence bundle.
+  first, then materialize a single-unit sequence bundle with `--spec` or
+  explicit payload/cap sequences.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in
   `docs/studies/retron_hairpin_design/routes.md`.
 - Missing left/right base feasibility, terminal-nick route, nickase, or
@@ -84,7 +96,13 @@ Out of scope:
 3. Execute or report the route.
 - For complete reference inputs, run `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint|compile`.
 - For GenBank/PNG output, run the same module's `materialize` command with
-  explicit payload/cap sequences. Do not add `--repeat-count`.
+  `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
+- If the user asked to open outputs in Finder, do not stop after `compile`.
+  After `materialize`, open the root and verify `manifest/sequence_index.tsv`,
+  per-design `sequences/forward.gb`, and PNGs under `variants/*/plots/`.
+- If sequence subcomponents are missing, report the exact missing
+  `--payload-sequence` / `--cap-sequence` IDs or the primitive route needed;
+  do not present catalog JSONs as the requested deliverables.
 - For missing constraints, name the missing fields and the primitive route.
 - For generated artifacts, name the output directory and contracts produced.
 
@@ -99,6 +117,12 @@ Out of scope:
 - IDs select and validate provided parts; catalogs freeze references.
 - Snapback and scar-nick solve primitives; the compiler emits one selected MSD
   unit per design.
+- Study code must not import `dnadesign.cruncher.src.*` or parse Cruncher
+  workspace internals; use `dnadesign.cruncher.snapback` and
+  `dnadesign.cruncher.scar_nick` public primitive-export APIs.
+- Rank ranges, rank lists, and all-hit selectors are valid source language only
+  when a future expansion contract is explicit; current product compilation
+  must fail fast instead of running implicit combinatorics.
 - Scar-nick source refs project only four-base left/right basal spans into the
   final ssDNA unless a future contract selects more.
 - Construct owns generic sequence assembly, not Retron biology.
@@ -114,7 +138,9 @@ Out of scope:
 - Selected route: compile, Snapback, scar-nick, YIU contrast, or status.
 - Exact command or next file to open.
 - Output directory/contract posture.
+- Deliverable verification for materialize requests: record count, bundle root, GenBank/PNG/SVG counts or exact missing sequence/backend blockers.
 - Fail-fast checks that apply.
+- Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.
 
 ## Output
@@ -123,6 +149,7 @@ Return a short routing answer with:
 - what parts are present and missing
 - what will run next
 - where outputs should live
+- whether artifacts were emitted or which sequence subcomponents blocked them
 - which invariant protects against drift
 - status/preflight details only when explicitly requested
 
@@ -131,6 +158,7 @@ Return a short routing answer with:
 Should trigger:
 - "Compile this Retron MSD shorthand ID into a design catalog."
 - "Generate one MSD sequence with GenBank and PNG outputs for these Retron IDs."
+- "Open a transient Finder window with these Retron MSD outputs."
 - "I have left/right bases but need to know if the scar-nick profile is valid."
 - "Which primitive route owns this missing Retron MSD part?"
 - "Harden the Retron MSD compiler skill or routing."

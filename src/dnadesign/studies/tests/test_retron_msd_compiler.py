@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import csv
 import json
+import sys
 import tomllib
 from collections import Counter
 from pathlib import Path
@@ -25,9 +26,11 @@ from typer.testing import CliRunner
 
 from dnadesign.studies.retron_hairpin_design.cli import app
 from dnadesign.studies.retron_hairpin_design.msd_ids import (
+    MsdDesignPartInput,
     MsdIdError,
     compute_scar_nick_profile,
     parse_msd_construct_label,
+    parse_msd_design_parts,
 )
 
 _RUNNER = CliRunner()
@@ -54,6 +57,50 @@ _SCAR_NICK_HIT_LABELS = [
 ]
 _TETO_PAYLOAD = "tccctatcagtgatagaga"
 _SNAPBACK_CAP = "tCCTCAGcccGCTGAGGa"
+
+
+def _install_fake_viennarna_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        """
+__version__ = "2.7.0"
+
+class fold_compound:
+    def __init__(self, sequence):
+        self.sequence = sequence
+
+    def mfe(self):
+        half = len(self.sequence) // 2
+        structure = ["." for _ in self.sequence]
+        for index in range(min(6, half)):
+            structure[index] = "("
+            structure[len(self.sequence) - index - 1] = ")"
+        return "".join(structure), -1.0
+
+def plot_layout_naview(structure):
+    return {"layout": "naview", "structure": structure}
+
+def plot_structure_svg(filename, sequence, structure, layout=None):
+    if "U" in sequence or "T" not in sequence:
+        return 0
+    if layout != {"layout": "naview", "structure": structure}:
+        return 0
+    with open(filename, "w", encoding="utf-8") as handle:
+        handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80">\\n')
+        handle.write('<g id="pairs">\\n')
+        handle.write('<line class="basepairs" id="1,88" x1="0" y1="20" x2="220" y2="20" />\\n')
+        handle.write('</g><g id="seq">\\n')
+        for index, base in enumerate(sequence):
+            handle.write(f'<text class="nucleotide" x="{index * 2}" y="50">{base}</text>\\n')
+        handle.write('</g>\\n</svg>\\n')
+    return 1
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
 
 
 def _write_registry(tmp_path: Path) -> Path:
@@ -97,6 +144,21 @@ def test_parse_msd_construct_label_infers_profile_when_missing() -> None:
     assert parsed.right_base == "ACAG"
     assert parsed.profile_s3s2s1s0 == "MXMM"
     assert parsed.msd_design_id == "msd-tetr-c172-lcggt-racag-mxmm"
+
+
+def test_parse_msd_design_parts_uses_same_static_lint_without_manual_label_syntax() -> None:
+    parsed = parse_msd_design_parts(
+        MsdDesignPartInput(
+            construct_id="pES-retron-177",
+            payload_id="TetR",
+            cap_id="C172",
+            left_base="CGGT",
+            right_base="ACAG",
+        )
+    )
+
+    assert parsed.construct_label == "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+    assert parsed.profile_s3s2s1s0 == "MXMM"
 
 
 def test_parse_msd_construct_label_rejects_wrong_profile() -> None:
@@ -178,6 +240,279 @@ def test_retron_msd_lint_cli_fails_fast_on_unknown_registry_part(tmp_path: Path)
     assert payload["status"] == "error"
     assert "Unknown cap 'C999'" in payload["error"]
     assert "Route missing cap or shortening constraints to Snapback" in payload["next_step"]
+
+
+def test_retron_msd_lint_spec_accepts_explicit_design_parts(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+designs:
+  - construct_id: pES-retron-177
+    payload_id: TetR
+    cap_id: C172
+    left_base: CGGT
+    right_base: ACAG
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C172: tCCTCAGcccGCTGAGGa
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["record_count"] == 1
+    assert payload["records"][0]["construct_label"] == "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+
+
+def test_retron_msd_lint_spec_resolves_public_primitive_sources(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    snapback_run = tmp_path / "snapback_run"
+    snapback_report = snapback_run / "analysis" / "solve_report.json"
+    snapback_report.parent.mkdir(parents=True)
+    snapback_report.write_text(
+        json.dumps(
+            {
+                "workflow": "snapback_released_solve",
+                "hits": [
+                    {
+                        "rank": 1,
+                        "hit_kind": "exact",
+                        "nickase_variant_id": "Nb.BtsI",
+                        "release_variant_id": "BspQI",
+                        "target_search_hit": {"final_candidate": {"designed_sequence": "ACGTACGT"}},
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    scar_run = tmp_path / "scar_run"
+    scar_table = scar_run / "export" / "table__scar_nick_candidates.csv"
+    scar_table.parent.mkdir(parents=True)
+    scar_table.write_text(
+        "\n".join(
+            [
+                "rank,candidate_id,left_base,right_base,profile_s3s2s1s0,nickase_variant_id,nicked_strand,surviving_strand",
+                "1,scar-rank-01,CGGT,ACAG,MXMM,Nb.BtsI,bottom,top",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        f"""
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+designs:
+  - construct_id: pES-retron-public-source
+    payload_id: TetR
+    cap_id: C999
+    stem_base_source:
+      kind: scar_nick_stem_bases
+      run_dir: {scar_run.as_posix()}
+      selector:
+        mode: rank
+        rank: 1
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C999:
+    source:
+      kind: snapback_released_solve_cap
+      run_dir: {snapback_run.as_posix()}
+      selector:
+        mode: rank
+        rank: 1
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    record = json.loads(result.stdout)["records"][0]
+    assert record["cap"]["id"] == "C999"
+    assert record["cap"]["source_construct"] == "snapback-rank-01"
+    assert record["scar_nick"]["left_base"] == "CGGT"
+    assert record["scar_nick"]["right_base"] == "ACAG"
+    assert record["scar_nick"]["route_status"] == "resolved"
+    assert record["scar_nick"]["nick_orientation"] == "bottom"
+    assert record["scar_nick"]["nickase"] == "Nb.BtsI"
+
+
+def test_retron_msd_lint_spec_refuses_implicit_primitive_combinatorics(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    snapback_run = tmp_path / "snapback_run"
+    snapback_report = snapback_run / "analysis" / "solve_report.json"
+    snapback_report.parent.mkdir(parents=True)
+    snapback_report.write_text(
+        json.dumps(
+            {
+                "workflow": "snapback_released_solve",
+                "hits": [
+                    {
+                        "rank": 1,
+                        "hit_kind": "exact",
+                        "nickase_variant_id": "Nb.BtsI",
+                        "release_variant_id": "BspQI",
+                        "target_search_hit": {"final_candidate": {"designed_sequence": "ACGTACGT"}},
+                    },
+                    {
+                        "rank": 2,
+                        "hit_kind": "exact",
+                        "nickase_variant_id": "Nb.BsrDI",
+                        "release_variant_id": "BspQI",
+                        "target_search_hit": {"final_candidate": {"designed_sequence": "TGCATGCA"}},
+                    },
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        f"""
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C172:
+    source:
+      kind: snapback_released_solve_cap
+      run_dir: {snapback_run.as_posix()}
+      selector:
+        mode: all
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "selector mode=all is reserved for future explicit expansion contracts" in payload["error"]
+    assert "no implicit combinatoric expansion" in payload["error"]
+
+
+@pytest.mark.parametrize(
+    ("selector_yaml", "selector_mode"),
+    [
+        ("mode: ranks\n        ranks: [1]", "ranks"),
+        ("mode: range\n        start_rank: 1\n        end_rank: 1", "range"),
+        ("mode: all", "all"),
+    ],
+)
+def test_retron_msd_lint_spec_refuses_non_rank_selector_modes_for_single_option(
+    tmp_path: Path,
+    selector_yaml: str,
+    selector_mode: str,
+) -> None:
+    study_dir = _write_registry(tmp_path)
+    snapback_run = tmp_path / "snapback_run"
+    snapback_report = snapback_run / "analysis" / "solve_report.json"
+    snapback_report.parent.mkdir(parents=True)
+    snapback_report.write_text(
+        json.dumps(
+            {
+                "workflow": "snapback_released_solve",
+                "hits": [
+                    {
+                        "rank": 1,
+                        "hit_kind": "exact",
+                        "nickase_variant_id": "Nb.BtsI",
+                        "release_variant_id": "BspQI",
+                        "target_search_hit": {"final_candidate": {"designed_sequence": "ACGTACGT"}},
+                    },
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        f"""
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C172:
+    source:
+      kind: snapback_released_solve_cap
+      run_dir: {snapback_run.as_posix()}
+      selector:
+        {selector_yaml}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert f"selector mode={selector_mode} is reserved for future explicit expansion contracts" in payload["error"]
+    assert "Use selector mode=rank" in payload["error"]
 
 
 def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
@@ -270,6 +605,41 @@ def test_retron_msd_compile_text_reports_output_nudges(tmp_path: Path) -> None:
     assert "run materialize with explicit payload/cap sequences" in result.stdout
 
 
+def test_retron_msd_compile_cli_rejects_mixed_spec_and_label_sources(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "compile",
+            "--spec",
+            spec_path.as_posix(),
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            (tmp_path / "compiled").as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "Use either --spec or --id/--input" in payload["error"]
+
+
 def test_retron_msd_compile_refuses_legacy_assets_layout(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "compiled"
@@ -355,7 +725,47 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
     assert "Snapback" in payload["next_step"]
 
 
-def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_complement(tmp_path: Path) -> None:
+def test_retron_msd_materialize_requires_viennarna_for_deliverable_plots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "sequence_bundle"
+    monkeypatch.setitem(sys.modules, "RNA", None)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "materialize",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--payload-sequence",
+            f"TetR={_TETO_PAYLOAD}",
+            "--cap-sequence",
+            f"C172={_SNAPBACK_CAP}",
+            "--render-format",
+            "png",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "Folding backend Python module 'RNA' is not available" in payload["error"]
+    assert "Retron MSD GenBank/PNG/SVG deliverables require folding status ok" in payload["next_step"]
+
+
+def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_complement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_viennarna_python_api(tmp_path, monkeypatch)
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "sequence_bundle"
 
@@ -399,6 +809,7 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     features_path = variant_dir / "sequences" / "features.csv"
     png_path = variant_dir / "plots" / "component_span.png"
     folding_png_path = variant_dir / "plots" / "secondary_structure.png"
+    secondary_structure_svg_path = variant_dir / "plots" / "secondary_structure.svg"
     combined_png_path = variant_dir / "plots" / "component_span_and_folding.png"
     construct_bundle = variant_dir / "runtime" / "construct"
     assert sorted(item.name for item in variant_dir.iterdir()) == ["manifest", "plots", "runtime", "sequences"]
@@ -411,6 +822,9 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
         "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
     )
     assert Path(variant["folding_png"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.png")
+    assert Path(variant["secondary_structure_svg"]) == Path(
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.svg"
+    )
     assert Path(variant["combined_plot_png"]) == Path(
         "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span_and_folding.png"
     )
@@ -419,11 +833,16 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert features_path.is_file()
     assert png_path.is_file()
     assert folding_png_path.is_file()
+    assert secondary_structure_svg_path.is_file()
     assert combined_png_path.is_file()
     assert (construct_bundle / "manifest.json").is_file()
     assert (construct_bundle / "folding" / "secondary_structure_prediction_v1.json").is_file()
+    assert (
+        construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg"
+    ).is_file()
     assert png_path.stat().st_size > 0
     assert folding_png_path.stat().st_size > 0
+    assert secondary_structure_svg_path.stat().st_size > 0
     assert combined_png_path.stat().st_size > 0
 
     rows = list(
@@ -438,7 +857,10 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
         "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
     )
     assert rows[0]["component_span_png"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
-    assert rows[0]["folding_status"] in {"ok", "warning_optional_missing"}
+    assert rows[0]["secondary_structure_svg"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.svg"
+    )
+    assert rows[0]["folding_status"] == "ok"
     assert rows[0]["finder_reveal"].startswith("open -R ")
 
     catalog = json.loads((out_dir / "manifest" / "msd_design_catalog_v1.json").read_text(encoding="utf-8"))
@@ -454,6 +876,9 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     )
     assert record["artifacts"]["component_span_png"] == (
         "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/component_span.png"
+    )
+    assert record["artifacts"]["secondary_structure_svg"] == (
+        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.svg"
     )
 
     genbank_record = next(SeqIO.parse(genbank_path, "genbank"))
@@ -655,16 +1080,18 @@ def test_retron_msd_compiler_is_not_exposed_as_top_level_project_script() -> Non
 
 def test_retron_msd_study_uses_public_tool_apis_only() -> None:
     repo_root = Path(__file__).resolve().parents[4]
-    compiler_path = repo_root / "src" / "dnadesign" / "studies" / "retron_hairpin_design" / "compiler.py"
-    tree = ast.parse(compiler_path.read_text(encoding="utf-8"))
+    study_paths = sorted((repo_root / "src" / "dnadesign" / "studies" / "retron_hairpin_design").glob("*.py"))
     imports: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imports.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imports.add(node.module)
+    for path in study_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.add(node.module)
 
     assert "dnadesign.construct" in imports
     assert "dnadesign.construct.src.composition" not in imports
-    assert not any(name == "dnadesign.cruncher" or name.startswith("dnadesign.cruncher.") for name in imports)
+    assert not any(name == "dnadesign.cruncher" or name.startswith("dnadesign.cruncher.src") for name in imports)
+    assert not any(name.startswith("dnadesign.cruncher.workspaces") for name in imports)
     assert not any(name.startswith("dnadesign.folding.src") for name in imports)

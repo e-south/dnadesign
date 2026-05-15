@@ -14,17 +14,38 @@ Minimum complete reference:
 - optional profile code, which must match the computed `S3/S2/S1/S0` profile
 
 If the user provides a full lab-facing label, parse those fields from the label.
-If any primitive is missing, route instead of guessing.
+If the user provides a typed `retron_msd_compiler_spec_v1`, parse labels or
+explicit design parts from the spec. If any primitive is missing, route instead
+of guessing.
+
+Minimum complete materialized deliverable:
+
+- complete reference fields above
+- concrete payload sequence for every payload id
+- concrete cap sequence for every cap id, either literal or from an explicit
+  public primitive source
+
+User language such as "outputs", "deliverables", "exports", "GenBank",
+"plots", or "open in Finder" means the materialized deliverable, not just the
+catalog JSON bundle. If those sequence subcomponents are unavailable, stop on
+the missing IDs or primitive route instead of substituting a compile-only
+catalog.
 
 ## Boundary
 
 - Study-owned package: `dnadesign.studies.retron_hairpin_design`.
 - Registry: `docs/studies/retron_hairpin_design/msd_design_registry.yaml`.
 - Selected labels: `docs/studies/retron_hairpin_design/msd_design_hit_labels.txt`.
+- Compiler spec: `retron_msd_compiler_spec_v1` with `labels`, `designs`,
+  `payload_sequences`, and `cap_sequences`.
 - Do not expose a top-level `retron-msd` script.
 - Do not create Construct or Folding workspaces per ID.
 - Snapback and scar-nick solve missing primitive parts; the compiler validates
   selected parts into reference contracts and one MSD unit sequence per design.
+- Workspace-derived primitives must be loaded through
+  `dnadesign.cruncher.snapback` or `dnadesign.cruncher.scar_nick` public APIs,
+  not by importing `dnadesign.cruncher.src.*` or scraping internals in study
+  code.
 - A materialized MSD unit is 5' flank + left base, payload primary, cap
   geometry, payload complement, right base + 3' flank.
 - Do not add a repeat count or chain complete MSD units together.
@@ -37,6 +58,14 @@ Lint one label:
 ```bash
 uv run python -m dnadesign.studies.retron_hairpin_design.cli lint \
   --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM" \
+  --format json
+```
+
+Lint a typed compiler spec:
+
+```bash
+uv run python -m dnadesign.studies.retron_hairpin_design.cli lint \
+  --spec path/to/retron_msd_compiler_spec.yaml \
   --format json
 ```
 
@@ -63,6 +92,14 @@ uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize \
   --format json
 ```
 
+The same `compile` and `materialize` commands accept `--spec` instead of
+`--id` or `--input`; do not mix those input surfaces in one command.
+
+When the user asked for deliverables or Finder output, prefer `materialize`
+directly. A successful materialize response includes `finder_open` and writes
+`manifest/sequence_index.tsv`; use that index to reveal per-design GenBank files
+or verify plot paths.
+
 ## Fail-Fast Semantics
 
 - Reject malformed labels.
@@ -70,6 +107,10 @@ uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize \
 - Reject profile drift.
 - Reject non-ligatable `S0`.
 - Reject unknown payload/cap registry entries.
+- Reject mixed `--spec` and ad hoc `--id`/`--input` sources.
+- Reject primitive source selectors that return multiple options; use
+  `selector.mode=rank` for the explicit combination until a separate expansion
+  contract exists.
 - Reject sequence artifact generation when payload or cap sequences are missing;
   route missing cap/shortening inputs to Snapback or missing base-junction inputs
   to scar-nick instead of guessing.
@@ -99,6 +140,20 @@ catalogs, indexes, generated composition configs, and provenance live under
 `manifest/` for curated per-variant metadata, and `runtime/construct/` for the
 producer bundle. `manifest/sequence_index.tsv` carries the `open -R` Finder
 reveal command for each forward GenBank file.
+
+For a materialize request, verify the bundle by checking the expected variant
+count and at least these per-design artifacts:
+
+- `sequences/forward.gb`
+- `sequences/reverse_complement.gb`
+- `plots/component_span.png`
+- `plots/secondary_structure.png`
+- `plots/secondary_structure.svg`
+- `plots/component_span_and_folding.png`
+
+`secondary_structure.svg` and `secondary_structure.png` must come from a
+ViennaRNA folding status of `ok`; a warning image about a missing backend is a
+blocker, not a deliverable.
 
 ## Service Handoff
 
