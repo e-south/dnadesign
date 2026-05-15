@@ -233,6 +233,12 @@ that agents need before opening the full spec:
   backends are recorded as `warning_optional_missing` unless the config makes
   folding required.
 - Benchling handoff starts with GenBank plus FASTA/CSV sidecars.
+  Reverse-complement-derived segments and annotations should appear as
+  `complement(...)` GenBank features, with matching `strand`,
+  `source_segment_id`, and `transform_kind` columns in `features.csv`.
+  Composition CLI output and bundle manifests should expose the generated
+  `sequence.gb` path plus an `open -R .../sequence.gb` Finder reveal command
+  for local review.
 - BaseRender consumes only the generated canonical visual contract through
   generated job YAML for linear component-span QA; Construct does not render
   directly.

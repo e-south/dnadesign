@@ -83,4 +83,16 @@ def test_compose_run_writes_bundle_and_reports_json(tmp_path: Path) -> None:
     assert payload["composition"]["composition_id"] == "synthetic_x3"
     assert payload["composition"]["sequence_length"] == 48
     assert Path(payload["composition"]["artifact_bundle"]) == tmp_path / "artifacts" / "synthetic_x3"
+    assert Path(payload["artifacts"]["genbank"]) == tmp_path / "artifacts" / "synthetic_x3" / "sequence.gb"
+    assert payload["artifacts"]["finder_reveal"].startswith("open -R ")
     assert (tmp_path / "artifacts" / "synthetic_x3" / "assembled_sequence.json").exists()
+
+
+def test_compose_run_text_reports_genbank_finder_reveal(tmp_path: Path) -> None:
+    config_path = _write_minimal_composition_config(tmp_path)
+
+    result = _RUNNER.invoke(app, ["compose", "run", "--config", config_path.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    assert f"genbank: {tmp_path / 'artifacts' / 'synthetic_x3' / 'sequence.gb'}" in result.stdout
+    assert "finder_reveal: open -R " in result.stdout

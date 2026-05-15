@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import typer
@@ -69,6 +70,7 @@ def run_composition(
             {
                 "status": "ok",
                 "composition": result,
+                "artifacts": _composition_artifact_hints(result.artifact_bundle),
             }
         )
         return
@@ -78,6 +80,9 @@ def run_composition(
     )
     typer.echo(f"artifact_bundle: {result.artifact_bundle}")
     typer.echo(f"manifest: {result.manifest_path}")
+    hints = _composition_artifact_hints(result.artifact_bundle)
+    typer.echo(f"genbank: {hints['genbank']}")
+    typer.echo(f"finder_reveal: {hints['finder_reveal']}")
 
 
 @compose_app.command("review")
@@ -118,3 +123,11 @@ def review_composition(
         return
     typer.echo(f"Composition review complete: review_id={manifest.review_id}")
     typer.echo(f"review_svg: {Path(bundle) / manifest.artifacts.review_svg}")
+
+
+def _composition_artifact_hints(artifact_bundle: Path) -> dict[str, str]:
+    genbank_path = Path(artifact_bundle) / "sequence.gb"
+    return {
+        "genbank": genbank_path.as_posix(),
+        "finder_reveal": f"open -R {shlex.quote(genbank_path.as_posix())}",
+    }

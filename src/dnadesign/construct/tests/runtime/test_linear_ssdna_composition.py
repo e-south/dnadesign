@@ -14,10 +14,13 @@ from __future__ import annotations
 import csv
 import json
 import sys
+import warnings
 from pathlib import Path
 
 import pytest
 import yaml
+from Bio import SeqIO
+from Bio.GenBank import BiopythonParserWarning
 
 import dnadesign.baserender as baserender
 from dnadesign.construct.src.composition import run_linear_ssdna_composition
@@ -287,11 +290,46 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     assert features[0]["genbank_location"] == "1..15"
     assert features[1]["feature_id"] == "payload_primary"
     assert features[1]["genbank_location"] == "16..34"
+    features_by_id = {(row["feature_kind"], row["feature_id"], int(row["copy_index"])): row for row in features}
+    payload_complement_row = features_by_id[("segment", "payload_complement", 0)]
+    assert payload_complement_row["strand"] == "-1"
+    assert payload_complement_row["source_segment_id"] == "payload_primary"
+    assert payload_complement_row["transform_kind"] == "reverse_complement"
+    assert payload_complement_row["genbank_location"] == "complement(53..71)"
+    teto_complement_row = features_by_id[("annotation", "teto_complement", 0)]
+    assert teto_complement_row["strand"] == "-1"
+    assert teto_complement_row["source_segment_id"] == "payload_primary"
+    assert teto_complement_row["genbank_location"] == "complement(53..71)"
 
     genbank = (bundle / "sequence.gb").read_text(encoding="utf-8")
     assert "LOCUS       retron43_teto_manual_x8 704 bp ss-DNA linear SYN" in genbank
     assert '/label="stem_base_left copy 0"' in genbank
     assert "12..15" in genbank
+    assert "complement(53..71)" in genbank
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", BiopythonParserWarning)
+        genbank_record = SeqIO.read(bundle / "sequence.gb", "genbank")
+    assert str(genbank_record.seq).upper() == (RETRON43_UNIT * 8).upper()
+    genbank_features = {feature.qualifiers["label"][0]: feature for feature in genbank_record.features}
+    payload_primary = genbank_features["payload_primary copy 0"]
+    assert int(payload_primary.location.start) == 15
+    assert int(payload_primary.location.end) == 34
+    assert payload_primary.location.strand == 1
+    payload_complement = genbank_features["payload_complement copy 0"]
+    assert int(payload_complement.location.start) == 52
+    assert int(payload_complement.location.end) == 71
+    assert payload_complement.location.strand == -1
+    assert str(payload_complement.extract(genbank_record.seq)).upper() == "TCCCTATCAGTGATAGAGA"
+    teto_complement = genbank_features["teto_complement copy 0"]
+    assert int(teto_complement.location.start) == 52
+    assert int(teto_complement.location.end) == 71
+    assert teto_complement.location.strand == -1
+    assert str(teto_complement.extract(genbank_record.seq)).upper() == "TCCCTATCAGTGATAGAGA"
+
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    genbank_hint = manifest["operator_hints"]["genbank"]
+    assert genbank_hint["path"] == "sequence.gb"
+    assert genbank_hint["macos_finder_reveal"] == f"open -R {bundle / 'sequence.gb'}"
 
     visual = json.loads((bundle / "visual" / "sequence_evidence_map_v1.json").read_text(encoding="utf-8"))
     assert visual["contract_kind"] == "sequence_evidence_map_v1"

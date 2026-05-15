@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shlex
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -801,11 +802,22 @@ def _manifest_payload(composed: _ComposedLinearSsdna, *, artifact_bundle: Path) 
             "visual_contract": SEQUENCE_EVIDENCE_MAP_PATH.as_posix(),
             **_baserender_job_artifacts(composed),
         },
+        "operator_hints": _operator_hints(artifact_bundle),
     }
 
 
 def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _operator_hints(artifact_bundle: Path) -> dict[str, object]:
+    genbank_path = artifact_bundle / "sequence.gb"
+    return {
+        "genbank": {
+            "path": "sequence.gb",
+            "macos_finder_reveal": f"open -R {shlex.quote(genbank_path.as_posix())}",
+        }
+    }
 
 
 def _sha256_text(text: str) -> str:
