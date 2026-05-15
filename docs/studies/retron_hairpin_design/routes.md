@@ -192,8 +192,7 @@ flexibility, or schema work for the nick-disposal model.
 ### Study route: MSD design references
 
 Use this route when the task starts from a lab-facing construct label and needs
-a frozen design reference for later visuals, GenBank/FASTA handoff, or Reader
-joins.
+a frozen design reference, one MSD sequence unit, or Reader joins.
 
 - Type: `study-contract`
 - Plane: `data-plane`
@@ -210,6 +209,8 @@ joins.
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"`
 - Compile command:
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+- Materialize command:
+  `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Route note:
   this compiler is intentionally study-owned and is not registered as a top-level `uv run retron-msd` tool. It parses `construct_id`, payload/target,
   cap id, left/right scar-nick bases, and optional profile code; then it
@@ -218,9 +219,18 @@ joins.
   nickase, and nick orientation when known. The emitted
   `msd_design_catalog_v1` is the Reader-facing bridge; Reader should not parse Construct, Folding, BaseRender, or Cruncher internals. Ad hoc compiles should
   write to explicit transient directories such as `/tmp/dnadesign_retron_msd_*`;
-  Reader-linked runs should snapshot the same catalog and `assets/<msd_id>/`
-  files into the owning Reader experiment `inputs/designs/` directory. Do not
-  add per-design Construct/Folding workspaces for this ID-to-reference path.
+  Reader-linked runs should snapshot the same shallow bundle into the owning
+  Reader experiment `inputs/designs/` directory: `README.md`, `manifest.json`,
+  `msd_design_catalog_v1.json`, `reference_index.tsv`, and flat
+  `references/*.msd_design_reference_v1.json` files. Do not add per-design
+  Construct/Folding workspaces for this path. The materialized sequence is one
+  MSD unit per design: 5' flank plus left base, payload primary, cap geometry,
+  payload complement, right base plus 3' flank. The CLI does not expose a
+  repeat-count flag, so it cannot chain complete MSD units together. The
+  sequence bundle adds `sequence_manifest.json`, `sequence_index.tsv`,
+  `composition_configs/`, and `variants/`; each variant root exposes
+  `sequence.gb`, `sequence.fa`, `features.csv`, and `component_span_qa.png` for
+  Finder review.
 
 ### Contrast route: YIU boundary check
 

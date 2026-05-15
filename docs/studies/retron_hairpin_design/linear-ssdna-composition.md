@@ -12,13 +12,12 @@ Snapback or scar-nick primitives to composing a whole multicopy linear ssDNA
 insert. This page is Retron-specific; use the Construct reference above for
 generic composition and bundle-routing procedure.
 
-The current product profile is an ID-to-reference compiler plus optional
-assembly/rendering handoff. The user provides or selects primitive parts
-through a lab-facing MSD shorthand label; study code validates those parts
-against registry metadata and scar-nick profile rules; Construct/Folding may
-then be invoked only as stateless service surfaces to assemble or visualize a
-specific product. Do not create one persistent Construct or Folding workspace
-per requested design.
+The current product profile is an ID-to-reference compiler plus single-unit
+sequence artifacts. The user provides or selects primitive parts through a
+lab-facing MSD shorthand label; study code validates those parts against
+registry metadata and scar-nick profile rules; Construct/BaseRender are invoked
+as stateless service surfaces. Do not create one persistent Construct or Folding
+workspace per requested design.
 
 ### Study Boundary
 
@@ -27,7 +26,7 @@ dogfooding links. It does not own the generic assembler.
 
 | Question | Owner |
 | --- | --- |
-| Which payload, stem-base pair, cap, flank, and repeat count are selected? | Retron study record |
+| Which payload, stem-base pair, cap, flank, and output artifact route are selected? | Retron study record |
 | How is a lab-facing MSD shorthand label normalized and linted? | Retron study `msd_design_registry.yaml` plus `dnadesign.studies.retron_hairpin_design.cli` |
 | How are ordered ssDNA segments concatenated and spans emitted? | Construct |
 | Which snapback/cap candidates exist? | Cruncher Snapback |
@@ -56,9 +55,8 @@ IDs select and validate provided parts; catalogs freeze references.
 The compact label is not the source of truth by itself. The compiler parses it,
 recomputes the scar-nick `S3/S2/S1/S0` profile, fails fast on drift, joins
 study registry metadata, and writes `msd_design_reference_v1` /
-`msd_design_catalog_v1` records. Later sequence, visual, or GenBank products
-should attach to those records by digest and artifact path instead of asking
-Reader to interpret live Construct/Folding/Cruncher workspaces.
+`msd_design_catalog_v1` records. The materialize route then emits one MSD unit
+per design and attaches sequence digests plus artifact paths to those records.
 
 For the manual retron-43/TetO dogfood unit, the physical segments are:
 
@@ -239,6 +237,14 @@ that agents need before opening the full spec:
   Composition CLI output and bundle manifests should expose the generated
   `sequence.gb` path plus an `open -R .../sequence.gb` Finder reveal command
   for local review.
+- Retron MSD ID lists should use the study CLI `materialize` route for
+  single-unit GenBank/PNG output after concrete payload and cap sequences are
+  supplied. It writes `sequence_manifest.json`, `sequence_index.tsv`, generated
+  single-unit composition configs, and one `variants/<design-id>/` bundle per
+  variant with `sequence.gb`, FASTA/CSV sidecars, and `component_span_qa.png`
+  visible at the variant root. If payload or cap sequences are missing, the
+  route must fail before generating placeholder GenBank or PNG files. The CLI
+  does not expose `--repeat-count`.
 - BaseRender consumes only the generated canonical visual contract through
   generated job YAML for linear component-span QA; Construct does not render
   directly.
@@ -296,11 +302,20 @@ When returning to this work:
   source-of-truth contract with profile linting, route metadata, artifact
   pointers, and sequence digests once bundles are attached.
 - Ad hoc catalog output should use explicit transient directories such as
-  `/tmp/dnadesign_retron_msd_design_references`; Reader-linked output should
-  be copied into the owning Reader experiment `inputs/designs/` directory when
-  that integration is implemented. This is deliberately not USR persistence and
-  not workspace creation.
+  `/tmp/dnadesign_retron_msd_design_references`; the catalog bundle should stay
+  shallow, with top-level `README.md`, `manifest.json`,
+  `msd_design_catalog_v1.json`, `reference_index.tsv`, and a flat
+  `references/` directory. Reader-linked output should be copied into the
+  owning Reader experiment `inputs/designs/` directory when that integration is
+  implemented. This is deliberately not USR persistence and not workspace
+  creation.
 - Benchling handoff should start with GenBank plus FASTA/CSV sidecars.
+- Naive sequence-artifact Retron MSD requests should start with
+  `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize`
+  rather than manually creating Construct workspaces. Provide complete
+  subcomponents with `--payload-sequence ID=ACGT`, `--cap-sequence ID=ACGT`,
+  and no repeat-count flag; otherwise the compiler reports the missing
+  subcomponent and routes back to Snapback or scar-nick.
 
 ### Links
 

@@ -55,10 +55,11 @@ base-junction scar-nick work.
 - `docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md`
   owns remaining USR/source-ref/module-split follow-up work.
 - `src/dnadesign/studies/retron_hairpin_design/compiler.py` owns the study-local
-  MSD reference/catalog compiler API.
+  MSD reference/catalog compiler API, shallow output-bundle layout, and
+  single-unit sequence artifact generation.
 - `src/dnadesign/studies/retron_hairpin_design/cli.py` is the thin Typer
   command adapter for `msd_design_reference_v1` / `msd_design_catalog_v1`
-  records.
+  records plus the `materialize` GenBank/PNG route.
 
 ## Router rule
 

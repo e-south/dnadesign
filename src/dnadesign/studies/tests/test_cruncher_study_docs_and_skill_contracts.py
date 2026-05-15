@@ -85,7 +85,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.2"
+    assert metadata["version"] == "0.7.3"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -104,9 +104,9 @@ def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract(
 
     for phrase in (
         "Use for MSD IDs",
-        "multicopy ssDNA",
+        "single-unit MSD sequence bundles",
         "design catalogs",
-        "visuals/GenBank",
+        "GenBank/PNG",
         "missing MSD parts",
         "generic Cruncher/snapback",
     ):
@@ -118,7 +118,7 @@ def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract(
 
     positive_prompts = (
         "Compile pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM into a design catalog.",
-        "Generate a multicopy ssDNA reference and GenBank for this Retron MSD payload and cap.",
+        "Generate one MSD sequence plus GenBank and PNG for this Retron MSD payload and cap.",
         "Which primitive route owns this missing Retron MSD part?",
     )
     negative_prompts = (
@@ -139,7 +139,7 @@ def _naive_skill_match(prompt: str, discovery_surface: str) -> bool:
         return False
     if "wet-lab" in prompt_norm or "biology broadly" in prompt_norm:
         return False
-    positive_terms = ("retron msd", "msd", "multicopy ssdna", "genbank", "design catalog")
+    positive_terms = ("retron msd", "msd", "single-unit", "genbank", "design catalog")
     return any(term in prompt_norm and term in surface_norm for term in positive_terms)
 
 
@@ -179,6 +179,11 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "msd_design_hit_labels.txt" in routes
     assert "not registered as a top-level `uv run retron-msd` tool" in routes
     assert "Reader should not parse Construct, Folding, BaseRender, or Cruncher internals" in routes
+    assert "Materialize command" in routes
+    assert "sequence_manifest.json" in routes
+    assert "sequence_index.tsv" in routes
+    assert "component_span_qa.png" in routes
+    assert "repeat-count flag" in routes
     assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes
     assert "### Context route: scar-nick base-junction" in routes
     assert "src/dnadesign/cruncher/workspaces/de033" in routes
@@ -240,6 +245,14 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "Start with input completeness, not study phase" in route_matrix
     assert "Complete labels should lint/compile directly." in route_matrix
     assert "msd_design_reference_v1" in study_surfaces
+    assert "reference_index.tsv" in pipeline
+    assert "flat references" in pipeline
+    assert "id: msd_single_unit_materialize" in pipeline
+    assert "sequence_manifest.json" in pipeline
+    assert "component_span_qa.png" in pipeline
+    assert "shallow output-bundle layout" in study_surfaces
+    assert "single-unit sequence artifact generation" in study_surfaces
+    assert "materialize` GenBank/PNG route" in study_surfaces
     assert "scar-nick route in `routes.md`" in route_matrix
     assert "cruncher-study-status --study-dir docs/studies/retron_hairpin_design" in route_matrix
     assert "cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design" in route_matrix

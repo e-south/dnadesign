@@ -12,9 +12,12 @@
   cap/shortening constraints route to released-product Snapback; missing
   basal left/right base, terminal-nick, or profile constraints route to
   scar-nick.
+- Sequence artifact output is one MSD unit per design: 5' flank + left base,
+  payload primary, cap geometry, payload complement, right base + 3' flank.
 - Construct, Folding, BaseRender, and ViennaRNA plotting are service handoffs
   after part selection. They should consume explicit files or producer bundles,
-  not create one workspace per MSD ID.
+  not create one workspace per MSD ID. The compiler route does not expose a
+  repeat-count flag.
 - Released-product Snapback in `de033` remains the primitive owner for
   cap/shortening geometry.
 - Scar-nick through the `scar_nick` subpackage remains the primitive owner for
@@ -29,6 +32,8 @@
 
 - Compiler/product route:
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+- GenBank/PNG route after concrete subcomponents are available:
+  `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Status route for explicit progress/history questions only:
   `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight route for explicit blocker/readiness questions only:
@@ -178,9 +183,11 @@
   `intended_missed_count=8` for the declared intra-copy payload pairings.
 - Study-owned MSD design-reference compilation is available through
   `uv run python -m dnadesign.studies.retron_hairpin_design.cli`. It consumes
-  user-provided labels plus study registry metadata, emits
-  `msd_design_catalog_v1` and per-design `msd_design_reference_v1` records into
-  an explicit caller-chosen directory, and is intentionally not a top-level
+  user-provided labels plus study registry metadata, emits a shallow
+  design-reference bundle with `README.md`, `manifest.json`,
+  `reference_index.tsv`, `msd_design_catalog_v1.json`, and flat per-design
+  `msd_design_reference_v1` records under `references/` into an explicit
+  caller-chosen transient directory, and is intentionally not a top-level
   `retron-msd` script or persistent workspace family.
 - Released-product workflow:
   `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md`
@@ -197,15 +204,9 @@
    `uv run python -m dnadesign.studies.retron_hairpin_design.cli`.
 2. For missing parts, open `docs/studies/retron_hairpin_design/routes.md` and
    route to the smallest primitive owner: Snapback, scar-nick, or YIU contrast.
-3. When the question shifts from solving primitives to composing the whole
-   multicopy ssDNA insert, open
-   `docs/studies/retron_hairpin_design/linear-ssdna-composition.md` first and
-   then update the active execution checklist under `docs/exec-plans/active/`.
-   The current Construct tracer bullet validates and writes the manual
-   retron-43/TetO x8 local artifact bundle, BaseRender component-span SVG
-   handoff, and ViennaRNA folding request/preflight/prediction artifacts.
-   Folding-directed visual QA now writes ViennaRNA-native SVG plus dnadesign
-   annotation manifest artifacts under `visual/viennarna_secondary_structure/`,
-   not a from-scratch BaseRender fold layout.
+3. When the question shifts from solving primitives to composing sequence
+   artifacts, open `docs/studies/retron_hairpin_design/linear-ssdna-composition.md`.
+   The compiler materializes one MSD unit per design; the older manual x8
+   Construct dogfood remains a separate fixture.
 4. Run the pinned study preflight only when the real question is blocker or
    execution-readiness posture.

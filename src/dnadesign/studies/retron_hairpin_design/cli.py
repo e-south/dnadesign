@@ -19,9 +19,18 @@ from typing import Any
 import typer
 
 from .compiler import (
+    BUNDLE_MANIFEST_FILENAME,
+    BUNDLE_README_FILENAME,
+    COMPOSITION_CONFIG_DIRNAME,
+    REFERENCE_DIRNAME,
+    REFERENCE_INDEX_FILENAME,
+    SEQUENCE_INDEX_FILENAME,
+    SEQUENCE_MANIFEST_FILENAME,
+    VARIANT_DIRNAME,
     RetronMsdCompilerError,
     build_msd_design_reference,
     compile_msd_design_catalog,
+    materialize_msd_design_artifacts,
     write_msd_design_catalog,
 )
 from .msd_ids import MsdIdError
@@ -57,8 +66,24 @@ def _emit(payload: dict[str, Any], *, output_format: str) -> None:
         typer.echo(f"record_count: {payload.get('record_count')}")
     if payload.get("output_dir") is not None:
         typer.echo(f"output_dir: {payload['output_dir']}")
-    if payload.get("assets_dir") is not None:
-        typer.echo(f"assets_dir: {payload['assets_dir']}")
+    if payload.get("references_dir") is not None:
+        typer.echo(f"references_dir: {payload['references_dir']}")
+    if payload.get("index_path") is not None:
+        typer.echo(f"index_path: {payload['index_path']}")
+    if payload.get("manifest_path") is not None:
+        typer.echo(f"manifest_path: {payload['manifest_path']}")
+    if payload.get("readme_path") is not None:
+        typer.echo(f"readme_path: {payload['readme_path']}")
+    if payload.get("sequence_manifest_path") is not None:
+        typer.echo(f"sequence_manifest_path: {payload['sequence_manifest_path']}")
+    if payload.get("sequence_index_path") is not None:
+        typer.echo(f"sequence_index_path: {payload['sequence_index_path']}")
+    if payload.get("variants_dir") is not None:
+        typer.echo(f"variants_dir: {payload['variants_dir']}")
+    if payload.get("composition_configs_dir") is not None:
+        typer.echo(f"composition_configs_dir: {payload['composition_configs_dir']}")
+    if payload.get("finder_open") is not None:
+        typer.echo(f"finder_open: {payload['finder_open']}")
     if payload.get("next_step") is not None:
         typer.echo(f"next_step: {payload['next_step']}")
 
@@ -103,6 +128,19 @@ def _next_step_for_error(exc: Exception) -> str:
         )
     if "Duplicate construct label" in message:
         return "Deduplicate the input labels, then rerun compile with the same explicit --out-dir."
+    if "Duplicate MSD design reference filename" in message:
+        return "Deduplicate equivalent MSD design IDs before writing a catalog bundle."
+    if "Legacy MSD compiler output layout" in message:
+        return "Choose a fresh --out-dir or explicitly archive/remove the old generated assets directory."
+    if "Unexpected MSD compiler output entries" in message or "Stale MSD design reference output" in message:
+        return "Choose a fresh --out-dir or explicitly archive/remove unrelated generated output before compiling."
+    if "MSD sequence artifact generation requires concrete sequence subcomponents" in message:
+        return (
+            "Provide literal subcomponents with --payload-sequence ID=ACGT and --cap-sequence ID=ACGT, "
+            "or route missing cap/shortening inputs to Snapback before generating GenBank/PNG artifacts."
+        )
+    if "Stale MSD sequence output" in message or "Stale MSD composition config output" in message:
+        return "Choose a fresh --out-dir or explicitly archive/remove stale generated sequence outputs first."
     return "Run lint on one complete MSD label first; route missing biological constraints before generating a catalog."
 
 
@@ -112,8 +150,15 @@ def _lint_next_step() -> str:
 
 def _compile_next_step() -> str:
     return (
-        "Catalog emitted; use Construct/Folding/BaseRender service routes only if sequence, "
-        "GenBank, or visuals are requested."
+        "Catalog bundle emitted with flat references; run materialize with explicit payload/cap sequences "
+        "when one GenBank/PNG sequence bundle per MSD design is needed."
+    )
+
+
+def _materialize_next_step(out_dir: Path) -> str:
+    return (
+        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, and visual artifacts; "
+        f"open {out_dir.as_posix()} or use sequence_index.tsv for programmatic handoff."
     )
 
 
@@ -144,6 +189,19 @@ def _read_input_labels(input_file: Path) -> list[str]:
     return [line.strip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
 
 
+def _sequence_override_map(values: list[str], *, label: str) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for raw in values:
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        key, separator, value = text.partition("=")
+        if separator != "=" or not key.strip() or not value.strip():
+            raise RetronMsdCompilerError(f"{label} override must be ID=SEQUENCE.")
+        overrides[key.strip()] = value.strip()
+    return overrides
+
+
 @app.command("lint")
 def lint_command(
     label: str = typer.Option(..., "--id", help="Retron MSD construct label to parse and validate."),
@@ -160,6 +218,72 @@ def lint_command(
             "status": "ok",
             "reference": reference.model_dump(mode="json"),
             "next_step": _lint_next_step(),
+        },
+        output_format=format_norm,
+    )
+
+
+@app.command("materialize")
+def materialize_command(
+    ids: list[str] = typer.Option([], "--id", help="Retron MSD construct label. May be supplied more than once."),
+    input_file: Path | None = typer.Option(
+        None,
+        "--input",
+        exists=True,
+        readable=True,
+        dir_okay=False,
+        help="Plain-text, CSV, or TSV list of Retron MSD construct labels.",
+    ),
+    study_dir: Path = typer.Option(_DEFAULT_STUDY_DIR, "--study-dir", help="Retron hairpin study directory."),
+    out_dir: Path = typer.Option(..., "--out-dir", help="Transient directory for the sequence artifact bundle."),
+    payload_sequence: list[str] = typer.Option(
+        [],
+        "--payload-sequence",
+        help="Payload/target sequence override as ID=ACGT. Repeat for each payload ID.",
+    ),
+    cap_sequence: list[str] = typer.Option(
+        [],
+        "--cap-sequence",
+        help="Snapback-cap sequence override as ID=ACGT. Repeat for each cap ID.",
+    ),
+    render_format: list[str] = typer.Option(
+        ["png"],
+        "--render-format",
+        help="BaseRender component-span export format. Repeat for png/svg/pdf.",
+    ),
+    output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    format_norm = _format_option(output_format)
+    try:
+        labels = _collect_labels(ids, input_file)
+        catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+        result = materialize_msd_design_artifacts(
+            catalog,
+            out_dir=out_dir,
+            payload_sequences=_sequence_override_map(payload_sequence, label="payload sequence"),
+            cap_sequences=_sequence_override_map(cap_sequence, label="cap sequence"),
+            render_formats=render_format,
+        )
+    except (MsdIdError, RetronMsdRegistryError, RetronMsdCompilerError, OSError, ValueError) as exc:
+        _exit_with_error(exc, output_format=format_norm)
+    _emit(
+        {
+            "status": "ok",
+            "catalog_path": str(result.bundle_root / "msd_design_catalog_v1.json"),
+            "output_dir": str(result.bundle_root),
+            "references_dir": str(result.bundle_root / REFERENCE_DIRNAME),
+            "index_path": str(result.bundle_root / REFERENCE_INDEX_FILENAME),
+            "manifest_path": str(result.bundle_root / BUNDLE_MANIFEST_FILENAME),
+            "readme_path": str(result.bundle_root / BUNDLE_README_FILENAME),
+            "sequence_manifest_path": str(result.bundle_root / SEQUENCE_MANIFEST_FILENAME),
+            "sequence_index_path": str(result.bundle_root / SEQUENCE_INDEX_FILENAME),
+            "variants_dir": str(result.bundle_root / VARIANT_DIRNAME),
+            "composition_configs_dir": str(result.bundle_root / COMPOSITION_CONFIG_DIRNAME),
+            "record_count": len(result.catalog.records),
+            "variants": result.variants,
+            "records": [record.model_dump(mode="json") for record in result.catalog.records],
+            "finder_open": f"open {result.bundle_root.as_posix()}",
+            "next_step": _materialize_next_step(result.bundle_root),
         },
         output_format=format_norm,
     )
@@ -192,7 +316,10 @@ def compile_command(
             "status": "ok",
             "catalog_path": str(catalog_path),
             "output_dir": str(catalog_path.parent),
-            "assets_dir": str(catalog_path.parent / "assets"),
+            "references_dir": str(catalog_path.parent / REFERENCE_DIRNAME),
+            "index_path": str(catalog_path.parent / REFERENCE_INDEX_FILENAME),
+            "manifest_path": str(catalog_path.parent / BUNDLE_MANIFEST_FILENAME),
+            "readme_path": str(catalog_path.parent / BUNDLE_README_FILENAME),
             "record_count": len(catalog.records),
             "records": [record.model_dump(mode="json") for record in catalog.records],
             "next_step": _compile_next_step(),

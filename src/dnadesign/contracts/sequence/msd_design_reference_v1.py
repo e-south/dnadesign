@@ -164,6 +164,10 @@ class MsdDesignSourceV1(MsdDesignContractModel):
 class MsdDesignArtifactsV1(MsdDesignContractModel):
     composition_overview_svg: str | None = None
     secondary_structure_svg: str | None = None
+    component_span_png: str | None = None
+    component_span_svg: str | None = None
+    features_csv: str | None = None
+    visual_contract: str | None = None
     genbank: str | None = None
     forward_fasta: str | None = None
     reverse_complement_fasta: str | None = None
@@ -171,6 +175,10 @@ class MsdDesignArtifactsV1(MsdDesignContractModel):
     @field_validator(
         "composition_overview_svg",
         "secondary_structure_svg",
+        "component_span_png",
+        "component_span_svg",
+        "features_csv",
+        "visual_contract",
         "genbank",
         "forward_fasta",
         "reverse_complement_fasta",

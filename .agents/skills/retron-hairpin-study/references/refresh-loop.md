@@ -6,7 +6,7 @@ question is explicitly about progress, history, or blockers.
 ## Compiler Bootstrap
 
 1. Parse what the user supplied: label, payload, cap, left base, right base,
-   profile, repeat count, requested outputs.
+   profile, sequence subcomponents, requested outputs.
 2. Open the Study route for MSD design references in
    `docs/studies/retron_hairpin_design/routes.md`.
 3. Open `docs/studies/retron_hairpin_design/msd_design_registry.yaml` for
@@ -22,7 +22,7 @@ question is explicitly about progress, history, or blockers.
 | Question | Minimum evidence | Fail visibly when |
 | --- | --- | --- |
 | Can this ID compile? | normalized `msd_design_id`, profile, route metadata | label syntax, profile, `S0`, or registry lookup fails |
-| What is missing? | missing payload/cap/base/profile/repeat/artifact fields | unknown fields are silently guessed |
+| What is missing? | missing payload/cap/base/profile/sequence/artifact fields | unknown fields are silently guessed |
 | Which primitive should solve a missing part? | Snapback, scar-nick, or YIU route plus reason | the compiler tries to solve primitive search internally |
 | Where did outputs go? | explicit out-dir and contract filenames | outputs are hidden in a new workspace |
 | What is the old study status? | status command output | progress posture is mixed into a compile answer |

@@ -29,12 +29,18 @@ intent:
 
 command_groups:
   - id: msd_design_reference_catalog
-    purpose: Compile study-selected lab-facing Retron MSD labels into a transient design-reference catalog for Reader or ad hoc visual/sequence handoff without creating Construct or Folding workspaces.
+    purpose: Compile study-selected lab-facing Retron MSD labels into a transient shallow design-reference bundle for Reader or ad hoc visual/sequence handoff without creating Construct or Folding workspaces.
     workspace_ref: repo:.
     mutates_outputs: true
     commands:
       - uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM" --format json
       - uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json
+  - id: msd_single_unit_materialize
+    purpose: Materialize selected Retron MSD labels into transient single-unit GenBank, FASTA/CSV, and PNG visual bundles after concrete payload and cap sequence subcomponents are supplied.
+    workspace_ref: repo:.
+    mutates_outputs: true
+    commands:
+      - uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json
   - id: snapback_released_probe
     purpose: Confirm the allowed-policy exact-hit versus near-hit posture for the released-product 0/3/3 lane against the real release-enzyme catalog with the Type IIS release enzyme pinned to BspQI before any mutating solve run.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
@@ -85,8 +91,18 @@ native_agent_bootstrap:
     - start compiler-style requests from provided parts and desired outputs, not study phase
     - complete Retron MSD labels compile directly into design-reference catalogs
     - Retron MSD design-reference compilation is study-owned, uses
-      user-provided labels plus registry metadata, and must not create stale
-      Construct or Folding workspaces
+      user-provided labels plus registry metadata, emits a shallow
+      reference_index.tsv plus flat references bundle, and must not create
+      stale Construct or Folding workspaces
+    - Retron MSD sequence materialization emits one MSD unit per design, with
+      5-prime flank plus left base, payload primary, cap geometry, payload
+      complement, right base plus 3-prime flank
+    - Retron MSD materialization has no repeat-count flag and must not chain
+      complete MSD units together
+    - GenBank/PNG output writes sequence_manifest.json, sequence_index.tsv,
+      generated single-unit composition configs, GenBank/FASTA/CSV sidecars, and
+      component_span_qa.png visuals, and must fail before placeholders when
+      payload or cap sequences are absent
     - released-product Snapback is the active shortening architecture
     - scar-nick owns base-junction retained-scar feasibility and top-or-bottom terminal nick context
     - strict scar-nick policy is exact terminal nick, zero protected downstream bases, downstream N only, and S0=M
