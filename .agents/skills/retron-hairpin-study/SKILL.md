@@ -17,8 +17,7 @@ Route Retron MSD work as a genetic compiler: compile a reference, materialize on
 
 In scope:
 - Retron MSD shorthand IDs and explicit part sets.
-- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, and
-  selected public primitive sources.
+- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, and selected public primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
@@ -31,23 +30,18 @@ Out of scope:
 - Bench-level retron protocol advice.
 - Making Retron MSD compilation a top-level `retron-msd` tool.
 - Creating one Construct or Folding workspace per requested design.
-- Reporting phase/status posture unless the user explicitly asks for study
-  progress or blockers.
+- Reporting phase/status posture unless the user explicitly asks for study progress or blockers.
 
 ## Success Criteria
 
 - The first decision is input completeness: compile now, or route missing constraints.
 - Complete user-provided parts are validated and compiled without solver work.
 - Compiler specs are parsed at the boundary, then compile from trusted part structures.
-- Incomplete parts route to the smallest primitive: Snapback, scar-nick, or
-  YIU contrast.
-- Solved primitive inputs come through public Snapback/scar-nick APIs; selectors
-  must be explicit and multi-option selections must not expand silently.
+- Incomplete parts route to the smallest primitive: Snapback, scar-nick, or YIU contrast.
+- Solved primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
   payload primary, cap geometry, payload complement, right base + 3' flank.
-- Materialized `msd_design_id` / variant directory names must preserve the
-  cap/base/profile ontology in filenames: use `C172-LCGGT-RACAG-MXMM` style
-  suffixes, never lowercase `c172-lcggt-racag-mxmm` for those sections.
+- Materialized `msd_design_id` / variant directory names must preserve the cap/base/profile ontology in filenames, using `C172-LCGGT-RACAG-MXMM` style suffixes.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
 - Materialized plot deliverables require ViennaRNA status `ok`; publish
@@ -56,9 +50,7 @@ Out of scope:
 - Secondary-structure subtitles must include the scar-nick mismatch profile
   from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
-- GenBank/CSV output uses display labels for visible feature names, keeps raw
-  ids in machine qualifiers, and does not duplicate full component spans as
-  same-span annotations.
+- GenBank/CSV output uses display labels, keeps raw ids in machine qualifiers, and avoids duplicate full component spans as same-span annotations.
 - Outputs go to explicit transient or caller-owned directories; no workspace
   sprawl.
 - Contracts fail fast on profile drift, non-ligatable `S0=M` violations, unknown registry

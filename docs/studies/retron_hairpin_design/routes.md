@@ -240,7 +240,8 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   payload complement, right base plus 3' flank. The CLI does not expose a
   repeat-count flag, so it cannot chain complete MSD units together. The
   sequence bundle keeps the top level to `README.md`, `manifest/`, and
-  `variants/`. Bundle manifests live under `manifest/bundle/`, catalogs and
+  `variants/`, including `manifest/sequence_manifest.json` and
+  `manifest/sequence_index.tsv`. Bundle manifests live under `manifest/bundle/`, catalogs and
   frozen references under `manifest/catalog/`, indexes under
   `manifest/indexes/`, and generated composition configs under
   `manifest/configs/composition/`; each `variants/<msd_design_id>/` directory groups
