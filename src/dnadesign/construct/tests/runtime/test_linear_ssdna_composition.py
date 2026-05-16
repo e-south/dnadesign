@@ -639,6 +639,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert 'data-dnadesign-panel="secondary_structure"' in review_svg
     assert 'data-dnadesign-source-svg="secondary_structure.annotated.svg"' in review_svg
     assert 'data-dnadesign-source-orientation="cap_right"' in review_svg
+    assert "dnadesign-composition-review-structure-caption" not in review_svg
     assert 'data-dnadesign-panel="component_span"' in review_svg
     assert 'data-dnadesign-panel-row="1"' in review_svg
     assert 'data-dnadesign-panel-row="2"' in review_svg

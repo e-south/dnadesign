@@ -95,7 +95,7 @@ def publish_composition_review_svg(
         structure=structure,
         component=component,
         composition_id=_composition_id_from_visual_contract(visual_contract),
-        structure_caption=_structure_caption(visual_contract),
+        structure_caption=_structure_caption_for_review(visual_contract, structure),
         target_nucleotide_font_size_px=target_nucleotide_font_size_px,
         structure_scale=structure_scale,
         component_scale=component_scale,
@@ -279,6 +279,19 @@ def _structure_caption(visual_contract: SequenceEvidenceMapV1) -> tuple[str, lis
         if subtitle_parts:
             subtitles.append(" | ".join(subtitle_parts))
     return title, subtitles
+
+
+def _structure_caption_for_review(
+    visual_contract: SequenceEvidenceMapV1,
+    structure: _SvgAsset,
+) -> tuple[str, list[str]]:
+    if _has_element_id(structure.root, "dnadesign-secondary-structure-title"):
+        return "", []
+    return _structure_caption(visual_contract)
+
+
+def _has_element_id(root: ET.Element, element_id: str) -> bool:
+    return any(node.attrib.get("id") == element_id for node in root.iter())
 
 
 def _structure_caption_height(structure_caption: tuple[str, list[str]]) -> float:
