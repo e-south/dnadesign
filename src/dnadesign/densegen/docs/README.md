@@ -24,7 +24,8 @@
 1. [Quick checklist](concepts/quick-checklist.md): run preflight checks before executing jobs.
 2. [Pipeline lifecycle](concepts/pipeline-lifecycle.md): locate a failing stage and expected transitions.
 3. [Outputs and metadata](concepts/outputs-and-metadata.md): verify expected artifacts and metadata surfaces.
-4. [CLI reference](reference/cli.md): confirm command contracts and failure semantics.
+4. [Outputs reference](reference/outputs.md): inspect exact artifact paths and data contracts.
+5. [CLI reference](reference/cli.md): confirm command contracts and failure semantics.
 
 #### Tune sampling and generation
 - [Sampling](concepts/sampling.md): tune sampling behavior and candidate-pool construction.
@@ -47,3 +48,5 @@
 - [concepts/](concepts/): behavioral models and lifecycle explanations.
 - [reference/](reference/): stable schema, CLI, and artifact contracts.
 - [dev/](dev/): maintainer architecture notes and journal entries.
+- [Architecture notes](dev/architecture.md): internal lifecycle and package boundaries.
+- [Development journal](dev/journal.md): maintainer decisions, investigations, and audit notes.

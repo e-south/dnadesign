@@ -26,6 +26,7 @@ TOP_LEVEL_SOURCE_PACKAGES = {
     "legacy",
     "maintenance",
     "overlays",
+    "regulondb",
     "registry",
     "runtime",
     "sequence_views",
@@ -109,6 +110,10 @@ PACKAGE_FILES = {
         "digest_ledger.py",
         "maintenance.py",
         "projection.py",
+    },
+    ("regulondb",): {
+        "__init__.py",
+        "functional_annotations.py",
     },
     ("registry",): {
         "__init__.py",
@@ -337,6 +342,7 @@ PACKAGE_SUBPACKAGES = {
     ("maintenance",): set(),
     ("overlays",): {"support"},
     ("overlays", "support"): set(),
+    ("regulondb",): set(),
     ("registry",): set(),
     ("runtime",): set(),
     ("sequence_views",): set(),

@@ -113,6 +113,10 @@ Helper packages under `src/dnadesign/usr/src/`:
 - `src/dnadesign/usr/src/genbank/importer.py`
 - `src/dnadesign/usr/src/genbank/models.py`
 - `src/dnadesign/usr/src/genbank/parser.py`
+- `regulondb/`
+  - RegulonDB-specific overlay enrichment helpers for source-backed promoter/regulator annotations
+- `src/dnadesign/usr/src/regulondb/__init__.py`
+- `src/dnadesign/usr/src/regulondb/functional_annotations.py`
 - `datasets/`
   - dataset helper packages for core ingest/activity primitives, materialization, maintenance-gated mutation operations, overlay operations, validation, and read/query flows
   - `datasets/core/` is the closed dataset core cluster for identity, ingest, activity notes, and dataset-scoped events

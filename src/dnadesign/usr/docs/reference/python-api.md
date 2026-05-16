@@ -13,7 +13,7 @@ import from `dnadesign.usr`; the old sibling root modules such as `dnadesign.usr
 
 Within `dnadesign.usr.src`, root packages are reserved for coordinators. Helper families now live
 under `cli/support/`, `contracts/`, `datasets/`, `events/`, `legacy/`, `overlays/support/`,
-`overlays/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
+`overlays/`, `regulondb/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
 `usr/src` root should contain package directories only plus `__init__.py`; flat implementation
 files at that level are considered an architecture regression.
 Shared error/schema/type/sequence contracts now live under `contracts/`.

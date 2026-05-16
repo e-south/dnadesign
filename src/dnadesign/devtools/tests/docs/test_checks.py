@@ -55,6 +55,10 @@ from dnadesign.ops.runbooks.path_policy import (
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
 )
 
+VALID_TOOL_BANNER_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180"></svg>\n'
+)
+
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -402,12 +406,27 @@ def test_tool_readme_banner_check_accepts_existing_local_svg_banner(tmp_path: Pa
     )
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
 
     issues = _find_tool_readme_banner_issues(tmp_path)
 
     assert issues == []
+
+
+def test_tool_readme_banner_check_rejects_nonstandard_banner_dimensions(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "![Alpha banner](assets/alpha-banner.svg)\n\nShort narrative.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="420" viewBox="0 0 1600 420"></svg>\n',
+    )
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert any("1200x180 SVG contract" in issue for issue in issues)
 
 
 def test_tool_readme_structure_check_requires_banner_as_first_non_empty_line(tmp_path: Path) -> None:
@@ -417,7 +436,7 @@ def test_tool_readme_structure_check_requires_banner_as_first_non_empty_line(tmp
     )
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
 
     issues = _find_tool_readme_structure_issues(tmp_path)
@@ -432,7 +451,7 @@ def test_tool_readme_structure_check_rejects_heading_immediately_after_banner(tm
     )
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
 
     issues = _find_tool_readme_structure_issues(tmp_path)
@@ -447,7 +466,7 @@ def test_tool_readme_structure_check_requires_top_level_markdown_doc_link(tmp_pa
     )
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
 
     issues = _find_tool_readme_structure_issues(tmp_path)
@@ -475,12 +494,53 @@ def test_tool_readme_structure_check_accepts_banner_narrative_and_docs_link(tmp_
     )
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
 
     issues = _find_tool_readme_structure_issues(tmp_path)
 
     assert issues == []
+
+
+def test_tool_readme_structure_check_rejects_overlong_tool_readmes(tmp_path: Path) -> None:
+    body_lines = ["![Alpha banner](assets/alpha-banner.svg)", "", "Short narrative.", "", "[Docs](docs/README.md)"]
+    body_lines.extend(f"Extra line {idx}." for idx in range(40))
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "README.md", "\n".join(body_lines) + "\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
+
+    issues = _find_tool_readme_structure_issues(tmp_path)
+
+    assert any("top-level tool README has" in issue for issue in issues)
+
+
+def test_tool_readme_structure_check_requires_docs_index_first_when_present(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "\n".join(
+            [
+                "![Alpha banner](assets/alpha-banner.svg)",
+                "",
+                "Short narrative.",
+                "",
+                "[Repository docs](../../../docs/README.md)",
+                "[Alpha docs](docs/README.md)",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
+
+    issues = _find_tool_readme_structure_issues(tmp_path)
+
+    assert any("first local markdown link must point to the tool docs index" in issue for issue in issues)
 
 
 def test_root_docs_entrypoint_check_requires_docs_index_link(tmp_path: Path) -> None:
@@ -1488,11 +1548,11 @@ def test_main_fails_when_readme_tool_catalog_missing_repo_tool(tmp_path: Path) -
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "assets" / "notify-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "README.md",
@@ -1615,11 +1675,11 @@ def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path)
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "assets" / "notify-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "README.md",
@@ -1774,11 +1834,11 @@ def test_main_fails_when_codecov_components_do_not_cover_repo_tools(tmp_path: Pa
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "assets" / "notify-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "README.md",
@@ -1994,11 +2054,11 @@ def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) ->
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "assets" / "notify-banner.svg",
-        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+        VALID_TOOL_BANNER_SVG,
     )
     _write(
         tmp_path / "README.md",

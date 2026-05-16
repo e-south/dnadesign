@@ -42,26 +42,19 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         text,
         [
             "![Ops banner](assets/ops-banner.svg)",
-            "## Common entrypoints",
             "## Documentation",
+            "docs/README.md",
+            "docs/how-to-use-ops.md",
+            "../../../docs/runbooks/README.md",
+            "../../../docs/README.md",
         ],
         label="src/dnadesign/ops/README.md",
     )
-    assert "Ops manages batch orchestration and read-only status across tools." in text
-    assert "Use Ops when:" in text
-    assert "Do not use Ops when:" in text
-    assert "shared command index" in text
-    assert "uv run ops catalog list" in text
-    assert "does not keep a second registry" in text
-    assert "uv run ops catalog show <registry-id>" in text
-    assert "uv run ops progress explain <registry-id>" in text
-    assert "docs/README.md" in text
-    assert "docs/how-to-use-ops.md" in text
-    assert "../../../docs/runbooks/README.md" in text
-    assert "../../../docs/operations/README.md" in text
-    assert "../../../docs/operations/orchestration-runbooks.md" in text
-    assert "runbooks/presets" in text
-    assert "../../../docs/README.md" in text
+    assert "Ops provides the shared command surface" in text
+    assert "uv run ops catalog list" not in text
+    assert "Use Ops when:" not in text
+    assert "Do not use Ops when:" not in text
+    assert len(text.splitlines()) <= 35
     assert "## Entrypoint contract" not in text
     assert "## Boundary reminder" not in text
     assert "progressive disclosure" not in text.lower()

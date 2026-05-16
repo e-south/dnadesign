@@ -85,19 +85,19 @@ contract artifacts or bundle manifest.
 
 | Tool | CLI | Docs |
 | --- | --- | --- |
-| `aligner` | n/a | [aligner README](../src/dnadesign/aligner/README.md) |
-| `billboard` | n/a | [billboard README](../src/dnadesign/billboard/README.md) |
+| `aligner` | n/a | [aligner docs](../src/dnadesign/aligner/docs/README.md) |
+| `billboard` | n/a | [billboard docs](../src/dnadesign/billboard/docs/README.md) |
 | `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
-| `libshuffle` | n/a | [libshuffle README](../src/dnadesign/libshuffle/README.md) |
-| `nmf` | n/a | [nmf README](../src/dnadesign/nmf/README.md) |
+| `libshuffle` | n/a | [libshuffle docs](../src/dnadesign/libshuffle/docs/README.md) |
+| `nmf` | n/a | [nmf docs](../src/dnadesign/nmf/docs/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
-| `permuter` | `uv run permuter --help` | [permuter README](../src/dnadesign/permuter/README.md) |
-| `tfkdanalysis` | n/a | [tfkdanalysis README](../src/dnadesign/tfkdanalysis/README.md) |
+| `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
+| `tfkdanalysis` | n/a | [tfkdanalysis docs](../src/dnadesign/tfkdanalysis/docs/README.md) |
 | `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
 
 #### Artifact services
@@ -118,7 +118,7 @@ contract artifacts or bundle manifest.
 
 | Surface | CLI | Docs |
 | --- | --- | --- |
-| `contracts` | n/a | [contracts README](../src/dnadesign/contracts/README.md) |
+| `contracts` | n/a | [contracts docs](../src/dnadesign/contracts/docs/README.md) |
 | `studies` | n/a | [studies README](../src/dnadesign/studies/README.md) |
 
 ### System records

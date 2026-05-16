@@ -38,8 +38,13 @@ LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
 TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+TOOL_README_BANNER_DIMENSION_PATTERN = re.compile(
+    r"<svg[^>]*\bwidth=\"1200\"[^>]*\bheight=\"180\"[^>]*\bviewBox=\"0 0 1200 180\"",
+    flags=re.IGNORECASE,
+)
 README_TOOL_CATALOG_EXCLUDED_TOOLS = {"studies"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+TOOL_README_MAX_LINES = 35
 TOOL_README_TOP_LINK_SCAN_LINES = 80
 RUNBOOK_DEMO_SHELL_LANGS = {"bash", "sh", "zsh"}
 RUNBOOK_DEMO_YAML_LANGS = {"yaml", "yml"}
@@ -1750,6 +1755,14 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
         target_path = (readme_path.parent / target_rel).resolve()
         if not target_path.exists():
             issues.append(f"{readme_path}: banner asset target does not exist: {target_rel}.")
+            continue
+
+        banner_text = target_path.read_text(encoding="utf-8")
+        if TOOL_README_BANNER_DIMENSION_PATTERN.search(banner_text) is None:
+            issues.append(
+                f"{target_path}: tool banner must use the low-clutter 1200x180 SVG contract "
+                'with viewBox="0 0 1200 180".'
+            )
 
         if "placeholder" in top_block.lower():
             issues.append(f"{readme_path}: banner copy must not use placeholder wording.")
@@ -1770,6 +1783,12 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
 
         text = readme_path.read_text(encoding="utf-8")
         lines = text.splitlines()
+        if len(lines) > TOOL_README_MAX_LINES:
+            issues.append(
+                f"{readme_path}: top-level tool README has {len(lines)} lines; "
+                f"keep it at or below {TOOL_README_MAX_LINES} lines and route detail into docs/."
+            )
+
         non_empty_indices = [idx for idx, line in enumerate(lines) if line.strip()]
         if not non_empty_indices:
             issues.append(f"{readme_path}: README is empty.")
@@ -1788,17 +1807,34 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
             )
 
         top_block = "\n".join(lines[:TOOL_README_TOP_LINK_SCAN_LINES])
-        has_local_markdown_link = False
+        first_local_markdown_link: str | None = None
         for raw in LINK_PATTERN.findall(top_block):
             link = raw.strip().split()[0]
             if link.startswith(("http://", "https://", "mailto:", "#")):
                 continue
             target_rel = link.split("#", 1)[0].strip()
             if target_rel.lower().endswith(".md"):
-                has_local_markdown_link = True
+                first_local_markdown_link = target_rel
                 break
-        if not has_local_markdown_link:
+        if first_local_markdown_link is None:
             issues.append(f"{readme_path}: top section must include a local markdown link to deeper documentation.")
+            continue
+
+        docs_index = None
+        for candidate in (readme_path.parent / "docs" / "README.md", readme_path.parent / "docs" / "index.md"):
+            if candidate.exists():
+                docs_index = candidate.resolve()
+                break
+        if docs_index is None:
+            continue
+
+        first_target = (readme_path.parent / first_local_markdown_link).resolve()
+        if first_target != docs_index:
+            expected_rel = docs_index.relative_to(readme_path.parent).as_posix()
+            issues.append(
+                f"{readme_path}: first local markdown link must point to the tool docs index "
+                f"'{expected_rel}', not '{first_local_markdown_link}'."
+            )
 
     return issues
 

@@ -173,9 +173,6 @@ src/dnadesign/prototypes/
 src/dnadesign/usr/archived/
 src/dnadesign/usr/datasets/usr_regulondb_native_promoters/
 
-# Permuter docs (local only for now)
-src/dnadesign/permuter/docs/
-
 # OPAL campaigns: keep configs tracked, ignore artifacts/data.
 src/dnadesign/opal/campaigns/**
 !src/dnadesign/opal/campaigns/**/

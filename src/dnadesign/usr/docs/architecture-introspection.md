@@ -78,6 +78,7 @@ Package-root Python should stay limited to `__init__.py` and `__main__.py`; cros
   - Legacy conversion/repair: `legacy/convert.py` coordinating helpers under `legacy/*`
   - Runtime helpers: `runtime/*`, currently centered on DuckDB UTC session enforcement
   - Overlay support: `overlays/*` plus `overlays/support/*`
+  - RegulonDB support: `regulondb/*` for source-specific promoter/regulator enrichment helpers
   - Registry/event contracts: `registry/*` and `events/*`, keeping the import surface stable while decomposing internal helpers
   - Ops entrypoints and test support outside `usr/src`: `../ops/sync_audit_drill.py` for the stable deterministic sync drill and `../../devtools/tests/support/usr.py` for cross-tool USR fixture helpers
 - Component/function view:

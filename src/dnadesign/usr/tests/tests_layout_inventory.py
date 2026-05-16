@@ -21,6 +21,7 @@ ROOT_TEST_MODULES = {
     "test_module_layout.py",
     "test_public_api_imports.py",
     "test_root_resolution_contract.py",
+    "test_regulondb_functional_annotations.py",
     "test_tests_layout.py",
     "test_usr_harness_script.py",
     "test_usr_sync_audit_drill_script.py",

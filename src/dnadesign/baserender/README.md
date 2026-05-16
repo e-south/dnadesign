@@ -5,11 +5,6 @@ the stable `dnadesign.baserender` API. It is the linear/component evidence
 renderer for producer-owned contracts; it does not solve biological designs or
 own secondary-structure layout.
 
-Jobs use `BaseRenderJobV3` / `RenderJobV3`. Render-contract descriptors such
-as `sequence_rows_render_v3` and `nucleotide_evidence_map_render_v3` name the
-concrete visualization use case. Historical job names remain compatibility
-aliases.
-
 ## Documentation
 
 - [baserender docs index](docs/README.md): compact route map for reference, integrations, demos, and examples.

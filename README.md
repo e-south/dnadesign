@@ -14,9 +14,9 @@
 
 ## Documentation
 
-Start with the docs index when you need a workflow, current study record, or tool guide.
+Use the docs index to choose a workflow, inspect existing work, or jump to a tool.
 
-- [Docs index](docs/README.md): workflow, tool, and repository docs.
+- [Docs index](docs/README.md): main index for workflow, tool, and repository docs.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.
@@ -57,7 +57,7 @@ Choose the package that owns the artifact, workspace, or workflow you need.
 
 | Tool | Description | Coverage |
 | --- | --- | --- |
-| [**ops**](src/dnadesign/ops/README.md) | Plan, run, and inspect batch workflows. | [![ops coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=ops)](https://codecov.io/gh/e-south/dnadesign?component=ops) |
+| [**ops**](src/dnadesign/ops/README.md) | Plan, submit, and inspect batch runbooks across tools. | [![ops coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=ops)](https://codecov.io/gh/e-south/dnadesign?component=ops) |
 | [**notify**](src/dnadesign/notify/README.md) | Send webhook notifications for local runs and scheduler-backed jobs. | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
 
 ### Shared contracts
