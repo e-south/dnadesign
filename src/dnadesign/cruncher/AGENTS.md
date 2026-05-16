@@ -9,9 +9,9 @@ Supplement to repo-root `AGENTS.md` with cruncher-specific layout + test guidanc
 - Repo-local retron hairpin study skill: `.agents/skills/retron-hairpin-study/SKILL.md`
 - Default config: `src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml`
 - Source: `src/dnadesign/cruncher/src/` (cli/, config/, core/, ingest/, io/, analysis/, artifacts/, viz/, integrations/, app/, store/, utils/)
-- Results: per-workspace `out_dir` (demo default: `src/dnadesign/cruncher/workspaces/demo_pairwise/outputs/`)
+- Results: per-workspace `out_dir`; treat generated output directories as run artifacts.
 - Tests: `src/dnadesign/cruncher/tests/`
-  - Slow tests: `src/dnadesign/cruncher/tests/slow/`
+  - Slow tests live under the tests tree when present.
 
 ### Generated vs hand-edited
 - Hand-edited: `workspaces/*/configs/config.yaml`, code, test fixtures under `src/dnadesign/cruncher/tests/`

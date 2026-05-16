@@ -75,7 +75,7 @@ Rules:
 
 - Do not hand-edit generated outputs; fix code/config and regenerate.
 - Ask before committing generated artifacts or large binaries.
-- Avoid changes under `src/dnadesign/archived/` and `src/dnadesign/prototypes/` unless explicitly requested.
+- Avoid archived or prototype source trees unless explicitly requested.
 
 ## Definition of done
 
