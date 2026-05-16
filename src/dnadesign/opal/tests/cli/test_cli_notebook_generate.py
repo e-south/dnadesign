@@ -73,7 +73,7 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
         assert hasattr(module, "app")
 
 
-def test_notebook_generate_requires_ledger_by_default(tmp_path: Path) -> None:
+def test_notebook_generate_allows_pre_run_campaign_by_default(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
@@ -97,8 +97,12 @@ def test_notebook_generate_requires_ledger_by_default(tmp_path: Path) -> None:
             str(campaign),
         ],
     )
-    assert res.exit_code != 0, res.output
-    assert "Missing runs sink" in res.output
+    assert res.exit_code == 0, res.output
+    out_path = workdir / "notebooks" / "opal_demo_analysis.py"
+    assert out_path.exists()
+    text = out_path.read_text()
+    assert "No runs available yet" in text
+    assert "outputs/ledger/runs.parquet" in text
 
 
 def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:

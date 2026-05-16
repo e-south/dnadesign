@@ -1,0 +1,126 @@
+version: 1
+study_id: stress_ethanol_cipro_growth
+state_order: ["00", "10", "01", "11"]
+seed: 7
+allow_duplicate_ids: false
+
+candidate_feature_table:
+  dataset_id: usr_prom_eth_cip_opal_candidates
+  role: opal_candidate_feature_table
+  records_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet
+  required_columns: ["id", "bio_type", "sequence", "alphabet"]
+  x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
+  x_source:
+    view_id: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+    rows_path: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/views/intermediate_embedding_7b_context_anchor_mean_bidir_concat/rows.parquet
+    matrix_path: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/views/intermediate_embedding_7b_context_anchor_mean_bidir_concat/matrix.npy
+    meaning: fixed-length Fwd+RC 1 kb context-anchor Evo2 7B intermediate embedding vector
+    not: ["UMAP coordinate", "centroid distance", "assay label", "phenotype claim"]
+
+source_artifacts:
+  latentdna_margins: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/scalars/balanced_design_family_margins_intermediate_embedding_7b_context_anchor_mean_bidir_concat/table.parquet
+  latentdna_sigma35_stress_margins: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/scalars/sigma35_stress_margins_intermediate_embedding_7b_context_anchor_mean_bidir_concat/table.parquet
+  densegen_anchor_records: src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/records.parquet
+
+filters:
+  require_positive_target_margin: true
+  include_source_class: ["densegen"]
+  allowed_sigma35_variants: ["f", "e", "d", "c"]
+  preferred_sigma35_variants: ["f", "e"]
+  exploratory_sigma35_variants: ["d", "c"]
+  note: LatentDNA margins are pre-assay priors only; do not treat them as phenotype claims.
+
+diversity:
+  keys:
+    - regulator_composition
+    - spacer_length
+    - tfbs_offset_summary
+    - tfbs_orientation_summary
+    - motif_tier_summary
+  note: Do not select directly by centroid-nearest rank or UMAP position.
+
+outputs:
+  review_csv: src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/outputs/batch0_review.csv
+  review_parquet: src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/outputs/batch0_review.parquet
+
+campaigns:
+  - slug: stress_eth_cip_ethanol_rf_sfxi_topn
+    name: Stress ethanol/ciprofloxacin ethanol-factor RF SFXI top-n
+    objective: ethanol_factor
+    label_hist_column: opal__stress_eth_cip_ethanol_rf_sfxi_topn__label_hist
+    setpoint_vector: [0, 1, 0, 1]
+    target_margin_column: synthetic_margin_ethanol_vs_background
+    off_target_margin_columns:
+      - synthetic_margin_cipro_vs_background
+      - synthetic_margin_dual_vs_background
+    slots:
+      - name: ethanol_core
+        count: 4
+        plan: ethanol
+        regulator_compositions: ["baeR", "cpxR"]
+        allowed_sigma35_variants: ["f", "e", "d", "c"]
+        sigma35_mode: strong
+      - name: ethanol_dual_carrier
+        count: 2
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["baeR+lexA", "cpxR+lexA"]
+        allowed_sigma35_variants: ["f", "e", "d", "c"]
+        sigma35_mode: strong
+
+  - slug: stress_eth_cip_cipro_rf_sfxi_topn
+    name: Stress ethanol/ciprofloxacin cipro-factor RF SFXI top-n
+    objective: cipro_factor
+    label_hist_column: opal__stress_eth_cip_cipro_rf_sfxi_topn__label_hist
+    setpoint_vector: [0, 0, 1, 1]
+    target_margin_column: synthetic_margin_cipro_vs_background
+    off_target_margin_columns:
+      - synthetic_margin_ethanol_vs_background
+      - synthetic_margin_dual_vs_background
+    slots:
+      - name: cipro_lexa
+        count: 4
+        plan: ciprofloxacin
+        regulator_compositions: ["lexA"]
+        allowed_sigma35_variants: ["f", "e", "d", "c"]
+        sigma35_mode: strong
+      - name: cipro_dual_lexa_carrier
+        count: 2
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["baeR+lexA", "cpxR+lexA"]
+        allowed_sigma35_variants: ["f", "e", "d", "c"]
+        sigma35_mode: strong
+
+  - slug: stress_eth_cip_and_rf_sfxi_topn
+    name: Stress ethanol/ciprofloxacin AND RF SFXI top-n
+    objective: and
+    label_hist_column: opal__stress_eth_cip_and_rf_sfxi_topn__label_hist
+    setpoint_vector: [0, 0, 0, 1]
+    target_margin_column: synthetic_margin_dual_vs_background
+    off_target_margin_columns:
+      - synthetic_margin_ethanol_vs_background
+      - synthetic_margin_cipro_vs_background
+    slots:
+      - name: and_cpxr_lexa
+        count: 2
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["cpxR+lexA"]
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: and_cpxr_lexa_exploratory
+        count: 1
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["cpxR+lexA"]
+        allowed_sigma35_variants: ["d", "c"]
+        sigma35_mode: exploratory
+      - name: and_baer_lexa
+        count: 2
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["baeR+lexA"]
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: and_baer_lexa_exploratory
+        count: 1
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["baeR+lexA"]
+        allowed_sigma35_variants: ["d", "c"]
+        sigma35_mode: exploratory

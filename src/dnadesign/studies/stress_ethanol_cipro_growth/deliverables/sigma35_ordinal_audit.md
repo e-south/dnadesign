@@ -7,6 +7,14 @@ margin grammar for Sigma-35, W Collection core60, and Anderson iGEM core60, but
 the W and Anderson numeric standards remain collection-specific scales and
 should not be pooled into one promoter-strength score.
 
+For Sigma-35, the scalar audit and the swarm gallery are related, but they are
+not the same statistic. Both use the same declared order file, with `f`
+strongest and `b` weakest. The swarm displays that ladder as `B=1`, `C=2`,
+`D=3`, `E=4`, `F=5`, so a positive row-level Spearman means rows move toward
+the `F` endpoint as the class gets stronger. The scalar audit Spearman and
+Kendall compare pairwise centroid-distance gaps; the swarm annotations compare
+row order against an `F`-vs-`B` endpoint margin.
+
 ### sigma35_ordinal_audit | Sigma-35 ordinal audit
 
 #### Plot details
@@ -36,6 +44,10 @@ It reports Spearman and Kendall correlations between those two vectors, plus a
 balanced Sigma-35 Spearman, a within-family mean Spearman, a within-regulator
 mean Spearman, and a shuffled-label permutation p-value. Confidence intervals
 are reported for the Spearman-based summary rows.
+
+These are not the same Spearman and Kendall values shown on the ordinal swarm
+subplot. Here, the question is: are farther-apart declared Sigma-35 classes
+farther apart as class centroids in embedding space?
 
 **Decision use.** Ordered Sigma-35 structure adds a within-design signal beyond
 coarse cohort separation. A good candidate should preserve the intended ladder
@@ -75,6 +87,12 @@ strong-end centroid; negative values mean it lies closer to the weak-end
 centroid. The annotation reports Spearman rho between row-level ordinal class
 order and this high-dimensional margin, plus a simple linear \(R^2\) for those
 same two row-level variables.
+
+For the Sigma-35 dropdown selection, the annotation uses the same `f/e/d/c/b`
+order as the scalar audit but applies it to row-level endpoint margins. The
+question is: do individual rows slide monotonically from `B`-like to `F`-like
+along the strong/weak endpoint axis? That is why the swarm statistics can be
+larger or smaller than the scalar audit values without contradicting them.
 
 **Decision use.** This is the simplest row-level bridge to the ordinal score.
 It shows whether the selected ladder is visible before that order is compressed

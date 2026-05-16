@@ -30,6 +30,9 @@ Keep ownership boundaries clear.
   workflow doc.
 - Cluster and OPAL detail stays in their tool-owned workflow docs until the
   study owns a concrete results root or campaign config.
+- OPAL campaign notebook viewing is routed through the study `routes.md` OPAL
+  section and `opal notebook generate/run`; this skill should not grow a
+  parallel OPAL command walkthrough.
 
 ## Router rule
 

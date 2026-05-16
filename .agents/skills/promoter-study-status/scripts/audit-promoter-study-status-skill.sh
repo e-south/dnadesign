@@ -134,6 +134,9 @@ require_pattern 'Which study files are authoritative' "skill includes authority 
 require_pattern 'Which dataset sync posture is current' "skill includes sync trigger coverage"
 require_pattern 'What should run next on this host\?' "skill excludes next-run readiness triggers"
 require_pattern 'analysis_surfaces' "skill points at snapshot exploratory-analysis inventory" "$TMP_COMBINED"
+require_pattern 'How do I check OPAL campaign status or open OPAL plots\?' "route matrix covers OPAL status and plot routing" "$REFERENCE_DIR/route-matrix.md"
+require_pattern 'opal notebook generate/run' "route matrix preserves generated OPAL notebook route" "$REFERENCE_DIR/route-matrix.md"
+require_pattern 'OPAL campaign notebook viewing is routed through the study `routes\.md` OPAL' "study surfaces keep OPAL detail out of the status skill" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'ops\.study\.yaml' "skill uses checked-in ops study contract"
 require_pattern 'default notify-enabled Infer presets|default notify-enabled infer presets' "skill documents strict notify-enabled submit readiness"
 require_pattern 'campaign\.yaml' "route matrix includes campaign manifest in authority chain" "$REFERENCE_DIR/route-matrix.md"
@@ -148,6 +151,7 @@ require_absent 'Refresh batch or notify evidence only when asked' "skill avoids 
 require_absent 'notify setup resolve-events' "skill top level avoids inline notify command walkthrough"
 require_absent 'usr --root <usr-root> diff <dataset-id> <remote-name>' "skill top level avoids inline sync command walkthrough"
 require_absent 'infer run --config <infer-config> --dry-run' "skill top level avoids inline infer dry-run walkthrough"
+require_absent 'opal status -c' "skill top level avoids inline OPAL status walkthrough"
 require_absent 'usr maintenance overlay-remove|infer prune' "skill top level avoids rollback command inventory"
 
 if [[ $failures -eq 0 ]]; then

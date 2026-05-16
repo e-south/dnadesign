@@ -22,9 +22,6 @@ import typer
 
 from ...analysis.facade import (
     CampaignAnalysis,
-    ensure_labels_path,
-    ensure_predictions_dir,
-    ensure_runs_path,
 )
 from ...analysis.notebook_template import render_campaign_notebook
 from ...core.pretty import console_out
@@ -241,7 +238,7 @@ def cmd_notebook_generate(
     validate: bool = typer.Option(
         True,
         "--validate/--no-validate",
-        help="Validate ledger artifacts exist before generating the notebook.",
+        help="Validate requested round against existing runs before generating the notebook.",
     ),
 ) -> None:
     try:
@@ -264,10 +261,7 @@ def cmd_notebook_generate(
                 raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
             round_sel = str(round_val)
 
-        if validate:
-            ensure_runs_path(ws.ledger_runs_path)
-            ensure_predictions_dir(ws.ledger_predictions_dir)
-            ensure_labels_path(ws.ledger_labels_path)
+        if validate and ws.ledger_runs_path.exists():
             runs_df = analysis.read_runs()
             # Validate requested round exists (or at least that runs are available for "latest").
             resolve_round_index_from_runs(runs_df, round_sel)

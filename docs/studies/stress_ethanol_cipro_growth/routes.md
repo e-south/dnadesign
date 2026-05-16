@@ -14,6 +14,13 @@ This page keeps the downstream handoff map in one place.
 ### Terminology guardrails
 
 - DenseGen generation plans are biological generation conditions such as `background_only`, `ethanol`, `ciprofloxacin`, and `ethanol_ciprofloxacin`.
+- OPAL campaigns are downstream objectives: ethanol factor, ciprofloxacin
+  factor, and AND. AND is not a synonym for every
+  `ethanol_ciprofloxacin` DenseGen row.
+- OPAL reads an `opal_candidate_feature_table`, not just a matrix. The planned
+  table is `usr_prom_eth_cip_opal_candidates` with X column
+  `latentdna__evo2_7b__context_anchor_mean_bidir_concat`.
+- SFXI state order for these campaigns is `[00, 10, 01, 11]`.
 - Study lifecycle phases are record-plane state labels such as the current `latentdna_reference_normalization_audit`; they are not DenseGen generation plans.
 - Infer lanes are model-family and dataset-target configs such as `anchor_only_20b` or `anchor_plus_template_7b`; they are not lifecycle phases.
 - Route `Plane` values use the repo-wide enum from `ARCHITECTURE.md`. If extra nuance is needed, use `Surface role` rather than inventing a new plane name.
@@ -99,7 +106,8 @@ This page keeps the downstream handoff map in one place.
 - Pre-specified regulator landmark overlay:
   - `native_tf_axis_orientation_audit` is the stable artifact id for the BaeR/CpxR/LexA regulator landmark audit. It reuses the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat` view after the shared anchor/context quota is expanded with `usr_regulondb_native_promoter_core60`; it requires `usr_regulondb_native_promoters/_relations/regulatory_interactions.parquet` and is not an OPAL input.
 - Configured exploratory regulator appendix:
-  - `native_regulator_plan_margin_enrichment` is specified in `src/dnadesign/latentdna/docs/dev/native-regulator-plan-margin-enrichment.md`. It tests source-backed RegulonDB regulator enrichments in synthetic-plan margins and fixed 5%/10% native tails, while keeping the existing BaeR/CpxR/LexA landmark audit separate from post-hoc regulator discovery. It now emits contract tables plus a static appendix plot surfaced in the `latent_geometry_browser` plot-review notebook panel.
+  - `native_regulator_plan_margin_enrichment` is specified in `src/dnadesign/latentdna/docs/dev/native-regulator-plan-margin-enrichment.md`. It tests source-backed RegulonDB regulator rank shifts across synthetic-plan margins, then uses fixed 5%/10% native tails as readable enrichment summaries. It keeps the existing BaeR/CpxR/LexA landmark audit separate from post-hoc regulator discovery and emits contract tables plus a static appendix plot surfaced in the `latent_geometry_browser` plot-review notebook panel.
+  - `native_regulator_go_bp_plan_margin_enrichment` is the BioCyc GO biological-process companion. It reuses the persisted plan-margin score and tail tables, joins `promoter_regulator_go_terms.parquet`, and renders a separate functional-term appendix plot so regulator names and ontology-level interpretation remain distinct.
 - RegulonDB regulator functional terms:
   - BioCyc KB 29.6 SmartTable GO terms are projected onto `usr_regulondb_native_promoters` through `src/dnadesign/usr/scripts/project_regulondb_functional_annotations.py`.
   - The method contract is `src/dnadesign/usr/docs/reference/regulondb-functional-annotations.md`.
@@ -175,9 +183,27 @@ This page keeps the downstream handoff map in one place.
 - Plane: `control-plane`
 - Surface role: `decision`
 - Owner-boundary: `opal`
-- Current state: `not_configured`
-- Entry artifact: study-owned feature bundle chosen outside LatentDNA
-- Exit artifact: OPAL-ready feature bundle plus campaign config when a downstream decision is made
+- Current state: `configured_pending_candidate_table`
+- Entry artifact: `usr_prom_eth_cip_opal_candidates`
+- Exit artifact: campaign-owned OPAL ledgers under each `outputs/ledger/`
 - Primary doc/workspace: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
+- Batch-0 selector: `src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/`
+- Candidate table role: `opal_candidate_feature_table`
+- Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
+- Campaign configs:
+  - `src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
+  - `src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml`
+  - `src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml`
 - First command: `uv run ops catalog show opal.downstream.usr-infer-x-active-learning`
-- Boundary note: LatentDNA can narrow the choice of `X`, but it does not own the downstream OPAL handoff decision.
+- Pre-run-safe campaign viewer: `uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force`
+- Campaign notebook run: `uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
+- Post-run status command: `uv run opal status -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --with-ledger`
+- Post-run plot command: `uv run opal plot -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
+- Notebook role: generated campaign-specific artifact viewer for OPAL records,
+  rounds, ledgers, labels, predictions, selected records, and plot
+  deliverables. This is the OPAL notebook route; do not treat checked-in
+  maintainer fixtures as competing operator notebooks.
+- Boundary note: LatentDNA can narrow the choice of `X`, but it does not own
+  the downstream OPAL handoff decision. Batch 0 is a pre-assay seed; after
+  labels exist, OPAL owns ingest, label history, training, scoring, active
+  selection, and ledgers.

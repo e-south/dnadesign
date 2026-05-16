@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/notebooks/test_promoter_eda_notebook_smoke.py
+src/dnadesign/opal/tests/notebooks/test_campaign_progress_notebook_smoke.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,19 +15,19 @@ from pathlib import Path
 
 import pytest
 
-NOTEBOOK_PATH = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
+NOTEBOOK_PATH = Path("src/dnadesign/opal/notebooks/campaign_progress.py")
 
 
 def _load_notebook_module() -> object:
-    spec = importlib.util.spec_from_file_location("prom60_eda_smoke", NOTEBOOK_PATH)
+    spec = importlib.util.spec_from_file_location("campaign_progress_smoke", NOTEBOOK_PATH)
     if spec is None or spec.loader is None:
-        raise RuntimeError("Unable to load prom60_eda notebook module")
+        raise RuntimeError("Unable to load campaign_progress notebook module")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-def test_prom60_eda_headless(tmp_path: Path) -> None:
+def test_campaign_progress_headless(tmp_path: Path) -> None:
     if importlib.util.find_spec("marimo") is None:
         pytest.skip("marimo is not installed in this environment")
     env_backup = os.environ.copy()

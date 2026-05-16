@@ -30,7 +30,7 @@ def test_promoter_study_registry_and_snapshot_surfaces_have_expected_structure()
 
     roles = {row["role"] for row in datasets["datasets"]}
     assert "densegen_anchor" in roles
-    assert "feature_matrix" in roles
+    assert "opal_candidate_feature_table" in roles
 
     study_pipeline = pipeline["study_pipeline"]
     assert "construct_workspace" in study_pipeline["execution_surfaces"]

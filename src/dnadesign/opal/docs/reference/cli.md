@@ -609,7 +609,7 @@ Built-ins injected for plots:
 
 ### `notebook`
 
-Generate or run a campaign-tied marimo notebook for interactive analysis.
+Generate or run the campaign-specific marimo artifact viewer.
 
 **Usage**
 
@@ -621,13 +621,19 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 
 **Notes**
 
-* `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
+* `generate` writes the campaign-specific artifact viewer for records, round/run
+  state, ledger readiness, selected records, labels, predictions, and
+  `outputs/plots` deliverables.
 * `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
-* By default, `generate` validates ledger artifacts exist. Use `--no-validate` to scaffold a notebook before any runs.
-* When `--validate` is on, `--round` must exist in ledger runs (otherwise use `--no-validate`).
+* `generate` works before the first OPAL run. Missing ledger, label,
+  prediction, and plot artifacts appear as explicit notebook states.
+* When `--validate` is on and ledger runs already exist, `--round` must resolve
+  in those runs. `--no-validate` skips that round check.
 * `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
 * `run` resolves the notebook under `<workdir>/notebooks`. If multiple exist, it prompts in TTY or requires `--path` in non-interactive mode.
 * Running `uv run opal notebook` (no subcommand) lists available notebooks and nudges the next step.
+* Checked-in notebook fixtures are maintainer/test surfaces. Operator-facing
+  campaign notebooks should come from `opal notebook generate`.
 
 ---
 

@@ -262,6 +262,21 @@ study_pipeline:
     state: planned
   opal:
     doc: src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md
-    entry_artifact: study-owned feature bundle chosen outside LatentDNA
-    config: n/a
-    state: not_configured
+    entry_artifact: usr_prom_eth_cip_opal_candidates
+    candidate_feature_table:
+      dataset: usr_prom_eth_cip_opal_candidates
+      role: opal_candidate_feature_table
+      x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
+      x_source: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+    config: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
+    configs:
+      ethanol_factor: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
+      cipro_factor: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+      and: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml
+    notebook:
+      role: campaign_specific_artifact_viewer
+      pre_run_safe: true
+      generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force
+      run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
+    batch0_selector: src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml
+    state: configured_pending_candidate_table

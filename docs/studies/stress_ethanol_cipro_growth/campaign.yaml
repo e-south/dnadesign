@@ -2,18 +2,21 @@ version: 2
 path_base: repo
 campaign_id: stress_ethanol_cipro_growth
 steps:
-  - label: promoter-feature-matrix
-    registry_id: usr.data-plane.promoter-feature-matrix
+  - label: opal-candidate-feature-table-ethanol
+    registry_id: opal.downstream.usr-infer-x-active-learning
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
-      dataset: usr_prom_eth_cip_matrix
-  - label: multi-source-source-of-truth
-    registry_id: usr.data-plane.multi-source-source-of-truth
+      dataset: usr_prom_eth_cip_opal_candidates
+      opal_config: repo:src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
+  - label: opal-candidate-feature-table-cipro
+    registry_id: opal.downstream.usr-infer-x-active-learning
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
-      dataset: usr_prom_eth_cip_matrix
-  - label: construct-infer-source-of-truth
-    registry_id: usr.data-plane.construct-infer-source-of-truth
+      dataset: usr_prom_eth_cip_opal_candidates
+      opal_config: repo:src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+  - label: opal-candidate-feature-table-and
+    registry_id: opal.downstream.usr-infer-x-active-learning
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
-      dataset: usr_prom_eth_cip_matrix
+      dataset: usr_prom_eth_cip_opal_candidates
+      opal_config: repo:src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml

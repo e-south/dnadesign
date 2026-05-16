@@ -32,10 +32,12 @@ def test_opal_docs_index_routes_to_usr_infer_x_workflow() -> None:
 
     assert "### Start here" in docs_index
     assert "./workflows/usr-infer-x-active-learning.md" in docs_index
-    assert "./docs/workflows/usr-infer-x-active-learning.md" in top_readme
-    assert "infer has already written the chosen feature column into the dataset" in top_readme
-    assert "If you only need exploratory structure" in top_readme
-    assert "../cluster/docs/workflows/exploratory-clustering.md" in top_readme
+    assert "docs/index.md" in top_readme
+    assert "docs/workflows/usr-infer-x-active-learning.md" in top_readme
+    assert "infer has already written the chosen feature column into USR" in docs_index
+    assert "../../../cluster/docs/workflows/exploratory-clustering.md" in _read(
+        "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md"
+    )
 
 
 def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> None:

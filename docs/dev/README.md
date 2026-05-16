@@ -99,6 +99,8 @@ uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-int
    [generic linear ssDNA composition execution plan](../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 7. Active follow-up checklist:
    [linear ssDNA composition hardening follow-ups](../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
+8. Active OPAL notebook consolidation spec:
+   [OPAL campaign notebook consolidation](plans/2026-05-15-opal-campaign-notebook-consolidation-spec.md)
 
 ### Naming and file layout
 

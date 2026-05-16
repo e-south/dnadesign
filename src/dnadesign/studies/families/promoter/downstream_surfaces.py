@@ -26,7 +26,7 @@ def inspect_promoter_downstream_surfaces(
     *,
     study_context: PromoterStudyResolvedContext,
 ) -> dict[str, dict[str, object]]:
-    feature_matrix_dataset = _feature_matrix_dataset_id(study_context=study_context)
+    downstream_candidate_dataset = _downstream_candidate_dataset_id(study_context=study_context)
     return {
         "cluster": _inspect_declared_surface(
             study_context=study_context,
@@ -34,7 +34,7 @@ def inspect_promoter_downstream_surfaces(
             default_doc=_DEFAULT_CLUSTER_DOC,
             default_state="planned",
             surface_key="results_root",
-            entry_artifact_default=feature_matrix_dataset,
+            entry_artifact_default=downstream_candidate_dataset,
         ),
         "opal": _inspect_declared_surface(
             study_context=study_context,
@@ -42,7 +42,7 @@ def inspect_promoter_downstream_surfaces(
             default_doc=_DEFAULT_OPAL_DOC,
             default_state="not_configured",
             surface_key="config",
-            entry_artifact_default=feature_matrix_dataset,
+            entry_artifact_default=downstream_candidate_dataset,
         ),
     }
 
@@ -92,16 +92,20 @@ def _inspect_declared_surface(
     return payload
 
 
-def _feature_matrix_dataset_id(
+def _downstream_candidate_dataset_id(
     *,
     study_context: PromoterStudyResolvedContext,
 ) -> str | None:
+    preferred_roles = {
+        "opal_candidate_feature_table",
+        "feature_matrix",
+    }
     for dataset_state in study_context.dataset_states:
-        if _string_or_none(dataset_state.get("role")) == "feature_matrix":
+        if _string_or_none(dataset_state.get("role")) in preferred_roles:
             return _string_or_none(dataset_state.get("dataset"))
     for dataset_state in study_context.dataset_states:
         dataset_id = _string_or_none(dataset_state.get("dataset"))
-        if dataset_id and "feature_matrix" in dataset_id:
+        if dataset_id and ("feature_matrix" in dataset_id or "opal_candidates" in dataset_id):
             return dataset_id
     return None
 

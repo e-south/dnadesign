@@ -2,7 +2,7 @@
 name: promoter-study-status
 description: Report record-backed promoter-study status for one live study. Use when the user asks where the promoter study stands, what phase or datasets are current, whether the checked-in study record needs a refresh, which study files are authoritative, which dataset sync posture is current, or whether the study is still source-phase versus downstream. Do not use for blockers or next-run readiness; use `promoter-study-preflight`. Do not use for tool-local operational walkthroughs or generic workflow discovery when no checked-in study record exists.
 metadata:
-  version: 0.5.0
+  version: 0.5.1
   category: workflow-automation
   tags: [usr, promoter-study, status, routes, preflight]
 ---

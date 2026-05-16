@@ -138,10 +138,13 @@ artifacts:
     artifact_type: dataset
     dataset_id: construct_prom_eth_cip_context
     ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_context
-  feature_matrix_dataset:
+  opal_candidate_feature_table:
     artifact_type: dataset
-    dataset_id: usr_prom_eth_cip_matrix
-    ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_matrix
+    role: opal_candidate_feature_table
+    dataset_id: usr_prom_eth_cip_opal_candidates
+    ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates
+    x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
+    x_source: intermediate_embedding_7b_context_anchor_mean_bidir_concat
   reference_native_dataset:
     artifact_type: dataset
     dataset_id: usr_promoter_references

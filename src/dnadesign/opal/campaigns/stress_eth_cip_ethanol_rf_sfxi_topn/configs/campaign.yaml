@@ -1,0 +1,79 @@
+# OPAL campaign configuration: stress ethanol/ciprofloxacin ethanol factor
+
+campaign:
+  name: "Stress ethanol/ciprofloxacin ethanol factor RF + SFXI + top_n"
+  slug: "stress_eth_cip_ethanol_rf_sfxi_topn"
+  workdir: "."
+
+data:
+  location:
+    kind: usr
+    path: "../../../usr/datasets"
+    dataset: usr_prom_eth_cip_opal_candidates
+  x_column_name: "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+  y_column_name: "opal__stress_eth_cip_ethanol_rf_sfxi_topn__y"
+  y_expected_length: 8
+
+ingest:
+  duplicate_policy: "error"
+
+training:
+  policy:
+    cumulative_training: true
+    label_cross_round_deduplication_policy: "latest_only"
+    allow_resuggesting_candidates_until_labeled: true
+  y_ops:
+    - name: intensity_median_iqr
+      params:
+        min_labels: 5
+        center: median
+        scale: iqr
+        eps: 1e-8
+
+transforms_x: { name: identity, params: {} }
+transforms_y:
+  name: sfxi_vec8_from_table_v1
+  params:
+    sequence_column: sequence
+    logic_columns: ["v00", "v10", "v01", "v11"]
+    intensity_columns: ["y00_star", "y10_star", "y01_star", "y11_star"]
+    enforce_log2_offset_match: true
+    expected_log2_offset_delta: 0.0
+
+model:
+  name: random_forest
+  params:
+    n_estimators: 100
+    criterion: "friedman_mse"
+    bootstrap: true
+    oob_score: true
+    random_state: 7
+    n_jobs: -1
+    emit_feature_importance: true
+
+objectives:
+  - name: "sfxi_v1"
+    params:
+      setpoint_vector: [0, 1, 0, 1]
+      logic_exponent_beta: 1.0
+      intensity_exponent_gamma: 1.0
+      intensity_log2_offset_delta: 0.0
+      scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
+
+selection:
+  name: "top_n"
+  params:
+    top_k: 6
+    score_ref: "sfxi_v1/sfxi"
+    tie_handling: "competition_rank"
+    objective_mode: "maximize"
+
+scoring:
+  score_batch_size: 1000
+
+safety:
+  fail_on_mixed_biotype_or_alphabet: true
+  require_biotype_and_alphabet_on_init: true
+  conflict_policy_on_duplicate_ids: "error"
+  write_back_requires_columns_present: true
+  accept_x_mismatch: false

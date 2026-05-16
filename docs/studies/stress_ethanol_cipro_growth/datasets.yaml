@@ -217,8 +217,8 @@ datasets:
       audit_json: docs/studies/stress_ethanol_cipro_growth/audits/construct_prom_eth_cip_context--cluster-diff.json
       strict_bootstrap_id: true
       remote_path: n/a
-  - role: feature_matrix
-    dataset: usr_prom_eth_cip_matrix
+  - role: opal_candidate_feature_table
+    dataset: usr_prom_eth_cip_opal_candidates
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
     status: planned
@@ -226,14 +226,22 @@ datasets:
     owner_tool: usr
     onboard_mode: create_new
     authority: shared
-    notes: Planned shared downstream feature dataset. The current Infer full-lane configs keep anchor-only and template-backed planes explicit until a later shared consolidation step.
+    notes: >-
+      Planned OPAL candidate feature table. This is a USR `records.parquet`
+      candidate universe with stable promoter row identity, sequence,
+      audit/provenance metadata, one fixed-length vector-valued X column named
+      `latentdna__evo2_7b__context_anchor_mean_bidir_concat`, and
+      campaign-specific OPAL label-history columns after labels are ingested.
+      The X value is the Fwd+RC 1 kb context-anchor Evo2 7B intermediate
+      embedding vector; it is not UMAP, centroid distance, an assay label, or a
+      phenotype claim.
     sync:
       enabled: true
       remote_name: cluster
-      remote_dataset: usr_prom_eth_cip_matrix
+      remote_dataset: usr_prom_eth_cip_opal_candidates
       remote_root_kind: shared
       default_direction: bidirectional
-      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/usr_prom_eth_cip_matrix--cluster-diff.json
+      audit_json: docs/studies/stress_ethanol_cipro_growth/audits/usr_prom_eth_cip_opal_candidates--cluster-diff.json
       strict_bootstrap_id: true
       remote_path: n/a
   - role: native_reference_records
