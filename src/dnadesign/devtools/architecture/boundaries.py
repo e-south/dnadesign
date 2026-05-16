@@ -89,8 +89,11 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
 }
 _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]] = {
     ("construct", "folding"): ("dnadesign.folding",),
+    ("studies", "baserender"): ("dnadesign.baserender",),
+    ("studies", "construct"): ("dnadesign.construct",),
 }
 _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("studies", "cruncher"): ("dnadesign.cruncher.scar_nick", "dnadesign.cruncher.snapback"),
     ("usr", "cruncher"): ("dnadesign.cruncher.ingest.promoters",),
 }
 _FORBIDDEN_LEGACY_SURFACE_PATHS = (

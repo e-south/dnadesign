@@ -186,6 +186,56 @@ def test_find_undeclared_cross_tool_imports_allows_usr_cruncher_promoter_export_
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_study_public_retron_producer_edges(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "retron_hairpin_design" / "compiler.py",
+        "\n".join(
+            [
+                "import dnadesign.baserender as baserender",
+                "import dnadesign.construct as construct",
+                "from dnadesign.construct import run_linear_ssdna_composition",
+                "from dnadesign.cruncher.scar_nick import load_scar_nick_stem_base_primitives",
+                "from dnadesign.cruncher.snapback import load_released_solve_cap_primitives",
+            ]
+        ),
+    )
+    _write(tmp_path / "src" / "dnadesign" / "baserender" / "__init__.py", "def run_job():\n    return None\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "construct" / "__init__.py",
+        "def run_linear_ssdna_composition():\n    return None\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "cruncher" / "scar_nick" / "__init__.py",
+        "def load_scar_nick_stem_base_primitives():\n    return []\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "cruncher" / "snapback" / "__init__.py",
+        "def load_released_solve_cap_primitives():\n    return []\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_study_unspecified_cruncher_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "retron_hairpin_design" / "compiler.py",
+        "from dnadesign.cruncher.analysis import load_rows\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "cruncher" / "analysis" / "__init__.py",
+        "def load_rows():\n    return []\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "studies"
+    assert violations[0].imported_tool == "cruncher"
+    assert violations[0].import_target == "dnadesign.cruncher.analysis"
+
+
 def test_find_undeclared_cross_tool_imports_rejects_usr_cruncher_unspecified_edge(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "usr" / "scripts" / "import_promoters.py",
