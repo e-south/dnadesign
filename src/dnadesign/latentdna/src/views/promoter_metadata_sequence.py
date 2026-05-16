@@ -1,4 +1,13 @@
-"""Sequence-derived promoter metadata for LatentDNA view rows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/promoter_metadata_sequence.py
+
+Sequence-derived promoter metadata for LatentDNA view rows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

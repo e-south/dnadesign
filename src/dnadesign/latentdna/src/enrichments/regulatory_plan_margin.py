@@ -1,4 +1,13 @@
-"""Regulatory association enrichment over synthetic-plan latent margins."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/regulatory_plan_margin.py
+
+Regulatory association enrichment over synthetic-plan latent margins.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

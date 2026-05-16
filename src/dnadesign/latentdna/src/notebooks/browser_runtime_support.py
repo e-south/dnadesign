@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_support.py
+
 Shared browser runtime support helpers for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -14,10 +21,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
-from ..labels import humanize_column_name
-from ..metadata_axes import (
+from ..metadata.axes import (
     AxisStyle,
     axis_color_map,
     axis_display_label,
@@ -27,9 +32,10 @@ from ..metadata_axes import (
     normalize_axis_category,
     ordered_categories_for_axis,
 )
-from ..metadata_join_keys import candidate_join_key_pairs_for_columns
-from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
-from ..visual_style import (
+from ..metadata.join_keys import candidate_join_key_pairs_for_columns
+from ..presentation.annotation_layout import choose_annotation_placement
+from ..presentation.labels import humanize_column_name
+from ..presentation.visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
     PLOT_TICK_FONT_SIZE,
     PUBLICATION_PALETTE,
@@ -39,7 +45,8 @@ from ..visual_style import (
     humanize_display_text,
     reference_annotation_label,
 )
-from ..visual_style import scatter_style as shared_scatter_style
+from ..presentation.visual_style import scatter_style as shared_scatter_style
+from ..references.sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..workspaces.loader import load_workspace_config
 from .browser_runtime_ui import (
     key_value_table as key_value_table,

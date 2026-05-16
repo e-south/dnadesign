@@ -1,4 +1,13 @@
-"""Generic table and config validation helpers for enrichment builders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/table_contracts.py
+
+Generic table and config validation helpers for enrichment builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

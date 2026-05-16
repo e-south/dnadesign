@@ -1,4 +1,13 @@
-"""Representation scorecard scalar builders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/builders/representation_scorecard.py
+
+Representation scorecard scalar builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

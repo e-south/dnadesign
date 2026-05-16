@@ -1,4 +1,13 @@
-"""Metric-panel data contracts for static plot rendering."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/metric.py
+
+Metric-panel data contracts for static plot rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -9,8 +18,8 @@ import numpy as np
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...metadata_axes import AxisStyle, ordered_categories_for_axis
-from ...visual_style import (
+from ...metadata.axes import AxisStyle, ordered_categories_for_axis
+from ...presentation.visual_style import (
     PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
@@ -165,6 +174,16 @@ def metric_panel_needs_candidate_label_ticks(rows: list[dict[str, object]], spec
     return False
 
 
+def metric_panel_prefers_horizontal_bars(plot_id: str | None) -> bool:
+    """Return whether dense candidate labels should be placed on the y axis."""
+
+    return plot_id in {
+        "context_pair_summary",
+        "context_robustness_summary",
+        "representation_health_summary",
+    }
+
+
 def load_metric_panel_grid_input(context: WorkspaceContext, spec: ResolvedPlotSpec) -> MetricPanelGridInput:
     """Load and validate metric-panel rows from a scalar table artifact."""
 
@@ -290,7 +309,7 @@ def render_metric_panel(
     label_column = metric_panel_label_column(spec)
     ordered_rows = _sorted_metric_rows(rows, spec=spec)
     grouped_family_bars = metric_panel_uses_grouped_family_bars(ordered_rows, spec)
-    horizontal_metric = spec.plot_id == "representation_health_summary" and not grouped_family_bars
+    horizontal_metric = metric_panel_prefers_horizontal_bars(spec.plot_id) and not grouped_family_bars
     include_family = not (spec.color_column == "candidate_family")
     use_candidate_label_ticks = metric_panel_needs_candidate_label_ticks(ordered_rows, spec)
     tick_fallback_column = "candidate_label" if use_candidate_label_ticks else label_column
@@ -313,7 +332,9 @@ def render_metric_panel(
     else:
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
     ci_enabled = spec.ci_lower_column is not None and spec.ci_upper_column is not None and ordered_rows
-    horizontal_grouped_metric = grouped_family_bars and spec.plot_id in _HORIZONTAL_GROUPED_METRIC_PLOT_IDS
+    horizontal_grouped_metric = grouped_family_bars and (
+        spec.plot_id in _HORIZONTAL_GROUPED_METRIC_PLOT_IDS or metric_panel_prefers_horizontal_bars(spec.plot_id)
+    )
 
     if horizontal_grouped_metric:
         family_order = ordered_categories_for_axis(None, [str(row["candidate_family"]) for row in ordered_rows])

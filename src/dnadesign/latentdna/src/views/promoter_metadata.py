@@ -1,4 +1,13 @@
-"""Public promoter metadata derivation dispatcher for LatentDNA workspaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/promoter_metadata.py
+
+Public promoter metadata derivation dispatcher for LatentDNA workspaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

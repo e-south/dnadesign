@@ -1,4 +1,13 @@
-"""Generic statistical helpers for enrichment tables."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/enrichment_stats.py
+
+Generic statistical helpers for enrichment tables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

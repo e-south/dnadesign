@@ -1,4 +1,13 @@
-"""Rank association tests for categorical features over numeric axes."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/rank_association.py
+
+Rank association tests for categorical features over numeric axes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

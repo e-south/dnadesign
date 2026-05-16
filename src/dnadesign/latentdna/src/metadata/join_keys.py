@@ -1,4 +1,13 @@
-"""Shared metadata join-key contract for LatentDNA notebook overlays."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/metadata/join_keys.py
+
+Shared metadata join-key contract for LatentDNA notebook overlays.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

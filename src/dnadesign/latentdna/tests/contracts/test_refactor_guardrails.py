@@ -92,10 +92,11 @@ def test_human_audience_flags_are_removed() -> None:
 def test_generic_runtime_modules_do_not_branch_on_sigma35_semantics() -> None:
     repo_root = _repo_root()
     runtime_paths = [
-        repo_root / "src/dnadesign/latentdna/src/labels.py",
         repo_root / "src/dnadesign/latentdna/src/notebooks/browser_runtime_projection.py",
         repo_root / "src/dnadesign/latentdna/src/notebooks/browser_runtime_plot_review.py",
         repo_root / "src/dnadesign/latentdna/src/notebooks/browser_runtime_support.py",
+        repo_root / "src/dnadesign/latentdna/src/presentation/labels.py",
+        repo_root / "src/dnadesign/latentdna/src/presentation/visual_style.py",
         repo_root / "src/dnadesign/latentdna/src/plots/render.py",
         repo_root / "src/dnadesign/latentdna/src/scalars/build.py",
         repo_root / "src/dnadesign/latentdna/src/scalars/common.py",
@@ -105,7 +106,6 @@ def test_generic_runtime_modules_do_not_branch_on_sigma35_semantics() -> None:
         repo_root / "src/dnadesign/latentdna/src/scalars/preassay_reference.py",
         repo_root / "src/dnadesign/latentdna/src/scalars/preassay_selection.py",
         repo_root / "src/dnadesign/latentdna/src/scalars/preassay_summary.py",
-        repo_root / "src/dnadesign/latentdna/src/visual_style.py",
     ]
     forbidden_tokens = ["sig35", "sigma35", "sigma-35", "promoter-specific"]
 

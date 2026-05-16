@@ -1,4 +1,13 @@
-"""Matplotlib drawing helpers for static annotation overlays."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/annotation_rendering.py
+
+Matplotlib drawing helpers for static annotation overlays.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -6,10 +15,10 @@ from typing import Any
 
 import numpy as np
 
-from ..annotation_layout import choose_annotation_placement
 from ..contracts.errors import ContractViolationError
 from ..contracts.plot import ResolvedPlotSpec
-from ..visual_style import ANNOTATION_LABEL_BOX_ALPHA, SPINE_COLOR, TEXT_COLOR, humanize_display_text
+from ..presentation.annotation_layout import choose_annotation_placement
+from ..presentation.visual_style import ANNOTATION_LABEL_BOX_ALPHA, SPINE_COLOR, TEXT_COLOR, humanize_display_text
 from ..workspaces.loader import WorkspaceContext
 from .annotations import annotation_label_text
 from .axes import explicit_axis_label

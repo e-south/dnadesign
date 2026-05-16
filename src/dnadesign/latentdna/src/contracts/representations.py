@@ -1,4 +1,13 @@
-"""Representation-family contract helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/representations.py
+
+Representation-family contract helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

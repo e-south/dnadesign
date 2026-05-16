@@ -1,4 +1,13 @@
-"""Reference and label annotation contracts for static plot rendering."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/annotations.py
+
+Reference and label annotation contracts for static plot rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -6,8 +15,8 @@ from dataclasses import dataclass
 
 from ..contracts.errors import ContractViolationError
 from ..contracts.plot import ResolvedPlotSpec
-from ..reference_sets import resolve_reference_set_rows
-from ..visual_style import reference_annotation_label
+from ..presentation.visual_style import reference_annotation_label
+from ..references.sets import resolve_reference_set_rows
 from ..workspaces.loader import WorkspaceContext
 from .tables import require_row_columns
 

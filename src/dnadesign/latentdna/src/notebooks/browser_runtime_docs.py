@@ -1,8 +1,17 @@
-"""Study-document parsing helpers for the LatentDNA browser runtime."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_docs.py
+
+Study-document parsing helpers for the LatentDNA browser runtime.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
-from ..labels import humanize_plot_title
+from ..presentation.labels import humanize_plot_title
 
 
 def _humanize_plot_id(plot_id: str) -> str:

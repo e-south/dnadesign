@@ -1,4 +1,4 @@
-from dnadesign.latentdna.src.visual_style import scatter_style
+from dnadesign.latentdna.src.presentation.visual_style import scatter_style
 
 
 def test_large_latent_scatter_style_prioritizes_visible_clouds() -> None:

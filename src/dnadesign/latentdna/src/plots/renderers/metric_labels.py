@@ -1,12 +1,21 @@
-"""Tick-label contracts for metric-panel plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/metric_labels.py
+
+Tick-label contracts for metric-panel plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 import re
 from typing import Any
 
-from ...labels import humanize_candidate
-from ...visual_style import PLOT_TICK_FONT_SIZE, humanize_display_text, wrap_plot_title
+from ...presentation.labels import humanize_candidate
+from ...presentation.visual_style import PLOT_TICK_FONT_SIZE, humanize_display_text, wrap_plot_title
 
 
 def wrapped_metric_tick_label(value: object, *, width: int = 16, max_lines: int | None = None) -> str:

@@ -1,4 +1,13 @@
-"""Cohort-level geometry helpers for pre-assay LatentDNA summaries."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/geometry/cohorts.py
+
+Cohort-level geometry helpers for pre-assay LatentDNA summaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

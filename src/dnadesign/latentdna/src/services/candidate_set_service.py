@@ -1,9 +1,18 @@
-"""Candidate-representation set resolution for notebook and status surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/candidate_set_service.py
+
+Candidate-representation set resolution for notebook and status surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 from ..contracts.notebook import WorkspaceNotebookCandidateSet, WorkspaceNotebookCandidateView
-from ..labels import humanize_candidate
+from ..presentation.labels import humanize_candidate
 from .view_shape_cache import ViewShapeCache
 
 

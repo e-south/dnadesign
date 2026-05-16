@@ -1,4 +1,13 @@
-"""Binary classification metric helpers for scalar scorecards."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/classification_metrics.py
+
+Binary classification metric helpers for scalar scorecards.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

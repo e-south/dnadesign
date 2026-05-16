@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/render.py
+
 Artifact-driven plotting helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -10,8 +17,8 @@ from typing import Any
 from ..contracts.errors import ContractViolationError
 from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..contracts.plot_semantics import PlotSemantics
-from ..metadata_axes import axis_style_map_from_config
-from ..visual_style import (
+from ..metadata.axes import axis_style_map_from_config
+from ..presentation.visual_style import (
     DEFAULT_PLOT_PNG_DPI,
     PLOT_FONT_FAMILY,
     TEXT_COLOR,

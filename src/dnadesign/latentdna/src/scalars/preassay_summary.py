@@ -1,4 +1,13 @@
-"""Summary pre-assay scalar builders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/preassay_summary.py
+
+Summary pre-assay scalar builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

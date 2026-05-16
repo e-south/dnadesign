@@ -1,4 +1,13 @@
-"""Contracts for native regulator plan-margin enrichment artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/regulatory_plan_margin_contracts.py
+
+Contracts for native regulator plan-margin enrichment artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

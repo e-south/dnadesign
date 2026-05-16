@@ -1,4 +1,13 @@
-"""Machine-readable candidate X inventory for workspace status surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/candidate_inventory_service.py
+
+Machine-readable candidate X inventory for workspace status surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

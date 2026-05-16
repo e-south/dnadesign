@@ -1,4 +1,13 @@
-"""Live plot-review rendering helpers for hue-switchable notebook surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_plot_review.py
+
+Live plot-review rendering helpers for hue-switchable notebook surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -11,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from ..contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
-from ..metadata_axes import axis_display_text, axis_style_map_from_payload
+from ..metadata.axes import axis_display_text, axis_style_map_from_payload
 from ..plots.layout import _grid_figure_size as static_grid_figure_size
 from ..plots.layout import _panel_grid_dimensions as static_panel_grid_dimensions
 from ..plots.layout import metric_panel_grid_layout
@@ -20,14 +29,14 @@ from ..plots.renderers.curve import render_curve_panel
 from ..plots.renderers.distribution import derived_panel_label, render_distribution_panel
 from ..plots.renderers.metric import metric_panel_groups, metric_panel_required_columns, render_metric_panel
 from ..plots.renderers.scatter import category_color_map as static_category_color_map
-from ..visual_style import (
+from ..presentation.visual_style import (
     TEXT_COLOR,
     compact_candidate_title,
     humanize_display_text,
     legend_layout,
     wrap_plot_title,
 )
-from ..visual_style import scatter_style as shared_scatter_style
+from ..presentation.visual_style import scatter_style as shared_scatter_style
 from .browser_runtime_plot_review_axes import categorical_hue_series as _categorical_hue_series
 from .browser_runtime_plot_review_axes import categorical_hue_values as _categorical_hue_values
 from .browser_runtime_plot_review_axes import configured_hue_kinds as _configured_hue_kinds

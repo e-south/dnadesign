@@ -1,4 +1,13 @@
-"""Distribution renderers for static and notebook plot surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/distribution.py
+
+Distribution renderers for static and notebook plot surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,10 +19,10 @@ import pyarrow.parquet as pq
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...labels import humanize_candidate
-from ...metadata_axes import AxisStyle, normalize_axis_categories
+from ...metadata.axes import AxisStyle, normalize_axis_categories
+from ...presentation.labels import humanize_candidate
+from ...presentation.visual_style import PUBLICATION_PALETTE, humanize_display_text, wrap_plot_title
 from ...stats.rank import kendall_tau_b, linear_r2, spearman_correlation
-from ...visual_style import PUBLICATION_PALETTE, humanize_display_text, wrap_plot_title
 from ...workspaces.loader import WorkspaceContext
 from ..axes import (
     apply_axes_style,
@@ -245,11 +254,11 @@ def _render_ordinal_swarm(
     tau_b = _finite_statistic(kendall_tau_b(stat_x, stat_y, min_pairs=3))
     r2 = _finite_statistic(linear_r2(stat_x, stat_y, min_pairs=3))
     if rho is not None:
-        stat_label = f"Ordinal-order rho={rho:.2f}"
+        stat_label = f"Spearman ρ={rho:.2f}"
         if tau_b is not None:
-            stat_label = f"{stat_label}\nKendall tau-b={tau_b:.2f}"
+            stat_label = f"{stat_label}\nKendall τb={tau_b:.2f}"
         if r2 is not None:
-            stat_label = f"{stat_label}\nlinear R^2={r2:.2f}"
+            stat_label = f"{stat_label}\nlinear R²={r2:.2f}"
         ax.text(
             0.03,
             0.97,

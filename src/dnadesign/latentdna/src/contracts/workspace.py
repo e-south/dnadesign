@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/workspace.py
+
 Workspace schema contracts for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -169,9 +176,18 @@ class MetadataAxisConfig(StrictWorkspaceModel):
     display_labels: dict[str, str] = Field(default_factory=dict)
     compact_display_labels: dict[str, str] = Field(default_factory=dict)
     category_colors: dict[str, str] = Field(default_factory=dict)
+    category_alpha: dict[str, float] = Field(default_factory=dict)
     noncanonical_policy: MetadataAxisNoncanonicalPolicyConfig | None = None
     ordinal_subset: list[str] = Field(default_factory=list)
     metric_labels: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("category_alpha")
+    @classmethod
+    def _validate_category_alpha(cls, value: dict[str, float]) -> dict[str, float]:
+        invalid = {key: alpha for key, alpha in value.items() if alpha <= 0.0 or alpha > 1.0}
+        if invalid:
+            raise ValueError("metadata axis category_alpha values must be in the interval (0, 1]")
+        return value
 
 
 class MetadataSection(StrictWorkspaceModel):

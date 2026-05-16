@@ -1,4 +1,13 @@
-"""Feature-term enrichment over persisted plan-margin tail groups."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/plan_margin_feature_enrichment.py
+
+Feature-term enrichment over persisted plan-margin tail groups.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Scalar builder for native regulator plan-margin enrichment."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/builders/regulatory_plan_margin.py
+
+Scalar builder for native regulator plan-margin enrichment.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

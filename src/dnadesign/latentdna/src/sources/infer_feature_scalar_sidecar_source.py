@@ -1,11 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/sources/infer_feature_scalar_sidecar_source.py
+
 LatentDNA source adapter for canonical Infer feature-scalar sidecars.
 
-This adapter exposes `_derived/infer/feature_scalar_aliases.parquet` joined to
-`feature_scalars.parquet`, USR sequence views, mutable view semantics, and the
-owning dataset rows. It mirrors the feature-vector sidecar adapter, but returns
-one scalar `value` column for outputs such as Evo2 log-likelihood totals and
-mean-per-token diagnostics.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -40,7 +40,7 @@ from dnadesign.latentdna.src.notebooks.rendering import (
     resolve_plot_render_asset,
     select_plot_render_path,
 )
-from dnadesign.latentdna.src.visual_style import SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE, wrap_plot_title
+from dnadesign.latentdna.src.presentation.visual_style import SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
 SIGMA35_AXIS_STYLES = {

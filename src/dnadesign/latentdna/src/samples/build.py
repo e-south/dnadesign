@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/samples/build.py
+
 Sample building helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -13,7 +20,7 @@ import pyarrow as pa
 
 from ..contracts.errors import ContractViolationError
 from ..io.parquet_io import read_table, write_table
-from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
+from ..references.sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..workspaces.loader import WorkspaceContext
 
 

@@ -1,4 +1,13 @@
-"""Static summaries for categorical-feature enrichment tables."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/enrichment_summary.py
+
+Static summaries for categorical-feature enrichment tables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -8,7 +17,7 @@ from typing import Any
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import PlotStaticFilterConfig, ResolvedPlotSpec
-from ...visual_style import (
+from ...presentation.visual_style import (
     PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,

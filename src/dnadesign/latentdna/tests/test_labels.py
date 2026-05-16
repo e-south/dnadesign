@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dnadesign.latentdna.src.labels import humanize_candidate, humanize_label, humanize_plot_title
+from dnadesign.latentdna.src.presentation.labels import humanize_candidate, humanize_label, humanize_plot_title
 
 
 def test_humanize_label_preserves_required_public_labels() -> None:

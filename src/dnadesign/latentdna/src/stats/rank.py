@@ -1,4 +1,13 @@
-"""Rank and ordinal association statistics used across LatentDNA."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/stats/rank.py
+
+Rank and ordinal association statistics used across LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

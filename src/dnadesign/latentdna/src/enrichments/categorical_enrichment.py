@@ -1,4 +1,13 @@
-"""Generic categorical-feature enrichment over explicit row groups."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/enrichments/categorical_enrichment.py
+
+Generic categorical-feature enrichment over explicit row groups.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

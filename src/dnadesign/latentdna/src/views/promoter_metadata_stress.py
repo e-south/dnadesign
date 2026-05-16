@@ -1,4 +1,13 @@
-"""Stress-promoter study metadata derivations for LatentDNA rows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/promoter_metadata_stress.py
+
+Stress-promoter study metadata derivations for LatentDNA rows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

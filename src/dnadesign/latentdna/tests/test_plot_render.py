@@ -13,7 +13,7 @@ from matplotlib.collections import PathCollection
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from dnadesign.latentdna.src.contracts.plot_semantics import PlotSemantics
-from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
+from dnadesign.latentdna.src.metadata.axes import axis_style_map_from_payload
 from dnadesign.latentdna.src.plots.annotation_rendering import (
     annotation_continuous_color_encoding as _annotation_continuous_color_encoding,
 )
@@ -64,8 +64,8 @@ from dnadesign.latentdna.src.plots.renderers.scatter import category_key as _cat
 from dnadesign.latentdna.src.plots.renderers.scatter import continuous_color_encoding as _continuous_color_encoding
 from dnadesign.latentdna.src.plots.renderers.xy import render_xy_plot
 from dnadesign.latentdna.src.plots.tables import read_table_rows
+from dnadesign.latentdna.src.presentation.visual_style import compact_candidate_title, wrap_plot_title
 from dnadesign.latentdna.src.services._plot_payloads import plot_input_payload
-from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
 SIGMA35_AXIS_STYLES = axis_style_map_from_payload(
@@ -204,6 +204,49 @@ def test_axis_style_hue_keeps_context_derived_densegen_rows_categorical() -> Non
         )
         == SIGMA35_NONCANONICAL_BUCKET
     )
+
+
+def test_axis_style_category_alpha_deemphasizes_background_category() -> None:
+    styles = axis_style_map_from_payload(
+        {
+            "tf_bin": {
+                "axis_id": "tf_bin",
+                "column": "tf_bin",
+                "category_order": ["neither", "ethanol_TF", "lexA_TF"],
+                "category_colors": {"neither": "#D9DEE7", "ethanol_TF": "#0072B2", "lexA_TF": "#D55E00"},
+                "category_alpha": {"neither": 0.24},
+            }
+        }
+    )
+    rows = [
+        {"x": 0.0, "y": 0.0, "tf_bin": "ethanol_TF"},
+        {"x": 0.1, "y": 0.1, "tf_bin": "neither"},
+        {"x": 0.2, "y": 0.2, "tf_bin": "lexA_TF"},
+    ]
+    color_map, _ = _category_color_map([rows], "tf_bin", axis_styles=styles)
+    fig, ax = plt.subplots(figsize=(4, 4))
+    try:
+        from dnadesign.latentdna.src.plots.renderers.scatter import scatter_points
+
+        scatter_points(
+            ax,
+            rows,
+            resolved_x="x",
+            resolved_y="y",
+            color_column="tf_bin",
+            color_map=color_map,
+            shape_column=None,
+            shape_map={},
+            point_size=32.0,
+            alpha=0.9,
+            axis_styles=styles,
+        )
+
+        assert len(ax.collections) == 3
+        assert ax.collections[0].get_alpha() == pytest.approx(0.24)
+        assert ax.collections[1].get_alpha() == pytest.approx(0.9)
+    finally:
+        plt.close(fig)
 
 
 def test_continuous_color_encoding_honors_explicit_hue_option() -> None:
@@ -599,7 +642,7 @@ def test_metric_panel_disables_grouped_family_bars_when_keys_would_overwrite_row
             square=False,
         )
 
-        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        tick_labels = [label.get_text() for label in ax.get_yticklabels()]
         assert "Fwd\nanchor" in tick_labels
         assert "Fwd\nseq" in tick_labels
         assert all("7B Intermediate" not in label for label in tick_labels)
@@ -1079,9 +1122,9 @@ def testrender_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> Non
             square=False,
         )
 
-        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        tick_labels = [label.get_text() for label in ax.get_yticklabels()]
         assert tick_labels == ["7B", "20B"]
-        assert all(label.get_rotation() == 32.0 for label in ax.get_xticklabels())
+        assert all(label.get_rotation() == 0.0 for label in ax.get_yticklabels())
     finally:
         plt.close(fig)
 
@@ -1164,10 +1207,8 @@ def test_render_distribution_panel_ordinal_swarm_draws_sampled_points_and_rank_a
         line_labels = {line.get_label() for line in ax.lines}
         assert "_ordinal_linear_fit" in line_labels
         assert "_ordinal_class_median_connector" in line_labels
-        assert any(
-            "Ordinal-order rho" in text.get_text() and "Kendall tau-b" in text.get_text() and "R^2" in text.get_text()
-            for text in ax.texts
-        )
+        assert any("Spearman ρ" in text.get_text() and "Kendall τb" in text.get_text() for text in ax.texts)
+        assert not any("Ordinal-order rho" in text.get_text() for text in ax.texts)
     finally:
         plt.close(fig)
 
@@ -1262,14 +1303,14 @@ def test_render_metric_panel_compacts_context_pair_tick_labels() -> None:
             square=True,
         )
 
-        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        tick_labels = [label.get_text() for label in ax.get_yticklabels()]
         assert tick_labels == [
             "Fwd\nanchor",
             "Fwd\nseq",
             "RC\nanchor",
             "RC\nseq",
         ]
-        assert all(label.get_rotation() == 0.0 for label in ax.get_xticklabels())
+        assert all(label.get_rotation() == 0.0 for label in ax.get_yticklabels())
     finally:
         plt.close(fig)
 
@@ -1353,8 +1394,8 @@ def test_render_distribution_panel_ordinal_swarm_preserves_zero_rank_order() -> 
         )
 
         assert [label.get_text() for label in ax.get_xticklabels()] == ["Weak", "Middle", "Strong"]
-        assert any("Ordinal-order rho=1.00" in text.get_text() for text in ax.texts)
-        assert any("Kendall tau-b=1.00" in text.get_text() for text in ax.texts)
+        assert any("Spearman ρ=1.00" in text.get_text() for text in ax.texts)
+        assert any("Kendall τb=1.00" in text.get_text() for text in ax.texts)
     finally:
         plt.close(fig)
 

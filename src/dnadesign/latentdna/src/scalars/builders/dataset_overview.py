@@ -1,4 +1,13 @@
-"""Scalar builder for dataset cohort-overview count tables."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/builders/dataset_overview.py
+
+Scalar builder for dataset cohort-overview count tables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,8 +19,8 @@ import pyarrow as pa
 
 from ...contracts.errors import ContractViolationError
 from ...io.parquet_io import write_table
-from ...labels import humanize_label
 from ...metadata.derivations import derive_metadata_value
+from ...presentation.labels import humanize_label
 from ...sources.resolver import inspect_source_schema, read_records_table, resolve_source
 from ...views.row_contracts import derivation_dependency_columns
 from ...workspaces.loader import WorkspaceContext

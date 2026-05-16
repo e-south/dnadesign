@@ -1,4 +1,13 @@
-"""XY scatter renderers for table-backed static plot artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/xy.py
+
+XY scatter renderers for table-backed static plot artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -11,8 +20,8 @@ import pyarrow.parquet as pq
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...metadata_axes import AxisStyle
-from ...visual_style import (
+from ...metadata.axes import AxisStyle
+from ...presentation.visual_style import (
     SPINE_COLOR,
     compact_candidate_title,
     humanize_display_text,

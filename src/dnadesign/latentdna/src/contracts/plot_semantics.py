@@ -1,4 +1,13 @@
-"""Plot-level semantics contracts for persisted LatentDNA figures."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/plot_semantics.py
+
+Plot-level semantics contracts for persisted LatentDNA figures.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

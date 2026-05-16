@@ -1,4 +1,13 @@
-"""Marimo UI helpers for generated LatentDNA browser notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_ui.py
+
+Marimo UI helpers for generated LatentDNA browser notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -7,7 +16,7 @@ from collections.abc import Iterable
 import marimo as mo
 import pandas as pd
 
-from ..visual_style import (
+from ..presentation.visual_style import (
     GRID_COLOR,
     NOTEBOOK_FONT_STACK,
     PANEL_BACKGROUND_COLOR,

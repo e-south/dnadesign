@@ -1,4 +1,13 @@
-"""Reusable statistical primitives for LatentDNA analyses."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/stats/__init__.py
+
+Reusable statistical primitives for LatentDNA analyses.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

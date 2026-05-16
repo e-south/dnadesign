@@ -1,4 +1,13 @@
-"""Categorical count renderer for static plot artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/categorical.py
+
+Categorical count renderer for static plot artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -9,8 +18,8 @@ import numpy as np
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...metadata_axes import AxisStyle
-from ...visual_style import PUBLICATION_PALETTE, TEXT_COLOR, humanize_display_text, wrap_plot_title
+from ...metadata.axes import AxisStyle
+from ...presentation.visual_style import PUBLICATION_PALETTE, TEXT_COLOR, humanize_display_text, wrap_plot_title
 from ...workspaces.loader import WorkspaceContext
 from ..axes import apply_axes_style
 from ..layout import _grid_figure_size, _panel_grid_dimensions

@@ -1080,6 +1080,28 @@ metadata:
         "16": "#2C7BB6"
         "17": "#FEE090"
         "18": "#D73027"
+    tf_bin:
+      column: tf_bin
+      label: Native TF bin
+      kind: categorical
+      category_order: [neither, ethanol_TF, lexA_TF, mixed]
+      display_labels:
+        neither: Neither
+        ethanol_TF: BaeR/CpxR
+        lexA_TF: LexA
+        mixed: Mixed
+      compact_display_labels:
+        neither: Neither
+        ethanol_TF: BaeR/CpxR
+        lexA_TF: LexA
+        mixed: Mixed
+      category_colors:
+        neither: "#D9DEE7"
+        ethanol_TF: "#0072B2"
+        lexA_TF: "#D55E00"
+        mixed: "#7B3294"
+      category_alpha:
+        neither: 0.24
 metric_definitions:
   sig35_variant_separation_ratio:
     display_name: Sigma-35 separation ratio

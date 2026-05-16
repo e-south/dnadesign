@@ -1,11 +1,20 @@
-"""User-facing label helpers for latentdna notebook and plot surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/presentation/labels.py
+
+User-facing label helpers for latentdna notebook and plot surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 import re
 from collections.abc import Mapping
 
-from .metrics.definitions import resolve_metric_definition
+from ..metrics.definitions import resolve_metric_definition
 
 _REFERENCE_NEIGHBOR_CENSORED_RANK_LABEL = resolve_metric_definition(
     "reference_neighbor_topk_censored_rank_median"

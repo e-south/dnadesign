@@ -1,4 +1,13 @@
-"""Ordinal pre-assay scalar builders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/preassay_ordinal.py
+
+Ordinal pre-assay scalar builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -16,7 +25,7 @@ from ..geometry.cohorts import (
     resample_groups,
 )
 from ..io.json_io import read_json
-from ..metadata_axes import AxisStyle, axis_style_map_from_config
+from ..metadata.axes import AxisStyle, axis_style_map_from_config
 from ..stats.rank import kendall_tau_b, spearman_correlation
 from ..workspaces.loader import WorkspaceContext
 from .common import (

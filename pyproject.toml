@@ -29,6 +29,7 @@ dependencies = [
   "pyyaml",
   "rich",
   "scanpy==1.10.3",
+  "scipy>=1.17.0",
   "seaborn",
   "tqdm",
   "typer",

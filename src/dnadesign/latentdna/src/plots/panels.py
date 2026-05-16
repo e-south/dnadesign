@@ -1,10 +1,19 @@
-"""Shared panel-level plot helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/panels.py
+
+Shared panel-level plot helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..visual_style import SPINE_COLOR, TEXT_COLOR, wrap_plot_title
+from ..presentation.visual_style import SPINE_COLOR, TEXT_COLOR, wrap_plot_title
 from .axes import apply_axes_style
 
 

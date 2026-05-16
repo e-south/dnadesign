@@ -1,4 +1,13 @@
-"""Shared scalar-builder utilities for artifact-first latentdna workflows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/common.py
+
+Shared scalar-builder utilities for artifact-first latentdna workflows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,8 +19,8 @@ import numpy as np
 
 from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..geometry.preprocessing import standardize_and_l2_normalize
-from ..labels import humanize_candidate
 from ..metrics.definitions import resolve_metric_definition
+from ..presentation.labels import humanize_candidate
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
 

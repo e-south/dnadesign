@@ -1,4 +1,13 @@
-"""Shared preprocessing helpers for cosine-based LatentDNA geometry."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/geometry/preprocessing.py
+
+Shared preprocessing helpers for cosine-based LatentDNA geometry.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Shared helpers for LatentDNA promoter metadata derivations."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/promoter_metadata_common.py
+
+Shared helpers for LatentDNA promoter metadata derivations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

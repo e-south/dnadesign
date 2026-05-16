@@ -1,4 +1,13 @@
-"""Static semantic validation for LatentDNA workspace sequence contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/semantic_validation_service.py
+
+Static semantic validation for LatentDNA workspace sequence contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

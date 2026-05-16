@@ -6868,6 +6868,26 @@
       ],
       "warnings": []
     },
+    "native_regulator_plan_margin_enrichment": {
+      "title": "Native regulator plan-margin enrichment",
+      "status": "ok",
+      "freshness": "ok",
+      "acceptance_checks": [],
+      "artifact_paths": [
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/scalars/native_regulator_plan_margin_enrichment",
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/scalars/native_regulator_go_bp_plan_margin_enrichment",
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/native_regulator_plan_margin_enrichment",
+        "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/native_regulator_go_bp_plan_margin_enrichment"
+      ],
+      "docs_refs": [
+        {
+          "docs_ref": "study:stress_ethanol_cipro_growth/deliverables/native_regulator_plan_margin_enrichment",
+          "relative_ref": "deliverables/native_regulator_plan_margin_enrichment",
+          "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/studies/stress_ethanol_cipro_growth/deliverables/native_regulator_plan_margin_enrichment.md"
+        }
+      ],
+      "warnings": []
+    },
     "appendix_geometry_review": {
       "title": "Appendix geometry review",
       "status": "ok",
@@ -6889,8 +6909,8 @@
     },
     "appendix_umap_gallery": {
       "title": "UMAP gallery",
-      "status": "ok",
-      "freshness": "ok",
+      "status": "attention",
+      "freshness": "attention",
       "acceptance_checks": [],
       "artifact_paths": [
         "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/appendix_umap_gallery",
@@ -6938,7 +6958,8 @@
       "spacer_length",
       "source_family",
       "selection_basis",
-      "design_family"
+      "design_family",
+      "tf_bin"
     ],
     "candidate_sets": {
       "first_class_intermediate_7b": {
@@ -7007,5 +7028,5 @@
     "candidate_decision_frontier",
     "candidate_x_selection_scorecard"
   ],
-  "last_updated_at": "2026-05-14T02:16:17.834806+00:00"
+  "last_updated_at": "2026-05-15T21:04:19.706124+00:00"
 }

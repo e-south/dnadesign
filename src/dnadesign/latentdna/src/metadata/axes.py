@@ -1,11 +1,20 @@
-"""Generic metadata axis styling for notebook and plot runtimes."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/metadata/axes.py
+
+Generic metadata axis styling for notebook and plot runtimes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
-from .labels import humanize_label
+from ..presentation.labels import humanize_label
 
 DEFAULT_NONCANONICAL_CATEGORY = "__latentdna_noncanonical__"
 DEFAULT_NONCANONICAL_COLOR = "#9AA5B1"
@@ -21,6 +30,7 @@ class AxisStyle:
     display_labels: dict[str, str] = field(default_factory=dict)
     compact_display_labels: dict[str, str] = field(default_factory=dict)
     category_colors: dict[str, str] = field(default_factory=dict)
+    category_alpha: dict[str, float] = field(default_factory=dict)
     ordinal_subset: list[str] = field(default_factory=list)
     metric_labels: dict[str, str] = field(default_factory=dict)
     noncanonical_bucket: str | None = None
@@ -76,6 +86,7 @@ def _axis_style_from_config(axis_id: str, axis: object) -> AxisStyle:
             str(key): str(value) for key, value in dict(payload.get("compact_display_labels", {}) or {}).items()
         },
         category_colors={str(key): str(value) for key, value in dict(payload.get("category_colors", {}) or {}).items()},
+        category_alpha={str(key): float(value) for key, value in dict(payload.get("category_alpha", {}) or {}).items()},
         ordinal_subset=[str(value) for value in payload.get("ordinal_subset", [])],
         metric_labels={str(key): str(value) for key, value in dict(payload.get("metric_labels", {}) or {}).items()},
         noncanonical_bucket=str(bucket) if bucket is not None else None,
@@ -122,6 +133,7 @@ def axis_styles_payload(styles: Mapping[str, AxisStyle]) -> dict[str, dict[str, 
             "display_labels": dict(style.display_labels),
             "compact_display_labels": dict(style.compact_display_labels),
             "category_colors": dict(style.category_colors),
+            "category_alpha": dict(style.category_alpha),
             "ordinal_subset": list(style.ordinal_subset),
             "metric_labels": dict(style.metric_labels),
             "noncanonical_bucket": style.noncanonical_bucket,
@@ -147,6 +159,7 @@ def _canonical_candidates(style: AxisStyle) -> list[str]:
         *style.display_labels,
         *style.compact_display_labels,
         *style.category_colors,
+        *style.category_alpha,
     ]
     return [str(value) for value in values]
 
@@ -192,6 +205,7 @@ def _canonical_value(style: AxisStyle, value: object) -> str:
         *style.display_labels,
         *style.compact_display_labels,
         *style.category_colors,
+        *style.category_alpha,
     ]:
         if normalize_category_key(candidate) == normalized:
             return str(candidate)
@@ -328,3 +342,15 @@ def axis_color_map(
     if style is not None and style.noncanonical_bucket is not None:
         colors.setdefault(style.noncanonical_bucket, DEFAULT_NONCANONICAL_COLOR)
     return colors
+
+
+def axis_category_alpha(style: AxisStyle | None, category: object, *, default: float) -> float:
+    """Return a configured category alpha, falling back to the caller default."""
+
+    if style is None:
+        return default
+    configured = _label_lookup({key: str(value) for key, value in style.category_alpha.items()}, category)
+    if configured is None:
+        return default
+    alpha = float(configured)
+    return alpha if 0.0 < alpha <= 1.0 else default

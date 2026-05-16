@@ -1,4 +1,13 @@
-"""Shared subplot layout policy for LatentDNA plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/layout.py
+
+Shared subplot layout policy for LatentDNA plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

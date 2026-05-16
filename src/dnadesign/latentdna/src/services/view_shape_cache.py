@@ -1,4 +1,13 @@
-"""Shared view matrix shape reads for status and notebook control surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/view_shape_cache.py
+
+Shared view matrix shape reads for status and notebook control surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

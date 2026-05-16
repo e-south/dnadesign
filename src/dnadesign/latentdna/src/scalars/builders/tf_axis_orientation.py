@@ -1,4 +1,13 @@
-"""TF-axis orientation scalar builders for native promoter overlays."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/builders/tf_axis_orientation.py
+
+TF-axis orientation scalar builders for native promoter overlays.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

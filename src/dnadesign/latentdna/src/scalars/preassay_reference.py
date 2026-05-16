@@ -1,4 +1,13 @@
-"""Reference-set pre-assay scalar builders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/preassay_reference.py
+
+Reference-set pre-assay scalar builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,8 +19,8 @@ import pyarrow as pa
 from ..contracts.errors import ContractViolationError
 from ..geometry.cohorts import centroid_map, group_indices
 from ..geometry.preprocessing import try_l2_normalize_vector
-from ..labels import humanize_label
-from ..reference_sets import resolve_reference_set_rows
+from ..presentation.labels import humanize_label
+from ..references.sets import resolve_reference_set_rows
 from ..workspaces.loader import WorkspaceContext
 from .common import (
     ScalarInputRef,

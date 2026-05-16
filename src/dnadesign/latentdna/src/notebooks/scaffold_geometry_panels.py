@@ -1,4 +1,13 @@
-"""Projection-browser geometry scaffold cells for the LatentDNA notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/scaffold_geometry_panels.py
+
+Projection-browser geometry scaffold cells for the LatentDNA notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

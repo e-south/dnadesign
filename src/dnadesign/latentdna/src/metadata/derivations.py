@@ -1,4 +1,13 @@
-"""Config-driven metadata derivation helpers for latentdna."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/metadata/derivations.py
+
+Config-driven metadata derivation helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/notebook_geometry_controls.py
+
 Geometry control assembly for workspace notebook surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -19,11 +26,11 @@ from ..contracts.notebook import (
 )
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
-from ..labels import humanize_candidate
-from ..metadata_axes import axis_style_map_from_config, axis_styles_payload
-from ..metadata_join_keys import JOINABLE_KEY_COLUMNS, candidate_join_key_pairs_for_columns
-from ..reference_sets import reference_set_required_columns
-from ..visual_style import reference_annotation_label
+from ..metadata.axes import axis_style_map_from_config, axis_styles_payload
+from ..metadata.join_keys import JOINABLE_KEY_COLUMNS, candidate_join_key_pairs_for_columns
+from ..presentation.labels import humanize_candidate
+from ..presentation.visual_style import reference_annotation_label
+from ..references.sets import reference_set_required_columns
 from .candidate_set_service import build_workspace_candidate_sets, candidate_set_view_ids
 from .view_shape_cache import ViewShapeCache
 

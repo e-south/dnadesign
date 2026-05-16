@@ -1,4 +1,13 @@
-"""Projection/UMAP renderers for static plot artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/projection.py
+
+Projection/UMAP renderers for static plot artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -7,8 +16,8 @@ from typing import Any
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...metadata_axes import AxisStyle
-from ...visual_style import PLOT_TITLE_FONT_SIZE, compact_candidate_title, scatter_style, wrap_plot_title
+from ...metadata.axes import AxisStyle
+from ...presentation.visual_style import PLOT_TITLE_FONT_SIZE, compact_candidate_title, scatter_style, wrap_plot_title
 from ...workspaces.loader import WorkspaceContext
 from ..annotation_rendering import (
     add_annotation_colorbar,

@@ -1,4 +1,13 @@
-"""Plot-review layout, axis-label, and hue helper primitives."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_plot_review_axes.py
+
+Plot-review layout, axis-label, and hue helper primitives.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -7,7 +16,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from ..visual_style import humanize_display_text, wrap_plot_title
+from ..presentation.visual_style import humanize_display_text, wrap_plot_title
 from .browser_runtime_support import (
     category_values_for_legend,
     continuous_hue_render_params,

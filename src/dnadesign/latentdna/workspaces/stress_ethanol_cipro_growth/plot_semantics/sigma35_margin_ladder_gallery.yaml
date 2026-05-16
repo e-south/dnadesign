@@ -2,10 +2,23 @@ plot_id: sigma35_margin_ladder_gallery
 title: Ordinal ladder swarm gallery
 question: Do row-level positions along a declared ordinal axis move in the expected weak-to-strong order?
 decision_role: primary
-encoding: Swarm-strip panel gallery for ordinal audits. The notebook dropdown switches between the DenseGen Sigma-35 B-F ladder, W collection core60 standards, and Anderson iGEM core60 standards. Each point is one row in the selected candidate view. When an ordinal class has multiple rows, the black interval marks the within-class interquartile range and the black tick marks the median; singleton classes are shown as points only. A faint black connector links class medians when that remains readable, and a muted dashed line shows the least-squares linear fit for the displayed ordinal-rank trend. The annotation reports row-level Spearman rho, Kendall tau-b, and simple linear R^2 between ordinal class order and high-dimensional endpoint margin.
+encoding: >-
+  Swarm-strip panel gallery for ordinal audits. The notebook dropdown switches
+  between the DenseGen Sigma-35 B-F ladder, W collection core60 standards, and
+  Anderson iGEM core60 standards. Each point is one row in the selected
+  candidate view. When an ordinal class has multiple rows, the black interval
+  marks the within-class interquartile range and the black tick marks the
+  median; singleton classes are shown as points only. A faint black connector
+  links class medians when that remains readable, and a muted dashed line shows
+  the least-squares linear fit for the displayed ordinal-rank trend. The
+  annotation reports row-level Spearman ρ, Kendall τb, and simple linear R²
+  between ordinal class order and high-dimensional endpoint margin. For
+  Sigma-35, these annotations are related to, but not the same as, the scalar
+  ordinal-audit Spearman and Kendall values.
 scope: First-class 7B intermediate candidate views, including anchor-source, full-context, context-anchor, reverse-complement, and block-normalized bidirectional context-anchor summaries.
 guardrails:
   - Treat this as row-level evidence behind the ordinal scorecard, not as a phenotype estimate.
+  - Do not expect the row-level Spearman or Kendall annotations to match the scalar Sigma-35 ordinal audit; the scalar audit compares pairwise class-centroid distance gaps, while this panel compares row order against an endpoint margin.
   - Compare W collection and Anderson iGEM only within their own dropdown selections because their numeric strength scales are not interchangeable.
   - Read UMAPs as orientation aids only; this plot is built from high-dimensional cosine margins.
   - Keep reference-derived non-core60 rows out of the W and Anderson core60 ordinal selections.
@@ -19,7 +32,22 @@ math_md: |
   \cos(z_x,c_{\mathrm{strong}}) -
   \cos(z_x,c_{\mathrm{weak}}).
   $$
-  Positive values mean a row lies closer to the strong-end centroid; negative values mean it lies closer to the weak-end centroid. The annotation computes Spearman rho between row-level ordinal class order and this high-dimensional margin, Kendall tau-b for pairwise ordering agreement with tie correction, and a simple linear $R^2$ for the same two row-level variables. The dashed line is the corresponding least-squares fit, shown only as a visual guide to linear trend. For Sigma-35, class order is the declared B-F ladder; for W and Anderson, order comes from collection-specific numeric strength metadata.
-rationale_md: This keeps the ordinal audit compact while expanding it beyond Sigma-35. The same visual grammar answers whether the designed Sigma-35 variants, W standards, or Anderson standards show a monotonic latent-space trace in a given candidate X representation.
-limitations_md: The plot uses study-internal centroid endpoints, so it demonstrates geometric consistency with declared ordinal metadata. Kendall tau-b is the clearest ordinal-agreement statistic when ties are present; Spearman summarizes broader monotonic alignment. The dashed line and $R^2$ are descriptive visual aids and should not be read as calibrated expression-strength models. It does not calibrate growth phenotype.
+  Positive values mean a row lies closer to the strong-end centroid; negative values mean it lies closer to the weak-end centroid. For Sigma-35, the shared order file is f/e/d/c/b with f strongest and b weakest; the plot displays the same ladder as B=1, C=2, D=3, E=4, F=5, so a positive row-level rank correlation means rows move toward the F endpoint as the class gets stronger. The annotation computes Spearman $\rho$ between row-level ordinal class order and this high-dimensional margin, Kendall $\tau_b$ for pairwise ordering agreement with tie correction, and a simple linear $R^2$ for the same two row-level variables. The dashed line is the corresponding least-squares fit, shown only as a visual guide to linear trend. The scalar Sigma-35 ordinal audit uses the same declared ladder but instead correlates pairwise rank gaps, $|r_g-r_h|$, with centroid distances, $1-\cos(c_g,c_h)$. Therefore the swarm asks whether individual rows slide from B-like to F-like along the endpoint axis, while the scalar audit asks whether all class-centroid gaps respect ordinal spacing. For W and Anderson, order comes from collection-specific numeric strength metadata.
+rationale_md: >-
+  This keeps the ordinal audit compact while expanding it beyond Sigma-35. The
+  same visual grammar answers whether the designed Sigma-35 variants, W
+  standards, or Anderson standards show a monotonic latent-space trace in a
+  given candidate X representation. The swarm can look stronger than the scalar
+  audit because it tests a directional endpoint projection over rows, whereas
+  the scalar audit tests all pairwise centroid gaps.
+limitations_md: >-
+  The plot uses study-internal centroid endpoints, so it demonstrates geometric
+  consistency with declared ordinal metadata. Kendall tau-b is the clearest
+  ordinal-agreement statistic when ties are present; Spearman summarizes
+  broader monotonic alignment. The dashed line and $R^2$ are descriptive visual
+  aids and should not be read as calibrated expression-strength models. For
+  Sigma-35, compare the annotations to the scalar ordinal audit as complementary
+  evidence, not as matching statistics: both use the same order file, but the
+  swarm measures row-level endpoint margins and the scalar audit measures
+  centroid-distance gaps. It does not calibrate growth phenotype.
 failure_modes_md: If selector filters drift, native-length standards can be mixed into the core60 audit. If candidate views are compared without preserving the same ordinal class order, the visual comparison becomes misleading.

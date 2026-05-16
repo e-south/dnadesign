@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.latentdna.src.reference_sets import resolve_reference_set_ids_from_columns, resolve_reference_set_rows
+from dnadesign.latentdna.src.references.sets import resolve_reference_set_ids_from_columns, resolve_reference_set_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 

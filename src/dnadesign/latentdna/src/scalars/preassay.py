@@ -1,4 +1,13 @@
-"""Pre-assay scalar builder registry."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/preassay.py
+
+Pre-assay scalar builder registry.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

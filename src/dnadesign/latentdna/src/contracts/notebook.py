@@ -1,4 +1,13 @@
-"""Notebook scaffold and control-plane contracts for latentdna."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/notebook.py
+
+Notebook scaffold and control-plane contracts for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -130,6 +139,7 @@ class WorkspaceNotebookAxisStyle(StrictNotebookModel):
     display_labels: dict[str, str] = Field(default_factory=dict)
     compact_display_labels: dict[str, str] = Field(default_factory=dict)
     category_colors: dict[str, str] = Field(default_factory=dict)
+    category_alpha: dict[str, float] = Field(default_factory=dict)
     ordinal_subset: list[str] = Field(default_factory=list)
     metric_labels: dict[str, str] = Field(default_factory=dict)
     noncanonical_bucket: str | None = None

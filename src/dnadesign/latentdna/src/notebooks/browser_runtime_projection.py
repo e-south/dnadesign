@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_projection.py
+
 Projection rendering helpers for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -12,8 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..metadata_axes import axis_display_text, axis_style_map_from_payload
-from ..visual_style import (
+from ..metadata.axes import axis_display_text, axis_style_map_from_payload
+from ..presentation.visual_style import (
     PLOT_TITLE_FONT_SIZE,
     PUBLICATION_PALETTE,
     TEXT_COLOR,
@@ -21,7 +28,7 @@ from ..visual_style import (
     legend_layout,
     wrap_plot_title,
 )
-from ..visual_style import (
+from ..presentation.visual_style import (
     scatter_style as shared_scatter_style,
 )
 from .browser_runtime_support import (

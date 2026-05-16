@@ -1,4 +1,13 @@
-"""Plot-review scaffold cells for the LatentDNA browser notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/scaffold_plot_review.py
+
+Plot-review scaffold cells for the LatentDNA browser notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Selection and ordinal-detail pre-assay scalar builders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/preassay_selection.py
+
+Selection and ordinal-detail pre-assay scalar builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -11,8 +20,8 @@ import pyarrow as pa
 from ..contracts.errors import ContractViolationError
 from ..geometry.cohorts import centroid_map, group_indices, ordinal_gap_and_distance_vectors
 from ..geometry.preprocessing import try_l2_normalize_vector
-from ..labels import humanize_label
-from ..metadata_axes import axis_display_text
+from ..metadata.axes import axis_display_text
+from ..presentation.labels import humanize_label
 from ..stats.rank import spearman_correlation
 from ..workspaces.loader import WorkspaceContext
 from .common import (

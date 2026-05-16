@@ -10,7 +10,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
-from dnadesign.latentdna.src.metadata_axes import (
+from dnadesign.latentdna.src.metadata.axes import (
     axis_display_text,
     axis_style_map_from_config,
     legend_categories,

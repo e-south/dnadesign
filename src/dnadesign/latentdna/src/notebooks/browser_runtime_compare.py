@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_compare.py
+
 Comparison math and visualization helpers for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -10,8 +17,8 @@ import marimo as mo
 import numpy as np
 import pandas as pd
 
-from ..labels import humanize_column_name
-from ..visual_style import (
+from ..presentation.labels import humanize_column_name
+from ..presentation.visual_style import (
     PANEL_BACKGROUND_COLOR,
     PUBLICATION_PALETTE,
     SPINE_COLOR,

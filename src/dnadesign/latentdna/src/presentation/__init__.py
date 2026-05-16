@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/latentdna/src/neighbors/__init__.py
+src/dnadesign/latentdna/src/presentation/__init__.py
 
-Neighbor fitting helpers for latentdna.
+Package initializer for LatentDNA presentation modules.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

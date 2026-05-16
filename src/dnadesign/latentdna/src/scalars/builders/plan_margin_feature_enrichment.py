@@ -1,4 +1,13 @@
-"""Scalar builder for plan-margin feature-term enrichment."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/builders/plan_margin_feature_enrichment.py
+
+Scalar builder for plan-margin feature-term enrichment.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Shared promoter metadata contracts for LatentDNA workspaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/promoter_metadata.py
+
+Shared promoter metadata contracts for LatentDNA workspaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

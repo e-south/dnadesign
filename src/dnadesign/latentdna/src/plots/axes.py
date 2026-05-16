@@ -1,11 +1,20 @@
-"""Shared axis styling and label contracts for static plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/axes.py
+
+Shared axis styling and label contracts for static plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..metadata_axes import AxisStyle, axis_display_text
-from ..visual_style import (
+from ..metadata.axes import AxisStyle, axis_display_text
+from ..presentation.visual_style import (
     GRID_COLOR,
     PANEL_BACKGROUND_COLOR,
     PLOT_FONT_FAMILY,

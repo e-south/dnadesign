@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/row_contracts.py
+
 Shared row-column contracts for source-backed latentdna views.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -8,7 +15,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from ..contracts.errors import ContractViolationError
-from ..reference_sets import reference_set_required_columns
+from ..references.sets import reference_set_required_columns
 from ..workspaces.loader import WorkspaceContext
 
 

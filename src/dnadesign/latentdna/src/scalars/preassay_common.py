@@ -1,4 +1,13 @@
-"""Pre-assay scalar builders for representation triage."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/preassay_common.py
+
+Pre-assay scalar builders for representation triage.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -11,7 +20,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import ContractViolationError
-from ..labels import humanize_label
+from ..presentation.labels import humanize_label
 from ..workspaces.loader import WorkspaceContext
 from .common import (
     ScalarInputRef,
