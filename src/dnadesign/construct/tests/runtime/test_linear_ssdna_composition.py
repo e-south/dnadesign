@@ -611,7 +611,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     review_png_path = result.artifact_bundle / review_manifest.artifacts.review_png
     assert review_manifest.contract_kind == "composition_review_svg_v1"
     assert (
-        review_manifest.sources.structure_svg == "visual/viennarna_secondary_structure/secondary_structure.native.svg"
+        review_manifest.sources.structure_svg
+        == "visual/viennarna_secondary_structure/secondary_structure.annotated.svg"
     )
     assert review_manifest.layout.row_count == 2
     assert review_manifest.layout.panel_order == ["secondary_structure", "component_span"]
@@ -636,7 +637,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert review_png_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     review_svg = review_svg_path.read_text(encoding="utf-8")
     assert 'data-dnadesign-panel="secondary_structure"' in review_svg
-    assert 'data-dnadesign-source-svg="secondary_structure.native.svg"' in review_svg
+    assert 'data-dnadesign-source-svg="secondary_structure.annotated.svg"' in review_svg
+    assert 'data-dnadesign-source-orientation="cap_right"' in review_svg
     assert 'data-dnadesign-panel="component_span"' in review_svg
     assert 'data-dnadesign-panel-row="1"' in review_svg
     assert 'data-dnadesign-panel-row="2"' in review_svg

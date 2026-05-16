@@ -26,7 +26,7 @@ from .errors import ValidationError
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 
-STRUCTURE_SVG_PATH = Path("visual/viennarna_secondary_structure/secondary_structure.native.svg")
+STRUCTURE_SVG_PATH = Path("visual/viennarna_secondary_structure/secondary_structure.annotated.svg")
 COMPONENT_SPAN_SVG_PATH = Path("visual/renders/component_span_qa_svg/component_span_qa.svg")
 COMPOSITION_REVIEW_DIR = Path("visual/reviews")
 COMPOSITION_REVIEW_SVG_PATH = COMPOSITION_REVIEW_DIR / "composition_overview.svg"
@@ -206,7 +206,7 @@ def _compose_review_svg(
             "data-dnadesign-component-effective-nucleotide-font-size-px": f"{component_effective_font_size:.3f}",
             "data-dnadesign-component-panel-emphasis": _COMPONENT_PANEL_EMPHASIS,
             "data-dnadesign-structure-fit-policy": _STRUCTURE_FIT_POLICY,
-            "data-dnadesign-structure-source-policy": "native_geometry_with_review_caption",
+            "data-dnadesign-structure-source-policy": "oriented_annotated_geometry_with_review_caption",
         },
     )
     title = ET.SubElement(root, f"{{{SVG_NS}}}title")
@@ -364,6 +364,13 @@ def _append_panel(
             "overflow": "visible",
         },
     )
+    if panel == "secondary_structure":
+        orientation = str(asset.root.attrib.get("data-dnadesign-orientation", "")).strip()
+        orientation_angle = str(asset.root.attrib.get("data-dnadesign-orientation-angle-deg", "")).strip()
+        if orientation:
+            nested.set("data-dnadesign-source-orientation", orientation)
+        if orientation_angle:
+            nested.set("data-dnadesign-source-orientation-angle-deg", orientation_angle)
     omitted_count = 0
     if panel == "component_span":
         nested.set("data-dnadesign-component-panel-emphasis", _COMPONENT_PANEL_EMPHASIS)

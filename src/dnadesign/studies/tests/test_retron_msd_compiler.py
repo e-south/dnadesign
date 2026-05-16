@@ -888,8 +888,11 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     annotated_structure_svg = (
         construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg"
     ).read_text(encoding="utf-8")
+    composition_overview_svg = composition_overview_svg_path.read_text(encoding="utf-8")
     assert "mismatch profile MXMM" in annotated_structure_svg
-    assert "mismatch profile MXMM" in composition_overview_svg_path.read_text(encoding="utf-8")
+    assert "mismatch profile MXMM" in composition_overview_svg
+    assert 'data-dnadesign-source-svg="secondary_structure.annotated.svg"' in composition_overview_svg
+    assert 'data-dnadesign-source-orientation="cap_right"' in composition_overview_svg
     fills_by_semantic = {
         item["semantic"]: item["fill"]
         for item in visual_contract["meta"]["span_backdrops"]
