@@ -1038,6 +1038,7 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
 
 def test_retron_msd_materialize_rejects_repeat_count_flag(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
+    help_result = _RUNNER.invoke(app, ["materialize", "--help"])
 
     result = _RUNNER.invoke(
         app,
@@ -1054,8 +1055,10 @@ def test_retron_msd_materialize_rejects_repeat_count_flag(tmp_path: Path) -> Non
         ],
     )
 
-    assert result.exit_code != 0
-    assert "repeat-count" in result.output
+    assert help_result.exit_code == 0
+    assert "--repeat-count" not in help_result.output
+    assert result.exit_code == 2
+    assert "Usage:" in result.output
 
 
 def test_retron_msd_materialize_refuses_flat_legacy_sequence_layout(tmp_path: Path) -> None:
