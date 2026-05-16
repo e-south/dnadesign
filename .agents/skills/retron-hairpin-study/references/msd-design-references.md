@@ -97,8 +97,8 @@ The same `compile` and `materialize` commands accept `--spec` instead of
 
 When the user asked for deliverables or Finder output, prefer `materialize`
 directly. A successful materialize response includes `finder_open` and writes
-`manifest/sequence_index.tsv`; use that index to reveal per-design GenBank files
-or verify plot paths.
+`manifest/indexes/sequence_index.tsv`; use that index to reveal per-design
+GenBank files or verify plot paths.
 
 ## Fail-Fast Semantics
 
@@ -132,14 +132,22 @@ use a fresh output directory instead of mixing new output into the legacy `asset
 layout or stale `references/` files from a different catalog.
 
 The `materialize` route uses a headful bundle layout that keeps the top level
-limited to `README.md`, `manifest/`, and `variants/`. Machine-readable
-catalogs, indexes, generated composition configs, and provenance live under
-`manifest/`. Each `variants/<msd_design_id>/` directory is grouped into
+limited to `README.md`, `manifest/`, and `variants/`. Machine-readable root
+metadata is grouped by ontology: bundle manifests under `manifest/bundle/`,
+catalogs and frozen references under `manifest/catalog/`, indexes under
+`manifest/indexes/`, and generated composition configs under
+`manifest/configs/composition/`. Each `variants/<msd_design_id>/` directory is grouped into
 `sequences/` for forward and reverse-complement GenBank/FASTA plus feature CSV,
-`plots/` for `secondary_structure.native.png` and `composition_overview.svg`,
-`manifest/` for curated per-variant metadata, and `runtime/construct/` for the
-producer bundle. `manifest/sequence_index.tsv` carries the `open -R` Finder
-reveal command for each forward GenBank file.
+`plots/` for `secondary_structure.native.png`, `composition_overview.svg`, and
+`composition_overview.png`,
+`manifest/` for curated per-variant metadata grouped into `composition/`,
+`construct/`, `folding/`, `provenance/`, `reviews/`, and `visual/`, and
+`runtime/construct/` for the producer bundle. `runtime/construct/manifest/`
+mirrors the same semantic grouping for producer metadata. Variant directory
+names preserve scar-nick ontology in the suffix, for example
+`msd-tetr-C172-LCGGT-RACAG-MXMM`, with cap, left base, right base, and mismatch
+profile uppercase. `manifest/indexes/sequence_index.tsv` carries the `open -R`
+Finder reveal command for each forward GenBank file.
 
 For a materialize request, verify the bundle by checking the expected variant
 count and at least these per-design artifacts:
@@ -148,11 +156,13 @@ count and at least these per-design artifacts:
 - `sequences/reverse_complement.gb`
 - `plots/secondary_structure.native.png`
 - `plots/composition_overview.svg`
+- `plots/composition_overview.png`
 
 `secondary_structure.native.png` must be rasterized from the ViennaRNA native
 secondary-structure SVG after folding status `ok`. `composition_overview.svg`
 must be the two-row review with secondary structure first and the BaseRender
-component span second. Legacy `component_span.png`,
+component span second; `composition_overview.png` must be its high-resolution
+raster sibling for review workflows. Legacy `component_span.png`,
 `secondary_structure.png`, `secondary_structure.svg`, and
 `component_span_and_folding.png` files are stale/wrong curated deliverables.
 

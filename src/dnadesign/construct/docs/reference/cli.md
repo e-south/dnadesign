@@ -75,8 +75,8 @@ emit a local artifact bundle rather than a USR-backed template/context run.
   assembled sequence exports, manifest metadata, visual contracts, and optional
   Folding/BaseRender handoff artifacts.
 - `compose review` reads an existing bundle and publishes the two-panel
-  composition review when the required structure and component-span artifacts
-  are present.
+  composition review SVG plus high-resolution PNG sibling when the required
+  structure and component-span artifacts are present.
 
 Failure posture:
 

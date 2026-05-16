@@ -1,54 +1,12 @@
 ![contracts banner](assets/contracts-banner.svg)
 
-`contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
+Contracts publishes versioned artifact schemas used when two tools need a
+neutral handoff without importing each other's internals.
 
-Use it when producers and consumers need a neutral, versioned contract surface
-without importing each other's tool internals. Keep contracts generic unless a
-domain-qualified handoff must be consumed by a sibling project.
+## Documentation
 
-See the [repository docs index](../../../docs/README.md) for workflow routes and system runbooks.
-
-## Current exports
-
-Generic composition and folding:
-
-- `LinearSsdnaCompositionV1`: ordered segment, annotation, repeat, and
-  provenance contract for linear ssDNA products
-- `SecondaryStructurePredictionRequestV1`: backend-neutral folding request
-  contract with explicit DNA/RNA backend policy
-- `SecondaryStructurePredictionV1`: backend-neutral folding result contract for
-  canonical component-unit secondary-structure predictions
-
-Visual contracts:
-
-- `LinearDuplexViewV1`: shared duplex QA contract for cassette visuals
-- `HairpinTopologyViewV1`: shared ssDNA hairpin topology contract
-- `CassetteViewsManifestV1`: discovery manifest that groups emitted view files and recommended jobs
-- `SequenceEvidenceMapV1`: shared nucleotide-evidence contract for YIU and sibling renderers
-- `ViennaRNAStructureSvgV1`: manifest for ViennaRNA-native structure SVG artifacts and dnadesign annotation metadata
-- `CompositionReviewSvgV1`: manifest for two-row composition review SVGs that combine structure and component-span QA views
-- `YiuLinearStateV1`: shared linear/state contract for YIU visual publication
-- `YiuHairpinTopologyV1`: shared hairpin topology contract for YIU ligation states
-- `YiuTopologyCartoonV1`: shared topology/cartoon contract for YIU circular or branched states
-
-Domain-qualified handoff contracts:
-
-- `MsdDesignReferenceV1` / `MsdDesignCatalogV1`: Retron MSD-specific
-  design-reference handoff contracts for study/Reader integration. These live
-  here because Reader is expected to consume frozen references without parsing
-  Construct, Folding, BaseRender, or Cruncher internals.
-
-Domain-qualified contracts are allowed here only when a non-owner consumer
-needs a frozen record and the alternative would be parsing a tool or study
-internal surface. For the MSD contracts, the current consumer is Reader-facing
-Retron study integration; the owner boundary remains the Retron study record,
-not Construct, Folding, BaseRender, or Cruncher. The v1 promise is additive
-compatibility only; breaking changes require a new version or migration. Move a
-domain-qualified contract out of shared contracts if it loses its sibling
-consumer, becomes study-only, or starts accumulating behavior instead of record
-shape.
-
-## Tests
-
-- `src/dnadesign/contracts/tests/test_visual_contracts.py`
-- `src/dnadesign/contracts/tests/test_sequence_contracts.py`
+- [Contracts docs index](docs/README.md): schema families, export catalog, and
+  boundary rules.
+- [Contract exports](docs/reference/exports.md): public model names and
+  domain-qualified handoff policy.
+- [Repository docs index](../../../docs/README.md): cross-tool workflow routing.

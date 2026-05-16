@@ -195,7 +195,7 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
         and _annotation_exactly_duplicates_segment(span, segment_spans)
     ]
     stem_base_indices = _stem_base_indices(annotation_spans, view)
-    return {
+    meta: dict[str, object] = {
         "source_contract": "linear_ssdna_composition_v1",
         "sequence_sha256": _sha256_text(sequence),
         "source_sequence_sha256": composed.sequence_sha256,
@@ -257,6 +257,10 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
             for span in duplicate_annotations
         ],
     }
+    scar_nick = _display_profile_scar_nick_meta(display_profile)
+    if scar_nick:
+        meta["scar_nick"] = scar_nick
+    return meta
 
 
 def _stem_base_indices(annotation_spans: list[Any], view: dict[str, Any]) -> list[int]:
@@ -333,12 +337,24 @@ def _style_payload(configured_style: Any | None) -> dict[str, object]:
 
 
 def _display_profile_meta(display_profile: Any, *, title: str) -> dict[str, object]:
-    return {
+    meta: dict[str, object] = {
         "title": title,
         "component_labels": dict(display_profile.component_labels),
         "annotation_labels": dict(display_profile.annotation_labels),
         "component_hues": dict(display_profile.component_hues),
     }
+    scar_nick = _display_profile_scar_nick_meta(display_profile)
+    if scar_nick:
+        meta["scar_nick"] = scar_nick
+    return meta
+
+
+def _display_profile_scar_nick_meta(display_profile: Any) -> dict[str, object]:
+    scar_nick = getattr(display_profile, "scar_nick", None)
+    if scar_nick is None:
+        return {}
+    payload = scar_nick.model_dump(exclude_none=True) if hasattr(scar_nick, "model_dump") else dict(scar_nick)
+    return {key: value for key, value in payload.items() if str(value).strip()}
 
 
 def _pretty_display_label(raw: str) -> str:

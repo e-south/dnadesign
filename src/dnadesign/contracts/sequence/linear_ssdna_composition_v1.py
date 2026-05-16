@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -327,12 +328,32 @@ class LinearSsdnaVisualStyleConfigV1(SequenceContractModel):
         return _not_blank(value, label="visual.display_profile style field")
 
 
+class LinearSsdnaScarNickDisplayMetadataV1(SequenceContractModel):
+    left_base: str
+    right_base: str
+    profile_s3s2s1s0: str
+
+    @field_validator("left_base", "right_base")
+    @classmethod
+    def _base_not_blank(cls, value: str) -> str:
+        return _not_blank(value, label="visual.display_profile.scar_nick base").upper()
+
+    @field_validator("profile_s3s2s1s0")
+    @classmethod
+    def _profile_is_valid(cls, value: str) -> str:
+        profile = _not_blank(value, label="visual.display_profile.scar_nick.profile_s3s2s1s0").upper()
+        if not re.fullmatch(r"[MWX]{4}", profile):
+            raise ValueError("visual.display_profile.scar_nick.profile_s3s2s1s0 must contain four M/W/X symbols.")
+        return profile
+
+
 class LinearSsdnaVisualDisplayProfileV1(SequenceContractModel):
     title: str | None = None
     component_labels: dict[str, str] = Field(default_factory=dict)
     annotation_labels: dict[str, str] = Field(default_factory=dict)
     component_hues: dict[str, str] = Field(default_factory=dict)
     component_styles: dict[str, LinearSsdnaVisualStyleConfigV1] = Field(default_factory=dict)
+    scar_nick: LinearSsdnaScarNickDisplayMetadataV1 | None = None
     base_highlight_color: str | None = None
 
     @field_validator("title", "base_highlight_color")
@@ -452,5 +473,6 @@ __all__ = [
     "LinearSsdnaAnnotationV1",
     "LinearSsdnaAssertionV1",
     "LinearSsdnaVisualDisplayProfileV1",
+    "LinearSsdnaScarNickDisplayMetadataV1",
     "LinearSsdnaVisualStyleConfigV1",
 ]

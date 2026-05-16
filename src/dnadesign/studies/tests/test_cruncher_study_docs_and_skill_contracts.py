@@ -184,6 +184,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "manifest/sequence_index.tsv" in routes
     assert "secondary_structure.native.png" in routes
     assert "composition_overview.svg" in routes
+    assert "composition_overview.png" in routes
     assert "Visible GenBank/CSV labels should be display labels" in routes
     assert "repeat-count flag" in routes
     assert "Open `pipeline.yaml` only when the task needs machine-readable command-group" in routes
@@ -253,9 +254,10 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "sequence_manifest.json" in pipeline
     assert "secondary_structure.native.png" in pipeline
     assert "composition_overview.svg" in pipeline
+    assert "composition_overview.png" in pipeline
     assert "shallow output-bundle layout" in study_surfaces
     assert "single-unit sequence artifact generation" in study_surfaces
-    assert "materialize` GenBank/native-structure-PNG route" in study_surfaces
+    assert "materialize` GenBank/native-structure-PNG/review-PNG" in study_surfaces
     assert "full component spans" in skill
     assert "same-span annotations" in skill
     assert "scar-nick route in `routes.md`" in route_matrix

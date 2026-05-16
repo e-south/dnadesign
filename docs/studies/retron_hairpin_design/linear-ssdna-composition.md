@@ -154,10 +154,11 @@ Required outputs:
   section is present. Section labels and subtitle lines use one pinned
   annotation font size. Visible summary wording should stay concise and
   publication-facing, not machine-key-heavy.
-- generated two-row composition review SVG under `visual/reviews/` that stacks
-  the ViennaRNA annotated structure above the BaseRender component-span SVG and
-  balances visual weight by keeping the folded plot readable while scaling and
-  emboldening the component-span row enough that neither subplot visually
+- generated two-row composition review SVG and high-resolution PNG sibling
+  under `visual/reviews/` that stack the ViennaRNA annotated structure above
+  the BaseRender component-span SVG and balance visual weight by keeping the
+  folded plot readable while scaling and emboldening the component-span row
+  enough that neither subplot visually
   dominates. The review omits the standalone BaseRender component-span title
   because the top title/subtitle already identifies the composition. BaseRender
   remains the linear component-span renderer and should not duplicate
@@ -173,7 +174,7 @@ Current checked-in Construct surface:
   `uv run construct compose run --config src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
 - BaseRender component-span QA:
   `uv run baserender job run src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/baserender_jobs/component_span_qa_svg.yaml`
-- composition review SVG:
+- composition review SVG and high-resolution PNG:
   `uv run construct compose review --bundle src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
 - Folding preflight:
   `uv run folding preflight --bundle src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
@@ -201,8 +202,9 @@ Current checked-in Construct surface:
   `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json`
 - generated ViennaRNA-native annotated SVG:
   `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/viennarna_secondary_structure/secondary_structure.annotated.svg`
-- generated two-row composition review SVG:
+- generated two-row composition review SVG and high-resolution PNG:
   `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/reviews/composition_overview.svg`
+  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/reviews/composition_overview.png`
 
 Do not commit generated `outputs/` artifacts unless explicitly requested.
 
@@ -246,10 +248,13 @@ that agents need before opening the full spec:
 - Retron MSD ID lists should use the study CLI `materialize` route for
   single-unit GenBank/structure-review output after concrete payload and cap sequences are
   supplied through `--spec` or explicit overrides. It keeps top-level output limited to `README.md`, `manifest/`, and
-  `variants/`; writes sequence indexes, catalogs, provenance, and generated
-  single-unit composition configs under `manifest/`; and groups each
-  `variants/<design-id>/` bundle into `sequences/`, `plots/`, `manifest/`, and
-  `runtime/construct/`. If payload or cap sequences are missing, the route must
+  `variants/`; writes bundle manifests under `manifest/bundle/`, catalogs and
+  frozen references under `manifest/catalog/`, indexes under
+  `manifest/indexes/`, and generated single-unit composition configs under
+  `manifest/configs/composition/`; and groups each `variants/<design-id>/`
+  bundle into `sequences/`, `plots/`, semantic `manifest/` groups, and
+  `runtime/construct/`. Variant IDs preserve cap/base/profile ontology with
+  uppercase suffixes such as `C172-LCGGT-RACAG-MXMM`. If payload or cap sequences are missing, the route must
   fail before generating placeholder GenBank or plot files. The CLI does not
   expose `--repeat-count`.
 - BaseRender consumes only the generated canonical visual contract through
@@ -328,9 +333,10 @@ When returning to this work:
   subcomponent and routes back to Snapback or scar-nick. Materialized output
   uses top-level `README.md`, `manifest/`, and `variants/`; each variant groups
   forward/reverse-complement GenBank and FASTA under `sequences/`,
-  `secondary_structure.native.png` plus `composition_overview.svg` under
-  `plots/`, curated metadata under `manifest/`, and raw Construct output under
-  `runtime/construct/`.
+  `secondary_structure.native.png` plus `composition_overview.svg` and
+  `composition_overview.png` under
+  `plots/`, curated metadata under semantic `manifest/` groups, and raw Construct output under
+  `runtime/construct/` with a semantic `runtime/construct/manifest/` mirror.
 
 ### Links
 

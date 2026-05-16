@@ -45,11 +45,16 @@ Out of scope:
   must be explicit and multi-option selections must not expand silently.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
   payload primary, cap geometry, payload complement, right base + 3' flank.
+- Materialized `msd_design_id` / variant directory names must preserve the
+  cap/base/profile ontology in filenames: use `C172-LCGGT-RACAG-MXMM` style
+  suffixes, never lowercase `c172-lcggt-racag-mxmm` for those sections.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
 - Materialized plot deliverables require ViennaRNA status `ok`; publish
-  `secondary_structure.native.png` and two-row `composition_overview.svg`
-  (secondary structure first, BaseRender component span second), not composites.
+  `secondary_structure.native.png`, two-row `composition_overview.svg`, and
+  high-resolution `composition_overview.png`, not legacy composites.
+- Secondary-structure subtitles must include the scar-nick mismatch profile
+  from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
 - GenBank/CSV output uses display labels for visible feature names, keeps raw
   ids in machine qualifiers, and does not duplicate full component spans as
@@ -97,9 +102,10 @@ Out of scope:
 - For GenBank/structure-review output, run the same module's `materialize` command with
   `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
 - If the user asked to open outputs in Finder, do not stop after `compile`;
-  after `materialize`, open the root and verify `manifest/sequence_index.tsv`,
+  after `materialize`, open the root and verify `manifest/indexes/sequence_index.tsv`,
   per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`,
-  and `plots/composition_overview.svg`.
+  `composition_overview.svg`, `composition_overview.png`, and a
+  secondary-structure subtitle containing the mismatch profile.
 - If sequence subcomponents are missing, report the exact missing
   `--payload-sequence` / `--cap-sequence` IDs or the primitive route needed;
   do not present catalog JSONs as the requested deliverables.
@@ -139,7 +145,7 @@ Out of scope:
 - Exact command or next file to open.
 - Output directory/contract posture.
 - Deliverable verification for materialize requests: record count, bundle root,
-  GenBank/native-structure-PNG/review-SVG counts, or exact blockers.
+  GenBank/native-structure-PNG/review-SVG/review-PNG counts, or exact blockers.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.

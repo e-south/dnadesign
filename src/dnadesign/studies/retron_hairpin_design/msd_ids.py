@@ -43,10 +43,10 @@ class ParsedMsdConstructLabel:
             [
                 "msd",
                 _slug_token(self.payload_id),
-                _slug_token(self.cap_id),
-                f"l{self.left_base.lower()}",
-                f"r{self.right_base.lower()}",
-                self.profile_s3s2s1s0.lower(),
+                _slug_token_preserve_case(self.cap_id),
+                f"L{self.left_base}",
+                f"R{self.right_base}",
+                self.profile_s3s2s1s0,
             ]
         )
 
@@ -64,6 +64,12 @@ class MsdDesignPartInput:
 def _slug_token(value: str) -> str:
     text = str(value).strip().lower()
     text = re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-")
+
+
+def _slug_token_preserve_case(value: str) -> str:
+    text = str(value).strip()
+    text = re.sub(r"[^A-Za-z0-9]+", "-", text)
     return text.strip("-")
 
 

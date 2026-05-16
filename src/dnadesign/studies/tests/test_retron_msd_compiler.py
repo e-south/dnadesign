@@ -143,7 +143,7 @@ def test_parse_msd_construct_label_infers_profile_when_missing() -> None:
     assert parsed.left_base == "CGGT"
     assert parsed.right_base == "ACAG"
     assert parsed.profile_s3s2s1s0 == "MXMM"
-    assert parsed.msd_design_id == "msd-tetr-c172-lcggt-racag-mxmm"
+    assert parsed.msd_design_id == "msd-tetr-C172-LCGGT-RACAG-MXMM"
 
 
 def test_parse_msd_design_parts_uses_same_static_lint_without_manual_label_syntax() -> None:
@@ -190,7 +190,7 @@ def test_retron_msd_lint_cli_reports_reference_json(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
-    assert payload["reference"]["msd_design_id"] == "msd-tetr-c172-lcggt-racag-mxmm"
+    assert payload["reference"]["msd_design_id"] == "msd-tetr-C172-LCGGT-RACAG-MXMM"
     assert payload["reference"]["scar_nick"]["route_status"] == "note_only"
     assert payload["next_step"].startswith("Input is complete")
 
@@ -537,7 +537,7 @@ def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     catalog_path = Path(payload["catalog_path"])
-    reference_path = out_dir / "references" / "msd-tetr-c172-lcggt-racag-mxmm.msd_design_reference_v1.json"
+    reference_path = out_dir / "references" / "msd-tetr-C172-LCGGT-RACAG-MXMM.msd_design_reference_v1.json"
     assert catalog_path == out_dir / "msd_design_catalog_v1.json"
     assert Path(payload["output_dir"]) == out_dir
     assert Path(payload["references_dir"]) == out_dir / "references"
@@ -555,7 +555,7 @@ def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
     assert index_rows == [
         {
             "construct_id": "pES-retron-177",
-            "msd_design_id": "msd-tetr-c172-lcggt-racag-mxmm",
+            "msd_design_id": "msd-tetr-C172-LCGGT-RACAG-MXMM",
             "payload_id": "TetR",
             "cap_id": "C172",
             "left_base": "CGGT",
@@ -564,7 +564,7 @@ def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
             "route_status": "note_only",
             "nick_orientation": "",
             "nickase": "",
-            "reference_path": "references/msd-tetr-c172-lcggt-racag-mxmm.msd_design_reference_v1.json",
+            "reference_path": "references/msd-tetr-C172-LCGGT-RACAG-MXMM.msd_design_reference_v1.json",
         }
     ]
     manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -796,36 +796,60 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert payload["status"] == "ok"
     assert payload["record_count"] == 1
     assert sorted(item.name for item in out_dir.iterdir()) == ["README.md", "manifest", "variants"]
-    assert Path(payload["sequence_manifest_path"]) == out_dir / "manifest" / "sequence_manifest.json"
-    assert Path(payload["sequence_index_path"]) == out_dir / "manifest" / "sequence_index.tsv"
+    assert sorted(item.name for item in (out_dir / "manifest").iterdir()) == ["bundle", "catalog", "configs", "indexes"]
+    assert Path(payload["sequence_manifest_path"]) == out_dir / "manifest" / "bundle" / "sequence_manifest.json"
+    assert Path(payload["sequence_index_path"]) == out_dir / "manifest" / "indexes" / "sequence_index.tsv"
     assert Path(payload["variants_dir"]) == out_dir / "variants"
-    assert Path(payload["composition_configs_dir"]) == out_dir / "manifest" / "composition_configs"
+    assert Path(payload["composition_configs_dir"]) == out_dir / "manifest" / "configs" / "composition"
+    assert (out_dir / "manifest" / "bundle" / "manifest.json").is_file()
+    assert (out_dir / "manifest" / "catalog" / "references").is_dir()
+    assert (
+        out_dir
+        / "manifest"
+        / "configs"
+        / "composition"
+        / "msd-tetr-C172-LCGGT-RACAG-MXMM.linear_ssdna_composition.yaml"
+    ).is_file()
     assert payload["finder_open"] == f"open {out_dir}"
     assert "Single-unit MSD sequence bundle emitted" in payload["next_step"]
 
     variant = payload["variants"][0]
-    variant_dir = out_dir / "variants" / "msd-tetr-c172-lcggt-racag-mxmm"
+    variant_dir = out_dir / "variants" / "msd-tetr-C172-LCGGT-RACAG-MXMM"
+    expected_variant = Path("variants/msd-tetr-C172-LCGGT-RACAG-MXMM")
     genbank_path = variant_dir / "sequences" / "forward.gb"
     revcom_genbank_path = variant_dir / "sequences" / "reverse_complement.gb"
     features_path = variant_dir / "sequences" / "features.csv"
     composition_overview_svg_path = variant_dir / "plots" / "composition_overview.svg"
+    composition_overview_png_path = variant_dir / "plots" / "composition_overview.png"
     secondary_structure_native_png_path = variant_dir / "plots" / "secondary_structure.native.png"
     construct_bundle = variant_dir / "runtime" / "construct"
     assert sorted(item.name for item in variant_dir.iterdir()) == ["manifest", "plots", "runtime", "sequences"]
+    assert sorted(item.name for item in (variant_dir / "manifest").iterdir()) == [
+        "composition",
+        "construct",
+        "folding",
+        "provenance",
+        "reviews",
+        "visual",
+    ]
     assert sorted(item.name for item in (variant_dir / "plots").iterdir()) == [
+        "composition_overview.png",
         "composition_overview.svg",
         "secondary_structure.native.png",
     ]
     assert variant["unit_count"] == 1
-    assert Path(variant["genbank"]) == Path("variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb")
+    assert Path(variant["genbank"]) == expected_variant / "sequences" / "forward.gb"
     assert Path(variant["reverse_complement_genbank"]) == Path(
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/reverse_complement.gb"
     )
     assert Path(variant["composition_overview_svg"]) == Path(
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/composition_overview.svg"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.svg"
+    )
+    assert Path(variant["composition_overview_png"]) == Path(
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.png"
     )
     assert Path(variant["secondary_structure_native_png"]) == Path(
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.native.png"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/secondary_structure.native.png"
     )
     assert "component_span_png" not in variant
     assert "folding_png" not in variant
@@ -834,34 +858,64 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert revcom_genbank_path.is_file()
     assert features_path.is_file()
     assert composition_overview_svg_path.is_file()
+    assert composition_overview_png_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert secondary_structure_native_png_path.is_file()
     assert (construct_bundle / "manifest.json").is_file()
+    assert (construct_bundle / "manifest" / "composition" / "assembled_sequence.json").is_file()
+    assert (construct_bundle / "manifest" / "provenance" / "provenance.json").is_file()
+    assert (construct_bundle / "manifest" / "reviews" / "composition_review_svg_v1.json").is_file()
+    assert (construct_bundle / "manifest" / "visual" / "sequence_evidence_map_v1.json").is_file()
     assert (construct_bundle / "folding" / "secondary_structure_prediction_v1.json").is_file()
     assert (
         construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg"
     ).is_file()
     assert (construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.native.svg").is_file()
     assert (construct_bundle / "visual" / "reviews" / "composition_overview.svg").is_file()
+    assert (construct_bundle / "visual" / "reviews" / "composition_overview.png").is_file()
     assert (construct_bundle / "visual" / "reviews" / "composition_review_svg_v1.json").is_file()
+    assert (variant_dir / "manifest" / "folding" / "secondary_structure_prediction_v1.json").is_file()
+    assert (variant_dir / "manifest" / "reviews" / "composition_review_svg_v1.json").is_file()
+    assert (variant_dir / "manifest" / "visual" / "secondary_structure" / "native.svg").is_file()
     assert composition_overview_svg_path.stat().st_size > 0
+    assert composition_overview_png_path.stat().st_size > 0
     assert secondary_structure_native_png_path.stat().st_size > 0
+    visual_contract = json.loads((variant_dir / "manifest" / "visual" / "sequence_evidence_map_v1.json").read_text())
+    assert visual_contract["meta"]["scar_nick"] == {
+        "left_base": "CGGT",
+        "right_base": "ACAG",
+        "profile_s3s2s1s0": "MXMM",
+    }
+    annotated_structure_svg = (
+        construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg"
+    ).read_text(encoding="utf-8")
+    assert "mismatch profile MXMM" in annotated_structure_svg
+    assert "mismatch profile MXMM" in composition_overview_svg_path.read_text(encoding="utf-8")
+    fills_by_semantic = {
+        item["semantic"]: item["fill"]
+        for item in visual_contract["meta"]["span_backdrops"]
+        if item["semantic"] in {"flank_5p", "payload_primary", "snapback_cap_segment", "payload_complement", "flank_3p"}
+    }
+    assert len(set(fills_by_semantic.values())) == 5
 
     rows = list(
         csv.DictReader(
-            (out_dir / "manifest" / "sequence_index.tsv").read_text(encoding="utf-8").splitlines(),
+            (out_dir / "manifest" / "indexes" / "sequence_index.tsv").read_text(encoding="utf-8").splitlines(),
             delimiter="\t",
         )
     )
     assert rows[0]["unit_count"] == "1"
-    assert rows[0]["genbank"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb"
+    assert rows[0]["genbank"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/forward.gb"
     assert rows[0]["reverse_complement_genbank"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/reverse_complement.gb"
     )
     assert rows[0]["composition_overview_svg"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/composition_overview.svg"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.svg"
+    )
+    assert rows[0]["composition_overview_png"] == (
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.png"
     )
     assert rows[0]["secondary_structure_native_png"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.native.png"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/secondary_structure.native.png"
     )
     assert "component_span_png" not in rows[0]
     assert "folding_png" not in rows[0]
@@ -869,22 +923,25 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert rows[0]["folding_status"] == "ok"
     assert rows[0]["finder_reveal"].startswith("open -R ")
 
-    catalog = json.loads((out_dir / "manifest" / "msd_design_catalog_v1.json").read_text(encoding="utf-8"))
+    catalog = json.loads((out_dir / "manifest" / "catalog" / "msd_design_catalog_v1.json").read_text(encoding="utf-8"))
     record = catalog["records"][0]
     flank_5p_len = len("gtcagaaaaaa") + 4
     flank_3p_len = 4 + len("acagtaactcaga")
     unit_len = flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP) + len(_TETO_PAYLOAD) + flank_3p_len
     assert record["sequence"]["length"] == unit_len
-    assert record["source"]["dnadesign_bundle"] == "variants/msd-tetr-c172-lcggt-racag-mxmm"
-    assert record["artifacts"]["genbank"] == "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/forward.gb"
+    assert record["source"]["dnadesign_bundle"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM"
+    assert record["artifacts"]["genbank"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/forward.gb"
     assert record["artifacts"]["reverse_complement_genbank"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/sequences/reverse_complement.gb"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/reverse_complement.gb"
     )
     assert record["artifacts"]["composition_overview_svg"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/composition_overview.svg"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.svg"
+    )
+    assert record["artifacts"]["composition_overview_png"] == (
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.png"
     )
     assert record["artifacts"]["secondary_structure_native_png"] == (
-        "variants/msd-tetr-c172-lcggt-racag-mxmm/plots/secondary_structure.native.png"
+        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/secondary_structure.native.png"
     )
     assert "component_span_png" not in record["artifacts"]
     assert "folding_png" not in record["artifacts"]
@@ -1033,7 +1090,7 @@ def test_retron_msd_materialize_refuses_flat_legacy_sequence_layout(tmp_path: Pa
 def test_retron_msd_materialize_refuses_stale_legacy_plot_deliverables(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "sequence_bundle"
-    stale_plots_dir = out_dir / "variants" / "msd-tetr-c172-lcggt-racag-mxmm" / "plots"
+    stale_plots_dir = out_dir / "variants" / "msd-tetr-C172-LCGGT-RACAG-MXMM" / "plots"
     stale_plots_dir.mkdir(parents=True)
     (stale_plots_dir / "component_span_and_folding.png").write_text("stale\n", encoding="utf-8")
 

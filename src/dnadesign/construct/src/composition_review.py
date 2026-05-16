@@ -26,10 +26,11 @@ from .errors import ValidationError
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 
-STRUCTURE_SVG_PATH = Path("visual/viennarna_secondary_structure/secondary_structure.annotated.svg")
+STRUCTURE_SVG_PATH = Path("visual/viennarna_secondary_structure/secondary_structure.native.svg")
 COMPONENT_SPAN_SVG_PATH = Path("visual/renders/component_span_qa_svg/component_span_qa.svg")
 COMPOSITION_REVIEW_DIR = Path("visual/reviews")
 COMPOSITION_REVIEW_SVG_PATH = COMPOSITION_REVIEW_DIR / "composition_overview.svg"
+COMPOSITION_REVIEW_PNG_PATH = COMPOSITION_REVIEW_DIR / "composition_overview.png"
 COMPOSITION_REVIEW_MANIFEST_PATH = COMPOSITION_REVIEW_DIR / "composition_review_svg_v1.json"
 _STRUCTURE_PANEL_WIDTH_RATIO = 1.25
 _COMPONENT_TO_STRUCTURE_REVIEW_WIDTH_RATIO = 1.22
@@ -37,6 +38,8 @@ _STRUCTURE_FIT_POLICY = "balanced_visual_weight"
 _COMPONENT_PANEL_EMPHASIS = "bold_glyph_review"
 _COMPONENT_SOURCE_TITLE_POLICY = "omit_redundant_source_title"
 _COMPONENT_SOURCE_TITLE_COLOR = "#6b7280"
+_REVIEW_PNG_SCALE = 3.0
+_REVIEW_PNG_PPI = 216.0
 
 
 @dataclass(frozen=True)
@@ -92,11 +95,17 @@ def publish_composition_review_svg(
         structure=structure,
         component=component,
         composition_id=_composition_id_from_visual_contract(visual_contract),
+        structure_caption=_structure_caption(visual_contract),
         target_nucleotide_font_size_px=target_nucleotide_font_size_px,
         structure_scale=structure_scale,
         component_scale=component_scale,
         structure_effective_font_size=structure_effective_font_size,
         component_effective_font_size=component_effective_font_size,
+    )
+    _validate_structure_nucleotide_text(
+        svg_build.root,
+        expected_count=len(visual_contract.primary_sequence),
+        source_nucleotide_font_size_px=structure.source_nucleotide_font_size_px,
     )
 
     output_path = bundle / COMPOSITION_REVIEW_SVG_PATH
@@ -105,6 +114,7 @@ def publish_composition_review_svg(
     ET.register_namespace("", SVG_NS)
     ET.register_namespace("xlink", XLINK_NS)
     ET.ElementTree(svg_build.root).write(output_path, encoding="utf-8", xml_declaration=True)
+    _write_review_png(output_path, bundle / COMPOSITION_REVIEW_PNG_PATH)
     manifest = _manifest(
         bundle=bundle,
         visual_contract=visual_contract,
@@ -118,6 +128,10 @@ def publish_composition_review_svg(
         component_source_title_omitted_count=svg_build.component_source_title_omitted_count,
     )
     _write_json(manifest_path, manifest.model_dump(mode="json"))
+    _write_json(
+        bundle / "manifest" / "reviews" / "composition_review_svg_v1.json",
+        manifest.model_dump(mode="json"),
+    )
     _update_bundle_manifest(bundle, manifest)
     return manifest
 
@@ -161,6 +175,7 @@ def _compose_review_svg(
     structure: _SvgAsset,
     component: _SvgAsset,
     composition_id: str,
+    structure_caption: tuple[str, list[str]],
     target_nucleotide_font_size_px: float,
     structure_scale: float,
     component_scale: float,
@@ -173,9 +188,11 @@ def _compose_review_svg(
     structure_height = structure.height * structure_scale
     component_width = component.width * component_scale
     component_height = component.height * component_scale
+    caption_title, caption_subtitles = structure_caption
+    caption_height = _structure_caption_height(structure_caption)
     content_width = max(structure_width, component_width)
     outer_width = content_width + 2 * pad
-    outer_height = structure_height + gap + component_height + 2 * pad
+    outer_height = caption_height + structure_height + gap + component_height + 2 * pad
     root = ET.Element(
         f"{{{SVG_NS}}}svg",
         {
@@ -189,6 +206,7 @@ def _compose_review_svg(
             "data-dnadesign-component-effective-nucleotide-font-size-px": f"{component_effective_font_size:.3f}",
             "data-dnadesign-component-panel-emphasis": _COMPONENT_PANEL_EMPHASIS,
             "data-dnadesign-structure-fit-policy": _STRUCTURE_FIT_POLICY,
+            "data-dnadesign-structure-source-policy": "native_geometry_with_review_caption",
         },
     )
     title = ET.SubElement(root, f"{{{SVG_NS}}}title")
@@ -204,13 +222,21 @@ def _compose_review_svg(
             "style": "fill: #FFFFFF; stroke: none;",
         },
     )
+    if caption_title:
+        _append_structure_caption(
+            root,
+            x=pad + content_width / 2.0,
+            y=pad,
+            title=caption_title,
+            subtitles=caption_subtitles,
+        )
     _append_panel(
         root,
         asset=structure,
         panel="secondary_structure",
         row=1,
         x=pad + (content_width - structure_width) / 2.0,
-        y=pad,
+        y=pad + caption_height,
         scale=structure_scale,
         effective_font_size=structure_effective_font_size,
     )
@@ -220,7 +246,7 @@ def _compose_review_svg(
         panel="component_span",
         row=2,
         x=pad + (content_width - component_width) / 2.0,
-        y=pad + structure_height + gap,
+        y=pad + caption_height + structure_height + gap,
         scale=component_scale,
         effective_font_size=component_effective_font_size,
     )
@@ -228,6 +254,86 @@ def _compose_review_svg(
         root=root,
         component_source_title_omitted_count=component_source_title_omitted_count,
     )
+
+
+def _structure_caption(visual_contract: SequenceEvidenceMapV1) -> tuple[str, list[str]]:
+    title = str(
+        visual_contract.meta.get("structure_title") or visual_contract.display.title or visual_contract.state_id
+    )
+    title = re.sub(r"\s+", " ", title.strip())
+    subtitles: list[str] = []
+    scar_nick = visual_contract.meta.get("scar_nick")
+    if isinstance(scar_nick, dict):
+        subtitle_parts: list[str] = []
+        left_base = str(scar_nick.get("left_base") or "").strip()
+        right_base = str(scar_nick.get("right_base") or "").strip()
+        profile = str(scar_nick.get("profile_s3s2s1s0") or "").strip().upper()
+        if left_base and right_base:
+            subtitle_parts.append(f"left {left_base} / right {right_base}")
+        elif left_base:
+            subtitle_parts.append(f"left {left_base}")
+        elif right_base:
+            subtitle_parts.append(f"right {right_base}")
+        if profile:
+            subtitle_parts.append(f"mismatch profile {profile}")
+        if subtitle_parts:
+            subtitles.append(" | ".join(subtitle_parts))
+    return title, subtitles
+
+
+def _structure_caption_height(structure_caption: tuple[str, list[str]]) -> float:
+    title, subtitles = structure_caption
+    if not title:
+        return 0.0
+    return 24.0 + 12.0 * len(subtitles)
+
+
+def _append_structure_caption(
+    root: ET.Element,
+    *,
+    x: float,
+    y: float,
+    title: str,
+    subtitles: list[str],
+) -> None:
+    layer = ET.SubElement(
+        root,
+        f"{{{SVG_NS}}}g",
+        {
+            "id": "dnadesign-composition-review-structure-caption",
+            "data-dnadesign-caption-layer": "secondary_structure",
+        },
+    )
+    title_node = ET.SubElement(
+        layer,
+        f"{{{SVG_NS}}}text",
+        {
+            "class": "dnadesign-structure-title",
+            "x": f"{x:.3f}",
+            "y": f"{y + 8.0:.3f}",
+            "text-anchor": "middle",
+            "dominant-baseline": "middle",
+            "style": "font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #111827;",
+        },
+    )
+    title_node.text = title
+    for index, subtitle in enumerate(subtitles):
+        subtitle_node = ET.SubElement(
+            layer,
+            f"{{{SVG_NS}}}text",
+            {
+                "class": "dnadesign-structure-subtitle",
+                "data-dnadesign-subtitle-line-index": str(index),
+                "x": f"{x:.3f}",
+                "y": f"{y + 21.0 + index * 12.0:.3f}",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "style": (
+                    "font-family: DejaVu Sans, Arial, sans-serif; font-size: 9px; font-weight: 500; fill: #475569;"
+                ),
+            },
+        )
+        subtitle_node.text = subtitle
 
 
 def _append_panel(
@@ -264,6 +370,11 @@ def _append_panel(
         nested.set("data-dnadesign-component-source-title-policy", _COMPONENT_SOURCE_TITLE_POLICY)
     for child in list(asset.root):
         child_copy = copy.deepcopy(child)
+        if panel == "secondary_structure":
+            _normalize_structure_nucleotide_text(
+                child_copy,
+                source_nucleotide_font_size_px=asset.source_nucleotide_font_size_px,
+            )
         if panel == "component_span":
             omitted_count += _remove_component_source_title_groups(child_copy, source_height=asset.height)
             _apply_component_panel_emphasis(child_copy)
@@ -271,6 +382,70 @@ def _append_panel(
     if panel == "component_span":
         nested.set("data-dnadesign-component-source-title-omitted-count", str(omitted_count))
     return omitted_count
+
+
+def _normalize_structure_nucleotide_text(element: ET.Element, *, source_nucleotide_font_size_px: float) -> None:
+    for node in element.iter():
+        if _local_name(node.tag) != "text":
+            continue
+        if "nucleotide" not in set(str(node.attrib.get("class", "")).split()):
+            continue
+        node.set("font-size", f"{source_nucleotide_font_size_px:.3f}px")
+        node.set("font-family", "DejaVu Sans, Arial, sans-serif")
+        style = str(node.attrib.get("style", "")).strip()
+        node.set(
+            "style",
+            _append_style_declarations(
+                style,
+                (
+                    "font-family: DejaVu Sans, Arial, sans-serif",
+                    f"font-size: {source_nucleotide_font_size_px:.3f}px",
+                ),
+            ),
+        )
+
+
+def _validate_structure_nucleotide_text(
+    root: ET.Element,
+    *,
+    expected_count: int,
+    source_nucleotide_font_size_px: float,
+) -> None:
+    panel = _find_panel(root, "secondary_structure")
+    if panel is None:
+        raise ValidationError("Composition review SVG is missing the secondary_structure panel.")
+    nucleotide_nodes = [
+        node
+        for node in panel.iter()
+        if _local_name(node.tag) == "text" and "nucleotide" in set(str(node.attrib.get("class", "")).split())
+    ]
+    if len(nucleotide_nodes) != expected_count:
+        raise ValidationError(
+            "Composition review secondary_structure panel has "
+            f"{len(nucleotide_nodes)} nucleotide text nodes; expected {expected_count}."
+        )
+    missing_style_count = sum(
+        1
+        for node in nucleotide_nodes
+        if _numeric_length(node.attrib.get("font-size")) != source_nucleotide_font_size_px
+        or "dejavusans" not in _normalize_css_text(str(node.attrib.get("font-family", "")))
+        or "font-size" not in _normalize_css_text(str(node.attrib.get("style", "")))
+        or "font-family" not in _normalize_css_text(str(node.attrib.get("style", "")))
+    )
+    if missing_style_count:
+        raise ValidationError(
+            "Composition review secondary_structure panel contains "
+            f"{missing_style_count} nucleotide text nodes without explicit renderer-safe font styling."
+        )
+    panel.set("data-dnadesign-structure-nucleotide-text-count", str(len(nucleotide_nodes)))
+    panel.set("data-dnadesign-structure-nucleotide-text-font-policy", "explicit_renderer_safe")
+
+
+def _find_panel(root: ET.Element, panel: str) -> ET.Element | None:
+    for node in root.iter():
+        if node.attrib.get("data-dnadesign-panel") == panel:
+            return node
+    return None
 
 
 def _manifest(
@@ -300,7 +475,10 @@ def _manifest(
             "visual_contract": SEQUENCE_EVIDENCE_MAP_PATH.as_posix(),
             "bundle_manifest": "manifest.json" if (bundle / "manifest.json").is_file() else None,
         },
-        artifacts={"review_svg": COMPOSITION_REVIEW_SVG_PATH.as_posix()},
+        artifacts={
+            "review_svg": COMPOSITION_REVIEW_SVG_PATH.as_posix(),
+            "review_png": COMPOSITION_REVIEW_PNG_PATH.as_posix(),
+        },
         layout={
             "row_count": 2,
             "panel_order": ["secondary_structure", "component_span"],
@@ -316,6 +494,8 @@ def _manifest(
             "component_source_title_policy": _COMPONENT_SOURCE_TITLE_POLICY,
             "structure_to_component_width_ratio": width_ratio,
             "vertical_gap_px": 18.0,
+            "review_png_scale": _REVIEW_PNG_SCALE,
+            "review_png_ppi": _REVIEW_PNG_PPI,
         },
         qa={
             "subplot_visual_weight_balanced": (
@@ -494,16 +674,38 @@ def _update_bundle_manifest(bundle: Path, review_manifest: CompositionReviewSvgV
         raise ValidationError("Bundle manifest artifacts must be an object.")
     artifacts["composition_review"] = COMPOSITION_REVIEW_MANIFEST_PATH.as_posix()
     artifacts["composition_review_svg"] = review_manifest.artifacts.review_svg
+    artifacts["composition_review_png"] = review_manifest.artifacts.review_png
     _write_json(manifest_path, payload)
 
 
+def _write_review_png(source_svg: Path, output_png: Path) -> None:
+    try:
+        import vl_convert as vlc
+    except ImportError as exc:  # pragma: no cover - dependency is pinned in the managed environment.
+        raise ValidationError("vl-convert-python is required to publish composition review PNG artifacts.") from exc
+    try:
+        png_bytes = vlc.svg_to_png(
+            source_svg.read_text(encoding="utf-8"),
+            scale=_REVIEW_PNG_SCALE,
+            ppi=_REVIEW_PNG_PPI,
+        )
+    except Exception as exc:  # pragma: no cover - renderer-specific failure details.
+        raise ValidationError(f"Failed to rasterize composition review SVG to PNG: {source_svg}") from exc
+    if not bytes(png_bytes).startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValidationError(f"Composition review PNG renderer returned invalid PNG data for: {source_svg}")
+    output_png.parent.mkdir(parents=True, exist_ok=True)
+    output_png.write_bytes(bytes(png_bytes))
+
+
 def _write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 __all__ = [
     "COMPONENT_SPAN_SVG_PATH",
     "COMPOSITION_REVIEW_MANIFEST_PATH",
+    "COMPOSITION_REVIEW_PNG_PATH",
     "COMPOSITION_REVIEW_SVG_PATH",
     "STRUCTURE_SVG_PATH",
     "publish_composition_review_svg",

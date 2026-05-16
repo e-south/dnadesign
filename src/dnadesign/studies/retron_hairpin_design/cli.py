@@ -21,12 +21,15 @@ import typer
 from .compiler import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,
+    CATALOG_FILENAME,
     COMPOSITION_CONFIG_DIRNAME,
+    MANIFEST_BUNDLE_DIRNAME,
+    MANIFEST_CATALOG_DIRNAME,
+    MANIFEST_CONFIGS_DIRNAME,
     MANIFEST_DIRNAME,
+    MANIFEST_INDEXES_DIRNAME,
     REFERENCE_DIRNAME,
     REFERENCE_INDEX_FILENAME,
-    SEQUENCE_INDEX_FILENAME,
-    SEQUENCE_MANIFEST_FILENAME,
     VARIANT_DIRNAME,
     RetronMsdCompilerError,
     build_msd_design_reference,
@@ -202,11 +205,12 @@ def _materialize_next_step(out_dir: Path, *, warnings: list[str]) -> str:
     if warnings:
         return (
             "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, and plot/status artifacts; "
-            f"open {out_dir.as_posix()} or inspect manifest/sequence_index.tsv for folding status."
+            f"open {out_dir.as_posix()} or inspect manifest/indexes/sequence_index.tsv for folding status."
         )
     return (
-        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, native structure PNG, and review SVG; "
-        f"open {out_dir.as_posix()} or use manifest/sequence_index.tsv for programmatic handoff."
+        "Single-unit MSD sequence bundle emitted with GenBank, FASTA/CSV, native structure PNG, review SVG, "
+        "and review PNG; "
+        f"open {out_dir.as_posix()} or use manifest/indexes/sequence_index.tsv for programmatic handoff."
     )
 
 
@@ -398,16 +402,22 @@ def materialize_command(
     _emit(
         {
             "status": "ok",
-            "catalog_path": str(result.bundle_root / MANIFEST_DIRNAME / "msd_design_catalog_v1.json"),
+            "catalog_path": str(result.bundle_root / MANIFEST_DIRNAME / MANIFEST_CATALOG_DIRNAME / CATALOG_FILENAME),
             "output_dir": str(result.bundle_root),
-            "references_dir": str(result.bundle_root / MANIFEST_DIRNAME / REFERENCE_DIRNAME),
-            "index_path": str(result.bundle_root / MANIFEST_DIRNAME / REFERENCE_INDEX_FILENAME),
-            "manifest_path": str(result.bundle_root / MANIFEST_DIRNAME / BUNDLE_MANIFEST_FILENAME),
+            "references_dir": str(result.bundle_root / MANIFEST_DIRNAME / MANIFEST_CATALOG_DIRNAME / REFERENCE_DIRNAME),
+            "index_path": str(
+                result.bundle_root / MANIFEST_DIRNAME / MANIFEST_INDEXES_DIRNAME / REFERENCE_INDEX_FILENAME
+            ),
+            "manifest_path": str(
+                result.bundle_root / MANIFEST_DIRNAME / MANIFEST_BUNDLE_DIRNAME / BUNDLE_MANIFEST_FILENAME
+            ),
             "readme_path": str(result.bundle_root / BUNDLE_README_FILENAME),
-            "sequence_manifest_path": str(result.bundle_root / MANIFEST_DIRNAME / SEQUENCE_MANIFEST_FILENAME),
-            "sequence_index_path": str(result.bundle_root / MANIFEST_DIRNAME / SEQUENCE_INDEX_FILENAME),
+            "sequence_manifest_path": str(result.manifest_path),
+            "sequence_index_path": str(result.index_path),
             "variants_dir": str(result.bundle_root / VARIANT_DIRNAME),
-            "composition_configs_dir": str(result.bundle_root / MANIFEST_DIRNAME / COMPOSITION_CONFIG_DIRNAME),
+            "composition_configs_dir": str(
+                result.bundle_root / MANIFEST_DIRNAME / MANIFEST_CONFIGS_DIRNAME / COMPOSITION_CONFIG_DIRNAME
+            ),
             "record_count": len(result.catalog.records),
             "variants": result.variants,
             "records": [record.model_dump(mode="json", exclude_none=True) for record in result.catalog.records],

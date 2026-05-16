@@ -450,6 +450,7 @@ def _write_bundle(composed: _ComposedLinearSsdna, *, artifact_bundle: Path, conf
     _write_baserender_jobs(artifact_bundle, composed)
     write_sequence_exports(artifact_bundle, composed)
     _write_json(artifact_bundle / "manifest.json", _manifest_payload(composed, artifact_bundle=artifact_bundle))
+    _write_semantic_manifest_mirror(artifact_bundle)
 
 
 def _remove_deprecated_generated_artifacts(artifact_bundle: Path) -> None:
@@ -466,6 +467,51 @@ def _remove_deprecated_generated_artifacts(artifact_bundle: Path) -> None:
         contracts_dir.rmdir()
     except OSError:
         pass
+
+
+def _write_semantic_manifest_mirror(artifact_bundle: Path) -> None:
+    mirrored_paths = [
+        ("manifest.json", "manifest/bundle/manifest.json"),
+        ("assembled_sequence.json", "manifest/composition/assembled_sequence.json"),
+        ("segment_spans.json", "manifest/composition/segment_spans.json"),
+        ("annotation_spans.json", "manifest/composition/annotation_spans.json"),
+        ("validation_report.json", "manifest/composition/validation_report.json"),
+        ("provenance.json", "manifest/provenance/provenance.json"),
+        ("visual/sequence_evidence_map_v1.json", "manifest/visual/sequence_evidence_map_v1.json"),
+        ("folding/folding_preflight.json", "manifest/folding/folding_preflight.json"),
+        (
+            "folding/secondary_structure_prediction_request_v1.yaml",
+            "manifest/folding/secondary_structure_prediction_request_v1.yaml",
+        ),
+        ("folding/secondary_structure_prediction_v1.json", "manifest/folding/secondary_structure_prediction_v1.json"),
+        (
+            "folding/secondary_structure_input_sequence.json",
+            "manifest/folding/secondary_structure_input_sequence.json",
+        ),
+        (
+            "visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json",
+            "manifest/visual/secondary_structure/viennarna_secondary_structure_svg_v1.json",
+        ),
+        (
+            "visual/viennarna_secondary_structure/secondary_structure.annotation_manifest.json",
+            "manifest/visual/secondary_structure/annotation_manifest.json",
+        ),
+        (
+            "visual/viennarna_secondary_structure/secondary_structure.native.svg",
+            "manifest/visual/secondary_structure/native.svg",
+        ),
+        (
+            "visual/viennarna_secondary_structure/secondary_structure.annotated.svg",
+            "manifest/visual/secondary_structure/annotated.svg",
+        ),
+    ]
+    for source_name, destination_name in mirrored_paths:
+        source = artifact_bundle / source_name
+        if not source.is_file():
+            continue
+        destination = artifact_bundle / destination_name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
 
 
 def _assembled_sequence_payload(composed: _ComposedLinearSsdna) -> dict[str, object]:

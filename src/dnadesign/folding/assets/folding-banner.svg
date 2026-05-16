@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180" role="img" aria-labelledby="title desc">
   <title id="title">folding</title>
-  <desc id="desc">Secondary-structure prediction for sequence artifacts.</desc>
+  <desc id="desc">secondary-structure prediction for sequence artifacts.</desc>
   <rect width="1200" height="180" fill="#111827" />
   <path d="M72 48H1128" stroke="#94a3b8" stroke-opacity="0.28" stroke-width="2" />
   <g font-family="Helvetica, Arial, sans-serif">

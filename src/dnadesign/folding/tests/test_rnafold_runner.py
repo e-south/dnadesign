@@ -27,6 +27,7 @@ from dnadesign.folding import (
     publish_viennarna_structure_svg,
     run_prediction_request,
 )
+from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox
 
 
 def _write_assembled_sequence(tmp_path: Path, sequence: str = "GCAT") -> tuple[Path, str]:
@@ -50,6 +51,12 @@ def _write_assembled_sequence(tmp_path: Path, sequence: str = "GCAT") -> tuple[P
         encoding="utf-8",
     )
     return artifact, sequence_sha256
+
+
+def _parse_viewbox(root: ET.Element) -> tuple[float, float, float, float]:
+    parts = [float(part) for part in str(root.attrib["viewBox"]).split()]
+    assert len(parts) == 4
+    return parts[0], parts[1], parts[2], parts[3]
 
 
 def _request(tmp_path: Path, *, executable: str, required: bool = False) -> SecondaryStructurePredictionRequestV1:
@@ -124,6 +131,45 @@ def _python_api_request(
             },
         }
     )
+
+
+def test_expand_root_viewbox_keeps_normalized_geometry_centered_with_asymmetric_labels() -> None:
+    root = ET.Element(
+        "{http://www.w3.org/2000/svg}svg",
+        {"width": "452", "height": "452"},
+    )
+    ET.SubElement(
+        root,
+        "{http://www.w3.org/2000/svg}rect",
+        {
+            "x": "0",
+            "y": "0",
+            "width": "452",
+            "height": "452",
+            "style": "stroke: white; fill: white",
+        },
+    )
+    geometry_bbox = {
+        "min_x": 60.0,
+        "min_y": 100.0,
+        "max_x": 500.0,
+        "max_y": 225.0,
+    }
+
+    _expand_root_viewbox(
+        root,
+        layout_normalization={"geometry_bbox": geometry_bbox},
+        label_boxes=[
+            (70.0, 90.0, 110.0, 112.0),
+            (500.0, 150.0, 560.0, 172.0),
+        ],
+    )
+
+    x, _, width, _ = _parse_viewbox(root)
+    left_margin = geometry_bbox["min_x"] - x
+    right_margin = x + width - geometry_bbox["max_x"]
+    assert left_margin == pytest.approx(right_margin, abs=0.01)
+    assert left_margin >= 72.0
 
 
 def test_parse_rnafold_stdout_maps_pairs_to_original_coordinates() -> None:
@@ -432,6 +478,11 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                         "payload_complement": "#E45756",
                         "snapback_cap_segment": "#54A24B",
                     },
+                    "scar_nick": {
+                        "left_base": "G",
+                        "right_base": "A",
+                        "profile_s3s2s1s0": "MXMM",
+                    },
                     "segment_labels": [
                         {"text": "Left stem base", "start": 0, "end": 1, "label_side": "below"},
                         {"text": "TetO primary", "start": 0, "end": 2, "label_side": "above"},
@@ -492,7 +543,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     namespace = {"svg": "http://www.w3.org/2000/svg"}
     text_values = [node.text for node in root.findall(".//svg:text", namespace)]
     assert "Retron 43 TetO x8" in text_values
-    assert "TetO payload | left G / right A" in text_values
+    assert "TetO payload | left G / right A | mismatch profile MXMM" in text_values
     assert "Snapback cap CC (2 nt)" in text_values
     assert not any(
         str(value).startswith(("sections:", "components:", "snapback:", "scar_nick:")) for value in text_values

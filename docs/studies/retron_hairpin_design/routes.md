@@ -240,13 +240,17 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   payload complement, right base plus 3' flank. The CLI does not expose a
   repeat-count flag, so it cannot chain complete MSD units together. The
   sequence bundle keeps the top level to `README.md`, `manifest/`, and
-  `variants/`. Catalogs, `manifest/sequence_manifest.json`,
-  `manifest/sequence_index.tsv`, generated composition configs, and provenance
-  live under `manifest/`; each `variants/<msd_design_id>/` directory groups
+  `variants/`. Bundle manifests live under `manifest/bundle/`, catalogs and
+  frozen references under `manifest/catalog/`, indexes under
+  `manifest/indexes/`, and generated composition configs under
+  `manifest/configs/composition/`; each `variants/<msd_design_id>/` directory groups
   forward/reverse-complement GenBank and FASTA under `sequences/`,
-  `secondary_structure.native.png` plus `composition_overview.svg` under
-  `plots/`, curated metadata under `manifest/`, and raw producer output under
-  `runtime/construct/`. Visible GenBank/CSV labels should be display labels
+  `secondary_structure.native.png` plus `composition_overview.svg` and
+  `composition_overview.png` under
+  `plots/`, curated metadata under semantic `manifest/` groups, and raw
+  producer output under `runtime/construct/` with a semantic
+  `runtime/construct/manifest/` mirror. Variant IDs preserve cap/base/profile
+  ontology with uppercase suffixes such as `C172-LCGGT-RACAG-MXMM`. Visible GenBank/CSV labels should be display labels
   such as `msd[teto]`, `Cap`, `Left Base`, and `Right Base`; raw ids remain
   machine metadata, not operator-facing labels.
 

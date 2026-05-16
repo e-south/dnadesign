@@ -44,6 +44,9 @@ def structure_subtitle_lines(
     base_phrase = _base_phrase(left_base=left_base, right_base=right_base)
     if base_phrase:
         first_line_parts.append(base_phrase)
+    mismatch_profile = _mismatch_profile_phrase(visual_contract)
+    if mismatch_profile:
+        first_line_parts.append(mismatch_profile)
     if first_line_parts:
         lines.append(" | ".join(first_line_parts))
     cap = _cap_summary(visual_contract, section_annotations)
@@ -106,6 +109,16 @@ def _base_phrase(*, left_base: str, right_base: str) -> str:
     if right_base:
         return f"right {right_base}"
     return ""
+
+
+def _mismatch_profile_phrase(visual_contract: SequenceEvidenceMapV1) -> str:
+    scar_nick = visual_contract.meta.get("scar_nick")
+    if not isinstance(scar_nick, dict):
+        return ""
+    profile = str(scar_nick.get("profile_s3s2s1s0", "")).strip().upper()
+    if not profile:
+        return ""
+    return f"mismatch profile {profile}"
 
 
 def _cap_summary(

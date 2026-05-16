@@ -36,7 +36,9 @@ uv run construct compose review --bundle <artifact-bundle>
 All commands support `--format json`.
 
 `review` also accepts `--nucleotide-font-size-px <float>` when the combined
-structure/component-span review needs a pinned nucleotide scale.
+structure/component-span review needs a pinned nucleotide scale. The review
+publisher emits both `visual/reviews/composition_overview.svg` and a
+high-resolution `visual/reviews/composition_overview.png`.
 
 ### Contract Flow
 

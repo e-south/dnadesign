@@ -12,9 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import io
 import json
 import sys
 import warnings
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -30,6 +32,36 @@ from dnadesign.construct.src.errors import ValidationError
 _DNA_COMPLEMENT = str.maketrans("ACGTacgt", "TGCAtgca")
 RETRON43_UNIT = "gtcagaaaaaaCAAGtccctatcagtgatagagatCCTCAGcccGCTGAGGatctctatcactgatagggaCTCGacagtaactcaga"
 RETRON43_UNIT_COMPLEMENT = RETRON43_UNIT.translate(_DNA_COMPLEMENT)
+
+
+def _png_delta_without_secondary_structure_nucleotides(review_svg_path: Path, review_png_path: Path) -> tuple[int, int]:
+    import vl_convert as vlc
+    from PIL import Image, ImageChops
+
+    root = ET.parse(review_svg_path).getroot()
+    parent_by_child = {child: parent for parent in root.iter() for child in list(parent)}
+    removed_count = 0
+    for node in list(root.iter()):
+        if not node.tag.endswith("text"):
+            continue
+        if "nucleotide" not in str(node.attrib.get("class", "")).split():
+            continue
+        current = parent_by_child.get(node)
+        while current is not None and current.attrib.get("data-dnadesign-panel") != "secondary_structure":
+            current = parent_by_child.get(current)
+        if current is None:
+            continue
+        parent_by_child[node].remove(node)
+        removed_count += 1
+
+    stripped_png = vlc.svg_to_png(ET.tostring(root, encoding="unicode"), scale=3.0, ppi=216.0)
+    actual = Image.open(review_png_path).convert("RGBA")
+    stripped = Image.open(io.BytesIO(stripped_png)).convert("RGBA")
+    assert actual.size == stripped.size
+    delta = ImageChops.difference(actual, stripped).convert("L")
+    histogram = delta.histogram()
+    changed_pixels = sum(histogram[11:])
+    return removed_count, changed_pixels
 
 
 def _write_retron43_config(
@@ -495,7 +527,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         return 0
     with open(filename, "w", encoding="utf-8") as handle:
         handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
-        handle.write('<svg xmlns="http://www.w3.org/2000/svg">\\n')
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80">\\n')
         handle.write('<g id="pairs"></g>\\n')
         handle.write('<g id="seq">\\n')
         for index, base in enumerate(sequence):
@@ -576,9 +608,15 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
 
     review_manifest = publish_composition_review_svg(result.artifact_bundle)
     review_svg_path = result.artifact_bundle / review_manifest.artifacts.review_svg
+    review_png_path = result.artifact_bundle / review_manifest.artifacts.review_png
     assert review_manifest.contract_kind == "composition_review_svg_v1"
+    assert (
+        review_manifest.sources.structure_svg == "visual/viennarna_secondary_structure/secondary_structure.native.svg"
+    )
     assert review_manifest.layout.row_count == 2
     assert review_manifest.layout.panel_order == ["secondary_structure", "component_span"]
+    assert review_manifest.layout.review_png_scale == 3.0
+    assert review_manifest.layout.review_png_ppi == 216.0
     assert review_manifest.layout.component_nucleotide_font_size_px == 6.0
     assert review_manifest.layout.structure_fit_policy == "balanced_visual_weight"
     assert review_manifest.layout.structure_scale > 1.1
@@ -594,12 +632,26 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert review_manifest.qa.component_source_title_omitted_count >= 1
     assert review_manifest.qa.warnings == []
     assert review_svg_path == result.artifact_bundle / "visual" / "reviews" / "composition_overview.svg"
+    assert review_png_path == result.artifact_bundle / "visual" / "reviews" / "composition_overview.png"
+    assert review_png_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     review_svg = review_svg_path.read_text(encoding="utf-8")
     assert 'data-dnadesign-panel="secondary_structure"' in review_svg
+    assert 'data-dnadesign-source-svg="secondary_structure.native.svg"' in review_svg
     assert 'data-dnadesign-panel="component_span"' in review_svg
     assert 'data-dnadesign-panel-row="1"' in review_svg
     assert 'data-dnadesign-panel-row="2"' in review_svg
     assert 'data-dnadesign-structure-fit-policy="balanced_visual_weight"' in review_svg
+    assert 'data-dnadesign-structure-nucleotide-text-count="88"' in review_svg
+    assert 'data-dnadesign-structure-nucleotide-text-font-policy="explicit_renderer_safe"' in review_svg
+    assert review_svg.count('class="nucleotide') == 88
+    assert review_svg.count('font-family="DejaVu Sans, Arial, sans-serif"') == 88
+    assert review_svg.count('font-size="12.000px"') == 88
+    removed_count, changed_pixels = _png_delta_without_secondary_structure_nucleotides(
+        review_svg_path,
+        review_png_path,
+    )
+    assert removed_count == 88
+    assert changed_pixels > 20_000
     assert 'data-dnadesign-component-effective-nucleotide-font-size-px="9.150"' in review_svg
     assert 'data-dnadesign-component-panel-emphasis="bold_glyph_review"' in review_svg
     assert 'data-dnadesign-review-emphasis="component_span_bold_glyph"' in review_svg

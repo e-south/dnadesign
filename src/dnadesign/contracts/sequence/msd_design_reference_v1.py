@@ -163,6 +163,7 @@ class MsdDesignSourceV1(MsdDesignContractModel):
 
 class MsdDesignArtifactsV1(MsdDesignContractModel):
     composition_overview_svg: str | None = None
+    composition_overview_png: str | None = None
     secondary_structure_native_png: str | None = None
     secondary_structure_svg: str | None = None
     component_span_png: str | None = None
@@ -179,6 +180,7 @@ class MsdDesignArtifactsV1(MsdDesignContractModel):
 
     @field_validator(
         "composition_overview_svg",
+        "composition_overview_png",
         "secondary_structure_native_png",
         "secondary_structure_svg",
         "component_span_png",

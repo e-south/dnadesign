@@ -38,9 +38,20 @@ LEGACY_ASSETS_DIRNAME = "assets"
 SEQUENCE_MANIFEST_FILENAME = "sequence_manifest.json"
 SEQUENCE_INDEX_FILENAME = "sequence_index.tsv"
 MANIFEST_DIRNAME = "manifest"
-COMPOSITION_CONFIG_DIRNAME = "composition_configs"
+MANIFEST_BUNDLE_DIRNAME = "bundle"
+MANIFEST_CATALOG_DIRNAME = "catalog"
+MANIFEST_CONFIGS_DIRNAME = "configs"
+MANIFEST_INDEXES_DIRNAME = "indexes"
+COMPOSITION_CONFIG_DIRNAME = "composition"
 VARIANT_DIRNAME = "variants"
 VARIANT_MANIFEST_DIRNAME = "manifest"
+VARIANT_MANIFEST_COMPOSITION_DIRNAME = "composition"
+VARIANT_MANIFEST_CONSTRUCT_DIRNAME = "construct"
+VARIANT_MANIFEST_FOLDING_DIRNAME = "folding"
+VARIANT_MANIFEST_PROVENANCE_DIRNAME = "provenance"
+VARIANT_MANIFEST_REVIEWS_DIRNAME = "reviews"
+VARIANT_MANIFEST_VISUAL_DIRNAME = "visual"
+VARIANT_MANIFEST_SECONDARY_STRUCTURE_DIRNAME = "secondary_structure"
 VARIANT_PLOTS_DIRNAME = "plots"
 VARIANT_RUNTIME_DIRNAME = "runtime"
 VARIANT_SEQUENCES_DIRNAME = "sequences"
@@ -112,10 +123,13 @@ def materialize_msd_design_artifacts(
     root.mkdir(parents=True, exist_ok=True)
 
     manifest_dir = root / MANIFEST_DIRNAME
-    configs_dir = manifest_dir / COMPOSITION_CONFIG_DIRNAME
+    bundle_manifest_dir = manifest_dir / MANIFEST_BUNDLE_DIRNAME
+    catalog_dir = manifest_dir / MANIFEST_CATALOG_DIRNAME
+    configs_dir = manifest_dir / MANIFEST_CONFIGS_DIRNAME / COMPOSITION_CONFIG_DIRNAME
+    indexes_dir = manifest_dir / MANIFEST_INDEXES_DIRNAME
     variants_dir = root / VARIANT_DIRNAME
-    manifest_dir.mkdir(parents=True, exist_ok=True)
-    configs_dir.mkdir(parents=True, exist_ok=True)
+    for directory in (bundle_manifest_dir, catalog_dir, configs_dir, indexes_dir):
+        directory.mkdir(parents=True, exist_ok=True)
     variants_dir.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict[str, object]] = []
@@ -166,10 +180,16 @@ def materialize_msd_design_artifacts(
         updated_records.append(_record_with_sequence_artifacts(record, row=row))
 
     updated_catalog = MsdDesignCatalogV1(records=updated_records)
-    _write_materialized_catalog(updated_catalog, root=root, manifest_dir=manifest_dir)
-    _write_sequence_index(manifest_dir / SEQUENCE_INDEX_FILENAME, rows)
+    _write_materialized_catalog(
+        updated_catalog,
+        root=root,
+        bundle_manifest_dir=bundle_manifest_dir,
+        catalog_dir=catalog_dir,
+        indexes_dir=indexes_dir,
+    )
+    _write_sequence_index(indexes_dir / SEQUENCE_INDEX_FILENAME, rows)
     _write_sequence_manifest(
-        manifest_dir / SEQUENCE_MANIFEST_FILENAME,
+        bundle_manifest_dir / SEQUENCE_MANIFEST_FILENAME,
         rows=rows,
         render_formats=producer_render_formats,
         root=root,
@@ -178,8 +198,8 @@ def materialize_msd_design_artifacts(
     return MsdSequenceBundleResult(
         catalog=updated_catalog,
         bundle_root=root,
-        manifest_path=manifest_dir / SEQUENCE_MANIFEST_FILENAME,
-        index_path=manifest_dir / SEQUENCE_INDEX_FILENAME,
+        manifest_path=bundle_manifest_dir / SEQUENCE_MANIFEST_FILENAME,
+        index_path=indexes_dir / SEQUENCE_INDEX_FILENAME,
         variants=rows,
     )
 
@@ -227,7 +247,9 @@ def _write_materialized_catalog(
     catalog: MsdDesignCatalogV1,
     *,
     root: Path,
-    manifest_dir: Path,
+    bundle_manifest_dir: Path,
+    catalog_dir: Path,
+    indexes_dir: Path,
 ) -> Path:
     reference_filenames = [_reference_bundle_filename(record) for record in catalog.records]
     duplicate_reference_filenames = sorted(
@@ -238,7 +260,7 @@ def _write_materialized_catalog(
             f"Duplicate MSD design reference filename(s): {', '.join(duplicate_reference_filenames)}"
         )
 
-    references_dir = manifest_dir / REFERENCE_DIRNAME
+    references_dir = catalog_dir / REFERENCE_DIRNAME
     references_dir.mkdir(parents=True, exist_ok=True)
     reference_rows: list[dict[str, object]] = []
     for record, reference_filename in zip(catalog.records, reference_filenames, strict=True):
@@ -246,16 +268,16 @@ def _write_materialized_catalog(
         reference_path.write_text(record.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
         reference_rows.append(_reference_index_row(record, reference_path=reference_path, root=root))
 
-    catalog_path = manifest_dir / CATALOG_FILENAME
+    catalog_path = catalog_dir / CATALOG_FILENAME
     catalog_path.write_text(catalog.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
-    _write_reference_index(manifest_dir / REFERENCE_INDEX_FILENAME, reference_rows)
+    _write_reference_index(indexes_dir / REFERENCE_INDEX_FILENAME, reference_rows)
     _write_bundle_manifest(
-        manifest_dir / BUNDLE_MANIFEST_FILENAME,
+        bundle_manifest_dir / BUNDLE_MANIFEST_FILENAME,
         catalog=catalog,
         reference_rows=reference_rows,
-        catalog_path=(manifest_dir / CATALOG_FILENAME).relative_to(root).as_posix(),
-        reference_index_path=(manifest_dir / REFERENCE_INDEX_FILENAME).relative_to(root).as_posix(),
-        references_dir=(manifest_dir / REFERENCE_DIRNAME).relative_to(root).as_posix(),
+        catalog_path=catalog_path.relative_to(root).as_posix(),
+        reference_index_path=(indexes_dir / REFERENCE_INDEX_FILENAME).relative_to(root).as_posix(),
+        references_dir=references_dir.relative_to(root).as_posix(),
         grouped_dirs=[MANIFEST_DIRNAME, VARIANT_DIRNAME],
         top_level_files=[BUNDLE_README_FILENAME],
     )
@@ -341,13 +363,10 @@ def _guard_materialize_output_layout(
     manifest_dir = root / MANIFEST_DIRNAME
     if manifest_dir.exists():
         allowed_manifest_entries = {
-            BUNDLE_MANIFEST_FILENAME,
-            CATALOG_FILENAME,
-            COMPOSITION_CONFIG_DIRNAME,
-            REFERENCE_DIRNAME,
-            REFERENCE_INDEX_FILENAME,
-            SEQUENCE_INDEX_FILENAME,
-            SEQUENCE_MANIFEST_FILENAME,
+            MANIFEST_BUNDLE_DIRNAME,
+            MANIFEST_CATALOG_DIRNAME,
+            MANIFEST_CONFIGS_DIRNAME,
+            MANIFEST_INDEXES_DIRNAME,
             *IGNORED_OUTPUT_FILENAMES,
         }
         stale_manifest_entries = sorted(
@@ -359,7 +378,7 @@ def _guard_materialize_output_layout(
                 f"{', '.join(stale_manifest_entries)}. Choose a fresh --out-dir or archive/remove stale output first."
             )
 
-    references_dir = manifest_dir / REFERENCE_DIRNAME
+    references_dir = manifest_dir / MANIFEST_CATALOG_DIRNAME / REFERENCE_DIRNAME
     if references_dir.exists():
         stale_reference_entries = sorted(
             item.name
@@ -373,7 +392,7 @@ def _guard_materialize_output_layout(
                 "Choose a fresh --out-dir or explicitly archive/remove stale generated references before materializing."
             )
 
-    configs_dir = manifest_dir / COMPOSITION_CONFIG_DIRNAME
+    configs_dir = manifest_dir / MANIFEST_CONFIGS_DIRNAME / COMPOSITION_CONFIG_DIRNAME
     if configs_dir.exists():
         expected_config_names = {
             f"{design_id}.linear_ssdna_composition.yaml" for design_id in expected_design_ids
@@ -404,6 +423,7 @@ def _guard_materialize_output_layout(
         *IGNORED_OUTPUT_FILENAMES,
     }
     allowed_plot_entries = {
+        "composition_overview.png",
         "composition_overview.svg",
         "secondary_structure.native.png",
         *IGNORED_OUTPUT_FILENAMES,
@@ -596,14 +616,26 @@ def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) ->
             "stem_base_left": "Left Base",
             "stem_base_right": "Right Base",
         },
+        "scar_nick": {
+            "left_base": record.scar_nick.left_base,
+            "right_base": record.scar_nick.right_base,
+            "profile_s3s2s1s0": record.scar_nick.profile_s3s2s1s0,
+        },
         "component_hues": {
-            "flank_5p": "#4C78A8",
-            "flank_3p": "#72B7B2",
-            "payload_primary": "#F58518",
-            "payload_complement": "#E45756",
-            "snapback_cap_segment": "#54A24B",
-            "stem_base_left": "#B279A2",
-            "stem_base_right": "#9D755D",
+            "flank_5p": "#2563EB",
+            "flank_3p": "#14B8A6",
+            "payload_primary": "#F97316",
+            "payload_complement": "#DC2626",
+            "snapback_cap_segment": "#16A34A",
+            "stem_base_left": "#7C3AED",
+            "stem_base_right": "#A16207",
+        },
+        "component_styles": {
+            "flank_5p": {"fill": "#BFDBFE", "alpha": 0.72, "edge_color": "#2563EB"},
+            "payload_primary": {"fill": "#FDBA74", "alpha": 0.66, "edge_color": "#EA580C"},
+            "snapback_cap_segment": {"fill": "#86EFAC", "alpha": 0.68, "edge_color": "#16A34A"},
+            "payload_complement": {"fill": "#FCA5A5", "alpha": 0.66, "edge_color": "#DC2626"},
+            "flank_3p": {"fill": "#5EEAD4", "alpha": 0.72, "edge_color": "#0D9488"},
         },
         "base_highlight_color": "#111827",
     }
@@ -763,35 +795,44 @@ def _publish_variant_outputs(
 
     review_manifest = _publish_composition_review(construct_bundle)
     composition_overview_svg = plots_dir / "composition_overview.svg"
+    composition_overview_png = plots_dir / "composition_overview.png"
     _copy_required_file(construct_bundle / review_manifest.artifacts.review_svg, composition_overview_svg)
+    _copy_required_file(construct_bundle / review_manifest.artifacts.review_png, composition_overview_png)
 
+    composition_manifest_dir = manifest_dir / VARIANT_MANIFEST_COMPOSITION_DIRNAME
+    construct_manifest_dir = manifest_dir / VARIANT_MANIFEST_CONSTRUCT_DIRNAME
+    folding_manifest_dir = manifest_dir / VARIANT_MANIFEST_FOLDING_DIRNAME
+    provenance_manifest_dir = manifest_dir / VARIANT_MANIFEST_PROVENANCE_DIRNAME
+    reviews_manifest_dir = manifest_dir / VARIANT_MANIFEST_REVIEWS_DIRNAME
+    visual_manifest_dir = manifest_dir / VARIANT_MANIFEST_VISUAL_DIRNAME
+    secondary_structure_manifest_dir = visual_manifest_dir / VARIANT_MANIFEST_SECONDARY_STRUCTURE_DIRNAME
     manifest_sources = [
-        (construct_bundle / "manifest.json", manifest_dir / "construct_manifest.json"),
-        (construct_bundle / "assembled_sequence.json", manifest_dir / "assembled_sequence.json"),
-        (construct_bundle / "segment_spans.json", manifest_dir / "segment_spans.json"),
-        (construct_bundle / "annotation_spans.json", manifest_dir / "annotation_spans.json"),
-        (construct_bundle / "provenance.json", manifest_dir / "provenance.json"),
-        (construct_bundle / "validation_report.json", manifest_dir / "validation_report.json"),
+        (construct_bundle / "manifest.json", construct_manifest_dir / "manifest.json"),
+        (construct_bundle / "assembled_sequence.json", composition_manifest_dir / "assembled_sequence.json"),
+        (construct_bundle / "segment_spans.json", composition_manifest_dir / "segment_spans.json"),
+        (construct_bundle / "annotation_spans.json", composition_manifest_dir / "annotation_spans.json"),
+        (construct_bundle / "provenance.json", provenance_manifest_dir / "provenance.json"),
+        (construct_bundle / "validation_report.json", composition_manifest_dir / "validation_report.json"),
         (
             construct_bundle / "visual" / "sequence_evidence_map_v1.json",
-            manifest_dir / "sequence_evidence_map_v1.json",
+            visual_manifest_dir / "sequence_evidence_map_v1.json",
         ),
-        (folding_prediction, manifest_dir / "folding_prediction.json"),
-        (construct_bundle / "folding" / "folding_preflight.json", manifest_dir / "folding_preflight.json"),
+        (folding_prediction, folding_manifest_dir / "secondary_structure_prediction_v1.json"),
+        (construct_bundle / "folding" / "folding_preflight.json", folding_manifest_dir / "folding_preflight.json"),
         (
             construct_bundle / "folding" / "secondary_structure_prediction_request_v1.yaml",
-            manifest_dir / "folding_request.yaml",
+            folding_manifest_dir / "secondary_structure_prediction_request_v1.yaml",
         ),
-        (structure_manifest, manifest_dir / "viennarna_secondary_structure_svg_v1.json"),
-        (structure_annotation_manifest, manifest_dir / "secondary_structure.annotation_manifest.json"),
-        (native_structure_svg, manifest_dir / "secondary_structure.native.svg"),
+        (structure_manifest, secondary_structure_manifest_dir / "viennarna_secondary_structure_svg_v1.json"),
+        (structure_annotation_manifest, secondary_structure_manifest_dir / "annotation_manifest.json"),
+        (native_structure_svg, secondary_structure_manifest_dir / "native.svg"),
         (
             structure_plot_dir / "secondary_structure.annotated.svg",
-            manifest_dir / "secondary_structure.annotated.svg",
+            secondary_structure_manifest_dir / "annotated.svg",
         ),
         (
             construct_bundle / "visual" / "reviews" / "composition_review_svg_v1.json",
-            manifest_dir / "composition_review_svg_v1.json",
+            reviews_manifest_dir / "composition_review_svg_v1.json",
         ),
     ]
     for source, destination in manifest_sources:
@@ -803,11 +844,14 @@ def _publish_variant_outputs(
         "forward_fasta": forward_fasta.relative_to(root).as_posix(),
         "reverse_complement_fasta": reverse_complement_fasta.relative_to(root).as_posix(),
         "features_csv": features_csv.relative_to(root).as_posix(),
-        "visual_contract": (manifest_dir / "sequence_evidence_map_v1.json").relative_to(root).as_posix(),
-        "construct_manifest": (manifest_dir / "construct_manifest.json").relative_to(root).as_posix(),
-        "folding_prediction": (manifest_dir / "folding_prediction.json").relative_to(root).as_posix(),
+        "visual_contract": (visual_manifest_dir / "sequence_evidence_map_v1.json").relative_to(root).as_posix(),
+        "construct_manifest": (construct_manifest_dir / "manifest.json").relative_to(root).as_posix(),
+        "folding_prediction": (folding_manifest_dir / "secondary_structure_prediction_v1.json")
+        .relative_to(root)
+        .as_posix(),
         "folding_status": folding_status,
         "composition_overview_svg": composition_overview_svg.relative_to(root).as_posix(),
+        "composition_overview_png": composition_overview_png.relative_to(root).as_posix(),
         "secondary_structure_native_png": native_structure_png.relative_to(root).as_posix(),
     }
 
@@ -1065,6 +1109,7 @@ def _sequence_index_row(
         "folding_prediction": curated["folding_prediction"],
         "folding_status": curated["folding_status"],
         "composition_overview_svg": curated["composition_overview_svg"],
+        "composition_overview_png": curated["composition_overview_png"],
         "secondary_structure_native_png": curated["secondary_structure_native_png"],
         "finder_reveal": f"open -R {shlex.quote(genbank_path.as_posix())}",
     }
@@ -1092,6 +1137,7 @@ def _record_with_sequence_artifacts(record: MsdDesignReferenceV1, *, row: Mappin
     }
     for field in (
         "composition_overview_svg",
+        "composition_overview_png",
         "secondary_structure_native_png",
     ):
         value = row.get(field)
@@ -1142,6 +1188,7 @@ def _write_sequence_index(path: Path, rows: list[dict[str, object]]) -> None:
         "folding_prediction",
         "folding_status",
         "composition_overview_svg",
+        "composition_overview_png",
         "secondary_structure_native_png",
         "finder_reveal",
     ]
@@ -1194,11 +1241,17 @@ def _write_sequence_manifest(
     payload = {
         "contract": "msd_single_unit_sequence_bundle_v1",
         "schema_version": 1,
-        "catalog": f"{MANIFEST_DIRNAME}/{CATALOG_FILENAME}",
-        "sequence_index": f"{MANIFEST_DIRNAME}/{SEQUENCE_INDEX_FILENAME}",
+        "catalog": f"{MANIFEST_DIRNAME}/{MANIFEST_CATALOG_DIRNAME}/{CATALOG_FILENAME}",
+        "sequence_index": f"{MANIFEST_DIRNAME}/{MANIFEST_INDEXES_DIRNAME}/{SEQUENCE_INDEX_FILENAME}",
         "manifest_dir": MANIFEST_DIRNAME,
         "variants_dir": VARIANT_DIRNAME,
-        "composition_configs_dir": f"{MANIFEST_DIRNAME}/{COMPOSITION_CONFIG_DIRNAME}",
+        "composition_configs_dir": (f"{MANIFEST_DIRNAME}/{MANIFEST_CONFIGS_DIRNAME}/{COMPOSITION_CONFIG_DIRNAME}"),
+        "manifest_layout": {
+            "bundle_dir": f"{MANIFEST_DIRNAME}/{MANIFEST_BUNDLE_DIRNAME}",
+            "catalog_dir": f"{MANIFEST_DIRNAME}/{MANIFEST_CATALOG_DIRNAME}",
+            "configs_dir": f"{MANIFEST_DIRNAME}/{MANIFEST_CONFIGS_DIRNAME}",
+            "indexes_dir": f"{MANIFEST_DIRNAME}/{MANIFEST_INDEXES_DIRNAME}",
+        },
         "unit_count_per_design": _MSD_UNIT_REPEAT_COUNT,
         "render_formats": list(render_formats),
         "variant_count": len(rows),
@@ -1207,6 +1260,14 @@ def _write_sequence_manifest(
             "sequences_dir": VARIANT_SEQUENCES_DIRNAME,
             "plots_dir": VARIANT_PLOTS_DIRNAME,
             "manifest_dir": VARIANT_MANIFEST_DIRNAME,
+            "manifest_groups": [
+                VARIANT_MANIFEST_COMPOSITION_DIRNAME,
+                VARIANT_MANIFEST_CONSTRUCT_DIRNAME,
+                VARIANT_MANIFEST_FOLDING_DIRNAME,
+                VARIANT_MANIFEST_PROVENANCE_DIRNAME,
+                VARIANT_MANIFEST_REVIEWS_DIRNAME,
+                VARIANT_MANIFEST_VISUAL_DIRNAME,
+            ],
             "runtime_dir": VARIANT_RUNTIME_DIRNAME,
             "construct_runtime_dir": f"{VARIANT_RUNTIME_DIRNAME}/{CONSTRUCT_RUNTIME_DIRNAME}",
         },
@@ -1232,8 +1293,14 @@ def _write_bundle_readme(
             "Generated bundle for one single-unit MSD sequence per design.",
             "",
             "Open first:",
-            f"- `{MANIFEST_DIRNAME}/{SEQUENCE_INDEX_FILENAME}`: scan table with GenBank, plot, and Finder paths.",
-            f"- `{MANIFEST_DIRNAME}/{SEQUENCE_MANIFEST_FILENAME}`: machine-readable bundle manifest.",
+            (
+                f"- `{MANIFEST_DIRNAME}/{MANIFEST_INDEXES_DIRNAME}/{SEQUENCE_INDEX_FILENAME}`: "
+                "scan table with GenBank, plot, and Finder paths."
+            ),
+            (
+                f"- `{MANIFEST_DIRNAME}/{MANIFEST_BUNDLE_DIRNAME}/{SEQUENCE_MANIFEST_FILENAME}`: "
+                "machine-readable bundle manifest."
+            ),
             f"- `{first_variant}/{VARIANT_SEQUENCES_DIRNAME}/forward.gb`: first forward GenBank export.",
             (
                 f"- `{first_variant}/{VARIANT_SEQUENCES_DIRNAME}/reverse_complement.gb`: "
@@ -1247,6 +1314,10 @@ def _write_bundle_readme(
                 f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/composition_overview.svg`: "
                 "first two-row structure/component review."
             ),
+            (
+                f"- `{first_variant}/{VARIANT_PLOTS_DIRNAME}/composition_overview.png`: "
+                "high-resolution PNG sibling for the first two-row review."
+            ),
             "",
             f"Record count: {len(catalog.records)}",
             "",
@@ -1256,16 +1327,24 @@ def _write_bundle_readme(
                 f"and `{VARIANT_DIRNAME}/`;"
             ),
             (
-                f"- keep runtime and provenance metadata under `{MANIFEST_DIRNAME}/` or each variant "
-                f"`{VARIANT_MANIFEST_DIRNAME}/`;"
+                f"- keep root metadata grouped under `{MANIFEST_DIRNAME}/{MANIFEST_BUNDLE_DIRNAME}/`, "
+                f"`{MANIFEST_DIRNAME}/{MANIFEST_CATALOG_DIRNAME}/`, "
+                f"`{MANIFEST_DIRNAME}/{MANIFEST_CONFIGS_DIRNAME}/`, and "
+                f"`{MANIFEST_DIRNAME}/{MANIFEST_INDEXES_DIRNAME}/`;"
             ),
-            f"- keep each variant grouped by `{VARIANT_SEQUENCES_DIRNAME}/`, `{VARIANT_PLOTS_DIRNAME}/`, "
-            f"`{VARIANT_MANIFEST_DIRNAME}/`, and `{VARIANT_RUNTIME_DIRNAME}/`;",
+            (
+                f"- keep each variant grouped by `{VARIANT_SEQUENCES_DIRNAME}/`, `{VARIANT_PLOTS_DIRNAME}/`, "
+                f"`{VARIANT_MANIFEST_DIRNAME}/`, and `{VARIANT_RUNTIME_DIRNAME}/`; variant manifests group "
+                "composition, construct, folding, provenance, review, and visual records;"
+            ),
             "- sequence bundles contain one MSD unit per design; do not repeat-expand complete MSD units.",
             "",
             "Finder:",
             f"- `open {shlex.quote(path.parent.as_posix())}` opens the transient bundle directory.",
-            f"- `finder_reveal` in `{MANIFEST_DIRNAME}/{SEQUENCE_INDEX_FILENAME}` reveals each forward GenBank file.",
+            (
+                f"- `finder_reveal` in `{MANIFEST_DIRNAME}/{MANIFEST_INDEXES_DIRNAME}/{SEQUENCE_INDEX_FILENAME}` "
+                "reveals each forward GenBank file."
+            ),
             "",
         ]
         path.write_text("\n".join(lines), encoding="utf-8")
@@ -1299,7 +1378,11 @@ __all__ = [
     "COMPOSITION_CONFIG_DIRNAME",
     "DEFAULT_FLANK_3P_SUFFIX",
     "DEFAULT_FLANK_5P_PREFIX",
+    "MANIFEST_BUNDLE_DIRNAME",
+    "MANIFEST_CATALOG_DIRNAME",
+    "MANIFEST_CONFIGS_DIRNAME",
     "MANIFEST_DIRNAME",
+    "MANIFEST_INDEXES_DIRNAME",
     "MsdSequenceBundleResult",
     "REFERENCE_DIRNAME",
     "REFERENCE_FILENAME",

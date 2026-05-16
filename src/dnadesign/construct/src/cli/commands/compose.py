@@ -123,6 +123,7 @@ def review_composition(
         return
     typer.echo(f"Composition review complete: review_id={manifest.review_id}")
     typer.echo(f"review_svg: {Path(bundle) / manifest.artifacts.review_svg}")
+    typer.echo(f"review_png: {Path(bundle) / manifest.artifacts.review_png}")
 
 
 def _composition_artifact_hints(artifact_bundle: Path) -> dict[str, str]:

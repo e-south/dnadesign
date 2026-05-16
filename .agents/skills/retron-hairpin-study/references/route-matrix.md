@@ -25,9 +25,9 @@ study-phase reporting.
 - If sequence or visual artifacts are requested, materialize one MSD unit per
   design and keep complete-unit repeat expansion out of the compiler.
 - If Finder/output/deliverable language is present, verify
-  `manifest/sequence_index.tsv`, per-design GenBank files,
-  `plots/secondary_structure.native.png`, and
-  `plots/composition_overview.svg` before reporting success.
+  `manifest/indexes/sequence_index.tsv`, per-design GenBank files,
+  `plots/secondary_structure.native.png`, `plots/composition_overview.svg`, and
+  `plots/composition_overview.png` before reporting success.
 - If primitive sources select multiple ranks, fail fast unless a future
   expansion contract is explicit; the preferred product surface is one selected
   cap rank plus one selected stem-base rank per design.

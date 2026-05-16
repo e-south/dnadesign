@@ -850,17 +850,17 @@ def _expand_root_viewbox(
     height = _float_text(root.attrib.get("height"))
     viewbox = _root_viewbox(root, width=width, height=height)
     candidate_boxes: list[tuple[float, float, float, float]] = []
+    geometry_box: tuple[float, float, float, float] | None = None
     geometry_bbox = layout_normalization.get("geometry_bbox")
     if isinstance(geometry_bbox, dict):
         try:
-            candidate_boxes.append(
-                (
-                    float(geometry_bbox["min_x"]),
-                    float(geometry_bbox["min_y"]),
-                    float(geometry_bbox["max_x"]),
-                    float(geometry_bbox["max_y"]),
-                )
+            geometry_box = (
+                float(geometry_bbox["min_x"]),
+                float(geometry_bbox["min_y"]),
+                float(geometry_bbox["max_x"]),
+                float(geometry_bbox["max_y"]),
             )
+            candidate_boxes.append(geometry_box)
         except (KeyError, TypeError, ValueError):
             pass
     candidate_boxes.extend(label_boxes)
@@ -875,6 +875,14 @@ def _expand_root_viewbox(
         max_y = min_y + view_height
     else:
         return
+    if geometry_box is not None and geometry_box[2] > geometry_box[0]:
+        geometry_margin = max(
+            geometry_box[0] - min_x,
+            max_x - geometry_box[2],
+            0.0,
+        )
+        min_x = geometry_box[0] - geometry_margin
+        max_x = geometry_box[2] + geometry_margin
     pad = 12.0
     new_width = max_x - min_x + 2 * pad
     new_height = max_y - min_y + 2 * pad

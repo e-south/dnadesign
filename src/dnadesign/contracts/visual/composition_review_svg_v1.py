@@ -49,11 +49,12 @@ class CompositionReviewSvgSourcesV1(VisualContractModel):
 
 class CompositionReviewSvgArtifactsV1(VisualContractModel):
     review_svg: str
+    review_png: str
 
-    @field_validator("review_svg")
+    @field_validator("review_svg", "review_png")
     @classmethod
     def _artifact_not_blank(cls, value: str) -> str:
-        return _not_blank(value, label="review_svg")
+        return _not_blank(value, label="review artifact")
 
 
 class CompositionReviewSvgLayoutV1(VisualContractModel):
@@ -71,6 +72,8 @@ class CompositionReviewSvgLayoutV1(VisualContractModel):
     component_source_title_policy: Literal["omit_redundant_source_title"] = "omit_redundant_source_title"
     structure_to_component_width_ratio: float = Field(gt=0)
     vertical_gap_px: float = Field(ge=0)
+    review_png_scale: float = Field(gt=0)
+    review_png_ppi: float = Field(gt=0)
 
     @model_validator(mode="after")
     def _validate_panel_order(self) -> "CompositionReviewSvgLayoutV1":
