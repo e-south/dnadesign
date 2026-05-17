@@ -6,6 +6,9 @@
 Public import surface: `dnadesign.usr`
 
 Mutation methods require a registry at the dataset root.
+Registry namespace setup is part of the public library surface via
+`parse_columns_spec` and `register_namespace`; cross-tool tests and operators
+should not import `dnadesign.usr.src.registry` directly.
 
 Internal modules under `dnadesign.usr.src.*` are implementation details. Cross-tool callers should
 import from `dnadesign.usr`; the old sibling root modules such as `dnadesign.usr.dataset` and

@@ -16,7 +16,7 @@
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 
 If you still need to choose between source assembly, construct expansion, and feature extraction, start with [Promoter study Evo2 workflow journey](promoter-evo2-journey.md) first.
-If you need a maintained answer to "where is this real study right now?", keep the companion [Promoter study status contract](promoter-study-status-contract.md) next to the active study manifest and affiliated-dataset registry.
+If you need a maintained answer to "where is this real study right now?", keep the companion [Stress ethanol/cipro status contract](../../../../../docs/studies/stress_ethanol_cipro_growth/status-contract.md) next to the active study manifest and affiliated-dataset registry.
 
 Use this runbook to:
 

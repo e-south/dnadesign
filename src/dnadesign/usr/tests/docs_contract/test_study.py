@@ -25,7 +25,6 @@ def test_promoter_study_registry_and_snapshot_surfaces_have_expected_structure()
     by_id = {row["study_id"]: row for row in studies_index["studies"]}
 
     assert studies_index["active_study_id"] == "stress_ethanol_cipro_growth"
-    assert by_id["stress_ethanol_cipro_growth"]["family"] == "promoter"
     assert by_id["stress_ethanol_cipro_growth"]["record_root"] == "docs/studies/stress_ethanol_cipro_growth"
 
     roles = {row["role"] for row in datasets["datasets"]}
@@ -49,7 +48,7 @@ def test_promoter_study_docs_link_and_reference_owner_surfaces() -> None:
     for rel_path in (
         "docs/studies/README.md",
         "src/dnadesign/usr/docs/operations/promoter-evo2-journey.md",
-        "src/dnadesign/usr/docs/operations/promoter-study-status-contract.md",
+        "docs/studies/stress_ethanol_cipro_growth/status-contract.md",
     ):
         assert_markdown_links_resolve(rel_path)
 
@@ -59,7 +58,7 @@ def test_promoter_study_docs_link_and_reference_owner_surfaces() -> None:
 
     assert "multi-source-shared-dataset-assembly.md" in journey
     assert "construct-infer-shared-dataset-runbook.md" in journey
-    assert "promoter-study-status-contract.md" in journey
+    assert "status-contract.md" in journey
     assert "usr-infer-x-active-learning.md" in journey
     assert "Route map: `routes.md`" in status
     assert "Study execution map: `pipeline.yaml`" in status
@@ -68,37 +67,35 @@ def test_promoter_study_docs_link_and_reference_owner_surfaces() -> None:
     assert "### LatentDNA comparison surface" in routes
 
 
-def test_promoter_study_contract_and_templates_reference_checked_in_record_surfaces() -> None:
-    contract = read_text("src/dnadesign/usr/docs/operations/promoter-study-status-contract.md")
-    preflight = read_text("src/dnadesign/usr/docs/operations/promoter-study-preflight.md")
+def test_stress_ethanol_cipro_contract_avoids_family_templates() -> None:
+    contract = read_text("docs/studies/stress_ethanol_cipro_growth/status-contract.md")
+    preflight = read_text("docs/studies/stress_ethanol_cipro_growth/preflight.md")
     templates_index = read_text("docs/templates/README.md")
-    status_template = read_text("docs/templates/promoter-study-status.md")
-    datasets_template = read_text("docs/templates/promoter-study-datasets.yaml")
 
-    assert "docs/studies/index.yaml" in contract
-    assert "docs/studies/<study-id>/" in contract
-    assert "promoter-study-preflight --scope next --json" in contract
-    assert "Minimum blocker evidence" in preflight
-    assert "promoter-study-index.yaml" in templates_index
-    assert "promoter-study-datasets.yaml" in templates_index
-    assert "promoter-study-status.md" in templates_index
-    assert "### Current datasets" in status_template
-    assert "### Current phase" in status_template
-    assert "root_kind: shared|workspace_local_export|external_usr" in datasets_template
-    assert "onboard_mode: existing_local|existing_remote|existing_both|create_new" in datasets_template
+    assert "stress_ethanol_cipro_growth" in contract
+    assert "studies.stress-ethanol-cipro-growth.status --json" in contract
+    assert "Use this only for `stress_ethanol_cipro_growth`" in contract
+    assert "studies.stress-ethanol-cipro-growth.preflight --scope next --json" in preflight
+    assert "promoter-study-index.yaml" not in templates_index
+    assert "promoter-study-datasets.yaml" not in templates_index
+    assert "promoter-study-ops.study.yaml" not in templates_index
+    assert "stress-ethanol-cipro-growth-status.md" not in templates_index
 
 
 def test_repo_local_skill_audit_scripts_are_documented_and_present() -> None:
     dev_docs = read_text("docs/dev/README.md")
     repo = repo_root()
-    promoter_skill_root = repo / ".agents" / "skills" / "promoter-study-status"
+    promoter_skill_root = repo / ".agents" / "skills" / "stress-ethanol-cipro-growth-status"
     sync_skill_root = repo / ".agents" / "skills" / "bu-scc-usr-sync"
 
-    assert ".agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh" in dev_docs
+    assert (
+        ".agents/skills/stress-ethanol-cipro-growth-status/scripts/audit-stress-ethanol-cipro-growth-status-skill.sh"
+        in dev_docs
+    )
     assert ".agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh" in dev_docs
 
     assert (promoter_skill_root / "SKILL.md").exists()
-    assert (promoter_skill_root / "scripts" / "audit-promoter-study-status-skill.sh").exists()
+    assert (promoter_skill_root / "scripts" / "audit-stress-ethanol-cipro-growth-status-skill.sh").exists()
     assert (promoter_skill_root / "references" / "route-matrix.md").exists()
     assert (promoter_skill_root / "references" / "refresh-loop.md").exists()
     assert (promoter_skill_root / "references" / "study-surfaces.md").exists()
@@ -111,7 +108,12 @@ def test_repo_local_skill_audit_scripts_are_documented_and_present() -> None:
 def test_repo_local_skill_audits_pass() -> None:
     repo = repo_root()
     commands = [
-        repo / ".agents" / "skills" / "promoter-study-status" / "scripts" / "audit-promoter-study-status-skill.sh",
+        repo
+        / ".agents"
+        / "skills"
+        / "stress-ethanol-cipro-growth-status"
+        / "scripts"
+        / "audit-stress-ethanol-cipro-growth-status-skill.sh",
         repo / ".agents" / "skills" / "bu-scc-usr-sync" / "scripts" / "audit-bu-scc-usr-sync-skill.sh",
     ]
     for command in commands:

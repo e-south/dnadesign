@@ -232,8 +232,10 @@ STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
     "docs/README.md",
     "docs/studies/README.md",
     "docs/studies/study-status-ops-surfaces.md",
-    "src/dnadesign/usr/docs/operations/promoter-study-status-contract.md",
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/status-contract.md",
+    "docs/studies/stress_ethanol_cipro_growth/preflight.md",
+    "docs/studies/retron_hairpin_design/status-contract.md",
+    "docs/studies/retron_hairpin_design/preflight.md",
 )
 LEGACY_STUDY_STATUS_SURFACE_TERMS = (
     "study-family policy",
@@ -318,25 +320,25 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/promoter-study-status-contract.md": {
+    "docs/studies/stress_ethanol_cipro_growth/status-contract.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "studies",
     },
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md": {
+    "docs/studies/stress_ethanol_cipro_growth/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "studies",
     },
-    "src/dnadesign/cruncher/docs/operations/cruncher-study-status.md": {
+    "docs/studies/retron_hairpin_design/status-contract.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "cruncher",
+        "owner_boundary": "studies",
     },
-    "src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md": {
+    "docs/studies/retron_hairpin_design/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "cruncher",
+        "owner_boundary": "studies",
     },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
@@ -377,11 +379,11 @@ OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/studies/README.md",
     "docs/studies/stress_ethanol_cipro_growth/status.md",
     "src/dnadesign/ops/README.md",
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/preflight.md",
 )
 STUDY_EXECUTION_SOURCE_DOC_PATHS = (
     "docs/studies/README.md",
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -430,8 +432,10 @@ def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
 
     docs_md_files = sorted(docs_root.rglob("*.md"))
     tool_docs_md_files = _collect_tool_docs_markdown_files(repo_root)
+    tool_readme_md_files = _collect_tool_readme_markdown_files(repo_root)
     all_md_files = list(docs_md_files)
     all_md_files.extend(tool_docs_md_files)
+    all_md_files.extend(tool_readme_md_files)
     for name in ROOT_MARKDOWN_FILES:
         path = repo_root / name
         if path.exists():
@@ -453,6 +457,19 @@ def _collect_tool_docs_markdown_files(repo_root: Path) -> list[Path]:
         for path in docs_root.rglob("*.md"):
             tool_docs.add(path)
     return sorted(tool_docs)
+
+
+def _collect_tool_readme_markdown_files(repo_root: Path) -> list[Path]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+
+    files: list[Path] = []
+    for tool_name in sorted(discover_repo_tools(repo_root=repo_root)):
+        readme_path = src_root / tool_name / "README.md"
+        if readme_path.exists():
+            files.append(readme_path)
+    return files
 
 
 def _collect_markdown_files_from_relative_paths(repo_root: Path, *, relative_paths: tuple[str, ...]) -> list[Path]:
@@ -1581,7 +1598,7 @@ def _find_study_status_surface_semantics_issues(repo_root: Path) -> list[str]:
             line_no = content[: content.index(term)].count("\n") + 1
             issues.append(
                 f"{path}:{line_no}: stale study-status family ontology term {term!r} is not allowed; "
-                "route studies through explicit ops_surfaces.status_kind and ops_surfaces.preflight_kind."
+                "route studies through concrete study-owned providers only when those providers exist."
             )
     return issues
 
@@ -1802,7 +1819,7 @@ def _extract_section_bodies(text: str) -> dict[str, str]:
 
 
 def _collect_public_interface_markdown_files(repo_root: Path) -> list[Path]:
-    files: set[Path] = set()
+    files: set[Path] = set(_collect_tool_readme_markdown_files(repo_root))
     for rel in PUBLIC_INTERFACE_DOC_PATHS:
         target = repo_root / rel
         if not target.exists():

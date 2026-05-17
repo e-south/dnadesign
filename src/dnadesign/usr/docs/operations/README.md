@@ -37,8 +37,8 @@ Use this index to pick the next dataset, sync, or handoff step.
 | Need | Runbook |
 | --- | --- |
 | Bootstrap a fresh thread, recover a missing study record, or find the next study-owned handoff | [../../../../../docs/studies/README.md](../../../../../docs/studies/README.md) |
-| Current study status | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
-| Current study preflight | [promoter-study-preflight.md](promoter-study-preflight.md) |
+| Current study status | [status-contract.md](../../../../../docs/studies/stress_ethanol_cipro_growth/status-contract.md) |
+| Current study preflight | [preflight.md](../../../../../docs/studies/stress_ethanol_cipro_growth/preflight.md) |
 | Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 | Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
 
@@ -67,8 +67,8 @@ Use this index to pick the next dataset, sync, or handoff step.
    [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md)
 4. Promoter study workflows:
    [promoter-evo2-journey.md](promoter-evo2-journey.md),
-   [promoter-study-status-contract.md](promoter-study-status-contract.md),
-   [promoter-study-preflight.md](promoter-study-preflight.md),
+   [status-contract.md](../../../../../docs/studies/stress_ethanol_cipro_growth/status-contract.md),
+   [preflight.md](../../../../../docs/studies/stress_ethanol_cipro_growth/preflight.md),
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:
    [sync-fidelity-drills.md](sync-fidelity-drills.md),

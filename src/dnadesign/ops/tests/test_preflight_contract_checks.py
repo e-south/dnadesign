@@ -47,8 +47,8 @@ def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str
 def _contract() -> StudyOpsContract:
     return StudyOpsContract(
         study_id="demo_study",
-        status_kind="promoter-study-status",
-        preflight_kind="promoter-study-preflight",
+        status_kind="stress-ethanol-cipro-growth-status",
+        preflight_kind="stress-ethanol-cipro-growth-preflight",
         title="Demo study",
         phase_order=("infer_batch_preparation", "infer_anchor_only_20b", "infer_anchor_only_7b"),
         snapshot_summary_scope="repo",

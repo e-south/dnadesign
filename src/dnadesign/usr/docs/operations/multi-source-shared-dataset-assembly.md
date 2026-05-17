@@ -23,7 +23,7 @@ Use this runbook to:
 
 This runbook uses a packaged construct workspace as a local tracer bullet. The
 commands below intentionally keep early mutations inside that workspace-local
-USR root. For live promoter-study status and continuation, keep the study
+USR root. For live stress_ethanol_cipro_growth status and continuation, keep the study
 record's declared shared USR root authoritative and move or repoint the flow
 deliberately before treating the dataset as the cross-tool source of truth.
 

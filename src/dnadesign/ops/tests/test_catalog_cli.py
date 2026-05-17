@@ -319,7 +319,7 @@ def test_cli_catalog_list_supports_related_tool_sources() -> None:
     assert "procedures" not in payload
 
 
-def test_cli_catalog_list_supports_related_tool_sources_for_promoter_study_status() -> None:
+def test_cli_catalog_list_supports_related_tool_sources_for_stress_ethanol_cipro_growth_status() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -332,14 +332,14 @@ def test_cli_catalog_list_supports_related_tool_sources_for_promoter_study_statu
             "--section",
             "tool-sources",
             "--related-to",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--json",
         ],
     )
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-study-status"}
+    assert payload["filters"] == {"related_to": "studies.stress-ethanol-cipro-growth.status"}
     assert payload["counts"] == {"tool_sources": 8}
     assert [entry["tool"] for entry in payload["tool_sources"]] == [
         "densegen",
@@ -385,7 +385,7 @@ def test_cli_catalog_list_supports_related_to_filter() -> None:
     assert "tool_sources" not in payload
 
 
-def test_cli_catalog_list_supports_related_to_filter_for_promoter_study_status() -> None:
+def test_cli_catalog_list_supports_related_to_filter_for_stress_ethanol_cipro_growth_status() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -398,17 +398,17 @@ def test_cli_catalog_list_supports_related_to_filter_for_promoter_study_status()
             "--section",
             "procedures",
             "--related-to",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--json",
         ],
     )
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-study-status"}
+    assert payload["filters"] == {"related_to": "studies.stress-ethanol-cipro-growth.status"}
     assert payload["counts"] == {"procedures": 4}
     assert {entry["registry_id"] for entry in payload["procedures"]} == {
-        "usr.data-plane.promoter-study-preflight",
+        "studies.stress-ethanol-cipro-growth.preflight",
         "usr.data-plane.multi-source-source-of-truth",
         "usr.data-plane.construct-infer-source-of-truth",
         "usr.data-plane.promoter-feature-matrix",
@@ -583,7 +583,7 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
     ]
 
 
-def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_status() -> None:
+def test_cli_catalog_show_json_exposes_latentdna_route_from_stress_ethanol_cipro_growth_status() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -591,7 +591,7 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
         [
             "catalog",
             "show",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--repo-root",
             str(_repo_root()),
             "--json",
@@ -600,7 +600,7 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["owner_boundary"] == "usr"
+    assert payload["owner_boundary"] == "studies"
     assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
         "densegen",
         "construct",
@@ -611,10 +611,10 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
         "notify",
         "ops",
     ]
-    assert ("latentdna", "promoter-study-representation-comparison") in [
+    assert ("latentdna", "stress-ethanol-cipro-representation-comparison") in [
         (entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]
     ]
-    assert ("handoff-to", "usr.data-plane.promoter-study-preflight") in [
+    assert ("handoff-to", "studies.stress-ethanol-cipro-growth.preflight") in [
         (entry["relation_type"], entry["registry_id"]) for entry in payload["related_procedures"]
     ]
 

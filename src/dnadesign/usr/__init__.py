@@ -99,6 +99,8 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "write_view_semantics": (".src.api", "write_view_semantics"),
     "ensure_registry_entries": (".src.api", "ensure_registry_entries"),
     "ensure_sequence_contract_namespaces": (".src.api", "ensure_sequence_contract_namespaces"),
+    "parse_columns_spec": (".src.api", "parse_columns_spec"),
+    "register_namespace": (".src.api", "register_namespace"),
 }
 
 __all__ = list(_ATTR_SOURCES)

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/cli/__init__.py
 
-Intentional public CLI entrypoint shim for the installed OPS console script.
+Public CLI entrypoint module for the installed OPS console script.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

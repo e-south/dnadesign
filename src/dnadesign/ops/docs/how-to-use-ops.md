@@ -26,7 +26,7 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 
 ### Check status or build a manifest
 
-- `uv run ops progress explain <registry-id>`: print the required status flags, a ready-to-paste `progress show` command, and any adapter-specific notes before you touch artifacts.
+- `uv run ops progress explain <registry-id>`: print the required status flags, a ready-to-paste `progress show` command, and any provider-specific notes before you touch artifacts.
 - `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one status surface once you have the explicit artifact inputs.
 - `uv run ops catalog show <registry-id>`: inspect the required status flags before you run `progress show` if you do not already know the artifact contract.
 - `uv run ops progress scaffold <registry-id> ...`: emit an explicit manifest skeleton for one or more registered procedures. It prints YAML to stdout unless you pass `--out`.

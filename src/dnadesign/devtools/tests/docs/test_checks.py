@@ -391,7 +391,7 @@ def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms
         "Verify the active study selector, `family`, and `record_root` in the study index.\n",
     )
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "promoter-study-status-contract.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "status-contract.md",
         "The selected study entry must declare `family` and `record_root`.\n",
     )
 
@@ -2333,6 +2333,79 @@ def test_public_interface_doc_contract_includes_maintainer_and_runbook_routers(t
     assert any("docs/runbooks/README.md" in issue and "absolute filesystem path token" in issue for issue in issues)
 
 
+def test_public_interface_doc_contract_includes_top_level_tool_readmes(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "opal" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "README.md",
+        "Call `python -m dnadesign.cruncher.src.cli.app` from `/tmp/opal-demo`.\n",
+    )
+
+    issues = _find_public_interface_doc_contract_issues(tmp_path)
+
+    assert any("src/dnadesign/opal/README.md" in issue and "internal source inreach" in issue for issue in issues)
+    assert any(
+        "src/dnadesign/opal/README.md" in issue and "absolute filesystem path token" in issue for issue in issues
+    )
+
+
+def test_broken_link_check_includes_top_level_tool_readmes(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    _write(tmp_path / "docs" / "README.md", f"## Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n")
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "opal" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "README.md",
+        "![opal banner](assets/opal-banner.svg)\n\nOPAL narrative.\n\n## Documentation\n\n[Missing](docs/missing.md)\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "opal" / "assets" / "opal-banner.svg", VALID_TOOL_BANNER_SVG)
+    _write(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "# dnadesign",
+                "",
+                "[Documentation](docs/README.md)",
+                "",
+                "## Available tools",
+                "",
+                "| Tool | Description | Coverage |",
+                "| --- | --- | --- |",
+                "| [**opal**](src/dnadesign/opal/README.md) | opal tool | "
+                "[Codecov](https://codecov.io/gh/example/repo?component=opal) |",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "codecov.yml",
+        "\n".join(
+            [
+                "component_management:",
+                "  default_rules:",
+                "    statuses:",
+                "      - type: project",
+                "        target: auto",
+                "        threshold: 0.5%",
+                "        if_ci_failed: error",
+                "        if_not_found: failure",
+                "  individual_components:",
+                "    - component_id: opal",
+                "      name: opal",
+                "      paths:",
+                "        - src/dnadesign/opal/**",
+                "",
+            ]
+        ),
+    )
+
+    rc = main(["--repo-root", str(tmp_path)])
+
+    assert rc == 1
+
+
 def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "README.md", f"## Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n")
@@ -3035,7 +3108,7 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
         "Use infer_local_runtime and notify_profile_doctor in ops.study.yaml.\n",
     )
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "promoter-study-preflight.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "preflight.md",
         "Read notify.profile.*.details.setup_command after infer_validate_config.\n",
     )
 
@@ -3054,14 +3127,14 @@ def test_study_execution_source_drift_check_flags_pipeline_only_claims(tmp_path:
         "Use pipeline.yaml as the only source for real Construct, Infer, and runbook paths.\n",
     )
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "promoter-study-preflight.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "preflight.md",
         "pipeline.yaml remains the only valid source for exact execution surfaces.\n",
     )
 
     issues = _find_study_execution_source_drift_issues(tmp_path)
 
     assert any("docs/studies/README.md" in issue for issue in issues)
-    assert any("promoter-study-preflight.md" in issue for issue in issues)
+    assert any("preflight.md" in issue for issue in issues)
 
 
 def test_legacy_contract_surface_docs_check_flags_repo_root_contract_references(tmp_path: Path) -> None:

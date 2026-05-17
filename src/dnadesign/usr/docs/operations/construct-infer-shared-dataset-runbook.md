@@ -19,7 +19,7 @@ If upstream inputs still span multiple USR datasets, start with [multi-source-sh
 
 This runbook uses the packaged construct workspace as a local tracer bullet.
 Its early commands intentionally write into that packaged workspace-local USR
-root. For live promoter-study status and continuation, keep the study record's
+root. For live stress_ethanol_cipro_growth status and continuation, keep the study record's
 declared shared USR root authoritative and repoint construct configs
 deliberately before treating the dataset as the cross-tool source of truth.
 

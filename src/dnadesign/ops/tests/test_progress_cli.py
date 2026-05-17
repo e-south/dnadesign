@@ -24,10 +24,7 @@ import dnadesign.usr as usr_pkg
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.status_adapters.promoter_status.ops.provider import (
-    provide_promoter_preflight,
-    provide_promoter_status,
-)
+from dnadesign.ops.status.service import run_status_kind
 from dnadesign.usr import (
     Dataset,
     SequenceViewRecord,
@@ -36,8 +33,12 @@ from dnadesign.usr import (
     write_sequence_views,
 )
 
-PROMOTER_STATUS_ADAPTER_MODULE = "dnadesign.studies.status_adapters.promoter_status.adapter"
-PROMOTER_RUN_PREFLIGHT_COMMAND_REF = f"{PROMOTER_STATUS_ADAPTER_MODULE}.run_preflight_command"
+STRESS_ETHANOL_CIPRO_GROWTH_STATUS_SERVICE_MODULE = (
+    "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service"
+)
+STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF = (
+    f"{STRESS_ETHANOL_CIPRO_GROWTH_STATUS_SERVICE_MODULE}.run_preflight_command"
+)
 
 
 def _repo_root() -> Path:
@@ -48,14 +49,35 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
-def _promoter_study_status(study_dir: Path | None, *, repo_root: Path | None) -> tuple[str, str, dict[str, object]]:
+def test_progress_command_source_is_decomposed_by_responsibility() -> None:
+    source_root = _repo_root() / "src" / "dnadesign" / "ops" / "cli" / "commands"
+    budgets = {
+        "progress.py": 550,
+        "progress_render.py": 350,
+        "progress_status_specs.py": 150,
+    }
+
+    for filename, max_lines in budgets.items():
+        path = source_root / filename
+        assert path.is_file(), filename
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        assert line_count <= max_lines, f"{filename} has {line_count} lines > {max_lines}"
+
+
+def _stress_ethanol_cipro_growth_status(
+    study_dir: Path | None, *, repo_root: Path | None
+) -> tuple[str, str, dict[str, object]]:
     inputs: dict[str, object] = {}
     if study_dir is not None:
         inputs["study_dir"] = study_dir
-    return provide_promoter_status(repo_root=repo_root, inputs=inputs)
+    return run_status_kind(
+        "stress-ethanol-cipro-growth-status",
+        repo_root=repo_root,
+        raw_inputs=inputs,
+    )
 
 
-def _promoter_study_preflight(
+def _stress_ethanol_cipro_growth_preflight(
     study_dir: Path | None,
     *,
     repo_root: Path | None,
@@ -66,7 +88,11 @@ def _promoter_study_preflight(
         inputs["study_dir"] = study_dir
     if scope is not None:
         inputs["scope"] = scope
-    return provide_promoter_preflight(repo_root=repo_root, inputs=inputs)
+    return run_status_kind(
+        "stress-ethanol-cipro-growth-preflight",
+        repo_root=repo_root,
+        raw_inputs=inputs,
+    )
 
 
 def _write_study_index(index_path: Path) -> None:
@@ -74,11 +100,11 @@ def _write_study_index(index_path: Path) -> None:
     index_path.write_text(
         (
             "version: 1\n"
-            "active_study_id: demo_study\n"
+            "active_study_id: stress_ethanol_cipro_growth\n"
             "studies:\n"
-            "  - study_id: demo_study\n"
+            "  - study_id: stress_ethanol_cipro_growth\n"
             "    title: Demo study\n"
-            "    record_root: docs/studies/demo_study\n"
+            "    record_root: docs/studies/stress_ethanol_cipro_growth\n"
         ),
         encoding="utf-8",
     )
@@ -617,10 +643,10 @@ def _write_promoter_ops_contract(
         yaml.safe_dump(
             {
                 "version": 2,
-                "study_id": "demo_study",
+                "study_id": "stress_ethanol_cipro_growth",
                 "ops_surfaces": {
-                    "status_kind": "promoter-study-status",
-                    "preflight_kind": "promoter-study-preflight",
+                    "status_kind": "stress-ethanol-cipro-growth-status",
+                    "preflight_kind": "stress-ethanol-cipro-growth-preflight",
                 },
                 "title": "Demo study",
                 "record_sources": {
@@ -661,18 +687,18 @@ def _write_promoter_ops_contract(
     )
 
 
-def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densegen_target: int) -> None:
+def _write_stress_ethanol_cipro_growth_record(study_dir: Path, *, densegen_rows: int, densegen_target: int) -> None:
     repo_root = study_dir.parents[2]
     study_dir.mkdir(parents=True, exist_ok=True)
-    (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
+    (study_dir / "campaign.yaml").write_text("campaign_id: stress_ethanol_cipro_growth\nsteps: []\n", encoding="utf-8")
     (study_dir / "status.md").write_text(
-        "## demo_study\n\n- Canonical consolidated feature dataset: `n/a`\n",
+        "## stress_ethanol_cipro_growth\n\n- Canonical consolidated feature dataset: `n/a`\n",
         encoding="utf-8",
     )
     (study_dir / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
-                "study_id": "demo_study",
+                "study_id": "stress_ethanol_cipro_growth",
                 "datasets": [
                     {
                         "role": "densegen_anchor",
@@ -696,7 +722,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
         yaml.safe_dump(
             {
                 "study_pipeline": {
-                    "study_id": "demo_study",
+                    "study_id": "stress_ethanol_cipro_growth",
                     "canonical_usr_root": "usr_root",
                     "row_targets": {
                         "densegen_anchor_minimum_before_first_full_lane_infer": densegen_target,
@@ -766,7 +792,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
     (repo_root / "workspace" / "infer").mkdir(parents=True, exist_ok=True)
 
 
-def _write_promoter_study_preflight_record(
+def _write_stress_ethanol_cipro_growth_preflight_record(
     study_dir: Path,
     *,
     densegen_rows: int = 2,
@@ -775,15 +801,15 @@ def _write_promoter_study_preflight_record(
 ) -> None:
     repo_root = study_dir.parents[2]
     study_dir.mkdir(parents=True, exist_ok=True)
-    (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
+    (study_dir / "campaign.yaml").write_text("campaign_id: stress_ethanol_cipro_growth\nsteps: []\n", encoding="utf-8")
     (study_dir / "status.md").write_text(
-        "## demo_study\n\n- Canonical consolidated feature dataset: `n/a`\n",
+        "## stress_ethanol_cipro_growth\n\n- Canonical consolidated feature dataset: `n/a`\n",
         encoding="utf-8",
     )
     (study_dir / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
-                "study_id": "demo_study",
+                "study_id": "stress_ethanol_cipro_growth",
                 "datasets": [
                     {
                         "role": "densegen_anchor",
@@ -825,7 +851,7 @@ def _write_promoter_study_preflight_record(
         yaml.safe_dump(
             {
                 "study_pipeline": {
-                    "study_id": "demo_study",
+                    "study_id": "stress_ethanol_cipro_growth",
                     "canonical_usr_root": "usr_root",
                     "execution_surfaces": {
                         "construct_workspace": "workspace/construct",
@@ -1147,23 +1173,23 @@ def test_cli_progress_show_reports_usr_dataset_surface() -> None:
         assert payload["evidence"]["rows"] == 2
 
 
-def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
+def test_cli_progress_show_reports_stress_ethanol_cipro_growth_record_surface() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_record(study_dir, densegen_rows=2, densegen_target=5)
 
         result = runner.invoke(
             app,
             [
                 "progress",
                 "show",
-                "usr.data-plane.promoter-study-status",
+                "studies.stress-ethanol-cipro-growth.status",
                 "--repo-root",
                 str(_repo_root()),
                 "--study-dir",
@@ -1174,9 +1200,9 @@ def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["status_kind"] == "promoter-study-status"
+        assert payload["status_kind"] == "stress-ethanol-cipro-growth-status"
         assert payload["state"] == "attention"
-        assert payload["evidence"]["study_id"] == "demo_study"
+        assert payload["evidence"]["study_id"] == "stress_ethanol_cipro_growth"
         assert payload["evidence"]["study_selection_source"] == "explicit"
         assert payload["evidence"]["is_active_study"] is True
         assert payload["evidence"]["densegen_rows"] == 2
@@ -1197,17 +1223,17 @@ def test_cli_progress_show_marks_pipeline_only_execution_surfaces_as_derived() -
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         result = runner.invoke(
             app,
             [
                 "progress",
                 "show",
-                "usr.data-plane.promoter-study-status",
+                "studies.stress-ethanol-cipro-growth.status",
                 "--repo-root",
                 str(_repo_root()),
                 "--study-dir",
@@ -1231,23 +1257,23 @@ def test_cli_progress_show_marks_pipeline_only_execution_surfaces_as_derived() -
         assert payload["evidence"]["missing_derived_execution_surfaces"] == []
 
 
-def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None:
+def test_stress_ethanol_cipro_study_progress_discovers_active_study_from_repo_root() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_record(study_dir, densegen_rows=2, densegen_target=5)
 
-        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
+        state, summary, evidence = _stress_ethanol_cipro_growth_status(None, repo_root=repo_root)
 
         assert state == "attention"
-        assert evidence["study_id"] == "demo_study"
+        assert evidence["study_id"] == "stress_ethanol_cipro_growth"
         assert evidence["study_selection_source"] == "active_registry"
-        assert evidence["active_study_registry_path"] == str(promoter_index)
+        assert evidence["active_study_registry_path"] == str(study_index)
         assert evidence["study_dir"] == str(study_dir)
         assert evidence["infer_notify_profiles"] == {}
         assert evidence["infer_notify_profile_errors"] == {}
@@ -1255,20 +1281,20 @@ def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None
         assert "handoff outputs pending promoter/demo_anchor_set" in summary
 
 
-def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root() -> None:
+def test_stress_ethanol_cipro_study_progress_resolves_relative_study_dir_against_repo_root() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         repo_root = Path.cwd() / "repo"
         repo_root.mkdir(parents=True, exist_ok=True)
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_record(study_dir, densegen_rows=2, densegen_target=5)
 
-        state, _, evidence = _promoter_study_status(
-            Path("docs/studies/demo_study"),
+        state, _, evidence = _stress_ethanol_cipro_growth_status(
+            Path("docs/studies/stress_ethanol_cipro_growth"),
             repo_root=repo_root,
         )
 
@@ -1277,16 +1303,16 @@ def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root()
         assert evidence["study_dir"] == str(study_dir)
 
 
-def test_promoter_study_progress_demotes_source_gate_once_handoffs_exceed_target() -> None:
+def test_stress_ethanol_cipro_study_progress_demotes_source_gate_once_handoffs_exceed_target() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir, densegen_rows=2, anchor_rows=7, construct_rows=7)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir, densegen_rows=2, anchor_rows=7, construct_rows=7)
 
         pipeline_path = study_dir / "pipeline.yaml"
         pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
@@ -1304,7 +1330,7 @@ def test_promoter_study_progress_demotes_source_gate_once_handoffs_exceed_target
                 entry["status"] = "present"
         datasets_path.write_text(yaml.safe_dump(datasets_payload, sort_keys=False), encoding="utf-8")
 
-        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
+        state, summary, evidence = _stress_ethanol_cipro_growth_status(None, repo_root=repo_root)
 
         assert state == "ok"
         assert "handoffs ready anchor=7 construct=7" in summary
@@ -1317,18 +1343,18 @@ def test_promoter_study_progress_demotes_source_gate_once_handoffs_exceed_target
         assert evidence["planned_outputs_state"]["state"] == "ok"
 
 
-def test_promoter_study_status_surfaces_stale_construct_handoff() -> None:
+def test_stress_ethanol_cipro_study_status_surfaces_stale_construct_handoff() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir, densegen_rows=5, anchor_rows=2, construct_rows=2)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir, densegen_rows=5, anchor_rows=2, construct_rows=2)
 
-        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
+        state, summary, evidence = _stress_ethanol_cipro_growth_status(None, repo_root=repo_root)
 
         assert state == "attention"
         assert "source rows visible densegen_demo_anchor 5 rows" in summary
@@ -1344,15 +1370,15 @@ def test_promoter_study_status_surfaces_stale_construct_handoff() -> None:
         ]
 
 
-def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_reports_command_and_dataset_blockers(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -1421,9 +1447,9 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -1440,7 +1466,7 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1456,10 +1482,10 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 output_on_conflict="error",
             ),
         )
-        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+        state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
-        assert "demo_study: preflight phase infer_batch_preparation" in summary
+        assert "stress_ethanol_cipro_growth: preflight phase infer_batch_preparation" in summary
         assert evidence["preferred_infer_model_family"] == "evo2_20b"
         assert evidence["notify_environment"] == {
             "NOTIFY_WEBHOOK": False,
@@ -1510,14 +1536,14 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
         assert evidence["counts"]["missing"] == 0
 
 
-def test_promoter_study_preflight_reports_sequence_view_contract_health(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_reports_sequence_view_contract_health(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
         _write_study_index(repo_root / "docs" / "studies" / "index.yaml")
-        _write_promoter_study_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
         usr_root = repo_root / "usr_root"
         _write_sequence_view_sidecar(
             usr_root,
@@ -1559,19 +1585,19 @@ def test_promoter_study_preflight_reports_sequence_view_contract_health(monkeypa
         ops_path.write_text(yaml.safe_dump(ops_payload, sort_keys=False), encoding="utf-8")
 
         monkeypatch.setattr(
-            PROMOTER_RUN_PREFLIGHT_COMMAND_REF,
+            STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF,
             lambda argv, *, cwd, timeout_seconds=180: CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [], "probe_error": None},
         )
 
-        _state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+        _state, _summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
 
         checks = {check["id"]: check for check in evidence["checks"]}
         check = checks["infer.sequence_views.context_contract"]
@@ -1583,16 +1609,16 @@ def test_promoter_study_preflight_reports_sequence_view_contract_health(monkeypa
         assert evidence["scope"] == "full"
 
 
-def test_promoter_study_status_reports_sequence_view_summary_without_deep_infer_completion(
+def test_stress_ethanol_cipro_study_status_reports_sequence_view_summary_without_deep_infer_completion(
     monkeypatch,
 ) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
         _write_study_index(repo_root / "docs" / "studies" / "index.yaml")
-        _write_promoter_study_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
         datasets_path = study_dir / "datasets.yaml"
         datasets_payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8"))
         for entry in datasets_payload["datasets"]:
@@ -1680,7 +1706,8 @@ def test_promoter_study_status_reports_sequence_view_summary_without_deep_infer_
 
         def _fake_plan(config_path: Path, job: str | None = None):
             raise AssertionError(
-                f"promoter-study-status must not scan Infer feature-completion sidecars: {config_path} {job}"
+                "stress-ethanol-cipro-growth-status must not scan Infer "
+                f"feature-completion sidecars: {config_path} {job}"
             )
 
         monkeypatch.setattr(
@@ -1689,7 +1716,7 @@ def test_promoter_study_status_reports_sequence_view_summary_without_deep_infer_
             raising=False,
         )
 
-        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
+        state, summary, evidence = _stress_ethanol_cipro_growth_status(None, repo_root=repo_root)
 
         assert state == "ok"
         assert "sequence-view product contracts 1/1 ok" in summary
@@ -1702,14 +1729,14 @@ def test_promoter_study_status_reports_sequence_view_summary_without_deep_infer_
         assert evidence["infer_feature_completion_state"] is None
 
 
-def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_reports_infer_sequence_view_completion(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
         _write_study_index(repo_root / "docs" / "studies" / "index.yaml")
-        _write_promoter_study_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir, anchor_rows=2, construct_rows=4)
         ops_path = study_dir / "ops.study.yaml"
         ops_payload = yaml.safe_load(ops_path.read_text(encoding="utf-8"))
         ops_payload["execution_surfaces"]["infer_completion_anchor_7b"] = {
@@ -1781,17 +1808,17 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             return CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False)
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [], "probe_error": None},
         )
 
-        _state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+        _state, _summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
 
         checks = {check["id"]: check for check in evidence["checks"]}
         check = checks["infer.feature_completion.anchor_7b"]
@@ -1819,15 +1846,15 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
         ]
 
 
-def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_blocks_stale_construct_inputs_in_next_scope(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir, densegen_rows=5, anchor_rows=2, construct_rows=2)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir, densegen_rows=5, anchor_rows=2, construct_rows=2)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -1883,9 +1910,9 @@ def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(mo
 
         monkeypatch.setenv("NOTIFY_WEBHOOK", "https://example.invalid/webhook")
         monkeypatch.setenv("SSL_CERT_FILE", "/tmp/cert.pem")
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -1902,7 +1929,7 @@ def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(mo
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1919,7 +1946,7 @@ def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(mo
             ),
         )
 
-        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
+        state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="next")
 
         assert state == "attention"
         assert "blocked by:" in summary
@@ -1930,15 +1957,17 @@ def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(mo
         assert "infer.input.merged_anchor_from_densegen" in evidence["blocked_by"]
 
 
-def test_promoter_study_preflight_demotes_construct_runtime_attention_once_materialized(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_demotes_construct_runtime_attention_once_materialized(
+    monkeypatch,
+) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -2009,9 +2038,9 @@ def test_promoter_study_preflight_demotes_construct_runtime_attention_once_mater
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2028,10 +2057,10 @@ def test_promoter_study_preflight_demotes_construct_runtime_attention_once_mater
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
-        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+        state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
         checks = {check["id"]: check for check in evidence["checks"]}
@@ -2041,15 +2070,15 @@ def test_promoter_study_preflight_demotes_construct_runtime_attention_once_mater
         assert "construct.runtime.slot_a_window" in evidence["nonblocking_attention_ids"]
 
 
-def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_scope_next_defers_later_lane_blockers(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -2118,9 +2147,9 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2137,7 +2166,7 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2153,7 +2182,7 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 output_on_conflict="error",
             ),
         )
-        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
+        state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="next")
 
         assert state == "attention"
         assert "focus phase infer_batch_preparation" in summary
@@ -2171,15 +2200,15 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
         assert evidence["deferred_check_ids"] == []
 
 
-def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         contract_path = study_dir / "ops.study.yaml"
         contract_payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
@@ -2258,9 +2287,9 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2277,7 +2306,7 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2293,7 +2322,7 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 output_on_conflict="error",
             ),
         )
-        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
+        state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="next")
 
         assert state == "attention"
         assert "focus phase infer_anchor_only_20b" in summary
@@ -2314,15 +2343,15 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
         assert "notify.profile.anchor_only_20b" not in evidence["nonblocking_attention_ids"]
 
 
-def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attention(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_completed_infer_lane_attention(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         contract_path = study_dir / "ops.study.yaml"
         contract_payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
@@ -2398,9 +2427,9 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2417,7 +2446,7 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2433,7 +2462,7 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 output_on_conflict="error",
             ),
         )
-        state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+        state, _summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
         assert "infer.local_gpu.visibility" not in evidence["blocked_by"]
@@ -2446,15 +2475,17 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
         assert "infer.batch.20b.anchor_plus_template.plan" in evidence["blocked_by"]
 
 
-def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_attention(monkeypatch) -> None:
+def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_parallel_optional_densegen_attention(
+    monkeypatch,
+) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
-        _write_study_index(promoter_index)
-        _write_promoter_study_preflight_record(study_dir)
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+        study_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(study_index)
+        _write_stress_ethanol_cipro_growth_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -2523,9 +2554,9 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
+        monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2542,7 +2573,7 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2558,7 +2589,7 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 output_on_conflict="error",
             ),
         )
-        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+        state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
         assert "densegen.config.probe_solver" not in evidence["blocked_by"]
@@ -3324,23 +3355,23 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     kinds = {entry["status_kind"]: entry for entry in payload["status_kinds"]}
-    assert kinds["promoter-study-preflight"]["observes_plane"] == "execution_readiness"
-    assert kinds["promoter-study-preflight"]["surface_type"] == "study_preflight"
-    assert kinds["promoter-study-preflight"]["cost_class"] == "deep"
-    assert kinds["promoter-study-preflight"]["summary_scope"] == "host"
-    assert kinds["promoter-study-preflight"]["provider_id"] == "study.promoter_status"
-    assert kinds["promoter-study-preflight"]["optional_inputs"] == [
+    assert kinds["stress-ethanol-cipro-growth-preflight"]["observes_plane"] == "execution_readiness"
+    assert kinds["stress-ethanol-cipro-growth-preflight"]["surface_type"] == "study_preflight"
+    assert kinds["stress-ethanol-cipro-growth-preflight"]["cost_class"] == "deep"
+    assert kinds["stress-ethanol-cipro-growth-preflight"]["summary_scope"] == "host"
+    assert kinds["stress-ethanol-cipro-growth-preflight"]["provider_id"] == "study.stress_ethanol_cipro_growth"
+    assert kinds["stress-ethanol-cipro-growth-preflight"]["optional_inputs"] == [
         {
             "cli_flag": "--study-dir",
             "summary": (
-                "Checked-in promoter-study directory containing campaign.yaml, "
+                "Checked-in stress_ethanol_cipro_growth study directory containing campaign.yaml, "
                 "datasets.yaml, status.md, and ops.study.yaml."
             ),
         },
         {
             "cli_flag": "--scope",
             "summary": (
-                "Preflight scope for promoter-study-preflight surfaces: "
+                "Preflight scope for stress-ethanol-cipro-growth-preflight surfaces: "
                 "`full` runs the whole suite; `next` focuses the next actionable "
                 "phase and defers later-lane blockers."
             ),
@@ -3350,23 +3381,23 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
             "summary": "Per-command timeout for command-backed preflight checks on this host.",
         },
     ]
-    assert kinds["cruncher-study-preflight"]["observes_plane"] == "execution_readiness"
-    assert kinds["cruncher-study-preflight"]["surface_type"] == "study_preflight"
-    assert kinds["cruncher-study-preflight"]["cost_class"] == "deep"
-    assert kinds["cruncher-study-preflight"]["summary_scope"] == "host"
-    assert kinds["cruncher-study-preflight"]["provider_id"] == "study.cruncher_status"
-    assert kinds["cruncher-study-preflight"]["optional_inputs"] == [
+    assert kinds["retron-hairpin-design-preflight"]["observes_plane"] == "execution_readiness"
+    assert kinds["retron-hairpin-design-preflight"]["surface_type"] == "study_preflight"
+    assert kinds["retron-hairpin-design-preflight"]["cost_class"] == "deep"
+    assert kinds["retron-hairpin-design-preflight"]["summary_scope"] == "host"
+    assert kinds["retron-hairpin-design-preflight"]["provider_id"] == "study.retron_hairpin_design"
+    assert kinds["retron-hairpin-design-preflight"]["optional_inputs"] == [
         {
             "cli_flag": "--study-dir",
             "summary": (
-                "Checked-in cruncher-study directory containing campaign.yaml, "
+                "Checked-in retron_hairpin_design record directory containing campaign.yaml, "
                 "datasets.yaml, status.md, ops.study.yaml, routes.md, and pipeline.yaml."
             ),
         },
         {
             "cli_flag": "--scope",
             "summary": (
-                "Preflight scope for cruncher-study-preflight surfaces: "
+                "Preflight scope for retron-hairpin-design-preflight surfaces: "
                 "`full` runs the whole suite; `next` focuses the current actionable route, track, "
                 "or phase declared by the study contract."
             ),
@@ -3392,14 +3423,13 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_status_sur
         [
             "progress",
             "show",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--help",
         ],
     )
 
     assert result.exit_code == 0
     assert "--study-dir" in result.output
-    assert "Checked-in promoter-study directory containing" in result.output
     assert "--scope" not in result.output
 
 
@@ -3411,7 +3441,7 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_preflight_
         [
             "progress",
             "show",
-            "usr.data-plane.promoter-study-preflight",
+            "studies.stress-ethanol-cipro-growth.preflight",
             "--help",
         ],
     )
@@ -3420,10 +3450,9 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_preflight_
     assert "--study-dir" in result.output
     assert "--scope" in result.output
     assert "--command-timeout-seconds" in result.output
-    assert "Preflight scope for promoter-study-preflight" in result.output
 
 
-def test_cli_progress_show_help_includes_registry_specific_inputs_for_cruncher_preflight_surface() -> None:
+def test_cli_progress_show_help_includes_registry_specific_inputs_for_retron_preflight_surface() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -3431,7 +3460,7 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_cruncher_p
         [
             "progress",
             "show",
-            "cruncher.data-plane.cruncher-study-preflight",
+            "studies.retron-hairpin-design.preflight",
             "--help",
         ],
     )
@@ -3439,7 +3468,8 @@ def test_cli_progress_show_help_includes_registry_specific_inputs_for_cruncher_p
     assert result.exit_code == 0
     assert "--study-dir" in result.output
     assert "--scope" in result.output
-    assert "Preflight scope for cruncher-study-preflight" in result.output
+    assert "Preflight scope for retron-hairpin-design-" in result.output
+    assert "preflight surfaces" in result.output
 
 
 def test_cli_progress_explain_includes_related_scaffold_when_route_has_neighbors() -> None:

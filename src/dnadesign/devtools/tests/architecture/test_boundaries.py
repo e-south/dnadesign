@@ -22,6 +22,7 @@ from dnadesign.devtools.architecture.boundaries import (
     TOP_LEVEL_TOOL_BOUNDARY_PACKAGES,
     find_legacy_surface_violations,
     find_review_surface_private_imports,
+    find_studies_layout_violations,
     find_top_level_layout_violations,
     find_undeclared_cross_tool_imports,
     main,
@@ -92,6 +93,21 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_p
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_rejects_ops_to_usr_non_contract_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "gates.py",
+        "from dnadesign.usr.storage import DatasetStore\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "usr" / "storage.py", "class DatasetStore:\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "ops"
+    assert violations[0].imported_tool == "usr"
+    assert violations[0].import_target == "dnadesign.usr.storage"
+
+
 def test_find_undeclared_cross_tool_imports_rejects_ops_to_studies_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "ops" / "gates.py", "from dnadesign.studies import StudyOpsContract\n")
     _write(tmp_path / "src" / "dnadesign" / "studies" / "__init__.py", "class StudyOpsContract:\n    pass\n")
@@ -157,9 +173,24 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_rejects_ops_to_infer_non_contract_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "plan.py",
+        "from dnadesign.infer.runtime import infer_batch\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "infer" / "runtime.py", "def infer_batch():\n    return None\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "ops"
+    assert violations[0].imported_tool == "infer"
+    assert violations[0].import_target == "dnadesign.infer.runtime"
+
+
 def test_find_undeclared_cross_tool_imports_allows_studies_to_densegen_public_edge(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "studies" / "status_adapters" / "demo_status" / "surface.py",
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "status" / "surface.py",
         "from dnadesign.densegen import inspect_analysis_surface\n",
     )
     _write(
@@ -170,6 +201,24 @@ def test_find_undeclared_cross_tool_imports_allows_studies_to_densegen_public_ed
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
     assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_studies_to_densegen_non_facade(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "status" / "surface.py",
+        "from dnadesign.densegen.analysis import inspect_analysis_surface\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "densegen" / "analysis.py",
+        "def inspect_analysis_surface(_path):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "studies"
+    assert violations[0].imported_tool == "densegen"
+    assert violations[0].import_target == "dnadesign.densegen.analysis"
 
 
 @pytest.mark.parametrize(
@@ -185,7 +234,7 @@ def test_find_undeclared_cross_tool_imports_allows_studies_to_ops_public_facades
     import_statement: str,
 ) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "studies" / "status_adapters" / "demo_status" / "surface.py",
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "status" / "surface.py",
         import_statement,
     )
     _write(
@@ -215,7 +264,7 @@ def test_find_undeclared_cross_tool_imports_rejects_studies_to_ops_internal_faca
     import_statement: str,
 ) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "studies" / "status_adapters" / "demo_status" / "surface.py",
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "status" / "surface.py",
         import_statement,
     )
     _write(
@@ -344,7 +393,6 @@ def test_find_undeclared_cross_tool_imports_allows_shared_contract_package(tmp_p
         ("notify", "infer"),
         ("ops", "construct"),
         ("ops", "densegen"),
-        ("ops", "notify"),
     ),
 )
 def test_find_undeclared_cross_tool_imports_allows_contract_owner_edges(
@@ -364,6 +412,39 @@ def test_find_undeclared_cross_tool_imports_allows_contract_owner_edges(
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
     assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_allows_ops_to_notify_core_contracts(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "notify.py",
+        "from dnadesign.notify.core.contracts import run\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "notify" / "core" / "contracts.py",
+        "def run():\n    return 1\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_ops_to_notify_non_contract_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "notify.py",
+        "from dnadesign.notify.contracts import run\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "notify" / "contracts.py",
+        "def run():\n    return 1\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "ops"
+    assert violations[0].imported_tool == "notify"
+    assert violations[0].import_target == "dnadesign.notify.contracts"
 
 
 def test_find_undeclared_cross_tool_imports_rejects_internal_src_target_even_for_allowed_edge(tmp_path: Path) -> None:
@@ -570,6 +651,23 @@ def test_find_review_surface_private_imports_allows_same_tool_internal_tests(tmp
     assert violations == []
 
 
+def test_find_review_surface_private_imports_rejects_ops_tests_importing_concrete_study_packages(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "tests" / "test_status.py",
+        "from dnadesign.studies.studies.demo_study.status.service import STUDY_STATUS_SERVICE\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "studies" / "studies" / "demo_study" / "__init__.py", "")
+
+    violations = find_review_surface_private_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "ops"
+    assert violations[0].imported_tool == "studies"
+    assert violations[0].import_target == "dnadesign.studies.studies.demo_study.status.service"
+
+
 def test_find_review_surface_private_imports_allows_public_cross_tool_review_imports(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "studies" / "tests" / "test_public_surface.py",
@@ -605,11 +703,11 @@ def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_
     assert violations == []
 
 
-def test_find_undeclared_cross_tool_imports_scans_study_status_adapter_modules(tmp_path: Path) -> None:
+def test_find_undeclared_cross_tool_imports_scans_study_status_modules(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "def run():\n    return 1\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "src" / "runtime.py", "def run():\n    return 1\n")
     _write(
-        tmp_path / "src" / "dnadesign" / "studies" / "status_adapters" / "demo_status" / "status.py",
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "status" / "status.py",
         "from dnadesign.bar.src.runtime import run\n",
     )
 
@@ -735,6 +833,37 @@ def test_find_top_level_layout_violations_flags_unexpected_top_level_module(tmp_
 
     assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
         ("unexpected top-level module", "src/dnadesign/helpers.py"),
+    ]
+
+
+def test_find_studies_layout_violations_accepts_progressive_disclosure_layout(tmp_path: Path) -> None:
+    studies_root = tmp_path / "src" / "dnadesign" / "studies"
+    _write(studies_root / "__init__.py", "")
+    _write(studies_root / "README.md", "# studies\n")
+    for name in ("assets", "core", "studies", "tests"):
+        (studies_root / name).mkdir(parents=True, exist_ok=True)
+    (studies_root / "studies" / "demo_study").mkdir(parents=True, exist_ok=True)
+
+    violations = find_studies_layout_violations(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_studies_layout_violations_rejects_flat_concrete_study_package(tmp_path: Path) -> None:
+    studies_root = tmp_path / "src" / "dnadesign" / "studies"
+    _write(studies_root / "__init__.py", "")
+    _write(studies_root / "README.md", "# studies\n")
+    for name in ("assets", "core", "studies", "tests"):
+        (studies_root / name).mkdir(parents=True, exist_ok=True)
+    (studies_root / "demo_study").mkdir(parents=True, exist_ok=True)
+
+    violations = find_studies_layout_violations(repo_root=tmp_path)
+
+    assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
+        (
+            "concrete study package must live under src/dnadesign/studies/studies",
+            "src/dnadesign/studies/demo_study",
+        )
     ]
 
 

@@ -54,7 +54,7 @@ def test_build_status_inputs_coerces_declared_repo_path() -> None:
 
 
 def test_build_status_inputs_applies_declared_default_scope() -> None:
-    spec = load_status_kind_spec("promoter-study-preflight")
+    spec = load_status_kind_spec("stress-ethanol-cipro-growth-preflight")
 
     resolved = build_status_inputs(spec=spec, raw_inputs={}, repo_root=Path("/tmp/repo"))
 

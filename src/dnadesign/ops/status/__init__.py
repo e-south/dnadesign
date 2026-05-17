@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/status/__init__.py
 
-Neutral status/observation public facade.
+Neutral status/observation public surface.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

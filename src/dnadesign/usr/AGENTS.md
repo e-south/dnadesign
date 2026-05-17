@@ -65,7 +65,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync.md`
 - Repo-local BU SCC sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
-- Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
+- Repo-local stress ethanol cipro growth status skill: `.agents/skills/stress-ethanol-cipro-growth-status/SKILL.md`
   - Do not add tool-local skills under `src/dnadesign/usr/skills/`; the canonical skill root for this repo is `.agents/skills/`.
 - Checked-in study records: `docs/studies/README.md`
 - Active study registry: `docs/studies/index.yaml`

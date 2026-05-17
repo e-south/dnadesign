@@ -75,7 +75,7 @@ def test_parse_status_input_tokens_rejects_duplicate_input_across_flag_and_escap
 
 def test_render_progress_show_command_preserves_metadata_placeholders() -> None:
     rendered = render_progress_show_command(
-        registry_id="usr.data-plane.promoter-study-preflight",
+        registry_id="studies.stress-ethanol-cipro-growth.preflight",
         required_inputs=(
             InputFieldSpec(
                 name="study_dir",
@@ -88,4 +88,4 @@ def test_render_progress_show_command_preserves_metadata_placeholders() -> None:
         ),
     )
 
-    assert rendered == "uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir <study-dir>"
+    assert rendered == "uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --study-dir <study-dir>"

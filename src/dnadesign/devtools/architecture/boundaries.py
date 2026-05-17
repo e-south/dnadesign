@@ -90,14 +90,22 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("usr", "ops"),
 }
 _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("ops", "construct"): ("dnadesign.construct.contracts",),
+    ("ops", "densegen"): ("dnadesign.densegen.contracts",),
+    ("ops", "infer"): ("dnadesign.infer", "dnadesign.infer.contracts"),
+    ("ops", "notify"): ("dnadesign.notify.core.contracts",),
+    ("ops", "usr"): ("dnadesign.usr",),
     ("construct", "folding"): ("dnadesign.folding",),
     ("studies", "baserender"): ("dnadesign.baserender",),
     ("studies", "construct"): ("dnadesign.construct",),
+    ("studies", "densegen"): ("dnadesign.densegen",),
+    ("studies", "infer"): ("dnadesign.infer", "dnadesign.infer.contracts"),
     ("studies", "ops"): (
         "dnadesign.ops.catalog",
         "dnadesign.ops.preflight",
         "dnadesign.ops.status",
     ),
+    ("studies", "usr"): ("dnadesign.usr",),
     ("devtools", "ops"): (
         "dnadesign.ops.catalog",
         "dnadesign.ops.runbooks",
@@ -131,9 +139,9 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/studies/families"),
     Path("src/dnadesign/studies/promoter"),
     Path("docs/studies/promoter"),
-    Path("src/dnadesign/studies/status_adapters/promoter_status/preflight_infer.py"),
-    Path("src/dnadesign/studies/status_adapters/promoter_status/preflight_orchestration.py"),
-    Path("src/dnadesign/studies/status_adapters/promoter_status/preflight_upstream.py"),
+    Path("src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight_infer.py"),
+    Path("src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight_orchestration.py"),
+    Path("src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight_upstream.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_infer.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_orchestration.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_upstream.py"),
@@ -141,6 +149,8 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
 _ALLOWED_OPS_ROOT_CLI_PATHS = {
     Path("src/dnadesign/ops/cli"),
 }
+_ALLOWED_STUDIES_ROOT_DIRECTORIES = {"assets", "core", "studies", "tests"}
+_ALLOWED_STUDIES_ROOT_FILES = {"README.md", "__init__.py"}
 _ALLOWED_CACHE_FILE_SUFFIXES = {".pyc", ".pyo"}
 
 
@@ -376,6 +386,21 @@ def find_review_surface_private_imports(*, repo_root: Path) -> list[ImportViolat
                 continue
             if imported_tool not in tool_names and imported_tool != "devtools":
                 continue
+            if (
+                owner_tool in {"ops", "devtools"}
+                and imported_tool == "studies"
+                and len(parts) >= 4
+                and parts[2] == "studies"
+            ):
+                violations.append(
+                    ImportViolation(
+                        owner_tool=owner_tool,
+                        imported_tool=imported_tool,
+                        file_path=file_path,
+                        import_target=target,
+                    )
+                )
+                continue
             if parts[2] != "src":
                 continue
             violations.append(
@@ -459,6 +484,35 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
     return violations
 
 
+def find_studies_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutViolation]:
+    resolved_repo_root = repo_root.expanduser().resolve()
+    studies_root = resolved_repo_root / "src" / "dnadesign" / "studies"
+    if not studies_root.exists():
+        raise FileNotFoundError(f"Expected studies source root at {studies_root}")
+
+    violations: list[TopLevelLayoutViolation] = []
+    for candidate in sorted(studies_root.iterdir()):
+        if candidate.name.startswith(".") or candidate.name == "__pycache__":
+            continue
+        if candidate.is_dir():
+            if candidate.name not in _ALLOWED_STUDIES_ROOT_DIRECTORIES:
+                violations.append(
+                    TopLevelLayoutViolation(
+                        path=candidate,
+                        reason="concrete study package must live under src/dnadesign/studies/studies",
+                    )
+                )
+            continue
+        if candidate.is_file() and candidate.name not in _ALLOWED_STUDIES_ROOT_FILES:
+            violations.append(
+                TopLevelLayoutViolation(
+                    path=candidate,
+                    reason="unexpected studies package root file",
+                )
+            )
+    return violations
+
+
 def _is_cache_only_legacy_path(path: Path) -> bool:
     if path.is_file():
         return path.suffix in _ALLOWED_CACHE_FILE_SUFFIXES
@@ -492,11 +546,18 @@ def main(argv: list[str] | None = None) -> int:
         review_surface_violations = find_review_surface_private_imports(repo_root=args.repo_root)
         legacy_surface_violations = find_legacy_surface_violations(repo_root=args.repo_root)
         top_level_layout_violations = find_top_level_layout_violations(repo_root=args.repo_root)
+        studies_layout_violations = find_studies_layout_violations(repo_root=args.repo_root)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
 
-    if not (violations or review_surface_violations or legacy_surface_violations or top_level_layout_violations):
+    if not (
+        violations
+        or review_surface_violations
+        or legacy_surface_violations
+        or top_level_layout_violations
+        or studies_layout_violations
+    ):
         print("Architecture boundary checks passed.")
         return 0
 
@@ -511,6 +572,8 @@ def main(argv: list[str] | None = None) -> int:
     for item in legacy_surface_violations:
         print(f" - forbidden legacy surface still exists: {item.path}")
     for item in top_level_layout_violations:
+        print(f" - {item.reason}: {item.path}")
+    for item in studies_layout_violations:
         print(f" - {item.reason}: {item.path}")
     return 1
 
