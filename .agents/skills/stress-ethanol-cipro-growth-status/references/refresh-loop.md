@@ -6,9 +6,9 @@ surface that answers the question.
 ## Blank-thread bootstrap
 
 1. Read `docs/studies/README.md` and `docs/studies/index.yaml`.
-2. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`.
+2. Run `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Escalate to
-   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+   `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
    only for blocker or next-run readiness questions.
 4. Open `docs/studies/<study-id>/routes.md` only after the record or blocker
    question is answered.
@@ -26,13 +26,13 @@ surface that answers the question.
 
 ## Snapshot-first refresh
 
-- `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 - Use this for current phase, current datasets, row counts, downstream posture,
   and the next declared study surface.
 
 ## Explicit escalation for blockers
 
-- `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
 - Use this for `what blocks execution here?` or `what should run next on this
   host?`
 
@@ -40,9 +40,9 @@ surface that answers the question.
 
 | Question | Primary surface | Minimum evidence | Fail visibly when |
 | --- | --- | --- | --- |
-| Where is the study now? | `usr.data-plane.promoter-study-status` | study id, current phase, dataset ids, row counts, downstream posture, next surface | selector fields or required record files are missing |
-| Which exploratory-analysis artifacts are available? | `usr.data-plane.promoter-study-status` plus `routes.md` | `analysis_surfaces.densegen`, `analysis_surfaces.latentdna`, or `analysis_surfaces.cluster` with ids, commands, and artifact paths | route inventory is missing for the owning tool or the study omits the needed workspace/doc binding |
-| What blocks execution here? | `usr.data-plane.promoter-study-preflight --scope next` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `ops.study.yaml` or declared execution surfaces are missing |
+| Where is the study now? | `studies.stress-ethanol-cipro-growth.status` | study id, current phase, dataset ids, row counts, downstream posture, next surface | selector fields or required record files are missing |
+| Which exploratory-analysis artifacts are available? | `studies.stress-ethanol-cipro-growth.status` plus `routes.md` | `analysis_surfaces.densegen`, `analysis_surfaces.latentdna`, or `analysis_surfaces.cluster` with ids, commands, and artifact paths | route inventory is missing for the owning tool or the study omits the needed workspace/doc binding |
+| What blocks execution here? | `studies.stress-ethanol-cipro-growth.preflight --scope next` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `ops.study.yaml` or declared execution surfaces are missing |
 | Which dataset sync posture is current? | `datasets.yaml` plus `usr.data-plane.hpc-sync` | dataset id, remote profile, audit JSON path, explicit drift summary | sync-enabled dataset entries or audit evidence are missing |
 | Which owner surface should I open next? | `docs/studies/<study-id>/routes.md` | owner tool, entry artifact, primary doc or workspace, first command | the study spans owner surfaces but no route map is checked in |
 
@@ -64,7 +64,7 @@ surface that answers the question.
 - Missing registry, stale selector, or missing study directory: repair
   `docs/studies/index.yaml` and the required record files, then rerun status.
 - Missing or incomplete command-level evidence: rerun
-  `usr.data-plane.promoter-study-preflight --scope next` and summarize the
+  `studies.stress-ethanol-cipro-growth.preflight --scope next` and summarize the
   blocker with `kind`, `surface_id`, and `artifact_id`.
 - Missing sync posture: refresh the explicit `usr diff --audit-json-out` audit
   named by `datasets.yaml`, then summarize it through `usr.data-plane.hpc-sync`.

@@ -72,7 +72,7 @@ Implemented in the current working tree:
   QA for product-kind, orientation, pooling, length, and anchor-bound evidence.
 - Ops/preflight `infer_sequence_view_completion` checks that run the Infer
   completion planner and surface reusable/stale/missing feature-vector counts.
-- `promoter-study-status` now exposes cheap sequence-view product-contract
+- `stress-ethanol-cipro-growth-status` now exposes cheap sequence-view product-contract
   summaries, generated-artifact freshness, and Infer sequence-view
   feature-completion summaries in structured JSON fields.
 - Active study `_views/sequence_views.parquet` sidecars have been migrated from
@@ -127,7 +127,7 @@ Latest audit delta:
   enough to expose product-missing, stale, missing, and reusable states before
   model execution.
 - Generated product sidecar freshness is now green locally:
-  `promoter-study-status --json` reports `sequence-view product contracts 4/4 ok`
+  `stress-ethanol-cipro-growth-status --json` reports `sequence-view product contracts 4/4 ok`
   and `generated_artifact_freshness.state=ok`.
 - Generated view-semantics addenda are now populated locally for active study
   datasets: `157279` merged-anchor rows, `314558` merged-context rows, `48`
@@ -152,8 +152,8 @@ Latest audit delta:
   product/staleness gate before `infer run --dry-run`. The gate uses
   `--max-missing-products 0 --max-stale-vectors 0` and intentionally does not
   set `--max-missing-vectors 0`.
-- The cheap `promoter-study-status` snapshot now summarizes product-contract
-  and feature-completion coverage, while `promoter-study-preflight` remains the
+- The cheap `stress-ethanol-cipro-growth-status` snapshot now summarizes product-contract
+  and feature-completion coverage, while `stress-ethanol-cipro-growth-preflight` remains the
   authoritative next-run readiness surface.
 
 ### Core Decision
@@ -190,7 +190,7 @@ Consequences:
 | Active Infer planner configs | Main and reference 7B sequence-view completion configs exist for dry-run feature planning. | `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml`, `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference.evo2_7b.yaml` |
 | Sequence-view runbook gates | Sequence-view Infer runbook plans add completion validation with product/stale thresholds before dry-run and submit planning. | `src/dnadesign/ops/orchestrator/plan_tools.py`, `src/dnadesign/ops/tests/test_runbook_orchestrator.py` |
 | Ops completion preflight | `infer_sequence_view_completion` runs the planner command, parses JSON, aggregates reusable/stale/missing/product-missing counts, and applies configured thresholds. | `src/dnadesign/ops/preflight/contract_checks.py`, `docs/studies/stress_ethanol_cipro_growth/ops.study.yaml` |
-| Status aggregation | The cheap promoter status snapshot exposes `sequence_view_contract_state` and `infer_feature_completion_state` for product contracts, generated sidecar freshness, and nonblocking feature-completion awareness. | `src/dnadesign/studies/status_adapters/promoter_status/adapter.py`, `src/dnadesign/studies/status_adapters/promoter_status/snapshot.py` |
+| Status aggregation | The cheap stress_ethanol_cipro_growth status snapshot exposes `sequence_view_contract_state` and `infer_feature_completion_state` for product contracts, generated sidecar freshness, and nonblocking feature-completion awareness. | `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py`, `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/snapshot.py` |
 | Study state | The checked-in study record says the branch is in `infer_batch_preparation`, with 157,279 anchor rows and 314,558 context rows. | `docs/studies/stress_ethanol_cipro_growth/status.md` |
 | Coverage gap | Existing Infer overlays are row-based and cover 157,164 ids on the anchor and context handoffs. Missing context coverage includes all reverse-complement contexts. | `docs/studies/stress_ethanol_cipro_growth/status.md` |
 
@@ -530,10 +530,10 @@ Study prose must use full terms:
 
 Current reporting split:
 
-- `usr.data-plane.promoter-study-preflight` is the authoritative next-run
+- `studies.stress-ethanol-cipro-growth.preflight` is the authoritative next-run
   readiness surface for sequence-view product contracts and Infer completion
   planner output.
-- `usr.data-plane.promoter-study-status` remains the cheap record-plane snapshot;
+- `studies.stress-ethanol-cipro-growth.status` remains the cheap record-plane snapshot;
   it now exposes `sequence_view_contract_state` and
   `infer_feature_completion_state` as structured JSON summaries. Those fields are
   situational-awareness summaries, not a replacement for preflight when an
@@ -560,7 +560,7 @@ Assertions:
 
 Evidence:
 
-- `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 - `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 - focused docs/source diff review.
 
@@ -666,7 +666,7 @@ Status: done as a USR library helper and as an Ops/preflight
 
 Done: generated active-study sequence-view sidecars have been migrated to the
 generic product-kind vocabulary and recomputed `view_id` values. Direct QA,
-`promoter-study-status`, and next-scope preflight report the product contracts
+`stress-ethanol-cipro-growth-status`, and next-scope preflight report the product contracts
 as current in this checkout.
 
 Open: generated sidecars still need explicit USR sync/publish handling for other
@@ -835,7 +835,7 @@ generated-data sync/publish discipline and richer legacy Infer identity proof.
 Done: study prose is updated, Ops/preflight has first-class USR sequence-view QA
 through `sequence_view_contract`, and Ops/preflight consumes Infer
 feature-completion planner output through `infer_sequence_view_completion`.
-`promoter-study-status` now exposes summarized product completion,
+`stress-ethanol-cipro-growth-status` now exposes summarized product completion,
 feature-completion, and generated-artifact freshness fields without duplicating
 the full preflight payload.
 Sequence-view Infer runbook plans now render the completion planner before
@@ -845,7 +845,7 @@ submit a lane whose required sequence products are absent.
 Deliverables:
 
 - Add a sequence-view contract check to promoter preflight. Implemented.
-- Update promoter-study status to report coverage by product kind, orientation,
+- Update stress_ethanol_cipro_growth status to report coverage by product kind, orientation,
   pooling, and model/layer. Implemented as summary fields over canonical
   sidecars.
 - Add explicit "product completion" versus "feature completion" sections.
@@ -939,10 +939,10 @@ Current implemented checks:
 | Infer sequence-view completion planner | `uv run pytest -q src/dnadesign/infer/tests/runtime/test_sequence_view_completion_planner.py` |
 | Infer CLI planner surface | `uv run pytest -q src/dnadesign/infer/tests/cli/test_validate_command.py` |
 | Existing feature-bundle sequence-view behavior | `uv run pytest -q src/dnadesign/infer/tests/runtime/test_feature_bundle_execution.py` |
-| Ops/preflight sequence-view contract check | `uv run pytest -q src/dnadesign/ops/tests/test_progress_cli.py::test_promoter_study_preflight_reports_sequence_view_contract_health` |
-| Ops/status sequence-view and Infer completion summaries | `uv run pytest -q src/dnadesign/ops/tests/test_progress_cli.py::test_promoter_study_status_reports_sequence_view_and_infer_completion_summary` |
+| Ops/preflight sequence-view contract check | `uv run pytest -q src/dnadesign/ops/tests/test_progress_cli.py::test_stress_ethanol_cipro_study_preflight_reports_sequence_view_contract_health` |
+| Ops/status sequence-view and Infer completion summaries | `uv run pytest -q src/dnadesign/studies/tests/test_stress_ethanol_cipro_status_snapshot.py::test_build_stress_ethanol_cipro_growth_status_surfaces_sequence_view_and_feature_completion_sections` |
 | Sequence-view runbook product/stale submit gate | `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py::test_sequence_view_infer_runbook_preflight_gates_missing_products_not_missing_vectors` |
-| Study/Ops record-plane smoke check | `uv run ops progress show usr.data-plane.promoter-study-status --json` |
+| Study/Ops record-plane smoke check | `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` |
 
 ### Cutover Acceptance
 
@@ -950,7 +950,7 @@ The sequence-view ontology cutover is only complete when product semantics,
 feature completion, generated artifacts, and operator runbooks agree. Current
 state:
 
-- [x] Product contracts are green in `promoter-study-status` and preflight for
+- [x] Product contracts are green in `stress-ethanol-cipro-growth-status` and preflight for
   the active main/reference sequence-view datasets.
 - [x] Sequence-view completion reports `missing_products=0` for active main and
   reference 7B configs.
@@ -1052,7 +1052,7 @@ uv run pytest -q src/dnadesign/infer/tests/cli/test_validate_command.py
 Focused checks after Study/Ops changes:
 
 ```bash
-uv run ops progress show usr.data-plane.promoter-study-status --json
+uv run ops progress show studies.stress-ethanol-cipro-growth.status --json
 uv run pytest -q src/dnadesign/studies/tests src/dnadesign/ops/tests
 ```
 
@@ -1168,7 +1168,7 @@ raw-editing Parquet strings. Current local product-contract acceptance is:
   split `48` forward and `48` reverse-complement.
 - `usr_promoter_references`: `48` `selected_region` source-backed reference
   views.
-- `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
   reports `state=ok`, `sequence-view product contracts 4/4 ok`, and
   `generated_artifact_freshness.state=ok`.
 
@@ -1242,7 +1242,7 @@ Exit criteria:
   notebook generation all work against the refreshed partial feature state.
 
 The third highest-leverage slice, cheap status aggregation of the
-feature-completion planner output, is implemented. `usr.data-plane.promoter-study-status
+feature-completion planner output, is implemented. `studies.stress-ethanol-cipro-growth.status
 --json` now exposes summarized product completion, feature completion, and
 generated-artifact freshness fields. The text status page links the detailed
 preflight route for next-run blockers, and planned reference features remain

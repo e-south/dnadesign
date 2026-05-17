@@ -773,7 +773,7 @@ approves.
    Add plot semantics YAML for each new plot under
    `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/plot_semantics/`.
    Add or update study deliverable markdown under
-   `src/dnadesign/studies/regulondb_native_promoter_panel/deliverables/`.
+   `src/dnadesign/studies/studies/regulondb_native_promoter_panel/deliverables/`.
 
 9. Update `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/config.yaml`
    without broad churn:
@@ -834,7 +834,7 @@ approves.
 14. Update docs after behavior is stable:
 
     - `src/dnadesign/latentdna/docs/reference/workspace-schema.md`
-    - `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
+    - `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
     - `src/dnadesign/latentdna/docs/reference/performance-budgets.md` if live
       pressure timings change materially
     - study deliverable markdown for any plot whose interpretation changed
@@ -925,7 +925,7 @@ Repo acceptance:
 - Related design spec:
   [sequence-view ontology and Infer completion hardening](../../dev/plans/2026-04-28-sequence-view-ontology-and-infer-completion-hardening-spec.md)
 - LatentDNA workflow:
-  [promoter-study representation comparison](../../../src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md)
+  [promoter-study representation comparison](../../../src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md)
 - Stress study record:
   [stress ethanol cipro growth status](../../studies/stress_ethanol_cipro_growth/status.md)
 - RegulonDB study record:

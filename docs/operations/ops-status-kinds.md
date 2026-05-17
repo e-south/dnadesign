@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Registered public OPS routes and their status-kind adapters:
+Registered public OPS routes and their status-kind providers:
 
 | Registry id | Status kind | Observed plane | Surface type | Summary scope | Cost | Required inputs | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -12,17 +12,17 @@ Registered public OPS routes and their status-kind adapters:
 | `usr.data-plane.chained-densegen-infer-sync` | `usr-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `usr` |
 | `usr.data-plane.multi-source-source-of-truth` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
 | `usr.data-plane.construct-infer-source-of-truth` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
-| `usr.data-plane.promoter-study-status` | `promoter-study-status` | `record` | `study_snapshot` | `repo` | `cheap` | none | `usr` |
-| `usr.data-plane.promoter-study-preflight` | `promoter-study-preflight` | `execution_readiness` | `study_preflight` | `host` | `deep` | none | `usr` |
-| `cruncher.data-plane.cruncher-study-status` | `cruncher-study-status` | `record` | `study_snapshot` | `repo` | `cheap` | none | `cruncher` |
-| `cruncher.data-plane.cruncher-study-preflight` | `cruncher-study-preflight` | `execution_readiness` | `study_preflight` | `host` | `deep` | none | `cruncher` |
+| `studies.stress-ethanol-cipro-growth.status` | `stress-ethanol-cipro-growth-status` | `record` | `study_snapshot` | `repo` | `cheap` | none | `studies` |
+| `studies.stress-ethanol-cipro-growth.preflight` | `stress-ethanol-cipro-growth-preflight` | `execution_readiness` | `study_preflight` | `host` | `deep` | none | `studies` |
+| `studies.retron-hairpin-design.status` | `retron-hairpin-design-status` | `record` | `study_snapshot` | `repo` | `cheap` | none | `studies` |
+| `studies.retron-hairpin-design.preflight` | `retron-hairpin-design-preflight` | `execution_readiness` | `study_preflight` | `host` | `deep` | none | `studies` |
 | `usr.data-plane.promoter-feature-matrix` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
 | `cluster.downstream.exploratory-clustering` | `cluster-run-index` | `data` | `run_index` | `workspace` | `cheap` | `--cluster-results-root` | `cluster` |
 | `opal.downstream.usr-infer-x-active-learning` | `opal-campaign-state` | `control` | `campaign_snapshot` | `workspace` | `cheap` | `--opal-config` | `opal` |
 
 ### Direct status-kind inventory
 
-`uv run ops progress kinds --json` is the complete adapter inventory. It also
+`uv run ops progress kinds --json` is the complete provider inventory. It also
 lists owner-provided status kinds that are not catalog-backed public routes yet,
 including `latentdna-workspace-snapshot` for LatentDNA workspace snapshot
 inspection.

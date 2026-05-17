@@ -1,5 +1,0 @@
-study_id: <study-id>
-usr_remotes_path: n/a
-datasets: []
-notes:
-  - This study is workspace/spec driven unless a shared-USR dataset is explicitly declared later.

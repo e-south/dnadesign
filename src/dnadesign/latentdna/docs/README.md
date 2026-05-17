@@ -9,7 +9,7 @@ and use concepts when aligning terminology across workspaces.
 
 ### Choose a Path
 
-- [Promoter-study representation comparison workflow](workflows/promoter-study-representation-comparison.md)
+- [Stress ethanol/cipro representation comparison workflow](workflows/stress-ethanol-cipro-representation-comparison.md)
 - [Context-geometry workflow](workflows/context-shift.md)
 - [Cross-view agreement workflow](workflows/cross-view-agreement.md)
 

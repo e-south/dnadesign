@@ -25,5 +25,5 @@ rationale_md: Gives a compact inspection surface for whether known reference sta
 limitations_md: Strength values are sparse and may not share one scale across reference collections. UMAP geometry is non-linear and not a substitute for explicit correlation or distance statistics.
 failure_modes_md: Mixed strength scales, missing numeric annotations, stale reference metadata, or overinterpreted UMAP axes can make visual trends look stronger than the underlying evidence.
 docs_refs:
-  - src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+  - src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
   - src/dnadesign/latentdna/docs/reference/artifact-manifests.md

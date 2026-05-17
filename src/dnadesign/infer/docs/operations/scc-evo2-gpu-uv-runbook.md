@@ -301,8 +301,8 @@ Treat live study collection as four explicit gates:
 For study-owned USR write-back lanes, run:
 
 ```bash
-uv run ops progress show usr.data-plane.promoter-study-status --json # Confirm the checked-in study snapshot is current.
-NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json # Confirm the current host is execution-ready.
+uv run ops progress show studies.stress-ethanol-cipro-growth.status --json # Confirm the checked-in study snapshot is current.
+NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json # Confirm the current host is execution-ready.
 uv run infer validate usr-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
 uv run usr --root src/dnadesign/usr/datasets namespace show infer # Confirm the shared USR root already knows the infer namespace.
 ```

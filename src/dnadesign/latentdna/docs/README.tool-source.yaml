@@ -10,6 +10,6 @@ keywords:
   - downstream
   - embeddings
 routes:
-  - id: promoter-study-representation-comparison
-    path: workflows/promoter-study-representation-comparison.md
-    summary: Study-bound comparison route for promoter anchor and construct-context datasets once vector-bearing USR surfaces exist.
+  - id: stress-ethanol-cipro-representation-comparison
+    path: workflows/stress-ethanol-cipro-representation-comparison.md
+    summary: Study-bound comparison route for stress anchor and construct-context datasets once vector-bearing USR surfaces exist.

@@ -1,4 +1,4 @@
-# Promoter-Study Representation Comparison
+# Stress Ethanol/Cipro Representation Comparison
 
 **Type:** workflow
 **Plane:** data-plane
@@ -6,11 +6,11 @@
 **Owner-boundary:** latentdna
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-08
-**Registry-id:** latentdna.promoter-study.representation-comparison
+**Registry-id:** latentdna.stress-ethanol-cipro-growth.representation-comparison
 **Entry artifact:** usr_prom_eth_cip_anchor, construct_prom_eth_cip_context, usr_promoter_references, construct_prom_eth_cip_reference_core60, and construct_prom_eth_cip_reference_contexts
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 
-The promoter study now binds LatentDNA to row-level USR metadata sources plus
+The stress_ethanol_cipro_growth study binds LatentDNA to row-level USR metadata sources plus
 canonical Infer feature sidecars. The row sources remain useful for cohort,
 landmark, and dataset-overview plots. Embedding-bearing views must come from
 `_derived/infer/feature_aliases.parquet` joined to `feature_vectors.parquet`
@@ -199,7 +199,7 @@ otherwise.
 ### Deeper study notes
 
 Keep longer interpretation in
-`src/dnadesign/studies/stress_ethanol_cipro_growth/notes/`.
+`src/dnadesign/studies/studies/stress_ethanol_cipro_growth/notes/`.
 
 Use the notes for:
 

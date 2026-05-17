@@ -72,7 +72,7 @@ def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, wo
     payload["study_binding"] = {
         "study_id": study_dir.name,
         "record_root": study_dir.resolve().as_posix(),
-        "deliverable_docs_root": f"src/dnadesign/studies/{study_dir.name}",
+        "deliverable_docs_root": f"src/dnadesign/studies/studies/{study_dir.name}",
     }
 
 

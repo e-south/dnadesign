@@ -32,7 +32,7 @@ It owns:
 | Execution-readiness plane | observed by preflight surfaces | Host, workspace, scheduler, and command blockers for the next action. |
 
 The plane a command belongs to is not always the same as the plane it observes.
-Example: `ops progress show usr.data-plane.promoter-study-preflight` belongs to the observation plane, but it observes the execution-readiness plane.
+Example: `ops progress show studies.stress-ethanol-cipro-growth.preflight` belongs to the observation plane, but it observes the execution-readiness plane.
 When a route or workflow needs more nuance than the plane enum provides, keep
 `Plane` on the canonical enum and add a separate field such as `Surface role`
 instead of inventing replacement plane names.
@@ -60,7 +60,7 @@ That same precedence is used for campaign summaries, preflight blocker ordering,
 
 Use the cheap snapshot first:
 
-- `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 
 Snapshot answers record-backed questions:
 
@@ -71,7 +71,7 @@ Snapshot answers record-backed questions:
 
 Escalate to preflight when the question is about blockers or readiness:
 
-- `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json`
 
 Preflight answers readiness questions:
 
@@ -105,6 +105,6 @@ For runbook orchestration, keep runtime visibility explicit:
 | registered procedures and route metadata | `ops catalog` plus checked-in `*.registry.yaml` files |
 | status-kind ontology | checked-in `*/ops/status.registry.yaml` and `ops/providers/*/status.registry.yaml` files |
 | study lifecycle order, track map, and declared preflight checks | checked-in `docs/studies/<study-id>/ops.study.yaml` |
-| live study summary | `promoter-study-status` snapshot plus the checked-in study record |
-| execution blockers | `promoter-study-preflight` |
+| live study summary | `stress-ethanol-cipro-growth-status` snapshot plus the checked-in study record |
+| execution blockers | `stress-ethanol-cipro-growth-preflight` |
 | orchestration outcome | workspace-scoped audit JSON observed through `ops-audit-json` |

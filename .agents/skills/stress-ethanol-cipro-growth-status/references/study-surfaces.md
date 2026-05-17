@@ -34,6 +34,20 @@ Keep ownership boundaries clear.
   section and `opal notebook generate/run`; this skill should not grow a
   parallel OPAL command walkthrough.
 
+## Study-Owned Source Routing
+
+- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py`:
+  OPS service orchestration and contract binding.
+- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/snapshot.py`:
+  record-backed status assembly.
+- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight.py`:
+  preflight context resolution and check coordination.
+- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/`:
+  semantic completeness, sequence-view, and runtime probes. Deep Infer feature
+  completion stays under preflight command checks.
+- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/ops/`:
+  OPS provider entrypoints and checked-in status registry metadata.
+
 ## Router rule
 
 If a follow-up question needs commands, tuning, or tool-local troubleshooting,

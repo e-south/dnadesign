@@ -71,4 +71,4 @@ Interpretation:
 See also:
 
 - [../dev/journal.md](../dev/journal.md)
-- [../workflows/promoter-study-representation-comparison.md](../workflows/promoter-study-representation-comparison.md)
+- [../workflows/stress-ethanol-cipro-representation-comparison.md](../workflows/stress-ethanol-cipro-representation-comparison.md)

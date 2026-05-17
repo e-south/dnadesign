@@ -541,7 +541,8 @@ def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_templa
     assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
     assert config_payload["study_binding"]["record_root"] == study_dir.resolve().as_posix()
     assert (
-        config_payload["study_binding"]["deliverable_docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
+        config_payload["study_binding"]["deliverable_docs_root"]
+        == "src/dnadesign/studies/studies/stress_ethanol_cipro_growth"
     )
 
 

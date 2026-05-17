@@ -27,7 +27,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     readme = (repo_root / "src/dnadesign/latentdna/README.md").read_text(encoding="utf-8")
     docs_index = (repo_root / "src/dnadesign/latentdna/docs/README.md").read_text(encoding="utf-8")
     workflow = (
-        repo_root / "src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md"
+        repo_root / "src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md"
     ).read_text(encoding="utf-8")
     cli_contracts = (repo_root / "src/dnadesign/latentdna/docs/reference/cli-contracts.md").read_text(encoding="utf-8")
     workspace_schema = (repo_root / "src/dnadesign/latentdna/docs/reference/workspace-schema.md").read_text(
@@ -50,10 +50,10 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "LatentDNA compares learned sequence representations" in readme
     assert "comparison layer for `dnadesign`" not in readme
     assert "workspace snapshot contract" in readme.lower()
-    assert "promoter-study representation comparison workflow" in readme.lower()
-    assert "docs/workflows/promoter-study-representation-comparison.md" in readme
+    assert "stress ethanol/cipro representation comparison workflow" in readme.lower()
+    assert "docs/workflows/stress-ethanol-cipro-representation-comparison.md" in readme
 
-    assert "workflows/promoter-study-representation-comparison.md" in docs_index
+    assert "workflows/stress-ethanol-cipro-representation-comparison.md" in docs_index
     assert "reference/workspace-snapshot-contract.md" in docs_index
     assert "reference/artifact-naming.md" in docs_index
     assert "operations/README.md" in docs_index
@@ -191,7 +191,7 @@ def test_latentdna_docs_remove_legacy_promoter_surface_names() -> None:
     scan_roots = [
         repo_root / "src/dnadesign/latentdna",
         repo_root / "docs/studies/stress_ethanol_cipro_growth",
-        repo_root / "src/dnadesign/studies/stress_ethanol_cipro_growth",
+        repo_root / "src/dnadesign/studies/studies/stress_ethanol_cipro_growth",
     ]
     forbidden_tokens = [
         "".join(["atlas", "_2x2_intermediate_main"]),

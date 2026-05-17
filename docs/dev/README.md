@@ -34,7 +34,7 @@ Use this index to find maintainer workflows, checks, and planning records.
 5. Run boundary checks when changing cross-tool imports:
 `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
 6. Run the repo-local skill audits when changing `.agents/skills/`:
-`bash .agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh`
+`bash .agents/skills/stress-ethanol-cipro-growth-status/scripts/audit-stress-ethanol-cipro-growth-status-skill.sh`
 `bash .agents/skills/retron-hairpin-study/scripts/audit-retron-hairpin-study-skill.sh`
 `bash .agents/skills/notify-ops/scripts/audit-notify-ops-skill.sh`
 `bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh`

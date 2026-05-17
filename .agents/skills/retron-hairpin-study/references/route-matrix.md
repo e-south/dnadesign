@@ -14,8 +14,8 @@ study-phase reporting.
 | "I need mismatch/boundary illustration." | YIU route in `routes.md` | YIU is contrast-only. |
 | "I need sequence, SVG, PNG, or GenBank for selected parts." | compile reference, then materialize single-unit sequence bundle | The compiler emits one MSD unit per design and does not accept a repeat count. |
 | "Open a transient Finder window with these outputs/deliverables." | materialize single-unit sequence bundle, then open the bundle root | Finder/output wording implies concrete artifacts; catalog JSONs alone are not the requested deliverable. |
-| "Where is the old study status?" | `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json` | Use only for progress/history questions. |
-| "What blocks a legacy study run?" | `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` | Use only for blocker/readiness questions. |
+| "Where is the Retron study status?" | `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` | Use only for progress/history questions. |
+| "What blocks the Retron study run?" | `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` | Use only for blocker/readiness questions. |
 
 ## Compiler-First Boundary
 

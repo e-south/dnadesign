@@ -10,8 +10,8 @@ prompt-surface pressure tests.
 | `docs/studies/README.md` | repo-local | Study-record ownership, status vs preflight split, and pinned-study bootstrap. |
 | `docs/studies/retron_hairpin_design/` | repo-local | Current retron hairpin study scope, route map, pipeline context, and skill path. |
 | `docs/studies/retron_hairpin_design/scar-nick-base-junction.md` | repo-local | Scar-nick strict terminal nick policy, B26/B43 profile convention, retained scar coverage, and schema implications. |
-| `src/dnadesign/cruncher/docs/operations/cruncher-study-status.md` | repo-local | Snapshot contract for one checked-in Cruncher study. |
-| `src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md` | repo-local | Command-readiness contract for one checked-in Cruncher study. |
+| `docs/studies/retron_hairpin_design/status-contract.md` | repo-local | Snapshot contract for the concrete retron_hairpin_design study. |
+| `docs/studies/retron_hairpin_design/preflight.md` | repo-local | Command-readiness contract for the concrete retron_hairpin_design study. |
 | `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md` | repo-local | Released-product Snapback boundary and lane intent. |
 | `src/dnadesign/cruncher/src/scar_nick/` | repo-local | Current scar-nick schema, planner, geometry, and artifact contracts. |
 | `src/dnadesign/cruncher/workspaces/scar_nick_teto/` | repo-local | Current scar-nick TetO workspace and BbsI-HF route context. |

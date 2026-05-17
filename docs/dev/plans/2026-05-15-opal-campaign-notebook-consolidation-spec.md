@@ -13,7 +13,7 @@ without becoming a competing control plane or a study-specific atlas.
 
 ### Best Outcome
 
-A naive agent can enter through `promoter-study-status`, read the checked-in
+A naive agent can enter through `stress-ethanol-cipro-growth-status`, read the checked-in
 study record, follow `docs/studies/<study-id>/routes.md` to OPAL, and use one
 generated marimo notebook for campaign/round artifact visualization. OPAL CLI
 commands remain canonical for state and validation; the notebook composes their
@@ -22,7 +22,7 @@ concepts into an ergonomic read-only view.
 ### Non-Goals
 
 - Do not add OPAL command sprawl when existing commands can express the flow.
-- Do not embed OPAL walkthroughs directly in `promoter-study-status`.
+- Do not embed OPAL walkthroughs directly in `stress-ethanol-cipro-growth-status`.
 - Do not add BaseRender-specific or DenseGen-specific rendering logic to OPAL.
 - Do not make LatentDNA projection or atlas columns OPAL readiness gates.
 - Do not maintain a checked-in active notebook as a second user-facing route
@@ -38,7 +38,7 @@ concepts into an ergonomic read-only view.
 4. Shared helper modules return plain data, strings, or typed records; marimo
    cells stay focused on UI composition.
 5. Study and ops routes point to OPAL through `routes.md` and OPAL docs, while
-   `promoter-study-status` remains the record-plane router.
+   `stress-ethanol-cipro-growth-status` remains the record-plane router.
 
 ### Notebook Contract
 
@@ -59,7 +59,7 @@ to decide whether to regenerate plots with `opal plot`.
 
 ### Study/Ops Routing Contract
 
-For promoter studies, `promoter-study-status` answers the record-backed status
+For promoter studies, `stress-ethanol-cipro-growth-status` answers the record-backed status
 question, then routes OPAL follow-up through `docs/studies/<study-id>/routes.md`.
 The study route should include:
 
@@ -82,7 +82,7 @@ The study route should include:
 - [x] Changed `opal notebook generate` to work for valid pre-run campaigns;
   generated notebooks now show missing runs, labels, predictions, and plots as
   explicit degraded states instead of blocking generation on ledger artifacts.
-- [x] Added promoter-study-status audit guards for the OPAL route boundary:
+- [x] Added stress-ethanol-cipro-growth-status audit guards for the OPAL route boundary:
   status/plot/notebook questions route through `routes.md`, not the skill body.
 - [ ] Dogfood generated notebooks against a demo campaign with plots present.
 - [ ] Add adversarial CLI tests for missing plots and plot-output metadata
@@ -99,8 +99,8 @@ DNADESIGN_HEADLESS=1 uv run pytest -q \
   src/dnadesign/opal/tests/analysis \
   src/dnadesign/opal/tests/cli/test_cli_notebook_generate.py
 uv run pytest -q src/dnadesign/studies/tests/test_stress_ethanol_cipro_opal_batch0.py
-bash .agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh
-uv run ruff check src/dnadesign/opal src/dnadesign/studies .agents/skills/promoter-study-status
+bash .agents/skills/stress-ethanol-cipro-growth-status/scripts/audit-stress-ethanol-cipro-growth-status-skill.sh
+uv run ruff check src/dnadesign/opal src/dnadesign/studies .agents/skills/stress-ethanol-cipro-growth-status
 uv run ruff format --check src/dnadesign/opal src/dnadesign/studies
 uv run python -m dnadesign.devtools.docs.checks --repo-root .
 git diff --check
@@ -112,6 +112,6 @@ git diff --check
 - Generated notebooks must not reference `densegen__visual`.
 - Projection fields such as LatentDNA UMAP columns are optional context only.
 - New study OPAL routing should update `routes.md`, not
-  `promoter-study-status` top-level workflow text.
+  `stress-ethanol-cipro-growth-status` top-level workflow text.
 - New plot viewer behavior should extend OPAL plot artifact contracts before
   adding file-name-specific notebook logic.

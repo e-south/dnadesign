@@ -133,7 +133,7 @@ imports, and local artifact bundles before optional USR persistence.
   `msd_design_reference_v1` / `msd_design_catalog_v1`, strict Retron MSD label
   parsing with scar-nick `S3/S2/S1/S0` profile linting, checked-in registry
   entries for the scar-nick hit list, and a study-local CLI module under
-  `dnadesign.studies.retron_hairpin_design` without adding a top-level
+  `dnadesign.studies.studies.retron_hairpin_design` without adding a top-level
   `retron-msd` script.
 - [x] (2026-05-14 03:40Z) Study information-architecture hardening: added the
   selected MSD label list, exposed the ID-to-catalog route through

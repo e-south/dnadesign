@@ -113,8 +113,16 @@ require_file "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssd
 require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/pipeline.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/ops.study.yaml"
-require_file "$REPO_ROOT/src/dnadesign/cruncher/docs/operations/cruncher-study-status.md"
-require_file "$REPO_ROOT/src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/status-contract.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/preflight.md"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler_spec.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/composition_payload.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/output_guards.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/materialized_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/manifests.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/layout.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/errors.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
@@ -167,6 +175,32 @@ require_section "## Trigger Tests"
 require_line_budget "$SKILL_FILE" "$SIZE_BUDGET_LINES"
 require_frontmatter_yaml
 
+if uv run python - "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design" <<'PY'
+from pathlib import Path
+import sys
+
+source_root = Path(sys.argv[1])
+budgets = {
+    "compiler.py": 450,
+    "composition_payload.py": 450,
+    "output_guards.py": 450,
+    "materialized_outputs.py": 450,
+    "manifests.py": 450,
+}
+violations = []
+for filename, budget in budgets.items():
+    line_count = len((source_root / filename).read_text(encoding="utf-8").splitlines())
+    if line_count > budget:
+        violations.append(f"{filename} has {line_count} lines > {budget}")
+if violations:
+    raise SystemExit("; ".join(violations))
+PY
+then
+  pass "Retron compiler source stays decomposed by responsibility"
+else
+  fail "Retron compiler source stays decomposed by responsibility"
+fi
+
 require_pattern 'docs/studies/README\.md' "skill routes through study records docs"
 require_pattern 'docs/studies/retron_hairpin_design/status\.md' "skill references pinned study status"
 require_pattern 'docs/studies/retron_hairpin_design/routes\.md' "skill references pinned study routes"
@@ -179,6 +213,10 @@ require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-compo
 require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
 require_pattern 'docs/studies/retron_hairpin_design/pipeline\.yaml' "skill references pinned study pipeline"
 require_pattern 'references/test-matrix\.md' "skill references test matrix for validation"
+require_pattern 'composition_payload\.py' "skill routes composition payload source separately"
+require_pattern 'output_guards\.py' "skill routes output guard source separately"
+require_pattern 'materialized_outputs\.py' "skill routes artifact publication source separately"
+require_pattern 'manifests\.py' "skill routes manifest writer source separately"
 require_pattern 'developers\.openai\.com/api/docs/guides/prompt-engineering#coding' "skill records OpenAI Developers prompt-surface source"
 require_pattern 'Start with input completeness, not study phase' "skill uses compiler-first routing"
 require_pattern 'status command output' "skill keeps status as optional progress evidence"

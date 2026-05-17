@@ -79,8 +79,8 @@ Out of scope:
 - Mismatch-only display or boundary contrast: route to YIU; it is not the
   topology engine.
 - Progress or blocker question: only then use
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json` or
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`.
+  `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` or
+  `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`.
 
 2. Load only the needed surfaces.
 - Compiler route: `docs/studies/retron_hairpin_design/routes.md`, then
@@ -92,7 +92,7 @@ Out of scope:
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
 3. Execute or report the route.
-- For complete reference inputs, run `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint|compile`.
+- For complete reference inputs, run `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint|compile`.
 - For GenBank/structure-review output, run the same module's `materialize` command with
   `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
 - If the user asked to open outputs in Finder, do not stop after `compile`;

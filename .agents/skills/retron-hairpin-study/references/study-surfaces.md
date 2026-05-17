@@ -54,14 +54,25 @@ base-junction scar-nick work.
   owns the completed implementation checklist and validation evidence.
 - `docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md`
   owns remaining USR/source-ref/module-split follow-up work.
-- `src/dnadesign/studies/retron_hairpin_design/compiler.py` owns the study-local
-  MSD reference/catalog compiler API, shallow output-bundle layout, and
-  single-unit sequence artifact generation.
-- `src/dnadesign/studies/retron_hairpin_design/compiler_spec.py` owns typed
+- `src/dnadesign/studies/studies/retron_hairpin_design/compiler.py` owns the
+  study-local compile/materialize orchestration API only.
+- `src/dnadesign/studies/studies/retron_hairpin_design/compiler_spec.py` owns typed
   `retron_msd_compiler_spec_v1` parsing, explicit part normalization, and
   public primitive-source selector checks.
-- `src/dnadesign/studies/retron_hairpin_design/cli.py` is the thin Typer
-  command adapter for `msd_design_reference_v1` / `msd_design_catalog_v1`
+- `src/dnadesign/studies/studies/retron_hairpin_design/composition_payload.py`
+  owns single-unit sequence artifact generation intent as linear-ssDNA
+  composition payload construction.
+- `src/dnadesign/studies/studies/retron_hairpin_design/output_guards.py` owns
+  fail-fast stale-output guards for the shallow output-bundle layout.
+- `src/dnadesign/studies/studies/retron_hairpin_design/materialized_outputs.py`
+  owns GenBank/plot/manifest artifact publication from Construct output.
+- `src/dnadesign/studies/studies/retron_hairpin_design/manifests.py` owns
+  catalog, index, manifest, and bundle README writers for that shallow
+  output-bundle layout.
+- `src/dnadesign/studies/studies/retron_hairpin_design/layout.py` owns
+  output-layout constants, and `errors.py` owns the fail-fast exception type.
+- `src/dnadesign/studies/studies/retron_hairpin_design/cli.py` is the thin Typer
+  command service for `msd_design_reference_v1` / `msd_design_catalog_v1`
   records plus the `materialize` GenBank/native-structure-PNG/review-PNG
   route.
 - `dnadesign.cruncher.snapback` and `dnadesign.cruncher.scar_nick` expose the

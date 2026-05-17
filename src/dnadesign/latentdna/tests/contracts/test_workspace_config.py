@@ -997,7 +997,7 @@ sources: {}
 metadata:
   include: []
 study_binding:
-  study_dir: src/dnadesign/studies/stress_ethanol_cipro_growth
+  study_dir: src/dnadesign/studies/studies/stress_ethanol_cipro_growth
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -1027,7 +1027,7 @@ metadata:
   include: []
 study_binding:
   study_id: stress_ethanol_cipro_growth
-  docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth
+  docs_root: src/dnadesign/studies/studies/stress_ethanol_cipro_growth
         """.strip()
         + "\n",
         encoding="utf-8",
