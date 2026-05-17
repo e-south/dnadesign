@@ -34,13 +34,13 @@ fi
 Run this before each new submit group:
 
 ```bash
-scripts/sge-session-status.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3
 ```
 
 Use this when a user asks for concrete active-job status before confirmation:
 
 ```bash
-scripts/sge-active-jobs.sh --max-jobs 12
+$SKILL_DIR/scripts/sge-active-jobs.sh --max-jobs 12
 ```
 
 Rules:
@@ -53,7 +53,7 @@ Rules:
 Run advisor before proposing multi-submit plans:
 
 ```bash
-scripts/sge-submit-shape-advisor.sh \
+$SKILL_DIR/scripts/sge-submit-shape-advisor.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```
@@ -71,7 +71,7 @@ Queue fairness:
 Run this when communicating submit readiness to the user:
 
 ```bash
-scripts/sge-operator-brief.sh \
+$SKILL_DIR/scripts/sge-operator-brief.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```
@@ -97,7 +97,7 @@ scripts/sge-operator-brief.sh \
 Run policy QA checks on submit artifacts before real submission.
 
 ```bash
-scripts/qa-sge-submit-preflight.sh \
+$SKILL_DIR/scripts/qa-sge-submit-preflight.sh \
   --template <TEMPLATE> \
   --require-project-flag
 ```
@@ -131,7 +131,7 @@ scripts/qa-sge-submit-preflight.sh \
 - cite BU allocating-memory and resources-jobs docs for memory/resource claims
 - cite BU process-reaper docs when recommending recovery after forced termination
 - cite BU transferring-files docs before recommending transfer-node usage
-- avoid hard-coded queue/resource policy claims without source-evidence entries
+- avoid hard-coded queue/resource policy claims without external-sources entries
 
 ### Submit
 

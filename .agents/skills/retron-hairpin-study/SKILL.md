@@ -40,7 +40,8 @@ Out of scope:
 - Incomplete parts route to the smallest primitive: Snapback, scar-nick, or YIU contrast.
 - Solved primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
-  payload primary, cap geometry, payload complement, right base + 3' flank.
+  payload primary, snapback foldback geometry with a 3 nt `Cap` subsection,
+  payload complement, right base + 3' flank.
 - Materialized `msd_design_id` / variant directory names must preserve the cap/base/profile ontology in filenames, using `C172-LCGGT-RACAG-MXMM` style suffixes.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
@@ -78,7 +79,8 @@ Out of scope:
 - Mismatch-only display or boundary contrast: route to YIU; it is not the
   topology engine.
 - Progress or blocker question: only then use
-  `cruncher-study-status` or `cruncher-study-preflight`.
+  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json` or
+  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`.
 
 2. Load only the needed surfaces.
 - Compiler route: `docs/studies/retron_hairpin_design/routes.md`, then

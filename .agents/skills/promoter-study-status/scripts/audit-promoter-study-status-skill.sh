@@ -117,6 +117,7 @@ require_pattern 'docs/studies/README\.md' "skill routes through study records do
 require_pattern 'docs/studies/index\.yaml' "skill requires active study index"
 require_pattern 'promoter-study-status-contract\.md' "skill points at status contract"
 require_pattern 'promoter-study-preflight' "skill points at preflight route"
+require_absent '`promoter-study-preflight`' "skill does not name preflight as a repo-local skill" "$SKILL_FILE"
 require_pattern 'Do not use for blockers or next-run readiness' "skill frontmatter excludes preflight questions" "$SKILL_FILE"
 require_pattern 'docs/studies/<study-id>/campaign\.yaml' "skill references checked-in campaign manifest"
 require_pattern 'docs/studies/<study-id>/datasets\.yaml' "skill references dataset registry"

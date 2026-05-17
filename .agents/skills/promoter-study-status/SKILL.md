@@ -1,6 +1,6 @@
 ---
 name: promoter-study-status
-description: Report record-backed promoter-study status for one live study. Use when the user asks where the promoter study stands, what phase or datasets are current, whether the checked-in study record needs a refresh, which study files are authoritative, which dataset sync posture is current, or whether the study is still source-phase versus downstream. Do not use for blockers or next-run readiness; use `promoter-study-preflight`. Do not use for tool-local operational walkthroughs or generic workflow discovery when no checked-in study record exists.
+description: Report record-backed promoter-study status for one live study. Use when the user asks where the promoter study stands, what phase or datasets are current, whether the checked-in study record needs a refresh, which study files are authoritative, which dataset sync posture is current, or whether the study is still source-phase versus downstream. Do not use for blockers or next-run readiness; use the Ops `usr.data-plane.promoter-study-preflight` status command. Do not use for tool-local operational walkthroughs or generic workflow discovery when no checked-in study record exists.
 metadata:
   version: 0.5.1
   category: workflow-automation
@@ -12,8 +12,8 @@ metadata:
 ## Purpose
 
 Answer `where is the live promoter study now?` from the checked-in study
-record. Route blocker questions to `promoter-study-preflight` and owner-surface
-questions to the study's `routes.md`.
+record. Route blocker questions to the Ops `usr.data-plane.promoter-study-preflight`
+status command and owner-surface questions to the study's `routes.md`.
 
 ## Scope
 
@@ -27,8 +27,8 @@ In scope:
   tool docs
 
 Out of scope:
-- blocker or next-run readiness questions that belong to
-  `promoter-study-preflight`
+- blocker or next-run readiness questions that belong to the Ops
+  `usr.data-plane.promoter-study-preflight` status command
 - tool-local DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL
   operational walkthroughs
 - reconstructing live study state from generic runbooks, workspaces, or
@@ -82,7 +82,8 @@ Out of scope:
 ## Guardrails
 
 - `promoter-study-status` is the record-plane router.
-- `promoter-study-preflight` is the execution-readiness router.
+- `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+  is the execution-readiness router; it is not a repo-local skill name.
 - Keep `status.md` factual and short; keep lifecycle and preflight authority in
   `ops.study.yaml`; keep structural workspace or config bindings in
   `pipeline.yaml`.
@@ -105,8 +106,8 @@ Out of scope:
   checked-in record
 - exploratory-analysis route inventory only through snapshot
   `analysis_surfaces` plus `routes.md`, not by inventing tool-local state
-- next route surface: `routes.md`, `promoter-study-preflight`, or the owning
-  tool doc or workspace
+- next route surface: `routes.md`, the Ops `usr.data-plane.promoter-study-preflight`
+  status command, or the owning tool doc or workspace
 - explicit assumptions or missing artifacts when the record is incomplete
 
 ## Output

@@ -13,25 +13,25 @@ Use this contract whenever an agent reports current HPC state to the user.
 1. Collect machine status:
 
 ```bash
-scripts/sge-session-status.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3
 ```
 
 2. Collect active job snapshot:
 
 ```bash
-scripts/sge-active-jobs.sh --max-jobs 12
+$SKILL_DIR/scripts/sge-active-jobs.sh --max-jobs 12
 ```
 
 3. Render user-facing status card:
 
 ```bash
-scripts/sge-status-card.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-status-card.sh --warn-over-running 3
 ```
 
 4. Render consolidated operator brief for submit gating:
 
 ```bash
-scripts/sge-operator-brief.sh --planned-submits <N> --warn-over-running 3
+$SKILL_DIR/scripts/sge-operator-brief.sh --planned-submits <N> --warn-over-running 3
 ```
 
 ### Status card template

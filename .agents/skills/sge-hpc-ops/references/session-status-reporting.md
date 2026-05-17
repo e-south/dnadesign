@@ -11,7 +11,7 @@ Use this reference to produce a concise status report that both agent and user c
 ### Standard command
 
 ```bash
-scripts/sge-session-status.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3
 ```
 
 Expected fields:
@@ -25,7 +25,7 @@ Expected fields:
 Use this to report concrete job ids and states alongside aggregate counts:
 
 ```bash
-scripts/sge-active-jobs.sh --max-jobs 12
+$SKILL_DIR/scripts/sge-active-jobs.sh --max-jobs 12
 ```
 
 ### If more than 3 jobs are running
@@ -45,7 +45,7 @@ scripts/sge-active-jobs.sh --max-jobs 12
 Use this as the default end-user report when submit guidance is needed:
 
 ```bash
-scripts/sge-operator-brief.sh --planned-submits <N> --warn-over-running 3
+$SKILL_DIR/scripts/sge-operator-brief.sh --planned-submits <N> --warn-over-running 3
 ```
 
 ### Manual fallback commands
@@ -75,7 +75,7 @@ qstat -u "$USER" | awk '
 Use fixture input for CI-style checks and offline validation:
 
 ```bash
-scripts/sge-session-status.sh --qstat-file /tmp/qstat.fixture --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --qstat-file /tmp/qstat.fixture --warn-over-running 3
 ```
 
 ### Communication contract
@@ -84,4 +84,4 @@ When reporting status:
 - include whether threshold was exceeded
 - include exact warning rationale when threshold exceeded
 - include next-step options (wait, chain with `-hold_jid`, or convert to array)
-- include the rendered status card from `scripts/sge-status-card.sh` when interacting with end users
+- include the rendered status card from `$SKILL_DIR/scripts/sge-status-card.sh` when interacting with end users

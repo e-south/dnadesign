@@ -11,7 +11,7 @@ Use this reference when the user asks for current HPC state and whether addition
 ### Standard command
 
 ```bash
-scripts/sge-operator-brief.sh \
+$SKILL_DIR/scripts/sge-operator-brief.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```
@@ -35,7 +35,7 @@ Use `--json` for machine-readable fields including numeric `running_jobs`, `thre
 When users ask for exact active job ids/states, pair operator brief with:
 
 ```bash
-scripts/sge-active-jobs.sh --max-jobs 12
+$SKILL_DIR/scripts/sge-active-jobs.sh --max-jobs 12
 ```
 
 ### Gate semantics
@@ -47,7 +47,7 @@ scripts/sge-active-jobs.sh --max-jobs 12
 ### Deterministic fixture mode
 
 ```bash
-scripts/sge-operator-brief.sh \
+$SKILL_DIR/scripts/sge-operator-brief.sh \
   --qstat-file /tmp/qstat.fixture \
   --planned-submits 8 \
   --warn-over-running 3

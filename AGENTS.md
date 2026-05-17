@@ -46,6 +46,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Notify operator docs: `docs/notify/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Repo-local notify operator skill: `.agents/skills/notify-ops/SKILL.md`
+- Repo-local SGE/HPC operator skill: `.agents/skills/sge-hpc-ops/SKILL.md`
 - Repo-local BU SCC USR sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
 - Repo-local retron hairpin study skill: `.agents/skills/retron-hairpin-study/SKILL.md`

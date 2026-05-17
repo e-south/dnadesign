@@ -70,12 +70,14 @@ Clarification policy:
 ### Step 3: Apply up-to-date handling
 - for BU SCC claims, use official BU pages listed in `references/bu-scc-system-usage.md`
 - classify claims as stable vs volatile (numeric limits, hostnames, quotas, process-reaper thresholds)
-- check retrieval age in `references/source-evidence.md`; refresh volatile claims older than 45 days
+- check retrieval age in `references/external-sources.md`; refresh volatile claims older than 45 days
 - if volatile claims cannot be refreshed in-session, mark them unknown and avoid hard-coded values
 ### Step 4: Build a capability snapshot
+- From the repo root, set `SKILL_DIR=.agents/skills/sge-hpc-ops` before
+  running skill-local helper scripts.
 - run probes from `references/probe-first-contract.md`
-- run `scripts/sge-session-status.sh --warn-over-running 3`
-- run `scripts/sge-active-jobs.sh --max-jobs 12` when status reporting is requested
+- run `$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3`
+- run `$SKILL_DIR/scripts/sge-active-jobs.sh --max-jobs 12` when status reporting is requested
 - include: `route_id`, `execution_locus`, `session_handoff_state`, unresolved unknowns
 - include counts: `running_jobs`, `queued_jobs`, `eqw_jobs` and threshold warning state
 ### Step 5: Build deterministic execution plan
@@ -86,7 +88,7 @@ Clarification policy:
 - when starting a live watcher against an existing USR event stream and replay is not desired, seed the watcher cursor to the current `.events.log` size before `notify usr-events watch --follow`
 - align threaded workloads (`OMP_NUM_THREADS`) with `NSLOTS`
 - prefer arrays (`SGE_TASK_ID`) for fanout and `-hold_jid` chains for ordered pipelines
-- run `scripts/sge-submit-shape-advisor.sh --warn-over-running 3` before multi-submit plans
+- run `$SKILL_DIR/scripts/sge-submit-shape-advisor.sh --warn-over-running 3` before multi-submit plans
 - if running jobs are more than 3 and additional submissions are requested, warn and require explicit confirmation
 - in over-threshold cases, propose arrays or dependency chains before raw parallel submits
 - respect the queue and do not skip the line
@@ -99,11 +101,11 @@ Clarification policy:
 ### Step 6: Apply verify-before-submit gate
 - verify project/account flags, script readability, and shell init compatibility (`#!/bin/bash -l`)
 - run scheduler syntax validation (`qsub -verify`, fallback `qsub -w v`)
-- run `scripts/qa-sge-submit-preflight.sh` on submit artifacts
+- run `$SKILL_DIR/scripts/qa-sge-submit-preflight.sh` on submit artifacts
 - run:
-  - `scripts/sge-session-status.sh --warn-over-running 3`
-  - `scripts/sge-submit-shape-advisor.sh --warn-over-running 3`
-  - `scripts/sge-operator-brief.sh --planned-submits <N> --warn-over-running 3`
+  - `$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3`
+  - `$SKILL_DIR/scripts/sge-submit-shape-advisor.sh --warn-over-running 3`
+  - `$SKILL_DIR/scripts/sge-operator-brief.sh --planned-submits <N> --warn-over-running 3`
 - for notify workflows, verify resolver/profile inputs and webhook environment before watcher submit
 - submit only when checks are green
 ### Step 7: Monitor and recover
@@ -177,6 +179,6 @@ Should not trigger:
 - `references/route-load-matrix.md`, `references/probe-first-contract.md`, and `references/workflow-router.md`
 - `references/session-status-reporting.md`, `references/user-status-contract.md`, `references/submission-shape-advisor.md`, and `references/operator-brief.md`
 - `references/interactive-contract.md`, `references/batch-submit-contract.md`, `references/runbook-entrypoints.md`, and `references/automation-qa-preflight.md`
-- `references/ci-mechanical-gates.md`, `references/workload-dnadesign.md`, `references/bu-scc-system-usage.md`, `references/source-evidence.md`, and `references/test-matrix.md`
-- `scripts/qa-sge-submit-preflight.sh`, `scripts/sge-session-status.sh`, `scripts/sge-active-jobs.sh`, `scripts/sge-status-card.sh`, `scripts/sge-submit-shape-advisor.sh`, and `scripts/sge-operator-brief.sh`
-- Run `scripts/audit-sge-hpc-ops-skill.sh` for deterministic skill-contract checks.
+- `references/ci-mechanical-gates.md`, `references/workload-dnadesign.md`, `references/bu-scc-system-usage.md`, `references/external-sources.md`, and `references/test-matrix.md`
+- `$SKILL_DIR/scripts/qa-sge-submit-preflight.sh`, `$SKILL_DIR/scripts/sge-session-status.sh`, `$SKILL_DIR/scripts/sge-active-jobs.sh`, `$SKILL_DIR/scripts/sge-status-card.sh`, `$SKILL_DIR/scripts/sge-submit-shape-advisor.sh`, and `$SKILL_DIR/scripts/sge-operator-brief.sh`
+- Run `$SKILL_DIR/scripts/audit-sge-hpc-ops-skill.sh` for deterministic skill-contract checks.

@@ -64,17 +64,17 @@ Use this taxonomy before submit and at incident triage time.
 ### Standard commands
 
 ```bash
-scripts/qa-sge-submit-preflight.sh \
+$SKILL_DIR/scripts/qa-sge-submit-preflight.sh \
   --template <PATH_TO_QSUB> \
   --require-project-flag
 ```
 
 ```bash
-scripts/sge-session-status.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3
 ```
 
 ```bash
-scripts/sge-submit-shape-advisor.sh \
+$SKILL_DIR/scripts/sge-submit-shape-advisor.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```

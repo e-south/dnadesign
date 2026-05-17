@@ -17,7 +17,7 @@ Use this reference when deciding how to submit one or many jobs under current qu
 ### Standard command
 
 ```bash
-scripts/sge-submit-shape-advisor.sh \
+$SKILL_DIR/scripts/sge-submit-shape-advisor.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```
@@ -46,7 +46,7 @@ contract.
 Independent fanout under high pressure:
 
 ```bash
-scripts/sge-submit-shape-advisor.sh \
+$SKILL_DIR/scripts/sge-submit-shape-advisor.sh \
   --planned-submits 32 \
   --warn-over-running 3
 ```
@@ -54,7 +54,7 @@ scripts/sge-submit-shape-advisor.sh \
 Ordered pipeline under high pressure:
 
 ```bash
-scripts/sge-submit-shape-advisor.sh \
+$SKILL_DIR/scripts/sge-submit-shape-advisor.sh \
   --planned-submits 8 \
   --requires-order \
   --warn-over-running 3

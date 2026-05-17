@@ -50,7 +50,7 @@ qsub -help 2>&1 | grep -E ' -P | -A |project|account' || true
 Prefer the helper command:
 
 ```bash
-scripts/sge-session-status.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3
 ```
 
 Manual fallback if script is unavailable:
