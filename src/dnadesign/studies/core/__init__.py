@@ -1,10 +1,9 @@
-from .adapter_loader import load_study_family_adapter
 from .models import (
-    StudyFamilyAdapter,
     StudyOpsContract,
     StudyPhaseContract,
     StudyPreflightContract,
     StudyPreflightNextScopeContract,
+    StudyStatusAdapter,
     StudyStatusContext,
 )
 from .preflight_plan import (
@@ -20,16 +19,15 @@ __all__ = [
     "ActiveStudySelection",
     "StudyIndex",
     "StudyIndexEntry",
-    "StudyFamilyAdapter",
     "StudyOpsContract",
     "StudyPhaseContract",
     "StudyPreflightContract",
     "StudyPreflightNextScopeContract",
     "StudyPreflightPlan",
+    "StudyStatusAdapter",
     "StudyStatusContext",
     "build_study_preflight_plan",
     "discover_active_study_selection",
-    "load_study_family_adapter",
     "load_study_index",
     "load_study_ops_contract",
     "normalize_study_preflight_scope",

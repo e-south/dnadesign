@@ -6,8 +6,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from dnadesign.latentdna.src.services.workspace_snapshot_service import (
-    _decision_ladder,
     _model_families,
+    decision_ladder,
     workspace_snapshot,
 )
 
@@ -49,7 +49,7 @@ def test_decision_ladder_excludes_appendix_only_deliverables() -> None:
         )
     )
 
-    assert _decision_ladder(context) == [
+    assert decision_ladder(context) == [
         "dataset_overview",
         "workspace_snapshot_export",
     ]

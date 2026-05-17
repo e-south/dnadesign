@@ -4,6 +4,5 @@ version: 1
 active_study_id: <study-id>
 studies:
   - study_id: <study-id>
-    family: promoter
     title: <one-line-title>
     record_root: docs/studies/<study-id>

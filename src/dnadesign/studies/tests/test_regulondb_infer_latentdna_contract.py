@@ -4,8 +4,8 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.latentdna.src.services.workspace_snapshot_service import _decision_ladder
-from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
+from dnadesign.latentdna.workspace_snapshot import decision_ladder
+from dnadesign.latentdna.workspaces import load_workspace_config
 
 
 def _repo_root() -> Path:
@@ -87,5 +87,5 @@ def test_regulondb_latentdna_binding_decision_deliverables_match_workspace_ladde
     )
     context = load_workspace_config(repo_root / "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel")
 
-    assert binding["decision_deliverables"] == _decision_ladder(context)
+    assert binding["decision_deliverables"] == decision_ladder(context)
     assert set(binding["decision_deliverables"]) <= set(context.config.deliverables)

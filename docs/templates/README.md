@@ -22,7 +22,7 @@ Templates provide consistent structure for system-of-record docs, runbooks, ADRs
 - [Cruncher study OPS contract template](cruncher-study-ops.study.yaml)
 
 The promoter-study templates define the checked-in record plane. The matching
-study-family adapter code lives under `src/dnadesign/studies/`, not inside OPS
+study status adapter code lives under `src/dnadesign/studies/`, not inside OPS
 core.
 
 The Cruncher-study templates do the same for command-centric tracked studies

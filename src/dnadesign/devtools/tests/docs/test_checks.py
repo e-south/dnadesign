@@ -15,6 +15,7 @@ import datetime as dt
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.devtools.docs.checks import (
@@ -30,6 +31,7 @@ from dnadesign.devtools.docs.checks import (
     _find_operational_runbook_path_issues,
     _find_ops_deprecated_semantics_issues,
     _find_packaged_runbook_variant_issues,
+    _find_public_interface_doc_contract_issues,
     _find_readme_tool_catalog_issues,
     _find_root_docs_entrypoint_issues,
     _find_runbook_catalog_issues,
@@ -39,6 +41,7 @@ from dnadesign.devtools.docs.checks import (
     _find_stale_overlay_guard_term_issues,
     _find_study_execution_source_drift_issues,
     _find_study_record_doc_issues,
+    _find_study_status_surface_semantics_issues,
     _find_tool_docs_metadata_issues,
     _find_tool_readme_banner_issues,
     _find_tool_readme_structure_issues,
@@ -50,7 +53,7 @@ from dnadesign.ops.catalog import (
     render_catalog_procedure_section,
     render_catalog_tool_source_section,
 )
-from dnadesign.ops.runbooks.path_policy import (
+from dnadesign.ops.runbooks import (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
 )
@@ -218,15 +221,56 @@ def test_main_fails_for_broken_relative_link(tmp_path: Path) -> None:
     assert rc == 1
 
 
+def test_broken_links_check_rejects_absolute_local_path_outside_repo(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside.write_text("# Outside\n", encoding="utf-8")
+    source = tmp_path / "docs" / "index.md"
+    _write(source, f"[outside]({outside})\n")
+
+    broken = _find_broken_links([source], repo_root=tmp_path)
+
+    assert broken == [(source, f"{outside} (local link escapes repository)")]
+
+
+def test_broken_link_check_ignores_fenced_code_markdown_links(tmp_path: Path) -> None:
+    index_path = tmp_path / "docs" / "index.md"
+    _write(
+        index_path,
+        "\n".join(
+            [
+                "## Examples",
+                "",
+                "```md",
+                "[illustrative missing link](./not-a-real-route.md)",
+                "```",
+                "",
+            ]
+        ),
+    )
+
+    broken = _find_broken_links([index_path])
+
+    assert broken == []
+
+
+def test_broken_link_check_still_flags_body_markdown_links(tmp_path: Path) -> None:
+    index_path = tmp_path / "docs" / "index.md"
+    _write(index_path, "[missing](./nope.md)\n")
+
+    broken = _find_broken_links([index_path])
+
+    assert broken == [(index_path, "./nope.md")]
+
+
 def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: Path) -> None:
     _write(
         tmp_path / "docs" / "studies" / "README.md",
         "\n".join(
             [
-                "campaign.yaml",
-                "datasets.yaml",
-                "status.md",
-                "ops.study.yaml",
+                "`campaign.yaml`",
+                "`datasets.yaml`",
+                "`status.md`",
+                "`ops.study.yaml`",
                 "legacy path: docs/studies/promoter/demo_study/status.md",
             ]
         )
@@ -241,7 +285,6 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
                 "studies": [
                     {
                         "study_id": "demo_study",
-                        "family": "promoter",
                         "record_root": "docs/studies/demo_study",
                     }
                 ],
@@ -267,6 +310,98 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
     assert any("docs/studies/README.md" in issue and "docs/studies/promoter/" in issue for issue in issues)
 
 
+def test_find_study_record_doc_issues_requires_navigable_required_file_references(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "Study records normally include campaign.yaml, datasets.yaml, status.md, and ops.study.yaml.\n",
+    )
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert any("campaign.yaml" in issue and "markdown link or code span" in issue for issue in issues)
+    assert any("datasets.yaml" in issue and "markdown link or code span" in issue for issue in issues)
+    assert any("status.md" in issue and "markdown link or code span" in issue for issue in issues)
+    assert any("ops.study.yaml" in issue and "markdown link or code span" in issue for issue in issues)
+
+
+def test_find_study_record_doc_issues_accepts_code_span_required_file_references(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `campaign.yaml`",
+                "- `datasets.yaml`",
+                "- `status.md`",
+                "- `ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert not any("missing navigable study-record contract reference" in issue for issue in issues)
+
+
+def test_find_study_record_doc_issues_rejects_record_root_outside_study_records(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `campaign.yaml`",
+                "- `datasets.yaml`",
+                "- `status.md`",
+                "- `ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [
+                    {
+                        "study_id": "demo_study",
+                        "record_root": "docs/other/demo_study",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+    )
+    for required_name in ("campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"):
+        _write(tmp_path / "docs" / "other" / "demo_study" / required_name, "placeholder\n")
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert any("record_root must live under docs/studies/<study-id>" in issue for issue in issues)
+
+
+def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        "Study-family adapters are explicit seams and family routing resolves through "
+        "`src/dnadesign/studies/families/<family>/`.\n",
+    )
+    _write(
+        tmp_path / "docs" / "README.md",
+        "Verify the active study selector, `family`, and `record_root` in the study index.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "promoter-study-status-contract.md",
+        "The selected study entry must declare `family` and `record_root`.\n",
+    )
+
+    issues = _find_study_status_surface_semantics_issues(tmp_path)
+
+    assert any("Study-family adapters" in issue for issue in issues)
+    assert any("`family`, and `record_root`" in issue for issue in issues)
+    assert any("declare `family` and `record_root`" in issue for issue in issues)
+
+
 def _write_active_study_datasets(tmp_path: Path, datasets: list[dict[str, object]]) -> None:
     _write(
         tmp_path / "docs" / "studies" / "index.yaml",
@@ -277,7 +412,6 @@ def _write_active_study_datasets(tmp_path: Path, datasets: list[dict[str, object
                 "studies": [
                     {
                         "study_id": "demo_study",
-                        "family": "promoter",
                         "record_root": "docs/studies/demo_study",
                     }
                 ],
@@ -483,6 +617,8 @@ def test_tool_readme_structure_check_accepts_banner_narrative_and_docs_link(tmp_
                 "",
                 "Short narrative overview.",
                 "",
+                "## Documentation",
+                "",
                 "See [docs index](../../../docs/README.md) for workflows and references.",
                 "",
                 "## Usage",
@@ -502,8 +638,99 @@ def test_tool_readme_structure_check_accepts_banner_narrative_and_docs_link(tmp_
     assert issues == []
 
 
+def test_tool_readme_structure_check_rejects_multi_paragraph_intro(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "\n".join(
+            [
+                "![Alpha banner](assets/alpha-banner.svg)",
+                "",
+                "First narrative paragraph.",
+                "",
+                "Second narrative paragraph belongs in deeper docs.",
+                "",
+                "## Documentation",
+                "",
+                "[Alpha docs](docs/README.md)",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
+
+    issues = _find_tool_readme_structure_issues(tmp_path)
+
+    assert any("intro after the banner must be one paragraph" in issue for issue in issues)
+
+
+def test_tool_readme_structure_check_rejects_self_referential_intro(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "\n".join(
+            [
+                "![Alpha banner](assets/alpha-banner.svg)",
+                "",
+                "Alpha is the analysis package in `dnadesign`.",
+                "",
+                "## Documentation",
+                "",
+                "[Alpha docs](docs/README.md)",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
+
+    issues = _find_tool_readme_structure_issues(tmp_path)
+
+    assert any("avoid self-referential package/layer-in-dnadesign wording" in issue for issue in issues)
+
+
+def test_tool_readme_structure_check_requires_documentation_heading(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "\n".join(
+            [
+                "![Alpha banner](assets/alpha-banner.svg)",
+                "",
+                "Alpha scores short sequence examples.",
+                "",
+                "## Start here",
+                "",
+                "[Alpha docs](docs/README.md)",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
+
+    issues = _find_tool_readme_structure_issues(tmp_path)
+
+    assert any("first heading after the intro must be '## Documentation'" in issue for issue in issues)
+
+
 def test_tool_readme_structure_check_rejects_overlong_tool_readmes(tmp_path: Path) -> None:
-    body_lines = ["![Alpha banner](assets/alpha-banner.svg)", "", "Short narrative.", "", "[Docs](docs/README.md)"]
+    body_lines = [
+        "![Alpha banner](assets/alpha-banner.svg)",
+        "",
+        "Short narrative.",
+        "",
+        "## Documentation",
+        "",
+        "[Docs](docs/README.md)",
+    ]
     body_lines.extend(f"Extra line {idx}." for idx in range(40))
     _write(tmp_path / "src" / "dnadesign" / "alpha" / "README.md", "\n".join(body_lines) + "\n")
     _write(
@@ -525,6 +752,8 @@ def test_tool_readme_structure_check_requires_docs_index_first_when_present(tmp_
                 "![Alpha banner](assets/alpha-banner.svg)",
                 "",
                 "Short narrative.",
+                "",
+                "## Documentation",
                 "",
                 "[Repository docs](../../../docs/README.md)",
                 "[Alpha docs](docs/README.md)",
@@ -587,6 +816,24 @@ def test_root_docs_entrypoint_check_rejects_plain_text_paths_without_links(tmp_p
                 "![dnadesign banner](assets/dnadesign-banner.svg)",
                 "",
                 "Use docs/README.md as the docs entrypoint.",
+                "",
+            ]
+        ),
+    )
+
+    issues = _find_root_docs_entrypoint_issues(tmp_path)
+
+    assert any("must include a markdown link to docs/README.md" in issue for issue in issues)
+
+
+def test_root_docs_entrypoint_check_rejects_bannerless_readme_without_docs_link(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "# dnadesign",
+                "",
+                "Use the docs index.",
                 "",
             ]
         ),
@@ -951,6 +1198,15 @@ def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: 
     issues = _find_operational_runbook_path_issues(tmp_path)
 
     assert any("operational runbook path is outside allowed locations" in issue for issue in issues)
+
+
+def test_find_operational_runbook_path_issues_rejects_malformed_tracked_yaml(tmp_path: Path) -> None:
+    _write(tmp_path / "broken.yaml", "runbook:\n  workflow_id: [broken\n")
+    _git_init(tmp_path)
+    _git_add(tmp_path, "broken.yaml")
+
+    with pytest.raises(ValueError, match="operational runbook yaml is invalid"):
+        _find_operational_runbook_path_issues(tmp_path)
 
 
 def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_git_repo(tmp_path: Path) -> None:
@@ -1517,9 +1773,13 @@ def test_main_fails_when_exec_plan_progress_checklist_lacks_timestamp(tmp_path: 
 
 def test_main_passes_for_valid_links(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    _write(tmp_path / "docs" / "index.md", "## x\n\n[guide](./guide.md)\n[#anchor](#x)\n[site](https://example.com)\n")
+    _write(
+        tmp_path / "docs" / "README.md",
+        f"## x\n\n**Owner:** maintainers\n**Last verified:** {today}\n\n"
+        "[guide](./guide.md)\n[#anchor](#x)\n[site](https://example.com)\n",
+    )
     _write(tmp_path / "docs" / "guide.md", "## Guide\n")
-    _write(tmp_path / "README.md", "[docs](docs/index.md)\n")
+    _write(tmp_path / "README.md", "[docs](docs/README.md)\n")
     _write(
         tmp_path / "ARCHITECTURE.md",
         f"**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n[docs](docs/guide.md)\n",
@@ -1540,11 +1800,17 @@ def test_main_fails_when_readme_tool_catalog_missing_repo_tool(tmp_path: Path) -
     _write(tmp_path / "src" / "dnadesign" / "notify" / "__init__.py", "")
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "README.md",
-        "![aligner banner](assets/aligner-banner.svg)\n\nAligner narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![aligner banner](assets/aligner-banner.svg)\n\n"
+        "Aligner narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "README.md",
-        "![notify banner](assets/notify-banner.svg)\n\nNotify narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![notify banner](assets/notify-banner.svg)\n\n"
+        "Notify narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
@@ -1559,6 +1825,8 @@ def test_main_fails_when_readme_tool_catalog_missing_repo_tool(tmp_path: Path) -
         "\n".join(
             [
                 "# dnadesign",
+                "",
+                "[Documentation](docs/README.md)",
                 "",
                 "## Available tools",
                 "",
@@ -1585,6 +1853,8 @@ def test_readme_tool_catalog_does_not_require_studies_row(tmp_path: Path) -> Non
         "\n".join(
             [
                 "# dnadesign",
+                "",
+                "[Documentation](docs/README.md)",
                 "",
                 "## Available tools",
                 "",
@@ -1614,6 +1884,8 @@ def test_main_fails_when_readme_tool_catalog_row_has_too_few_columns(tmp_path: P
             [
                 "# dnadesign",
                 "",
+                "[Documentation](docs/README.md)",
+                "",
                 "## Available tools",
                 "",
                 "| Tool | Description | Coverage |",
@@ -1642,6 +1914,8 @@ def test_main_fails_when_readme_tool_catalog_missing_coverage_column(tmp_path: P
             [
                 "# dnadesign",
                 "",
+                "[Documentation](docs/README.md)",
+                "",
                 "## Available tools",
                 "",
                 "| Tool | Description |",
@@ -1658,7 +1932,7 @@ def test_main_fails_when_readme_tool_catalog_missing_coverage_column(tmp_path: P
 
 def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    _write(tmp_path / "docs" / "index.md", "## Index\n")
+    _write(tmp_path / "docs" / "README.md", f"## Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n")
     _write(
         tmp_path / "ARCHITECTURE.md",
         f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
@@ -1667,11 +1941,17 @@ def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path)
     _write(tmp_path / "src" / "dnadesign" / "notify" / "__init__.py", "")
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "README.md",
-        "![aligner banner](assets/aligner-banner.svg)\n\nAligner narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![aligner banner](assets/aligner-banner.svg)\n\n"
+        "Aligner narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "README.md",
-        "![notify banner](assets/notify-banner.svg)\n\nNotify narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![notify banner](assets/notify-banner.svg)\n\n"
+        "Notify narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
@@ -1686,6 +1966,8 @@ def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path)
         "\n".join(
             [
                 "# dnadesign",
+                "",
+                "[Documentation](docs/README.md)",
                 "",
                 "## Available tools",
                 "",
@@ -1826,11 +2108,17 @@ def test_main_fails_when_codecov_components_do_not_cover_repo_tools(tmp_path: Pa
     _write(tmp_path / "src" / "dnadesign" / "notify" / "__init__.py", "")
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "README.md",
-        "![aligner banner](assets/aligner-banner.svg)\n\nAligner narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![aligner banner](assets/aligner-banner.svg)\n\n"
+        "Aligner narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "README.md",
-        "![notify banner](assets/notify-banner.svg)\n\nNotify narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![notify banner](assets/notify-banner.svg)\n\n"
+        "Notify narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
@@ -2035,9 +2323,19 @@ def test_main_fails_when_public_interface_docs_use_internal_source_inreach(tmp_p
     assert rc == 1
 
 
+def test_public_interface_doc_contract_includes_maintainer_and_runbook_routers(tmp_path: Path) -> None:
+    _write(tmp_path / "docs" / "dev" / "README.md", "Call `python -m dnadesign.cruncher.src.cli.app`.\n")
+    _write(tmp_path / "docs" / "runbooks" / "README.md", "Use `/tmp/local-runbook.yaml` for scratch work.\n")
+
+    issues = _find_public_interface_doc_contract_issues(tmp_path)
+
+    assert any("docs/dev/README.md" in issue and "internal source inreach" in issue for issue in issues)
+    assert any("docs/runbooks/README.md" in issue and "absolute filesystem path token" in issue for issue in issues)
+
+
 def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    _write(tmp_path / "docs" / "index.md", "## Index\n")
+    _write(tmp_path / "docs" / "README.md", f"## Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n")
     _write(
         tmp_path / "ARCHITECTURE.md",
         f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
@@ -2046,11 +2344,17 @@ def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) ->
     _write(tmp_path / "src" / "dnadesign" / "notify" / "__init__.py", "")
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "README.md",
-        "![aligner banner](assets/aligner-banner.svg)\n\nAligner narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![aligner banner](assets/aligner-banner.svg)\n\n"
+        "Aligner narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "notify" / "README.md",
-        "![notify banner](assets/notify-banner.svg)\n\nNotify narrative.\n\n[Docs](../../../docs/README.md)\n",
+        "![notify banner](assets/notify-banner.svg)\n\n"
+        "Notify narrative.\n\n"
+        "## Documentation\n\n"
+        "[Docs](../../../docs/README.md)\n",
     )
     _write(
         tmp_path / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg",
@@ -2065,6 +2369,8 @@ def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) ->
         "\n".join(
             [
                 "# dnadesign",
+                "",
+                "[Documentation](docs/README.md)",
                 "",
                 "## Available tools",
                 "",
@@ -2623,6 +2929,91 @@ def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp
     issues = _find_runbook_catalog_issues(tmp_path)
 
     assert any("missing status surface glossary entry for 'ops-audit-json'" in issue for issue in issues)
+
+
+def test_runbook_catalog_check_uses_status_registry_inventory_for_glossary(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic control-plane runbook contract.",
+                "**Execution-kind:** executable",
+                "**Status-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary="Deterministic control-plane runbook contract.",
+        execution_kind="executable",
+        status_kind="ops-audit-json",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "providers" / "builtin" / "status.registry.yaml",
+        "\n".join(
+            [
+                "version: 1",
+                "provider_id: builtin.ops",
+                "entries:",
+                "  - status_kind: ops-audit-json",
+                "    owner_boundary: ops",
+                "    observes_plane: control",
+                "    provider_ref: dnadesign.ops.providers.builtin.status_provider:provide_ops_audit_status",
+                "    description: Read one orchestration audit JSON.",
+                "    surface_type: orchestration_audit",
+                "    cost_class: cheap",
+                "    summary_scope: workspace",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "latentdna" / "ops" / "status.registry.yaml",
+        "\n".join(
+            [
+                "version: 1",
+                "provider_id: latentdna.workspace-status",
+                "entries:",
+                "  - status_kind: latentdna-workspace-snapshot",
+                "    owner_boundary: latentdna",
+                "    observes_plane: data",
+                "    provider_ref: dnadesign.latentdna.ops.status_providers:provide_snapshot",
+                "    description: Read one LatentDNA workspace snapshot.",
+                "    surface_type: artifact_catalog",
+                "    cost_class: cheap",
+                "    summary_scope: workspace",
+                "",
+            ]
+        ),
+    )
+    _write_generated_runbook_catalog_readme(
+        tmp_path,
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert any("missing status surface glossary entry for 'latentdna-workspace-snapshot'" in issue for issue in issues)
 
 
 def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> None:

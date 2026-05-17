@@ -14,8 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.families.cruncher.adapter import STUDY_FAMILY_ADAPTER
-from dnadesign.studies.families.cruncher.preflight import (
+from dnadesign.studies.status_adapters.cruncher_status.adapter import STUDY_STATUS_ADAPTER
+from dnadesign.studies.status_adapters.cruncher_status.preflight import (
     CruncherPreflightDependencies,
     build_cruncher_preflight_progress,
     resolve_cruncher_preflight_context,
@@ -37,8 +37,8 @@ def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str
 
 def test_cruncher_preflight_next_scope_limits_checks_to_current_phase(tmp_path: Path) -> None:
     study_root = _write_cruncher_study_record(tmp_path)
-    context = STUDY_FAMILY_ADAPTER.load_context(repo_root=tmp_path, study_root=study_root)
-    study_context = context.family_context.study_context
+    context = STUDY_STATUS_ADAPTER.load_context(repo_root=tmp_path, study_root=study_root)
+    study_context = context.adapter_context.study_context
 
     resolved = resolve_cruncher_preflight_context(
         study_context=study_context,
@@ -75,8 +75,8 @@ def test_cruncher_preflight_next_scope_limits_checks_to_current_phase(tmp_path: 
 
 def test_cruncher_preflight_reports_required_command_blockers(tmp_path: Path) -> None:
     study_root = _write_cruncher_study_record(tmp_path)
-    context = STUDY_FAMILY_ADAPTER.load_context(repo_root=tmp_path, study_root=study_root)
-    study_context = context.family_context.study_context
+    context = STUDY_STATUS_ADAPTER.load_context(repo_root=tmp_path, study_root=study_root)
+    study_context = context.adapter_context.study_context
 
     resolved = resolve_cruncher_preflight_context(
         study_context=study_context,

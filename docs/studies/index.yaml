@@ -1,20 +1,17 @@
 # Repo-wide selector for the currently active checked-in study record.
-# If the request names a different checked-in study or family, keep this value
+# If the request names a different checked-in study, keep this value
 # truthful and pin the desired record with `--study-dir docs/studies/<study-id>`.
 version: 1
 active_study_id: stress_ethanol_cipro_growth
 studies:
   - study_id: stress_ethanol_cipro_growth
-    family: promoter
     title: Stress / ethanol / ciprofloxacin growth study
     record_root: docs/studies/stress_ethanol_cipro_growth
   - study_id: regulondb_native_promoter_panel
-    family: promoter
     title: RegulonDB native promoter panel
     record_root: docs/studies/regulondb_native_promoter_panel
   # Named Cruncher study. Pin `--study-dir docs/studies/retron_hairpin_design`
   # for retron hairpin questions instead of assuming the repo-wide active study matches.
   - study_id: retron_hairpin_design
-    family: cruncher
     title: Retron hairpin design effort
     record_root: docs/studies/retron_hairpin_design

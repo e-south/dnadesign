@@ -1,7 +1,10 @@
 version: 2
 study_id: stress_ethanol_cipro_growth
-family: promoter
 title: Stress / ethanol / ciprofloxacin growth study
+
+ops_surfaces:
+  status_kind: promoter-study-status
+  preflight_kind: promoter-study-preflight
 
 record_sources:
   narrative_ref: manifest:status.md

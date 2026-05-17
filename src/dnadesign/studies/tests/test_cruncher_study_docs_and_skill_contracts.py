@@ -180,8 +180,10 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "not registered as a top-level `uv run retron-msd` tool" in routes
     assert "Reader should not parse Construct, Folding, BaseRender, or Cruncher internals" in routes
     assert "Materialize command" in routes
-    assert "manifest/sequence_manifest.json" in routes
-    assert "manifest/sequence_index.tsv" in routes
+    assert "manifest/bundle/sequence_manifest.json" in routes
+    assert "manifest/indexes/sequence_index.tsv" in routes
+    assert "manifest/sequence_manifest.json" not in routes
+    assert "manifest/sequence_index.tsv" not in routes
     assert "secondary_structure.native.png" in routes
     assert "composition_overview.svg" in routes
     assert "composition_overview.png" in routes

@@ -242,3 +242,32 @@ def test_main_fails_for_invalid_file_summary_payload(tmp_path: Path) -> None:
     )
 
     assert rc == 1
+
+
+def test_main_fails_when_covered_lines_exceed_statements(tmp_path: Path) -> None:
+    coverage_path = tmp_path / "coverage.json"
+    baseline_path = tmp_path / "tool-coverage-baseline.json"
+    coverage_path.write_text(
+        json.dumps(
+            {
+                "files": {
+                    "src/dnadesign/usr/src/storage/parquet.py": {
+                        "summary": {"covered_lines": 150, "num_statements": 100}
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")
+
+    rc = main(
+        [
+            "--coverage-json",
+            str(coverage_path),
+            "--baseline-json",
+            str(baseline_path),
+        ]
+    )
+
+    assert rc == 1

@@ -61,6 +61,7 @@ DEFAULT_FLANK_3P_SUFFIX = "acagtaactcaga"
 IGNORED_OUTPUT_FILENAMES = {".DS_Store"}
 _BASERENDER_CONTRACT_KIND = "nucleotide_evidence_map_render_v3"
 _MSD_UNIT_REPEAT_COUNT = 1
+_SNAPBACK_FOLDBACK_SEGMENT_ID = "snapback_foldback_geometry"
 
 
 class RetronMsdCompilerError(ValueError):
@@ -361,22 +362,41 @@ def _guard_materialize_output_layout(
         )
 
     manifest_dir = root / MANIFEST_DIRNAME
-    if manifest_dir.exists():
-        allowed_manifest_entries = {
+    _guard_materialize_directory_entries(
+        manifest_dir,
+        allowed_entries={
             MANIFEST_BUNDLE_DIRNAME,
             MANIFEST_CATALOG_DIRNAME,
             MANIFEST_CONFIGS_DIRNAME,
             MANIFEST_INDEXES_DIRNAME,
-            *IGNORED_OUTPUT_FILENAMES,
-        }
-        stale_manifest_entries = sorted(
-            item.name for item in manifest_dir.iterdir() if item.name not in allowed_manifest_entries
-        )
-        if stale_manifest_entries:
-            raise RetronMsdCompilerError(
-                f"Unexpected MSD materialize manifest entries at {manifest_dir}: "
-                f"{', '.join(stale_manifest_entries)}. Choose a fresh --out-dir or archive/remove stale output first."
-            )
+        },
+        output_label="materialize manifest",
+        next_step="Choose a fresh --out-dir or archive/remove stale output first.",
+    )
+    _guard_materialize_directory_entries(
+        manifest_dir / MANIFEST_BUNDLE_DIRNAME,
+        allowed_entries={BUNDLE_MANIFEST_FILENAME, SEQUENCE_MANIFEST_FILENAME},
+        output_label="bundle manifest",
+        next_step="Choose a fresh --out-dir or archive/remove stale bundle manifest output first.",
+    )
+    _guard_materialize_directory_entries(
+        manifest_dir / MANIFEST_CATALOG_DIRNAME,
+        allowed_entries={CATALOG_FILENAME, REFERENCE_DIRNAME},
+        output_label="catalog manifest",
+        next_step="Choose a fresh --out-dir or archive/remove stale catalog output first.",
+    )
+    _guard_materialize_directory_entries(
+        manifest_dir / MANIFEST_CONFIGS_DIRNAME,
+        allowed_entries={COMPOSITION_CONFIG_DIRNAME},
+        output_label="config manifest",
+        next_step="Choose a fresh --out-dir or archive/remove stale config output first.",
+    )
+    _guard_materialize_directory_entries(
+        manifest_dir / MANIFEST_INDEXES_DIRNAME,
+        allowed_entries={REFERENCE_INDEX_FILENAME, SEQUENCE_INDEX_FILENAME},
+        output_label="index manifest",
+        next_step="Choose a fresh --out-dir or archive/remove stale index output first.",
+    )
 
     references_dir = manifest_dir / MANIFEST_CATALOG_DIRNAME / REFERENCE_DIRNAME
     if references_dir.exists():
@@ -429,8 +449,13 @@ def _guard_materialize_output_layout(
         *IGNORED_OUTPUT_FILENAMES,
     }
     for variant_dir in variants_dir.iterdir():
-        if variant_dir.name in IGNORED_OUTPUT_FILENAMES or not variant_dir.is_dir():
+        if variant_dir.name in IGNORED_OUTPUT_FILENAMES:
             continue
+        if not variant_dir.is_dir():
+            raise RetronMsdCompilerError(
+                f"Expected MSD variant output directory at {variant_dir}, but found a file. "
+                "Choose a fresh --out-dir or archive/remove stale generated variant output first."
+            )
         stale_variant_entries = sorted(
             item.name for item in variant_dir.iterdir() if item.name not in allowed_variant_entries
         )
@@ -439,16 +464,117 @@ def _guard_materialize_output_layout(
                 f"Unexpected MSD variant output entries at {variant_dir}: {', '.join(stale_variant_entries)}. "
                 "Choose a fresh --out-dir or archive/remove stale generated variant output first."
             )
+        _guard_materialize_directory_entries(
+            variant_dir / VARIANT_SEQUENCES_DIRNAME,
+            allowed_entries={
+                "features.csv",
+                "forward.fa",
+                "forward.gb",
+                "reverse_complement.fa",
+                "reverse_complement.gb",
+            },
+            output_label="sequence artifact",
+            next_step="Choose a fresh --out-dir or archive/remove stale sequence artifacts before materializing.",
+        )
         plots_dir = variant_dir / VARIANT_PLOTS_DIRNAME
-        if plots_dir.exists():
-            stale_plot_entries = sorted(
-                item.name for item in plots_dir.iterdir() if item.name not in allowed_plot_entries
-            )
-            if stale_plot_entries:
-                raise RetronMsdCompilerError(
-                    f"Stale MSD plot output at {plots_dir}: {', '.join(stale_plot_entries)}. "
-                    "Choose a fresh --out-dir or archive/remove stale plot artifacts before materializing."
-                )
+        _guard_materialize_directory_entries(
+            plots_dir,
+            allowed_entries=allowed_plot_entries,
+            output_label="plot",
+            next_step="Choose a fresh --out-dir or archive/remove stale plot artifacts before materializing.",
+        )
+        _guard_materialize_directory_entries(
+            variant_dir / VARIANT_MANIFEST_DIRNAME,
+            allowed_entries={
+                VARIANT_MANIFEST_COMPOSITION_DIRNAME,
+                VARIANT_MANIFEST_CONSTRUCT_DIRNAME,
+                VARIANT_MANIFEST_FOLDING_DIRNAME,
+                VARIANT_MANIFEST_PROVENANCE_DIRNAME,
+                VARIANT_MANIFEST_REVIEWS_DIRNAME,
+                VARIANT_MANIFEST_VISUAL_DIRNAME,
+            },
+            output_label="variant manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale variant manifest output first.",
+        )
+        variant_manifest_dir = variant_dir / VARIANT_MANIFEST_DIRNAME
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_COMPOSITION_DIRNAME,
+            allowed_entries={
+                "annotation_spans.json",
+                "assembled_sequence.json",
+                "segment_spans.json",
+                "validation_report.json",
+            },
+            output_label="composition manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale composition manifest output first.",
+        )
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_CONSTRUCT_DIRNAME,
+            allowed_entries={"manifest.json"},
+            output_label="construct manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale construct manifest output first.",
+        )
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_FOLDING_DIRNAME,
+            allowed_entries={
+                "folding_preflight.json",
+                "secondary_structure_prediction_request_v1.yaml",
+                "secondary_structure_prediction_v1.json",
+            },
+            output_label="folding manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale folding manifest output first.",
+        )
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_PROVENANCE_DIRNAME,
+            allowed_entries={"provenance.json"},
+            output_label="provenance manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale provenance manifest output first.",
+        )
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_REVIEWS_DIRNAME,
+            allowed_entries={"composition_review_svg_v1.json"},
+            output_label="review manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale review manifest output first.",
+        )
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_VISUAL_DIRNAME,
+            allowed_entries={"sequence_evidence_map_v1.json", VARIANT_MANIFEST_SECONDARY_STRUCTURE_DIRNAME},
+            output_label="visual manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale visual manifest output first.",
+        )
+        _guard_materialize_directory_entries(
+            variant_manifest_dir / VARIANT_MANIFEST_VISUAL_DIRNAME / VARIANT_MANIFEST_SECONDARY_STRUCTURE_DIRNAME,
+            allowed_entries={
+                "annotated.svg",
+                "annotation_manifest.json",
+                "native.svg",
+                "viennarna_secondary_structure_svg_v1.json",
+            },
+            output_label="secondary-structure manifest",
+            next_step="Choose a fresh --out-dir or archive/remove stale secondary-structure manifest output first.",
+        )
+
+
+def _guard_materialize_directory_entries(
+    directory: Path,
+    *,
+    allowed_entries: set[str],
+    output_label: str,
+    next_step: str,
+) -> None:
+    if not directory.exists():
+        return
+    if not directory.is_dir():
+        raise RetronMsdCompilerError(
+            f"Expected MSD {output_label} output directory at {directory}, but found a file. {next_step}"
+        )
+    stale_entries = sorted(
+        item.name for item in directory.iterdir() if item.name not in allowed_entries | IGNORED_OUTPUT_FILENAMES
+    )
+    if stale_entries:
+        raise RetronMsdCompilerError(
+            f"Stale MSD {output_label} output at {directory}: {', '.join(stale_entries)}. {next_step}"
+        )
 
 
 def _require_sequence_subcomponents(
@@ -549,8 +675,8 @@ def _msd_unit_segments(
             "source": {"kind": "literal", "label": f"{record.payload_or_target.id} override"},
         },
         {
-            "segment_id": "snapback_cap_segment",
-            "role": "cap",
+            "segment_id": _SNAPBACK_FOLDBACK_SEGMENT_ID,
+            "role": "snapback_foldback_geometry",
             "sequence": cap_sequence,
             "source": {"kind": "literal", "label": f"{record.cap.id} override"},
         },
@@ -577,7 +703,13 @@ def _msd_unit_segments(
     ]
 
 
-def _msd_unit_annotations(*, flank_5p_prefix: str, flank_5p: str, right_base: str) -> list[dict[str, object]]:
+def _msd_unit_annotations(
+    *,
+    flank_5p_prefix: str,
+    flank_5p: str,
+    right_base: str,
+    cap_topology,
+) -> list[dict[str, object]]:
     return [
         {
             "annotation_id": "stem_base_left",
@@ -599,6 +731,36 @@ def _msd_unit_annotations(*, flank_5p_prefix: str, flank_5p: str, right_base: st
                 "end": len(right_base),
             },
         },
+        {
+            "annotation_id": "snapback_retained_stem",
+            "role": "snapback_retained_stem",
+            "location": {
+                "basis": "segment",
+                "segment_id": _SNAPBACK_FOLDBACK_SEGMENT_ID,
+                "start": cap_topology.retained_stem_span.start,
+                "end": cap_topology.retained_stem_span.end,
+            },
+        },
+        {
+            "annotation_id": "snapback_cap",
+            "role": "snapback_cap",
+            "location": {
+                "basis": "segment",
+                "segment_id": _SNAPBACK_FOLDBACK_SEGMENT_ID,
+                "start": cap_topology.cap_span.start,
+                "end": cap_topology.cap_span.end,
+            },
+        },
+        {
+            "annotation_id": "snapback_foldback_return",
+            "role": "snapback_foldback_return",
+            "location": {
+                "basis": "segment",
+                "segment_id": _SNAPBACK_FOLDBACK_SEGMENT_ID,
+                "start": cap_topology.foldback_return_span.start,
+                "end": cap_topology.foldback_return_span.end,
+            },
+        },
     ]
 
 
@@ -608,13 +770,16 @@ def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) ->
         "component_labels": {
             "flank_5p": "5' Flanking",
             "payload_primary": payload_label,
-            "snapback_cap_segment": "Cap",
+            _SNAPBACK_FOLDBACK_SEGMENT_ID: "Foldback",
             "payload_complement": f"{payload_label} complement",
             "flank_3p": "3' Flanking",
         },
         "annotation_labels": {
             "stem_base_left": "Left Base",
             "stem_base_right": "Right Base",
+            "snapback_retained_stem": "Foldback stem",
+            "snapback_cap": "Cap",
+            "snapback_foldback_return": "Foldback return",
         },
         "scar_nick": {
             "left_base": record.scar_nick.left_base,
@@ -626,18 +791,22 @@ def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) ->
             "flank_3p": "#14B8A6",
             "payload_primary": "#F97316",
             "payload_complement": "#DC2626",
-            "snapback_cap_segment": "#16A34A",
+            _SNAPBACK_FOLDBACK_SEGMENT_ID: "#64748B",
+            "snapback_retained_stem": "#7C3AED",
+            "snapback_cap": "#16A34A",
+            "snapback_foldback_return": "#DB2777",
             "stem_base_left": "#7C3AED",
             "stem_base_right": "#A16207",
         },
         "component_styles": {
             "flank_5p": {"fill": "#BFDBFE", "alpha": 0.72, "edge_color": "#2563EB"},
             "payload_primary": {"fill": "#FDBA74", "alpha": 0.66, "edge_color": "#EA580C"},
-            "snapback_cap_segment": {"fill": "#86EFAC", "alpha": 0.68, "edge_color": "#16A34A"},
+            "snapback_cap": {"fill": "#86EFAC", "alpha": 0.78, "edge_color": "#16A34A"},
             "payload_complement": {"fill": "#FCA5A5", "alpha": 0.66, "edge_color": "#DC2626"},
             "flank_3p": {"fill": "#5EEAD4", "alpha": 0.72, "edge_color": "#0D9488"},
+            "stem_base_left": {"fill": "#EDE9FE", "alpha": 0.76, "edge_color": "#7C3AED"},
+            "stem_base_right": {"fill": "#FEF3C7", "alpha": 0.76, "edge_color": "#A16207"},
         },
-        "base_highlight_color": "#111827",
     }
 
 
@@ -653,6 +822,7 @@ def _composition_config_payload(
 ) -> dict[str, object]:
     left_base = record.scar_nick.left_base
     right_base = record.scar_nick.right_base
+    cap_topology = _require_cap_topology(record=record, cap_sequence=cap_sequence)
     flank_5p = f"{flank_5p_prefix}{left_base}"
     flank_3p = f"{right_base}{flank_3p_suffix}"
     payload_label = record.payload_or_target.display_name or record.payload_or_target.id
@@ -683,6 +853,7 @@ def _composition_config_payload(
                     flank_5p_prefix=flank_5p_prefix,
                     flank_5p=flank_5p,
                     right_base=right_base,
+                    cap_topology=cap_topology,
                 ),
                 "assertions": [
                     {
@@ -728,6 +899,23 @@ def _composition_config_payload(
         },
         "output": {"artifact_bundle": artifact_bundle.as_posix(), "usr": {"enabled": False}},
     }
+
+
+def _require_cap_topology(*, record: MsdDesignReferenceV1, cap_sequence: str):
+    topology = record.cap.snapback_topology
+    if topology is None:
+        raise RetronMsdCompilerError(
+            f"MSD cap '{record.cap.id}' is missing snapback_topology. "
+            "Retron materialization requires explicit Snapback foldback geometry so the Cap label covers only "
+            "the cap subsection, not the whole foldback segment."
+        )
+    expected_length = topology.foldback_return_span.end
+    if len(cap_sequence) != expected_length:
+        raise RetronMsdCompilerError(
+            f"MSD cap '{record.cap.id}' sequence length {len(cap_sequence)} does not match "
+            f"snapback_topology length {expected_length}."
+        )
+    return topology
 
 
 def _run_baserender_jobs(

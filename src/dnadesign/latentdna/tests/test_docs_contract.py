@@ -47,7 +47,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes.md").read_text(encoding="utf-8")
     study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/status.md").read_text(encoding="utf-8")
 
-    assert "comparison layer for `dnadesign`" in readme
+    assert "LatentDNA compares learned sequence representations" in readme
+    assert "comparison layer for `dnadesign`" not in readme
     assert "workspace snapshot contract" in readme.lower()
     assert "promoter-study representation comparison workflow" in readme.lower()
     assert "docs/workflows/promoter-study-representation-comparison.md" in readme

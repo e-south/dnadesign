@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.densegen.src.viz.plot_inventory import CURRENT_INVENTORY_SCHEMA_VERSION, required_notebook_plot_ids
-from dnadesign.studies.families.promoter.analysis_surfaces import inspect_promoter_exploratory_analysis
+from dnadesign.densegen import CURRENT_INVENTORY_SCHEMA_VERSION, required_notebook_plot_ids
+from dnadesign.studies.status_adapters.promoter_status.analysis_surfaces import inspect_promoter_exploratory_analysis
 from dnadesign.studies.tests.test_promoter_snapshot import _make_study_context
 
 
@@ -213,6 +213,8 @@ def test_promoter_densegen_surface_reports_explicit_degraded_state_when_contract
 
 def test_promoter_analysis_surface_module_does_not_import_densegen_internals() -> None:
     repo_root = Path(__file__).resolve().parents[4]
-    source = (repo_root / "src/dnadesign/studies/families/promoter/analysis_surfaces.py").read_text(encoding="utf-8")
+    source = (repo_root / "src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py").read_text(
+        encoding="utf-8"
+    )
 
     assert ".".join(["dnadesign", "densegen", "src"]) not in source

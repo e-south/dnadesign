@@ -13,7 +13,8 @@
   basal left/right base, terminal-nick, or profile constraints route to
   scar-nick.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
-  payload primary, cap geometry, payload complement, right base + 3' flank.
+  payload primary, snapback foldback geometry with a 3 nt `Cap` subsection,
+  payload complement, right base + 3' flank.
 - Construct, Folding, BaseRender, and ViennaRNA plotting are service handoffs
   after part selection. They should consume explicit files or producer bundles,
   not create one workspace per MSD ID. The compiler route does not expose a

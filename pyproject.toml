@@ -105,6 +105,7 @@ where = ["src"]
   "resources/cassette/catalogs/*.yaml",
 ]
 "dnadesign.cluster" = [
+  "ops/status.registry.yaml",
   "presets/*/*.yaml",
   "workspaces/*/config.yaml",
 ]
@@ -131,8 +132,12 @@ where = ["src"]
   "workspaces/*/inputs/*",
 ]
 "dnadesign.latentdna" = [
+  "ops/status.registry.yaml",
   "workspaces/templates/*/*.yaml",
   "workspaces/templates/*/*.md",
+]
+"dnadesign.opal" = [
+  "ops/status.registry.yaml",
 ]
 "dnadesign.ops" = [
   "providers/*/status.registry.yaml",
@@ -141,7 +146,11 @@ where = ["src"]
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.studies" = [
-  "families/*/ops/status.registry.yaml",
+  "status_adapters/*/ops/status.registry.yaml",
+  "stress_ethanol_cipro_growth/opal_batch0/sampling.yaml",
+]
+"dnadesign.usr" = [
+  "ops/status.registry.yaml",
 ]
 
 [tool.pytest.ini_options]

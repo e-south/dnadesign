@@ -56,7 +56,7 @@ def get_click_command():
 
 
 def _load_status_kind_spec(status_kind: str) -> StatusKindSpec:
-    from dnadesign.ops.status import load_status_kind_spec
+    from dnadesign.ops.status.registry_loader import load_status_kind_spec
 
     return load_status_kind_spec(status_kind)
 

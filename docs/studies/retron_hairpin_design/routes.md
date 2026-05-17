@@ -222,7 +222,7 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   `construct_id`, payload/target, cap id, left/right scar-nick bases, and
   optional profile code; then it recomputes the `S3/S2/S1/S0` profile and
   fails fast if the provided code drifts or `S0` is not ligatable. Compiler
-  specs may point at solved Snapback cap primitives or scar-nick stem-base
+  specs may point at solved Snapback foldback primitives or scar-nick stem-base
   primitives only through public `dnadesign.cruncher.snapback` and
   `dnadesign.cruncher.scar_nick` APIs. `selector.mode=rank` is the preferred
   explicit combination surface; rank lists, ranges, and all-hit selectors must
@@ -236,14 +236,16 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   `msd_design_catalog_v1.json`, `reference_index.tsv`, and flat
   `references/*.msd_design_reference_v1.json` files. Do not add per-design
   Construct/Folding workspaces for this path. The materialized sequence is one
-  MSD unit per design: 5' flank plus left base, payload primary, cap geometry,
-  payload complement, right base plus 3' flank. The CLI does not expose a
+  MSD unit per design: 5' flank plus left base, payload primary, snapback
+  foldback geometry with a 3 nt `Cap` subsection, payload complement,
+  right base plus 3' flank. The CLI does not expose a
   repeat-count flag, so it cannot chain complete MSD units together. The
   sequence bundle keeps the top level to `README.md`, `manifest/`, and
-  `variants/`, including `manifest/sequence_manifest.json` and
-  `manifest/sequence_index.tsv`. Bundle manifests live under `manifest/bundle/`, catalogs and
-  frozen references under `manifest/catalog/`, indexes under
-  `manifest/indexes/`, and generated composition configs under
+  `variants/`. Bundle manifests, including
+  `manifest/bundle/sequence_manifest.json`, live under `manifest/bundle/`;
+  catalogs and frozen references live under `manifest/catalog/`; indexes,
+  including `manifest/indexes/sequence_index.tsv`, live under
+  `manifest/indexes/`; and generated composition configs live under
   `manifest/configs/composition/`; each `variants/<msd_design_id>/` directory groups
   forward/reverse-complement GenBank and FASTA under `sequences/`,
   `secondary_structure.native.png` plus `composition_overview.svg` and
@@ -252,7 +254,7 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
   producer output under `runtime/construct/` with a semantic
   `runtime/construct/manifest/` mirror. Variant IDs preserve cap/base/profile
   ontology with uppercase suffixes such as `C172-LCGGT-RACAG-MXMM`. Visible GenBank/CSV labels should be display labels
-  such as `msd[teto]`, `Cap`, `Left Base`, and `Right Base`; raw ids remain
+  such as `msd[teto]`, `Foldback`, `Cap`, `Left Base`, and `Right Base`; raw ids remain
   machine metadata, not operator-facing labels.
 
 ### Contrast route: YIU boundary check

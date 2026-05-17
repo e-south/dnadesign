@@ -20,10 +20,11 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - Runtime and CI behavior should avoid hidden fallback paths.
 - Long-running workflows should surface machine-readable state transitions and terminal outcomes.
 - Repeated campaign orchestration state is workspace-scoped (`<workspace-root>/outputs/logs/ops/*`) to avoid root-level runbook/log fan-out.
-- Observation-plane status discovery is metadata-first: checked-in
-  `src/dnadesign/**/ops/status.registry.yaml` fragments must load without
-  importing provider implementations, and provider code should only import when
-  the selected surface executes.
+- Observation-plane status discovery is metadata-first: checked-in tool-local
+  `src/dnadesign/**/ops/status.registry.yaml` fragments and Ops-owned
+  `src/dnadesign/ops/providers/*/status.registry.yaml` fragments must load
+  without importing provider implementations, and provider code should only
+  import when the selected surface executes.
 - Snapshot and preflight surfaces stay distinct:
   - record-plane snapshots are cheap, repo-scoped, and should not probe local
     GPUs or scheduler state on the fast path

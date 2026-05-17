@@ -67,7 +67,7 @@ For the manual retron-43/TetO dogfood unit, the physical segments are:
 | ---: | --- | --- |
 | `0-15` | `flank_5p` | `gtcagaaaaaaCAAG` |
 | `15-34` | `payload_primary` | `tccctatcagtgatagaga` |
-| `34-52` | `snapback_cap_segment` | `tCCTCAGcccGCTGAGGa` |
+| `34-52` | `snapback_foldback_geometry` | `tCCTCAGcccGCTGAGGa` |
 | `52-71` | `payload_complement` | `tctctatcactgataggga` |
 | `71-88` | `flank_3p` | `CTCGacagtaactcaga` |
 
@@ -75,7 +75,9 @@ Nested annotations include:
 
 - `stem_base_left`: `11-15`, `CAAG`
 - `teto_primary`: `15-34`
-- `snapback_cap`: `34-52`
+- `snapback_retained_stem`: `34-41`
+- `snapback_cap`: `41-44`
+- `snapback_foldback_return`: `44-52`
 - `teto_complement`: `52-71`
 - `stem_base_right`: `71-75`, `CTCG`
 
@@ -131,8 +133,8 @@ Required outputs:
   owners. BaseRender renders this as a paired top/bottom-strand view with
   component backdrops spanning both rows, solid light Watson-Crick connectors,
   text-only annotation labels rather than separate annotation rectangles, and
-  embossed left/right stem-base glyphs on both strands. The current dogfood
-  render carries publication-facing labels (`TetO primary`, `Snapback cap`,
+  highlighted left/right stem-base regions on both strands. The current dogfood
+  render carries publication-facing labels (`TetO primary`, `Foldback`, `Cap`,
   `TetO complement`, flank and stem-base labels), component hues, and backdrop
   styles in `visual.display_profile` on the study config; Construct and
   Folding consume that profile as data instead of hard-coding Retron terms.
@@ -276,11 +278,11 @@ that agents need before opening the full spec:
   reserved-region, and peer-label overlaps, and component hue metadata derived
   from `sequence_evidence_map_v1`. Its annotated title stack reports display
   sections plus canonical `flank_5p`, `payload_primary`,
-  `snapback_cap_segment`, `payload_complement`, `flank_3p`, `left_base`, and
+  `snapback_foldback_geometry`, `snapback_cap`, `payload_complement`, `flank_3p`, `left_base`, and
   `right_base` terms. Folding QA has a single declared payload
   reverse-complement pairing for the canonical unit and marks it recovered.
 - The manual retron-43/TetO dogfood unit intentionally uses the literal
-  18 nt `tCCTCAGcccGCTGAGGa` snapback-cap segment. Do not use this fixture to
+  18 nt `tCCTCAGcccGCTGAGGa` snapback foldback segment. Do not use this fixture to
   infer O33 stem-3/cap-3 geometry; that belongs to the later source-ref
   dogfood slice after fresh Cruncher outputs are rerun and cited.
 
@@ -303,7 +305,7 @@ When returning to this work:
 - Composition belongs in Construct if the contract stays generic.
 - Retron-specific selector/ranking logic starts as study config/rationale and
   becomes code only after repeated selection behavior justifies it. Current
-  compiler specs allow selected Snapback cap and scar-nick stem-base primitive
+  compiler specs allow selected Snapback foldback and scar-nick stem-base primitive
   ranks through public tool APIs, but multi-rank combinatorics intentionally
   fail fast until a separate expansion contract exists.
 - Folding preflight and ViennaRNA runner behavior now lives in the separate

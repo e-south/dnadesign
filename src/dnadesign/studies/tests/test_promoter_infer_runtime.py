@@ -14,11 +14,11 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.studies.families.promoter.infer_runtime import (
+from dnadesign.studies.status_adapters.promoter_status.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     resolve_promoter_study_infer_runtime_context,
 )
-from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext
+from dnadesign.studies.status_adapters.promoter_status.record_normalizer import PromoterStudyResolvedContext
 
 
 def _string_or_none(value: object) -> str | None:

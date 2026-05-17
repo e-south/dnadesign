@@ -9,13 +9,14 @@ study's `routes.md`.
 
 ### Surface model
 
-- `docs/studies/index.yaml` is a repo-wide selector, not a family-wide router.
+- `docs/studies/index.yaml` is a repo-wide selector, not an ontology or router.
 - `ops progress` is the observation surface for registered status/preflight
   routes.
-- `ops.study.yaml` declares lifecycle and readiness shape when a study needs
-  those semantics.
-- Not every study needs status/preflight. Open-ended design studies may rely on
-  route maps, notes, selected command groups, or repo-local skills.
+- `ops.study.yaml` declares lifecycle and readiness shape through explicit
+  `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind` values.
+- Not every request needs status/preflight. Open-ended design or product
+  questions may still route to maps, notes, selected command groups, or
+  repo-local skills.
 
 ### Common commands
 

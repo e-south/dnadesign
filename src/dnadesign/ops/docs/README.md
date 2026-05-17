@@ -20,6 +20,12 @@ command list lives in `docs/runbooks/README.md`.
 
 If you are entering from the shell rather than browsing docs first, start with `uv run ops catalog list --simple`, then open [How to use Ops](how-to-use-ops.md) for the command summary.
 
+### Operator overlays
+
+- [SGE/HPC operator skill](../../../../.agents/skills/sge-hpc-ops/SKILL.md): use when the task is scheduler-shaped (`qsub`, `qrsh`, queue state, BU SCC execution posture, or batch/Notify chains).
+- [Notify operator skill](../../../../.agents/skills/notify-ops/SKILL.md): use when the task is Slack watcher setup, validation, live watch, or recovery.
+- [BU SCC USR sync skill](../../../../.agents/skills/bu-scc-usr-sync/SKILL.md): use when the task is dataset sync between local dnadesign and BU SCC.
+
 ### Package-local surfaces
 
 - [Packaged runbook presets](../runbooks/presets): checked-in starter runbooks for common orchestration routes.

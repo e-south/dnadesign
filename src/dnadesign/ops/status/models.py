@@ -145,6 +145,7 @@ class StatusKindSpec:
         provider_id = str(self.provider_id or "").strip()
         owner_boundary = str(self.owner_boundary or "").strip()
         provider_ref = str(self.provider_ref or "").strip()
+        description = str(self.description or "").strip()
         if not status_kind:
             raise ValueError("status kind spec must define a non-empty status_kind")
         if not provider_id:
@@ -155,6 +156,8 @@ class StatusKindSpec:
             raise ValueError(
                 f"status kind spec {status_kind} must define provider_ref as module:function, received {provider_ref!r}"
             )
+        if not description:
+            raise ValueError(f"status kind spec {status_kind} must define a non-empty description")
         if self.observes_plane not in _STATUS_PLANES:
             raise ValueError(
                 f"status kind spec {status_kind} has unsupported observes_plane {self.observes_plane!r}: "

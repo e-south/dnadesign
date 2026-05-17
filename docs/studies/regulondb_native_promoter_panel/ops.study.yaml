@@ -1,7 +1,10 @@
 version: 2
 study_id: regulondb_native_promoter_panel
-family: promoter
 title: RegulonDB native promoter panel
+
+ops_surfaces:
+  status_kind: promoter-study-status
+  preflight_kind: promoter-study-preflight
 
 record_sources:
   narrative_ref: manifest:status.md

@@ -16,8 +16,8 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.ops.preflight.models import supported_preflight_check_kinds
-from dnadesign.ops.status.path_ref import resolve_path_ref
+from dnadesign.ops.preflight import supported_preflight_check_kinds
+from dnadesign.ops.status import resolve_path_ref
 
 from .models import (
     STUDY_LIFECYCLE_MODES,
@@ -45,12 +45,23 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         raise ValueError(f"unsupported ops.study.yaml version {version}: {contract_path}")
 
     study_id = str(payload.get("study_id") or "").strip()
-    family = str(payload.get("family") or "").strip()
     title = _string_or_none(payload.get("title"))
     if not study_id:
         raise ValueError(f"ops.study.yaml must define study_id: {contract_path}")
-    if not family:
-        raise ValueError(f"ops.study.yaml must define family: {contract_path}")
+    if "family" in payload:
+        raise ValueError(
+            "ops.study.yaml must not define legacy family; define explicit "
+            f"ops_surfaces.status_kind and ops_surfaces.preflight_kind instead: {contract_path}"
+        )
+    ops_surfaces = payload.get("ops_surfaces") or {}
+    if not isinstance(ops_surfaces, dict):
+        raise ValueError(f"ops.study.yaml ops_surfaces must be a mapping: {contract_path}")
+    status_kind = str(ops_surfaces.get("status_kind") or "").strip()
+    preflight_kind = str(ops_surfaces.get("preflight_kind") or "").strip()
+    if not status_kind:
+        raise ValueError(f"ops.study.yaml ops_surfaces.status_kind must be non-empty: {contract_path}")
+    if not preflight_kind:
+        raise ValueError(f"ops.study.yaml ops_surfaces.preflight_kind must be non-empty: {contract_path}")
 
     record_sources = _validated_contract_refs_mapping(
         payload.get("record_sources"),
@@ -295,7 +306,8 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
 
     return StudyOpsContract(
         study_id=study_id,
-        family=family,
+        status_kind=status_kind,
+        preflight_kind=preflight_kind,
         title=title,
         phase_order=phase_order,
         current_phase_id=current_phase_id,

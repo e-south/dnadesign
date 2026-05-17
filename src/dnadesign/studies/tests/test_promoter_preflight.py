@@ -14,24 +14,23 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.ops.preflight import CommandExecution
-from dnadesign.ops.preflight.models import supported_preflight_check_kinds
+from dnadesign.ops.preflight import CommandExecution, supported_preflight_check_kinds
 from dnadesign.studies.core.models import (
     StudyOpsContract,
     StudyPhaseContract,
     StudyPreflightContract,
     StudyPreflightNextScopeContract,
 )
-from dnadesign.studies.families.promoter import adapter as promoter_adapter
-from dnadesign.studies.families.promoter.infer_runtime import PromoterStudyInferRuntimeDependencies
-from dnadesign.studies.families.promoter.preflight import (
+from dnadesign.studies.status_adapters.promoter_status import adapter as promoter_adapter
+from dnadesign.studies.status_adapters.promoter_status.infer_runtime import PromoterStudyInferRuntimeDependencies
+from dnadesign.studies.status_adapters.promoter_status.preflight import (
     PromoterPreflightContextDependencies,
     PromoterPreflightCoordinatorDependencies,
     PromoterPreflightResolvedContext,
     build_promoter_preflight_progress,
     resolve_promoter_preflight_context,
 )
-from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext
+from dnadesign.studies.status_adapters.promoter_status.record_normalizer import PromoterStudyResolvedContext
 
 
 def _string_or_none(value: object) -> str | None:
@@ -192,7 +191,8 @@ def test_resolve_promoter_preflight_context_uses_contract_scope_groups_and_runti
         status_kind="promoter-study-preflight",
         contract=StudyOpsContract(
             study_id="demo_study",
-            family="promoter",
+            status_kind="promoter-study-status",
+            preflight_kind="promoter-study-preflight",
             phase_order=(
                 "densegen_growth",
                 "construct_context_expansion",
@@ -286,7 +286,8 @@ def test_build_promoter_preflight_progress_uses_only_contract_declared_generic_c
     commands: list[tuple[str, ...]] = []
     contract = StudyOpsContract(
         study_id="demo_study",
-        family="promoter",
+        status_kind="promoter-study-status",
+        preflight_kind="promoter-study-preflight",
         phase_order=("densegen_growth", "infer_batch_preparation"),
         snapshot_summary_scope="repo",
         execution_surfaces={
@@ -465,7 +466,8 @@ def test_build_promoter_preflight_progress_resolves_command_cwd_from_resolved_st
     (resolved_study_dir / "workspace").mkdir(parents=True, exist_ok=True)
     contract = StudyOpsContract(
         study_id="demo_study",
-        family="promoter",
+        status_kind="promoter-study-status",
+        preflight_kind="promoter-study-preflight",
         phase_order=("infer_batch_preparation",),
         snapshot_summary_scope="repo",
         execution_surfaces={

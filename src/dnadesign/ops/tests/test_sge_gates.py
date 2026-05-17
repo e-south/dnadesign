@@ -941,7 +941,7 @@ def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path,
     assert "does not emit overlay parts" in payload["reason"]
 
 
-def test_main_usr_overlay_guard_infer_tool_skips_ambiguous_multi_job_configs(tmp_path: Path, capsys) -> None:
+def test_main_usr_overlay_guard_infer_tool_rejects_ambiguous_multi_job_configs(tmp_path: Path, capsys) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     config_path = workspace_root / "configs" / "infer_config.yaml"
@@ -1008,10 +1008,9 @@ def test_main_usr_overlay_guard_infer_tool_skips_ambiguous_multi_job_configs(tmp
     )
     captured = capsys.readouterr()
 
-    assert exit_code == 0
-    payload = json.loads(captured.out)
-    assert payload["guard_status"] == "skipped"
-    assert payload["tool"] == "infer"
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "multiple USR destinations" in captured.err
 
 
 def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: Path, capsys) -> None:

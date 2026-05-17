@@ -54,6 +54,8 @@ _SKIPPED_PATH_SEGMENTS = {
     "demo_material",
     "__pycache__",
 }
+_REVIEW_SURFACE_PATH_SEGMENTS = {"tests", "notebooks", "docs", "jobs"}
+_REVIEW_SURFACE_CHECKED_OWNERS = {"ops", "studies", "devtools"}
 _TEST_SUPPORT_IMPORT_PREFIXES = ("dnadesign.devtools.tests.support", "dnadesign.testsupport")
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("billboard", "aligner"),
@@ -91,6 +93,16 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
     ("construct", "folding"): ("dnadesign.folding",),
     ("studies", "baserender"): ("dnadesign.baserender",),
     ("studies", "construct"): ("dnadesign.construct",),
+    ("studies", "ops"): (
+        "dnadesign.ops.catalog",
+        "dnadesign.ops.preflight",
+        "dnadesign.ops.status",
+    ),
+    ("devtools", "ops"): (
+        "dnadesign.ops.catalog",
+        "dnadesign.ops.runbooks",
+        "dnadesign.ops.status",
+    ),
 }
 _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
     ("studies", "cruncher"): ("dnadesign.cruncher.scar_nick", "dnadesign.cruncher.snapback"),
@@ -100,7 +112,6 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/_contracts"),
     Path("src/dnadesign/usr_roots.py"),
     Path("src/dnadesign/usr/src/roots.py"),
-    Path("src/dnadesign/ops/providers"),
     Path("src/dnadesign/ops/orchestrator/contracts.py"),
     Path("src/dnadesign/ops/promoter_study_context.py"),
     Path("src/dnadesign/ops/promoter_study_infer_runtime.py"),
@@ -117,11 +128,12 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/ops/tests/test_promoter_preflight_upstream.py"),
     Path("src/dnadesign/ops/tests/test_promoter_preflight_infer.py"),
     Path("src/dnadesign/ops/tests/test_promoter_preflight_coordinator.py"),
+    Path("src/dnadesign/studies/families"),
     Path("src/dnadesign/studies/promoter"),
     Path("docs/studies/promoter"),
-    Path("src/dnadesign/studies/families/promoter/preflight_infer.py"),
-    Path("src/dnadesign/studies/families/promoter/preflight_orchestration.py"),
-    Path("src/dnadesign/studies/families/promoter/preflight_upstream.py"),
+    Path("src/dnadesign/studies/status_adapters/promoter_status/preflight_infer.py"),
+    Path("src/dnadesign/studies/status_adapters/promoter_status/preflight_orchestration.py"),
+    Path("src/dnadesign/studies/status_adapters/promoter_status/preflight_upstream.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_infer.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_orchestration.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_upstream.py"),
@@ -162,16 +174,45 @@ def _discover_tools(repo_root: Path) -> set[str]:
     }
 
 
+def _boundary_checked_owners(*, repo_root: Path, tool_names: set[str]) -> set[str]:
+    checked = set(tool_names)
+    if (repo_root / "src" / "dnadesign" / "devtools").is_dir():
+        checked.add("devtools")
+    return checked
+
+
+def _skip_checked_python_file(relative_path: Path) -> bool:
+    if relative_path.parts and relative_path.parts[0] == "devtools":
+        return "tests" in relative_path.parts or "__pycache__" in relative_path.parts
+    return any(segment in _SKIPPED_PATH_SEGMENTS for segment in relative_path.parts)
+
+
 def _iter_checked_python_files(repo_root: Path, tool_names: set[str]) -> list[Path]:
+    src_root = repo_root / "src" / "dnadesign"
+    files: list[Path] = []
+    checked_owners = _boundary_checked_owners(repo_root=repo_root, tool_names=tool_names)
+    for path in src_root.rglob("*.py"):
+        rel = path.relative_to(src_root)
+        if not rel.parts:
+            continue
+        if rel.parts[0] not in checked_owners:
+            continue
+        if _skip_checked_python_file(rel):
+            continue
+        files.append(path)
+    return sorted(files)
+
+
+def _iter_review_surface_python_files(repo_root: Path, tool_names: set[str]) -> list[Path]:
     src_root = repo_root / "src" / "dnadesign"
     files: list[Path] = []
     for path in src_root.rglob("*.py"):
         rel = path.relative_to(src_root)
         if not rel.parts:
             continue
-        if rel.parts[0] not in tool_names:
+        if rel.parts[0] not in _REVIEW_SURFACE_CHECKED_OWNERS:
             continue
-        if any(segment in _SKIPPED_PATH_SEGMENTS for segment in rel.parts):
+        if not any(segment in _REVIEW_SURFACE_PATH_SEGMENTS for segment in rel.parts):
             continue
         files.append(path)
     return sorted(files)
@@ -308,6 +349,50 @@ def find_undeclared_cross_tool_imports(
     )
 
 
+def find_review_surface_private_imports(*, repo_root: Path) -> list[ImportViolation]:
+    tool_names = _discover_tools(repo_root)
+    src_root = repo_root / "src" / "dnadesign"
+    violations: list[ImportViolation] = []
+
+    for file_path in _iter_review_surface_python_files(repo_root, tool_names):
+        rel_path = file_path.relative_to(src_root)
+        owner_tool = rel_path.parts[0]
+        package_parts = ("dnadesign", *rel_path.parts[:-1])
+        source = file_path.read_text(encoding="utf-8")
+        try:
+            module = ast.parse(source, filename=str(file_path))
+        except SyntaxError as exc:
+            message = f"Unable to parse Python file for review-surface boundary checks: {file_path}: {exc.msg}"
+            raise ValueError(message) from exc
+
+        for target in _iter_import_targets(module, package_parts=package_parts):
+            if not target.startswith("dnadesign."):
+                continue
+            parts = target.split(".")
+            if len(parts) < 4:
+                continue
+            imported_tool = parts[1]
+            if imported_tool == owner_tool:
+                continue
+            if imported_tool not in tool_names and imported_tool != "devtools":
+                continue
+            if parts[2] != "src":
+                continue
+            violations.append(
+                ImportViolation(
+                    owner_tool=owner_tool,
+                    imported_tool=imported_tool,
+                    file_path=file_path,
+                    import_target=target,
+                )
+            )
+
+    return sorted(
+        violations,
+        key=lambda item: (item.owner_tool, item.imported_tool, str(item.file_path), item.import_target),
+    )
+
+
 def find_legacy_surface_violations(*, repo_root: Path) -> list[LegacySurfaceViolation]:
     resolved_repo_root = repo_root.expanduser().resolve()
     violations: list[LegacySurfaceViolation] = []
@@ -404,19 +489,25 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         violations = find_undeclared_cross_tool_imports(repo_root=args.repo_root)
+        review_surface_violations = find_review_surface_private_imports(repo_root=args.repo_root)
         legacy_surface_violations = find_legacy_surface_violations(repo_root=args.repo_root)
         top_level_layout_violations = find_top_level_layout_violations(repo_root=args.repo_root)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
 
-    if not violations and not legacy_surface_violations and not top_level_layout_violations:
+    if not (violations or review_surface_violations or legacy_surface_violations or top_level_layout_violations):
         print("Architecture boundary checks passed.")
         return 0
 
     print("Architecture boundary check failed.")
     for item in violations:
         print(f" - {item.file_path}: {item.owner_tool} -> {item.imported_tool} via '{item.import_target}'")
+    for item in review_surface_violations:
+        print(
+            " - review surface imports private sibling internals: "
+            f"{item.file_path}: {item.owner_tool} -> {item.imported_tool} via '{item.import_target}'"
+        )
     for item in legacy_surface_violations:
         print(f" - forbidden legacy surface still exists: {item.path}")
     for item in top_level_layout_violations:

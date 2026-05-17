@@ -1,0 +1,55 @@
+version: 1
+provider_id: study.cruncher_status
+entries:
+  - status_kind: cruncher-study-status
+    owner_boundary: cruncher
+    observes_plane: record
+    provider_ref: dnadesign.studies.status_adapters.cruncher_status.ops.provider:provide_cruncher_status
+    description: Read one checked-in cruncher-study directory and summarize its declared route or track, command groups, and native-agent bootstrap context.
+    surface_type: study_snapshot
+    cost_class: cheap
+    summary_scope: repo
+    input_schema:
+      - name: study_dir
+        manifest_key: study_dir
+        cli_flag: --study-dir
+        placeholder: docs/studies/<study-id>
+        summary: Checked-in cruncher-study directory containing campaign.yaml, datasets.yaml, status.md, ops.study.yaml, routes.md, and pipeline.yaml.
+        type: path
+        required: false
+        path_base: repo
+    notes:
+      - If the active checked-in study is not the one being asked about, pass --study-dir to pin the cruncher study explicitly.
+      - Use this route to recover context and intent before opening workspaces or running cruncher commands.
+  - status_kind: cruncher-study-preflight
+    owner_boundary: cruncher
+    observes_plane: execution_readiness
+    provider_ref: dnadesign.studies.status_adapters.cruncher_status.ops.provider:provide_cruncher_preflight
+    description: Run one read-only cruncher-study preflight suite across declared workspace-layout and command-validation surfaces.
+    surface_type: study_preflight
+    cost_class: deep
+    summary_scope: host
+    input_schema:
+      - name: study_dir
+        manifest_key: study_dir
+        cli_flag: --study-dir
+        placeholder: docs/studies/<study-id>
+        summary: Checked-in cruncher-study directory containing campaign.yaml, datasets.yaml, status.md, ops.study.yaml, routes.md, and pipeline.yaml.
+        type: path
+        required: false
+        path_base: repo
+      - name: scope
+        manifest_key: scope
+        cli_flag: --scope
+        placeholder: next
+        summary: >-
+          Preflight scope for cruncher-study-preflight surfaces: `full` runs
+          the whole suite; `next` focuses the current actionable route, track,
+          or phase declared by the study contract.
+        type: enum
+        required: false
+        default: next
+        choices: [next, full]
+    notes:
+      - This route composes read-only command preflights. Use it after the cheaper `cruncher.data-plane.cruncher-study-status` snapshot when you need command-level blockers.
+      - If the active checked-in study is not the one being asked about, pass --study-dir to pin the cruncher study explicitly.

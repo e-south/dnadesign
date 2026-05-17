@@ -11,9 +11,16 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dnadesign.studies.families.promoter.analysis_surfaces import inspect_promoter_exploratory_analysis
-from dnadesign.studies.families.promoter.latentdna_contract import _validate_binding, _validate_workspace_snapshot
-from dnadesign.studies.families.promoter.latentdna_readiness import inspect_promoter_latentdna_readiness
+from dnadesign.studies.status_adapters.promoter_status.analysis_surfaces import (
+    inspect_promoter_exploratory_analysis,
+)
+from dnadesign.studies.status_adapters.promoter_status.latentdna_contract import (
+    validate_binding,
+    validate_workspace_snapshot,
+)
+from dnadesign.studies.status_adapters.promoter_status.latentdna_readiness import (
+    inspect_promoter_latentdna_readiness,
+)
 from dnadesign.studies.tests.test_promoter_snapshot import _make_study_context
 
 
@@ -243,7 +250,7 @@ def test_inspect_promoter_latentdna_readiness_uses_binding_and_snapshot_contract
 
 
 def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> None:
-    binding = _validate_binding(
+    binding = validate_binding(
         {
             "workspace_id": "regulondb_native_promoter_panel",
             "workspace_ref": "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel",
@@ -273,7 +280,7 @@ def test_promoter_latentdna_binding_accepts_generic_source_dataset_keys() -> Non
         }
     )
 
-    snapshot = _validate_workspace_snapshot(
+    snapshot = validate_workspace_snapshot(
         binding=binding,
         snapshot={
             "schema_version": "latentdna.workspace_snapshot.v1",
@@ -354,7 +361,7 @@ def test_promoter_latentdna_snapshot_validation_requires_study_binding(tmp_path:
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
 
     with pytest.raises(ValueError, match="validated study binding"):
-        _validate_workspace_snapshot(binding=None, snapshot=snapshot)
+        validate_workspace_snapshot(binding=None, snapshot=snapshot)
 
 
 def test_inspect_promoter_latentdna_readiness_rejects_snapshot_schema_mismatch(tmp_path: Path) -> None:
@@ -480,8 +487,8 @@ def test_inspect_promoter_exploratory_analysis_reports_snapshot_backed_latentdna
 def test_promoter_latentdna_status_modules_do_not_import_latentdna_internals() -> None:
     repo_root = Path(__file__).resolve().parents[4]
     for relative_path in [
-        "src/dnadesign/studies/families/promoter/latentdna_readiness.py",
-        "src/dnadesign/studies/families/promoter/analysis_surfaces.py",
+        "src/dnadesign/studies/status_adapters/promoter_status/latentdna_readiness.py",
+        "src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py",
     ]:
         source = (repo_root / relative_path).read_text(encoding="utf-8")
         assert ".".join(["dnadesign", "latentdna", "src"]) not in source

@@ -107,9 +107,10 @@ default exact planner separately when an operator needs deeper batch-planning
 detail and can tolerate the runtime.
 
 `ops.study.yaml` is the visible source of readiness shape: it declares phases,
-groups, artifacts, execution surfaces, and generic checks. The promoter-family
-adapter still normalizes family-local paths and derived refs, but it no longer
-hides a second imperative readiness graph behind the contract.
+groups, artifacts, execution surfaces, generic checks, and explicit
+`ops_surfaces.status_kind` / `ops_surfaces.preflight_kind` values. The promoter
+status adapter still normalizes study-local paths and derived refs, but it no
+longer hides a second imperative readiness graph behind the contract.
 
 ### Contract rules
 

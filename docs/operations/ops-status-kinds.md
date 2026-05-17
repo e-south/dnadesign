@@ -14,9 +14,18 @@ Registered public OPS routes and their status-kind adapters:
 | `usr.data-plane.construct-infer-source-of-truth` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
 | `usr.data-plane.promoter-study-status` | `promoter-study-status` | `record` | `study_snapshot` | `repo` | `cheap` | none | `usr` |
 | `usr.data-plane.promoter-study-preflight` | `promoter-study-preflight` | `execution_readiness` | `study_preflight` | `host` | `deep` | none | `usr` |
+| `cruncher.data-plane.cruncher-study-status` | `cruncher-study-status` | `record` | `study_snapshot` | `repo` | `cheap` | none | `cruncher` |
+| `cruncher.data-plane.cruncher-study-preflight` | `cruncher-study-preflight` | `execution_readiness` | `study_preflight` | `host` | `deep` | none | `cruncher` |
 | `usr.data-plane.promoter-feature-matrix` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
 | `cluster.downstream.exploratory-clustering` | `cluster-run-index` | `data` | `run_index` | `workspace` | `cheap` | `--cluster-results-root` | `cluster` |
 | `opal.downstream.usr-infer-x-active-learning` | `opal-campaign-state` | `control` | `campaign_snapshot` | `workspace` | `cheap` | `--opal-config` | `opal` |
+
+### Direct status-kind inventory
+
+`uv run ops progress kinds --json` is the complete adapter inventory. It also
+lists owner-provided status kinds that are not catalog-backed public routes yet,
+including `latentdna-workspace-snapshot` for LatentDNA workspace snapshot
+inspection.
 
 ### Notes
 

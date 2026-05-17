@@ -81,6 +81,7 @@ class RetronMsdRegistry:
                     "id": parsed.cap_id,
                     "source_construct": cap.get("source_construct"),
                     "display_name": cap.get("display_name"),
+                    "snapback_topology": cap.get("snapback_topology"),
                 },
                 "scar_nick": {
                     "left_base": parsed.left_base,

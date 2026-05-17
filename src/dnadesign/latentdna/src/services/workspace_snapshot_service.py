@@ -148,7 +148,7 @@ def _deliverable_snapshots(context) -> dict[str, WorkspaceSnapshotDeliverable]:
     return snapshots
 
 
-def _decision_ladder(context) -> list[str]:
+def decision_ladder(context) -> list[str]:
     ladder: list[str] = []
     for deliverable_id, deliverable in context.config.deliverables.items():
         section = str(getattr(deliverable, "section", "") or "").strip().lower()
@@ -202,7 +202,7 @@ def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
         deliverables=_deliverable_snapshots(context),
         exports=_export_snapshots(context),
         browser=_browser_snapshot(context),
-        decision_ladder=_decision_ladder(context),
+        decision_ladder=decision_ladder(context),
         last_updated_at=datetime.now(UTC).isoformat(),
     ).model_dump(mode="json")
     write_json(context.output_root / "status" / "workspace_snapshot.json", payload)

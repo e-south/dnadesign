@@ -66,6 +66,7 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         text,
         [
             "### Start here",
+            "### Operator overlays",
             "### Package-local surfaces",
             "### Boundary reminders",
         ],
@@ -81,6 +82,10 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
     assert "../../../../docs/README.md" in text
     assert "uv run ops catalog list --simple" in text
     assert "How to use Ops" in text
+    assert "../../../../.agents/skills/sge-hpc-ops/SKILL.md" in text
+    assert "../../../../.agents/skills/notify-ops/SKILL.md" in text
+    assert "../../../../.agents/skills/bu-scc-usr-sync/SKILL.md" in text
+    assert "scheduler-shaped" in text
     assert "prints YAML to stdout unless you pass `--out`" in text
 
 

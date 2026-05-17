@@ -18,20 +18,3 @@ entries:
         type: path
         required: true
         path_base: repo
-schema_version: latentdna.status_registry.v1
-owner_boundary: latentdna
-artifact_roots:
-  workspace_outputs: outputs
-  status: outputs/status
-commands:
-  workspace_snapshot:
-    command: uv run latentdna workspace snapshot --workspace {workspace_id} --json
-    output_schema: latentdna.workspace_snapshot.v1
-    output_path: outputs/status/workspace_snapshot.json
-  workspace_catalog:
-    command: uv run latentdna deliverable list --workspace {workspace_id} --json
-    output_schema: latentdna.deliverable_list.v1
-docs:
-  snapshot_contract: src/dnadesign/latentdna/docs/reference/workspace-snapshot-contract.md
-  naming_grammar: src/dnadesign/latentdna/docs/reference/artifact-naming.md
-  operations: src/dnadesign/latentdna/docs/operations/README.md

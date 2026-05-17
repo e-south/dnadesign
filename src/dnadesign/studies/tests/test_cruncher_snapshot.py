@@ -15,8 +15,8 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.studies.families.cruncher.adapter import STUDY_FAMILY_ADAPTER
-from dnadesign.studies.families.cruncher.ops.provider import provide_cruncher_status
+from dnadesign.studies.status_adapters.cruncher_status.adapter import STUDY_STATUS_ADAPTER
+from dnadesign.studies.status_adapters.cruncher_status.ops.provider import provide_cruncher_status
 
 
 def _write_cruncher_study_record(tmp_path: Path) -> Path:
@@ -178,7 +178,10 @@ def _write_cruncher_study_record(tmp_path: Path) -> Path:
             {
                 "version": 2,
                 "study_id": "demo_study",
-                "family": "cruncher",
+                "ops_surfaces": {
+                    "status_kind": "cruncher-study-status",
+                    "preflight_kind": "cruncher-study-preflight",
+                },
                 "title": "Demo Cruncher study",
                 "record_sources": {
                     "narrative_ref": "manifest:status.md",
@@ -490,8 +493,8 @@ def test_cruncher_snapshot_reports_missing_required_record_files(tmp_path: Path)
     study_root = _write_cruncher_study_record(tmp_path)
     (study_root / "routes.md").unlink()
 
-    context = STUDY_FAMILY_ADAPTER.load_context(repo_root=tmp_path, study_root=study_root)
-    state, summary, evidence = STUDY_FAMILY_ADAPTER.build_snapshot(context)
+    context = STUDY_STATUS_ADAPTER.load_context(repo_root=tmp_path, study_root=study_root)
+    state, summary, evidence = STUDY_STATUS_ADAPTER.build_snapshot(context)
 
     assert state == "missing"
     assert "routes.md" in summary

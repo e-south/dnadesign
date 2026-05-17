@@ -24,12 +24,20 @@ import dnadesign.usr as usr_pkg
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.families.promoter.ops.provider import (
+from dnadesign.studies.status_adapters.promoter_status.ops.provider import (
     provide_promoter_preflight,
     provide_promoter_status,
 )
-from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
-from dnadesign.usr.src.overlays import with_overlay_metadata
+from dnadesign.usr import (
+    Dataset,
+    SequenceViewRecord,
+    ensure_sequence_contract_namespaces,
+    with_overlay_metadata,
+    write_sequence_views,
+)
+
+PROMOTER_STATUS_ADAPTER_MODULE = "dnadesign.studies.status_adapters.promoter_status.adapter"
+PROMOTER_RUN_PREFLIGHT_COMMAND_REF = f"{PROMOTER_STATUS_ADAPTER_MODULE}.run_preflight_command"
 
 
 def _repo_root() -> Path:
@@ -69,7 +77,6 @@ def _write_study_index(index_path: Path) -> None:
             "active_study_id: demo_study\n"
             "studies:\n"
             "  - study_id: demo_study\n"
-            "    family: promoter\n"
             "    title: Demo study\n"
             "    record_root: docs/studies/demo_study\n"
         ),
@@ -611,7 +618,10 @@ def _write_promoter_ops_contract(
             {
                 "version": 2,
                 "study_id": "demo_study",
-                "family": "promoter",
+                "ops_surfaces": {
+                    "status_kind": "promoter-study-status",
+                    "preflight_kind": "promoter-study-preflight",
+                },
                 "title": "Demo study",
                 "record_sources": {
                     "narrative_ref": "manifest:status.md",
@@ -1411,9 +1421,9 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -1430,7 +1440,7 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1549,15 +1559,15 @@ def test_promoter_study_preflight_reports_sequence_view_contract_health(monkeypa
         ops_path.write_text(yaml.safe_dump(ops_payload, sort_keys=False), encoding="utf-8")
 
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.run_preflight_command",
+            PROMOTER_RUN_PREFLIGHT_COMMAND_REF,
             lambda argv, *, cwd, timeout_seconds=180: CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [], "probe_error": None},
         )
 
@@ -1573,7 +1583,9 @@ def test_promoter_study_preflight_reports_sequence_view_contract_health(monkeypa
         assert evidence["scope"] == "full"
 
 
-def test_promoter_study_status_reports_sequence_view_and_infer_completion_summary(monkeypatch) -> None:
+def test_promoter_study_status_reports_sequence_view_summary_without_deep_infer_completion(
+    monkeypatch,
+) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
@@ -1667,34 +1679,8 @@ def test_promoter_study_status_reports_sequence_view_and_infer_completion_summar
         ops_path.write_text(yaml.safe_dump(ops_payload, sort_keys=False), encoding="utf-8")
 
         def _fake_plan(config_path: Path, job: str | None = None):
-            assert config_path == infer_config.resolve()
-            assert job is None
-            return (
-                {
-                    "dataset": "promoter/demo_construct_contexts",
-                    "bundle_id": "context_sequence_views_7b",
-                    "model_family": "evo2_7b",
-                    "required_views": 4,
-                    "required_vectors": 4,
-                    "required_scalars": 4,
-                    "existing_vectors": 2,
-                    "existing_scalars": 0,
-                    "reusable_vectors": 1,
-                    "reusable_scalars": 0,
-                    "stale_vectors": 1,
-                    "stale_scalars": 0,
-                    "missing_vectors": 2,
-                    "missing_scalars": 4,
-                    "missing_products": 0,
-                    "persisted_vector_reusable": 0,
-                    "persisted_scalar_reusable": 0,
-                    "existing_aliases": 0,
-                    "existing_scalar_aliases": 0,
-                    "by_product_kind": {"realized_context": 4},
-                    "by_orientation": {"forward": 2, "reverse_complement": 2},
-                    "by_pooling_operation": {"anchor_mean": 4},
-                    "commands": {"construct_completion": [], "infer_backfill": []},
-                },
+            raise AssertionError(
+                f"promoter-study-status must not scan Infer feature-completion sidecars: {config_path} {job}"
             )
 
         monkeypatch.setattr(
@@ -1707,23 +1693,13 @@ def test_promoter_study_status_reports_sequence_view_and_infer_completion_summar
 
         assert state == "ok"
         assert "sequence-view product contracts 1/1 ok" in summary
-        assert "infer sequence-view feature completion checks 0/1 ok" in summary
-        assert "reusable_vectors=1 stale_vectors=1 missing_vectors=2" in summary
-        assert "reusable_scalars=0 stale_scalars=0 missing_scalars=4 missing_products=0" in summary
+        assert "infer sequence-view feature completion" not in summary
         assert evidence["sequence_view_contract_state"]["state"] == "ok"
         assert evidence["sequence_view_contract_state"]["checks"][0]["counts_by_orientation"] == {
             "forward": 2,
             "reverse_complement": 2,
         }
-        assert evidence["infer_feature_completion_state"]["state"] == "attention"
-        assert evidence["infer_feature_completion_state"]["drives_top_level_attention"] is False
-        assert evidence["infer_feature_completion_state"]["aggregate"]["counts_by_product_kind"] == {
-            "realized_context": 4
-        }
-        assert evidence["infer_feature_completion_state"]["aggregate"]["counts_by_orientation"] == {
-            "forward": 2,
-            "reverse_complement": 2,
-        }
+        assert evidence["infer_feature_completion_state"] is None
 
 
 def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeypatch) -> None:
@@ -1805,13 +1781,13 @@ def test_promoter_study_preflight_reports_infer_sequence_view_completion(monkeyp
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             return CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False)
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [], "probe_error": None},
         )
 
@@ -1907,9 +1883,9 @@ def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(mo
 
         monkeypatch.setenv("NOTIFY_WEBHOOK", "https://example.invalid/webhook")
         monkeypatch.setenv("SSL_CERT_FILE", "/tmp/cert.pem")
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -1926,7 +1902,7 @@ def test_promoter_study_preflight_blocks_stale_construct_inputs_in_next_scope(mo
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2033,9 +2009,9 @@ def test_promoter_study_preflight_demotes_construct_runtime_attention_once_mater
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2052,7 +2028,7 @@ def test_promoter_study_preflight_demotes_construct_runtime_attention_once_mater
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
@@ -2142,9 +2118,9 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2161,7 +2137,7 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2282,9 +2258,9 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2301,7 +2277,7 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2422,9 +2398,9 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2441,7 +2417,7 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2547,9 +2523,9 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(PROMOTER_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2566,7 +2542,7 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -3352,7 +3328,7 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
     assert kinds["promoter-study-preflight"]["surface_type"] == "study_preflight"
     assert kinds["promoter-study-preflight"]["cost_class"] == "deep"
     assert kinds["promoter-study-preflight"]["summary_scope"] == "host"
-    assert kinds["promoter-study-preflight"]["provider_id"] == "study.promoter"
+    assert kinds["promoter-study-preflight"]["provider_id"] == "study.promoter_status"
     assert kinds["promoter-study-preflight"]["optional_inputs"] == [
         {
             "cli_flag": "--study-dir",
@@ -3378,7 +3354,7 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
     assert kinds["cruncher-study-preflight"]["surface_type"] == "study_preflight"
     assert kinds["cruncher-study-preflight"]["cost_class"] == "deep"
     assert kinds["cruncher-study-preflight"]["summary_scope"] == "host"
-    assert kinds["cruncher-study-preflight"]["provider_id"] == "study.cruncher"
+    assert kinds["cruncher-study-preflight"]["provider_id"] == "study.cruncher_status"
     assert kinds["cruncher-study-preflight"]["optional_inputs"] == [
         {
             "cli_flag": "--study-dir",

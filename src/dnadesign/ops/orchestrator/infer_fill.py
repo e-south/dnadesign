@@ -328,10 +328,13 @@ def _classify_infer_lane(*, runbook_path: Path, runbook: OrchestrationRunbookV1)
         completion = tuple(plan_sequence_view_feature_inventory_completion_from_config(config_path))
     except ValueError as exc:
         if str(exc) == "No selected jobs use feature_bundle.sequence_view_inputs.":
-            return _skip_lane(
+            return InferFillLane(
                 runbook_path=runbook_path,
-                runbook=runbook,
-                reason="legacy/non-sequence-view Infer config skipped before SGE plan rendering",
+                runbook_id=runbook.id,
+                workflow_id=runbook.workflow_id,
+                config_path=config_path,
+                action="blocked",
+                reasons=("unsupported Infer config: selected jobs must define feature_bundle.sequence_view_inputs",),
             )
         raise
     if not completion:

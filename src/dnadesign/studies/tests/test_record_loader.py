@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dnadesign.ops.preflight.models import supported_preflight_check_kinds
+from dnadesign.ops.preflight import supported_preflight_check_kinds
 from dnadesign.studies.core.record_loader import load_study_ops_contract
 
 
@@ -24,7 +24,10 @@ def _base_payload() -> dict[str, object]:
     return {
         "version": 2,
         "study_id": "demo_study",
-        "family": "promoter",
+        "ops_surfaces": {
+            "status_kind": "promoter-study-status",
+            "preflight_kind": "promoter-study-preflight",
+        },
         "title": "Demo study",
         "record_sources": {
             "narrative_ref": "manifest:status.md",
@@ -126,10 +129,30 @@ def test_load_study_ops_contract_accepts_valid_repo_scoped_surface_refs(tmp_path
     contract = load_study_ops_contract(study_root)
 
     assert contract.snapshot_summary_scope == "repo"
+    assert contract.status_kind == "promoter-study-status"
+    assert contract.preflight_kind == "promoter-study-preflight"
     assert contract.phases[0].next_surface == "repo:src/dnadesign/ops/runbooks/presets/demo.yaml"
     assert contract.phases[0].required_for_main_study_state is True
     assert contract.phases[1].required_for_main_study_state is False
     assert contract.phases[1].as_dict()["required_for_main_study_state"] is False
+
+
+def test_load_study_ops_contract_rejects_legacy_family_key(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["family"] = "promoter"
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="must not define legacy family"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_requires_explicit_ops_surfaces(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload.pop("ops_surfaces")
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="ops_surfaces.status_kind"):
+        load_study_ops_contract(study_root)
 
 
 def test_load_study_ops_contract_accepts_nonsequential_tracks(tmp_path: Path) -> None:

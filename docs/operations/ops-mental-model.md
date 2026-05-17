@@ -4,12 +4,12 @@
 **Last verified:** 2026-03-27
 
 OPS owns neutral command routing, read-only observation, and deterministic
-runbook control. Tool and study-family runtime policy stays outside OPS core.
+runbook control. Tool and study status runtime policy stays outside OPS core.
 
 ### What OPS is
 
 OPS is the neutral orchestration and status shell for cross-tool work in `dnadesign`.
-It does not own DenseGen, Infer, Notify, OPAL, USR, or study-family runtime policy.
+It does not own DenseGen, Infer, Notify, OPAL, USR, or study status runtime policy.
 Repo-local scheduler assumptions must stay explicit: generic `ops runbook init` requires `--project <project>` or an explicit preset such as `--preset bu-scc-dunlop`; it does not silently infer site identity.
 It owns:
 
@@ -103,7 +103,7 @@ For runbook orchestration, keep runtime visibility explicit:
 | Need | Source of truth |
 | --- | --- |
 | registered procedures and route metadata | `ops catalog` plus checked-in `*.registry.yaml` files |
-| status-kind ontology | checked-in `*/ops/status.registry.yaml` files |
+| status-kind ontology | checked-in `*/ops/status.registry.yaml` and `ops/providers/*/status.registry.yaml` files |
 | study lifecycle order, track map, and declared preflight checks | checked-in `docs/studies/<study-id>/ops.study.yaml` |
 | live study summary | `promoter-study-status` snapshot plus the checked-in study record |
 | execution blockers | `promoter-study-preflight` |

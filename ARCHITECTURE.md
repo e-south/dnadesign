@@ -30,7 +30,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Shared test infrastructure lives under `src/dnadesign/devtools/testsupport/` and is test-only by contract; production code must not depend on it.
 - OPS core is a neutral shell around discovery, observation/status, orchestration,
   and generic readiness evaluation; it must not own sibling-specific provider
-  implementations or study-family policy.
+  implementations or study-status adapter policy.
 - Shared operational plane: Notify (`src/dnadesign/notify/`) consumes USR events as integration signals without controlling producer tools.
 - Shared storage semantics: USR overlay/compaction/file-shape contracts use USR domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
 - Shared developer infrastructure: devtools modules provide CI scope detection, docs checks, coverage gates, and quality entropy reporting.
@@ -61,13 +61,15 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `docs/runbooks/README.md` is the concise inventory surface for authoritative procedures; it links to owner-local runbooks and workflows without relocating them.
 - Control-plane orchestration artifacts stay under workspace-scoped logging roots; tool-local docs define exact subpaths and artifact names.
 - Boundary-owned observation surfaces publish checked-in metadata under
-  `src/dnadesign/**/ops/status.registry.yaml`. OPS recursively discovers those
-  fragments, renders help from metadata alone, and imports provider code only
-  for the selected surface.
+  tool-local `src/dnadesign/**/ops/status.registry.yaml` files. Ops-owned
+  built-in providers live under `src/dnadesign/ops/providers/*/status.registry.yaml`.
+  OPS recursively discovers those fragments, renders help from metadata alone,
+  and imports provider code only for the selected surface.
 - Checked-in study records are study-first rather than family-nested:
   `docs/studies/index.yaml` selects the active study, each live study record
-  lives under `docs/studies/<study-id>/`, and family routing resolves through
-  `src/dnadesign/studies/families/<family>/`.
+  lives under `docs/studies/<study-id>/`, and Ops-facing routes are declared
+  explicitly with `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind`
+  in `ops.study.yaml`.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Active shared USR dataset ids are flat owner-first contracts, for example
@@ -82,8 +84,8 @@ This file is the architecture map: it names system boundaries, major flows, and 
   record or runbook.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
-- Study-family adapters are explicit seams. OPS loads them through metadata and
-  sanctioned loader boundaries; family-specific execution taxonomy does not
+- Study status adapters are explicit seams. OPS loads them through metadata and
+  sanctioned provider boundaries; study-specific execution taxonomy does not
   belong under `src/dnadesign/ops/`.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only

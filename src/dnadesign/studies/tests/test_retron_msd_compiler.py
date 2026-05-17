@@ -22,9 +22,11 @@ from pathlib import Path
 import pytest
 from Bio import SeqIO
 from Bio.Seq import Seq
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from dnadesign.studies.retron_hairpin_design.cli import app
+from dnadesign.studies.retron_hairpin_design.compiler_spec import RankedPrimitiveSelectorSpec
 from dnadesign.studies.retron_hairpin_design.msd_ids import (
     MsdDesignPartInput,
     MsdIdError,
@@ -56,7 +58,7 @@ _SCAR_NICK_HIT_LABELS = [
     "pES-retron-194-msd[TetR]; C172-LCTCA-RTGTG-MXMM",
 ]
 _TETO_PAYLOAD = "tccctatcagtgatagaga"
-_SNAPBACK_CAP = "tCCTCAGcccGCTGAGGa"
+_SNAPBACK_FOLDBACK = "GAGAGACTC"
 
 
 def _install_fake_viennarna_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -116,6 +118,12 @@ payloads:
 caps:
   C172:
     source_construct: retron-172
+    snapback_topology:
+      kind: snapback_foldback_geometry_v1
+      retained_stem_span: {start: 0, end: 3}
+      cap_span: {start: 3, end: 6}
+      foldback_return_span: {start: 6, end: 9}
+      source: de033 released-product 0/3/3 foldback geometry
 constructs:
   pES-retron-177:
     source_notes: 26-derived base / 172-cap crossover; tests 172-cap permissiveness.
@@ -258,7 +266,7 @@ designs:
 payload_sequences:
   TetR: tccctatcagtgatagaga
 cap_sequences:
-  C172: tCCTCAGcccGCTGAGGa
+  C172: GAGAGACTC
 """,
         encoding="utf-8",
     )
@@ -298,7 +306,9 @@ def test_retron_msd_lint_spec_resolves_public_primitive_sources(tmp_path: Path) 
                         "hit_kind": "exact",
                         "nickase_variant_id": "Nb.BtsI",
                         "release_variant_id": "BspQI",
-                        "target_search_hit": {"final_candidate": {"designed_sequence": "ACGTACGT"}},
+                        "target_search_hit": {
+                            "final_candidate": {"designed_sequence": "GAGAGACTC", "paired_bp": 3, "cap_nt": 3}
+                        },
                     }
                 ],
             }
@@ -365,6 +375,13 @@ cap_sequences:
     record = json.loads(result.stdout)["records"][0]
     assert record["cap"]["id"] == "C999"
     assert record["cap"]["source_construct"] == "snapback-rank-01"
+    assert record["cap"]["snapback_topology"] == {
+        "kind": "snapback_foldback_geometry_v1",
+        "retained_stem_span": {"start": 0, "end": 3},
+        "cap_span": {"start": 3, "end": 6},
+        "foldback_return_span": {"start": 6, "end": 9},
+        "source": "snapback_released_solve.final_candidate",
+    }
     assert record["scar_nick"]["left_base"] == "CGGT"
     assert record["scar_nick"]["right_base"] == "ACAG"
     assert record["scar_nick"]["route_status"] == "resolved"
@@ -372,7 +389,7 @@ cap_sequences:
     assert record["scar_nick"]["nickase"] == "Nb.BtsI"
 
 
-def test_retron_msd_lint_spec_refuses_implicit_primitive_combinatorics(tmp_path: Path) -> None:
+def test_retron_msd_lint_spec_refuses_non_rank_selector_before_primitive_combinatorics(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     snapback_run = tmp_path / "snapback_run"
     snapback_report = snapback_run / "analysis" / "solve_report.json"
@@ -387,14 +404,18 @@ def test_retron_msd_lint_spec_refuses_implicit_primitive_combinatorics(tmp_path:
                         "hit_kind": "exact",
                         "nickase_variant_id": "Nb.BtsI",
                         "release_variant_id": "BspQI",
-                        "target_search_hit": {"final_candidate": {"designed_sequence": "ACGTACGT"}},
+                        "target_search_hit": {
+                            "final_candidate": {"designed_sequence": "GAGAGACTC", "paired_bp": 3, "cap_nt": 3}
+                        },
                     },
                     {
                         "rank": 2,
                         "hit_kind": "exact",
                         "nickase_variant_id": "Nb.BsrDI",
                         "release_variant_id": "BspQI",
-                        "target_search_hit": {"final_candidate": {"designed_sequence": "TGCATGCA"}},
+                        "target_search_hit": {
+                            "final_candidate": {"designed_sequence": "GGAAGATCC", "paired_bp": 3, "cap_nt": 3}
+                        },
                     },
                 ],
             }
@@ -437,8 +458,9 @@ cap_sequences:
 
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
-    assert "selector mode=all is reserved for future explicit expansion contracts" in payload["error"]
-    assert "no implicit combinatoric expansion" in payload["error"]
+    assert "Input should be 'rank'" in payload["error"]
+    assert "cap_sequences.C172.source.selector.mode" in payload["error"]
+    assert "use selector mode=rank" in payload["next_step"]
 
 
 @pytest.mark.parametrize(
@@ -468,7 +490,9 @@ def test_retron_msd_lint_spec_refuses_non_rank_selector_modes_for_single_option(
                         "hit_kind": "exact",
                         "nickase_variant_id": "Nb.BtsI",
                         "release_variant_id": "BspQI",
-                        "target_search_hit": {"final_candidate": {"designed_sequence": "ACGTACGT"}},
+                        "target_search_hit": {
+                            "final_candidate": {"designed_sequence": "GAGAGACTC", "paired_bp": 3, "cap_nt": 3}
+                        },
                     },
                 ],
             }
@@ -511,8 +535,29 @@ cap_sequences:
 
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
-    assert f"selector mode={selector_mode} is reserved for future explicit expansion contracts" in payload["error"]
-    assert "Use selector mode=rank" in payload["error"]
+    assert "Input should be 'rank'" in payload["error"]
+    assert selector_mode in payload["error"]
+    assert "use selector mode=rank" in payload["next_step"]
+
+
+@pytest.mark.parametrize(
+    ("selector_payload", "selector_mode"),
+    [
+        ({"mode": "ranks", "ranks": [1]}, "ranks"),
+        ({"mode": "range", "start_rank": 1, "end_rank": 1}, "range"),
+        ({"mode": "all"}, "all"),
+    ],
+)
+def test_ranked_primitive_selector_spec_refuses_unsupported_modes_before_selection(
+    selector_payload: dict[str, object],
+    selector_mode: str,
+) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        RankedPrimitiveSelectorSpec.model_validate(selector_payload)
+
+    message = str(exc_info.value)
+    assert "mode" in message
+    assert selector_mode in message
 
 
 def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
@@ -725,6 +770,53 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
     assert "Snapback" in payload["next_step"]
 
 
+def test_retron_msd_materialize_requires_snapback_topology_for_cap_subsection(tmp_path: Path) -> None:
+    study_dir = tmp_path / "study"
+    study_dir.mkdir()
+    (study_dir / "msd_design_registry.yaml").write_text(
+        """
+contract: retron_msd_design_registry_v1
+schema_version: 1
+payloads:
+  TetR:
+    display_name: msd[teto]
+caps:
+  C172:
+    source_construct: retron-172
+constructs:
+  pES-retron-177:
+    scar_nick:
+      route_status: note_only
+""",
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "sequence_bundle"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "materialize",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--payload-sequence",
+            f"TetR={_TETO_PAYLOAD}",
+            "--cap-sequence",
+            f"C172={_SNAPBACK_FOLDBACK}",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "missing snapback_topology" in payload["error"]
+    assert "Cap label covers only the cap subsection" in payload["error"]
+
+
 def test_retron_msd_materialize_requires_viennarna_for_deliverable_plots(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -746,7 +838,7 @@ def test_retron_msd_materialize_requires_viennarna_for_deliverable_plots(
             "--payload-sequence",
             f"TetR={_TETO_PAYLOAD}",
             "--cap-sequence",
-            f"C172={_SNAPBACK_CAP}",
+            f"C172={_SNAPBACK_FOLDBACK}",
             "--render-format",
             "png",
             "--format",
@@ -783,7 +875,7 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
             "--payload-sequence",
             f"TetR={_TETO_PAYLOAD}",
             "--cap-sequence",
-            f"C172={_SNAPBACK_CAP}",
+            f"C172={_SNAPBACK_FOLDBACK}",
             "--render-format",
             "png",
             "--format",
@@ -891,14 +983,56 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     composition_overview_svg = composition_overview_svg_path.read_text(encoding="utf-8")
     assert "mismatch profile MXMM" in annotated_structure_svg
     assert "mismatch profile MXMM" in composition_overview_svg
+    assert "Cap AGA (3 nt)" in annotated_structure_svg
+    assert "Cap AGA (3 nt)" in composition_overview_svg
+    assert "Cap Geometry" not in annotated_structure_svg
+    assert "Cap Geometry" not in composition_overview_svg
+    assert "Foldback stem" not in composition_overview_svg
+    assert "Foldback return" not in composition_overview_svg
+    assert 'data-dnadesign-section-label="Foldback"' not in composition_overview_svg
     assert 'data-dnadesign-source-svg="secondary_structure.annotated.svg"' in composition_overview_svg
     assert 'data-dnadesign-source-orientation="cap_right"' in composition_overview_svg
     fills_by_semantic = {
         item["semantic"]: item["fill"]
         for item in visual_contract["meta"]["span_backdrops"]
-        if item["semantic"] in {"flank_5p", "payload_primary", "snapback_cap_segment", "payload_complement", "flank_3p"}
+        if item["semantic"]
+        in {
+            "flank_5p",
+            "payload_primary",
+            "snapback_cap",
+            "payload_complement",
+            "flank_3p",
+        }
     }
-    assert len(set(fills_by_semantic.values())) == 5
+    assert set(fills_by_semantic) == {
+        "flank_5p",
+        "payload_primary",
+        "snapback_cap",
+        "payload_complement",
+        "flank_3p",
+    }
+    assert len(set(fills_by_semantic.values())) == len(fills_by_semantic)
+    edge_colors_by_semantic = {
+        item["semantic"]: item["edge_color"]
+        for item in visual_contract["meta"]["span_backdrops"]
+        if item["semantic"]
+        in {
+            "flank_5p",
+            "payload_primary",
+            "snapback_cap",
+            "payload_complement",
+            "flank_3p",
+        }
+    }
+    assert set(edge_colors_by_semantic) == set(fills_by_semantic)
+    assert len(set(edge_colors_by_semantic.values())) == len(edge_colors_by_semantic)
+    assert 'id="dnadesign-secondary-structure-semantic-edges"' in composition_overview_svg
+    for semantic, edge_color in edge_colors_by_semantic.items():
+        assert f'data-dnadesign-edge-semantic="{semantic}"' in composition_overview_svg
+        assert f"stroke: {edge_color}" in composition_overview_svg
+    for semantic in ["stem_base_left", "stem_base_right"]:
+        assert f'data-dnadesign-edge-semantic="{semantic}"' in composition_overview_svg
+        assert f"stroke: {visual_contract['meta']['component_palette'][semantic]}" in composition_overview_svg
 
     rows = list(
         csv.DictReader(
@@ -930,7 +1064,7 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     record = catalog["records"][0]
     flank_5p_len = len("gtcagaaaaaa") + 4
     flank_3p_len = 4 + len("acagtaactcaga")
-    unit_len = flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP) + len(_TETO_PAYLOAD) + flank_3p_len
+    unit_len = flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_FOLDBACK) + len(_TETO_PAYLOAD) + flank_3p_len
     assert record["sequence"]["length"] == unit_len
     assert record["source"]["dnadesign_bundle"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM"
     assert record["artifacts"]["genbank"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/forward.gb"
@@ -959,16 +1093,16 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert "payload_complement" not in features_by_label
     assert "snapback_cap" not in features_by_label
     assert not any("copy 0" in label for label in features_by_label)
-    assert {"5' Flanking", "msd[teto]", "Cap", "msd[teto] complement"} <= set(features_by_label)
+    assert {"5' Flanking", "msd[teto]", "Foldback", "msd[teto] complement"} <= set(features_by_label)
     features_by_id = {
         feature.qualifiers["dnadesign_feature_id"][0]: feature
         for feature in genbank_record.features
         if "dnadesign_feature_id" in feature.qualifiers
     }
     payload_complement = features_by_id["payload_complement"]
-    assert int(payload_complement.location.start) == flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP)
+    assert int(payload_complement.location.start) == flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_FOLDBACK)
     assert int(payload_complement.location.end) == (
-        flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_CAP) + len(_TETO_PAYLOAD)
+        flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_FOLDBACK) + len(_TETO_PAYLOAD)
     )
     assert payload_complement.location.strand == -1
     assert payload_complement.qualifiers["label"] == ["msd[teto] complement"]
@@ -978,17 +1112,26 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
 
     feature_rows = list(csv.DictReader(features_path.read_text(encoding="utf-8").splitlines()))
     annotation_ids = {row["feature_id"] for row in feature_rows if row["feature_kind"] == "annotation"}
-    assert annotation_ids == {"stem_base_left", "stem_base_right"}
+    assert annotation_ids == {
+        "stem_base_left",
+        "stem_base_right",
+        "snapback_retained_stem",
+        "snapback_cap",
+        "snapback_foldback_return",
+    }
     assert {
         "5' Flanking",
         "Left Base",
         "msd[teto]",
+        "Foldback",
+        "Foldback stem",
         "Cap",
+        "Foldback return",
         "msd[teto] complement",
         "Right Base",
         "3' Flanking",
     } <= {row["display_label"] for row in feature_rows}
-    assert not {"flank_5p", "payload_primary", "snapback_cap_segment", "payload_complement"} & {
+    assert not {"flank_5p", "payload_primary", "snapback_foldback_geometry", "payload_complement"} & {
         row["display_label"] for row in feature_rows
     }
     duplicate_display_spans = [
@@ -1080,7 +1223,7 @@ def test_retron_msd_materialize_refuses_flat_legacy_sequence_layout(tmp_path: Pa
             "--payload-sequence",
             f"TetR={_TETO_PAYLOAD}",
             "--cap-sequence",
-            f"C172={_SNAPBACK_CAP}",
+            f"C172={_SNAPBACK_FOLDBACK}",
             "--format",
             "json",
         ],
@@ -1113,7 +1256,7 @@ def test_retron_msd_materialize_refuses_stale_legacy_plot_deliverables(tmp_path:
             "--payload-sequence",
             f"TetR={_TETO_PAYLOAD}",
             "--cap-sequence",
-            f"C172={_SNAPBACK_CAP}",
+            f"C172={_SNAPBACK_FOLDBACK}",
             "--format",
             "json",
         ],
@@ -1125,6 +1268,40 @@ def test_retron_msd_materialize_refuses_stale_legacy_plot_deliverables(tmp_path:
     assert "Stale MSD plot output" in payload["error"]
     assert "component_span_and_folding.png" in payload["error"]
     assert "archive/remove stale plot artifacts" in payload["next_step"]
+
+
+def test_retron_msd_materialize_refuses_stale_variant_sequence_outputs(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "sequence_bundle"
+    stale_sequences_dir = out_dir / "variants" / "msd-tetr-C172-LCGGT-RACAG-MXMM" / "sequences"
+    stale_sequences_dir.mkdir(parents=True)
+    (stale_sequences_dir / "legacy_sequence.gb").write_text("stale\n", encoding="utf-8")
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "materialize",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--payload-sequence",
+            f"TetR={_TETO_PAYLOAD}",
+            "--cap-sequence",
+            f"C172={_SNAPBACK_FOLDBACK}",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "Stale MSD sequence artifact output" in payload["error"]
+    assert "legacy_sequence.gb" in payload["error"]
+    assert "archive/remove stale sequence artifacts" in payload["next_step"]
 
 
 def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> None:

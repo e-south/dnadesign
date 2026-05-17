@@ -1,11 +1,6 @@
 ![latentdna banner](docs/assets/latentdna-banner.svg)
 
-LatentDNA is the comparison layer for `dnadesign`.
-
-LatentDNA compares learned sequence representations and turns those comparisons
-into workspace-owned tables, plots, snapshots, and notebooks. Study-specific
-labels live in workspace config, while downstream benchmarking and final
-selection stay with the owning study or consumer tool.
+LatentDNA compares learned sequence representations and turns those comparisons into workspace-owned tables, plots, snapshots, and notebooks for representation review. Study-specific labels live in workspace config, while downstream benchmarking and final selection stay with the owning study or consumer tool.
 
 ## Documentation
 

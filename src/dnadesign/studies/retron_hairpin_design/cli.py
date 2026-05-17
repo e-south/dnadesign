@@ -168,8 +168,10 @@ def _next_step_for_error(exc: Exception) -> str:
     if "compiler spec" in message or "selector" in message or "primitive" in message:
         return (
             "Fix the retron_msd_compiler_spec_v1 file so every design has complete explicit parts, "
-            "and use selector mode=rank for each public primitive source unless a future expansion contract is added."
+            "and use selector mode=rank for each public primitive source."
         )
+    if "Stale MSD sequence artifact output" in message:
+        return "Choose a fresh --out-dir or explicitly archive/remove stale sequence artifacts before materializing."
     if "Stale MSD sequence output" in message or "Stale MSD composition config output" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove stale generated sequence outputs first."
     return "Run lint on one complete MSD label first; route missing biological constraints before generating a catalog."

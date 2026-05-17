@@ -1,6 +1,6 @@
 ![Universal Sequence Record banner](assets/usr-banner.svg)
 
-Universal Sequence Record (USR) provides sequence datasets with explicit overlay and mutation-event contracts. It is the storage and integration boundary for tools that write sequence outputs and derived annotations. Use USR to maintain `records.parquet`, append namespaced overlays under `_derived/`, and emit `.events.log` mutation events for downstream operators.
+Universal Sequence Record (USR) stores sequence datasets with explicit overlay and mutation-event contracts. It is the integration boundary for tools that write sequence outputs and derived annotations, maintain `records.parquet`, append namespaced overlays under `_derived/`, and emit `.events.log` mutation events for downstream operators.
 
 ## Documentation
 

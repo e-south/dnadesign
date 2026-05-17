@@ -99,8 +99,8 @@ native_agent_bootstrap:
       public Snapback and scar-nick APIs, and multi-rank selectors must fail
       fast unless an explicit expansion contract is added
     - Retron MSD sequence materialization emits one MSD unit per design, with
-      5-prime flank plus left base, payload primary, cap geometry, payload
-      complement, right base plus 3-prime flank
+      5-prime flank plus left base, payload primary, snapback foldback geometry
+      with a 3 nt Cap subsection, payload complement, right base plus 3-prime flank
     - Retron MSD materialization has no repeat-count flag and must not chain
       complete MSD units together
     - GenBank/structure-review output writes manifest/bundle/sequence_manifest.json,

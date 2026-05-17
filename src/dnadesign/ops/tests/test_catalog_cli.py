@@ -15,9 +15,11 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.ops.catalog import CatalogQuery, filter_runbook_catalog, load_runbook_catalog
+from dnadesign.ops.catalog.metadata import _load_registry_metadata_file, _load_tool_source_metadata_file
 from dnadesign.ops.cli import app
 
 
@@ -32,6 +34,11 @@ def _repo_root() -> Path:
 _ANSI_ESCAPE_RE = re.compile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
 def test_load_runbook_catalog_reads_shared_registry() -> None:
     catalog = load_runbook_catalog(repo_root=_repo_root())
 
@@ -43,10 +50,66 @@ def test_load_runbook_catalog_reads_shared_registry() -> None:
     assert catalog.find_tool_source("latentdna") is not None
 
 
+def test_catalog_registry_metadata_rejects_unknown_top_level_keys(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "operations" / "demo.md"
+    metadata_path = doc_path.with_name("demo.registry.yaml")
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Procedure\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: demo.procedure
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: demo.yaml
+exit_artifact: audit.json
+execution_kind: executable
+status_kind: ops-audit-json
+summary: Demo procedure.
+legacy_alias: stale
+""",
+    )
+
+    with pytest.raises(ValueError, match="registry metadata has unknown key\\(s\\): legacy_alias"):
+        _load_registry_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
+
+
+def test_catalog_tool_source_metadata_rejects_unknown_route_keys(tmp_path: Path) -> None:
+    doc_path = tmp_path / "src" / "dnadesign" / "demo" / "docs" / "README.md"
+    route_path = doc_path.with_name("workflow.md")
+    metadata_path = doc_path.with_suffix(".tool-source.yaml")
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Tool\n")
+    _write(route_path, "# Demo Workflow\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+tool: demo
+summary: Demo docs.
+routes:
+  - id: workflow
+    path: workflow.md
+    summary: Demo workflow.
+    legacy: stale
+""",
+    )
+
+    with pytest.raises(ValueError, match="route 1 has unknown key\\(s\\): legacy"):
+        _load_tool_source_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
+
+
 def test_ops_package_data_declares_packaged_runbook_presets() -> None:
     pyproject = (_repo_root() / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '"dnadesign.ops"' in pyproject
+    assert "providers/*/status.registry.yaml" in pyproject
     assert "runbooks/presets/*.yaml" in pyproject
     assert "runbooks/templates/*.qsub" in pyproject
 

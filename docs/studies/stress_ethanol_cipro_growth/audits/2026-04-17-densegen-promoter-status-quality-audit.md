@@ -45,10 +45,12 @@ Out of scope:
 
 Severity: high
 
-`src/dnadesign/studies/families/promoter/analysis_surfaces.py` imports
-`dnadesign.densegen.src.viz.plot_registry.PLOT_SPECS` directly, even though the
-repo-wide rule forbids cross-tool internal `src.*` imports and DenseGen already
-exports `PLOT_SPECS` from its public root API.
+At the time of this audit,
+`src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py`
+imported DenseGen plot registry internals directly, even though the repo-wide
+rule forbids cross-tool internal imports. The current implementation consumes
+DenseGen through the public `dnadesign.densegen.inspect_analysis_surface`
+surface instead.
 
 Why this matters:
 
@@ -61,7 +63,7 @@ Evidence:
 
 - `DESIGN.md:54-60`
 - `ARCHITECTURE.md:76-80`
-- `src/dnadesign/studies/families/promoter/analysis_surfaces.py:294-299`
+- `src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py:294-299`
 - `src/dnadesign/densegen/__init__.py:14-29`
 - `src/dnadesign/densegen/tests/config/test_public_api_module_layout.py:20-34`
 
@@ -71,21 +73,21 @@ Severity: high
 
 The promoter-study snapshot swallows DenseGen import failures and substitutes
 empty plot specs. It also hardcodes DenseGen default and optional plot ids in
-study-family code.
+study status adapter code.
 
 Why this matters:
 
 - This is a direct violation of the repo's no-silent-fallback rule.
 - The record-plane route can degrade without telling the operator.
-- Tool-local knowledge is duplicated in the study-family adapter instead of
+- Tool-local knowledge is duplicated in the study status adapter instead of
   consumed through one public contract.
 
 Evidence:
 
 - `RELIABILITY.md:18-31`
 - `DESIGN.md:20-23`
-- `src/dnadesign/studies/families/promoter/analysis_surfaces.py:83-85`
-- `src/dnadesign/studies/families/promoter/analysis_surfaces.py:294-312`
+- `src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py:83-85`
+- `src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py:294-312`
 
 #### 3. DenseGen default plot surface has multiple sources of truth
 
@@ -159,8 +161,8 @@ Why this matters:
 
 Evidence:
 
-- `src/dnadesign/studies/families/promoter/analysis_surfaces.py:87-92`
-- `src/dnadesign/studies/families/promoter/analysis_surfaces.py:95-120`
+- `src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py:87-92`
+- `src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py:95-120`
 
 #### 6. Study-owned route/status docs drift from repo doc-model rules
 
@@ -205,7 +207,7 @@ Why this matters:
 Evidence:
 
 - `src/dnadesign/densegen/contracts.py:1-212`
-- `src/dnadesign/studies/families/promoter/analysis_surfaces.py:56-120`
+- `src/dnadesign/studies/status_adapters/promoter_status/analysis_surfaces.py:56-120`
 
 ### Pragmatic-Principles Readout
 
@@ -217,11 +219,11 @@ Principles currently not met cleanly:
 - Explicit contracts: generated plots, visible plots, default plots, and route
   inventory are not defined in one place.
 - DRY knowledge: DenseGen plot taxonomy is duplicated across workspace config,
-  pipeline record, notebook inventory, and study-family code.
-- Orthogonality: record-plane status reaches into DenseGen internals instead of
-  consuming a small public surface contract.
-- No silent fallback: study-family analysis silently swallows DenseGen import
-  failures; ridgeline silently degrades from deployed to retained lengths.
+  pipeline record, notebook inventory, and study status adapter code.
+- Orthogonality: record-plane status must consume a small public surface
+  contract instead of reaching into DenseGen internals.
+- No silent fallback: study status adapter analysis must report
+  contract-visible degradation when declared analysis surfaces cannot be read.
 - Fail fast: current behavior often returns plausible-but-degraded output
   instead of a contract-visible degraded state.
 
@@ -299,7 +301,7 @@ The dev spec should explicitly say:
 
 The dev spec may authorize changes in these areas:
 
-- promoter-study status skill and study-family adapter wiring
+- promoter-study status skill and study status adapter wiring
 - OPS/status routing that consumes study-owned analysis metadata
 - `docs/studies/...` record surfaces such as `status.md`, `routes.md`, and
   `pipeline.yaml`

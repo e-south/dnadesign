@@ -532,6 +532,66 @@ def validate_candidate_feature_table(
     return {"row_count": int(len(records)), "x_dim": int(x_dim or 0)}
 
 
+def _configured_candidate_feature_table_ids(config: Mapping[str, Any], *, repo_root: str | Path) -> set[str]:
+    candidate_table = dict(config.get("candidate_feature_table", {}) or {})
+    records_path = _normal_text(candidate_table.get("records_path"))
+    if not records_path:
+        raise ValueError(
+            "candidate feature table config is missing required field: candidate_feature_table.records_path"
+        )
+    records = pd.read_parquet(_resolve_repo_path(Path(repo_root), records_path), columns=["id"])
+    return set(records["id"].astype(str).tolist())
+
+
+def validate_selected_ids_against_candidate_feature_table(
+    selected: pd.DataFrame,
+    config: Mapping[str, Any],
+    *,
+    repo_root: str | Path,
+) -> dict[str, int]:
+    """Ensure selected handoff rows are valid OPAL candidate-table rows."""
+
+    candidate_ids = _configured_candidate_feature_table_ids(config, repo_root=repo_root)
+    selected_ids = selected["id"].astype(str)
+    missing_ids = sorted(set(selected_ids.tolist()) - candidate_ids)
+    if missing_ids:
+        sample = ", ".join(missing_ids[:5])
+        raise ValueError(
+            "selected batch-0 rows are missing from the OPAL candidate feature table: "
+            f"{sample}. Refresh the configured records.parquet before selecting batch-0 rows."
+        )
+    return {"selected_row_count": int(len(selected)), "candidate_row_count": int(len(candidate_ids))}
+
+
+def validate_configured_candidate_feature_table(config: Mapping[str, Any], *, repo_root: str | Path) -> dict[str, int]:
+    candidate_table = dict(config.get("candidate_feature_table", {}) or {})
+    records_path = _normal_text(candidate_table.get("records_path"))
+    x_column = _normal_text(candidate_table.get("x_column"))
+    missing = [
+        field
+        for field, value in {
+            "candidate_feature_table.records_path": records_path,
+            "candidate_feature_table.x_column": x_column,
+        }.items()
+        if not value
+    ]
+    if missing:
+        raise ValueError(f"candidate feature table config is missing required field(s): {', '.join(missing)}")
+
+    root = Path(repo_root)
+    x_source = candidate_table.get("x_source")
+    view_rows_path: Path | None = None
+    if isinstance(x_source, Mapping):
+        rows_path = _normal_text(x_source.get("rows_path"))
+        if rows_path:
+            view_rows_path = _resolve_repo_path(root, rows_path)
+    return validate_candidate_feature_table(
+        records_path=_resolve_repo_path(root, records_path),
+        x_column=x_column,
+        view_rows_path=view_rows_path,
+    )
+
+
 def _write_selection_outputs(selected: pd.DataFrame, config: Mapping[str, Any], *, repo_root: Path) -> list[Path]:
     outputs = dict(config.get("outputs", {}) or {})
     written: list[Path] = []
@@ -558,13 +618,35 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     config = load_sampling_config(args.config)
     repo_root = args.repo_root or _repo_root_from(args.config)
+    candidate_table_report = validate_configured_candidate_feature_table(config, repo_root=repo_root)
     candidates = build_candidate_frame(config, repo_root=repo_root)
     selected = select_batch0(candidates, config)
+    selection_table_report = validate_selected_ids_against_candidate_feature_table(
+        selected,
+        config,
+        repo_root=repo_root,
+    )
     summary = selected.groupby("campaign").size().to_dict()
-    print(json.dumps({"selected": summary}, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "candidate_feature_table": candidate_table_report,
+                "selected": summary,
+                "selection_candidate_table": selection_table_report,
+            },
+            sort_keys=True,
+        )
+    )
     if args.write:
         written = _write_selection_outputs(selected, config, repo_root=repo_root)
-        print(json.dumps({"written": [str(path) for path in written]}, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "written": [str(path) for path in written],
+                },
+                sort_keys=True,
+            )
+        )
     return 0
 
 

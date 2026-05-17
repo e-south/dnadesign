@@ -3,7 +3,7 @@
 OPAL runs active-learning campaigns over labeled sequence datasets with explicit
 feature, objective, selection, and ledger contracts.
 
-### Documentation
+## Documentation
 
 - [OPAL docs index](docs/index.md): workflows, plugins, concepts, references,
   and maintainer notes.

@@ -1,10 +1,6 @@
 ![Studies banner](assets/studies-banner.svg)
 
-`studies` contains narrow helpers for checked-in study records that need code
-without becoming generic tool features.
-
-Ops owns the status and preflight API. This package supplies family adapters and
-study-specific helpers that Ops or repo-local skills call explicitly.
+`studies` contains narrow helpers for checked-in study records that need code without becoming generic tool features; Ops owns the status and preflight APIs, while this package supplies explicit status adapters and study-specific helpers that Ops or repo-local skills call explicitly.
 
 ## Documentation
 

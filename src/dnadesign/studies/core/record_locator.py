@@ -24,7 +24,6 @@ class ActiveStudySelection:
     repo_root: Path
     index_path: Path
     active_study_id: str
-    family: str
     study_root: Path
     entry: StudyIndexEntry
 
@@ -50,7 +49,6 @@ def discover_active_study_selection(
         repo_root=study_index.repo_root,
         index_path=study_index.index_path,
         active_study_id=study_index.active_study_id,
-        family=entry.family,
         study_root=entry.record_root,
         entry=entry,
     )

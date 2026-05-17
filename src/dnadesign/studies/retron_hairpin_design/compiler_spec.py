@@ -34,56 +34,17 @@ class MsdCompilerSpecModel(BaseModel):
 
 
 class RankedPrimitiveSelectorSpec(MsdCompilerSpecModel):
-    mode: Literal["rank", "ranks", "range", "all"] = "rank"
-    rank: int | None = Field(default=None, ge=1)
-    ranks: list[int] | None = None
-    start_rank: int | None = Field(default=None, ge=1)
-    end_rank: int | None = Field(default=None, ge=1)
-
-    @field_validator("ranks")
-    @classmethod
-    def _ranks_are_positive(cls, value: list[int] | None) -> list[int] | None:
-        if value is None:
-            return None
-        if not value:
-            raise ValueError("selector.ranks must not be empty.")
-        if any(rank < 1 for rank in value):
-            raise ValueError("selector.ranks must contain positive ranks.")
-        if len(set(value)) != len(value):
-            raise ValueError("selector.ranks must not contain duplicate ranks.")
-        return value
+    mode: Literal["rank"] = "rank"
+    rank: int = Field(ge=1)
 
     @model_validator(mode="after")
     def _validate_mode_fields(self) -> "RankedPrimitiveSelectorSpec":
-        if self.mode == "rank":
-            if self.rank is None or self.ranks is not None or self.start_rank is not None or self.end_rank is not None:
-                raise ValueError("selector mode=rank requires rank only.")
-        elif self.mode == "ranks":
-            if self.ranks is None or self.rank is not None or self.start_rank is not None or self.end_rank is not None:
-                raise ValueError("selector mode=ranks requires ranks only.")
-        elif self.mode == "range":
-            if self.rank is not None or self.ranks is not None or self.start_rank is None or self.end_rank is None:
-                raise ValueError("selector mode=range requires start_rank and end_rank only.")
-            if self.end_rank < self.start_rank:
-                raise ValueError("selector.end_rank must be >= selector.start_rank.")
-        elif (
-            self.rank is not None or self.ranks is not None or self.start_rank is not None or self.end_rank is not None
-        ):
-            raise ValueError("selector mode=all does not accept rank fields.")
+        if self.mode != "rank":
+            raise ValueError("selector supports only mode=rank.")
         return self
 
-    def requested_ranks(self, available_ranks: list[int]) -> list[int]:
-        if self.mode == "rank":
-            if self.rank is None:
-                raise MsdCompilerSpecError("selector mode=rank requires rank.")
-            return [self.rank]
-        if self.mode == "ranks":
-            return list(self.ranks or [])
-        if self.mode == "range":
-            if self.start_rank is None or self.end_rank is None:
-                raise MsdCompilerSpecError("selector mode=range requires start_rank and end_rank.")
-            return list(range(self.start_rank, self.end_rank + 1))
-        return list(available_ranks)
+    def requested_ranks(self) -> list[int]:
+        return [self.rank]
 
 
 class SnapbackCapSourceSpec(MsdCompilerSpecModel):
@@ -261,6 +222,7 @@ def _resolve_cap_sequences(
         metadata[cap_id] = {
             "source_construct": primitive.primitive_id,
             "display_name": f"{cap_id} {primitive.primitive_id}",
+            "snapback_topology": primitive.snapback_topology,
         }
     return sequences, metadata
 
@@ -318,7 +280,7 @@ def _select_single_snapback_cap(source: SnapbackCapSourceSpec, *, label: str):
     selected = _select_ranked(primitives, selector=source.selector, label=label)
     if len(selected) != 1:
         raise MsdCompilerSpecError(
-            f"{label} selected {len(selected)} Snapback cap primitives. "
+            f"{label} selected {len(selected)} Snapback foldback primitives. "
             "Use selector mode=rank for the preferred explicit combination; no implicit combinatoric expansion is run."
         )
     return selected[0]
@@ -338,11 +300,6 @@ def _select_single_stem_base(source: ScarNickStemBaseSourceSpec, *, label: str):
 
 
 def _select_ranked(primitives: list[Any], *, selector: RankedPrimitiveSelectorSpec, label: str) -> list[Any]:
-    if selector.mode != "rank":
-        raise MsdCompilerSpecError(
-            f"{label} selector mode={selector.mode} is reserved for future explicit expansion contracts. "
-            "Use selector mode=rank for the preferred explicit combination; no implicit combinatoric expansion is run."
-        )
     by_rank: dict[int, Any] = {}
     for primitive in primitives:
         rank = int(primitive.rank)
@@ -351,7 +308,7 @@ def _select_ranked(primitives: list[Any], *, selector: RankedPrimitiveSelectorSp
         by_rank[rank] = primitive
     if not by_rank:
         raise MsdCompilerSpecError(f"{label} found no primitive options.")
-    requested = selector.requested_ranks(sorted(by_rank))
+    requested = selector.requested_ranks()
     missing = [rank for rank in requested if rank not in by_rank]
     if missing:
         raise MsdCompilerSpecError(f"{label} requested missing primitive rank(s): {', '.join(map(str, missing))}.")

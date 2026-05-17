@@ -12,9 +12,11 @@ runbooks or generated outputs. Treat them as the record plane: `ops progress`
 may read them for observation, while `ops runbook` remains the control plane
 for planning and execution.
 
-Not every study needs a sequential status/preflight ladder. Some studies are
-open-ended design efforts where the right first step is a route map, note, or
-repo-local skill rather than a phase/status command.
+Every checked-in study in this index carries an `ops.study.yaml` contract with
+explicit `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind` values.
+That does not mean every request should invoke those commands: open-ended
+design or product requests should still start from the route map, note, or
+repo-local skill that owns the asked-for surface.
 
 ### Quick route
 
@@ -39,21 +41,22 @@ explicit status or readiness questions.
 names a checked-in study that is not `active_study_id`, keep the selector
 untouched and pin that study's directory or route map directly.
 
-Each real study may keep these artifacts:
+Each checked-in live study keeps these artifacts:
 
 - `campaign.yaml`: explicit campaign/progress manifest when useful
 - `datasets.yaml`: affiliated dataset registry and sync posture
 - `status.md`: maintainer-facing current state and concise next actions
-- `ops.study.yaml`: optional OPS-facing lifecycle/track and preflight contract
+- `ops.study.yaml`: required OPS-facing lifecycle/track contract with explicit
+  `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind`
 - `routes.md`: optional one-hop handoff map for current owner surfaces
 - `pipeline.yaml`: optional machine-readable runtime context for exact command
   groups or automation bootstrap
 - `audits/`: optional machine-readable sync/readiness evidence
 
-Keep the code boundary clear: study-family implementation code lives under
+Keep the code boundary clear: study status adapter implementation lives under
 `src/dnadesign/studies/`, not under `src/dnadesign/ops/`. Ops reads checked-in
-records and dispatches providers, but family snapshot/preflight logic and
-study-specific parsers stay with the family or study package.
+records and dispatches providers, but snapshot/preflight logic and
+study-specific parsers stay with the status adapter or study package.
 
 ### Declared layout
 

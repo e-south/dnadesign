@@ -16,13 +16,19 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from dnadesign.studies.core.models import StudyOpsContract, StudyPreflightContract, StudyStatusContext
-from dnadesign.studies.families.promoter.adapter import STUDY_FAMILY_ADAPTER, PromoterFamilyContext
-from dnadesign.studies.families.promoter.infer_runtime import (
+from dnadesign.studies.status_adapters.promoter_status.adapter import (
+    STUDY_STATUS_ADAPTER,
+    PromoterStatusAdapterContext,
+)
+from dnadesign.studies.status_adapters.promoter_status.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     PromoterStudyInferRuntimeResolvedContext,
 )
-from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext, _first_phase_by_status
-from dnadesign.studies.families.promoter.snapshot import (
+from dnadesign.studies.status_adapters.promoter_status.record_normalizer import (
+    PromoterStudyResolvedContext,
+    _first_phase_by_status,
+)
+from dnadesign.studies.status_adapters.promoter_status.snapshot import (
     PromoterStudyStatusDependencies,
     PromoterStudyStatusResolvedContext,
     _build_planned_outputs_state,
@@ -527,6 +533,62 @@ def test_build_promoter_study_status_surfaces_semantic_completeness_attention(tm
     assert "shared handoff metadata is semantically incomplete" in evidence["attention_reasons"]
 
 
+def test_build_promoter_study_status_surfaces_configured_latentdna_readiness_attention(tmp_path: Path) -> None:
+    study_context = replace(
+        _make_study_context(tmp_path),
+        densegen_row_target=8,
+        densegen_row_gap=0,
+    )
+    status_context = PromoterStudyStatusResolvedContext(
+        infer_runtime=PromoterStudyInferRuntimeResolvedContext(
+            preferred_model_family="evo2_7b",
+            supported_model_families=("evo2_7b",),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        ),
+    )
+    latentdna_state = {
+        "configured": True,
+        "state": "error",
+        "summary": "LatentDNA snapshot unreadable",
+    }
+
+    state, summary, evidence = build_promoter_study_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=PromoterStudyStatusDependencies(
+            infer_runtime=PromoterStudyInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: None,
+            inspect_latentdna_readiness=lambda **kwargs: latentdna_state,
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "attention"
+    assert "LatentDNA snapshot unreadable" in summary
+    assert evidence["latentdna"] == latentdna_state
+    assert "LatentDNA readiness is not ok" in evidence["attention_reasons"]
+
+
 def test_build_promoter_study_status_surfaces_sequence_view_and_feature_completion_sections(tmp_path: Path) -> None:
     study_context = replace(
         _make_study_context(tmp_path),
@@ -616,34 +678,51 @@ def test_build_promoter_study_status_surfaces_sequence_view_and_feature_completi
     assert "Infer feature completion is incomplete" not in evidence["attention_reasons"]
 
 
-def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path, monkeypatch) -> None:
+def test_promoter_snapshot_adapter_keeps_deep_host_and_feature_probes_out_of_record_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     study_context = _make_study_context(tmp_path)
     contract = StudyOpsContract(
         study_id="demo_study",
-        family="promoter",
+        status_kind="promoter-study-status",
+        preflight_kind="promoter-study-preflight",
         phase_order=("infer_batch_preparation", "infer_anchor_only_20b", "infer_anchor_only_7b"),
         snapshot_summary_scope="repo",
         preflight=StudyPreflightContract(default_scope="next"),
         current_phase_id="infer_batch_preparation",
         phases=(),
-        raw_payload={"study_id": "demo_study", "family": "promoter"},
+        raw_payload={
+            "study_id": "demo_study",
+            "ops_surfaces": {
+                "status_kind": "promoter-study-status",
+                "preflight_kind": "promoter-study-preflight",
+            },
+        },
     )
     adapter_context = StudyStatusContext(
         repo_root=tmp_path,
         study_root=study_context.resolved_study_dir,
         contract=contract,
-        family_context=PromoterFamilyContext(study_context=study_context),
+        adapter_context=PromoterStatusAdapterContext(study_context=study_context),
     )
 
     def _forbidden_probe() -> dict[str, object]:
         raise AssertionError("cheap snapshot must not probe local GPU inventory")
 
+    def _forbidden_feature_completion_probe(**_: object) -> dict[str, object]:
+        raise AssertionError("record snapshot must not scan Infer feature-completion sidecars")
+
     monkeypatch.setattr(
-        "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
+        "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_local_infer_gpu_inventory",
         _forbidden_probe,
     )
     monkeypatch.setattr(
-        "dnadesign.studies.families.promoter.adapter.build_promoter_study_infer_runtime_dependencies",
+        "dnadesign.studies.status_adapters.promoter_status.adapter.inspect_promoter_study_infer_feature_completion",
+        _forbidden_feature_completion_probe,
+    )
+    monkeypatch.setattr(
+        "dnadesign.studies.status_adapters.promoter_status.adapter.build_promoter_study_infer_runtime_dependencies",
         lambda: PromoterStudyInferRuntimeDependencies(
             resolve_named_path_mapping=lambda value, *, repo_root, label, status_kind: {
                 name: Path(path) for name, path in dict(value or {}).items()
@@ -675,8 +754,9 @@ def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path,
         ),
     )
 
-    state, summary, evidence = STUDY_FAMILY_ADAPTER.build_snapshot(adapter_context)
+    state, summary, evidence = STUDY_STATUS_ADAPTER.build_snapshot(adapter_context)
 
     assert state == "attention"
     assert "preferred infer evo2_20b" in summary
     assert "infer_local_gpu_inventory" not in evidence
+    assert evidence["infer_feature_completion_state"] is None

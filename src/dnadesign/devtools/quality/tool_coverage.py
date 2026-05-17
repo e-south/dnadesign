@@ -152,6 +152,11 @@ def validate_coverage_payload(coverage_data: dict, *, source: str) -> None:
                 raise ValueError(f"Coverage summary field '{key}' must be an integer for {file_path}: {source}")
             if value < 0:
                 raise ValueError(f"Coverage summary field '{key}' must be non-negative for {file_path}: {source}")
+        if summary["covered_lines"] > summary["num_statements"]:
+            raise ValueError(
+                "Coverage summary field 'covered_lines' must be less than or equal to "
+                f"'num_statements' for {file_path}: {source}"
+            )
 
 
 def _build_parser() -> argparse.ArgumentParser:

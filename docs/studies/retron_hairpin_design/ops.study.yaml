@@ -1,7 +1,10 @@
 version: 2
 study_id: retron_hairpin_design
-family: cruncher
 title: Retron hairpin design effort
+
+ops_surfaces:
+  status_kind: cruncher-study-status
+  preflight_kind: cruncher-study-preflight
 
 record_sources:
   narrative_ref: manifest:status.md

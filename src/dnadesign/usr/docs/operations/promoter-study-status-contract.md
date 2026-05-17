@@ -25,7 +25,8 @@ Use this page for the cheap snapshot.
 | Need | Surface | Why |
 | --- | --- | --- |
 | Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of study phase, datasets, row counts, and downstream posture. |
-| Are sequence products and feature-completion lanes visible at a glance? | `usr.data-plane.promoter-study-status --json` and read `evidence.sequence_view_contract_state` plus `evidence.infer_feature_completion_state` | Summarized product-kind/orientation/pooling contract health, generated sidecar freshness, and Infer reusable/stale/missing counts without replacing preflight. |
+| Are sequence products visible at a glance? | `usr.data-plane.promoter-study-status --json` and read `evidence.sequence_view_contract_state` | Summarized product-kind/orientation/pooling contract health and generated sidecar freshness without replacing preflight. |
+| Are Infer feature-completion lanes reusable or stale? | [Promoter Study Preflight](promoter-study-preflight.md) | The sequence-view feature-completion inventory scans large Infer sidecars, so it belongs in the deeper preflight surface rather than the record snapshot. |
 | What blocks execution on this host? | [Promoter Study Preflight](promoter-study-preflight.md) | Command-level readiness for the next actionable phase. |
 | Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
 | Which plots, notebooks, deliverables, or artifact roots are available? | `uv run ops progress show usr.data-plane.promoter-study-status --json` and read `evidence.analysis_surfaces` | One snapshot now exposes DenseGen contract-governed current inventory and freshness, LatentDNA deliverable ids plus artifact roots, and Cluster artifact-layout templates without guessing. |
@@ -100,6 +101,8 @@ execution surfaces, reads phase order and repo-summary scope from
 `ops.study.yaml`, reports the current phase, and highlights the next ready
 phase without submitting jobs or mutating USR. Host-local readiness such as GPU
 visibility stays advisory here and moves into preflight for hard blockers.
+Large feature-completion inventories also stay out of this record snapshot; use
+preflight when you need reusable/stale/missing Infer feature counts.
 The snapshot keeps each evidence axis separate: source growth, shared handoff
 readiness, semantic completeness for critical downstream metadata, and planned
 outputs. Operators should not have to infer readiness from one overloaded
@@ -121,8 +124,9 @@ or required check from the study-owned surface instead of hard-coding it here.
 The snapshot now also calls out stale downstream handoffs when merged anchor or
 Construct context datasets trail the upstream DenseGen source even though those
 datasets still exist.
-OPS resolves the registered provider. The promoter-family code that assembles
-the snapshot lives under `src/dnadesign/studies/families/promoter/`.
+OPS resolves the registered provider. The promoter status adapter code that
+assembles the snapshot lives under
+`src/dnadesign/studies/status_adapters/promoter_status/`.
 
 ### Exploratory-analysis route inventory
 
@@ -171,7 +175,7 @@ uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --
    onboarding mode, root semantics, and sync posture.
 3. A status note that answers the human questions the manifest and
    dataset registry do not encode.
-4. `ops.study.yaml`, which tells OPS the study-family lifecycle, record
+4. `ops.study.yaml`, which tells OPS the explicit study lifecycle, record
    sources, execution surfaces, snapshot scope, and next-scope preflight
    posture without hard-coding workflow taxonomy in core code.
 5. When downstream execution surfaces exist, an optional `routes.md` that points to the current DenseGen, Construct, Infer,
@@ -252,7 +256,9 @@ Discovery rules:
 
 - Read `docs/studies/index.yaml` first.
 - `active_study_id` must name a study declared under `studies:`.
-- The selected study entry must declare `family` and `record_root`.
+- The selected study entry must declare `record_root`; the study's
+  `ops.study.yaml` must declare `ops_surfaces.status_kind` and
+  `ops_surfaces.preflight_kind`.
 - The corresponding study directory must contain `campaign.yaml`,
   `datasets.yaml`, `status.md`, and `ops.study.yaml`.
 - If `routes.md` exists in the study directory, treat it as the study-owned
@@ -377,7 +383,7 @@ From `status.md`:
 
 From `ops.study.yaml`:
 
-- the study-family phase order that OPS should treat as canonical
+- the study phase order that OPS should treat as canonical
 - whether the cheap snapshot is repo-scoped or broader
 - which phase groups belong in `--scope next` preflight rather than `--scope full`
 

@@ -1,7 +1,10 @@
 version: 2
 study_id: <study-id>
-family: promoter
 title: <study-title>
+
+ops_surfaces:
+  status_kind: promoter-study-status
+  preflight_kind: promoter-study-preflight
 
 record_sources:
   narrative_ref: manifest:status.md

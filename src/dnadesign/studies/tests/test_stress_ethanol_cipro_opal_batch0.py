@@ -10,12 +10,17 @@ import pandas as pd
 import pytest
 import yaml
 
-from dnadesign.opal.src.config.loader import load_config
+from dnadesign.opal import load_config
 from dnadesign.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
     REQUIRED_REVIEW_COLUMNS,
     load_sampling_config,
     select_batch0,
     validate_candidate_feature_table,
+    validate_configured_candidate_feature_table,
+    validate_selected_ids_against_candidate_feature_table,
+)
+from dnadesign.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
+    main as batch0_select_main,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -160,6 +165,91 @@ def test_candidate_feature_table_validation_requires_fixed_length_x_and_view_ali
 
     with pytest.raises(ValueError, match="fixed-length"):
         validate_candidate_feature_table(records_path=records, x_column=x_col)
+
+
+def test_configured_candidate_feature_table_validation_resolves_repo_paths(tmp_path: Path) -> None:
+    records = tmp_path / "usr" / "datasets" / "demo" / "records.parquet"
+    view_rows = tmp_path / "latentdna" / "views" / "rows.parquet"
+    records.parent.mkdir(parents=True)
+    view_rows.parent.mkdir(parents=True)
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+    pd.DataFrame(
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAAA"],
+            "alphabet": ["dna_4"],
+            x_col: [[0.1, 0.2]],
+        }
+    ).to_parquet(records)
+    pd.DataFrame({"construct__anchor_id": ["a"]}).to_parquet(view_rows)
+
+    report = validate_configured_candidate_feature_table(
+        {
+            "candidate_feature_table": {
+                "records_path": "usr/datasets/demo/records.parquet",
+                "x_column": x_col,
+                "x_source": {"rows_path": "latentdna/views/rows.parquet"},
+            }
+        },
+        repo_root=tmp_path,
+    )
+
+    assert report == {"row_count": 1, "x_dim": 2}
+
+
+def test_batch0_preview_fails_fast_when_candidate_table_view_rows_drift(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    view_rows = tmp_path / "view_rows.parquet"
+    config_path = tmp_path / "sampling.yaml"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+    pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "bio_type": ["dna", "dna"],
+            "sequence": ["AAAA", "CCCC"],
+            "alphabet": ["dna_4", "dna_4"],
+            x_col: [[0.1, 0.2], [0.3, 0.4]],
+        }
+    ).to_parquet(records)
+    pd.DataFrame({"construct__anchor_id": ["b", "a"]}).to_parquet(view_rows)
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "campaigns": [],
+                "candidate_feature_table": {
+                    "records_path": "records.parquet",
+                    "x_column": x_col,
+                    "x_source": {"rows_path": "view_rows.parquet"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="align with LatentDNA view rows"):
+        batch0_select_main(["--config", str(config_path), "--repo-root", str(tmp_path)])
+
+
+def test_selected_ids_must_exist_in_candidate_feature_table(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+    pd.DataFrame(
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAAA"],
+            "alphabet": ["dna_4"],
+            x_col: [[0.1, 0.2]],
+        }
+    ).to_parquet(records)
+
+    with pytest.raises(ValueError, match="missing from the OPAL candidate feature table"):
+        validate_selected_ids_against_candidate_feature_table(
+            pd.DataFrame({"id": ["b"]}),
+            {"candidate_feature_table": {"records_path": "records.parquet"}},
+            repo_root=tmp_path,
+        )
 
 
 def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:

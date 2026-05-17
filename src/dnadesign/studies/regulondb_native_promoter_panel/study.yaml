@@ -1,4 +1,4 @@
 study_id: regulondb_native_promoter_panel
 title: RegulonDB native promoter panel
-family: promoter
+status_kind: promoter-study-status
 owner: dnadesign-maintainers
