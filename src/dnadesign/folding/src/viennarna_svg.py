@@ -19,7 +19,7 @@ from pathlib import Path
 
 from dnadesign.contracts.visual import SequenceEvidenceMapV1
 
-from .errors import FoldingExecutionError
+from .errors import FoldingConfigError, FoldingExecutionError
 from .pairing_qa import copy_for_index, pair_key
 from .viennarna_ontology import component_token, hue_for_owners, slug_token
 from .viennarna_summary import structure_subtitle_lines, structure_title
@@ -32,6 +32,13 @@ _DEFAULT_LABEL_LATERALS = (0.0, 18.0, -18.0, 36.0, -36.0, 58.0, -58.0, 82.0, -82
 _STEM_BASE_LABEL_OFFSETS = (18.0, 24.0, 30.0, 38.0, 48.0, 56.0, 68.0, 84.0)
 _STEM_BASE_LABEL_LATERALS = (0.0, 12.0, -12.0, 24.0, -24.0, 38.0, -38.0, 50.0, -50.0)
 _ANNOTATION_FONT_SIZE_PX = 9.0
+_VIENNARNA_SEQUENCE_TEXT_GROUP_ID = "seq"
+_NUCLEOTIDE_TEXT_FILL = "#111827"
+_BACKBONE_STROKE = "#6B7280"
+_BACKBONE_STROKE_WIDTH_PX = 2.0
+_SEMANTIC_BACKBONE_STROKE_WIDTH_PX = 2.4
+_BASEPAIR_STROKE = "#CBD5E1"
+_BASEPAIR_STROKE_WIDTH_PX = 1.0
 
 
 @dataclass(frozen=True)
@@ -88,8 +95,15 @@ def annotate_svg_surface(
         intended_pair_lookup=intended_pair_lookup,
         emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
     )
+    _style_native_structure_layers(surface)
     section_annotations = _section_annotations(surface, visual_contract=visual_contract)
     layout_normalization = _normalize_structure_orientation(surface, section_annotations)
+    _add_semantic_edge_layer(
+        surface,
+        visual_contract=visual_contract,
+        section_annotations=section_annotations,
+        layout_normalization=layout_normalization,
+    )
     highlight_boxes = _add_section_highlight_layer(
         surface,
         section_annotations=section_annotations,
@@ -102,6 +116,7 @@ def annotate_svg_surface(
         visual_contract=visual_contract,
         extra_view_boxes=highlight_boxes,
     )
+    _project_nucleotide_text_to_oriented_coordinates(surface, layout_normalization=layout_normalization)
     return SvgAnnotationResult(
         basepairs=basepair_annotations,
         section_annotations=section_annotations,
@@ -127,6 +142,8 @@ def _annotate_nucleotides_and_basepairs(
         element.set("data-dnadesign-owner-ids", owner_ids)
         element.set("data-dnadesign-effect-tags", effect_tags)
         element.set("data-dnadesign-hue", str(annotation["hue"]))
+        element.set("data-dnadesign-text-fill", _NUCLEOTIDE_TEXT_FILL)
+        element.set("data-dnadesign-text-color-policy", "semantic_metadata_text_black")
         classes = [item for item in str(element.attrib.get("class", "")).split() if item]
         if css_class not in classes:
             classes.append(css_class)
@@ -137,16 +154,20 @@ def _annotate_nucleotides_and_basepairs(
                 classes.append("dnadesign-stem-base-nucleotide")
         element.set("class", " ".join(classes))
         style = str(element.attrib.get("style", "")).strip()
-        hue_style = f"fill: {annotation['hue']};"
-        next_style = f"{style} {hue_style}".strip() if style else hue_style
+        next_style = _append_style_declarations(
+            style,
+            (
+                f"fill: {_NUCLEOTIDE_TEXT_FILL}",
+                "stroke: none",
+            ),
+        )
         if emphasize_stem_base_nucleotides and is_stem_base:
             next_style = _append_style_declarations(
                 next_style,
                 (
-                    "font-weight: 700",
-                    "stroke: #111827",
-                    "stroke-width: 0.35px",
-                    "paint-order: stroke fill",
+                    "font-weight: 500",
+                    "stroke-width: 0",
+                    "paint-order: normal",
                 ),
             )
         element.set("style", next_style)
@@ -198,6 +219,67 @@ def _annotate_nucleotides_and_basepairs(
     return basepair_annotations
 
 
+def _style_native_structure_layers(surface: SvgSurface) -> None:
+    for element in surface.tree.getroot().iter():
+        classes = set(str(element.attrib.get("class", "")).split())
+        if "backbone" in classes:
+            element.set(
+                "style",
+                _append_style_declarations(
+                    str(element.attrib.get("style", "")),
+                    (
+                        f"stroke: {_BACKBONE_STROKE}",
+                        "fill: none",
+                        f"stroke-width: {_format_px(_BACKBONE_STROKE_WIDTH_PX)}",
+                        "stroke-linecap: round",
+                        "stroke-linejoin: round",
+                    ),
+                ),
+            )
+        if "basepairs" in classes:
+            element.set("data-dnadesign-z-order", "hydrogen_bond_background")
+            element.set(
+                "style",
+                _append_style_declarations(
+                    str(element.attrib.get("style", "")),
+                    (
+                        f"stroke: {_BASEPAIR_STROKE}",
+                        "fill: none",
+                        f"stroke-width: {_format_px(_BASEPAIR_STROKE_WIDTH_PX)}",
+                        "stroke-opacity: 0.92",
+                        "stroke-linecap: round",
+                    ),
+                ),
+            )
+    _move_basepair_layers_behind_backbone(surface)
+
+
+def _move_basepair_layers_behind_backbone(surface: SvgSurface) -> None:
+    basepair_layers: list[ET.Element] = []
+    for element in surface.basepair_nodes:
+        layer = surface.parent_map.get(element)
+        if layer is not None and layer not in basepair_layers:
+            basepair_layers.append(layer)
+    for layer in basepair_layers:
+        container = surface.parent_map.get(layer)
+        if container is None:
+            continue
+        children = list(container)
+        if layer not in children:
+            continue
+        backbone_index = next(
+            (
+                index
+                for index, child in enumerate(children)
+                if "backbone" in set(str(child.attrib.get("class", "")).split())
+            ),
+            0,
+        )
+        container.remove(layer)
+        container.insert(backbone_index, layer)
+        layer.set("data-dnadesign-z-order", "hydrogen_bond_background")
+
+
 def _section_annotations(
     surface: SvgSurface,
     *,
@@ -224,21 +306,23 @@ def _section_annotations(
         if start < 0 or end > len(surface.nucleotide_nodes) or end <= start:
             continue
         section_nodes = surface.nucleotide_nodes[start:end]
-        anchor_x, anchor_y = _centroid([_element_world_point(surface, node) for node in section_nodes])
+        anchor_x, anchor_y = _centroid([_nucleotide_structure_point(surface, node) for node in section_nodes])
         owner_ids = _owner_ids_for_span(visual_contract, start=start, end=end)
         semantic_tokens = tuple(dict.fromkeys(component_token((owner_id,)) for owner_id in owner_ids))
+        section_semantic = _section_semantic(text)
         annotations.append(
             {
                 "section_id": f"section_{index:02d}_{slug_token(text)}",
                 "label": text,
                 "section_kind": _section_kind(text),
+                "section_semantic": section_semantic,
                 "start": start,
                 "end": end,
                 "anchor_x": anchor_x,
                 "anchor_y": anchor_y,
                 "owner_ids": list(owner_ids),
                 "semantic_tokens": list(semantic_tokens),
-                "hue": hue_for_owners(owner_ids, palette=component_palette),
+                "hue": component_palette.get(section_semantic) or hue_for_owners(owner_ids, palette=component_palette),
             }
         )
     return annotations
@@ -287,7 +371,7 @@ def _normalize_structure_orientation(
             "center_y": stem_center[1],
         }
     )
-    original_points = [_element_world_point(surface, node) for node in surface.nucleotide_nodes]
+    original_points = [_nucleotide_structure_point(surface, node) for node in surface.nucleotide_nodes]
     if abs(angle_degrees) < 1.0:
         normalization["reason"] = "already_cap_right"
         normalization["geometry_bbox"] = _bbox(original_points)
@@ -297,27 +381,223 @@ def _normalize_structure_orientation(
         normalization["reason"] = "no_graphics_to_wrap"
         normalization["geometry_bbox"] = _bbox(original_points)
         return normalization
-    _counter_rotate_nucleotide_text(surface, angle_degrees=angle_degrees)
     rotated_points = [
         _rotate_point(point, center=stem_center, angle_degrees=angle_degrees) for point in original_points
     ]
     normalization["geometry_bbox"] = _bbox(rotated_points)
     surface.tree.getroot().set("data-dnadesign-orientation", requested_orientation)
     surface.tree.getroot().set("data-dnadesign-orientation-angle-deg", f"{angle_degrees:.3f}")
-    normalization["nucleotide_text_orientation"] = "upright_counter_rotated"
+    normalization["nucleotide_text_orientation"] = "upright_projected_to_rotated_coordinates"
     normalization["applied"] = True
     return normalization
 
 
-def _counter_rotate_nucleotide_text(surface: SvgSurface, *, angle_degrees: float) -> None:
-    counter_angle = -angle_degrees
+def _project_nucleotide_text_to_oriented_coordinates(
+    surface: SvgSurface,
+    *,
+    layout_normalization: dict[str, object],
+) -> None:
+    if not bool(layout_normalization.get("applied")):
+        return
+    center = (
+        float(layout_normalization.get("center_x", 0.0)),
+        float(layout_normalization.get("center_y", 0.0)),
+    )
+    angle_degrees = float(layout_normalization.get("angle_degrees", 0.0))
+    root = surface.tree.getroot()
+    layer = ET.Element(
+        f"{{{SVG_NS}}}g",
+        {
+            "id": "dnadesign-viennarna-oriented-nucleotide-text",
+            "data-dnadesign-text-position-policy": "projected_to_cap_right_coordinates",
+        },
+    )
     for node in surface.nucleotide_nodes:
-        x = _float_attr(node, "x", fallback=0.0)
-        y = _float_attr(node, "y", fallback=0.0)
-        existing = str(node.attrib.get("transform", "")).strip()
-        counter = f"rotate({counter_angle:.3f} {x:.3f} {y:.3f})"
-        node.set("transform", f"{counter} {existing}".strip() if existing else counter)
+        original_point = _nucleotide_structure_point(surface, node)
+        x, y = _rotate_point(original_point, center=center, angle_degrees=angle_degrees)
+        parent = surface.parent_map.get(node)
+        if parent is not None:
+            parent.remove(node)
+        node.attrib.pop("transform", None)
+        node.set("x", f"{x:.3f}")
+        node.set("y", f"{y:.3f}")
         node.set("data-dnadesign-upright-text", "true")
+        node.set("data-dnadesign-position-policy", "projected_to_cap_right_coordinates")
+        node.set("data-dnadesign-anchor-policy", "centered_on_projected_coordinate")
+        node.set("data-dnadesign-node-anchor-policy", "native_coordinate_without_seq_baseline_offset")
+        node.set("text-anchor", "middle")
+        node.set("dominant-baseline", "middle")
+        layer.append(node)
+    if len(layer):
+        root.append(layer)
+
+
+def _add_semantic_edge_layer(
+    surface: SvgSurface,
+    *,
+    visual_contract: SequenceEvidenceMapV1 | None,
+    section_annotations: list[dict[str, object]],
+    layout_normalization: dict[str, object],
+) -> None:
+    if visual_contract is None or not section_annotations or len(surface.nucleotide_nodes) < 2:
+        return
+    edge_spans = _semantic_edge_spans(visual_contract, section_annotations)
+    if not edge_spans:
+        return
+    points = _display_points(surface, surface.nucleotide_nodes, layout_normalization)
+    root = surface.tree.getroot()
+    layer = ET.Element(
+        f"{{{SVG_NS}}}g",
+        {
+            "id": "dnadesign-secondary-structure-semantic-edges",
+            "data-dnadesign-edge-layer": "section_backbone",
+            "data-dnadesign-edge-color-source": "visual_contract_span_backdrops",
+        },
+    )
+    for index, (left, right) in enumerate(zip(points, points[1:])):
+        edge_span = _edge_span_for_index(edge_spans, index)
+        if edge_span is None:
+            continue
+        semantic = str(edge_span["semantic"])
+        color = str(edge_span["color"])
+        ET.SubElement(
+            layer,
+            f"{{{SVG_NS}}}line",
+            {
+                "class": "dnadesign-secondary-structure-semantic-edge",
+                "x1": f"{left[0]:.3f}",
+                "y1": f"{left[1]:.3f}",
+                "x2": f"{right[0]:.3f}",
+                "y2": f"{right[1]:.3f}",
+                "data-dnadesign-edge-index0": str(index),
+                "data-dnadesign-edge-start-index0": str(index),
+                "data-dnadesign-edge-end-index0": str(index + 1),
+                "data-dnadesign-edge-semantic": semantic,
+                "data-dnadesign-edge-color": color,
+                "data-dnadesign-edge-color-source": str(edge_span["source"]),
+                "style": (
+                    f"stroke: {color}; fill: none; "
+                    f"stroke-width: {_format_px(_SEMANTIC_BACKBONE_STROKE_WIDTH_PX)}; "
+                    "stroke-opacity: 0.96; stroke-linecap: round; stroke-linejoin: round;"
+                ),
+            },
+        )
+    if len(layer):
+        root.append(layer)
+
+
+def _semantic_edge_spans(
+    visual_contract: SequenceEvidenceMapV1,
+    section_annotations: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    spans = _stem_base_edge_spans(visual_contract, section_annotations)
+    spans.extend(_span_backdrop_edge_spans(visual_contract))
+    return spans
+
+
+def _stem_base_edge_spans(
+    visual_contract: SequenceEvidenceMapV1,
+    section_annotations: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    palette = _component_palette(visual_contract)
+    spans: list[dict[str, object]] = []
+    for section in section_annotations:
+        if str(section.get("section_kind", "")) != "stem_base":
+            continue
+        semantic = _stem_base_semantic(str(section.get("label", "")))
+        try:
+            start = int(section["start"])
+            end = int(section["end"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise FoldingConfigError("Stem-base section annotation has invalid start/end bounds.") from exc
+        if end - start < 2:
+            continue
+        color = palette.get(semantic)
+        if not color:
+            raise FoldingConfigError(
+                f"Sequence evidence map meta.component_palette must define {semantic!r} "
+                "for secondary-structure stem-base edge colors."
+            )
+        spans.append(
+            {
+                "semantic": semantic,
+                "start": start,
+                "end": end,
+                "color": color,
+                "source": "visual_contract_component_palette",
+                "match": "both_endpoints",
+            }
+        )
+    return spans
+
+
+def _span_backdrop_edge_spans(visual_contract: SequenceEvidenceMapV1) -> list[dict[str, object]]:
+    raw_backdrops = visual_contract.meta.get("span_backdrops")
+    if not isinstance(raw_backdrops, list):
+        if visual_contract.meta.get("segment_labels"):
+            raise FoldingConfigError(
+                "Sequence evidence map meta.span_backdrops with edge_color is required "
+                "for secondary-structure semantic edge colors."
+            )
+        return []
+    spans: list[dict[str, object]] = []
+    for index, raw in enumerate(raw_backdrops):
+        if not isinstance(raw, dict):
+            raise FoldingConfigError(f"Sequence evidence map meta.span_backdrops[{index}] must be an object.")
+        semantic = str(raw.get("semantic", "")).strip()
+        color = str(raw.get("edge_color", "")).strip()
+        try:
+            start = int(raw.get("start"))
+            end = int(raw.get("end"))
+        except (TypeError, ValueError) as exc:
+            raise FoldingConfigError(
+                f"Sequence evidence map meta.span_backdrops[{index}] must define integer start/end bounds."
+            ) from exc
+        if not semantic:
+            raise FoldingConfigError(f"Sequence evidence map meta.span_backdrops[{index}] must define semantic.")
+        if not color:
+            raise FoldingConfigError(f"Sequence evidence map meta.span_backdrops[{index}] must define edge_color.")
+        if start < 0 or end <= start or end > len(visual_contract.primary_sequence):
+            raise FoldingConfigError(
+                f"Sequence evidence map meta.span_backdrops[{index}] bounds must be within primary_sequence."
+            )
+        spans.append(
+            {
+                "semantic": semantic,
+                "start": start,
+                "end": end,
+                "color": color,
+                "source": "visual_contract_span_backdrops",
+                "match": "midpoint",
+            }
+        )
+    return spans
+
+
+def _edge_span_for_index(spans: list[dict[str, object]], index: int) -> dict[str, object] | None:
+    matches: list[tuple[int, int, dict[str, object]]] = []
+    for order, span in enumerate(spans):
+        start = int(span["start"])
+        end = int(span["end"])
+        if span["match"] == "both_endpoints":
+            if start <= index and index + 1 < end:
+                matches.append((end - start, order, span))
+            continue
+        midpoint = index + 0.5
+        if start <= midpoint < end:
+            matches.append((end - start, order, span))
+    if not matches:
+        return None
+    return min(matches, key=lambda item: (item[0], item[1]))[2]
+
+
+def _stem_base_semantic(label: str) -> str:
+    lowered = str(label).strip().lower()
+    if "left" in lowered:
+        return "stem_base_left"
+    if "right" in lowered:
+        return "stem_base_right"
+    return "stem_base"
 
 
 def _add_section_highlight_layer(
@@ -511,6 +791,17 @@ def _section_kind(label: str) -> str:
     return "component"
 
 
+def _section_semantic(label: str) -> str:
+    lowered = str(label).strip().lower()
+    if lowered == "cap":
+        return "snapback_cap"
+    if lowered == "foldback stem":
+        return "snapback_retained_stem"
+    if lowered == "foldback return":
+        return "snapback_foldback_return"
+    return ""
+
+
 def _is_stem_base_section(section: dict[str, object]) -> bool:
     return str(section.get("section_kind", "")) == "stem_base"
 
@@ -620,7 +911,7 @@ def _display_points(
     nodes: tuple[ET.Element, ...],
     layout_normalization: dict[str, object],
 ) -> list[tuple[float, float]]:
-    points = [_element_world_point(surface, node) for node in nodes]
+    points = [_nucleotide_structure_point(surface, node) for node in nodes]
     if not bool(layout_normalization.get("applied")):
         return points
     center = (
@@ -806,7 +1097,20 @@ def _wrap_svg_graphics_for_orientation(
     return True
 
 
-def _element_world_point(surface: SvgSurface, element: ET.Element) -> tuple[float, float]:
+def _nucleotide_structure_point(surface: SvgSurface, element: ET.Element) -> tuple[float, float]:
+    return _element_world_point(
+        surface,
+        element,
+        ignored_ancestor_ids=frozenset({_VIENNARNA_SEQUENCE_TEXT_GROUP_ID}),
+    )
+
+
+def _element_world_point(
+    surface: SvgSurface,
+    element: ET.Element,
+    *,
+    ignored_ancestor_ids: frozenset[str] = frozenset(),
+) -> tuple[float, float]:
     x = _float_attr(element, "x", fallback=0.0)
     y = _float_attr(element, "y", fallback=0.0)
     matrix = _identity_matrix()
@@ -816,6 +1120,8 @@ def _element_world_point(surface: SvgSurface, element: ET.Element) -> tuple[floa
         current = surface.parent_map[current]
         ancestors.append(current)
     for ancestor in reversed(ancestors):
+        if str(ancestor.attrib.get("id", "")) in ignored_ancestor_ids:
+            continue
         matrix = _matrix_multiply(matrix, _transform_matrix(str(ancestor.attrib.get("transform", ""))))
     matrix = _matrix_multiply(matrix, _transform_matrix(str(element.attrib.get("transform", ""))))
     return _apply_matrix(matrix, x, y)

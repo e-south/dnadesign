@@ -43,7 +43,7 @@ For the Retron/TetO case, Construct should concatenate ordered physical
 segments such as 5-prime flank, payload, snapback/cap segment,
 reverse-complement payload arm, and 3-prime flank. It should then emit
 annotation spans for meanings such as `stem_base_left`, `payload_primary`,
-`snapback_cap_segment`, `payload_complement`, `stem_base_right`, `TetO`,
+`snapback_foldback_geometry`, `payload_complement`, `stem_base_right`, `TetO`,
 `scar`, or `cap_subregion`.
 
 Construct validates sequence mechanics, span coverage, transforms, repeats,
@@ -74,7 +74,7 @@ Ownership boundaries are fixed:
 | Generic linear ssDNA composition | `Construct` |
 | Snapback/released-product geometry candidates | `Cruncher.snapback` |
 | Type IIS scar plus terminal nick feasibility | `Cruncher.scar_nick` |
-| Retron-specific selection/rationale | study records, and only later study-family selector code |
+| Retron-specific selection/rationale | study records, and only later study-owned selector code |
 | Retron MSD shorthand parsing and design-reference catalogs | `dnadesign.studies.retron_hairpin_design` plus study registry |
 | Folding execution | separate folding/backend layer |
 | Rendering | `BaseRender`, consuming contracts only |
@@ -166,7 +166,7 @@ The Retron study-local compiler will:
 - leave artifact paths and sequence digests nullable until a later
   assembly/visual/GenBank slice attaches concrete products.
 
-This layer is study-family code. Do not add a top-level `retron-msd` script,
+This layer is study-owned code. Do not add a top-level `retron-msd` script,
 and do not make Folding or Construct own persistent Retron MSD workspaces.
 
 #### Consequences
@@ -269,7 +269,7 @@ Retron multicopy products directly.
 
 The Retron Hairpin study is the right place for route posture, selected
 variants, rationale, dogfooding examples, and current artifact links. Any
-Retron-specific selector or ranker should remain study-family code, not
+Retron-specific selector or ranker should remain study-owned code, not
 Construct core.
 
 BaseRender is contract-first and adapter-based. It should consume visual
@@ -346,7 +346,7 @@ length is 88 nt:
 | ---: | --- | --- |
 | `0-15` | `flank_5p` | `gtcagaaaaaaCAAG` |
 | `15-34` | `payload_primary` | `tccctatcagtgatagaga` |
-| `34-52` | `snapback_cap_segment` | `tCCTCAGcccGCTGAGGa` |
+| `34-52` | `snapback_foldback_geometry` | `tCCTCAGcccGCTGAGGa` |
 | `52-71` | `payload_complement` | `tctctatcactgataggga` |
 | `71-88` | `flank_3p` | `CTCGacagtaactcaga` |
 
@@ -356,7 +356,9 @@ Nested semantic annotations include:
 | ---: | --- | --- |
 | `11-15` | `stem_base_left` | last four bases of the 5-prime flank, `CAAG` |
 | `15-34` | `teto_primary` | TetO payload arm |
-| `34-52` | `snapback_cap` | snapback/cap geometry segment |
+| `34-41` | `snapback_retained_stem` | retained foldback stem subsection |
+| `41-44` | `snapback_cap` | 3 nt cap subsection |
+| `44-52` | `snapback_foldback_return` | foldback return subsection |
 | `52-71` | `teto_complement` | reverse-complement payload arm |
 | `71-75` | `stem_base_right` | first four bases of the 3-prime flank, `CTCG` |
 
@@ -435,8 +437,8 @@ units:
           kind: literal
           label: manual_teto_payload
 
-      - segment_id: snapback_cap_segment
-        role: snapback_cap_segment
+      - segment_id: snapback_foldback_geometry
+        role: snapback_foldback_geometry
         sequence: tCCTCAGcccGCTGAGGa
         source:
           kind: literal
@@ -482,7 +484,7 @@ units:
         role: snapback_cap
         location:
           basis: segment
-          segment_id: snapback_cap_segment
+          segment_id: snapback_foldback_geometry
           start: 0
           end: 18
 
@@ -950,7 +952,7 @@ Example `segment_spans.json`:
   "segments": [
     {"copy_index": 0, "segment_id": "flank_5p", "start": 0, "end": 15},
     {"copy_index": 0, "segment_id": "payload_primary", "start": 15, "end": 34},
-    {"copy_index": 0, "segment_id": "snapback_cap_segment", "start": 34, "end": 52},
+    {"copy_index": 0, "segment_id": "snapback_foldback_geometry", "start": 34, "end": 52},
     {"copy_index": 0, "segment_id": "payload_complement", "start": 52, "end": 71},
     {"copy_index": 0, "segment_id": "flank_3p", "start": 71, "end": 88}
   ]
@@ -983,7 +985,7 @@ zero-based half-open spans to one-based inclusive GenBank locations:
 | `0-15` | `1..15` | `flank_5p` |
 | `11-15` | `12..15` | `stem_base_left` |
 | `15-34` | `16..34` | `payload_primary / TetO` |
-| `34-52` | `35..52` | `snapback_cap_segment` |
+| `34-52` | `35..52` | `snapback_foldback_geometry` |
 | `52-71` | `53..71` | `payload_complement` |
 | `71-88` | `72..88` | `flank_3p` |
 | `71-75` | `72..75` | `stem_base_right` |
@@ -1285,7 +1287,7 @@ Open questions:
 | Exact contract namespace under `src/dnadesign/contracts/` | Use `contracts/sequence` if available; otherwise `contracts/construct`. |
 | Exact folding package name | Use a separate `folding` or `secondary_structure` package. |
 | Exact study-code path for future selectors | Keep as study config first; add a separate ADR if code is needed. |
-| Whether to decompose `snapback_cap_segment` immediately | Start as one physical segment with optional sub-annotations. |
+| Whether to decompose `snapback_foldback_geometry` immediately | Start as one physical segment with explicit cap/stem/return sub-annotations. |
 | Whether to assert stem-base complementarity | Only assert if declared. |
 | Whether to support heterogeneous multicopy units in v1 | Keep v1 capable through multiple units, but first tracer uses homogeneous `repeat_count`. |
 

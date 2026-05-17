@@ -131,12 +131,12 @@ units:
         source:
           kind: literal
           label: manual_teto_payload
-      - segment_id: snapback_cap_segment
-        role: snapback_cap_segment
+      - segment_id: snapback_foldback_geometry
+        role: snapback_foldback_geometry
         sequence: tCCTCAGcccGCTGAGGa
         source:
           kind: literal
-          label: manual_snapback_43_cap
+          label: manual_snapback_43_foldback
       - segment_id: payload_complement
         role: payload_complement
         sequence: {complement}
@@ -173,8 +173,22 @@ units:
         role: snapback_cap
         location:
           basis: segment
-          segment_id: snapback_cap_segment
+          segment_id: snapback_foldback_geometry
+          start: 7
+          end: 10
+      - annotation_id: snapback_retained_stem
+        role: snapback_retained_stem
+        location:
+          basis: segment
+          segment_id: snapback_foldback_geometry
           start: 0
+          end: 7
+      - annotation_id: snapback_foldback_return
+        role: snapback_foldback_return
+        location:
+          basis: segment
+          segment_id: snapback_foldback_geometry
+          start: 10
           end: 18
       - annotation_id: teto_complement
         role: payload_complement
@@ -214,18 +228,24 @@ visual:
     component_labels:
       flank_5p: "5' flank"
       payload_primary: TetO primary
-      snapback_cap_segment: Snapback cap
+      snapback_foldback_geometry: Foldback
       payload_complement: TetO complement
       flank_3p: "3' flank"
     annotation_labels:
       stem_base_left: Left stem base
       stem_base_right: Right stem base
+      snapback_retained_stem: Foldback stem
+      snapback_cap: Cap
+      snapback_foldback_return: Foldback return
     component_hues:
       flank_5p: "#4C78A8"
       flank_3p: "#72B7B2"
       payload_primary: "#F58518"
       payload_complement: "#E45756"
-      snapback_cap_segment: "#54A24B"
+      snapback_foldback_geometry: "#64748B"
+      snapback_retained_stem: "#7C3AED"
+      snapback_cap: "#16A34A"
+      snapback_foldback_return: "#DB2777"
       stem_base_left: "#B279A2"
       stem_base_right: "#9D755D"
     component_styles:
@@ -237,10 +257,10 @@ visual:
         fill: "#34D399"
         alpha: 0.58
         edge_color: "#059669"
-      snapback_cap_segment:
-        fill: "#F472B6"
-        alpha: 0.56
-        edge_color: "#DB2777"
+      snapback_cap:
+        fill: "#86EFAC"
+        alpha: 0.78
+        edge_color: "#16A34A"
       payload_complement:
         fill: "#60A5FA"
         alpha: 0.58
@@ -249,7 +269,6 @@ visual:
         fill: "#CBD5E1"
         alpha: 0.70
         edge_color: "#94A3B8"
-    base_highlight_color: "#111827"
 benchling_export:
   enabled: true
   primary_format: genbank
@@ -303,10 +322,14 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     assert segment_spans["segments"][-1]["end"] == 704
 
     annotation_spans = json.loads((bundle / "annotation_spans.json").read_text(encoding="utf-8"))
-    assert annotation_spans["annotations"][4]["annotation_id"] == "stem_base_right"
-    assert annotation_spans["annotations"][4]["start"] == 71
-    assert annotation_spans["annotations"][9]["annotation_id"] == "stem_base_right"
-    assert annotation_spans["annotations"][9]["start"] == 159
+    annotations_by_copy_id = {
+        (annotation["copy_index"], annotation["annotation_id"]): annotation
+        for annotation in annotation_spans["annotations"]
+    }
+    assert annotations_by_copy_id[(0, "stem_base_right")]["start"] == 71
+    assert annotations_by_copy_id[(1, "stem_base_right")]["start"] == 159
+    assert annotations_by_copy_id[(0, "snapback_cap")]["start"] == 41
+    assert annotations_by_copy_id[(0, "snapback_cap")]["end"] == 44
 
     validation = json.loads((bundle / "validation_report.json").read_text(encoding="utf-8"))
     assert validation["status"] == "ok"
@@ -401,16 +424,19 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
         (52, 71, ""),
         (71, 88, ""),
     ]
-    assert [(tag["start"], tag["end"], tag["short_label"]) for tag in visual["effect_tags"]] == [
-        (11, 15, ""),
-        (71, 75, ""),
-    ]
+    assert {(tag["tag_kind"], tag["start"], tag["end"], tag["short_label"]) for tag in visual["effect_tags"]} == {
+        ("stem_base_left", 11, 15, ""),
+        ("snapback_retained_stem", 34, 41, ""),
+        ("snapback_cap", 41, 44, ""),
+        ("snapback_foldback_return", 44, 52, ""),
+        ("stem_base_right", 71, 75, ""),
+    }
     assert visual["boundaries"] == []
     assert len(visual["pairings"]) == 1
     assert {label["text"] for label in visual["meta"]["segment_labels"]} == {
         "5' flank",
         "TetO primary",
-        "Snapback cap",
+        "Cap",
         "TetO complement",
         "3' flank",
         "Left stem base",
@@ -419,17 +445,14 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     assert visual["meta"]["segment_label_gap_px"] == 6.0
     assert visual["meta"]["segment_label_tier_gap_px"] == 10.0
     assert visual["meta"]["interval_annotation_policy"] == "span_backdrops_only"
+    assert visual["meta"]["glyph_highlight_policy"] == "region_backdrops_only"
     assert visual["meta"]["render_pairing_links"] is False
     assert visual["meta"]["row_labels"] == {"primary": "Top", "complement": "Bottom"}
-    stem_base_indices = [11, 12, 13, 14, 71, 72, 73, 74]
     assert visual["meta"]["base_highlights"] == {
-        "primary": stem_base_indices,
-        "complement": stem_base_indices,
+        "primary": [],
+        "complement": [],
     }
-    assert visual["meta"]["base_highlight_color"] == {
-        "primary": "#111827",
-        "complement": "#111827",
-    }
+    assert "base_highlight_color" not in visual["meta"]
     assert [
         (
             backdrop["semantic"],
@@ -442,9 +465,9 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     ] == [
         ("flank_5p", 0, 15, "both", 0.70),
         ("payload_primary", 15, 34, "both", 0.58),
-        ("snapback_cap_segment", 34, 52, "both", 0.56),
         ("payload_complement", 52, 71, "both", 0.58),
         ("flank_3p", 71, 88, "both", 0.70),
+        ("snapback_cap", 41, 44, "both", 0.78),
     ]
     labels_by_text = {label["text"]: label for label in visual["meta"]["segment_labels"]}
     assert labels_by_text["TetO primary"]["label_side"] == "above"
@@ -593,9 +616,12 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     )
     assert {section["label"] for section in annotation_manifest["section_annotations"]} >= {
         "TetO primary",
-        "Snapback cap",
+        "Cap",
         "TetO complement",
     }
+    assert "Foldback" not in {section["label"] for section in annotation_manifest["section_annotations"]}
+    assert "Foldback stem" not in {section["label"] for section in annotation_manifest["section_annotations"]}
+    assert "Foldback return" not in {section["label"] for section in annotation_manifest["section_annotations"]}
     assert annotation_manifest["layout_normalization"]["requested_orientation"] == "cap_right"
 
     report = baserender.run_job(
@@ -625,7 +651,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert review_manifest.layout.component_width_px > review_manifest.layout.structure_width_px
     assert review_manifest.layout.structure_to_component_width_ratio == pytest.approx(0.82, abs=0.01)
     assert review_manifest.layout.component_effective_nucleotide_font_size_px == pytest.approx(9.15, abs=0.01)
-    assert review_manifest.layout.component_panel_emphasis == "bold_glyph_review"
+    assert review_manifest.layout.component_panel_emphasis == "filled_region_plain_glyph_review"
     assert review_manifest.layout.component_source_title_policy == "omit_redundant_source_title"
     assert review_manifest.qa.subplot_visual_weight_balanced is True
     assert review_manifest.qa.component_panel_emphasis_applied is True
@@ -656,8 +682,9 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert removed_count == 88
     assert changed_pixels > 20_000
     assert 'data-dnadesign-component-effective-nucleotide-font-size-px="9.150"' in review_svg
-    assert 'data-dnadesign-component-panel-emphasis="bold_glyph_review"' in review_svg
-    assert 'data-dnadesign-review-emphasis="component_span_bold_glyph"' in review_svg
+    assert 'data-dnadesign-component-panel-emphasis="filled_region_plain_glyph_review"' in review_svg
+    assert 'data-dnadesign-review-emphasis="component_span_bold_glyph"' not in review_svg
+    assert "stroke-width: 0.28px" not in review_svg
     assert 'data-dnadesign-component-source-title-policy="omit_redundant_source_title"' in review_svg
     assert 'data-dnadesign-component-source-title-omitted-count="' in review_svg
     assert "component span QA" not in review_svg
@@ -755,14 +782,23 @@ def test_run_linear_ssdna_composition_writes_baserender_component_span_job(tmp_p
     assert "<svg" in svg_text
     assert svg_text.count('id="sequence_pair_connector:') == 88
     assert "stroke-dasharray" not in svg_text
-    assert svg_text.count(":highlight") == 16
-    assert 'id="sequence:fwd:11:C:highlight"' in svg_text
-    assert 'id="sequence:rev:11:G:highlight"' in svg_text
+    assert ":highlight" not in svg_text
+    assert 'id="sequence:fwd:11:C"' in svg_text
+    assert 'id="sequence:rev:11:G"' in svg_text
     assert svg_text.count('id="sequence_backdrop:') == 5
     assert "intended RC" not in svg_text
-    for label in ["5' flank", "TetO primary", "Snapback cap", "TetO complement", "3' flank"]:
+    for label in [
+        "5' flank",
+        "TetO primary",
+        "Cap",
+        "TetO complement",
+        "3' flank",
+    ]:
         assert svg_text.count(f"<!-- {label} -->") == 1
-    for raw_slug in ["payload_primary", "snapback_cap_segment", "payload_complement"]:
+    assert "<!-- Foldback -->" not in svg_text
+    assert "<!-- Foldback stem -->" not in svg_text
+    assert "<!-- Foldback return -->" not in svg_text
+    for raw_slug in ["payload_primary", "snapback_foldback_geometry", "snapback_cap_segment", "payload_complement"]:
         assert f"<!-- {raw_slug} -->" not in svg_text
 
 

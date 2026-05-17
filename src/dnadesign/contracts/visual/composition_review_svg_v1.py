@@ -68,7 +68,7 @@ class CompositionReviewSvgLayoutV1(VisualContractModel):
     component_width_px: float = Field(gt=0)
     structure_effective_nucleotide_font_size_px: float = Field(gt=0)
     component_effective_nucleotide_font_size_px: float = Field(gt=0)
-    component_panel_emphasis: Literal["bold_glyph_review"] = "bold_glyph_review"
+    component_panel_emphasis: Literal["filled_region_plain_glyph_review"] = "filled_region_plain_glyph_review"
     component_source_title_policy: Literal["omit_redundant_source_title"] = "omit_redundant_source_title"
     structure_to_component_width_ratio: float = Field(gt=0)
     vertical_gap_px: float = Field(ge=0)

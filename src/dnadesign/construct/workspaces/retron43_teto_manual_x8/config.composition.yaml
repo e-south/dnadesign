@@ -28,12 +28,12 @@ units:
           kind: literal
           label: manual_teto_payload
 
-      - segment_id: snapback_cap_segment
-        role: snapback_cap_segment
+      - segment_id: snapback_foldback_geometry
+        role: snapback_foldback_geometry
         sequence: tCCTCAGcccGCTGAGGa
         source:
           kind: literal
-          label: manual_snapback_43_cap
+          label: manual_snapback_43_foldback
 
       - segment_id: payload_complement
         role: payload_complement
@@ -75,8 +75,24 @@ units:
         role: snapback_cap
         location:
           basis: segment
-          segment_id: snapback_cap_segment
+          segment_id: snapback_foldback_geometry
+          start: 7
+          end: 10
+
+      - annotation_id: snapback_retained_stem
+        role: snapback_retained_stem
+        location:
+          basis: segment
+          segment_id: snapback_foldback_geometry
           start: 0
+          end: 7
+
+      - annotation_id: snapback_foldback_return
+        role: snapback_foldback_return
+        location:
+          basis: segment
+          segment_id: snapback_foldback_geometry
+          start: 10
           end: 18
 
       - annotation_id: teto_complement
@@ -135,18 +151,24 @@ visual:
     component_labels:
       flank_5p: "5' flank"
       payload_primary: TetO primary
-      snapback_cap_segment: Snapback cap
+      snapback_foldback_geometry: Foldback
       payload_complement: TetO complement
       flank_3p: "3' flank"
     annotation_labels:
       stem_base_left: Left stem base
       stem_base_right: Right stem base
+      snapback_retained_stem: Foldback stem
+      snapback_cap: Cap
+      snapback_foldback_return: Foldback return
     component_hues:
       flank_5p: "#4C78A8"
       flank_3p: "#72B7B2"
       payload_primary: "#F58518"
       payload_complement: "#E45756"
-      snapback_cap_segment: "#54A24B"
+      snapback_foldback_geometry: "#64748B"
+      snapback_retained_stem: "#7C3AED"
+      snapback_cap: "#16A34A"
+      snapback_foldback_return: "#DB2777"
       stem_base_left: "#B279A2"
       stem_base_right: "#9D755D"
     component_styles:
@@ -158,10 +180,10 @@ visual:
         fill: "#34D399"
         alpha: 0.58
         edge_color: "#059669"
-      snapback_cap_segment:
-        fill: "#F472B6"
-        alpha: 0.56
-        edge_color: "#DB2777"
+      snapback_cap:
+        fill: "#86EFAC"
+        alpha: 0.78
+        edge_color: "#16A34A"
       payload_complement:
         fill: "#60A5FA"
         alpha: 0.58

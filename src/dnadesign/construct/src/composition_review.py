@@ -35,7 +35,7 @@ COMPOSITION_REVIEW_MANIFEST_PATH = COMPOSITION_REVIEW_DIR / "composition_review_
 _STRUCTURE_PANEL_WIDTH_RATIO = 1.25
 _COMPONENT_TO_STRUCTURE_REVIEW_WIDTH_RATIO = 1.22
 _STRUCTURE_FIT_POLICY = "balanced_visual_weight"
-_COMPONENT_PANEL_EMPHASIS = "bold_glyph_review"
+_COMPONENT_PANEL_EMPHASIS = "filled_region_plain_glyph_review"
 _COMPONENT_SOURCE_TITLE_POLICY = "omit_redundant_source_title"
 _COMPONENT_SOURCE_TITLE_COLOR = "#6b7280"
 _REVIEW_PNG_SCALE = 3.0
@@ -397,7 +397,6 @@ def _append_panel(
             )
         if panel == "component_span":
             omitted_count += _remove_component_source_title_groups(child_copy, source_height=asset.height)
-            _apply_component_panel_emphasis(child_copy)
         nested.append(child_copy)
     if panel == "component_span":
         nested.set("data-dnadesign-component-source-title-omitted-count", str(omitted_count))
@@ -575,26 +574,6 @@ def _translate_y_from_transform(transform: str) -> float | None:
 
 def _normalize_css_text(text: str) -> str:
     return re.sub(r"\s+", "", str(text).strip().lower())
-
-
-def _apply_component_panel_emphasis(element: ET.Element) -> None:
-    for node in element.iter():
-        if _local_name(node.tag) != "use":
-            continue
-        node.set("data-dnadesign-review-emphasis", "component_span_bold_glyph")
-        style = str(node.attrib.get("style", "")).strip()
-        node.set(
-            "style",
-            _append_style_declarations(
-                style,
-                (
-                    "stroke: #0F172A",
-                    "stroke-width: 0.28px",
-                    "stroke-opacity: 0.62",
-                    "paint-order: stroke fill",
-                ),
-            ),
-        )
 
 
 def _composition_id_from_visual_contract(visual_contract: SequenceEvidenceMapV1) -> str:

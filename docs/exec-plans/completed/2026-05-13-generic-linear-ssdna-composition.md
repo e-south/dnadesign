@@ -100,7 +100,7 @@ imports, and local artifact bundles before optional USR persistence.
   ViennaRNA's native white rectangle from the annotated SVG, made the
   dnadesign background the single fitted canvas, centered title/subtitle text
   on the normalized hairpin content, added canonical component,
-  `snapback_cap_segment`, and `scar_nick` `left_base`/`right_base` subtitle
+  `snapback_foldback_geometry`, and `scar_nick` `left_base`/`right_base` subtitle
   lines, and added peer-label collision accounting.
 - [x] (2026-05-14 00:05Z) Phase 5 composition-review design pass: moved
   secondary-structure summary wording into a dedicated folding helper, shortened
@@ -237,7 +237,7 @@ The native ViennaRNA background rectangle remains in
 The title/subtitle block is centered on the normalized hairpin geometry. Keep
 the visible wording short and publication-facing: for the manual retron-43/TetO
 dogfood this means `Retron 43 TetO x8`, `TetO payload | left CAAG / right CTCG`,
-and `Snapback cap tCCTCAGcccGCTGAGGa (18 nt)`, not machine-key subtitle lines.
+and `Foldback tCCTCAGcccGCTGAGGa (18 nt)` plus `Cap ccc (3 nt)`, not machine-key subtitle lines.
 
 Composition review note: the two-row overview is Construct-owned because it
 combines one folding artifact and one BaseRender artifact. It should live under
@@ -256,7 +256,7 @@ Decision: Composition authority belongs in Construct, but only as generic
 linear ssDNA composition.
 
 Rationale: Construct is the package boundary for deterministic sequence
-assembly. Retron biology belongs in the study record or later study-family
+assembly. Retron biology belongs in the study record or later study-owned
 selector code.
 
 Date/Author: 2026-05-13 / Shockwing + Codex

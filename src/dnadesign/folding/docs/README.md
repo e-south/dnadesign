@@ -90,7 +90,7 @@ Missing backends are not treated as success. Advisory requests emit
   workspaces.
 - Folding may publish ViennaRNA-native structure SVGs from successful
   predictions. BaseRender remains the linear/component evidence renderer.
-- Construct and study-family compilers call only the public Folding API or the
+- Construct and study-owned compilers call only the public Folding API or the
   `uv run folding` CLI.
 
 ### Internal Organization

@@ -27,6 +27,7 @@ from dnadesign.folding import (
     publish_viennarna_structure_svg,
     run_prediction_request,
 )
+from dnadesign.folding.src.errors import FoldingConfigError
 from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox
 
 
@@ -57,6 +58,22 @@ def _parse_viewbox(root: ET.Element) -> tuple[float, float, float, float]:
     parts = [float(part) for part in str(root.attrib["viewBox"]).split()]
     assert len(parts) == 4
     return parts[0], parts[1], parts[2], parts[3]
+
+
+def _rotate_test_point(
+    point: tuple[float, float],
+    *,
+    center: tuple[float, float],
+    angle_degrees: float,
+) -> tuple[float, float]:
+    import math
+
+    angle = math.radians(angle_degrees)
+    cos_v = math.cos(angle)
+    sin_v = math.sin(angle)
+    dx = point[0] - center[0]
+    dy = point[1] - center[1]
+    return center[0] + dx * cos_v - dy * sin_v, center[1] + dx * sin_v + dy * cos_v
 
 
 def _request(tmp_path: Path, *, executable: str, required: bool = False) -> SecondaryStructurePredictionRequestV1:
@@ -343,6 +360,20 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                     }
                 ],
                 "meta": {
+                    "span_backdrops": [
+                        {
+                            "semantic": "payload_primary",
+                            "start": 0,
+                            "end": 2,
+                            "edge_color": "#F58518",
+                        },
+                        {
+                            "semantic": "flank_3p",
+                            "start": 2,
+                            "end": 4,
+                            "edge_color": "#0D9488",
+                        },
+                    ],
                     "segment_labels": [
                         {"text": "Payload primary", "start": 0, "end": 2, "label_side": "above"},
                         {"text": "3' flank", "start": 2, "end": 4, "label_side": "above"},
@@ -380,6 +411,12 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert ">U<" not in annotated
     assert 'id="dnadesign-secondary-structure-labels"' in annotated
     assert 'data-dnadesign-section-label="Payload primary"' in annotated
+    assert 'id="dnadesign-secondary-structure-semantic-edges"' in annotated
+    assert 'data-dnadesign-edge-color-source="visual_contract_span_backdrops"' in annotated
+    assert 'data-dnadesign-edge-semantic="payload_primary"' in annotated
+    assert 'data-dnadesign-edge-semantic="flank_3p"' in annotated
+    assert "stroke: #F58518" in annotated
+    assert "stroke: #0D9488" in annotated
     annotation_manifest_path = (
         tmp_path / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotation_manifest.json"
     )
@@ -393,6 +430,84 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert annotation_manifest["basepairs"][0]["right_copy_index"] == 1
     assert annotation_manifest["section_annotations"][0]["label"] == "Payload primary"
     assert annotation_manifest["layout_normalization"]["requested_orientation"] == "cap_right"
+
+
+def test_publish_viennarna_structure_svg_requires_section_edge_colors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        """
+__version__ = "2.7.2"
+
+class fold_compound:
+    def __init__(self, sequence):
+        self.sequence = sequence
+
+    def mfe(self):
+        return "." * len(self.sequence), -1.0
+
+def plot_layout_naview(structure):
+    return {"layout": "naview", "structure": structure}
+
+def plot_structure_svg(filename, sequence, structure, layout=None):
+    with open(filename, "w", encoding="utf-8") as handle:
+        handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg">\\n')
+        handle.write('<g id="seq">\\n')
+        for index, base in enumerate(sequence):
+            handle.write(f'<text class="nucleotide" x="{index}" y="0">{base}</text>\\n')
+        handle.write('</g>\\n</svg>\\n')
+    return 1
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+    request = _python_api_request(tmp_path)
+    prediction = run_prediction_request(request, output_dir=tmp_path / "folding")
+    visual_contract = tmp_path / "sequence_evidence_map_v1.json"
+    visual_contract.write_text(
+        json.dumps(
+            {
+                "contract_kind": "sequence_evidence_map_v1",
+                "state_id": "demo",
+                "topology_kind": "linear_ssdna",
+                "alphabet": "dna",
+                "primary_sequence": "GCAT",
+                "owners": [
+                    {
+                        "owner_id": "demo.payload_primary",
+                        "row_id": "primary",
+                        "start": 0,
+                        "end": 4,
+                        "display_label": "Payload",
+                        "short_label": "payload",
+                    },
+                ],
+                "meta": {
+                    "segment_labels": [
+                        {"text": "Payload primary", "start": 0, "end": 4, "label_side": "above"},
+                    ],
+                    "span_backdrops": [
+                        {"semantic": "payload_primary", "start": 0, "end": 4},
+                    ],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FoldingConfigError, match="span_backdrops.*edge_color"):
+        publish_viennarna_structure_svg(
+            prediction,
+            assembled_sequence_path=tmp_path / "assembled_sequence.json",
+            visual_contract_path=visual_contract,
+            output_dir=tmp_path / "visual" / "viennarna_secondary_structure",
+        )
 
 
 def test_publish_viennarna_structure_svg_can_normalize_cap_orientation(
@@ -421,11 +536,16 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
         handle.write('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">\\n')
         handle.write('<rect style="stroke: white; fill: white" height="120" x="0" y="0" width="120" />\\n')
-        handle.write('<g id="seq">\\n')
+        handle.write('<g id="structure">\\n')
+        handle.write('<polyline class="backbone" id="outline" points="0,0 0,10 0,80 0,90 0,20 0,30" />\\n')
+        handle.write('<g id="pairs">\\n')
+        handle.write('<line class="basepairs" id="1,6" x1="0" y1="0" x2="0" y2="30" />\\n')
+        handle.write('</g>\\n')
+        handle.write('<g transform="translate(-4.6, 4)" id="seq">\\n')
         for index, base in enumerate(sequence):
             x, y = coords[index]
             handle.write(f'<text class="nucleotide" x="{x}" y="{y}">{base}</text>\\n')
-        handle.write('</g>\\n</svg>\\n')
+        handle.write('</g>\\n</g>\\n</svg>\\n')
     return 1
 """,
         encoding="utf-8",
@@ -453,11 +573,11 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                         "short_label": "",
                     },
                     {
-                        "owner_id": "demo.snapback_cap_segment",
+                        "owner_id": "demo.snapback_foldback_geometry",
                         "row_id": "primary",
                         "start": 2,
                         "end": 4,
-                        "display_label": "Snapback cap",
+                        "display_label": "Foldback",
                         "short_label": "",
                     },
                     {
@@ -476,8 +596,31 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                     "component_palette": {
                         "payload_primary": "#F58518",
                         "payload_complement": "#E45756",
-                        "snapback_cap_segment": "#54A24B",
+                        "snapback_foldback_geometry": "#64748B",
+                        "snapback_cap": "#16A34A",
+                        "stem_base_left": "#7C3AED",
+                        "stem_base_right": "#A16207",
                     },
+                    "span_backdrops": [
+                        {
+                            "semantic": "payload_primary",
+                            "start": 0,
+                            "end": 2,
+                            "edge_color": "#F58518",
+                        },
+                        {
+                            "semantic": "snapback_foldback_geometry",
+                            "start": 2,
+                            "end": 4,
+                            "edge_color": "#64748B",
+                        },
+                        {
+                            "semantic": "payload_complement",
+                            "start": 4,
+                            "end": 6,
+                            "edge_color": "#E45756",
+                        },
+                    ],
                     "scar_nick": {
                         "left_base": "G",
                         "right_base": "A",
@@ -486,7 +629,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                     "segment_labels": [
                         {"text": "Left stem base", "start": 0, "end": 1, "label_side": "below"},
                         {"text": "TetO primary", "start": 0, "end": 2, "label_side": "above"},
-                        {"text": "Snapback cap", "start": 2, "end": 4, "label_side": "above"},
+                        {"text": "Foldback", "start": 2, "end": 4, "label_side": "above"},
+                        {"text": "Cap", "start": 2, "end": 4, "label_side": "below"},
                         {"text": "TetO complement", "start": 4, "end": 6, "label_side": "above"},
                         {"text": "Right stem base", "start": 5, "end": 6, "label_side": "below"},
                     ],
@@ -518,13 +662,86 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert 'id="dnadesign-secondary-structure-title"' in annotated
     assert 'data-dnadesign-title-align="content_center"' in annotated
     assert 'data-dnadesign-upright-text="true"' in annotated
+    assert 'id="dnadesign-viennarna-oriented-nucleotide-text"' in annotated
+    assert 'data-dnadesign-text-position-policy="projected_to_cap_right_coordinates"' in annotated
+    assert annotated.count('data-dnadesign-position-policy="projected_to_cap_right_coordinates"') == len("GGCCAA")
+    assert annotated.count('data-dnadesign-anchor-policy="centered_on_projected_coordinate"') == len("GGCCAA")
+    assert annotated.count('text-anchor="middle"') >= len("GGCCAA")
+    assert annotated.count('dominant-baseline="middle"') >= len("GGCCAA")
+    assert 'data-dnadesign-anchor-policy="centered_on_rotated_coordinate"' not in annotated
+    root = ET.fromstring(annotated)
+    namespace = {"svg": "http://www.w3.org/2000/svg"}
+    backbone = root.find(".//svg:polyline[@class='backbone']", namespace)
+    assert backbone is not None
+    assert "stroke: #6B7280" in str(backbone.attrib.get("style", ""))
+    assert "stroke-width: 2px" in str(backbone.attrib.get("style", ""))
+    basepair = root.find(".//svg:line[@class='basepairs']", namespace)
+    assert basepair is not None
+    assert basepair.attrib["data-dnadesign-z-order"] == "hydrogen_bond_background"
+    assert "stroke: #CBD5E1" in str(basepair.attrib.get("style", ""))
+    assert "stroke-width: 1px" in str(basepair.attrib.get("style", ""))
+    semantic_edge_layer = root.find(".//svg:g[@id='dnadesign-secondary-structure-semantic-edges']", namespace)
+    assert semantic_edge_layer is not None
+    assert semantic_edge_layer.attrib["data-dnadesign-edge-color-source"] == "visual_contract_span_backdrops"
+    semantic_edges = semantic_edge_layer.findall("svg:line", namespace)
+    assert len(semantic_edges) == len("GGCCAA") - 1
+    assert {edge.attrib["data-dnadesign-edge-semantic"] for edge in semantic_edges} == {
+        "payload_primary",
+        "snapback_foldback_geometry",
+        "payload_complement",
+    }
+    edge_styles = [str(edge.attrib.get("style", "")) for edge in semantic_edges]
+    assert any("stroke: #F58518" in style for style in edge_styles)
+    assert any("stroke: #64748B" in style for style in edge_styles)
+    assert any("stroke: #E45756" in style for style in edge_styles)
+    structure_group = root.find(".//svg:g[@id='structure']", namespace)
+    assert structure_group is not None
+    child_ids = [child.attrib.get("id") for child in list(structure_group)]
+    assert child_ids.index("pairs") < child_ids.index("outline")
+    projected_nodes = [
+        node
+        for node in root.iter()
+        if node.attrib.get("data-dnadesign-position-policy") == "projected_to_cap_right_coordinates"
+    ]
+    assert len(projected_nodes) == len("GGCCAA")
+    for node in projected_nodes:
+        assert node.attrib["data-dnadesign-text-fill"] == "#111827"
+        assert node.attrib["data-dnadesign-text-color-policy"] == "semantic_metadata_text_black"
+        assert "fill: #111827" in str(node.attrib.get("style", ""))
+    stem_base_nodes = [
+        node for node in projected_nodes if "dnadesign-stem-base-nucleotide" in str(node.attrib.get("class", ""))
+    ]
+    assert stem_base_nodes
+    for node in stem_base_nodes:
+        style = str(node.attrib.get("style", ""))
+        assert "font-weight: 500" in style
+        assert "stroke: none" in style
+        assert "paint-order: normal" in style
+        assert "font-weight: 700" not in style
+    native_structure_points = [(0, 0), (0, 10), (0, 80), (0, 90), (0, 20), (0, 30)]
+    projected_center = (
+        float(annotation_manifest["layout_normalization"]["center_x"]),
+        float(annotation_manifest["layout_normalization"]["center_y"]),
+    )
+    projected_angle = float(annotation_manifest["layout_normalization"]["angle_degrees"])
+    for node, native_point in zip(projected_nodes, native_structure_points, strict=True):
+        expected_x, expected_y = _rotate_test_point(
+            native_point,
+            center=projected_center,
+            angle_degrees=projected_angle,
+        )
+        assert float(node.attrib["x"]) == pytest.approx(expected_x, abs=0.001)
+        assert float(node.attrib["y"]) == pytest.approx(expected_y, abs=0.001)
     assert 'id="dnadesign-secondary-structure-highlights"' in annotated
     assert 'data-dnadesign-section-kind="stem_base"' in annotated
     assert 'data-dnadesign-section-label="Left stem base"' in annotated
     assert 'data-dnadesign-section-label="Right stem base"' in annotated
     assert 'data-dnadesign-orientation="cap_right"' in annotated
     assert annotation_manifest["layout_normalization"]["applied"] is True
-    assert annotation_manifest["layout_normalization"]["nucleotide_text_orientation"] == "upright_counter_rotated"
+    assert (
+        annotation_manifest["layout_normalization"]["nucleotide_text_orientation"]
+        == "upright_projected_to_rotated_coordinates"
+    )
     assert abs(annotation_manifest["layout_normalization"]["angle_degrees"]) > 1.0
     assert all(section["label_nucleotide_overlap_count"] == 0 for section in annotation_manifest["section_annotations"])
     assert all(section["label_reserved_overlap_count"] == 0 for section in annotation_manifest["section_annotations"])
@@ -540,11 +757,10 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     )
 
     root = ET.fromstring(annotated)
-    namespace = {"svg": "http://www.w3.org/2000/svg"}
     text_values = [node.text for node in root.findall(".//svg:text", namespace)]
     assert "Retron 43 TetO x8" in text_values
     assert "TetO payload | left G / right A | mismatch profile MXMM" in text_values
-    assert "Snapback cap CC (2 nt)" in text_values
+    assert "Cap CC (2 nt)" in text_values
     assert not any(
         str(value).startswith(("sections:", "components:", "snapback:", "scar_nick:")) for value in text_values
     )
@@ -566,7 +782,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     ]
     assert stem_base_nodes
     assert all(node.attrib.get("data-dnadesign-stem-base-emphasis") == "true" for node in stem_base_nodes)
-    assert all("font-weight: 700" in str(node.attrib.get("style", "")) for node in stem_base_nodes)
+    assert all("font-weight: 500" in str(node.attrib.get("style", "")) for node in stem_base_nodes)
+    assert all("stroke: none" in str(node.attrib.get("style", "")) for node in stem_base_nodes)
 
     publish_viennarna_structure_svg(
         prediction,

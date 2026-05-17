@@ -33,7 +33,6 @@ _DNA_COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
 _DEFAULT_BACKDROP_STYLE = {"fill": "#CBD5E1", "alpha": 0.62, "edge_color": "#94A3B8"}
 _SEGMENT_LABEL_COLOR = "#334155"
 _ANNOTATION_LABEL_COLOR = "#475569"
-_DEFAULT_BASE_HIGHLIGHT_COLOR = "#111827"
 
 
 def visual_contract_payload(composed: Any) -> dict[str, object]:
@@ -186,7 +185,6 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
     segment_spans = list(view["segment_spans"])
     annotation_spans = list(view["annotation_spans"])
     display_profile = composed.config.visual.display_profile
-    base_highlight_color = display_profile.base_highlight_color or _DEFAULT_BASE_HIGHLIGHT_COLOR
     duplicate_annotations = [
         span
         for span in composed.annotation_spans
@@ -194,20 +192,16 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
         and span.copy_index == representative.copy_index
         and _annotation_exactly_duplicates_segment(span, segment_spans)
     ]
-    stem_base_indices = _stem_base_indices(annotation_spans, view)
     meta: dict[str, object] = {
         "source_contract": "linear_ssdna_composition_v1",
         "sequence_sha256": _sha256_text(sequence),
         "source_sequence_sha256": composed.sequence_sha256,
         "validation_status": "ok",
         "interval_annotation_policy": "span_backdrops_only",
+        "glyph_highlight_policy": "region_backdrops_only",
         "render_pairing_links": False,
         "row_labels": {"primary": "Top", "complement": "Bottom"},
-        "base_highlights": {"primary": stem_base_indices, "complement": stem_base_indices},
-        "base_highlight_color": {
-            "primary": base_highlight_color,
-            "complement": base_highlight_color,
-        },
+        "base_highlights": {"primary": [], "complement": []},
         "structure_title": title,
         "component_palette": dict(display_profile.component_hues),
         "display_profile": _display_profile_meta(display_profile, title=title),
@@ -224,26 +218,13 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
         },
         "unit_copies": _canonical_unit_copy_meta(view),
         "representative_unit_copies": [representative.to_dict()],
-        "span_backdrops": _segment_span_backdrops(segment_spans, view, display_profile=display_profile),
+        "span_backdrops": [
+            *_segment_span_backdrops(segment_spans, view, display_profile=display_profile),
+            *_annotation_span_backdrops(annotation_spans, view, display_profile=display_profile),
+        ],
         "segment_labels": [
-            {
-                "text": _display_label(span.segment_id, display_profile.component_labels),
-                "start": span.start + view["copy_offset"],
-                "end": span.end + view["copy_offset"],
-                "label_side": "above",
-                "color": _SEGMENT_LABEL_COLOR,
-            }
-            for span in segment_spans
-        ]
-        + [
-            {
-                "text": _display_label(span.annotation_id, display_profile.annotation_labels, fallback=span.role),
-                "start": span.start + view["copy_offset"],
-                "end": span.end + view["copy_offset"],
-                "label_side": "below",
-                "color": _ANNOTATION_LABEL_COLOR,
-            }
-            for span in annotation_spans
+            *_segment_label_entries(segment_spans, view, display_profile=display_profile),
+            *_annotation_label_entries(annotation_spans, view, display_profile=display_profile),
         ],
         "legend_exclude_tags": _legend_exclude_tags(segment_spans, annotation_spans),
         "suppressed_exact_span_annotations": [
@@ -263,16 +244,6 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
     return meta
 
 
-def _stem_base_indices(annotation_spans: list[Any], view: dict[str, Any]) -> list[int]:
-    indices: set[int] = set()
-    for span in annotation_spans:
-        if span.role not in {"stem_base_left", "stem_base_right"}:
-            continue
-        offset = int(view["copy_offset"])
-        indices.update(range(span.start + offset, span.end + offset))
-    return sorted(indices)
-
-
 def _segment_span_backdrops(
     segment_spans: list[Any],
     view: dict[str, Any],
@@ -283,6 +254,10 @@ def _segment_span_backdrops(
     for span in segment_spans:
         styles = display_profile.component_styles
         configured_style = styles.get(span.segment_id) or styles.get(span.role)
+        if _suppresses_overview_markup(span.segment_id, span.role):
+            continue
+        if configured_style is None and span.segment_id not in display_profile.component_labels:
+            continue
         style = _style_payload(configured_style)
         backdrops.append(
             {
@@ -296,6 +271,95 @@ def _segment_span_backdrops(
                 "edge_color": style["edge_color"],
                 "edge_alpha": 0.72,
                 "edge_linewidth": 0.36,
+            }
+        )
+    return backdrops
+
+
+def _segment_label_entries(
+    segment_spans: list[Any],
+    view: dict[str, Any],
+    *,
+    display_profile: Any,
+) -> list[dict[str, object]]:
+    labels: list[dict[str, object]] = []
+    for span in segment_spans:
+        if _suppresses_overview_markup(span.segment_id, span.role):
+            continue
+        text = display_profile.component_labels.get(span.segment_id)
+        if not text:
+            continue
+        labels.append(
+            {
+                "text": text,
+                "start": span.start + view["copy_offset"],
+                "end": span.end + view["copy_offset"],
+                "label_side": "above",
+                "color": _SEGMENT_LABEL_COLOR,
+            }
+        )
+    return labels
+
+
+def _annotation_label_entries(
+    annotation_spans: list[Any],
+    view: dict[str, Any],
+    *,
+    display_profile: Any,
+) -> list[dict[str, object]]:
+    labels: list[dict[str, object]] = []
+    for span in annotation_spans:
+        if _suppresses_overview_markup(span.annotation_id, span.role):
+            continue
+        text = display_profile.annotation_labels.get(span.annotation_id)
+        if not text:
+            continue
+        labels.append(
+            {
+                "text": text,
+                "start": span.start + view["copy_offset"],
+                "end": span.end + view["copy_offset"],
+                "label_side": "below",
+                "color": _ANNOTATION_LABEL_COLOR,
+            }
+        )
+    return labels
+
+
+def _suppresses_overview_markup(identifier: str, role: str) -> bool:
+    suppressed = {
+        "snapback_foldback_geometry",
+        "snapback_retained_stem",
+        "snapback_foldback_return",
+    }
+    return identifier in suppressed or role in suppressed
+
+
+def _annotation_span_backdrops(
+    annotation_spans: list[Any],
+    view: dict[str, Any],
+    *,
+    display_profile: Any,
+) -> list[dict[str, object]]:
+    backdrops: list[dict[str, object]] = []
+    for span in annotation_spans:
+        styles = display_profile.component_styles
+        configured_style = styles.get(span.annotation_id) or styles.get(span.role)
+        if configured_style is None:
+            continue
+        style = _style_payload(configured_style)
+        backdrops.append(
+            {
+                "semantic": span.annotation_id,
+                "start": span.start + view["copy_offset"],
+                "end": span.end + view["copy_offset"],
+                "cover_rows": "both",
+                "fill": style["fill"],
+                "alpha": style["alpha"],
+                "corner_radius": 2.0,
+                "edge_color": style["edge_color"],
+                "edge_alpha": 0.82,
+                "edge_linewidth": 0.44,
             }
         )
     return backdrops

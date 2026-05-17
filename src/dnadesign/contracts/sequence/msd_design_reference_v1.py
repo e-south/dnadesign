@@ -82,10 +82,49 @@ class MsdPayloadOrTargetV1(MsdDesignContractModel):
         return _not_blank(value, label="payload_or_target field")
 
 
+class MsdCapTopologySpanV1(MsdDesignContractModel):
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "MsdCapTopologySpanV1":
+        if self.end <= self.start:
+            raise ValueError("snapback topology span end must be > start.")
+        return self
+
+
+class MsdCapSnapbackTopologyV1(MsdDesignContractModel):
+    kind: Literal["snapback_foldback_geometry_v1"] = "snapback_foldback_geometry_v1"
+    retained_stem_span: MsdCapTopologySpanV1
+    cap_span: MsdCapTopologySpanV1
+    foldback_return_span: MsdCapTopologySpanV1
+    source: str | None = None
+
+    @field_validator("source")
+    @classmethod
+    def _optional_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _not_blank(value, label="snapback topology source")
+
+    @model_validator(mode="after")
+    def _validate_foldback_geometry(self) -> "MsdCapSnapbackTopologyV1":
+        if self.retained_stem_span.start != 0:
+            raise ValueError("snapback topology retained_stem_span.start must be 0.")
+        if self.retained_stem_span.end != self.cap_span.start:
+            raise ValueError("snapback topology retained_stem_span.end must equal cap_span.start.")
+        if self.cap_span.end != self.foldback_return_span.start:
+            raise ValueError("snapback topology cap_span.end must equal foldback_return_span.start.")
+        if self.cap_span.end - self.cap_span.start != 3:
+            raise ValueError("snapback topology cap_span must be exactly 3 nt.")
+        return self
+
+
 class MsdCapReferenceV1(MsdDesignContractModel):
     id: str
     source_construct: str | None = None
     display_name: str | None = None
+    snapback_topology: MsdCapSnapbackTopologyV1 | None = None
 
     @field_validator("id", "source_construct", "display_name")
     @classmethod

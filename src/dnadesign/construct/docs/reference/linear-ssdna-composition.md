@@ -68,7 +68,7 @@ workspace format.
 
 Do not create persistent Folding workspaces. Do not create one Construct
 workspace per ad hoc composition request. If a study needs a registry or
-compiler above this layer, keep that code under the study-family route and pass
+compiler above this layer, keep that code under the study-owned route and pass
 only validated composition specs into Construct.
 
 ### Failure Posture

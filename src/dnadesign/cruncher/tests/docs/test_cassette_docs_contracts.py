@@ -38,9 +38,10 @@ def test_top_level_docs_route_both_workflow_families() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "Cruncher is the DNA design package in `dnadesign`." in package_readme
+    assert "Cruncher solves workspace-based sequence optimization" in package_readme
+    assert "DNA design package in `dnadesign`" not in package_readme
     assert "cassette design" in package_readme
-    assert "YIU payload work" in package_readme
+    assert "YIU payload windows" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme

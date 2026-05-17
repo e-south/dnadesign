@@ -33,7 +33,16 @@ def test_msd_design_reference_contract_accepts_scar_nick_reference() -> None:
             "construct_label": "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
             "msd_design_id": "msd-tetr-c172-lcggt-racag-mxmm",
             "payload_or_target": {"id": "TetR"},
-            "cap": {"id": "C172", "source_construct": "retron-172"},
+            "cap": {
+                "id": "C172",
+                "source_construct": "retron-172",
+                "snapback_topology": {
+                    "kind": "snapback_foldback_geometry_v1",
+                    "retained_stem_span": {"start": 0, "end": 3},
+                    "cap_span": {"start": 3, "end": 6},
+                    "foldback_return_span": {"start": 6, "end": 9},
+                },
+            },
             "scar_nick": {
                 "left_base": "CGGT",
                 "right_base": "ACAG",
@@ -47,6 +56,8 @@ def test_msd_design_reference_contract_accepts_scar_nick_reference() -> None:
 
     assert reference.scar_nick.profile_s3s2s1s0 == "MXMM"
     assert reference.scar_nick.left_base == "CGGT"
+    assert reference.cap.snapback_topology is not None
+    assert reference.cap.snapback_topology.cap_span.model_dump(mode="json") == {"start": 3, "end": 6}
 
 
 def test_msd_design_reference_contract_rejects_profile_drift() -> None:
@@ -118,10 +129,10 @@ def test_linear_ssdna_composition_contract_accepts_retron43_literal() -> None:
                             "source": {"kind": "literal", "label": "manual_teto_payload"},
                         },
                         {
-                            "segment_id": "snapback_cap_segment",
-                            "role": "snapback_cap_segment",
+                            "segment_id": "snapback_foldback_geometry",
+                            "role": "snapback_foldback_geometry",
                             "sequence": "tCCTCAGcccGCTGAGGa",
-                            "source": {"kind": "literal", "label": "manual_snapback_43_cap"},
+                            "source": {"kind": "literal", "label": "manual_snapback_43_foldback"},
                         },
                         {
                             "segment_id": "payload_complement",
