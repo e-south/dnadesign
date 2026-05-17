@@ -25,9 +25,9 @@ from Bio.Seq import Seq
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-from dnadesign.studies.retron_hairpin_design.cli import app
-from dnadesign.studies.retron_hairpin_design.compiler_spec import RankedPrimitiveSelectorSpec
-from dnadesign.studies.retron_hairpin_design.msd_ids import (
+from dnadesign.studies.studies.retron_hairpin_design.cli import app
+from dnadesign.studies.studies.retron_hairpin_design.compiler_spec import RankedPrimitiveSelectorSpec
+from dnadesign.studies.studies.retron_hairpin_design.msd_ids import (
     MsdDesignPartInput,
     MsdIdError,
     compute_scar_nick_profile,
@@ -1363,7 +1363,8 @@ def test_retron_msd_compiler_is_not_exposed_as_top_level_project_script() -> Non
 
 def test_retron_msd_study_uses_public_tool_apis_only() -> None:
     repo_root = Path(__file__).resolve().parents[4]
-    study_paths = sorted((repo_root / "src" / "dnadesign" / "studies" / "retron_hairpin_design").glob("*.py"))
+    study_source = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
+    study_paths = sorted(study_source.glob("*.py"))
     imports: set[str] = set()
     for path in study_paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -1382,9 +1383,26 @@ def test_retron_msd_study_uses_public_tool_apis_only() -> None:
 
 def test_retron_msd_materialize_does_not_shell_out_to_inkscape() -> None:
     repo_root = Path(__file__).resolve().parents[4]
-    compiler_source = (repo_root / "src" / "dnadesign" / "studies" / "retron_hairpin_design" / "compiler.py").read_text(
-        encoding="utf-8"
-    )
+    compiler_path = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design" / "compiler.py"
+    compiler_source = compiler_path.read_text(encoding="utf-8")
 
     assert "inkscape" not in compiler_source.lower()
     assert "subprocess.run" not in compiler_source
+
+
+def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    source_root = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
+    budgets = {
+        "compiler.py": 450,
+        "composition_payload.py": 450,
+        "output_guards.py": 450,
+        "materialized_outputs.py": 450,
+        "manifests.py": 450,
+    }
+
+    for filename, max_lines in budgets.items():
+        path = source_root / filename
+        assert path.is_file(), filename
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        assert line_count <= max_lines, f"{filename} has {line_count} lines > {max_lines}"

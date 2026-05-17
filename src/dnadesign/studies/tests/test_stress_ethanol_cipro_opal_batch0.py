@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from dnadesign.opal import load_config
-from dnadesign.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
     REQUIRED_REVIEW_COLUMNS,
     load_sampling_config,
     select_batch0,
@@ -19,12 +19,12 @@ from dnadesign.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
     validate_configured_candidate_feature_table,
     validate_selected_ids_against_candidate_feature_table,
 )
-from dnadesign.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batch0.select import (
     main as batch0_select_main,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-SAMPLING = REPO_ROOT / "src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml"
+SAMPLING = REPO_ROOT / "src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml"
 CAMPAIGN_ROOT = REPO_ROOT / "src/dnadesign/opal/campaigns"
 STUDY_DOCS = REPO_ROOT / "docs/studies/stress_ethanol_cipro_growth"
 
@@ -303,6 +303,6 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert "uv run opal notebook run" in routes
     assert "Post-run status command" in routes
     assert "campaign-specific artifact viewer" in routes
-    assert "promoter-study-status" in routes
+    assert "studies.stress-ethanol-cipro-growth.status" in routes
     assert opal_notebook["role"] == "campaign_specific_artifact_viewer"
     assert opal_notebook["pre_run_safe"] is True

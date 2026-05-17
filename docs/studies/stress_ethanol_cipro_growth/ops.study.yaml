@@ -3,8 +3,8 @@ study_id: stress_ethanol_cipro_growth
 title: Stress / ethanol / ciprofloxacin growth study
 
 ops_surfaces:
-  status_kind: promoter-study-status
-  preflight_kind: promoter-study-preflight
+  status_kind: stress-ethanol-cipro-growth-status
+  preflight_kind: stress-ethanol-cipro-growth-preflight
 
 record_sources:
   narrative_ref: manifest:status.md
@@ -52,7 +52,7 @@ phases:
     next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
   - id: infer_batch_preparation
     status: complete
-    next_surface: repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md
+    next_surface: repo:docs/studies/stress_ethanol_cipro_growth/preflight.md
   - id: infer_sequence_views_anchor_construct_insert_7b
     status: complete
     next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml
@@ -111,7 +111,7 @@ phases:
   - id: latentdna_reference_normalization_audit
     status: in_progress
     required_for_main_study_state: false
-    next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+    next_surface: repo:src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
   - id: infer_anchor_only_20b
     status: planned
     required_for_main_study_state: false

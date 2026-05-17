@@ -32,13 +32,13 @@
 ### Quick route
 
 - Compiler/product route:
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - GenBank/native-structure-PNG/review-PNG route after concrete subcomponents are available:
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Status route for explicit progress/history questions only:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
+  `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight route for explicit blocker/readiness questions only:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
+  `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
 - Repo-local study shortcut:
   `.agents/skills/retron-hairpin-study/SKILL.md`
 
@@ -88,7 +88,7 @@
 ### Compiler and primitive surfaces
 
 - Compiler module:
-  `src/dnadesign/studies/retron_hairpin_design/`
+  `src/dnadesign/studies/studies/retron_hairpin_design/`
 - Compiler registry:
   `docs/studies/retron_hairpin_design/msd_design_registry.yaml`
 - Study-selected labels:
@@ -183,7 +183,7 @@
   `predicted_pair_count=259`, `cross_copy_pair_count=259`, and
   `intended_missed_count=8` for the declared intra-copy payload pairings.
 - Study-owned MSD design-reference compilation is available through
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli`. It consumes
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli`. It consumes
   user-provided labels plus study registry metadata, emits a shallow
   design-reference bundle with `README.md`, `manifest.json`,
   `reference_index.tsv`, `msd_design_catalog_v1.json`, and flat per-design
@@ -202,7 +202,7 @@
 ### Next actions
 
 1. For a lab-facing ID or complete part set, lint or compile through
-   `uv run python -m dnadesign.studies.retron_hairpin_design.cli`.
+   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli`.
 2. For missing parts, open `docs/studies/retron_hairpin_design/routes.md` and
    route to the smallest primitive owner: Snapback, scar-nick, or YIU contrast.
 3. When the question shifts from solving primitives to composing sequence

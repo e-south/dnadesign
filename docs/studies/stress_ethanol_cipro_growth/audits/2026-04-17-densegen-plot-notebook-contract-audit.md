@@ -7,7 +7,7 @@ Dataset basis: overlay-aware `usr:densegen/study_stress_ethanol_cipro` at `157,1
 
 ### Purpose
 
-This audit package is meant to support a follow-on development specification for the DenseGen promoter-study analysis surface: plot generation, plot manifest behavior, notebook gallery behavior, Stage A to Stage B bridge semantics, and study-record alignment.
+This audit package is meant to support a follow-on development specification for the DenseGen stress-study analysis surface: plot generation, plot manifest behavior, notebook gallery behavior, Stage A to Stage B bridge semantics, and study-record alignment.
 
 ### Swarm Run Contract
 
@@ -46,7 +46,7 @@ The dashed line is the minimum score among the MMR-retained set, not a simple â€
 The scaffold generates `outputs/notebooks/records_with_overlays.parquet` and `.baserender_preview_cache/`, but the workspace runbook and tutorial mostly describe the visible notebook and plots. DenseGen tests verify template wiring and small synthetic fixtures, not an end-to-end USR-backed notebook generation path against the shared analysis flow.
 
 8. Medium: study-level downstream attention surfaces are overstated.
-The promoter-study `status.md` and `routes.md` present `appendix_umap_gallery` as part of the current attention surface, but the LatentDNA notebook only exposes that preset when all eight canonical views are materialized, and its actual notebook surface is `latent_geometry_browser`.
+The stress study `status.md` and `routes.md` present `appendix_umap_gallery` as part of the current attention surface, but the LatentDNA notebook only exposes that preset when all eight canonical views are materialized, and its actual notebook surface is `latent_geometry_browser`.
 
 ### Deep Introspection
 
@@ -126,7 +126,7 @@ DenseGen output rows feed dataset plots, Stage-B plots, and the notebook.
 `plot_manifest.json` is shared between plot generation and notebook discovery.
 `densegen__used_tfbs_detail` is the bridge contract across output rows, notebook preview, and some plots.
 - Downstream:
-study docs, promoter-study status, and LatentDNA routes use DenseGen artifacts and dataset counts as a study-facing interpretation layer.
+study docs, stress_ethanol_cipro_growth status, and LatentDNA routes use DenseGen artifacts and dataset counts as a study-facing interpretation layer.
 
 #### Math And Operations Notes
 

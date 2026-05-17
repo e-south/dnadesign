@@ -2,12 +2,12 @@ version: 2
 path_base: repo
 campaign_id: retron_hairpin_design
 steps:
-  - label: cruncher-study-status
-    registry_id: cruncher.data-plane.cruncher-study-status
+  - label: retron-hairpin-design-status
+    registry_id: studies.retron-hairpin-design.status
     inputs:
       study_dir: docs/studies/retron_hairpin_design
-  - label: cruncher-study-preflight
-    registry_id: cruncher.data-plane.cruncher-study-preflight
+  - label: retron-hairpin-design-preflight
+    registry_id: studies.retron-hairpin-design.preflight
     inputs:
       study_dir: docs/studies/retron_hairpin_design
       scope: next

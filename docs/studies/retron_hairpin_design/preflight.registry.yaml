@@ -1,0 +1,23 @@
+schema_version: 1
+catalog_order: 58
+registry_id: studies.retron-hairpin-design.preflight
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: "`docs/studies/retron_hairpin_design/` plus declared workspace and validation-command surfaces"
+exit_artifact: one read-only command-level preflight summary for retron_hairpin_design
+summary: Run the retron_hairpin_design preflight suite across declared workspace-layout and command-validation surfaces without mutating outputs.
+execution_kind: iterative
+status_kind: retron-hairpin-design-preflight
+keywords:
+  - retron hairpin design
+  - preflight
+  - snapback
+  - yiu
+  - ops
+related_tools:
+  - cruncher
+  - ops
+relations:
+  - type: execution-support
+    target: studies.retron-hairpin-design.status

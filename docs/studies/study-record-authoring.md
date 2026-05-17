@@ -11,7 +11,7 @@ ladder.
 
 ```text
 docs/studies/<study-id>/
-  campaign.yaml
+  campaign.yaml  # optional explicit progress manifest
   datasets.yaml
   status.md
   ops.study.yaml
@@ -20,7 +20,7 @@ docs/studies/<study-id>/
   audits/
 ```
 
-- `campaign.yaml` is the explicit multi-step manifest generated from
+- `campaign.yaml` is an optional explicit multi-step manifest generated from
   `uv run ops progress scaffold ...` and then filled with real artifact paths.
 - `datasets.yaml` declares which USR datasets belong to the study and how they
   sync across local and remote roots.
@@ -33,28 +33,26 @@ docs/studies/<study-id>/
 - `audits/` stores machine-readable sync audit JSON files referenced from
   `datasets.yaml`.
 
-### Promoter-study bootstrap
+### Study Bootstrap
 
-Use this sequence for promoter-style studies that need the full
-status/preflight contract:
+Use this sequence for studies that need the shared checked-in record shape.
+Only add study status/preflight providers when that specific study owns the
+implementation.
 
 1. Create the study directory:
    `mkdir -p docs/studies/<study-id>`
-2. If `docs/studies/index.yaml` is missing, bootstrap it once:
-   `cp docs/templates/promoter-study-index.yaml docs/studies/index.yaml`
-3. Generate the manifest:
+2. If `docs/studies/index.yaml` is missing, author it from the active study id
+   and explicit `record_root` entries; do not copy a family-specific template.
+3. Generate a campaign manifest only when a registered progress route is useful:
    `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root> > docs/studies/<study-id>/campaign.yaml`
-4. Copy the dataset registry template:
-   `cp docs/templates/promoter-study-datasets.yaml docs/studies/<study-id>/datasets.yaml`
-5. Copy the status-note template:
-   `cp docs/templates/promoter-study-status.md docs/studies/<study-id>/status.md`
-6. Copy the OPS-facing study contract template:
-   `cp docs/templates/promoter-study-ops.study.yaml docs/studies/<study-id>/ops.study.yaml`
+4. Create `datasets.yaml` from real affiliated dataset ids and sync posture.
+5. Create `status.md` from the current study facts rather than a status-provider template.
+6. Create `ops.study.yaml` with lifecycle and execution surfaces. Add
+   `ops_surfaces` only after this study owns concrete status/preflight providers.
 7. Create the audit directory:
    `mkdir -p docs/studies/<study-id>/audits`
-8. Edit the checked-in `index.yaml`, `campaign.yaml`, `datasets.yaml`,
-   `status.md`, and `ops.study.yaml` so they point at real ids, paths, and
-   commands.
+8. Edit the checked-in `index.yaml`, `datasets.yaml`, `status.md`, and
+   `ops.study.yaml` so they point at real ids, paths, and commands.
 9. Add `routes.md` when the study spans several owner surfaces.
 10. Add `pipeline.yaml` when the study has exact Construct, Infer, batch, or
     Notify command groups.

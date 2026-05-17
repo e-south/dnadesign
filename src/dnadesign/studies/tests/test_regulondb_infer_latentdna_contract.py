@@ -1,11 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
-
-from dnadesign.latentdna.workspace_snapshot import decision_ladder
-from dnadesign.latentdna.workspaces import load_workspace_config
 
 
 def _repo_root() -> Path:
@@ -85,7 +83,13 @@ def test_regulondb_latentdna_binding_decision_deliverables_match_workspace_ladde
     binding = yaml.safe_load(
         (repo_root / "docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml").read_text(encoding="utf-8")
     )
-    context = load_workspace_config(repo_root / "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel")
+    snapshot = json.loads(
+        (
+            repo_root
+            / "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel"
+            / "outputs/status/workspace_snapshot.json"
+        ).read_text(encoding="utf-8")
+    )
 
-    assert binding["decision_deliverables"] == decision_ladder(context)
-    assert set(binding["decision_deliverables"]) <= set(context.config.deliverables)
+    assert binding["decision_deliverables"] == snapshot["decision_ladder"]
+    assert set(binding["decision_deliverables"]) <= set(snapshot["deliverables"])

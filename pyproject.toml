@@ -146,8 +146,9 @@ where = ["src"]
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.studies" = [
-  "status_adapters/*/ops/status.registry.yaml",
-  "stress_ethanol_cipro_growth/opal_batch0/sampling.yaml",
+  "studies/retron_hairpin_design/status/ops/status.registry.yaml",
+  "studies/stress_ethanol_cipro_growth/status/ops/status.registry.yaml",
+  "studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml",
 ]
 "dnadesign.usr" = [
   "ops/status.registry.yaml",

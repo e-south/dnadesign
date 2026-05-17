@@ -25,8 +25,8 @@ def _base_payload() -> dict[str, object]:
         "version": 2,
         "study_id": "demo_study",
         "ops_surfaces": {
-            "status_kind": "promoter-study-status",
-            "preflight_kind": "promoter-study-preflight",
+            "status_kind": "demo-study-status",
+            "preflight_kind": "demo-study-preflight",
         },
         "title": "Demo study",
         "record_sources": {
@@ -54,7 +54,7 @@ def _base_payload() -> dict[str, object]:
             {
                 "id": "infer_batch_preparation",
                 "status": "planned",
-                "next_surface": "repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+                "next_surface": "repo:docs/studies/demo_study/preflight.md",
             },
         ],
         "execution_surfaces": {
@@ -129,8 +129,8 @@ def test_load_study_ops_contract_accepts_valid_repo_scoped_surface_refs(tmp_path
     contract = load_study_ops_contract(study_root)
 
     assert contract.snapshot_summary_scope == "repo"
-    assert contract.status_kind == "promoter-study-status"
-    assert contract.preflight_kind == "promoter-study-preflight"
+    assert contract.status_kind == "demo-study-status"
+    assert contract.preflight_kind == "demo-study-preflight"
     assert contract.phases[0].next_surface == "repo:src/dnadesign/ops/runbooks/presets/demo.yaml"
     assert contract.phases[0].required_for_main_study_state is True
     assert contract.phases[1].required_for_main_study_state is False
@@ -146,12 +146,41 @@ def test_load_study_ops_contract_rejects_legacy_family_key(tmp_path: Path) -> No
         load_study_ops_contract(study_root)
 
 
-def test_load_study_ops_contract_requires_explicit_ops_surfaces(tmp_path: Path) -> None:
+def test_load_study_ops_contract_rejects_unknown_top_level_keys(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["status_adapters"] = {"demo": "legacy"}
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="unknown key\\(s\\) status_adapters"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_rejects_unknown_ops_surface_keys(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["ops_surfaces"]["status_adapter"] = "legacy"
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="ops_surfaces contains unknown key\\(s\\) status_adapter"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_allows_studies_without_status_provider(tmp_path: Path) -> None:
     payload = _base_payload()
     payload.pop("ops_surfaces")
     study_root = _write_contract(tmp_path, payload)
 
-    with pytest.raises(ValueError, match="ops_surfaces.status_kind"):
+    contract = load_study_ops_contract(study_root)
+
+    assert contract.status_kind is None
+    assert contract.preflight_kind is None
+
+
+def test_load_study_ops_contract_requires_status_and_preflight_surfaces_together(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["ops_surfaces"] = {"status_kind": "demo-study-status"}
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="must be declared together"):
         load_study_ops_contract(study_root)
 
 
@@ -177,7 +206,7 @@ def test_load_study_ops_contract_accepts_nonsequential_tracks(tmp_path: Path) ->
         {
             "id": "source_ref_dogfood",
             "status": "planned",
-            "next_surface": "repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+            "next_surface": "repo:docs/studies/demo_study/preflight.md",
         },
     ]
     del payload["phases"]

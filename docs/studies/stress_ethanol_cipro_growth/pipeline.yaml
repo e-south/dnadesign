@@ -229,7 +229,7 @@ study_pipeline:
         - If optimizing strictly for unique Evo2 forward passes, the 144 known overlapping inputs can be reused through an explicit cross-dataset materialization or skip policy, but that is an optimization rather than a fidelity fix.
   latentdna:
     binding: docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml
-    doc: src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+    doc: src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
     latest_materialization:
       checked: 2026-05-13
       workspace_snapshot_state: current_after_native_tf_axis_refresh
@@ -278,5 +278,5 @@ study_pipeline:
       pre_run_safe: true
       generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force
       run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
-    batch0_selector: src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml
+    batch0_selector: src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml
     state: configured_pending_candidate_table

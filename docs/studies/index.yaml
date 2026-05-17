@@ -10,7 +10,7 @@ studies:
   - study_id: regulondb_native_promoter_panel
     title: RegulonDB native promoter panel
     record_root: docs/studies/regulondb_native_promoter_panel
-  # Named Cruncher study. Pin `--study-dir docs/studies/retron_hairpin_design`
+  # Named Retron study. Pin `--study-dir docs/studies/retron_hairpin_design`
   # for retron hairpin questions instead of assuming the repo-wide active study matches.
   - study_id: retron_hairpin_design
     title: Retron hairpin design effort

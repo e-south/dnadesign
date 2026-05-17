@@ -12,11 +12,10 @@ runbooks or generated outputs. Treat them as the record plane: `ops progress`
 may read them for observation, while `ops runbook` remains the control plane
 for planning and execution.
 
-Every checked-in study in this index carries an `ops.study.yaml` contract with
-explicit `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind` values.
-That does not mean every request should invoke those commands: open-ended
-design or product requests should still start from the route map, note, or
-repo-local skill that owns the asked-for surface.
+Checked-in studies carry an `ops.study.yaml` contract for lifecycle and owned
+execution surfaces. A study declares `ops_surfaces.status_kind` and
+`ops_surfaces.preflight_kind` only after it owns a concrete provider; do not
+borrow another study's status surface.
 
 ### Quick route
 
@@ -32,7 +31,7 @@ For the checked-in Retron hairpin effort, start from
 `docs/studies/retron_hairpin_design/routes.md` or the repo-local
 `.agents/skills/retron-hairpin-study/SKILL.md` when the request is about MSD
 labels, design references, visuals, or GenBank/FASTA outputs. Use pinned
-`cruncher-study-status` and `cruncher-study-preflight` commands only for
+`retron-hairpin-design-status` and `retron-hairpin-design-preflight` commands only for
 explicit status or readiness questions.
 
 ### Authority chain
@@ -43,20 +42,21 @@ untouched and pin that study's directory or route map directly.
 
 Each checked-in live study keeps these artifacts:
 
-- `campaign.yaml`: explicit campaign/progress manifest when useful
+- `campaign.yaml`: optional explicit campaign/progress manifest when useful
 - `datasets.yaml`: affiliated dataset registry and sync posture
 - `status.md`: maintainer-facing current state and concise next actions
-- `ops.study.yaml`: required OPS-facing lifecycle/track contract with explicit
-  `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind`
+- `ops.study.yaml`: required OPS-facing lifecycle/track contract; optional
+  `ops_surfaces` only when the study owns concrete status/preflight providers
 - `routes.md`: optional one-hop handoff map for current owner surfaces
 - `pipeline.yaml`: optional machine-readable runtime context for exact command
   groups or automation bootstrap
 - `audits/`: optional machine-readable sync/readiness evidence
 
-Keep the code boundary clear: study status adapter implementation lives under
-`src/dnadesign/studies/`, not under `src/dnadesign/ops/`. Ops reads checked-in
-records and dispatches providers, but snapshot/preflight logic and
-study-specific parsers stay with the status adapter or study package.
+Keep the code boundary clear: concrete study status and preflight
+implementation lives under `src/dnadesign/studies/studies/<study-id>/`, not under
+`src/dnadesign/ops/` and not in a generic cross-study status bucket. Ops reads
+checked-in records and dispatches providers, but snapshot/preflight logic and
+study-specific parsers stay with the owning study package.
 
 ### Declared layout
 
@@ -74,7 +74,7 @@ docs/studies/<study-id>/
 Study-specific implementation helpers, when needed, live under:
 
 ```text
-src/dnadesign/studies/<study-id>/
+src/dnadesign/studies/studies/<study-id>/
 ```
 
 Those helpers must stay narrow. If behavior becomes reusable outside one study,
@@ -87,7 +87,7 @@ instead of growing a study-local tool.
 - [Study record authoring](study-record-authoring.md)
 - [Study index](index.yaml)
 - [Retron hairpin route map](retron_hairpin_design/routes.md)
-- [Stress promoter route map](stress_ethanol_cipro_growth/routes.md)
-- [Promoter study status contract](../../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md)
-- [Promoter study preflight contract](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md)
+- [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes.md)
+- [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/status-contract.md)
+- [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/preflight.md)
 - [Documentation index](../README.md)

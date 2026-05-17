@@ -29,8 +29,8 @@ def _write_repo(tmp_path: Path) -> Path:
         "version: 2\n"
         "study_id: demo_study\n"
         "ops_surfaces:\n"
-        "  status_kind: promoter-study-status\n"
-        "  preflight_kind: promoter-study-preflight\n",
+        "  status_kind: demo-study-status\n"
+        "  preflight_kind: demo-study-preflight\n",
         encoding="utf-8",
     )
     (repo_root / "docs" / "studies" / "index.yaml").write_text(
@@ -67,7 +67,7 @@ def test_discover_active_study_selection_uses_top_level_studies_index(tmp_path: 
 
     selection = discover_active_study_selection(
         repo_root=repo_root,
-        status_kind="promoter-study-status",
+        status_kind="demo-study-status",
     )
 
     assert selection.active_study_id == "demo_study"

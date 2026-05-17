@@ -2,15 +2,10 @@ version: 2
 study_id: regulondb_native_promoter_panel
 title: RegulonDB native promoter panel
 
-ops_surfaces:
-  status_kind: promoter-study-status
-  preflight_kind: promoter-study-preflight
-
 record_sources:
   narrative_ref: manifest:status.md
   datasets_ref: manifest:datasets.yaml
   pipeline_ref: manifest:pipeline.yaml
-  campaign_ref: manifest:campaign.yaml
   routes_ref: manifest:routes.md
 
 lifecycle:
@@ -63,7 +58,7 @@ phases:
     next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
   - id: latentdna_native_audit
     status: in_progress
-    next_surface: repo:src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md
+    next_surface: repo:src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
 
 artifacts:
   status_note:

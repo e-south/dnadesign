@@ -30,6 +30,23 @@ from .models import (
     StudyPreflightNextScopeContract,
 )
 
+_OPS_STUDY_TOP_LEVEL_KEYS = {
+    "version",
+    "study_id",
+    "title",
+    "ops_surfaces",
+    "record_sources",
+    "lifecycle",
+    "phases",
+    "tracks",
+    "artifacts",
+    "execution_surfaces",
+    "snapshot",
+    "preflight",
+    "family",
+}
+_OPS_SURFACES_KEYS = {"status_kind", "preflight_kind"}
+
 
 def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     resolved_study_root = study_root.expanduser().resolve()
@@ -40,6 +57,12 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     payload = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         raise ValueError(f"ops.study.yaml must be a mapping: {contract_path}")
+    _reject_unknown_mapping_keys(
+        payload,
+        allowed_keys=_OPS_STUDY_TOP_LEVEL_KEYS,
+        label="ops.study.yaml",
+        source=contract_path,
+    )
     version = int(payload.get("version") or 0)
     if version != 2:
         raise ValueError(f"unsupported ops.study.yaml version {version}: {contract_path}")
@@ -53,15 +76,26 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
             "ops.study.yaml must not define legacy family; define explicit "
             f"ops_surfaces.status_kind and ops_surfaces.preflight_kind instead: {contract_path}"
         )
-    ops_surfaces = payload.get("ops_surfaces") or {}
+    ops_surfaces = payload.get("ops_surfaces")
+    if ops_surfaces is None:
+        ops_surfaces = {}
     if not isinstance(ops_surfaces, dict):
         raise ValueError(f"ops.study.yaml ops_surfaces must be a mapping: {contract_path}")
+    _reject_unknown_mapping_keys(
+        ops_surfaces,
+        allowed_keys=_OPS_SURFACES_KEYS,
+        label="ops.study.yaml ops_surfaces",
+        source=contract_path,
+    )
     status_kind = str(ops_surfaces.get("status_kind") or "").strip()
     preflight_kind = str(ops_surfaces.get("preflight_kind") or "").strip()
-    if not status_kind:
-        raise ValueError(f"ops.study.yaml ops_surfaces.status_kind must be non-empty: {contract_path}")
-    if not preflight_kind:
-        raise ValueError(f"ops.study.yaml ops_surfaces.preflight_kind must be non-empty: {contract_path}")
+    if bool(status_kind) != bool(preflight_kind):
+        raise ValueError(
+            "ops.study.yaml ops_surfaces.status_kind and ops_surfaces.preflight_kind "
+            f"must be declared together: {contract_path}"
+        )
+    resolved_status_kind = status_kind or None
+    resolved_preflight_kind = preflight_kind or None
 
     record_sources = _validated_contract_refs_mapping(
         payload.get("record_sources"),
@@ -306,8 +340,8 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
 
     return StudyOpsContract(
         study_id=study_id,
-        status_kind=status_kind,
-        preflight_kind=preflight_kind,
+        status_kind=resolved_status_kind,
+        preflight_kind=resolved_preflight_kind,
         title=title,
         phase_order=phase_order,
         current_phase_id=current_phase_id,
@@ -345,6 +379,18 @@ def _derive_current_phase_id(phases: list[StudyPhaseContract]) -> str | None:
 def _string_or_none(value: object) -> str | None:
     text = str(value or "").strip()
     return text or None
+
+
+def _reject_unknown_mapping_keys(
+    payload: Mapping[str, object],
+    *,
+    allowed_keys: set[str],
+    label: str,
+    source: Path,
+) -> None:
+    unknown_keys = sorted(str(key) for key in payload if str(key) not in allowed_keys)
+    if unknown_keys:
+        raise ValueError(f"{label} contains unknown key(s) {', '.join(unknown_keys)}: {source}")
 
 
 def _string_sequence(

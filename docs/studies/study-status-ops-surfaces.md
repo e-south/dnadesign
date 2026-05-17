@@ -12,26 +12,26 @@ study's `routes.md`.
 - `docs/studies/index.yaml` is a repo-wide selector, not an ontology or router.
 - `ops progress` is the observation surface for registered status/preflight
   routes.
-- `ops.study.yaml` declares lifecycle and readiness shape through explicit
-  `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind` values.
+- `ops.study.yaml` declares lifecycle and readiness shape. It declares
+  `ops_surfaces` only when the study owns concrete status/preflight providers.
 - Not every request needs status/preflight. Open-ended design or product
   questions may still route to maps, notes, selected command groups, or
   repo-local skills.
 
 ### Common commands
 
-- Active promoter-study snapshot:
-  `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Active promoter-study command preflight:
-  `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
-- Pin a named non-active study or run from outside the repo checkout:
-  `--repo-root <repo-root> --study-dir docs/studies/<study-id>`
+- `stress_ethanol_cipro_growth` snapshot:
+  `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
+- `stress_ethanol_cipro_growth` command preflight:
+  `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json`
+- Do not pin another study to this surface. A different study needs its own
+  provider before it has an OPS status command.
 
 For the checked-in Retron hairpin study, use these only for explicit
 status/readiness questions:
 
-- `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
-- `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
+- `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
+- `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
 
 For Retron compiler/product requests, start from
 `docs/studies/retron_hairpin_design/routes.md` or
@@ -43,8 +43,9 @@ For Retron compiler/product requests, start from
 2. If the request names a checked-in study that is not `active_study_id`, pin
    that study's `routes.md` or status note first and treat the selector as
    discovery only.
-3. Use `ops progress show ... --study-dir docs/studies/<study-id>` only when
-   the question is explicitly about status, history, blockers, or readiness.
+3. Use `ops progress show ...` only when the selected study owns the named
+   status/preflight provider and the question is explicitly about status,
+   history, blockers, or readiness.
 4. Return to `docs/studies/<study-id>/routes.md` after any state or blocker
    question is answered and the next owner surface is the real need.
 

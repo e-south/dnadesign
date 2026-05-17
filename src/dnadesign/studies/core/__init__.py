@@ -3,8 +3,8 @@ from .models import (
     StudyPhaseContract,
     StudyPreflightContract,
     StudyPreflightNextScopeContract,
-    StudyStatusAdapter,
     StudyStatusContext,
+    StudyStatusService,
 )
 from .preflight_plan import (
     StudyPreflightPlan,
@@ -24,7 +24,7 @@ __all__ = [
     "StudyPreflightContract",
     "StudyPreflightNextScopeContract",
     "StudyPreflightPlan",
-    "StudyStatusAdapter",
+    "StudyStatusService",
     "StudyStatusContext",
     "build_study_preflight_plan",
     "discover_active_study_selection",

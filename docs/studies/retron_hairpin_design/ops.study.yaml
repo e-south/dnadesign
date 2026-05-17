@@ -3,8 +3,8 @@ study_id: retron_hairpin_design
 title: Retron hairpin design effort
 
 ops_surfaces:
-  status_kind: cruncher-study-status
-  preflight_kind: cruncher-study-preflight
+  status_kind: retron-hairpin-design-status
+  preflight_kind: retron-hairpin-design-preflight
 
 record_sources:
   narrative_ref: manifest:status.md
@@ -141,7 +141,7 @@ execution_surfaces:
       - run
       - python
       - -m
-      - dnadesign.studies.retron_hairpin_design.cli
+      - dnadesign.studies.studies.retron_hairpin_design.cli
       - lint
       - --id
       - 'pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM'
@@ -155,7 +155,7 @@ execution_surfaces:
       - run
       - python
       - -m
-      - dnadesign.studies.retron_hairpin_design.cli
+      - dnadesign.studies.studies.retron_hairpin_design.cli
       - compile
       - --input
       - docs/studies/retron_hairpin_design/msd_design_hit_labels.txt

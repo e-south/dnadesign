@@ -38,7 +38,7 @@
 - Supported infer families: `evo2_7b`, `evo2_20b`
 - Secondary/debug-required family: `evo2_20b`
 - LatentDNA browser default family: `evo2_7b`
-- Current next surface: `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
+- Current next surface: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
 - Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
 - Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
 - Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
@@ -166,5 +166,5 @@ is not a native bidirectional Evo2 state or hidden state.
 - Keep `native_tf_axis_orientation_audit` as an appendix axis-orientation audit: the current generated test supports the LexA/cipro direction and does not support the BaeR/CpxR ethanol direction.
 - Use the BioCyc GO sidecars only for source-backed regulator interpretation in appendix enrichment surfaces; keep downstream claims at the level of RegulonDB-associated regulator terms.
 - If a linear readout/probe audit is added later, make it a LatentDNA appendix diagnostic with fold-safe preprocessing and no OPAL coupling.
-- Re-run `uv run ops progress show usr.data-plane.promoter-study-status --json` after regeneration and confirm the LatentDNA attention flag clears or is still explained by a concrete generated-artifact gap.
+- Re-run `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` after regeneration and confirm the LatentDNA attention flag clears or is still explained by a concrete generated-artifact gap.
 - Refresh DenseGen plots/notebook if operator-visible DenseGen EDA is needed for current study interpretation.

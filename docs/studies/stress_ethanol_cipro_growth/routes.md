@@ -6,8 +6,8 @@ Use this page after the checked-in study status tells you where the record stand
 Use preflight when you need blockers or next-run readiness.
 This page keeps the downstream handoff map in one place.
 
-- Status: `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
+- Status: `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
+- Preflight: `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json`
 - LatentDNA downstream snapshot: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - Snapshot route inventory: `evidence.analysis_surfaces.{densegen,latentdna,cluster}`
 
@@ -82,7 +82,7 @@ This page keeps the downstream handoff map in one place.
 - Entry artifact: `usr_prom_eth_cip_anchor`, `construct_prom_eth_cip_context`, `construct_prom_eth_cip_reference_core60`, and `construct_prom_eth_cip_reference_contexts`
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
-- Primary doc: `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
+- Primary doc: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
 - Workspace: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md`
 - First command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - Snapshot artifact: the path declared by `latentdna_binding.yaml`
@@ -187,7 +187,7 @@ This page keeps the downstream handoff map in one place.
 - Entry artifact: `usr_prom_eth_cip_opal_candidates`
 - Exit artifact: campaign-owned OPAL ledgers under each `outputs/ledger/`
 - Primary doc/workspace: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
-- Batch-0 selector: `src/dnadesign/studies/stress_ethanol_cipro_growth/opal_batch0/`
+- Batch-0 selector: `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/`
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
 - Campaign configs:

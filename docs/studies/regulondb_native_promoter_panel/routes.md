@@ -2,14 +2,16 @@
 
 **Last verified:** 2026-05-04
 
-Use this page after the checked-in study status establishes the current phase.
-This study remains inactive for production execution, but downstream
+Use this page as the checked-in route record for this study. No study-owned OPS
+status provider is registered for `regulondb_native_promoter_panel`; do not
+route it through `stress_ethanol_cipro_growth` status surfaces. This study
+remains inactive for production execution, but downstream
 Construct/Infer/Notify/LatentDNA contracts are now checked in. The native USR
 dataset and the Construct-derived TSS-upstream core60 dataset are materialized
 locally and validated; generated data artifacts remain untracked.
 
-- Status: `uv run ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json`
-- Preflight: `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json`
+- Status: checked-in `status.md`, `datasets.yaml`, `ops.study.yaml`, and this route map.
+- Preflight: owner tool commands below until this study owns a concrete status/preflight provider.
 
 ### Source Intake
 

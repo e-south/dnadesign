@@ -12,9 +12,9 @@ progress or blocker questions.
 - Compiler/product route:
   `Study route: MSD design references` below.
 - Progress status route for explicit status/history questions only:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
+  `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
 - Execution preflight route for explicit blocker/readiness questions only:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
+  `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
 - Repo-local study shortcut:
   `.agents/skills/retron-hairpin-study/SKILL.md`
 - Pair with:
@@ -27,7 +27,7 @@ progress or blocker questions.
 - If the request supplies an MSD label or explicit parts, start from the
   compiler/product route. Do not run study status or preflight first.
 - If the request is explicitly about `retron_hairpin_design` progress,
-  history, or blockers, pin the study with the two `cruncher-study-*` commands
+  history, or blockers, pin the study with the two Retron status/preflight commands
   above even when `docs/studies/index.yaml` names another repo-wide active
   study.
 - After study status or preflight answers a progress or blocker question, stay
@@ -204,18 +204,18 @@ a frozen design reference, one MSD sequence unit, or Reader joins.
 - Study-selected label list:
   `docs/studies/retron_hairpin_design/msd_design_hit_labels.txt`
 - Public module:
-  `src/dnadesign/studies/retron_hairpin_design/cli.py`
+  `src/dnadesign/studies/studies/retron_hairpin_design/cli.py`
 - Typed compiler spec:
   `retron_msd_compiler_spec_v1` YAML/JSON accepted by `lint`, `compile`, and
   `materialize` through `--spec`
 - Lint command:
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"`
 - Spec lint command:
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli lint --spec path/to/retron_msd_compiler_spec.yaml --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint --spec path/to/retron_msd_compiler_spec.yaml --format json`
 - Compile command:
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - Materialize command:
-  `uv run python -m dnadesign.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Route note:
   this compiler is intentionally study-owned and is not registered as a top-level `uv run retron-msd` tool. It parses lab-facing labels or typed
   `retron_msd_compiler_spec_v1` design parts into the same trusted structure:

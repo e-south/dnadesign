@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/core/models.py
 
-Generic study status adapter contracts for OPS.
+Generic study status service contracts for OPS.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -95,8 +95,8 @@ class StudyPhaseContract:
 @dataclass(frozen=True)
 class StudyOpsContract:
     study_id: str
-    status_kind: str
-    preflight_kind: str
+    status_kind: str | None
+    preflight_kind: str | None
     phase_order: tuple[str, ...]
     snapshot_summary_scope: StudySummaryScope
     preflight: StudyPreflightContract
@@ -124,10 +124,10 @@ class StudyStatusContext:
     repo_root: Path
     study_root: Path
     contract: StudyOpsContract
-    adapter_context: object
+    service_context: object
 
 
-class StudyStatusAdapter(Protocol):
+class StudyStatusService(Protocol):
     status_kind: str
 
     def load_context(self, *, repo_root: Path | None, study_root: Path | None) -> StudyStatusContext: ...
@@ -155,6 +155,6 @@ __all__ = [
     "StudyPreflightNextScopeContract",
     "StudyPreflightScope",
     "StudySummaryScope",
-    "StudyStatusAdapter",
+    "StudyStatusService",
     "StudyStatusContext",
 ]

@@ -218,8 +218,8 @@ derived core60 lanes.
 
 Record-backed evidence through 2026-05-04:
 
-- `ops progress show usr.data-plane.promoter-study-status --study-dir docs/studies/regulondb_native_promoter_panel --json` reports `is_active_study=false` and the checked-in phase `latentdna_native_audit` after the native/full and core60 Infer sidecars are complete.
-- The same status surface reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and reports the generated core60 dataset as present in the local canonical USR root.
+- The checked-in record reports `latentdna_native_audit` after the native/full and core60 Infer sidecars are complete.
+- `datasets.yaml` reports `exists=true` and `rows=3182` for `usr_regulondb_native_promoters`, and reports the generated core60 dataset as present in the local canonical USR root.
 - `uv run usr validate usr_regulondb_native_promoters --strict` passes locally.
 - `uv run construct workspace run-project --workspace src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel --project native_tss_upstream_core60 --format json` returned `records_total=3182`, `records_written=3182`, and `dry_run=false`.
 - `uv run usr validate usr_regulondb_native_promoter_core60 --strict` passes locally.
@@ -241,7 +241,7 @@ Record-backed evidence through 2026-05-04:
   core60 records/views are all 60 bp, every core60 view has a parent native
   sequence, and `core60_sequence == parent_native_sequence[0:60]` for all
   3,182 views.
-- `uv run ops progress show usr.data-plane.promoter-study-preflight --study-dir docs/studies/regulondb_native_promoter_panel --scope next --command-timeout-seconds 30 --json` reports `state=ok`, 13 ok checks, no missing checks, and no blockers when run from this checkout on 2026-04-30.
+- No study-owned OPS preflight provider is registered for `regulondb_native_promoter_panel`; use the owner tool validation commands above until this study owns a concrete provider.
 - `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna validate workspace --workspace regulondb_native_promoter_panel --deep --json` returns `status=ok`.
 - `MPLCONFIGDIR=/tmp/dnadesign_mpl uv run latentdna workspace snapshot --workspace regulondb_native_promoter_panel --json` writes the local workspace snapshot contract with the current primary LatentDNA deliverables and browser geometry inventory.
 
