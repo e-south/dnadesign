@@ -34,6 +34,7 @@ _OPS_STUDY_TOP_LEVEL_KEYS = {
     "version",
     "study_id",
     "title",
+    "parts",
     "ops_surfaces",
     "record_sources",
     "lifecycle",
@@ -44,6 +45,15 @@ _OPS_STUDY_TOP_LEVEL_KEYS = {
     "snapshot",
     "preflight",
     "family",
+}
+_OPS_STUDY_PART_KEYS = {
+    "lifecycle",
+    "phases",
+    "tracks",
+    "artifacts",
+    "execution_surfaces",
+    "snapshot",
+    "preflight",
 }
 _OPS_SURFACES_KEYS = {"status_kind", "preflight_kind"}
 
@@ -57,6 +67,7 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     payload = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         raise ValueError(f"ops.study.yaml must be a mapping: {contract_path}")
+    payload = _expand_ops_study_parts(payload, contract_path=contract_path)
     _reject_unknown_mapping_keys(
         payload,
         allowed_keys=_OPS_STUDY_TOP_LEVEL_KEYS,
@@ -365,6 +376,64 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         execution_surfaces=execution_surfaces,
         raw_payload=dict(payload),
     )
+
+
+def _expand_ops_study_parts(payload: Mapping[str, object], *, contract_path: Path) -> dict[str, object]:
+    parts_payload = payload.get("parts")
+    if parts_payload is None:
+        return dict(payload)
+    if not isinstance(parts_payload, dict):
+        raise ValueError(f"ops.study.yaml parts must be a mapping: {contract_path}")
+    _reject_unknown_mapping_keys(
+        parts_payload,
+        allowed_keys=_OPS_STUDY_PART_KEYS,
+        label="ops.study.yaml parts",
+        source=contract_path,
+    )
+    expanded = {str(key): value for key, value in payload.items() if str(key) != "parts"}
+    for raw_section, raw_ref in parts_payload.items():
+        section = str(raw_section or "").strip()
+        if not section:
+            raise ValueError(f"ops.study.yaml parts keys must be non-empty: {contract_path}")
+        if section in expanded:
+            raise ValueError(f"ops.study.yaml parts.{section} duplicates an inline {section} section: {contract_path}")
+        part_path = _resolve_ops_study_part_path(
+            raw_ref,
+            contract_path=contract_path,
+            label=f"ops.study.yaml parts.{section}",
+        )
+        part_payload = yaml.safe_load(part_path.read_text(encoding="utf-8")) or {}
+        if section in {"phases", "tracks"}:
+            if not isinstance(part_payload, list):
+                raise ValueError(f"ops.study.yaml parts.{section} must load a list: {part_path}")
+        elif not isinstance(part_payload, dict):
+            raise ValueError(f"ops.study.yaml parts.{section} must load a mapping: {part_path}")
+        expanded[section] = part_payload
+    return expanded
+
+
+def _resolve_ops_study_part_path(raw_value: object, *, contract_path: Path, label: str) -> Path:
+    text = _string_or_none(raw_value)
+    if text is None:
+        raise ValueError(f"{label} must be a non-empty path: {contract_path}")
+    if text.startswith(("repo:", "manifest:")):
+        raise ValueError(f"{label} must be relative to the operations directory, not a path ref: {contract_path}")
+    relative_path = Path(text)
+    if relative_path.is_absolute():
+        raise ValueError(f"{label} must be relative to the operations directory: {contract_path}")
+    if ".." in relative_path.parts:
+        raise ValueError(f"{label} must not escape the operations directory: {contract_path}")
+    operations_dir = contract_path.parent.resolve()
+    part_path = (operations_dir / relative_path).resolve()
+    try:
+        part_path.relative_to(operations_dir)
+    except ValueError as exc:
+        raise ValueError(f"{label} escapes the operations directory: {contract_path}") from exc
+    if part_path == contract_path.resolve():
+        raise ValueError(f"{label} must not point back at ops.study.yaml: {contract_path}")
+    if not part_path.exists():
+        raise ValueError(f"{label} file does not exist: {part_path}")
+    return part_path
 
 
 def _derive_current_phase_id(phases: list[StudyPhaseContract]) -> str | None:

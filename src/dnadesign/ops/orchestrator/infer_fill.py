@@ -19,6 +19,7 @@ from typing import Literal
 import yaml
 
 from dnadesign.infer import plan_sequence_view_feature_inventory_completion_from_config
+from dnadesign.studies.core.record_loader import load_study_ops_contract
 
 from ..runbooks.path_policy import WORKSPACE_AUDIT_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1, is_infer_workflow_id, load_orchestration_runbook
@@ -154,11 +155,8 @@ def resolve_active_study_dir(*, repo_root: Path) -> Path:
 
 
 def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) -> tuple[Path, ...]:
-    ops_study_path = study_dir / "operations" / "ops.study.yaml"
-    payload = _read_yaml_mapping(ops_study_path)
-    surfaces = payload.get("execution_surfaces") or {}
-    if not isinstance(surfaces, Mapping):
-        raise ValueError(f"execution_surfaces must be a mapping in {ops_study_path}")
+    contract = load_study_ops_contract(study_dir)
+    surfaces = contract.execution_surfaces
     paths: list[Path] = []
     for surface in surfaces.values():
         if not isinstance(surface, Mapping):

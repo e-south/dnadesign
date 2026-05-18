@@ -78,6 +78,40 @@ legacy_alias: stale
         _load_registry_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
 
 
+def test_catalog_registry_metadata_can_live_under_contract_registry_directory(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "studies" / "demo_study" / "contracts" / "preflight.md"
+    metadata_path = doc_path.parent / "registry" / "preflight.registry.yaml"
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Preflight\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: studies.demo.preflight
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: demo study record
+exit_artifact: demo preflight summary
+execution_kind: iterative
+status_kind: demo-preflight
+summary: Demo preflight contract.
+""",
+    )
+
+    entry, relations = _load_registry_metadata_file(
+        metadata_path=metadata_path,
+        repo_root=tmp_path,
+        catalog_path=catalog_path,
+    )
+
+    assert entry.title == "Demo Preflight"
+    assert entry.doc_path == "../studies/demo_study/contracts/preflight.md"
+    assert relations == ()
+
+
 def test_catalog_tool_source_metadata_rejects_unknown_route_keys(tmp_path: Path) -> None:
     doc_path = tmp_path / "src" / "dnadesign" / "demo" / "docs" / "README.md"
     route_path = doc_path.with_name("workflow.md")

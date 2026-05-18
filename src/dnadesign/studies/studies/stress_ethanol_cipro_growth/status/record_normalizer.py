@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dnadesign.ops.status import resolve_path_ref
 from dnadesign.studies.core.models import StudyOpsContract
 from dnadesign.studies.core.record_loader import load_study_ops_contract
 
@@ -120,7 +121,7 @@ def resolve_stress_ethanol_cipro_growth_context(
             active_study=None,
             required_paths={},
             missing_required_files=(),
-            pipeline_path=resolved_study_dir / "operations" / "pipeline.yaml",
+            pipeline_path=resolved_study_dir / "operations" / "runtime" / "pipeline.yaml",
             pipeline_present=False,
             datasets_entries=(),
             study_pipeline={},
@@ -174,7 +175,7 @@ def resolve_stress_ethanol_cipro_growth_context(
         "operations/ops.study.yaml": resolved_study_dir / "operations" / "ops.study.yaml",
     }
     missing_required_files = tuple(name for name, path in required_paths.items() if not path.exists())
-    pipeline_path = resolved_study_dir / "operations" / "pipeline.yaml"
+    pipeline_path = resolved_study_dir / "operations" / "runtime" / "pipeline.yaml"
     evidence: dict[str, object] = {
         "requested_study_dir": requested_study_dir,
         "study_dir": str(resolved_study_dir),
@@ -237,6 +238,13 @@ def resolve_stress_ethanol_cipro_growth_context(
         )
 
     ops_contract = load_study_ops_contract(resolved_study_dir)
+    pipeline_path = _resolve_pipeline_path(
+        ops_contract=ops_contract,
+        repo_root=study_repo_root,
+        study_root=resolved_study_dir,
+    )
+    evidence["pipeline_path"] = str(pipeline_path)
+    evidence["pipeline_present"] = pipeline_path.exists()
     datasets_payload = dependencies.load_yaml_mapping(required_paths["record/datasets.yaml"], label="datasets.yaml")
     datasets_entries = datasets_payload.get("datasets") or []
     if not isinstance(datasets_entries, list):
@@ -509,6 +517,17 @@ def _declared_execution_surface_payload(*, contract_payload: dict[str, dict[str,
         if path_ref:
             declared[label] = path_ref
     return declared
+
+
+def _resolve_pipeline_path(*, ops_contract: StudyOpsContract, repo_root: Path, study_root: Path) -> Path:
+    pipeline_ref = ops_contract.record_sources.get("pipeline_ref") or "manifest:operations/runtime/pipeline.yaml"
+    return resolve_path_ref(
+        pipeline_ref,
+        repo_root=repo_root,
+        manifest_dir=study_root,
+        default_base="manifest",
+        label="ops.study.yaml record_sources.pipeline_ref",
+    )
 
 
 def _derived_execution_surface_index(

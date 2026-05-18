@@ -29,7 +29,6 @@ _REQUIRED_RECORD_FILES = {
     "status.md": "record/status.md",
     "ops.study.yaml": "operations/ops.study.yaml",
     "routes.md": "routes/README.md",
-    "pipeline.yaml": "operations/pipeline.yaml",
 }
 _BLOCKED_PHASE_STATUSES = frozenset({"blocked", "blocked_gpu"})
 _RUNTIME_PHASE_STATUSES = frozenset({"ready", "planned", "in_progress"})
@@ -116,26 +115,41 @@ def resolve_retron_hairpin_design_context(
 
     ops_contract = load_study_ops_contract(resolved_study_dir)
     record_paths = {name: resolved_study_dir / relative_path for name, relative_path in _REQUIRED_RECORD_FILES.items()}
-    missing_required_files = tuple(
-        _REQUIRED_RECORD_FILES[name] for name, path in record_paths.items() if not path.exists()
+    pipeline_ref = ops_contract.record_sources.get("pipeline_ref") or "manifest:operations/runtime/pipeline.yaml"
+    pipeline_path = _resolve_pipeline_path(
+        pipeline_ref=pipeline_ref,
+        repo_root=resolved_repo_root,
+        study_root=resolved_study_dir,
     )
+    record_paths["pipeline.yaml"] = pipeline_path
+    missing_required = [
+        _REQUIRED_RECORD_FILES[name]
+        for name, path in record_paths.items()
+        if name != "pipeline.yaml" and not path.exists()
+    ]
+    if not pipeline_path.exists():
+        missing_required.append(_record_source_label(pipeline_ref))
+    missing_required_files = tuple(missing_required)
     status_excerpt = _load_status_excerpt(record_paths["status.md"])
-    pipeline_payload = _load_yaml_mapping(record_paths["pipeline.yaml"], label="study pipeline")
+    pipeline_payload = _load_yaml_mapping(pipeline_path, label="study pipeline")
     command_groups = _load_command_groups(
         pipeline_payload.get("command_groups"),
         repo_root=resolved_repo_root,
         study_root=resolved_study_dir,
+        pipeline_path=pipeline_path,
         label="pipeline.yaml command_groups",
     )
     intent_payload = _normalized_intent_payload(
         pipeline_payload.get("intent"),
         repo_root=resolved_repo_root,
         study_root=resolved_study_dir,
+        pipeline_path=pipeline_path,
     )
     native_agent_bootstrap = _normalized_native_agent_bootstrap(
         pipeline_payload.get("native_agent_bootstrap"),
         repo_root=resolved_repo_root,
         study_root=resolved_study_dir,
+        pipeline_path=pipeline_path,
     )
     phase_states = ops_contract.phase_states
     current_phase = ops_contract.current_phase_id
@@ -279,9 +293,9 @@ def _load_command_groups(
     *,
     repo_root: Path,
     study_root: Path,
+    pipeline_path: Path,
     label: str,
 ) -> tuple[RetronHairpinDesignCommandGroup, ...]:
-    pipeline_path = study_root / "operations" / "pipeline.yaml"
     if payload is None:
         return ()
     if not isinstance(payload, list):
@@ -330,8 +344,8 @@ def _normalized_intent_payload(
     *,
     repo_root: Path,
     study_root: Path,
+    pipeline_path: Path,
 ) -> dict[str, object]:
-    pipeline_path = study_root / "operations" / "pipeline.yaml"
     if payload is None:
         return {}
     if not isinstance(payload, dict):
@@ -341,12 +355,14 @@ def _normalized_intent_payload(
         payload.get("context_refs"),
         repo_root=repo_root,
         study_root=study_root,
+        pipeline_path=pipeline_path,
         label="pipeline.yaml intent.context_refs",
     )
     normalized["decision_refs"] = _resolve_path_ref_sequence(
         payload.get("decision_refs"),
         repo_root=repo_root,
         study_root=study_root,
+        pipeline_path=pipeline_path,
         label="pipeline.yaml intent.decision_refs",
     )
     return normalized
@@ -357,8 +373,8 @@ def _normalized_native_agent_bootstrap(
     *,
     repo_root: Path,
     study_root: Path,
+    pipeline_path: Path,
 ) -> dict[str, object]:
-    pipeline_path = study_root / "operations" / "pipeline.yaml"
     if payload is None:
         return {}
     if not isinstance(payload, dict):
@@ -368,6 +384,7 @@ def _normalized_native_agent_bootstrap(
         payload.get("open_first"),
         repo_root=repo_root,
         study_root=study_root,
+        pipeline_path=pipeline_path,
         label="pipeline.yaml native_agent_bootstrap.open_first",
     )
     normalized["must_preserve"] = list(
@@ -386,6 +403,7 @@ def _resolve_path_ref_sequence(
     *,
     repo_root: Path,
     study_root: Path,
+    pipeline_path: Path,
     label: str,
 ) -> list[str]:
     if payload is None:
@@ -393,7 +411,7 @@ def _resolve_path_ref_sequence(
     values = _string_sequence(
         payload,
         label=label,
-        source=study_root / "operations" / "pipeline.yaml",
+        source=pipeline_path,
         allow_empty=True,
     )
     return [
@@ -408,6 +426,21 @@ def _resolve_path_ref_sequence(
         )
         for value in values
     ]
+
+
+def _resolve_pipeline_path(*, pipeline_ref: str, repo_root: Path, study_root: Path) -> Path:
+    return resolve_path_ref(
+        pipeline_ref,
+        repo_root=repo_root,
+        manifest_dir=study_root,
+        default_base="manifest",
+        label="ops.study.yaml record_sources.pipeline_ref",
+    )
+
+
+def _record_source_label(path_ref: str) -> str:
+    text = str(path_ref or "").strip()
+    return text.removeprefix("manifest:") or text or "operations/runtime/pipeline.yaml"
 
 
 def _resolve_execution_surface_index(

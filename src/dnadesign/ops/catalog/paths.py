@@ -23,6 +23,8 @@ def resolve_catalog_doc_path(*, catalog_path: Path, doc_path: str) -> Path:
 
 def resolve_registry_metadata_path_for_doc_path(doc_path: Path | str) -> Path:
     normalized = Path(doc_path)
+    if normalized.parent.name == "contracts":
+        return normalized.parent / "registry" / f"{normalized.stem}{REGISTRY_METADATA_SUFFIX}"
     return normalized.with_name(f"{normalized.stem}{REGISTRY_METADATA_SUFFIX}")
 
 
@@ -63,6 +65,14 @@ def resolve_catalog_repo_root(repo_root: Path | None) -> Path:
 
 
 def resolve_doc_path_for_metadata(*, metadata_path: Path, repo_root: Path) -> Path:
+    relative_metadata = metadata_path.resolve().relative_to(repo_root.resolve())
+    if relative_metadata.parent.name == "registry":
+        doc_relative = relative_metadata.parent.parent / (
+            relative_metadata.name[: -len(REGISTRY_METADATA_SUFFIX)] + ".md"
+        )
+        resolved_doc_path = (repo_root / doc_relative).resolve()
+        if resolved_doc_path.exists():
+            return resolved_doc_path
     return resolve_doc_path_for_sidecar(
         metadata_path=metadata_path,
         repo_root=repo_root,

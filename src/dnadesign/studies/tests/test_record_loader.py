@@ -32,7 +32,7 @@ def _base_payload() -> dict[str, object]:
         "record_sources": {
             "narrative_ref": "manifest:record/status.md",
             "datasets_ref": "manifest:record/datasets.yaml",
-            "pipeline_ref": "manifest:operations/pipeline.yaml",
+            "pipeline_ref": "manifest:operations/runtime/pipeline.yaml",
             "campaign_ref": "manifest:record/campaign.yaml",
         },
         "lifecycle": {
@@ -135,6 +135,53 @@ def test_load_study_ops_contract_accepts_valid_repo_scoped_surface_refs(tmp_path
     assert contract.phases[0].required_for_main_study_state is True
     assert contract.phases[1].required_for_main_study_state is False
     assert contract.phases[1].as_dict()["required_for_main_study_state"] is False
+
+
+def test_load_study_ops_contract_accepts_split_parts(tmp_path: Path) -> None:
+    payload = _base_payload()
+    split_keys = (
+        "lifecycle",
+        "phases",
+        "artifacts",
+        "execution_surfaces",
+        "snapshot",
+        "preflight",
+    )
+    payload["artifacts"] = {
+        "status_note": {
+            "artifact_type": "file",
+            "ref": "manifest:record/status.md",
+        }
+    }
+    root_payload = {key: value for key, value in payload.items() if key not in split_keys}
+    root_payload["parts"] = {key: f"contract/{key}.yaml" for key in split_keys}
+    study_root = _write_contract(tmp_path, root_payload)
+    contract_root = study_root / "operations" / "contract"
+    contract_root.mkdir(parents=True)
+    for key in split_keys:
+        (contract_root / f"{key}.yaml").write_text(
+            yaml.safe_dump(payload[key], sort_keys=False),
+            encoding="utf-8",
+        )
+
+    contract = load_study_ops_contract(study_root)
+
+    assert contract.current_phase_id == "densegen_growth"
+    assert contract.phase_order == ("densegen_growth", "infer_batch_preparation")
+    assert contract.artifacts["status_note"]["ref"] == "manifest:record/status.md"
+    assert contract.execution_surfaces["densegen_batch"]["surface_type"] == "runbook"
+
+
+def test_load_study_ops_contract_rejects_split_part_that_duplicates_inline_section(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["parts"] = {"preflight": "contract/preflight.yaml"}
+    study_root = _write_contract(tmp_path, payload)
+    contract_root = study_root / "operations" / "contract"
+    contract_root.mkdir(parents=True)
+    (contract_root / "preflight.yaml").write_text("default_scope: next\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicates an inline preflight section"):
+        load_study_ops_contract(study_root)
 
 
 def test_load_study_ops_contract_rejects_legacy_family_key(tmp_path: Path) -> None:
