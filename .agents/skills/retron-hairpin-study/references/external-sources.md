@@ -9,7 +9,7 @@ prompt-surface pressure tests.
 | --- | --- | --- |
 | `docs/studies/README.md` | repo-local | Study-record ownership, status vs preflight split, and pinned-study bootstrap. |
 | `docs/studies/retron_hairpin_design/` | repo-local | Current retron hairpin study scope, route map, pipeline context, and skill path. |
-| `docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md` | repo-local | Scar-nick strict terminal nick policy, B26/B43 profile convention, retained scar coverage, and schema implications. |
+| `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md` | repo-local | Scar-nick strict terminal nick policy, B26/B43 profile convention, retained scar coverage, and schema implications. |
 | `docs/studies/retron_hairpin_design/contracts/status.md` | repo-local | Snapshot contract for the concrete retron_hairpin_design study. |
 | `docs/studies/retron_hairpin_design/contracts/preflight.md` | repo-local | Command-readiness contract for the concrete retron_hairpin_design study. |
 | `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md` | repo-local | Released-product Snapback boundary and lane intent. |

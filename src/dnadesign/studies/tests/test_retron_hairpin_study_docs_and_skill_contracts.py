@@ -155,14 +155,14 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     route_matrix = _read(".agents/skills/retron-hairpin-study/references/route-matrix.md")
     refresh_loop = _read(".agents/skills/retron-hairpin-study/references/refresh-loop.md")
     study_surfaces = _read(".agents/skills/retron-hairpin-study/references/study-surfaces.md")
-    scar_nick_context = _read("docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md")
+    scar_nick_context = _read("docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md")
     status = _read("docs/studies/retron_hairpin_design/record/status.md")
     routes = _read("docs/studies/retron_hairpin_design/routes/README.md")
-    route_msd = _read("docs/studies/retron_hairpin_design/routes/msd-design-references.md")
-    route_snapback = _read("docs/studies/retron_hairpin_design/routes/released-product-snapback.md")
-    route_scar_nick = _read("docs/studies/retron_hairpin_design/routes/scar-nick-base-junction.md")
-    route_linear = _read("docs/studies/retron_hairpin_design/routes/linear-ssdna-composition.md")
-    route_yiu = _read("docs/studies/retron_hairpin_design/routes/yiu-boundary-check.md")
+    route_msd = _read("docs/studies/retron_hairpin_design/routes/references/msd-design-references.md")
+    route_snapback = _read("docs/studies/retron_hairpin_design/routes/product/released-product-snapback.md")
+    route_scar_nick = _read("docs/studies/retron_hairpin_design/routes/product/scar-nick-base-junction.md")
+    route_linear = _read("docs/studies/retron_hairpin_design/routes/composition/linear-ssdna-composition.md")
+    route_yiu = _read("docs/studies/retron_hairpin_design/routes/quality/yiu-boundary-check.md")
     route_details = "\n".join([route_msd, route_snapback, route_scar_nick, route_linear, route_yiu])
     workbench_readme = _read("docs/studies/retron_hairpin_design/workbench/README.md")
     workbench_ontology_readme = _read("docs/studies/retron_hairpin_design/workbench/ontology/README.md")
@@ -178,8 +178,18 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     workbench_materialization = _read(
         "docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml"
     )
-    pipeline = _read("docs/studies/retron_hairpin_design/operations/pipeline.yaml")
-    ops_study = _read("docs/studies/retron_hairpin_design/operations/ops.study.yaml")
+    pipeline = _read("docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml")
+    ops_root = _read("docs/studies/retron_hairpin_design/operations/ops.study.yaml")
+    ops_study = "\n".join(
+        [
+            ops_root,
+            _read("docs/studies/retron_hairpin_design/operations/contract/lifecycle.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/tracks.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/artifacts.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/execution_surfaces.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/preflight.yaml"),
+        ]
+    )
 
     assert "Retron MSD product work as a genetic compiler" in status
     assert "scar-nick" in status
@@ -197,8 +207,8 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "released_snapback_artifacts.md" in status
     assert "BbsI-HF retains 6/256 strict scars" in status
     assert "Exact B26 `MXMX` remains a biological control architecture" in status
-    assert "docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml" in status
-    assert "docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt" in status
+    assert "docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml" in status
+    assert "docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt" in status
     assert "docs/studies/retron_hairpin_design/workbench/" in status
     assert "starts from the user's provided parts and desired" in routes
     assert len(routes.splitlines()) <= 85
@@ -220,7 +230,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "composition_overview.svg" in route_msd
     assert "composition_overview.png" in route_msd
     assert "Each `variants/<msd_design_id>/` directory groups" in route_msd
-    assert "Open `../operations/pipeline.yaml` only when the task needs" in routes
+    assert "Open `../operations/runtime/pipeline.yaml` only when the task needs" in routes
     assert "Scar-Nick Base-Junction Route" in route_scar_nick
     assert "src/dnadesign/cruncher/workspaces/de033" in route_snapback
     assert "--nick-preset neb_nicking_v1" in route_snapback
@@ -249,7 +259,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert 'primary_lane: "study-owned Retron MSD design-reference compilation"' in pipeline
     assert 'state_label: "product route"' in pipeline
     assert "Do not answer compiler-style requests by defaulting to study phase" in pipeline
-    assert "repo:docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md" in pipeline
+    assert "repo:docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md" in pipeline
     assert "repo:docs/studies/retron_hairpin_design/workbench/README.md" in pipeline
     assert "scar_nick_profile_panel_v1.yaml" in pipeline
     assert "--nick-additional-preset thermo_nicking_v1" in pipeline
@@ -257,10 +267,14 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "pair_with:" in pipeline
     assert "harness-engineering" in pipeline
     assert "pragmatic-programming-principles" not in pipeline
+    assert "parts:" in ops_root
+    assert "contract/tracks.yaml" in ops_root
+    assert "track_order:" not in ops_root
+    assert "checks:" not in ops_root
     assert "id: msd_design_reference_catalog" in ops_study
     assert "mode: tracks" in ops_study
     assert "track_order:" in ops_study
-    assert "current_track:\n    strategy: explicit\n    id: msd_design_reference_catalog" in ops_study
+    assert "current_track:\n  strategy: explicit\n  id: msd_design_reference_catalog" in ops_study
     assert "group_track_bindings:" in ops_study
     assert "target_track_groups:" in ops_study
     assert "current_phase:" not in ops_study
@@ -268,7 +282,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "\nphases:" not in ops_study
     assert "group_phase_bindings:" not in ops_study
     assert "target_phase_groups:" not in ops_study
-    assert "msd_design_reference_catalog: [study_record, msd_reference_compile]" in ops_study
+    assert "msd_design_reference_catalog:\n    - study_record\n    - msd_reference_compile" in ops_study
     assert "id: snapback_released_solve" in ops_study
     assert "id: scar_nick_base_junction_context" in ops_study
     assert "artifact: scar_nick_base_junction_note" in ops_study
@@ -312,7 +326,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "materialize` GenBank/native-structure-PNG/review-PNG" in study_surfaces
     assert "full component spans" in skill
     assert "same-span annotations" in skill
-    assert "scar-nick route in `routes/README.md` / `routes/scar-nick-base-junction.md`" in route_matrix
+    assert "scar-nick route in `routes/README.md` / `routes/product/scar-nick-base-junction.md`" in route_matrix
     assert "studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design" in route_matrix
     assert "studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design" in route_matrix
     assert "Compiler Bootstrap" in refresh_loop
@@ -349,7 +363,7 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
     )
     label_lines = [
         line.strip()
-        for line in _read("docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt").splitlines()
+        for line in _read("docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt").splitlines()
         if line.strip() and not line.startswith("#")
     ]
 
@@ -370,10 +384,10 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
     assert len(design_set["designs"]) == 18
     assert design_labels == label_lines
     assert design_set["input_hashes"]["convenience_label_input_sha256"] == _sha256(
-        "docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt"
+        "docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt"
     )
     assert design_set["input_hashes"]["registry_sha256"] == _sha256(
-        "docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml"
+        "docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml"
     )
 
     for design in design_set["designs"]:
@@ -398,10 +412,10 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
         "docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
     )
     assert compiler_run["inputs"]["label_input"]["sha256"] == _sha256(
-        "docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt"
+        "docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt"
     )
     assert compiler_run["inputs"]["registry"]["sha256"] == _sha256(
-        "docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml"
+        "docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml"
     )
     assert compiler_run["observed_output"]["output_policy"] == "transient_not_checked_in"
     assert compiler_run["observed_output"]["record_count"] == 18
@@ -483,7 +497,7 @@ def test_named_study_records_keep_root_bounded_by_semantic_lanes() -> None:
         assert (study_root / "record" / "status.md").exists()
         assert (study_root / "operations" / "README.md").exists()
         assert (study_root / "operations" / "ops.study.yaml").exists()
-        assert (study_root / "operations" / "pipeline.yaml").exists()
+        assert (study_root / "operations" / "runtime" / "pipeline.yaml").exists()
         assert (study_root / "routes" / "README.md").exists()
 
     assert len((studies_root / "stress_ethanol_cipro_growth" / "routes" / "README.md").read_text().splitlines()) <= 60

@@ -84,11 +84,11 @@ Out of scope:
 
 2. Load only the needed surfaces.
 - Compiler route: `docs/studies/retron_hairpin_design/routes/README.md`, then
-  `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`, then
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`, then
   `references/msd-design-references.md`.
-- Whole-product context: `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`,
+- Whole-product context: `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`,
   then the active exec plan.
-- Machine-readable command groups: `docs/studies/retron_hairpin_design/operations/pipeline.yaml`.
+- Machine-readable command groups: `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`.
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
 3. Execute or report the route.

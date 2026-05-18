@@ -25,19 +25,19 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/workbench/provenance/`: compiler-run and
   materialization records that cite workbench design sets without storing bulky
   generated artifacts
-- `docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md`: the
+- `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`: the
   base-junction context for B26/B43 profile logic, strict terminal nick policy,
   retained scar families, and scar-nick schema implications
-- `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`: the
+- `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`: the
   study-owned handoff for whole-product multicopy ssDNA composition, including
   scar-nick projection boundaries
-- `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`: study-owned
+- `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`: study-owned
   registry metadata for payloads, caps, construct route notes, nickase, and
   nick orientation used by the MSD design-reference compiler
-- `docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt`:
+- `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`:
   convenience lab-facing MSD labels for compiler input; workbench design sets
   are authoritative for persistent cohort meaning
-- `docs/studies/retron_hairpin_design/operations/pipeline.yaml`: the exact command
+- `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need
 - `docs/studies/retron_hairpin_design/operations/ops.study.yaml`: nonsequential track map,
@@ -99,14 +99,14 @@ base-junction scar-nick work.
 When the next question needs exact commands or the next human step, use the
 study route map first.
 When the next question says "continue the dev spec" or concerns multicopy
-linear ssDNA assembly, open `contexts/linear-ssdna-composition.md`, then the
+linear ssDNA assembly, open `contexts/composition/linear-ssdna-composition.md`, then the
 dev spec, then the completed implementation record and current follow-up plan.
 When the next question starts from an MSD shorthand ID or Reader-facing design
 reference, use the Study route for MSD design references in `routes/README.md`, then
-`routes/msd-design-references.md`, then `references/msd-design-references.md`.
+`routes/references/msd-design-references.md`, then `references/msd-design-references.md`.
 When the next question asks why variants were selected or how the cohort maps to
 hypotheses/effects, open `workbench/README.md` and the relevant design set.
 When the next question needs machine-readable command groups or bootstrap
-metadata, open `operations/pipeline.yaml`.
+metadata, open `operations/runtime/pipeline.yaml`.
 When the next question needs harness or contract hardening, leave the study
 surface and pair with the owning companion skill.

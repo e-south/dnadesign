@@ -34,10 +34,10 @@ catalog.
 ## Boundary
 
 - Study-owned package: `dnadesign.studies.studies.retron_hairpin_design`.
-- Registry: `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`.
+- Registry: `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`.
 - Authoritative design set:
   `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`.
-- Convenience label input: `docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt`.
+- Convenience label input: `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`.
 - Compiler spec: `retron_msd_compiler_spec_v1` with `labels`, `designs`,
   `payload_sequences`, and `cap_sequences`.
 - Do not expose a top-level `retron-msd` script.
@@ -75,7 +75,7 @@ Compile the selected hit list:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile \
-  --input docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt \
+  --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --out-dir /tmp/dnadesign_retron_msd_design_references \
   --format json
 ```
@@ -85,7 +85,7 @@ subcomponents are available:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize \
-  --input docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt \
+  --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --out-dir /tmp/dnadesign_retron_msd_sequences \
   --payload-sequence TetR=<payload-sequence> \
   --cap-sequence C26=<cap-sequence> \

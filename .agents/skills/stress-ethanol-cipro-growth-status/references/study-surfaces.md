@@ -15,7 +15,7 @@ Keep ownership boundaries clear.
   root semantics, and sync posture
 - `docs/studies/<study-id>/operations/ops.study.yaml`: lifecycle order,
   snapshot scope, execution surfaces, and next-scope preflight grouping
-- `docs/studies/<study-id>/operations/pipeline.yaml`: structural workspace,
+- `docs/studies/<study-id>/operations/runtime/pipeline.yaml`: structural workspace,
   config, and downstream surface bindings that complement
   `operations/ops.study.yaml`, including any study-bound exploratory-analysis
   route inventory surfaced through snapshot `analysis_surfaces`
@@ -38,7 +38,7 @@ Keep ownership boundaries clear.
   grow a parallel OPAL command walkthrough.
 - OPAL batch-0 candidate-table creation is study-owned generated data. The
   current shared table is materialized, but the contract audit remains in
-  `opal_batch0/candidate_table.py`; route through `routes/opal.md` instead of
+  `opal_batch0/candidate_table.py`; route through `routes/decision/opal.md` instead of
   treating the full LatentDNA review view as the OPAL universe.
 - OPAL candidate ID provenance is study-owned. Route per-ID questions through
   `opal_batch0/provenance.py`, which joins DenseGen sidecars, anchor records,

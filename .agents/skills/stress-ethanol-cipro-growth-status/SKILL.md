@@ -31,13 +31,13 @@ Out of scope:
 ## Workflow
 
 1. Read `docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml`,
-   `record/datasets.yaml`, `operations/pipeline.yaml`, `record/status.md`, and `routes/README.md`.
+   `record/datasets.yaml`, `operations/runtime/pipeline.yaml`, `record/status.md`, and `routes/README.md`.
 2. Run the status command for record posture:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Run the preflight command only for blocker or next-run readiness:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`.
-4. Route downstream work through `routes/README.md`. Open `routes/opal.md` or
-   `routes/latentdna.md` only after the one-hop route selects that owner
+4. Route downstream work through `routes/README.md`. Open `routes/decision/opal.md` or
+   `routes/analysis/latentdna.md` only after the one-hop route selects that owner
    surface.
 
 ## Guardrails

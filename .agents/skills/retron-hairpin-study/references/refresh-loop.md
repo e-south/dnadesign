@@ -12,13 +12,13 @@ question is explicitly about progress, history, or blockers.
 3. If the question is persistent provenance, open
    `docs/studies/retron_hairpin_design/workbench/README.md` and the design set
    before compiler outputs.
-4. Open `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml` for
+4. Open `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml` for
    payload/cap/route metadata.
 5. Use `msd-design-references.md` for lint/compile commands and output
    posture.
 6. Open `linear-ssdna-composition.md` only when the requested output needs
    sequence assembly, visual QA, or GenBank sidecars.
-7. Open `operations/pipeline.yaml` only when a machine-readable command group is needed.
+7. Open `operations/runtime/pipeline.yaml` only when a machine-readable command group is needed.
 
 ## Minimum Evidence By Question
 
