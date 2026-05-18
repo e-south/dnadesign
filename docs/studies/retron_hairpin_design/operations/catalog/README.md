@@ -3,10 +3,11 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-This directory holds OPS catalog pages for the Retron hairpin design study.
-The root study record stays the entrypoint; these files describe observation
-and readiness surfaces for `ops progress`.
+This directory indexes OPS catalog pages for the Retron hairpin design study.
+The root study record stays the entrypoint; catalog contracts live under
+`contracts/`, and runbook-catalog sidecars live under `contracts/registry/`.
 
-- [Status contract](status.md): read-only study snapshot.
-- [Preflight contract](preflight.md): read-only command and path readiness.
-- `*.registry.yaml`: runbook-catalog sidecars for the adjacent contract docs.
+- [Status contract](contracts/status.md): read-only study snapshot.
+- [Preflight contract](contracts/preflight.md): read-only command and path readiness.
+- `contracts/registry/*.registry.yaml`: runbook-catalog sidecars for the
+  adjacent contract docs.

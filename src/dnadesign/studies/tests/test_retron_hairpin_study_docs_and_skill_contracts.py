@@ -189,8 +189,22 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
             _read("docs/studies/retron_hairpin_design/operations/contract/lifecycle/mode.yaml"),
             _read("docs/studies/retron_hairpin_design/operations/contract/lifecycle/tracks.yaml"),
             _read("docs/studies/retron_hairpin_design/operations/contract/surfaces/artifacts.yaml"),
-            _read("docs/studies/retron_hairpin_design/operations/contract/surfaces/execution_surfaces.yaml"),
-            _read("docs/studies/retron_hairpin_design/operations/contract/readiness/preflight.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/workspaces.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/compiler.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/snapback.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/yiu.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/readiness/scope.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/readiness/group-bindings.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/readiness/next-scope.yaml"),
+            _read("docs/studies/retron_hairpin_design/operations/contract/readiness/checks/context_consolidation.yaml"),
+            _read(
+                "docs/studies/retron_hairpin_design/operations/contract/readiness/checks/"
+                "msd_design_reference_catalog.yaml"
+            ),
+            _read(
+                "docs/studies/retron_hairpin_design/operations/contract/readiness/checks/snapback_released_probe.yaml"
+            ),
+            _read("docs/studies/retron_hairpin_design/operations/contract/readiness/checks/yiu_boundary_check.yaml"),
         ]
     )
 
@@ -271,6 +285,10 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "pragmatic-programming-principles" not in pipeline
     assert "parts:" in ops_root
     assert "contract/lifecycle/tracks.yaml" in ops_root
+    assert "contract/surfaces/execution/commands/compiler.yaml" in ops_root
+    assert "contract/readiness/checks/context_consolidation.yaml" in ops_root
+    assert "contract/surfaces/execution_surfaces.yaml" not in ops_root
+    assert "contract/readiness/preflight.yaml" not in ops_root
     assert "track_order:" not in ops_root
     assert "checks:" not in ops_root
     assert "id: msd_design_reference_catalog" in ops_study
@@ -323,6 +341,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "reference_index.tsv" in pipeline
     assert "flat references" in pipeline
     assert "id: msd_single_unit_materialize" in pipeline
+    assert "msd_single_unit_materialize:" in ops_study
     assert "sequence_manifest.json" in pipeline
     assert "secondary_structure.native.png" in pipeline
     assert "composition_overview.svg" in pipeline

@@ -1,3 +1,12 @@
+---
+doc_id: study-records-router
+surface: studies-index
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+first_hop: docs/studies/<study-id>/routes/README.md
+record_root_contract: docs/studies/<study-id>
+---
+
 ## Study Records
 
 **Owner:** dnadesign-maintainers
@@ -27,13 +36,13 @@ Use these surfaces by intent:
 | A request asks for status, history, blockers, or readiness | [Study Ops status surfaces](reference/study-status-ops-surfaces.md) | Use Ops only when the task is explicitly observation or readiness. |
 | A request asks how to add or refresh study records | [Study record authoring](reference/study-record-authoring.md) | Keep authoring and promoter-template details out of this top-level router. |
 
-For the checked-in Retron hairpin effort, start from
-`docs/studies/retron_hairpin_design/routes/README.md` or the repo-local
-`.agents/skills/retron-hairpin-study/SKILL.md` when the request is about MSD
-labels, design references, visuals, or GenBank/FASTA outputs. Use pinned
-registry ids `studies.retron-hairpin-design.status` and
-`studies.retron-hairpin-design.preflight` only for explicit status or
-readiness questions.
+### Checked-In Study Routes
+
+| Study | First route | Status surface | Skill |
+| --- | --- | --- | --- |
+| `stress_ethanol_cipro_growth` | [docs/studies/stress_ethanol_cipro_growth/routes](stress_ethanol_cipro_growth/routes/README.md) | OPS provider: `studies.stress-ethanol-cipro-growth.status`; preflight provider: `studies.stress-ethanol-cipro-growth.preflight` | `.agents/skills/stress-ethanol-cipro-growth-status/SKILL.md` |
+| `regulondb_native_promoter_panel` | [docs/studies/regulondb_native_promoter_panel/routes](regulondb_native_promoter_panel/routes/README.md) | Record-only: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | none |
+| `retron_hairpin_design` | [docs/studies/retron_hairpin_design/routes](retron_hairpin_design/routes/README.md) | Route-first for MSD work; use `studies.retron-hairpin-design.status` and `studies.retron-hairpin-design.preflight` only for explicit status or readiness questions. | `.agents/skills/retron-hairpin-study/SKILL.md` |
 
 ### Authority chain
 
@@ -44,6 +53,8 @@ untouched and pin that study's directory or route map directly.
 Each checked-in live study keeps these artifacts:
 
 - `README.md`: directory ontology and first-hop usage note
+  - include YAML frontmatter with `doc_id`, `surface`, `study_id`, `owner`,
+    `last_verified`, and `first_hop` or `entrypoint`
 - `record/`: checked-in factual record plane
   - `record/campaign.yaml`: optional explicit campaign/progress manifest
   - `record/datasets.yaml`: affiliated dataset registry and sync posture
@@ -55,13 +66,20 @@ Each checked-in live study keeps these artifacts:
     and lists `parts` under `operations/contract/`.
   - `operations/contract/`: optional split lifecycle, artifact,
     execution-surface, snapshot, and preflight declarations loaded by
-    `ops.study.yaml`. Keep fragment files under semantic sublanes such as
-    `lifecycle/`, `surfaces/`, `status/`, and `readiness/`.
-  - `operations/catalog/`: optional status/preflight catalog pages and registry
-    sidecars for studies with concrete OPS providers.
+    `ops.study.yaml`. A `parts` entry may point at one file or a short ordered
+    list of files. Keep fragment files under semantic sublanes such as
+    `lifecycle/`, `surfaces/execution/{runbooks,commands}/`, `status/`, and
+    `readiness/checks/`. Split any bulky owner lane into a nested directory
+    before it becomes a 200-line mixed-purpose YAML file.
+  - `operations/catalog/`: optional status/preflight catalog pages for studies
+    with concrete OPS providers. Put the contract pages under
+    `operations/catalog/contracts/` and their runbook-catalog sidecars under
+    `operations/catalog/contracts/registry/`.
   - `operations/runtime/command-groups/pipeline.yaml`: optional machine-readable runtime context for
     exact command groups or automation bootstrap
 - `routes/README.md`: optional one-hop handoff map for current owner surfaces
+  - include YAML frontmatter with `doc_id`, `surface: study-route-map`,
+    `study_id`, `owner`, `last_verified`, and status/preflight posture
 - `routes/`: optional focused route-detail pages when one owner surface would
   otherwise turn the router into a workflow encyclopedia
 - `contexts/`: optional long-form study rationale or handoff notes that are not
@@ -95,21 +113,29 @@ docs/studies/<study-id>/
   operations/
     ops.study.yaml
     catalog/
-      status.md
-      status.registry.yaml
-      preflight.md
-      preflight.registry.yaml
+      contracts/
+        status.md
+        preflight.md
+        registry/
+          status.registry.yaml
+          preflight.registry.yaml
     contract/
       lifecycle/
         mode.yaml
         phases.yaml
       surfaces/
         artifacts.yaml
-        execution_surfaces.yaml
+        execution/
+          workspaces.yaml
+          runbooks/
+          commands/
       status/
         snapshot.yaml
       readiness/
-        preflight.yaml
+        scope.yaml
+        group-bindings.yaml
+        next-scope.yaml
+        checks/
     runtime/
       command-groups/
         pipeline.yaml
@@ -140,6 +166,6 @@ instead of growing a study-local tool.
 - [Study index](index.yaml)
 - [Retron hairpin route map](retron_hairpin_design/routes/README.md)
 - [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes/README.md)
-- [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/operations/catalog/status.md)
-- [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/operations/catalog/preflight.md)
+- [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/operations/catalog/contracts/status.md)
+- [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md)
 - [Documentation index](../README.md)

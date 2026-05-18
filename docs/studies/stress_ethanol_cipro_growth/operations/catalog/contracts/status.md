@@ -11,7 +11,7 @@
 **Status-kind:** stress-ethanol-cipro-growth-status
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-18
 
 Use this only for `stress_ethanol_cipro_growth`. The provider lives in the
 study package and rejects other `study_id` values. It is not a promoter-family
@@ -49,5 +49,5 @@ selected X column.
 ### Next Surface
 
 Use [preflight](preflight.md) for command-level readiness and blockers. Use
-[routes](../../routes/README.md) after the state question is answered and the next
+[routes](../../../routes/README.md) after the state question is answered and the next
 task is to operate a specific owner tool.

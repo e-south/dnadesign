@@ -12,6 +12,8 @@ Start with:
 - [Choose a workflow](#choose-a-workflow) to follow a single-tool path, a cross-tool dataset path, or an operations path.
 - [Runbook catalog](runbooks/README.md) when you want commands before longer docs.
 - [Tool docs](#tool-docs) when you already know the package.
+- [Checked-in study routes](#checked-in-study-routes) when a task names a live
+  study and you need its route/status surface.
 - [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for repo contracts and operator docs.
 
 ### Inspect available work
@@ -56,14 +58,25 @@ Use these when data moves through more than one tool and the shared record lives
 | Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Review the stress/ethanol/cipro Evo2 route before choosing the next step | [Stress/ethanol/cipro Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter/evo2-journey.md) | Continue to [promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) only when the task is the generic USR handoff. |
-| Check the current stress/ethanol/cipro study record | [Stress ethanol/cipro status contract](studies/stress_ethanol_cipro_growth/operations/catalog/status.md) | Read the concrete study record in `docs/studies/stress_ethanol_cipro_growth/`, then open its route map when the next need is owner-surface navigation. |
-| Run the deeper stress/ethanol/cipro command preflight | [Stress ethanol/cipro preflight contract](studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md) | Use the study-owned preflight only for blocker or next-run readiness for `stress_ethanol_cipro_growth`. |
+| Check the current stress/ethanol/cipro study record | [Stress ethanol/cipro status contract](studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md) | Read the concrete study record in `docs/studies/stress_ethanol_cipro_growth/`, then open its route map when the next need is owner-surface navigation. |
+| Run the deeper stress/ethanol/cipro command preflight | [Stress ethanol/cipro preflight contract](studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md) | Use the study-owned preflight only for blocker or next-run readiness for `stress_ethanol_cipro_growth`. |
 | Navigate a checked-in study without exposing study-specific routes here | [Study records index](studies/README.md) | Use the active selector or named study directory, then open `docs/studies/<study-id>/routes/README.md`, `operations/ops.study.yaml`, and `operations/runtime/command-groups/pipeline.yaml` for declared status, preflight, or compiler routes. |
 | Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active study selector and `record_root` in [Study index](studies/index.yaml), then read `operations/ops.study.yaml` for explicit Ops surfaces. |
 | Build a promoter feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/routes/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync/audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync/fidelity-drills.md). |
 | Chain DenseGen -> USR -> Infer -> USR updates | [Chained DenseGen and Infer sync runbook](../src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
+
+### Checked-In Study Routes
+
+Use this table when the task names one concrete study. Do not borrow a status
+provider across studies.
+
+| Study | First route | Status surface | When to use Ops |
+| --- | --- | --- | --- |
+| `stress_ethanol_cipro_growth` | [routes](studies/stress_ethanol_cipro_growth/routes/README.md) | [status](studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md), [preflight](studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md) | Use `ops progress show` for status, blocker, or readiness questions. |
+| `regulondb_native_promoter_panel` | [routes](studies/regulondb_native_promoter_panel/routes/README.md) | record-only: `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml` | Do not use Ops status/preflight; no provider is registered. |
+| `retron_hairpin_design` | [routes](studies/retron_hairpin_design/routes/README.md) | [status](studies/retron_hairpin_design/operations/catalog/contracts/status.md), [preflight](studies/retron_hairpin_design/operations/catalog/contracts/preflight.md) | Use Ops only for explicit progress/readiness questions; deliverable requests route to materialize. |
 
 #### Scheduler and environment workflows
 

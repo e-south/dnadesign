@@ -1,0 +1,20 @@
+checks:
+  snapback_released_probe:
+  - kind: workspace_layout
+    check_id: de033.workspace
+    check_group: snapback_workspace
+    summary: de033 workspace is present.
+    required: true
+    surface: de033_workspace
+  - kind: path_exists
+    check_id: de033.runbook
+    check_group: snapback_workspace
+    summary: Released-product Snapback runbook is present.
+    required: true
+    artifact: snapback_released_runbook
+  - kind: command
+    check_id: de033.released_target_search
+    check_group: snapback_probe
+    summary: Released-product target-search probe completed.
+    required: true
+    surface: snapback_released_target_search

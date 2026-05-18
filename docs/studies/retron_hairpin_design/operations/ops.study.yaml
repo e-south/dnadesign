@@ -14,6 +14,17 @@ parts:
   lifecycle: contract/lifecycle/mode.yaml
   tracks: contract/lifecycle/tracks.yaml
   artifacts: contract/surfaces/artifacts.yaml
-  execution_surfaces: contract/surfaces/execution_surfaces.yaml
+  execution_surfaces:
+  - contract/surfaces/execution/workspaces.yaml
+  - contract/surfaces/execution/commands/snapback.yaml
+  - contract/surfaces/execution/commands/yiu.yaml
+  - contract/surfaces/execution/commands/compiler.yaml
   snapshot: contract/status/snapshot.yaml
-  preflight: contract/readiness/preflight.yaml
+  preflight:
+  - contract/readiness/scope.yaml
+  - contract/readiness/group-bindings.yaml
+  - contract/readiness/next-scope.yaml
+  - contract/readiness/checks/context_consolidation.yaml
+  - contract/readiness/checks/msd_design_reference_catalog.yaml
+  - contract/readiness/checks/snapback_released_probe.yaml
+  - contract/readiness/checks/yiu_boundary_check.yaml

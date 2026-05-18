@@ -12,7 +12,7 @@
   next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
 - id: infer_batch_preparation
   status: complete
-  next_surface: repo:docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md
+  next_surface: repo:docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md
 - id: infer_sequence_views_anchor_construct_insert_7b
   status: complete
   next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml

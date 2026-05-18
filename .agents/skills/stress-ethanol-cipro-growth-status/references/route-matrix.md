@@ -16,7 +16,7 @@ surface but belongs somewhere else.
 | Which study files are authoritative? | `record/campaign.yaml`, `record/datasets.yaml`, `record/status.md`, `operations/ops.study.yaml`, plus `routes/README.md` and `operations/runtime/command-groups/pipeline.yaml` when present | The checked-in record stays authoritative. |
 | Which dataset sync posture is current? | `record/datasets.yaml` plus `usr.data-plane.hpc-sync` evidence | Sync posture belongs to the dataset registry, not to this router. |
 | Is the study still source-phase or already downstream? | Snapshot plus `record/status.md` | Use record-backed `source/handoff mode` language until a canonical feature dataset exists. |
-| The study record is missing or inconsistent. | `docs/studies/README.md` plus `operations/catalog/status.md` | Fail visibly, repair the selector or record, then rerun status. |
+| The study record is missing or inconsistent. | `docs/studies/README.md` plus `operations/catalog/contracts/status.md` | Fail visibly, repair the selector or record, then rerun status. |
 
 Status-first routing boundary:
 

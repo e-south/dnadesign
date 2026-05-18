@@ -1,0 +1,54 @@
+msd_design_reference_lint:
+  surface_type: command
+  cwd_ref: repo:.
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - lint
+  - --id
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+  - --format
+  - json
+msd_design_reference_compile:
+  surface_type: command
+  cwd_ref: repo:.
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - compile
+  - --input
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+  - --out-dir
+  - /tmp/dnadesign_retron_msd_design_references
+  - --format
+  - json
+msd_single_unit_materialize:
+  surface_type: command
+  cwd_ref: repo:.
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - materialize
+  - --input
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+  - --out-dir
+  - /tmp/dnadesign_retron_msd_sequences
+  - --payload-sequence
+  - TetR=<payload-sequence>
+  - --cap-sequence
+  - C26=<cap-sequence>
+  - --cap-sequence
+  - C172=<cap-sequence>
+  - --render-format
+  - png
+  - --format
+  - json

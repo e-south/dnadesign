@@ -1,0 +1,9 @@
+usr_validate_native_dataset:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - usr
+  - validate
+  - usr_regulondb_native_promoters
+  - --strict

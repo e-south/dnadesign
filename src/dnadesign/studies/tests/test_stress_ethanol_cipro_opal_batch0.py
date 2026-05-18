@@ -911,7 +911,9 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
 
 def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_matrix() -> None:
     registry = yaml.safe_load(
-        (STUDY_DOCS / "operations" / "catalog" / "status.registry.yaml").read_text(encoding="utf-8")
+        (STUDY_DOCS / "operations" / "catalog" / "contracts" / "registry" / "status.registry.yaml").read_text(
+            encoding="utf-8"
+        )
     )
     relation_targets = {relation["target"] for relation in registry["relations"]}
 

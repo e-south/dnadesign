@@ -9,7 +9,9 @@ design study.
 - `ops.study.yaml`: thin Ops contract router with part paths.
 - `catalog/`: OPS status/preflight catalog pages and registry sidecars.
 - `contract/`: lifecycle, track, surface, status, and readiness declaration
-  fragments loaded by `ops.study.yaml`.
+  fragments loaded by `ops.study.yaml`. Execution surfaces are split into
+  `contract/surfaces/execution/{workspaces,commands}/`; readiness checks are
+  split by Retron track under `contract/readiness/checks/`.
 - `runtime/command-groups/pipeline.yaml`: command groups and automation
   bootstrap metadata.
 

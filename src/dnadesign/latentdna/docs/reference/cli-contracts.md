@@ -122,7 +122,7 @@ Workspace-specific flags:
 
 - Use `latentdna workspace init --from-study-dir docs/studies/stress_ethanol_cipro_growth --template promoter_reference_margin_benchmark` to hydrate the promoter-study pre-assay representation-triage ladder from the checked-in study record.
 - Use `latentdna workspace refresh` to clear workspace-local LatentDNA artifacts without touching upstream `usr/datasets`.
-- Use `latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json` before study-status or promoter-study tooling inspects LatentDNA state.
+- Use `latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run` before study-status or promoter-study tooling inspects LatentDNA state.
 - Use `latentdna validate workspace --deep` to confirm the declared source keys, view vector columns, cohort columns, landmark selector columns, and study-binding files against the live study data without materializing embedding matrices.
 - Use `latentdna deliverable status <deliverable-id>` after recipe or deliverable runs to surface freshness drift from recorded input-path digests rather than only presence/absence checks.
 - Canonical runtime artifacts live directly under `outputs/`. Nested output roots are rejected.

@@ -1,0 +1,5 @@
+group_phase_bindings:
+  densegen: densegen_growth
+  construct: construct_context_expansion
+  notify_environment: infer_batch_preparation
+  latentdna: latentdna_reference_normalization_audit

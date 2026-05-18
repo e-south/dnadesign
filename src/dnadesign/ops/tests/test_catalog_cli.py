@@ -78,9 +78,9 @@ legacy_alias: stale
         _load_registry_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
 
 
-def test_catalog_registry_metadata_can_live_under_operations_catalog_directory(tmp_path: Path) -> None:
-    doc_path = tmp_path / "docs" / "studies" / "demo_study" / "operations" / "catalog" / "preflight.md"
-    metadata_path = doc_path.with_name("preflight.registry.yaml")
+def test_catalog_registry_metadata_can_live_under_operations_catalog_contracts_directory(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "studies" / "demo_study" / "operations" / "catalog" / "contracts" / "preflight.md"
+    metadata_path = doc_path.parent / "registry" / "preflight.registry.yaml"
     catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
     _write(doc_path, "# Demo Preflight\n")
     _write(catalog_path, "# Runbooks\n")
@@ -108,7 +108,7 @@ summary: Demo preflight contract.
     )
 
     assert entry.title == "Demo Preflight"
-    assert entry.doc_path == "../studies/demo_study/operations/catalog/preflight.md"
+    assert entry.doc_path == "../studies/demo_study/operations/catalog/contracts/preflight.md"
     assert relations == ()
 
 

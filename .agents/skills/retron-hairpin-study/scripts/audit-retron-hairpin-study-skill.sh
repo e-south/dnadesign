@@ -131,8 +131,17 @@ require_file "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssd
 require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/ops.study.yaml"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/status.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/preflight.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/workspaces.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/compiler.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/snapback.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/yiu.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/scope.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/group-bindings.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/next-scope.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/checks/context_consolidation.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/checks/msd_design_reference_catalog.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/references.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/catalog_bundle.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/materialization.py"
@@ -168,6 +177,18 @@ if [[ -e "$OLD_SKILL_DIR" ]]; then
   fail "old skill directory removed"
 else
   pass "old skill directory removed"
+fi
+
+if [[ -e "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution_surfaces.yaml" ]]; then
+  fail "Retron execution surfaces split into semantic fragments"
+else
+  pass "Retron execution surfaces split into semantic fragments"
+fi
+
+if [[ -e "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/preflight.yaml" ]]; then
+  fail "Retron readiness checks split into semantic fragments"
+else
+  pass "Retron readiness checks split into semantic fragments"
 fi
 
 cat "$SKILL_FILE" > "$TMP_COMBINED"

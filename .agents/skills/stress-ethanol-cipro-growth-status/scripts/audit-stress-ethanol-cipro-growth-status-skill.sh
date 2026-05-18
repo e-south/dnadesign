@@ -90,9 +90,14 @@ PY
 }
 
 require_file "$SKILL_FILE"
-require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md"
-require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/notify/profile-doctor.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/notify/resolve-events.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/sequence-views.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/completion.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/notify.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/README.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/densegen.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md"
@@ -116,6 +121,7 @@ require_file "$REFERENCE_DIR/external-sources.md"
 
 require_frontmatter_yaml
 require_section "## Required Deliverables"
+require_section "## Trigger Tests"
 require_pattern '^name: stress-ethanol-cipro-growth-status$' "skill name is study-specific"
 require_pattern 'studies\.stress-ethanol-cipro-growth\.status' "skill names study status command"
 require_pattern 'studies\.stress-ethanol-cipro-growth\.preflight' "skill names study preflight command"
@@ -134,6 +140,18 @@ require_absent 'usr\.data-plane\.promoter-study' "skill has no old registry id"
 require_absent 'status_adapters/promoter_status' "skill has no old adapter path"
 require_absent 'generic promoter' "skill avoids generic promoter routing language"
 
+if [[ -e "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/notify.yaml" ]]; then
+  fail "stress Notify commands are split by subcommand family"
+else
+  pass "stress Notify commands are split by subcommand family"
+fi
+
+if [[ -e "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation.yaml" ]]; then
+  fail "stress Infer readiness checks are split by owner/action lane"
+else
+  pass "stress Infer readiness checks are split by owner/action lane"
+fi
+
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py" 320 "status service stays orchestration-sized"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/runtime_dependencies.py" 140 "runtime probe module stays bounded"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/semantic_completeness.py" 200 "semantic-completeness probe module stays bounded"
@@ -146,6 +164,8 @@ require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/an
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md" 100 "OPAL route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md" 80 "OPAL command detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md" 120 "LatentDNA route detail stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/sequence-views.yaml" 120 "Infer sequence-view readiness fragment stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/notify.yaml" 100 "Infer Notify readiness fragment stays bounded"
 
 if [[ $failures -eq 0 ]]; then
   printf 'Audit finished with no failures.\n'

@@ -1,3 +1,14 @@
+---
+doc_id: study-retron-hairpin-design-routes
+surface: study-route-map
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+entrypoint: self
+status_surface: studies.retron-hairpin-design.status
+preflight_surface: studies.retron-hairpin-design.preflight
+---
+
 ## Retron Hairpin Design Effort Routes
 
 **Owner:** dnadesign-maintainers
@@ -6,6 +17,15 @@
 Retron MSD product work starts from the user's provided parts and desired
 output, not from study phase. Status/preflight surfaces are only for explicit
 progress or blocker questions.
+
+### Navigation Header
+
+| Need | Surface |
+| --- | --- |
+| Primary route | this page |
+| Status | `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` |
+| Preflight | `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` |
+| Machine-readable contract | `../operations/ops.study.yaml` |
 
 ### Quick Route
 

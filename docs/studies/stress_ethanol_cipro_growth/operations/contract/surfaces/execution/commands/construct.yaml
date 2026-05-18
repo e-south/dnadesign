@@ -1,0 +1,23 @@
+construct_workspace_doctor:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - construct
+  - workspace
+  - doctor
+  - --workspace
+  - src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+construct_runtime_forward_anchor_window:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - construct
+  - workspace
+  - validate-project
+  - --workspace
+  - src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+  - --project
+  - forward_anchor_window
+  - --runtime

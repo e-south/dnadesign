@@ -490,7 +490,7 @@ def test_inspect_stress_ethanol_cipro_growth_exploratory_analysis_reports_snapsh
         "pooled_logits_7b_full_context_1kb",
     ]
     assert latentdna_surface["commands"]["snapshot"] == (
-        "uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json"
+        "uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run"
     )
 
 

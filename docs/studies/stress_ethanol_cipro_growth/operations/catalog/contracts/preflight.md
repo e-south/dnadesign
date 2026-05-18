@@ -11,7 +11,7 @@
 **Status-kind:** stress-ethanol-cipro-growth-preflight
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-18
 
 Use this after [status](status.md) when the question is blocker or
 next-run readiness for `stress_ethanol_cipro_growth`.
@@ -41,4 +41,4 @@ cursors, or infer a hidden readiness graph from generic runbooks.
 actionable phase and defer later-lane blockers. `--scope full` reports the full
 declared suite.
 
-Use [routes](../../routes/README.md) for the owner handoff after blockers are clear.
+Use [routes](../../../routes/README.md) for the owner handoff after blockers are clear.

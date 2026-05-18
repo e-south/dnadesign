@@ -18,12 +18,16 @@ docs/studies/<study-id>/
     status.md
   operations/
     ops.study.yaml
-    catalog/      # optional OPS status/preflight catalog docs
+    catalog/      # optional OPS catalog index
+      contracts/
+        registry/
     contract/      # optional split parts loaded by ops.study.yaml
       lifecycle/
       surfaces/
+        execution/
       status/
       readiness/
+        checks/
     runtime/
       command-groups/
         pipeline.yaml  # optional exact command groups/runtime context
@@ -37,7 +41,9 @@ docs/studies/<study-id>/
 ```
 
 - `README.md`, when present, names the study-local directory ontology and the
-  first-hop usage rules.
+  first-hop usage rules. Use YAML frontmatter for agent routing fields:
+  `doc_id`, `surface`, `study_id`, `owner`, `last_verified`, and `first_hop`
+  or `entrypoint`.
 - `record/campaign.yaml` is an optional explicit multi-step manifest generated from
   `uv run ops progress scaffold ...` and then filled with real artifact paths.
 - `record/datasets.yaml` declares which USR datasets belong to the study and how they
@@ -47,15 +53,23 @@ docs/studies/<study-id>/
   or track maps, record sources, artifacts, execution surfaces, and preflight
   planning.
 - `operations/contract/`, when present, stores split YAML sections referenced
-  by `operations/ops.study.yaml` `parts`. Use it when lifecycle, artifact,
-  execution-surface, or preflight declarations would make the entrypoint hard
-  to scan. Keep fragments under `lifecycle/`, `surfaces/`, `status/`, and
-  `readiness/`.
-- `operations/catalog/`, when present, stores status/preflight catalog docs and
-  adjacent registry sidecars for studies with concrete OPS providers.
+  by `operations/ops.study.yaml` `parts`. A part can point at one file or a
+  short ordered list of files. Use lists when execution surfaces or preflight
+  checks would otherwise become a flat shelf. Keep fragments under
+  `lifecycle/`, `surfaces/execution/{runbooks,commands}/`, `status/`, and
+  `readiness/checks/`. If one owner lane grows beyond scan-friendly size,
+  split it into a nested semantic directory and keep `ops.study.yaml` as the
+  one-hop index.
+- `operations/catalog/`, when present, stores status/preflight catalog docs for
+  studies with concrete OPS providers. Put catalog contract pages under
+  `operations/catalog/contracts/` and their registry sidecars under
+  `operations/catalog/contracts/registry/`.
 - `operations/runtime/command-groups/pipeline.yaml`, when present, records exact command groups or
   runtime context that should not be reconstructed from generic tool docs.
 - `routes/README.md`, when present, is the study-owned one-hop handoff page.
+  Use YAML frontmatter with `surface: study-route-map`, `study_id`, and the
+  status/preflight posture so blank-thread agents can classify it before
+  reading the full page.
 - `routes/`, when present, keeps focused owner-surface details out of the
   one-hop router.
 - `contexts/`, when present, stores long-form rationale or handoff notes that

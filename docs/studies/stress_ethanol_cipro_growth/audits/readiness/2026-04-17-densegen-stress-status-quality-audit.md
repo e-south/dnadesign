@@ -191,7 +191,7 @@ Evidence:
 - `docs/studies/stress_ethanol_cipro_growth/routes/README.md:1-9`
 - `docs/studies/stress_ethanol_cipro_growth/record/status.md:45-51`
 - `docs/studies/README.md:16-35`
-- `docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md:25-31`
+- `docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md:25-31`
 
 #### 7. DenseGen exposes a public contract for USR output, but not for its
 analysis surface

@@ -1,0 +1,11 @@
+yiu_direct_validate:
+  surface_type: command
+  cwd_ref: repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr
+  argv:
+  - uv
+  - run
+  - cruncher
+  - yiu
+  - validate
+  - --spec
+  - configs/yiu/tetr_teto2_wt_direct.yiu.yaml

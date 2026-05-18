@@ -233,7 +233,7 @@ def _inspect_latentdna_surface(
     }
     if workspace_id is not None:
         commands = {
-            "snapshot": f"uv run latentdna workspace snapshot --workspace {workspace_id} --json",
+            "snapshot": f"uv run latentdna workspace snapshot --workspace {workspace_id} --json --dry-run",
             "validate": f"uv run latentdna validate workspace --workspace {workspace_id} --deep",
             "deliverable_status_template": (
                 f"uv run latentdna deliverable status <deliverable-id> --workspace {workspace_id}"

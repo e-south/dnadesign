@@ -9,7 +9,10 @@ stress/ethanol/cipro growth study.
 - `ops.study.yaml`: thin Ops contract router with part paths.
 - `catalog/`: OPS status/preflight catalog pages and registry sidecars.
 - `contract/`: lifecycle, phase, surface, status, and readiness declaration
-  fragments loaded by `ops.study.yaml`.
+  fragments loaded by `ops.study.yaml`. Execution command fragments are split
+  by owner lane, with Notify subcommands under `contract/surfaces/execution/commands/notify/`.
+  Large Infer readiness checks are split under
+  `contract/readiness/checks/infer_batch_preparation/`.
 - `runtime/command-groups/pipeline.yaml`: command groups and downstream surface
   bindings.
 

@@ -1,6 +1,6 @@
 ## OPAL Route Detail
 
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-18
 
 Use this only after `routes/README.md` selects the OPAL campaign surface.
 
@@ -23,6 +23,16 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - Candidate table and label-source semantics:
   `../../../contexts/opal/candidate-table.md`
 - Campaign configs and commands: `campaign-commands.md`
+
+### Candidate Table Contract
+
+- Dataset id: `usr_prom_eth_cip_opal_candidates`
+- Role: `opal_candidate_feature_table`
+- Candidate universe: dense generated promoters only; archive SFXI, native,
+  reference, and control rows remain review context.
+- X column: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
+- Shared labels: `_opal/observed_labels.parquet` under the candidate table
+  dataset.
 
 ### Boundaries
 

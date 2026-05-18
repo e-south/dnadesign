@@ -1,0 +1,20 @@
+next_scope:
+  target_phase_groups:
+    densegen_growth:
+    - densegen
+    merged_anchor_set: []
+    construct_context_expansion:
+    - construct
+    infer_batch_preparation:
+    - infer
+    - notify_environment
+    - notify
+    - infer_batch_plan
+    latentdna_reference_normalization_audit:
+    - latentdna
+  runtime_phase_groups:
+  - infer
+  - notify
+  - infer_batch_plan
+  runtime_shared_groups:
+  - notify_environment

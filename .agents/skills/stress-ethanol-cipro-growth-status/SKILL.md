@@ -2,7 +2,7 @@
 name: stress-ethanol-cipro-growth-status
 description: Report record-backed status for stress_ethanol_cipro_growth. Use for current phase, active datasets, preflight, or LatentDNA/OPAL handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 1.0.2
+  version: 1.0.3
   category: workflow-automation
   tags: [studies, stress-ethanol-cipro-growth, status, routes, preflight]
 ---
@@ -56,6 +56,18 @@ Out of scope:
 - downstream posture for LatentDNA, Cluster, and OPAL when present in status evidence
 - preflight blockers only when preflight was requested
 - exact missing-record or mismatch errors when the record is incomplete
+
+## Trigger Tests
+
+Should trigger:
+- "Where is stress_ethanol_cipro_growth now?"
+- "Run the stress ethanol cipro preflight for the next phase."
+- "Which LatentDNA or OPAL route owns the current stress-study handoff?"
+
+Should not trigger:
+- "Where is regulondb_native_promoter_panel now?"
+- "Run a generic OPAL campaign walkthrough."
+- "Reconstruct current state from workspace outputs instead of the checked-in study record."
 
 ## References
 

@@ -1,3 +1,14 @@
+---
+doc_id: study-retron-hairpin-design
+surface: study-root
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+first_hop: routes/README.md
+status_surface: studies.retron-hairpin-design.status
+preflight_surface: studies.retron-hairpin-design.preflight
+---
+
 ## Retron Hairpin Design Study
 
 **Owner:** dnadesign-maintainers
@@ -22,8 +33,11 @@ retron_hairpin_design/
     contract/
       lifecycle/
       surfaces/
+        execution/
+          commands/
       status/
       readiness/
+        checks/
     runtime/
       command-groups/
         pipeline.yaml

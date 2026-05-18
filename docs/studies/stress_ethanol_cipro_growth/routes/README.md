@@ -1,4 +1,17 @@
+---
+doc_id: study-stress-ethanol-cipro-growth-routes
+surface: study-route-map
+study_id: stress_ethanol_cipro_growth
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+entrypoint: self
+status_surface: studies.stress-ethanol-cipro-growth.status
+preflight_surface: studies.stress-ethanol-cipro-growth.preflight
+---
+
 ## stress_ethanol_cipro_growth Routes
+
+**Owner:** dnadesign-maintainers
 
 **Last verified:** 2026-05-18
 
@@ -7,6 +20,15 @@ Use this page after the checked-in study status tells you where the record stand
 - Status: `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 - Preflight: `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json`
 - Snapshot route inventory: `evidence.analysis_surfaces.{densegen,latentdna,cluster}`
+
+### Navigation Header
+
+| Need | Surface |
+| --- | --- |
+| Primary route | this page |
+| Status | `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` |
+| Preflight | `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json` |
+| Machine-readable contract | `../operations/ops.study.yaml` |
 
 ### Route Index
 
