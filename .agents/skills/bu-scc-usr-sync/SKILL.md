@@ -44,10 +44,10 @@ Out of scope:
 ## Workflow
 
 1. Load the canonical sync surfaces.
-- Start at `src/dnadesign/usr/docs/operations/sync.md`.
-- Use `src/dnadesign/usr/docs/operations/sync-setup.md` for SSH keys, remote
+- Start at `src/dnadesign/usr/docs/operations/sync/README.md`.
+- Use `src/dnadesign/usr/docs/operations/sync/setup.md` for SSH keys, remote
   profiles, and auth posture.
-- Use `docs/bu-scc/README.md` and `docs/bu-scc/quickstart.md` for SCC-specific
+- Use `docs/bu-scc/README.md` and `docs/bu-scc/setup/quickstart.md` for SCC-specific
   storage and environment context.
 - Use [sync-loop.md](references/sync-loop.md) for the short operator ladder.
 

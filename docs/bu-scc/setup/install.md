@@ -13,14 +13,14 @@
 - You want to verify toolchain health before running long jobs.
 
 **Not for:**
-- Long-running production jobs (use [BU SCC Batch + Notify runbook](batch-notify.md)).
-- Operational monitoring setup (use [BU SCC Batch + Notify runbook](batch-notify.md) and [Notify USR events operator manual](../notify/usr-events.md)).
+- Long-running production jobs (use [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)).
+- Operational monitoring setup (use [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md) and [Notify USR events operator manual](../../notify/usr-events.md)).
 - Large model or dataset transfers on compute nodes (use BU data transfer node workflows).
 
 ### Scope
 
 - This doc covers environment setup and validation for CPU and Evo2 GPU workflows.
-- For batch submission and Notify operations, use [BU SCC Batch + Notify runbook](batch-notify.md).
+- For batch submission and Notify operations, use [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md).
 
 Run this from an SCC login shell:
 - `ssh <BU_USERNAME>@scc1.bu.edu`
@@ -593,7 +593,7 @@ Expected result for `TARGET_MODEL_ID=evo2_40b` on one L40S: `RUN_CAPACITY_FAIL`.
 ### 7) Next step
 
 For long jobs, arrays, Notify watchers, and transfer-node workflows, use:
-- [BU SCC Batch + Notify runbook](batch-notify.md)
+- [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)
 
 ---
 
@@ -754,8 +754,8 @@ PY
 
 ---
 
-Back: [BU SCC index](README.md)
+Back: [BU SCC index](../README.md)
 
 Next: [BU SCC Quickstart](quickstart.md)
 
-Next: [BU SCC Batch + Notify runbook](batch-notify.md)
+Next: [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)

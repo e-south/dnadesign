@@ -90,7 +90,7 @@ pixi install --locked
 pixi run -- fimo --version
 ```
 
-Dependency maintenance operations (add/update/remove) are documented in **[docs/dependencies.md](dependencies.md)**.
+Dependency maintenance operations are documented in **[Dependency maintenance](dependencies.md)**.
 
 ### 6) GPU extra (`infer-evo2`)
 This command is Linux `x86_64` only.
@@ -106,9 +106,9 @@ uv sync --locked --group dev --extra infer-evo2
 ```
 
 For SCC GPU setup, including environment exports and build controls, use:
-- [BU SCC install bootstrap: GPU setup and verification runbook](bu-scc/install.md#gpu-setup-and-verification-runbook)
-- [BU SCC install bootstrap: capacity gate and resource profile](bu-scc/install.md#64-capacity-gate-and-resource-profile)
-- [infer SCC Evo2 GPU environment runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
+- [BU SCC install bootstrap: GPU setup and verification runbook](../bu-scc/setup/install.md#gpu-setup-and-verification-runbook)
+- [BU SCC install bootstrap: capacity gate and resource profile](../bu-scc/setup/install.md#64-capacity-gate-and-resource-profile)
+- [infer SCC Evo2 GPU environment runbook](../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 SCC infer path policy:
 - keep one environment at `<dnadesign_repo>/.venv` (`UV_PROJECT_ENVIRONMENT="$PWD/.venv"`).
@@ -134,5 +134,5 @@ export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
 
 ### 8) Continue with workflow docs
 - If you want the shortest shell-first route after baseline verification, start with `uv run ops catalog list --simple`.
-- For workflow execution from the docs map, use [docs/README.md](README.md).
-- For BU SCC workflows, follow this order: [BU SCC quickstart](bu-scc/quickstart.md), [BU SCC install bootstrap](bu-scc/install.md), then [BU SCC batch plus Notify runbook](bu-scc/batch-notify.md).
+- For workflow execution from the docs map, use [docs/README.md](../README.md).
+- For BU SCC workflows, follow this order: [BU SCC quickstart](../bu-scc/setup/quickstart.md), [BU SCC install bootstrap](../bu-scc/setup/install.md), then [BU SCC batch plus Notify runbook](../bu-scc/runbooks/batch-notify.md).

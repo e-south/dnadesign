@@ -10,6 +10,6 @@ Use `ARCHITECTURE.md` first, then drill into sections here.
 ### Contents
 - [Cross-tool information architecture contract](../../ARCHITECTURE.md#cross-tool-information-architecture)
 - [Decision records (ADRs)](decisions/README.md)
-- [Monorepo organization audit](../dev/monorepo-organization-audit.md)
+- [Monorepo organization audit](../dev/audits/monorepo-organization.md)
 - [Root architecture map](../../ARCHITECTURE.md)
 - [Design invariants](../../DESIGN.md)

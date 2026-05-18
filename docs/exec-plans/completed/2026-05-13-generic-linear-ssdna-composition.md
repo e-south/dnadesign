@@ -524,11 +524,11 @@ regenerated from the dogfood config when needed.
 Read these files first:
 
 - Dev spec:
-  [generic linear ssDNA composition spec](../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
+  [generic linear ssDNA composition spec](../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 - Study handoff:
   [Retron linear ssDNA composition](../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
 - Study routes:
-  [Retron Hairpin routes](../../studies/retron_hairpin_design/routes.md)
+  [Retron Hairpin routes](../../studies/retron_hairpin_design/routes/README.md)
 - Scar-nick context:
   [scar-nick base-junction](../../studies/retron_hairpin_design/contexts/scar-nick-base-junction.md)
 - Planning lifecycle:
@@ -673,7 +673,7 @@ Repo acceptance:
 ### Links
 
 - Proposal:
-  [generic linear ssDNA composition spec](../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
+  [generic linear ssDNA composition spec](../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 - Study handoff:
   [Retron linear ssDNA composition](../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
 - PR: https://github.com/e-south/dnadesign/pull/47

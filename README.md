@@ -17,7 +17,7 @@
 Use the docs index to choose a workflow, inspect existing work, or jump to a tool.
 
 - [Docs index](docs/README.md): main index for workflow, tool, and repository docs.
-- [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
+- [Installation](docs/setup/installation.md): bootstrap the environment and run baseline verification commands.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.
 

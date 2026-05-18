@@ -72,7 +72,7 @@ Out of scope:
 
 4. Route scheduler-backed watcher work outward instead of expanding this skill.
 - For BU SCC batch submits or long-running watcher jobs, use
-  `docs/bu-scc/batch-notify.md`.
+  `docs/bu-scc/runbooks/batch-notify.md`.
 - When queue/session decisions are in scope, use
   `.agents/skills/sge-hpc-ops/SKILL.md`.
 

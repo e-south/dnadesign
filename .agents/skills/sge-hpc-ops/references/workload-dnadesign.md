@@ -10,8 +10,8 @@ find "$REPO_ROOT/docs/bu-scc/jobs" -maxdepth 1 -type f -name "*.qsub" 2>/dev/nul
 ```
 
 Primary docs:
-- `docs/bu-scc/quickstart.md`
-- `docs/bu-scc/batch-notify.md`
+- `docs/bu-scc/setup/quickstart.md`
+- `docs/bu-scc/runbooks/batch-notify.md`
 - `docs/bu-scc/jobs/README.md`
 
 ### Storage and quota precheck

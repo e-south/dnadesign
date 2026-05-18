@@ -189,10 +189,10 @@ Consequences:
 | Infer completion planner | Sequence-view bundles can be classified before model execution as reusable, stale, missing, or missing sequence products; zero-row selectors emit `missing_products` and `missing_product_selectors`. | `src/dnadesign/infer/src/features/completion_planner.py`, `src/dnadesign/infer/src/cli/commands/validate.py` |
 | Active Infer planner configs | Main and reference 7B sequence-view completion configs exist for dry-run feature planning. | `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml`, `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference.evo2_7b.yaml` |
 | Sequence-view runbook gates | Sequence-view Infer runbook plans add completion validation with product/stale thresholds before dry-run and submit planning. | `src/dnadesign/ops/orchestrator/plan_tools.py`, `src/dnadesign/ops/tests/test_runbook_orchestrator.py` |
-| Ops completion preflight | `infer_sequence_view_completion` runs the planner command, parses JSON, aggregates reusable/stale/missing/product-missing counts, and applies configured thresholds. | `src/dnadesign/ops/preflight/contract_checks.py`, `docs/studies/stress_ethanol_cipro_growth/ops.study.yaml` |
+| Ops completion preflight | `infer_sequence_view_completion` runs the planner command, parses JSON, aggregates reusable/stale/missing/product-missing counts, and applies configured thresholds. | `src/dnadesign/ops/preflight/contract_checks.py`, `docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml` |
 | Status aggregation | The cheap stress_ethanol_cipro_growth status snapshot exposes `sequence_view_contract_state` and `infer_feature_completion_state` for product contracts, generated sidecar freshness, and nonblocking feature-completion awareness. | `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py`, `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/snapshot.py` |
-| Study state | The checked-in study record says the branch is in `infer_batch_preparation`, with 157,279 anchor rows and 314,558 context rows. | `docs/studies/stress_ethanol_cipro_growth/status.md` |
-| Coverage gap | Existing Infer overlays are row-based and cover 157,164 ids on the anchor and context handoffs. Missing context coverage includes all reverse-complement contexts. | `docs/studies/stress_ethanol_cipro_growth/status.md` |
+| Study state | The checked-in study record says the branch is in `infer_batch_preparation`, with 157,279 anchor rows and 314,558 context rows. | `docs/studies/stress_ethanol_cipro_growth/record/status.md` |
+| Coverage gap | Existing Infer overlays are row-based and cover 157,164 ids on the anchor and context handoffs. Missing context coverage includes all reverse-complement contexts. | `docs/studies/stress_ethanol_cipro_growth/record/status.md` |
 
 ### Quality Bar
 
@@ -545,9 +545,9 @@ Current reporting split:
 
 Inputs:
 
-- `docs/studies/stress_ethanol_cipro_growth/status.md`
-- `docs/studies/stress_ethanol_cipro_growth/datasets.yaml`
-- `docs/studies/stress_ethanol_cipro_growth/pipeline.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/record/status.md`
+- `docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml`
 - Construct, USR, and Infer reference docs.
 
 Assertions:

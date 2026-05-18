@@ -19,13 +19,13 @@ history without starting from the full source spec.
 
 ### Current Authority
 
-- [Construct linear ssDNA composition reference](../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md):
+- [Construct linear ssDNA composition reference](../../../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md):
   current generic assembly contract and bundle layout.
-- [ADR 0002](../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md):
+- [ADR 0002](../../../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md):
   accepted architecture decision and ownership boundary.
-- [Retron linear ssDNA composition handoff](../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md):
+- [Retron linear ssDNA composition handoff](../../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md):
   Retron-specific study choices and caveats.
-- [Folding docs](../../../src/dnadesign/folding/docs/README.md):
+- [Folding docs](../../../../../src/dnadesign/folding/docs/README.md):
   secondary-structure prediction commands, bundle mode, and backend policy.
 
 ### Contract Boundary
@@ -56,13 +56,13 @@ belong in declared display profiles or study records.
 ### Reading Order
 
 1. Start with this page for the boundary and artifact map.
-2. Use the [Construct reference](../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
+2. Use the [Construct reference](../../../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
    for current behavior.
-3. Use the [implementation record](../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+3. Use the [implementation record](../../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
    for what shipped.
-4. Use the [hardening follow-up plan](../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
+4. Use the [hardening follow-up plan](../../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
    for remaining work.
-5. Use the [detailed source spec](linear-ssdna-composition/detailed-spec.md)
+5. Use the [detailed source spec](detailed-spec.md)
    only when you need the full design history.
 
 ### Claim Boundary

@@ -125,7 +125,7 @@ Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the s
 - optional legacy reset contract: set `INFER_RUN_ARGS=--overwrite` only when a direct row-writeback Infer run intentionally needs to recompute requested write-back outputs in place
 
 Before first submit on a host, run deterministic environment bootstrap:
-- [BU SCC install GPU setup and verification runbook](../install.md#gpu-setup-and-verification-runbook)
+- [BU SCC install GPU setup and verification runbook](../setup/install.md#gpu-setup-and-verification-runbook)
 - [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 ### Notify watcher submissions
@@ -227,7 +227,7 @@ tail -f outputs/logs/<job_name>.<job_id>.out
 
 For arrays, use `qsub -t ...` and consume `SGE_TASK_ID` inside scripts.
 
-Reference: [BU SCC Batch + Notify runbook: Job arrays](../batch-notify.md#5-job-arrays-parameter-sweeps)
+Reference: [BU SCC Batch + Notify runbook: Job arrays](../runbooks/batch-notify.md#5-job-arrays-parameter-sweeps)
 
 ### Edit vs submit-time overrides
 
@@ -237,5 +237,5 @@ Reference: [BU SCC Batch + Notify runbook: Job arrays](../batch-notify.md#5-job-
 
 ### References
 
-- Runbook: [BU SCC Batch + Notify runbook](../batch-notify.md)
+- Runbook: [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)
 - BU scheduler docs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/>

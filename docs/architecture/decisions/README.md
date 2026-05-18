@@ -23,7 +23,7 @@ Use this directory for new decisions going forward.
 3. Mark status as `proposed`, `accepted`, or `superseded`.
 
 ### Template
-- `../../templates/adr.md`
+- `../../templates/records/adr.md`
 
 ### Records
 - [ADR 0001: Namespace-scoped compatibility hashes for USR overlays](adr-0001-usr-namespace-contract-hash.md)

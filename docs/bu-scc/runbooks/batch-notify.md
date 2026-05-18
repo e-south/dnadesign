@@ -15,10 +15,10 @@
 **Key boundary:** Notify consumes **USR `<dataset>/.events.log`** (JSONL), not DenseGen `outputs/meta/events.jsonl`.
 
 Related docs:
-- Install/bootstrap: [BU SCC Install bootstrap](install.md)
-- End-to-end quick path: [BU SCC Quickstart](quickstart.md)
-- Job templates: [BU SCC jobs README](jobs/README.md)
-- Notify operator manual: [Notify USR events operator manual](../notify/usr-events.md)
+- Install/bootstrap: [BU SCC Install bootstrap](../setup/install.md)
+- End-to-end quick path: [BU SCC Quickstart](../setup/quickstart.md)
+- Job templates: [BU SCC jobs README](../jobs/README.md)
+- Notify operator manual: [Notify USR events operator manual](../../notify/usr-events.md)
 
 ---
 
@@ -80,14 +80,14 @@ set -euo pipefail
 
 ### 3) Canonical job scripts
 
-Use versioned templates from [BU SCC jobs README](jobs/README.md):
-- [DenseGen CPU batch template](jobs/densegen-cpu.qsub)
-- [Evo2 GPU template](jobs/evo2-gpu-infer.qsub)
-- [Notify watcher template](jobs/notify-watch.qsub)
+Use versioned templates from [BU SCC jobs README](../jobs/README.md):
+- [DenseGen CPU batch template](../jobs/densegen-cpu.qsub)
+- [Evo2 GPU template](../jobs/evo2-gpu-infer.qsub)
+- [Notify watcher template](../jobs/notify-watch.qsub)
 
 Before first Evo2 submit on a host, run:
-- [BU SCC install GPU setup and verification runbook](install.md#gpu-setup-and-verification-runbook)
-- [infer SCC Evo2 GPU environment runbook](../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
+- [BU SCC install GPU setup and verification runbook](../setup/install.md#gpu-setup-and-verification-runbook)
+- [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 Submit examples:
 
@@ -295,8 +295,8 @@ Do not configure Notify against DenseGen runtime events.
 
 ---
 
-Back: [BU SCC index](README.md)
+Back: [BU SCC index](../README.md)
 
-Next: [BU SCC Quickstart](quickstart.md)
+Next: [BU SCC Quickstart](../setup/quickstart.md)
 
-Next: [BU SCC job templates](jobs/README.md)
+Next: [BU SCC job templates](../jobs/README.md)

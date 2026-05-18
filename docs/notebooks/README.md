@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
-This document is a practical quickstart for running repository notebooks with marimo. Read it when you want to launch notebooks quickly; deeper notebook patterns and UI guidance are in `docs/marimo-reference.md`.
+This document is a practical quickstart for running repository notebooks with marimo. Read it when you want to launch notebooks quickly; deeper notebook patterns and UI guidance are in [marimo reference](marimo-reference.md).
 
 ### Campaign-tied notebooks (OPAL)
 This section covers notebook flows generated and managed inside OPAL campaigns.
@@ -48,4 +48,4 @@ uv add --script notebooks/sandbox_example.py numpy
 uv remove --script notebooks/sandbox_example.py numpy
 ```
 
-For deeper notebook authoring and UI behavior guidance, read **[docs/marimo-reference.md](marimo-reference.md)**.
+For deeper notebook authoring and UI behavior guidance, read **[marimo reference](marimo-reference.md)**.

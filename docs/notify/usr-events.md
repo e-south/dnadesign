@@ -161,7 +161,7 @@ Healthy watcher signals:
   heartbeat intervals
 
 Cluster operations:
-- BU SCC qsub workflow: [docs/bu-scc/batch-notify.md](../bu-scc/batch-notify.md)
+- BU SCC qsub workflow: [docs/bu-scc/runbooks/batch-notify.md](../bu-scc/runbooks/batch-notify.md)
 - Submit-ready watcher job: [docs/bu-scc/jobs/notify-watch.qsub](../bu-scc/jobs/notify-watch.qsub)
 
 ### Recover flow
@@ -227,5 +227,5 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 
 - Notify operations overview: [docs/notify/README.md](README.md)
 - Notify command contracts: [src/dnadesign/notify/docs/reference/command-contracts.md](../../src/dnadesign/notify/docs/reference/command-contracts.md)
-- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md)
+- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
 - DenseGen integration walkthrough: [DenseGen -> USR -> Notify tutorial](../../src/dnadesign/densegen/docs/tutorials/demo_usr_notify.md)

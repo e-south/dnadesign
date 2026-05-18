@@ -39,9 +39,9 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 
 ## Operational references
 
-- BU SCC operations source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, and `docs/bu-scc/batch-notify.md`
-- BU SCC quickstart: `docs/bu-scc/quickstart.md`
-- BU SCC batch + notify runbook: `docs/bu-scc/batch-notify.md`
+- BU SCC operations source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, and `docs/bu-scc/runbooks/batch-notify.md`
+- BU SCC quickstart: `docs/bu-scc/setup/quickstart.md`
+- BU SCC batch + notify runbook: `docs/bu-scc/runbooks/batch-notify.md`
 - Submit-ready BU SCC jobs: `docs/bu-scc/jobs/README.md`
 - Notify operator docs: `docs/notify/README.md`
 - Notify event contract: `docs/notify/usr-events.md`

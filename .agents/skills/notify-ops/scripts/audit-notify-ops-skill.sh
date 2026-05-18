@@ -71,7 +71,7 @@ require_text "src/dnadesign/notify/docs/reference/command-contracts.md" "notify 
 require_text "docs/notify/README.md" "skill links operator overview"
 require_text "docs/notify/usr-events.md" "skill links operator runbook"
 require_text "src/dnadesign/notify/docs/reference/command-contracts.md" "skill links command contracts"
-require_text "docs/bu-scc/batch-notify.md" "skill routes scheduler-backed watcher work"
+require_text "docs/bu-scc/runbooks/batch-notify.md" "skill routes scheduler-backed watcher work"
 require_text ".events.log" "skill keeps USR events boundary explicit"
 require_text "outputs/meta/events.jsonl" "skill rejects DenseGen runtime telemetry as input"
 require_text "--secret-source file --secret-ref file://" "skill prefers file-backed webhook refs"

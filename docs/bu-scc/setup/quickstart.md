@@ -138,7 +138,7 @@ Details: [BU SCC Install bootstrap: Sync dependencies](install.md#5-sync-depende
 
 For Evo2 build controls (`FLASH_ATTENTION_FORCE_BUILD`, `FLASH_ATTN_CUDA_ARCHS`, include-path composition), use:
 - [BU SCC install bootstrap: GPU setup and verification runbook](install.md#gpu-setup-and-verification-runbook)
-- [infer SCC Evo2 GPU environment runbook](../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
+- [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 ### 6) Smoke tests
 
@@ -247,10 +247,10 @@ Use:
   `gpu_capability: 12.0`, `gpu_type: RTXP6000`, and `gpu_memory_gib: 80.0`
 
 Template details and overrides:
-[BU SCC job templates](jobs/README.md)
+[BU SCC job templates](../jobs/README.md)
 
 Operational guidance:
-[BU SCC Batch + Notify runbook](batch-notify.md)
+[BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)
 
 ### 8) Add Notify
 
@@ -301,15 +301,15 @@ qsub -P <project> \
 ```
 
 Secure onboarding and wizard flow:
-[Notify USR events operator manual](../notify/usr-events.md)
+[Notify USR events operator manual](../../notify/usr-events.md)
 
 Deployment patterns and transfer-node guidance:
-[BU SCC Batch + Notify runbook](batch-notify.md)
+[BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)
 
 ---
 
-Back: [BU SCC index](README.md)
+Back: [BU SCC index](../README.md)
 
 Next: [BU SCC Install bootstrap](install.md)
 
-Next: [BU SCC Batch + Notify runbook](batch-notify.md)
+Next: [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)

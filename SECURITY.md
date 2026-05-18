@@ -51,4 +51,4 @@ It is a policy map with links to operator runbooks and implementation details.
 - Root agent map and safety rules: `AGENTS.md`
 - Notify operator manual: `docs/notify/README.md`
 - USR events/operator contracts: `docs/notify/usr-events.md`
-- BU SCC install and ops docs: `docs/bu-scc/install.md`, `docs/bu-scc/README.md`
+- BU SCC install and ops docs: `docs/bu-scc/setup/install.md`, `docs/bu-scc/README.md`

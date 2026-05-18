@@ -1,18 +1,18 @@
 ## Generic Linear ssDNA Composition Dev Spec
 
 This is the detailed source spec and design history. Start with the
-[linear ssDNA composition entry point](../2026-05-13-generic-linear-ssdna-composition-spec.md)
+[linear ssDNA composition entry point](2026-05-13-generic-linear-ssdna-composition.md)
 unless you need the full rationale.
 
 **Status:** accepted implementation reference
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-14
 **Primary study:** `retron_hairpin_design`
-**Current generic authority:** [Construct linear ssDNA composition reference](../../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
-**Architecture decision:** [ADR 0002](../../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
-**Study handoff:** [Retron linear ssDNA composition handoff](../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
-**Implementation record:** [Generic linear ssDNA composition](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
-**Follow-up plan:** [Linear ssDNA composition hardening follow-ups](../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
+**Current generic authority:** [Construct linear ssDNA composition reference](../../../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
+**Architecture decision:** [ADR 0002](../../../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
+**Study handoff:** [Retron linear ssDNA composition handoff](../../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
+**Implementation record:** [Generic linear ssDNA composition](../../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+**Follow-up plan:** [Linear ssDNA composition hardening follow-ups](../../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 
 ### Executive Summary
 
@@ -1246,9 +1246,9 @@ private sibling modules instead of contracts/public APIs.
 ### Implementation Plan Summary
 
 The completed implementation checklist is in:
-[Generic linear ssDNA composition](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md).
+[Generic linear ssDNA composition](../../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md).
 Remaining hardening work is tracked in:
-[Linear ssDNA composition hardening follow-ups](../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md).
+[Linear ssDNA composition hardening follow-ups](../../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md).
 
 High-level phases:
 
@@ -1293,9 +1293,9 @@ Open questions:
 
 ### Links
 
-- Study handoff: [linear ssDNA composition](../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
-- Study routes: [Retron Hairpin routes](../../../studies/retron_hairpin_design/routes.md)
-- Scar-nick context: [scar-nick base-junction](../../../studies/retron_hairpin_design/contexts/scar-nick-base-junction.md)
-- Implementation record: [generic linear ssDNA composition](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
-- Follow-up plan: [linear ssDNA composition hardening follow-ups](../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
-- Planning lifecycle: [PLANS](../../../../PLANS.md)
+- Study handoff: [linear ssDNA composition](../../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
+- Study routes: [Retron Hairpin routes](../../../../studies/retron_hairpin_design/routes/README.md)
+- Scar-nick context: [scar-nick base-junction](../../../../studies/retron_hairpin_design/contexts/scar-nick-base-junction.md)
+- Implementation record: [generic linear ssDNA composition](../../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
+- Follow-up plan: [linear ssDNA composition hardening follow-ups](../../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
+- Planning lifecycle: [PLANS](../../../../../PLANS.md)

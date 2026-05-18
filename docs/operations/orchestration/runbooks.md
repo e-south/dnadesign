@@ -435,6 +435,6 @@ Infer resume note:
 ### Related docs
 
 1. [Ops orchestration index](README.md)
-2. [Ops package README](../../src/dnadesign/ops/README.md)
-3. [OPS runtime visibility](ops-runtime-visibility.md)
-4. [BU SCC jobs docs](../bu-scc/jobs/README.md)
+2. [Ops package README](../../../src/dnadesign/ops/README.md)
+3. [OPS runtime visibility](../status/runtime-visibility.md)
+4. [BU SCC jobs docs](../../bu-scc/jobs/README.md)

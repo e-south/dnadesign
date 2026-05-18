@@ -65,7 +65,7 @@ Clarification policy:
 - when reporting HPC status to users, include `references/session-status-reporting.md` and `references/user-status-contract.md`
 - when submit-shape or readiness is in scope, include `references/submission-shape-advisor.md` and `references/operator-brief.md`
 - when command-first Ops runbooks are available, include `references/runbook-entrypoints.md`
-- when OPS CLI failure semantics or machine capture are relevant, include `docs/operations/ops-failure-contract.md`
+- when OPS CLI failure semantics or machine capture are relevant, include `docs/operations/contracts/failure.md`
 - for batch/interactive specifics, load only the matching contract (`references/batch-submit-contract.md` or `references/interactive-contract.md`)
 ### Step 3: Apply up-to-date handling
 - for BU SCC claims, use official BU pages listed in `references/bu-scc-system-usage.md`

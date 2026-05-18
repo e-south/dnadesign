@@ -80,7 +80,7 @@ does not run folding or assemble sequences.
 
 ### Links
 - Proposal:
-  `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md`
+  `docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md`
 - Generic operator authority:
   `src/dnadesign/construct/docs/reference/linear-ssdna-composition.md`
 - Implementation record:

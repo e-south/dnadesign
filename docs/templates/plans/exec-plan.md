@@ -44,6 +44,6 @@ Run and record the exact commands and outcomes:
 - <Manual CLI/API path run and expected output>
 
 ### Links
-- Proposal: [link](../dev/plans)
+- Proposal: [link](../../dev/plans)
 - PR: [link](https://github.com/<org>/<repo>/pull/<number>)
-- ADR: [link](../architecture/decisions/README.md)
+- ADR: [link](../../architecture/decisions/README.md)

@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
-Study contracts declare generic readiness checks in `ops.study.yaml`.
+Study contracts declare generic readiness checks in `operations/ops.study.yaml`.
 
 | Check kind | What it verifies | Typical non-`ok` meaning | Inputs it needs | Typical cost | Example use |
 | --- | --- | --- | --- | --- | --- |
@@ -29,7 +29,7 @@ For `scheduler_queue` checks, “probe unavailable” includes missing scheduler
 ### Where these checks come from
 
 - the vocabulary is declared by OPS generic preflight code
-- each study chooses which checks to run by declaring them in `docs/studies/<study-id>/ops.study.yaml`
+- each study chooses which checks to run by declaring them in `docs/studies/<study-id>/operations/ops.study.yaml`
 - blocker semantics come from the checked-in study contract too: `required: true`
   makes a failing check eligible to block the next action, while `required:
   false` keeps the failure visible as advisory-only evidence

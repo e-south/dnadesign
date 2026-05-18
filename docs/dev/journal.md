@@ -245,10 +245,10 @@ This section lists dated entries so you can jump to a specific investigation win
   - `docs/exec-plans/README.md`
   - `docs/templates/README.md`
 - Added reusable templates:
-  - `docs/templates/system-of-record.md`
-  - `docs/templates/runbook.md`
-  - `docs/templates/adr.md`
-  - `docs/templates/exec-plan.md`
+  - `docs/templates/records/system-of-record.md`
+  - `docs/templates/runbooks/runbook.md`
+  - `docs/templates/records/adr.md`
+  - `docs/templates/plans/exec-plan.md`
 - Added explicit ADR policy: numbered ADRs are required for new decisions going forward; historical backfill is optional.
 - Extended docs check contract to validate relative links from root system-of-record docs, not only `docs/` plus root `README.md`.
 - SOR hardening pass implemented with CI/devtool enforcement:

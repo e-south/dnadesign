@@ -1,13 +1,13 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-05-18
 
 Find the next task, command, or reference doc from the routes below.
 
 Start with:
 
-- [Installation](installation.md) to set up the repo on a new machine.
+- [Installation](setup/installation.md) to set up the repo on a new machine.
 - [Inspect available work](#inspect-available-work) to list packaged workspaces or dataset roots before choosing a workflow.
 - [Choose a workflow](#choose-a-workflow) to follow a single-tool path, a cross-tool dataset path, or an operations path.
 - [Runbook catalog](runbooks/README.md) when you want commands before longer docs.
@@ -43,7 +43,7 @@ Use these when one tool owns the next step.
 | Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
 | Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
-| Set up the SCC Evo2 infer GPU environment | [BU SCC install bootstrap](bu-scc/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
+| Set up the SCC Evo2 infer GPU environment | [BU SCC install bootstrap](bu-scc/setup/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Run Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
 | Inspect or extend Notify package internals | [Notify package docs index](../src/dnadesign/notify/docs/README.md) | Verify module boundaries in [Notify maintainer architecture map](../src/dnadesign/notify/docs/dev/architecture.md). |
 
@@ -53,17 +53,17 @@ Use these when data moves through more than one tool and the shared record lives
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
-| Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
-| Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
-| Review the promoter-study Evo2 route before choosing the next step | [Promoter study Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter-evo2-journey.md) | Continue to [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared handoff. |
-| Check the current stress/ethanol/cipro study record | [Stress ethanol/cipro status contract](studies/stress_ethanol_cipro_growth/status-contract.md) | Read the concrete study record in `docs/studies/stress_ethanol_cipro_growth/`, then open its route map when the next need is owner-surface navigation. |
-| Run the deeper stress/ethanol/cipro command preflight | [Stress ethanol/cipro preflight contract](studies/stress_ethanol_cipro_growth/preflight.md) | Use the study-owned preflight only for blocker or next-run readiness for `stress_ethanol_cipro_growth`. |
-| Navigate a checked-in study without exposing study-specific routes here | [Study records index](studies/README.md) | Use the active selector or named study directory, then open `docs/studies/<study-id>/routes.md`, `ops.study.yaml`, and `pipeline.yaml` for declared status, preflight, or compiler routes. |
-| Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active study selector and `record_root` in [Study index](studies/index.yaml), then read `ops.study.yaml` for explicit Ops surfaces. |
-| Build a promoter-study feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
-| Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
-| Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
-| Chain DenseGen -> USR -> Infer -> USR updates | [Chained DenseGen and Infer sync runbook](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Review the promoter-study Evo2 route before choosing the next step | [Promoter study Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter/evo2-journey.md) | Continue to [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) for the shared handoff. |
+| Check the current stress/ethanol/cipro study record | [Stress ethanol/cipro status contract](studies/stress_ethanol_cipro_growth/contracts/status.md) | Read the concrete study record in `docs/studies/stress_ethanol_cipro_growth/`, then open its route map when the next need is owner-surface navigation. |
+| Run the deeper stress/ethanol/cipro command preflight | [Stress ethanol/cipro preflight contract](studies/stress_ethanol_cipro_growth/contracts/preflight.md) | Use the study-owned preflight only for blocker or next-run readiness for `stress_ethanol_cipro_growth`. |
+| Navigate a checked-in study without exposing study-specific routes here | [Study records index](studies/README.md) | Use the active selector or named study directory, then open `docs/studies/<study-id>/routes/README.md`, `operations/ops.study.yaml`, and `operations/pipeline.yaml` for declared status, preflight, or compiler routes. |
+| Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active study selector and `record_root` in [Study index](studies/index.yaml), then read `operations/ops.study.yaml` for explicit Ops surfaces. |
+| Build a promoter-study feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
+| Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/routes/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync/audit-loop.md). |
+| Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync/fidelity-drills.md). |
+| Chain DenseGen -> USR -> Infer -> USR updates | [Chained DenseGen and Infer sync runbook](../src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
 
 #### Scheduler and environment workflows
 
@@ -71,8 +71,8 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
-| Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/batch-notify.md) | Verify event delivery contract in [Notify USR events contract](notify/usr-events.md). |
-| Plan and execute deterministic DenseGen/Infer HPC orchestration runbooks | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration-runbooks.md#contract-rules). |
+| Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/runbooks/batch-notify.md) | Verify event delivery contract in [Notify USR events contract](notify/usr-events.md). |
+| Plan and execute deterministic DenseGen/Infer HPC orchestration runbooks | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#contract-rules). |
 
 ### Tool docs
 
@@ -130,15 +130,15 @@ contract artifacts or bundle manifest.
 - [Plans](../PLANS.md): proposal, execution-plan, and decision lifecycle.
 - [Quality score](../QUALITY_SCORE.md): quality rubric and improvement framework.
 - Cross-tool handoff rules live in [Architecture](../ARCHITECTURE.md#cross-tool-information-architecture), [Design](../DESIGN.md#information-architecture-invariants), and the shared dataset workflows linked above.
-- Scheduler accumulation rules live in [Ops orchestration runbook contracts](operations/orchestration-runbooks.md#single-study-accumulation-contract).
+- Scheduler accumulation rules live in [Ops orchestration runbook contracts](operations/orchestration/runbooks.md#single-study-accumulation-contract).
 
 ### Operations
 
-- [Installation](installation.md): environment setup and verification baseline.
+- [Installation](setup/installation.md): environment setup and verification baseline.
 - [Runbook catalog](runbooks/README.md): shell command index for cross-tool procedures and tool entrypoints.
 - [Ops orchestration index](operations/README.md): orchestration docs for init, plan, execute, and status checks.
-- [OPS mental model](operations/ops-mental-model.md): plane model, shared state semantics, and snapshot versus preflight guidance.
-- [OPS failure contract](operations/ops-failure-contract.md): CLI exit-code and stderr contract for automation and maintainers.
+- [OPS mental model](operations/model/mental-model.md): plane model, shared state semantics, and snapshot versus preflight guidance.
+- [OPS failure contract](operations/contracts/failure.md): CLI exit-code and stderr contract for automation and maintainers.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
 - [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync, transfer, dataset assembly, and downstream handoff runbooks.

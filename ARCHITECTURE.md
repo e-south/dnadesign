@@ -40,7 +40,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `ARCHITECTURE.md` is the top-level authority for cross-tool boundaries and path ownership contracts.
 - `DESIGN.md` defines implementation invariants that must remain consistent with architecture boundaries.
 - `RELIABILITY.md` and `SECURITY.md` specialize runtime and secret-handling policy without overriding architecture boundaries.
-- `docs/operations/orchestration-runbooks.md` is the executable operator contract for batch orchestration behavior.
+- `docs/operations/orchestration/runbooks.md` is the executable operator contract for batch orchestration behavior.
 - `PLANS.md` governs lifecycle/process for promoting or changing these contracts.
 - Root docs route readers to one authoritative deep procedure; cross-tool runbooks may live either in top-level `docs/` or in the boundary-owning tool's operations docs when that tool owns the durable handoff.
 - `docs/runbooks/README.md` is the centralized inventory of authoritative cross-tool procedures and tool-local runbook sources; it is a discovery surface, not the owner of those procedures.
@@ -130,8 +130,8 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`
-- Monorepo organization audit: `docs/dev/monorepo-organization-audit.md`
-- BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
+- Monorepo organization audit: `docs/dev/audits/monorepo-organization.md`
+- BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/runbooks/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Reliability operations: `RELIABILITY.md`
 - Security policy and secrets handling: `SECURITY.md`

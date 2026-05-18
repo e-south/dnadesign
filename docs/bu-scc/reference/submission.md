@@ -3,8 +3,8 @@
 Command and resource defaults for BU SCC runs.
 
 Use this with:
-- `docs/bu-scc/quickstart.md`
-- `docs/bu-scc/batch-notify.md`
+- `docs/bu-scc/setup/quickstart.md`
+- `docs/bu-scc/runbooks/batch-notify.md`
 - `docs/bu-scc/jobs/README.md`
 
 ### Core rules

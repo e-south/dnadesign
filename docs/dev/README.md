@@ -27,7 +27,7 @@ Use this index to find maintainer workflows, checks, and planning records.
 ### Day-to-day tasks
 
 1. Record implementation notes in [`journal.md`](journal.md).
-2. Track structure and IA risks in [`monorepo-organization-audit.md`](monorepo-organization-audit.md).
+2. Track structure and IA risks in [`audits/monorepo-organization.md`](audits/monorepo-organization.md).
 3. Create or update proposals in [`plans/`](plans/).
 4. Run docs checks before merging docs updates:
 `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
@@ -92,18 +92,19 @@ uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-int
 2. Execution plan indexes: [active plans](../exec-plans/active/README.md), [completed plans](../exec-plans/completed/README.md)
 3. Decision records: [architecture decisions](../architecture/decisions/README.md)
 4. Sequence-view, reference-product, reverse-complement context, and Infer-completion hardening proposal:
-   [2026-04-28 sequence-view ontology and Infer completion spec](plans/2026-04-28-sequence-view-ontology-and-infer-completion-hardening-spec.md)
+   [2026-04-28 sequence-view ontology and Infer completion spec](plans/cross-tool/sequence-view/2026-04-28-ontology-and-infer-completion-hardening.md)
 5. Generic linear ssDNA composition proposal for Construct, folding QA, BaseRender handoff, and Retron dogfooding:
-   [2026-05-13 generic linear ssDNA composition spec](plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
+   [2026-05-13 generic linear ssDNA composition spec](plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 6. Completed implementation record:
    [generic linear ssDNA composition execution plan](../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 7. Active follow-up checklist:
    [linear ssDNA composition hardening follow-ups](../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 8. Active OPAL notebook consolidation spec:
-   [OPAL campaign notebook consolidation](plans/2026-05-15-opal-campaign-notebook-consolidation-spec.md)
+   [OPAL campaign notebook consolidation](plans/tools/opal/2026-05-15-campaign-notebook-consolidation.md)
 
 ### Naming and file layout
 
 - Use kebab-case for markdown files.
 - Prefix plan docs with `YYYY-MM-DD-`.
-- Keep archived plans under `plans/archive/`.
+- Keep current design proposals in semantic lanes under `plans/tools/` or
+  `plans/cross-tool/`; keep archived plans under `plans/archive/`.

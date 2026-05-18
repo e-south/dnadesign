@@ -12,17 +12,17 @@
 Batch orchestration and read-only Ops status checks start here. Dataset
 assembly, construct realization, and infer write-back stay in the shared USR
 runbooks. Detailed command behavior and schema rules live in
-[orchestration runbooks](orchestration-runbooks.md); command lookup lives in
+[orchestration runbooks](orchestration/runbooks.md); command lookup lives in
 the [runbook catalog](../runbooks/README.md).
 
 ### OPS docs
 
-- [OPS mental model](ops-mental-model.md): one-page plane model, state semantics, snapshot vs preflight, and source-of-truth map.
-- [OPS failure contract](ops-failure-contract.md): exit codes, stderr rules, and maintainer-facing failure expectations.
-- [OPS runtime visibility](ops-runtime-visibility.md): scheduler probe states, active-job resolution states, and degraded submit rules.
-- [OPS status kinds](ops-status-kinds.md): public routes, status kinds, owners, scope, and required inputs.
-- [OPS preflight checks](ops-preflight-checks.md): generic readiness check vocabulary used by `ops.study.yaml`.
-- [Orchestration runbooks](orchestration-runbooks.md): runbook schema, planner, executor, and scheduler-facing contracts.
+- [OPS mental model](model/mental-model.md): one-page plane model, state semantics, snapshot vs preflight, and source-of-truth map.
+- [OPS failure contract](contracts/failure.md): exit codes, stderr rules, and maintainer-facing failure expectations.
+- [OPS runtime visibility](status/runtime-visibility.md): scheduler probe states, active-job resolution states, and degraded submit rules.
+- [OPS status kinds](status/kinds.md): public routes, status kinds, owners, scope, and required inputs.
+- [OPS preflight checks](contracts/preflight-checks.md): generic readiness check vocabulary used by `operations/ops.study.yaml`.
+- [Orchestration runbooks](orchestration/runbooks.md): runbook schema, planner, executor, and scheduler-facing contracts.
 
 ### What Ops is for
 
@@ -35,7 +35,7 @@ the [runbook catalog](../runbooks/README.md).
 ### Start here
 
 1. Use [Command lookup](#command-lookup) when you need the catalog or status commands first.
-2. Read the [OPS mental model](ops-mental-model.md) if you need the plane model or state lattice first.
+2. Read the [OPS mental model](model/mental-model.md) if you need the plane model or state lattice first.
 3. Use [Orchestration routes](#orchestration-routes) when you are starting, dry-running, or submitting a runbook.
 4. Use [Contracts](#contracts) when you need the exact schema or command rules.
 5. Use [Status and manifest routes](#status-and-manifest-routes) when you need a read-only summary or an explicit manifest.
@@ -54,19 +54,19 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 
 | Need | Start here | Verify next |
 | --- | --- | --- |
-| Bootstrap a runbook from scratch | [runbook bootstrap path](orchestration-runbooks.md#runbook-bootstrap-path) | [runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1) |
-| Validate command order without side effects | [2-minute dry-run path](orchestration-runbooks.md#2-minute-dry-run-path) | [contract rules](orchestration-runbooks.md#contract-rules) |
-| Run batch-only orchestration | [orchestration workflow ids](orchestration-runbooks.md#orchestration-workflow-ids) | [planner and executor commands](orchestration-runbooks.md#planner-and-executor-commands) |
-| Run batch plus notify orchestration | [orchestration workflow ids](orchestration-runbooks.md#orchestration-workflow-ids) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
-| Run generation now and refresh plots in the same submit chain | [runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1) | [contract rules](orchestration-runbooks.md#contract-rules) |
+| Bootstrap a runbook from scratch | [runbook bootstrap path](orchestration/runbooks.md#runbook-bootstrap-path) | [runbook schema (v1)](orchestration/runbooks.md#runbook-schema-v1) |
+| Validate command order without side effects | [2-minute dry-run path](orchestration/runbooks.md#2-minute-dry-run-path) | [contract rules](orchestration/runbooks.md#contract-rules) |
+| Run batch-only orchestration | [orchestration workflow ids](orchestration/runbooks.md#orchestration-workflow-ids) | [planner and executor commands](orchestration/runbooks.md#planner-and-executor-commands) |
+| Run batch plus notify orchestration | [orchestration workflow ids](orchestration/runbooks.md#orchestration-workflow-ids) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
+| Run generation now and refresh plots in the same submit chain | [runbook schema (v1)](orchestration/runbooks.md#runbook-schema-v1) | [contract rules](orchestration/runbooks.md#contract-rules) |
 
 ### Contracts
 
-1. [runbook init command contract](orchestration-runbooks.md#runbook-bootstrap-path)
-2. [runbook plan command contract](orchestration-runbooks.md#planner-and-executor-commands)
-3. [runbook execute command contract](orchestration-runbooks.md#planner-and-executor-commands)
-4. [Runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1)
-5. [Contract rules](orchestration-runbooks.md#contract-rules)
+1. [runbook init command contract](orchestration/runbooks.md#runbook-bootstrap-path)
+2. [runbook plan command contract](orchestration/runbooks.md#planner-and-executor-commands)
+3. [runbook execute command contract](orchestration/runbooks.md#planner-and-executor-commands)
+4. [Runbook schema (v1)](orchestration/runbooks.md#runbook-schema-v1)
+5. [Contract rules](orchestration/runbooks.md#contract-rules)
 6. [Packaged runbook presets](../../src/dnadesign/ops/runbooks/presets)
 
 ### Status and manifest routes
@@ -75,7 +75,7 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
 3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
 4. Use `uv run ops progress show studies.stress-ethanol-cipro-growth.status` only for the concrete `stress_ethanol_cipro_growth` study before drilling into tool-local status.
-5. Use `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json` when you need the deeper execution-readiness blockers for that study. The surface reports check kinds declared in its `ops.study.yaml`, not hidden family-only readiness branches.
+5. Use `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json` when you need the deeper execution-readiness blockers for that study. The surface reports check kinds declared in its `operations/ops.study.yaml`, not hidden family-only readiness branches.
 6. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
 7. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
 8. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
@@ -84,9 +84,9 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 11. For study status, use the concrete study-owned surface only when one exists. For `stress_ethanol_cipro_growth`, keep the study files under `docs/studies/stress_ethanol_cipro_growth/` and use [Study records index](../studies/README.md) for selector rules.
 12. For status-kind meanings and the next checks for each one, see the [runbook catalog status views](../runbooks/README.md#status-views).
 13. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
-    [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md),
-    [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md),
-    or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).
+    [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md),
+    [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md),
+    or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md).
 
 ### Verification loop
 
