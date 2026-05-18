@@ -13,8 +13,9 @@
   basal left/right base, terminal-nick, or profile constraints route to
   scar-nick.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
-  payload primary, snapback foldback geometry with a 3 nt `Cap` subsection,
-  payload complement, right base + 3' flank.
+  payload primary, a user-selected cap/foldback segment, payload complement,
+  right base + 3' flank. Snapback subsection labels are emitted only when
+  topology is supplied.
 - Construct, Folding, BaseRender, and ViennaRNA plotting are service handoffs
   after part selection. They should consume explicit files or producer bundles,
   not create one workspace per MSD ID. The compiler route does not expose a
@@ -33,8 +34,8 @@
 
 - Compiler/product route:
   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
-- GenBank/native-structure-PNG/review-PNG route after concrete subcomponents are available:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
+- GenBank/native-structure-PNG/review-PNG route for the full checked-in cohort:
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json`
 - Status route for explicit progress/history questions only:
   `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight route for explicit blocker/readiness questions only:
@@ -51,6 +52,11 @@
   profile drift or non-ligatable `S0`.
 - The selected 177-194 scar-nick labels compile into one catalog from
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`.
+- Known cap sequences live in
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`:
+  `C26=AGGC`, `C43=tCCTCAGcccGCTGAGGa`, and selected `C172-C176` de033 source
+  labels. The compiler must not infer de033 sequence or topology from a future
+  `C###` id by pattern.
 - Persistent experimental meaning for the 177-194 cohort now lives in
   `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`;
   `msd_design_hit_labels.txt` is a convenience compiler input.
@@ -95,8 +101,12 @@
   `src/dnadesign/studies/studies/retron_hairpin_design/`
 - Compiler registry:
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`
+- Cap source lookup:
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`
 - Study-selected labels:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`
+- Full cohort materialization spec:
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`
 - Study workbench:
   `docs/studies/retron_hairpin_design/workbench/`
 - Compiler outputs:

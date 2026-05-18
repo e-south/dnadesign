@@ -9,10 +9,12 @@ source_refs:
   directions: docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml
   convenience_label_input: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
   registry: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
+  cap_source_lookup: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml
   compiler_module: src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py
 input_hashes:
   convenience_label_input_sha256: 8e01026027bbc9faf116f96e21f7be96182f7ceff23904b2e7a760b308f898ca # pragma: allowlist secret
-  registry_sha256: 74dae5b4360515044b84d1cc9b7b4fa8b75c4d6c3cf98bc0c54a60af1d52b664 # pragma: allowlist secret
+  registry_sha256: 9b0716e4dc2f7df3241f9bd570612dd76d9e37908b0f8421aca0012a202dd1ba # pragma: allowlist secret
+  cap_source_lookup_sha256: f5cdc3f13c5d860529478e1bdf31681e7372623b49c047652cda3513099139e6 # pragma: allowlist secret
 selection_basis:
   - Study-selected Retron MSD labels pES-retron-177 through pES-retron-194.
   - Preserve cap/base/profile ontology in every expected msd_design_id.

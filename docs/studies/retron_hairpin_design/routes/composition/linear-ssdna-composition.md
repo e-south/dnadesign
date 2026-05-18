@@ -1,3 +1,19 @@
+---
+doc_id: study-retron-hairpin-design-route-composition-linear-ssdna-composition
+surface: study-route-detail
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: construct/folding/baserender
+surface_role: composition-service-handoff
+current_state: materialization-ready-after-sequences
+entry_artifact: selected_msd_parts_plus_payload_and_cap_sequences
+exit_artifact: linear_ssdna_composition_v1_bundle
+---
+
 ## Linear ssDNA Composition Route
 
 **Owner:** dnadesign-maintainers
@@ -5,6 +21,16 @@
 
 Use this route when the Retron task shifts from solving Snapback or scar-nick
 primitives to composing a whole sequence artifact from selected parts.
+
+### Route Contract
+
+- Type: `route`
+- Plane: `data-plane`
+- Surface role: `composition-service-handoff`
+- Owner-boundary: `construct/folding/baserender`
+- Current state: `materialization-ready-after-sequences`
+- Entry artifact: selected MSD parts plus concrete payload and cap sequences
+- Exit artifact: `linear_ssdna_composition_v1` bundle with curated plots
 
 ### Boundary
 
@@ -28,6 +54,6 @@ primitives to composing a whole sequence artifact from selected parts.
 ### Route Rule
 
 For complete Retron MSD labels plus concrete payload and cap sequences, use the
-study compiler `materialize` command from `routes/references/msd-design-references.md`.
+study compiler `materialize` command from `routes/compiler/msd-design-references.md`.
 For generic composition behavior, use the Construct reference. Do not create one
 Construct or Folding workspace per Retron MSD ID.

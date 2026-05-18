@@ -101,6 +101,12 @@ class RetronMsdRegistry:
         value = source.get(key)
         if not isinstance(value, dict):
             available = ", ".join(sorted(source)) or "(none)"
+            if label == "cap" and key.startswith("C"):
+                raise RetronMsdRegistryError(
+                    f"Unknown {label} '{key}' in MSD construct label. C### cap ids are source handles and are not "
+                    "inferred from de033 by pattern; add an explicit registry entry or materialize with a "
+                    f"5'->3' cap sequence/source. Available: {available}."
+                )
             raise RetronMsdRegistryError(f"Unknown {label} '{key}' in MSD construct label. Available: {available}.")
         return value
 

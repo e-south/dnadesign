@@ -1,3 +1,19 @@
+---
+doc_id: study-retron-hairpin-design-route-product-scar-nick-base-junction
+surface: study-route-detail
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: cruncher/scar_nick
+surface_role: primitive-owner
+current_state: context-ready
+entry_artifact: left-right-base-and-profile-request
+exit_artifact: scar_nick_stem_base_primitives
+---
+
 ## Scar-Nick Base-Junction Route
 
 **Owner:** dnadesign-maintainers
@@ -9,11 +25,13 @@ flexibility, or schema work for the nick-disposal model.
 
 ### Route Contract
 
-- Type: `context`
+- Type: `route`
 - Plane: `data-plane`
-- Surface role: `base-junction-context`
-- Owner-boundary: `cruncher`
+- Surface role: `primitive-owner`
+- Owner-boundary: `cruncher/scar_nick`
 - Current state: `context-ready`
+- Entry artifact: left/right base and `S3/S2/S1/S0` profile request
+- Exit artifact: scar-nick stem-base primitive table
 - Workspace: `src/dnadesign/cruncher/workspaces/scar_nick_teto`
 - Workspace runbook: `src/dnadesign/cruncher/workspaces/scar_nick_teto/runbook.md`
 - Study note: `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`

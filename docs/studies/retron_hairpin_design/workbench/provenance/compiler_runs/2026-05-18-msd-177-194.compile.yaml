@@ -29,8 +29,12 @@ inputs:
     role: convenience compiler input mirrored from the workbench design set
   registry:
     path: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
-    sha256: 74dae5b4360515044b84d1cc9b7b4fa8b75c4d6c3cf98bc0c54a60af1d52b664 # pragma: allowlist secret
+    sha256: 9b0716e4dc2f7df3241f9bd570612dd76d9e37908b0f8421aca0012a202dd1ba # pragma: allowlist secret
     role: part and normalization metadata
+  cap_source_lookup:
+    path: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml
+    sha256: f5cdc3f13c5d860529478e1bdf31681e7372623b49c047652cda3513099139e6 # pragma: allowlist secret
+    role: checked-in cap source labels and 5'->3' sequences
 observed_output:
   output_policy: transient_not_checked_in
   audit_out_dir: /private/tmp/dnadesign_retron_workbench_compile_20260518 # pragma: allowlist secret

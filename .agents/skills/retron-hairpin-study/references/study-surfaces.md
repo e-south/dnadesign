@@ -34,9 +34,14 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`: study-owned
   registry metadata for payloads, caps, construct route notes, nickase, and
   nick orientation used by the MSD design-reference compiler
+- `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`: concise
+  cap source lookup for known `C###` ids and 5'->3' sequences
 - `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`:
   convenience lab-facing MSD labels for compiler input; workbench design sets
   are authoritative for persistent cohort meaning
+- `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`:
+  full checked-in materialization spec that supplies selected cap/foldback
+  segments as explicit 5'->3' sequences
 - `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need
@@ -107,7 +112,7 @@ linear ssDNA assembly, open `contexts/composition/linear-ssdna-composition.md`, 
 dev spec, then the completed implementation record and current follow-up plan.
 When the next question starts from an MSD shorthand ID or Reader-facing design
 reference, use the Study route for MSD design references in `routes/README.md`, then
-`routes/references/msd-design-references.md`, then `references/msd-design-references.md`.
+`routes/compiler/msd-design-references.md`, then `references/msd-design-references.md`.
 When the next question asks why variants were selected or how the cohort maps to
 hypotheses/effects, open `workbench/README.md` and the relevant design set.
 When the next question needs machine-readable command groups or bootstrap

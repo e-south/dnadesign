@@ -93,7 +93,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.7"
+    assert metadata["version"] == "0.7.11"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -161,7 +161,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     status_evidence = _read("docs/studies/retron_hairpin_design/record/evidence/design-evidence.md")
     status = f"{status_note}\n{status_evidence}"
     routes = _read("docs/studies/retron_hairpin_design/routes/README.md")
-    route_msd = _read("docs/studies/retron_hairpin_design/routes/references/msd-design-references.md")
+    route_msd = _read("docs/studies/retron_hairpin_design/routes/compiler/msd-design-references.md")
     route_snapback = _read("docs/studies/retron_hairpin_design/routes/product/released-product-snapback.md")
     route_scar_nick = _read("docs/studies/retron_hairpin_design/routes/product/scar-nick-base-junction.md")
     route_linear = _read("docs/studies/retron_hairpin_design/routes/composition/linear-ssdna-composition.md")
@@ -182,6 +182,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
         "docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml"
     )
     pipeline = _read("docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml")
+    command_group_map = _read("docs/studies/retron_hairpin_design/operations/runtime/command-groups/README.md")
     ops_root = _read("docs/studies/retron_hairpin_design/operations/ops.study.yaml")
     ops_study = "\n".join(
         [
@@ -225,6 +226,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "BbsI-HF retains 6/256 strict scars" in status
     assert "Exact B26 `MXMX` remains a biological control architecture" in status
     assert "docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml" in status
+    assert "docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml" in status
     assert "docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt" in status
     assert "docs/studies/retron_hairpin_design/workbench/" in status
     assert "starts from the user's provided parts and desired" in routes
@@ -235,6 +237,10 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "Do not run study status or preflight first." in routes
     assert "MSD Design References Route" in route_msd
     assert "msd_design_hit_labels.txt" in route_msd
+    assert "msd_cap_sources.yaml" in route_msd
+    assert "C26=AGGC" in route_msd
+    assert "C43=tCCTCAGcccGCTGAGGa" in route_msd
+    assert "does not infer de033 sequence or topology from an id pattern" in route_msd
     assert "not registered as a top-level" in route_msd
     assert "Reader should\nnot parse Construct, Folding, BaseRender, or Cruncher internals" in route_msd
     assert "materialize" in route_msd
@@ -272,12 +278,16 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "authoritative answer" in workbench_design_sets_readme
     assert "Run records cite design sets" in workbench_provenance_readme
     assert "repo:.agents/skills/retron-hairpin-study/SKILL.md" in pipeline
+    assert "command_group_map:" in pipeline
+    assert "lanes/materialize.yaml" in pipeline
+    assert "Retron Runtime Command Groups" in command_group_map
     assert 'primary_lane: "study-owned Retron MSD design-reference compilation"' in pipeline
     assert 'state_label: "product route"' in pipeline
     assert "Do not answer compiler-style requests by defaulting to study phase" in pipeline
     assert "repo:docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md" in pipeline
     assert "repo:docs/studies/retron_hairpin_design/workbench/README.md" in pipeline
     assert "scar_nick_profile_panel_v1.yaml" in pipeline
+    assert "msd_cap_sources.yaml" in pipeline
     assert "--nick-additional-preset thermo_nicking_v1" in pipeline
     assert "manifest:pipeline.yaml" not in pipeline
     assert "pair_with:" in pipeline
@@ -329,6 +339,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py" in study_surfaces
     assert "src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py" in study_surfaces
     assert "msd_design_hit_labels.txt" in pipeline
+    assert "msd_cap_sources" in ops_study
     assert "msd_design_reference_catalog" in pipeline
     assert "msd_design_hit_labels" in ops_study
     assert "workbench/design_sets" in study_surfaces
@@ -341,6 +352,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "reference_index.tsv" in pipeline
     assert "flat references" in pipeline
     assert "id: msd_single_unit_materialize" in pipeline
+    assert "msd_design_177_194_cap_sources_spec.yaml" in pipeline
     assert "msd_single_unit_materialize:" in ops_study
     assert "sequence_manifest.json" in pipeline
     assert "secondary_structure.native.png" in pipeline
@@ -414,6 +426,9 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
     assert design_set["input_hashes"]["registry_sha256"] == _sha256(
         "docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml"
     )
+    assert design_set["input_hashes"]["cap_source_lookup_sha256"] == _sha256(
+        "docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml"
+    )
 
     for design in design_set["designs"]:
         parsed = parse_msd_construct_label(design["label"])
@@ -442,16 +457,34 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
     assert compiler_run["inputs"]["registry"]["sha256"] == _sha256(
         "docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml"
     )
+    assert compiler_run["inputs"]["cap_source_lookup"]["sha256"] == _sha256(
+        "docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml"
+    )
     assert compiler_run["observed_output"]["output_policy"] == "transient_not_checked_in"
     assert compiler_run["observed_output"]["record_count"] == 18
     assert compiler_run["observed_output"]["catalog_contract"] == "msd_design_catalog_v1"
     assert compiler_run["observed_output"]["bundle_contract"] == "msd_design_catalog_bundle_v1"
 
-    assert materialization["status"] == "not_run_missing_sequence_subcomponents"
+    assert materialization["status"] == "verified_checked_in_full_cohort"
     assert materialization["design_set_ref"] == compiler_run["design_set_ref"]
     assert materialization["compiler_run_ref"].endswith("2026-05-18-msd-177-194.compile.yaml")
+    invalid_request = materialization["validated_request"]["invalid_requested_labels"][0]
+
+    assert invalid_request["lint_status"] == "failed_profile_mismatch"
+    assert "LCGGG-RACAG-MXMM" in invalid_request["requested_label"]
     assert set(materialization["required_inputs"]["payload_sequences"]) == {"TetR"}
-    assert set(materialization["required_inputs"]["cap_sequences"]) == {"C26", "C172"}
+    assert set(materialization["required_inputs"]["cap_sequences"]) == {"C172", "C26"}
+    assert materialization["selected_sequence_sources"]["caps"]["C172"]["source_label"] == (
+        "pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC"
+    )
+    assert materialization["selected_sequence_sources"]["caps"]["C26"]["sequence"] == "AGGC"
+    assert materialization["selected_sequence_sources"]["caps"]["C26"]["topology_status"] == (
+        "absent_subsection_labels_omitted"
+    )
+    assert materialization["observed_output"]["record_count"] == 18
+    assert materialization["observed_output"]["folding_status"] == "ok"
+    assert materialization["missing_sequence_subcomponents"] == []
+    assert materialization["topology_blockers"] == []
     assert "plots/secondary_structure.native.png" in materialization["expected_output"]["per_design_deliverables"]
     assert "plots/composition_overview.svg" in materialization["expected_output"]["per_design_deliverables"]
     assert "plots/composition_overview.png" in materialization["expected_output"]["per_design_deliverables"]
@@ -521,6 +554,8 @@ def test_named_study_records_keep_root_bounded_by_semantic_lanes() -> None:
         assert (study_root / "operations" / "README.md").exists()
         assert (study_root / "operations" / "ops.study.yaml").exists()
         assert (study_root / "operations" / "runtime" / "command-groups" / "pipeline.yaml").exists()
+        assert (study_root / "operations" / "runtime" / "command-groups" / "README.md").exists()
+        assert (study_root / "operations" / "runtime" / "command-groups" / "lanes").is_dir()
         assert (study_root / "routes" / "README.md").exists()
 
     assert len((studies_root / "stress_ethanol_cipro_growth" / "routes" / "README.md").read_text().splitlines()) <= 60

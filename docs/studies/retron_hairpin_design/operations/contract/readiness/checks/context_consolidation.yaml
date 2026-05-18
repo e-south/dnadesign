@@ -73,6 +73,12 @@ checks:
     required: true
     artifact: msd_design_registry
   - kind: path_exists
+    check_id: study.msd_cap_sources.present
+    check_group: study_record
+    summary: Explicit MSD cap source lookup is present.
+    required: true
+    artifact: msd_cap_sources
+  - kind: path_exists
     check_id: study.msd_design_hit_labels.present
     check_group: study_record
     summary: Study-selected MSD design labels are present.

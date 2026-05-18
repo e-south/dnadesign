@@ -40,7 +40,9 @@ retron_hairpin_design/
         checks/
     runtime/
       command-groups/
+        README.md
         pipeline.yaml
+        lanes/
   routes/                   # one-hop router plus focused route details
     README.md
   compiler/                 # study compiler inputs and normalization metadata
@@ -53,6 +55,8 @@ retron_hairpin_design/
 
 Use `routes/README.md` first for task routing. Use `record/status.md` only for
 current state, `operations/ops.study.yaml` for lifecycle/preflight declarations,
-`operations/runtime/command-groups/pipeline.yaml` for command groups, `workbench/` when the
-question is why a cohort exists or what experimental direction it tests, and
-`compiler/` for Retron MSD label normalization or catalog compilation.
+`operations/runtime/command-groups/README.md` for command-group lane routing,
+`operations/runtime/command-groups/pipeline.yaml` for the machine-loaded command
+payload, `workbench/` when the question is why a cohort exists or what
+experimental direction it tests, and `compiler/` for Retron MSD label
+normalization or catalog compilation.

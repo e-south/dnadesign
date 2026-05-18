@@ -6,7 +6,7 @@ routes_doc:
   ref: manifest:routes/README.md
 route_msd_design_references:
   artifact_type: file
-  ref: manifest:routes/references/msd-design-references.md
+  ref: manifest:routes/compiler/msd-design-references.md
 route_released_product_snapback:
   artifact_type: file
   ref: manifest:routes/product/released-product-snapback.md
@@ -31,9 +31,15 @@ linear_ssdna_composition_note:
 msd_design_registry:
   artifact_type: file
   ref: manifest:compiler/catalog/msd_design_registry.yaml
+msd_cap_sources:
+  artifact_type: file
+  ref: manifest:compiler/catalog/msd_cap_sources.yaml
 msd_design_hit_labels:
   artifact_type: file
   ref: manifest:compiler/inputs/msd_design_hit_labels.txt
+msd_design_177_194_cap_sources_spec:
+  artifact_type: file
+  ref: manifest:compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
 workbench_readme:
   artifact_type: file
   ref: manifest:workbench/README.md

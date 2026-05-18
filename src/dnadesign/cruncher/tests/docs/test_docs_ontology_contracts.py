@@ -112,9 +112,9 @@ def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit(
     assert "[YIU boundary check](quality/yiu-boundary-check.md)" in routes
     assert "Keep this page as a one-hop route map" in routes
     assert "## Released-Product Snapback Route" in snapback_route
-    assert "Surface role: `primary-execution`" in snapback_route
+    assert "Surface role: `primitive-owner`" in snapback_route
     assert "## Scar-Nick Base-Junction Route" in scar_nick_route
-    assert "Surface role: `base-junction-context`" in scar_nick_route
+    assert "Surface role: `primitive-owner`" in scar_nick_route
     assert "## YIU Boundary Check Route" in yiu_route
     assert "Surface role: `contrast-check`" in yiu_route
     assert 'Do not say "snapshot posture" or lead with current phase' in skill

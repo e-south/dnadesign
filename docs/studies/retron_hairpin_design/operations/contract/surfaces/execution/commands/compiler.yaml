@@ -38,16 +38,10 @@ msd_single_unit_materialize:
   - -m
   - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
   - materialize
-  - --input
-  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+  - --spec
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
   - --out-dir
   - /tmp/dnadesign_retron_msd_sequences
-  - --payload-sequence
-  - TetR=<payload-sequence>
-  - --cap-sequence
-  - C26=<cap-sequence>
-  - --cap-sequence
-  - C172=<cap-sequence>
   - --render-format
   - png
   - --format

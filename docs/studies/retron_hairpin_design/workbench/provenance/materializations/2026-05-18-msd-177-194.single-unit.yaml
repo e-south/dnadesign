@@ -3,10 +3,22 @@ schema_version: 1
 study_id: retron_hairpin_design
 materialization_id: 2026-05-18-msd-177-194.single-unit
 run_kind: materialize
-status: not_run_missing_sequence_subcomponents
+status: verified_checked_in_full_cohort
 design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
 compiler_run_ref: docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml
-reason: Concrete TetR payload and C26/C172 cap sequences must be supplied before GenBank and plot deliverables are emitted.
+reason: The checked-in 177-194 cohort materializes from a typed spec because TetR, C172, and C26 are explicit user/source-selected sequences. The malformed operator-supplied 177 label remains a fail-fast request error, but C26 topology is not required for literal cap/foldback segment assembly.
+validated_at: 2026-05-18
+validated_request:
+  requested_label_count: 18
+  checked_in_label_count: 18
+  invalid_requested_labels:
+    - requested_label: "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMM"
+      checked_in_label: "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+      lint_status: failed_profile_mismatch
+      lint_error: "MSD construct label provided profile MXMM but left/right bases imply MXMX."
+      required_resolution: correct the declared profile, correct the left/right bases, or use the checked-in valid cohort label before materialize
+  valid_checked_in_label_input: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+  fail_fast_invariant: do not emit sequence, GenBank, or plot deliverables when any requested label fails MSD profile validation
 command_template:
   cwd: repo:.
   argv:
@@ -16,23 +28,49 @@ command_template:
     - -m
     - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
     - materialize
-    - --input
-    - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+    - --spec
+    - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
     - --out-dir
-    - /tmp/dnadesign_retron_msd_sequences
-    - --payload-sequence
-    - TetR=<payload-sequence>
-    - --cap-sequence
-    - C26=<cap-sequence>
-    - --cap-sequence
-    - C172=<cap-sequence>
+    - /tmp/dnadesign_retron_msd_sequences_177_194_cap_sources
     - --render-format
     - png
     - --format
     - json
 required_inputs:
   payload_sequences: [TetR]
-  cap_sequences: [C26, C172]
+  cap_sequences: [C172, C26]
+selected_sequence_sources:
+  payload:
+    id: TetR
+    kind: literal_sequence
+    sequence: TCCCTATCAGTGATAGAGA
+    source: src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+  caps:
+    C172:
+      kind: literal_cap_foldback_segment
+      source: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C172.sequence_5to3
+      source_label: pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC
+      sequence: GAGAGACTC
+      topology_status: supplied
+    C26:
+      kind: literal_cap_foldback_segment
+      source: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C26.sequence_5to3
+      source_label: retron-26-msd[TetR]; full-AGGC
+      sequence: AGGC
+      topology_status: absent_subsection_labels_omitted
+observed_output:
+  output_policy: transient_not_checked_in
+  output_dir: /private/tmp/dnadesign_retron_msd_sequences_177_194_cap_sources
+  record_count: 18
+  folding_status: ok
+  emitted_deliverables:
+    - sequences/forward.gb
+    - sequences/reverse_complement.gb
+    - plots/secondary_structure.native.png
+    - plots/composition_overview.svg
+    - plots/composition_overview.png
+missing_sequence_subcomponents: []
+topology_blockers: []
 expected_output:
   output_policy: transient_or_reader_snapshot
   bundle_contract: msd_single_unit_sequence_bundle_v1

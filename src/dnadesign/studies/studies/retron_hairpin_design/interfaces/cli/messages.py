@@ -25,8 +25,8 @@ def next_step_for_error(exc: Exception) -> str:
         )
     if "Unknown cap" in message:
         return (
-            "Route missing cap or shortening constraints to Snapback, "
-            "or add the validated cap to compiler/catalog/msd_design_registry.yaml."
+            "Route missing cap or shortening constraints to Snapback, add the validated cap to "
+            "compiler/catalog/msd_design_registry.yaml, or provide its explicit 5'->3' sequence in a compiler spec."
         )
     if "Unknown payload" in message:
         return (
@@ -53,7 +53,8 @@ def next_step_for_error(exc: Exception) -> str:
     if "MSD sequence artifact generation requires concrete sequence subcomponents" in message:
         return (
             "Provide literal subcomponents with --payload-sequence ID=ACGT and --cap-sequence ID=ACGT, "
-            "or route missing cap/shortening inputs to Snapback before generating GenBank/plot artifacts."
+            "or use a compiler spec with explicit 5'->3' cap sequences or public primitive sources before "
+            "generating GenBank/plot artifacts."
         )
     if (
         "ViennaRNA" in message

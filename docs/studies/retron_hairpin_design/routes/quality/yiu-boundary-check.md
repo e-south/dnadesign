@@ -1,3 +1,19 @@
+---
+doc_id: study-retron-hairpin-design-route-quality-yiu-boundary-check
+surface: study-route-detail
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: cruncher/yiu
+surface_role: contrast-check
+current_state: planned
+entry_artifact: mismatch-display-or-boundary-language-question
+exit_artifact: yiu_contrast_render_or_boundary_decision
+---
+
 ## YIU Boundary Check Route
 
 **Owner:** dnadesign-maintainers
@@ -11,8 +27,10 @@ language or a reminder of what YIU does and does not model.
 - Type: `route`
 - Plane: `data-plane`
 - Surface role: `contrast-check`
-- Owner-boundary: `cruncher`
+- Owner-boundary: `cruncher/yiu`
 - Current state: `planned`
+- Entry artifact: mismatch-display or boundary-language question
+- Exit artifact: YIU contrast render or explicit non-owner decision
 - Workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`
 - Primary docs:
   `src/dnadesign/cruncher/docs/guides/yiu_workflow.md`

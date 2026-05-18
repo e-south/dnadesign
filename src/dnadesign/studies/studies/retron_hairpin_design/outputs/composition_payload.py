@@ -44,7 +44,7 @@ def require_sequence_subcomponents(
     raise RetronMsdCompilerError(
         "MSD sequence artifact generation requires concrete sequence subcomponents for "
         f"{'; '.join(pieces)}. Provide --payload-sequence ID=ACGT and --cap-sequence ID=ACGT overrides, "
-        "or route missing cap/shortening inputs to Snapback and missing base-junction inputs to scar-nick first."
+        "or use a compiler spec with explicit 5'->3' cap sequences or public primitive sources first."
     )
 
 
@@ -128,7 +128,7 @@ def _msd_unit_annotations(
     right_base: str,
     cap_topology,
 ) -> list[dict[str, object]]:
-    return [
+    annotations: list[dict[str, object]] = [
         {
             "annotation_id": "stem_base_left",
             "role": "stem_base_left",
@@ -149,37 +149,44 @@ def _msd_unit_annotations(
                 "end": len(right_base),
             },
         },
-        {
-            "annotation_id": "snapback_retained_stem",
-            "role": "snapback_retained_stem",
-            "location": {
-                "basis": "segment",
-                "segment_id": SNAPBACK_FOLDBACK_SEGMENT_ID,
-                "start": cap_topology.retained_stem_span.start,
-                "end": cap_topology.retained_stem_span.end,
-            },
-        },
-        {
-            "annotation_id": "snapback_cap",
-            "role": "snapback_cap",
-            "location": {
-                "basis": "segment",
-                "segment_id": SNAPBACK_FOLDBACK_SEGMENT_ID,
-                "start": cap_topology.cap_span.start,
-                "end": cap_topology.cap_span.end,
-            },
-        },
-        {
-            "annotation_id": "snapback_foldback_return",
-            "role": "snapback_foldback_return",
-            "location": {
-                "basis": "segment",
-                "segment_id": SNAPBACK_FOLDBACK_SEGMENT_ID,
-                "start": cap_topology.foldback_return_span.start,
-                "end": cap_topology.foldback_return_span.end,
-            },
-        },
     ]
+    if cap_topology is None:
+        return annotations
+    annotations.extend(
+        [
+            {
+                "annotation_id": "snapback_retained_stem",
+                "role": "snapback_retained_stem",
+                "location": {
+                    "basis": "segment",
+                    "segment_id": SNAPBACK_FOLDBACK_SEGMENT_ID,
+                    "start": cap_topology.retained_stem_span.start,
+                    "end": cap_topology.retained_stem_span.end,
+                },
+            },
+            {
+                "annotation_id": "snapback_cap",
+                "role": "snapback_cap",
+                "location": {
+                    "basis": "segment",
+                    "segment_id": SNAPBACK_FOLDBACK_SEGMENT_ID,
+                    "start": cap_topology.cap_span.start,
+                    "end": cap_topology.cap_span.end,
+                },
+            },
+            {
+                "annotation_id": "snapback_foldback_return",
+                "role": "snapback_foldback_return",
+                "location": {
+                    "basis": "segment",
+                    "segment_id": SNAPBACK_FOLDBACK_SEGMENT_ID,
+                    "start": cap_topology.foldback_return_span.start,
+                    "end": cap_topology.foldback_return_span.end,
+                },
+            },
+        ]
+    )
+    return annotations
 
 
 def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) -> dict[str, object]:
@@ -240,7 +247,7 @@ def composition_config_payload(
 ) -> dict[str, object]:
     left_base = record.scar_nick.left_base
     right_base = record.scar_nick.right_base
-    cap_topology = _require_cap_topology(record=record, cap_sequence=cap_sequence)
+    cap_topology = _validated_cap_topology(record=record, cap_sequence=cap_sequence)
     flank_5p = f"{flank_5p_prefix}{left_base}"
     flank_3p = f"{right_base}{flank_3p_suffix}"
     payload_label = record.payload_or_target.display_name or record.payload_or_target.id
@@ -319,14 +326,10 @@ def composition_config_payload(
     }
 
 
-def _require_cap_topology(*, record: MsdDesignReferenceV1, cap_sequence: str):
+def _validated_cap_topology(*, record: MsdDesignReferenceV1, cap_sequence: str):
     topology = record.cap.snapback_topology
     if topology is None:
-        raise RetronMsdCompilerError(
-            f"MSD cap '{record.cap.id}' is missing snapback_topology. "
-            "Retron materialization requires explicit Snapback foldback geometry so the Cap label covers only "
-            "the cap subsection, not the whole foldback segment."
-        )
+        return None
     expected_length = topology.foldback_return_span.end
     if len(cap_sequence) != expected_length:
         raise RetronMsdCompilerError(

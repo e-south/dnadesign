@@ -8,8 +8,13 @@ These are not generated outputs and not experimental rationale.
 
 - `catalog/msd_design_registry.yaml`: payload, cap, and construct normalization
   metadata used by the compiler.
+- `catalog/msd_cap_sources.yaml`: concise `C###` cap source lookup with
+  explicit 5'->3' sequences.
 - `inputs/msd_design_hit_labels.txt`: convenience lab-facing label input mirrored from
   the workbench design-set record.
+- `inputs/msd_design_177_194_cap_sources_spec.yaml`: full checked-in
+  materialization spec with TetR selected literally and C172/C26 supplied as
+  explicit 5'->3' cap/foldback segment sequences.
 
 Persistent cohort meaning belongs in `../workbench/design_sets/`. Generated
 catalogs and sequence bundles belong in explicit transient or caller-owned

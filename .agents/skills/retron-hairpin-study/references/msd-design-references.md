@@ -38,6 +38,10 @@ catalog.
 - Authoritative design set:
   `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`.
 - Convenience label input: `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`.
+- Cap source lookup:
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`.
+- Full cohort materialization spec:
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`.
 - Compiler spec: `retron_msd_compiler_spec_v1` with `labels`, `designs`,
   `payload_sequences`, and `cap_sequences`.
 - Do not expose a top-level `retron-msd` script.
@@ -48,8 +52,14 @@ catalog.
   `dnadesign.cruncher.snapback` or `dnadesign.cruncher.scar_nick` public APIs,
   not by importing `dnadesign.cruncher.src.*` or scraping internals in study
   code.
-- A materialized MSD unit is 5' flank + left base, payload primary, cap
-  geometry, payload complement, right base + 3' flank.
+- A materialized MSD unit is 5' flank + left base, payload primary, a
+  user-selected cap/foldback segment, payload complement, right base + 3'
+  flank. Snapback subsection labels are optional topology metadata, not a
+  requirement for literal sequence assembly.
+- `C###` cap IDs are symbolic. Known cap sequences live in
+  `msd_cap_sources.yaml`: `C26=AGGC`, `C43=tCCTCAGcccGCTGAGGa`, and the
+  selected `C172-C176` de033 source labels. The compiler does not infer de033
+  sequence or topology from an id pattern.
 - Do not add a repeat count or chain complete MSD units together.
 - Reader consumes `msd_design_catalog_v1`, not live dnadesign internals.
 
@@ -80,22 +90,23 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.
   --format json
 ```
 
-Materialize single-unit GenBank/structure-review outputs after concrete sequence
-subcomponents are available:
+Materialize the full checked-in cohort from explicit 5'->3' cap/foldback
+segments:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
-  --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
+  --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml \
   --out-dir /tmp/dnadesign_retron_msd_sequences \
-  --payload-sequence TetR=<payload-sequence> \
-  --cap-sequence C26=<cap-sequence> \
-  --cap-sequence C172=<cap-sequence> \
   --render-format png \
   --format json
 ```
 
 The same `compile` and `materialize` commands accept `--spec` instead of
 `--id` or `--input`; do not mix those input surfaces in one command.
+`C###` cap IDs are not implicit de033 lookups; materialization specs must
+provide each cap as a literal 5'->3' sequence or an explicit public primitive
+source. If topology is absent, the whole supplied cap/foldback segment is
+materialized as one segment and subsection labels are omitted.
 
 For persistent experimental provenance, update the workbench design set and run
 records. Generated compile/materialize bundles remain transient unless an

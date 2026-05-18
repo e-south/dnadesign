@@ -248,8 +248,10 @@ that agents need before opening the full spec:
   `sequence.gb` path plus an `open -R .../sequence.gb` Finder reveal command
   for local review.
 - Retron MSD ID lists should use the study CLI `materialize` route for
-  single-unit GenBank/structure-review output after concrete payload and cap sequences are
-  supplied through `--spec` or explicit overrides. It keeps top-level output limited to `README.md`, `manifest/`, and
+  single-unit GenBank/structure-review output after concrete payload and cap
+  sequences are supplied through `--spec` or explicit overrides. The checked-in
+  C172 spec selects TetR plus the explicit 5'->3' C172 sequence; do
+  not infer de033 sequence from a `C###` cap id by pattern. It keeps top-level output limited to `README.md`, `manifest/`, and
   `variants/`; writes bundle manifests under `manifest/bundle/`, catalogs and
   frozen references under `manifest/catalog/`, indexes under
   `manifest/indexes/`, and generated single-unit composition configs under
@@ -329,8 +331,10 @@ When returning to this work:
 - Benchling handoff should start with GenBank plus FASTA/CSV sidecars.
 - Naive sequence-artifact Retron MSD requests should start with
   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize`
-  rather than manually creating Construct workspaces. Provide complete
-  subcomponents with `--spec` or with `--payload-sequence ID=ACGT`,
+  rather than manually creating Construct workspaces. For the checked-in
+  177-194 cohort, start from
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`.
+  Provide other complete subcomponents with `--spec` or with `--payload-sequence ID=ACGT`,
   `--cap-sequence ID=ACGT`, and no repeat-count flag; otherwise the compiler reports the missing
   subcomponent and routes back to Snapback or scar-nick. Materialized output
   uses top-level `README.md`, `manifest/`, and `variants/`; each variant groups

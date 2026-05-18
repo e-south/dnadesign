@@ -130,7 +130,7 @@ def materialize_command(
     cap_sequence: list[str] = typer.Option(
         [],
         "--cap-sequence",
-        help="Snapback-cap sequence override as ID=ACGT. Repeat for each cap ID.",
+        help="Cap/foldback segment sequence override as ID=ACGT. Repeat for each cap ID.",
     ),
     render_format: list[str] = typer.Option(
         ["png"],

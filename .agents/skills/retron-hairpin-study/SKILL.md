@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD compiler work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.7
+  version: 0.7.11
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -40,8 +40,9 @@ Out of scope:
 - Incomplete parts route to the smallest primitive: Snapback, scar-nick, or YIU contrast.
 - Solved primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
-  payload primary, snapback foldback geometry with a 3 nt `Cap` subsection,
-  payload complement, right base + 3' flank.
+  payload primary, user-selected cap/foldback segment, payload complement,
+  right base + 3' flank. Snapback subsection annotations are emitted only when
+  topology is supplied.
 - Materialized `msd_design_id` / variant directory names must preserve the cap/base/profile ontology in filenames, using `C172-LCGGT-RACAG-MXMM` style suffixes.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
@@ -68,9 +69,8 @@ Out of scope:
 - Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
   and use `selector.mode=rank` for the preferred explicit primitive
   combination.
-- Need sequence, visual, or GenBank from selected parts: compile a reference
-  first, then materialize a single-unit sequence bundle with `--spec` or
-  explicit payload/cap sequences.
+- Need sequence, visual, or GenBank: materialize with `--spec` or explicit
+  payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
 - Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in
   `docs/studies/retron_hairpin_design/routes/README.md`.
@@ -86,9 +86,9 @@ Out of scope:
 - Compiler route: `docs/studies/retron_hairpin_design/routes/README.md`, then
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`, then
   `references/msd-design-references.md`.
-- Whole-product context: `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`,
-  then the active exec plan.
-- Machine-readable command groups: `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`.
+- Whole-product context: `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md` plus the active exec plan.
+- Machine-readable command groups: open `docs/studies/retron_hairpin_design/operations/runtime/command-groups/README.md`
+  first, then the matching `command-groups/lanes/` sidecar; use `pipeline.yaml` only for the full payload.
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
 3. Execute or report the route.
@@ -100,8 +100,8 @@ Out of scope:
   per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`,
   `composition_overview.svg`, `composition_overview.png`, and a
   secondary-structure subtitle containing the mismatch profile.
-- If sequence subcomponents are missing, report the exact missing
-  `--payload-sequence` / `--cap-sequence` IDs or the primitive route needed;
+- If sequence subcomponents are missing, report the exact missing IDs or the
+  primitive route needed; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
 - For missing constraints, name the missing fields and the primitive route.
 - For generated artifacts, name the output directory and contracts produced.

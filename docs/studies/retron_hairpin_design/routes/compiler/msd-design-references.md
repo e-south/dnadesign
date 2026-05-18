@@ -1,3 +1,19 @@
+---
+doc_id: study-retron-hairpin-design-route-compiler-msd-design-references
+surface: study-route-detail
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: studies/retron_hairpin_design
+surface_role: compiler-materialization-entrypoint
+current_state: compiler-ready
+entry_artifact: retron_msd_label_or_compiler_spec
+exit_artifact: msd_design_catalog_v1_or_msd_single_unit_sequence_bundle_v1
+---
+
 ## MSD Design References Route
 
 **Owner:** dnadesign-maintainers
@@ -9,16 +25,22 @@ design-set provenance.
 
 ### Route Contract
 
-- Type: `study-contract`
+- Type: `route`
 - Plane: `data-plane`
-- Surface role: `record-plane design-reference-normalization`
+- Surface role: `compiler-materialization-entrypoint`
 - Owner-boundary: `studies/retron_hairpin_design`
 - Current state: `compiler-ready`
+- Entry artifact: lab-facing MSD construct label or `retron_msd_compiler_spec_v1`
+- Exit artifact: `msd_design_catalog_v1` or `msd_single_unit_sequence_bundle_v1`
 - Registry: `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`
 - Authoritative cohort:
   `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`
 - Convenience label input:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`
+- Cap source lookup:
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`
+- Full cohort materialization spec:
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`
 - Public module: `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py`
 - Typed compiler spec: `retron_msd_compiler_spec_v1`
 
@@ -48,19 +70,21 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.
   --format json
 ```
 
-Materialize single-unit sequence artifacts after concrete sequences are
-available:
+Materialize the full checked-in cohort from explicit 5'->3' cap/foldback
+segments:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
-  --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
+  --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml \
   --out-dir /tmp/dnadesign_retron_msd_sequences \
-  --payload-sequence TetR=<payload-sequence> \
-  --cap-sequence C26=<cap-sequence> \
-  --cap-sequence C172=<cap-sequence> \
   --render-format png \
   --format json
 ```
+
+`C###` cap IDs are not implicit de033 lookups; materialization specs must
+provide each cap as a literal 5'->3' sequence or an explicit public primitive
+source. If topology is absent, the compiler emits the whole supplied
+cap/foldback segment and omits subsection labels.
 
 ### Boundaries
 
@@ -76,6 +100,14 @@ stem-base primitives only through public `dnadesign.cruncher.snapback` and
 `dnadesign.cruncher.scar_nick` APIs. `selector.mode=rank` is the current
 explicit combination surface; rank lists, ranges, and all-hit selectors must
 fail until a deliberate expansion contract exists.
+
+`C###` cap IDs are symbolic. Known cap sequences live in
+`compiler/catalog/msd_cap_sources.yaml`: `C26=AGGC`,
+`C43=tCCTCAGcccGCTGAGGa`, and the selected `C172-C176` de033 source labels.
+The compiler does not infer de033 sequence or topology from an id pattern.
+Sequence-producing specs must provide a literal 5'->3' cap sequence or an
+explicit public primitive source. Topology is only needed for subsection
+annotations or topology-specific claims.
 
 The emitted `msd_design_catalog_v1` is the Reader-facing bridge. Reader should
 not parse Construct, Folding, BaseRender, or Cruncher internals. Ad hoc compiles

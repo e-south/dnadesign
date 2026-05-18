@@ -39,6 +39,8 @@ note. Keep first-hop routing in `../../routes/README.md` and current state in
   `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`.
 - Study-owned MSD design registry:
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`.
+- Study-owned cap source lookup:
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`.
 - Study-selected MSD label list:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`.
 - Generic linear ssDNA composition dev spec:

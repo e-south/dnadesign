@@ -31,7 +31,7 @@ progress or blocker questions.
 
 | Need | Open |
 | --- | --- |
-| MSD label, complete parts, design catalog, GenBank, plots, or Reader join | [MSD design references](references/msd-design-references.md) |
+| MSD label, complete parts, design catalog, GenBank, plots, or Reader join | [MSD design references](compiler/msd-design-references.md) |
 | Persistent hypotheses, effect tags, design-set membership, or compiler/materialization provenance | [Experimental workbench](../workbench/README.md) |
 | Missing cap or shortening geometry | [Released-product Snapback](product/released-product-snapback.md) |
 | Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile | [Scar-nick base-junction](product/scar-nick-base-junction.md) |

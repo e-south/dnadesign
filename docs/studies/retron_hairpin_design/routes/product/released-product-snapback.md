@@ -1,3 +1,19 @@
+---
+doc_id: study-retron-hairpin-design-route-product-released-product-snapback
+surface: study-route-detail
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: cruncher/snapback
+surface_role: primitive-owner
+current_state: in_progress
+entry_artifact: cap-or-shortening-geometry-request
+exit_artifact: snapback_released_product_primitives
+---
+
 ## Released-Product Snapback Route
 
 **Owner:** dnadesign-maintainers
@@ -10,9 +26,11 @@ This is the cap/shortening primitive owner, not the Retron MSD compiler.
 
 - Type: `route`
 - Plane: `data-plane`
-- Surface role: `primary-execution`
-- Owner-boundary: `cruncher`
+- Surface role: `primitive-owner`
+- Owner-boundary: `cruncher/snapback`
 - Current state: `in_progress`
+- Entry artifact: cap or shortening geometry request
+- Exit artifact: released-product Snapback hit bundle
 - Workspace: `src/dnadesign/cruncher/workspaces/de033`
 - Primary doc: `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md`
 
@@ -66,6 +84,7 @@ uv run cruncher snapback released-solve \
 - Hit table: `export/table__hits.csv`
 - Per-hit bundles: `analysis/materialized_hits/hit_<rank>/`
 - Per-hit plot: `plots/released_hit_triptych.pdf`
+- Study cap source lookup: `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`
 
 ### Notes
 
@@ -75,6 +94,11 @@ The active lane uses `neb_nicking_v1 + thermo_nicking_v1`, excludes
 geometry may begin left of logical origin `0`; nickase geometry may extend left
 of origin only when the omitted prefix is one contiguous fully degenerate `N` block
 in the oriented top-strand view.
+
+The study-owned cap lookup records `C26=AGGC`, `C43=tCCTCAGcccGCTGAGGa`, and
+the selected `C172-C176` de033 source labels in
+`compiler/catalog/msd_cap_sources.yaml`. These are checked-in entries, not a
+general rule that any future `C###` id should be resolved from this workspace.
 
 `released-design` and `released-show` remain optional audit paths for the
 checked-in invalid fixture. The downstream-`BspQI` spec under

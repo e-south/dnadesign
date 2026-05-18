@@ -25,6 +25,10 @@ from Bio.Seq import Seq
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
+from dnadesign.studies.studies.retron_hairpin_design.catalog.cap_sources import (
+    load_msd_cap_source_lookup,
+    parse_cap_source_label,
+)
 from dnadesign.studies.studies.retron_hairpin_design.catalog.compiler_spec import RankedPrimitiveSelectorSpec
 from dnadesign.studies.studies.retron_hairpin_design.catalog.msd_ids import (
     MsdDesignPartInput,
@@ -59,6 +63,36 @@ _SCAR_NICK_HIT_LABELS = [
 ]
 _TETO_PAYLOAD = "tccctatcagtgatagaga"
 _SNAPBACK_FOLDBACK = "GAGAGACTC"
+
+
+def test_parse_cap_source_label_extracts_5to3_de033_cap_sequence() -> None:
+    parsed = parse_cap_source_label("pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC")
+
+    assert parsed.construct_id == "pES-retron-172"
+    assert parsed.payload_id == "TetR"
+    assert parsed.source_family == "033"
+    assert parsed.sequence_5to3 == "GAGAGACTC"
+
+
+def test_checked_in_cap_source_lookup_keeps_de033_sources_explicit() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    registry = load_msd_cap_source_lookup(repo_root / "docs" / "studies" / "retron_hairpin_design")
+
+    assert registry.sources["C26"].sequence_5to3 == "AGGC"
+    assert registry.sources["C43"].sequence_5to3 == "TCCTCAGCCCGCTGAGGA"
+    assert registry.sources["C43"].source_label == "retron-43-msd[TetR]; full-tCCTCAGcccGCTGAGGa"
+    assert {
+        cap_id: source.sequence_5to3
+        for cap_id, source in registry.sources.items()
+        if cap_id in {"C172", "C173", "C174", "C175", "C176"}
+    } == {
+        "C172": "GAGAGACTC",
+        "C173": "GGAAGATCC",
+        "C174": "AGAGACTCT",
+        "C175": "GTAACGTAC",
+        "C176": "GTGACGCAC",
+    }
+    assert registry.sources["C172"].source_label == "pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC"
 
 
 def _install_fake_viennarna_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -248,6 +282,8 @@ def test_retron_msd_lint_cli_fails_fast_on_unknown_registry_part(tmp_path: Path)
     payload = json.loads(result.stdout)
     assert payload["status"] == "error"
     assert "Unknown cap 'C999'" in payload["error"]
+    assert "source handles" in payload["error"]
+    assert "not inferred from de033 by pattern" in payload["error"]
     assert "Route missing cap or shortening constraints to Snapback" in payload["next_step"]
 
 
@@ -768,10 +804,15 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
     assert "payload(s): TetR" in payload["error"]
     assert "cap(s): C172" in payload["error"]
     assert "--payload-sequence ID=ACGT" in payload["next_step"]
-    assert "Snapback" in payload["next_step"]
+    assert "explicit 5'->3' cap sequences" in payload["next_step"]
 
 
-def test_retron_msd_materialize_requires_snapback_topology_for_cap_subsection(tmp_path: Path) -> None:
+def test_retron_msd_materialize_accepts_literal_cap_segment_without_snapback_topology(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_viennarna_python_api(tmp_path, monkeypatch)
+    monkeypatch.setenv("DNADESIGN_INKSCAPE", "__must_not_be_used__")
     study_dir = tmp_path / "study"
     compiler_dir = study_dir / "compiler" / "catalog"
     compiler_dir.mkdir(parents=True)
@@ -783,10 +824,11 @@ payloads:
   TetR:
     display_name: msd[teto]
 caps:
-  C172:
-    source_construct: retron-172
+  C26:
+    source_construct: retron-26
+    display_name: C26 cap source
 constructs:
-  pES-retron-177:
+  pES-retron-178:
     scar_nick:
       route_status: note_only
 """,
@@ -799,7 +841,7 @@ constructs:
         [
             "materialize",
             "--id",
-            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "pES-retron-178-msd[TetR]; C26-LCAAG-RCTCG-MXMM",
             "--study-dir",
             study_dir.as_posix(),
             "--out-dir",
@@ -807,16 +849,36 @@ constructs:
             "--payload-sequence",
             f"TetR={_TETO_PAYLOAD}",
             "--cap-sequence",
-            f"C172={_SNAPBACK_FOLDBACK}",
+            "C26=AGGC",
+            "--render-format",
+            "png",
             "--format",
             "json",
         ],
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
-    assert "missing snapback_topology" in payload["error"]
-    assert "Cap label covers only the cap subsection" in payload["error"]
+    assert payload["status"] == "ok"
+    assert payload["record_count"] == 1
+    variant_dir = out_dir / "variants" / "msd-tetr-C26-LCAAG-RCTCG-MXMM"
+    assert (variant_dir / "sequences" / "forward.gb").is_file()
+    assert (variant_dir / "plots" / "secondary_structure.native.png").is_file()
+
+    catalog = json.loads((out_dir / "manifest" / "catalog" / "msd_design_catalog_v1.json").read_text())
+    record = catalog["records"][0]
+    flank_5p_len = len("gtcagaaaaaa") + 4
+    flank_3p_len = 4 + len("acagtaactcaga")
+    unit_len = flank_5p_len + len(_TETO_PAYLOAD) + len("AGGC") + len(_TETO_PAYLOAD) + flank_3p_len
+    assert record["sequence"]["length"] == unit_len
+
+    feature_rows = list(csv.DictReader((variant_dir / "sequences" / "features.csv").read_text().splitlines()))
+    annotation_ids = {row["feature_id"] for row in feature_rows if row["feature_kind"] == "annotation"}
+    assert annotation_ids == {"stem_base_left", "stem_base_right"}
+    assert "Foldback" in {row["display_label"] for row in feature_rows}
+    assert not {"snapback_retained_stem", "snapback_cap", "snapback_foldback_return"} & {
+        row["feature_id"] for row in feature_rows
+    }
 
 
 def test_retron_msd_materialize_requires_viennarna_for_deliverable_plots(
