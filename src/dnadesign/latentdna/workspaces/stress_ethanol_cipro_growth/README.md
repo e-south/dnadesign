@@ -5,6 +5,7 @@ This workspace holds the LatentDNA comparison surfaces for the active stress / e
 - Workspace id: `stress_ethanol_cipro_growth`
 - Study binding: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
 - Snapshot artifact: `outputs/status/workspace_snapshot.json`
+- Read-only snapshot inspection: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run`
 - Gate: `representation_health_summary`
 - Active feature source contract: canonical Infer feature sidecars joined to USR sequence-view and view-semantics sidecars
 - Available active geometry: completed 7B construct-insert `seq_mean`, forward

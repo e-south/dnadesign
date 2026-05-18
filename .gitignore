@@ -304,6 +304,8 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/.gitkeep
 
 # LatentDNA workspaces: keep configs/templates tracked; generated analysis outputs stay local.
+# The stress study snapshot is a sanctioned checked-in status record; use
+# `latentdna workspace snapshot --dry-run` for read-only inspections.
 src/dnadesign/latentdna/workspaces/**/outputs/
 !src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/
 src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/*

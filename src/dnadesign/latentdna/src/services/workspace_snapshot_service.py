@@ -189,7 +189,7 @@ def _export_snapshots(context) -> dict[str, WorkspaceSnapshotExport]:
     return snapshots
 
 
-def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
+def workspace_snapshot(workspace: str | Path, *, write: bool = True) -> dict[str, object]:
     context = load_workspace_config(workspace, validate_plot_semantics=False)
     payload = WorkspaceSnapshot(
         schema_version="latentdna.workspace_snapshot.v1",
@@ -205,5 +205,6 @@ def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
         decision_ladder=decision_ladder(context),
         last_updated_at=datetime.now(UTC).isoformat(),
     ).model_dump(mode="json")
-    write_json(context.output_root / "status" / "workspace_snapshot.json", payload)
+    if write:
+        write_json(context.output_root / "status" / "workspace_snapshot.json", payload)
     return payload

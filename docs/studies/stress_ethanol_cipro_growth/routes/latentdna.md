@@ -18,7 +18,8 @@ surface. Keep status questions in `status.md` or `ops progress`.
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
 - Workspace: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md`
-- Snapshot command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
+- Read-only snapshot command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run`
+- Publish snapshot command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
 - Validation command: `uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep`
 
 ### Review Order

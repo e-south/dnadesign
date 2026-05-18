@@ -129,7 +129,11 @@ views:
         encoding="utf-8",
     )
 
-    snapshot = workspace_snapshot(workspace_dir)
+    snapshot = workspace_snapshot(workspace_dir, write=False)
 
     assert "native" in snapshot["sources"]
     assert "future_core60_features" not in snapshot["sources"]
+    assert not (workspace_dir / "outputs" / "status" / "workspace_snapshot.json").exists()
+
+    workspace_snapshot(workspace_dir)
+    assert (workspace_dir / "outputs" / "status" / "workspace_snapshot.json").is_file()

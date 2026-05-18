@@ -78,7 +78,7 @@ Workspace-specific flags:
 - Mutating commands emit `latentdna.command_result.v1`.
 - Artifact directories carry `latentdna.manifest.v1` manifests.
 - `latentdna deliverable status` emits `latentdna.deliverable_status.v1`.
-- `latentdna workspace snapshot` emits `latentdna.workspace_snapshot.v1` and writes `outputs/status/workspace_snapshot.json`.
+- `latentdna workspace snapshot` emits `latentdna.workspace_snapshot.v1` and writes `outputs/status/workspace_snapshot.json`; add `--dry-run` for read-only inspection without modifying the tracked study snapshot.
 - `latentdna neighbors fit` and `latentdna cluster fit` require exactly one of `--view` or `--reduced-view`; reduced views are already scope-fixed and cannot be combined with `--sample` or `--alignment`.
 - `latentdna workspace init --json` emits `latentdna.command_result.v1` with `artifact_kind=workspace`.
 - `latentdna notebook generate` may emit `status=attention` when the notebook artifact exists but the default deliverable plot has not been rendered yet.

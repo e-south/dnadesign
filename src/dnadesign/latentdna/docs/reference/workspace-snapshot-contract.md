@@ -3,7 +3,11 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-15
 
-`latentdna workspace snapshot --workspace <id|path> --json` publishes the sanctioned study-facing status surface and writes `outputs/status/workspace_snapshot.json`.
+`latentdna workspace snapshot --workspace <id|path> --json` publishes the
+sanctioned study-facing status surface and writes
+`outputs/status/workspace_snapshot.json`. Use `--dry-run` when you need the
+same `latentdna.workspace_snapshot.v1` payload for inspection without touching
+the workspace snapshot file.
 
 Required top-level fields:
 

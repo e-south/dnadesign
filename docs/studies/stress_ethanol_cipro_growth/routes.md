@@ -99,7 +99,7 @@ Use this page after the checked-in study status tells you where the record stand
 - Exit artifact: published LatentDNA workspace snapshot plus sanctioned
   comparison deliverables and the `latent_geometry_browser` notebook
 - Detail: [`routes/latentdna.md`](routes/latentdna.md)
-- First command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json`
+- First command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run`
 - Route note: use this route for downstream comparison outputs after checking
   the study record. LatentDNA detail stays in `routes/latentdna.md`.
 
