@@ -45,5 +45,5 @@ relations:
     target: usr.data-plane.multi-source-source-of-truth
   - type: execution-support
     target: usr.data-plane.construct-infer-source-of-truth
-  - type: execution-support
-    target: usr.data-plane.promoter-feature-matrix
+  - type: handoff-to
+    target: opal.downstream.usr-infer-x-active-learning

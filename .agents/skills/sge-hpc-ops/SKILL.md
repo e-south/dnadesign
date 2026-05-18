@@ -1,8 +1,8 @@
 ---
 name: sge-hpc-ops
-description: Operate SGE or UGE clusters including BU SCC with probe-first capability detection, deterministic interactive or batch execution, verify-before-submit gates, workflow routing for DenseGen plus Notify chains, and freshness checks for volatile SCC policy claims. Use when users ask about qsub, qrsh, qlogin, qstat, qdel, job arrays, resource requests, queue monitoring, BU SCC connectivity, OnDemand sessions, transfer-node usage, Notify Slack wiring, or BU SCC batch workflows. Do not use for non-SGE schedulers or local-only coding tasks.
+description: Operate SGE/UGE and BU SCC jobs. Use when users ask about qsub, qrsh, qstat, qdel, OnDemand, resources, queue status, or dnadesign batch/Notify. Do not use for non-SGE schedulers or local-only coding.
 metadata:
-  version: 0.7.5
+  version: 0.7.6
   category: workflow-automation
   tags: [hpc, sge, bu-scc, batch, operations]
 ---

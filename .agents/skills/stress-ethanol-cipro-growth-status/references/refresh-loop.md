@@ -11,7 +11,8 @@ surface that answers the question.
    `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
    only for blocker or next-run readiness questions.
 4. Open `docs/studies/<study-id>/routes.md` only after the record or blocker
-   question is answered.
+   question is answered. Open `routes/opal.md` or `routes/latentdna.md` only
+   after that owner surface is selected.
 
 ## Required record inputs
 
@@ -22,6 +23,7 @@ surface that answers the question.
 - `docs/studies/<study-id>/status.md`
 - `docs/studies/<study-id>/ops.study.yaml`
 - `docs/studies/<study-id>/routes.md` when present
+- `docs/studies/<study-id>/routes/` detail files only after route selection
 - `docs/studies/<study-id>/pipeline.yaml` when present
 
 ## Snapshot-first refresh

@@ -30,7 +30,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Shared test infrastructure lives under `src/dnadesign/devtools/testsupport/` and is test-only by contract; production code must not depend on it.
 - OPS core is a neutral shell around discovery, observation/status, orchestration,
   and generic readiness evaluation; it must not own sibling-specific provider
-  implementations or study-status adapter policy.
+  implementations or study-specific status/preflight policy.
 - Shared operational plane: Notify (`src/dnadesign/notify/`) consumes USR events as integration signals without controlling producer tools.
 - Shared storage semantics: USR overlay/compaction/file-shape contracts use USR domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
 - Shared developer infrastructure: devtools modules provide CI scope detection, docs checks, coverage gates, and quality entropy reporting.
@@ -84,9 +84,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
   record or runbook.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
-- Study status adapters are explicit seams. OPS loads them through metadata and
-  sanctioned provider boundaries; study-specific execution taxonomy does not
-  belong under `src/dnadesign/ops/`.
+- Study status and preflight logic is study-owned once it becomes specific.
+  OPS discovers provider metadata and imports only the selected provider
+  entrypoint; study-specific execution taxonomy stays under
+  `src/dnadesign/studies/studies/<study-id>/`.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only
   - `runbook`: authoritative operator procedure with ordered commands and verification

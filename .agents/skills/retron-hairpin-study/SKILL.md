@@ -1,8 +1,8 @@
 ---
 name: retron-hairpin-study
-description: "Compile/route Retron MSD compiler requests. Use for MSD IDs, single-unit MSD sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Not for generic Cruncher/snapback."
+description: Route Retron MSD compiler work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.5
+  version: 0.7.6
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---

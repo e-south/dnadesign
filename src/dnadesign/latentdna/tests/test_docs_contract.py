@@ -143,7 +143,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "sigma35_centroid_distance_gallery" in study_routes
     assert "sigma35_stress_margin_gallery" in study_routes
     assert "context_pair_summary" in study_routes
-    assert "Snapshot attention surfaces: none for LatentDNA decision deliverables" in study_routes
+    assert "Snapshot attention surfaces: `design_structure_summary`, `sigma35_ordinal_audit`" in study_routes
     assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_routes
     assert "Plane: `data-plane`" in study_routes
     assert "Plane: `control-plane`" in study_routes

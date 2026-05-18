@@ -146,8 +146,12 @@ artifacts:
     role: opal_candidate_feature_table
     dataset_id: usr_prom_eth_cip_opal_candidates
     ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates
+    row_count: 157160
     x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
     x_source: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+    source_population: dense_generated_promoters_only
+    excludes: archive_sfxi_reference_control_rows
+    label_sidecar_state: absent_until_assay_labels
   reference_native_dataset:
     artifact_type: dataset
     dataset_id: usr_promoter_references

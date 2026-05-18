@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,10 @@ import numpy as np
 import pandas as pd
 import yaml
 
-REQUIRED_OPAL_COLUMNS: tuple[str, ...] = ("id", "bio_type", "sequence", "alphabet")
+from .candidate_table import (
+    validate_configured_candidate_feature_table,
+    validate_selected_ids_against_candidate_feature_table,
+)
 
 REQUIRED_REVIEW_COLUMNS: tuple[str, ...] = (
     "campaign",
@@ -421,6 +425,10 @@ def select_batch0(candidates: pd.DataFrame, config: Mapping[str, Any]) -> pd.Dat
     exclude_source_class = set(filters.get("exclude_source_class", []) or [])
     if exclude_source_class and "source_class" in frame.columns:
         frame = frame[~frame["source_class"].isin(exclude_source_class)].copy()
+    for column in filters.get("exclude_non_null_columns") or []:
+        column_name = str(column)
+        if column_name in frame.columns:
+            frame = frame[frame[column_name].isna()].copy()
     selected_frames: list[pd.DataFrame] = []
     used_ids: set[str] = set()
 
@@ -459,7 +467,6 @@ def select_batch0(candidates: pd.DataFrame, config: Mapping[str, Any]) -> pd.Dat
                 ),
                 axis=1,
             )
-            chosen["label_hist_column"] = f"opal__{campaign['slug']}__label_hist"
             campaign_selected = pd.concat([campaign_selected, chosen], ignore_index=True)
             selected_frames.append(chosen)
 
@@ -470,126 +477,7 @@ def select_batch0(candidates: pd.DataFrame, config: Mapping[str, Any]) -> pd.Dat
     missing = [column for column in REQUIRED_REVIEW_COLUMNS if column not in selected.columns]
     if missing:
         raise ValueError(f"selected review table is missing required columns: {missing}")
-    return selected.loc[:, [*REQUIRED_REVIEW_COLUMNS, "label_hist_column"]].copy()
-
-
-def _coerce_vector(value: Any) -> np.ndarray:
-    if _is_missing(value):
-        raise ValueError("X values must be non-null fixed-length vectors")
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not (stripped.startswith("[") and stripped.endswith("]")):
-            raise ValueError("X values must be list-like vectors, not scalar strings")
-        value = json.loads(stripped)
-    try:
-        arr = np.asarray(value, dtype=float).ravel()
-    except Exception as exc:
-        raise ValueError("X values must be numeric fixed-length vectors") from exc
-    if arr.size == 0 or not np.all(np.isfinite(arr)):
-        raise ValueError("X values must be finite non-empty fixed-length vectors")
-    return arr
-
-
-def validate_candidate_feature_table(
-    *,
-    records_path: str | Path,
-    x_column: str,
-    view_rows_path: str | Path | None = None,
-    view_row_id_column: str = "construct__anchor_id",
-) -> dict[str, int]:
-    """Validate the OPAL candidate feature table contract."""
-
-    records = pd.read_parquet(records_path)
-    missing = [column for column in (*REQUIRED_OPAL_COLUMNS, x_column) if column not in records.columns]
-    if missing:
-        raise ValueError(f"candidate feature table missing required columns: {missing}")
-
-    ids = records["id"].astype(str)
-    if ids.duplicated().any():
-        sample = ids[ids.duplicated()].unique().tolist()[:5]
-        raise ValueError(f"candidate feature table ids must be unique; duplicates={sample}")
-
-    x_dim: int | None = None
-    for row_id, value in zip(ids, records[x_column], strict=True):
-        vec = _coerce_vector(value)
-        if x_dim is None:
-            x_dim = int(vec.size)
-        elif int(vec.size) != x_dim:
-            raise ValueError(
-                "candidate feature table X column must be fixed-length; "
-                f"id={row_id!r} has length {vec.size}, expected {x_dim}"
-            )
-
-    if view_rows_path is not None:
-        view_rows = pd.read_parquet(view_rows_path)
-        if view_row_id_column not in view_rows.columns:
-            raise ValueError(f"LatentDNA view rows missing id column {view_row_id_column!r}")
-        view_ids = view_rows[view_row_id_column].astype(str).tolist()
-        record_ids = ids.tolist()
-        if record_ids != view_ids:
-            raise ValueError("candidate feature table ids do not align with LatentDNA view rows")
-
-    return {"row_count": int(len(records)), "x_dim": int(x_dim or 0)}
-
-
-def _configured_candidate_feature_table_ids(config: Mapping[str, Any], *, repo_root: str | Path) -> set[str]:
-    candidate_table = dict(config.get("candidate_feature_table", {}) or {})
-    records_path = _normal_text(candidate_table.get("records_path"))
-    if not records_path:
-        raise ValueError(
-            "candidate feature table config is missing required field: candidate_feature_table.records_path"
-        )
-    records = pd.read_parquet(_resolve_repo_path(Path(repo_root), records_path), columns=["id"])
-    return set(records["id"].astype(str).tolist())
-
-
-def validate_selected_ids_against_candidate_feature_table(
-    selected: pd.DataFrame,
-    config: Mapping[str, Any],
-    *,
-    repo_root: str | Path,
-) -> dict[str, int]:
-    """Ensure selected handoff rows are valid OPAL candidate-table rows."""
-
-    candidate_ids = _configured_candidate_feature_table_ids(config, repo_root=repo_root)
-    selected_ids = selected["id"].astype(str)
-    missing_ids = sorted(set(selected_ids.tolist()) - candidate_ids)
-    if missing_ids:
-        sample = ", ".join(missing_ids[:5])
-        raise ValueError(
-            "selected batch-0 rows are missing from the OPAL candidate feature table: "
-            f"{sample}. Refresh the configured records.parquet before selecting batch-0 rows."
-        )
-    return {"selected_row_count": int(len(selected)), "candidate_row_count": int(len(candidate_ids))}
-
-
-def validate_configured_candidate_feature_table(config: Mapping[str, Any], *, repo_root: str | Path) -> dict[str, int]:
-    candidate_table = dict(config.get("candidate_feature_table", {}) or {})
-    records_path = _normal_text(candidate_table.get("records_path"))
-    x_column = _normal_text(candidate_table.get("x_column"))
-    missing = [
-        field
-        for field, value in {
-            "candidate_feature_table.records_path": records_path,
-            "candidate_feature_table.x_column": x_column,
-        }.items()
-        if not value
-    ]
-    if missing:
-        raise ValueError(f"candidate feature table config is missing required field(s): {', '.join(missing)}")
-
-    root = Path(repo_root)
-    x_source = candidate_table.get("x_source")
-    view_rows_path: Path | None = None
-    if isinstance(x_source, Mapping):
-        rows_path = _normal_text(x_source.get("rows_path"))
-        if rows_path:
-            view_rows_path = _resolve_repo_path(root, rows_path)
-    return validate_candidate_feature_table(
-        records_path=_resolve_repo_path(root, records_path),
-        x_column=x_column,
-        view_rows_path=view_rows_path,
-    )
+    return selected.loc[:, REQUIRED_REVIEW_COLUMNS].copy()
 
 
 def _write_selection_outputs(selected: pd.DataFrame, config: Mapping[str, Any], *, repo_root: Path) -> list[Path]:
@@ -651,4 +539,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None

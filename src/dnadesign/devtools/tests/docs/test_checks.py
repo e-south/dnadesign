@@ -33,6 +33,7 @@ from dnadesign.devtools.docs.checks import (
     _find_packaged_runbook_variant_issues,
     _find_public_interface_doc_contract_issues,
     _find_readme_tool_catalog_issues,
+    _find_repo_local_skill_frontmatter_issues,
     _find_root_docs_entrypoint_issues,
     _find_runbook_catalog_issues,
     _find_runbook_demo_snippet_issues,
@@ -383,6 +384,7 @@ def test_find_study_record_doc_issues_rejects_record_root_outside_study_records(
 def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms(tmp_path: Path) -> None:
     _write(
         tmp_path / "ARCHITECTURE.md",
+        "Study status adapters are explicit seams. "
         "Study-family adapters are explicit seams and family routing resolves through "
         "`src/dnadesign/studies/families/<family>/`.\n",
     )
@@ -397,9 +399,34 @@ def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms
 
     issues = _find_study_status_surface_semantics_issues(tmp_path)
 
+    assert any("Study status adapters" in issue for issue in issues)
     assert any("Study-family adapters" in issue for issue in issues)
     assert any("`family`, and `record_root`" in issue for issue in issues)
     assert any("declare `family` and `record_root`" in issue for issue in issues)
+
+
+def test_find_repo_local_skill_frontmatter_issues_rejects_overlong_description(tmp_path: Path) -> None:
+    _write(
+        tmp_path / ".agents" / "skills" / "demo-skill" / "SKILL.md",
+        "\n".join(
+            [
+                "---",
+                "name: demo-skill",
+                f"description: {'x' * 221}",
+                "metadata:",
+                "  version: 0.1.0",
+                "  category: workflow-automation",
+                "---",
+                "",
+                "# Demo Skill",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_repo_local_skill_frontmatter_issues(tmp_path)
+
+    assert any("frontmatter description length 221/220" in issue for issue in issues)
 
 
 def _write_active_study_datasets(tmp_path: Path, datasets: list[dict[str, object]]) -> None:

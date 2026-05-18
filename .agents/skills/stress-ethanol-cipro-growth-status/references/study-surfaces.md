@@ -8,6 +8,8 @@ Keep ownership boundaries clear.
   current row counts, downstream posture, and concise next actions
 - `docs/studies/<study-id>/routes.md`: one-hop study handoff page for DenseGen,
   Construct, Infer, LatentDNA, Cluster, and OPAL
+- `docs/studies/<study-id>/routes/`: focused route details for owner surfaces
+  that would otherwise make the one-hop map monolithic
 - `docs/studies/<study-id>/datasets.yaml`: affiliated dataset registry, root
   semantics, and sync posture
 - `docs/studies/<study-id>/ops.study.yaml`: lifecycle order, snapshot scope,
@@ -31,8 +33,16 @@ Keep ownership boundaries clear.
 - Cluster and OPAL detail stays in their tool-owned workflow docs until the
   study owns a concrete results root or campaign config.
 - OPAL campaign notebook viewing is routed through the study `routes.md` OPAL
-  section and `opal notebook generate/run`; this skill should not grow a
-  parallel OPAL command walkthrough.
+  section, then the study-owned OPAL route-detail page; this skill should not
+  grow a parallel OPAL command walkthrough.
+- OPAL batch-0 candidate-table creation is study-owned generated data. The
+  current shared table is materialized, but the contract audit remains in
+  `opal_batch0/candidate_table.py`; route through `routes/opal.md` instead of
+  treating the full LatentDNA review view as the OPAL universe.
+- OPAL candidate ID provenance is study-owned. Route per-ID questions through
+  `opal_batch0/provenance.py`, which joins DenseGen sidecars, anchor records,
+  Construct views, Infer aliases, LatentDNA rows, and OPAL records by stable
+  `id`.
 
 ## Study-Owned Source Routing
 

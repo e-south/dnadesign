@@ -1,8 +1,8 @@
 ---
 name: bu-scc-usr-sync
-description: Operate dnadesign USR dataset sync against BU SCC using the repo's canonical USR roots, explicit remotes config, doctor and warm-auth preflight, pullable-dataset inventory checks, and no-delete safety. Use when the user wants to diff, pull, push, or bootstrap USR datasets between the local dnadesign clone and BU SCC. Do not use for generic scheduler submission tasks, non-USR file transfer plans, or repo changes with no sync workflow scope.
+description: Sync dnadesign USR datasets with BU SCC. Use for usr diff/pull/push/bootstrap, remotes doctor, warm-auth, and audit-json loops. Do not use for scheduler jobs, arbitrary file transfer, or code changes.
 metadata:
-  version: 0.2.0
+  version: 0.2.1
   category: workflow-automation
   tags: [usr, bu-scc, sync, datasets, dnadesign]
 ---

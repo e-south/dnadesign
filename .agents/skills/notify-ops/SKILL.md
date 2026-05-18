@@ -1,8 +1,8 @@
 ---
 name: notify-ops
-description: Operate dnadesign Notify watcher setup, validation, live watch, and recovery using the repo-owned runbooks, strict USR `.events.log` boundaries, and one-watcher-per-lane defaults. Use when the user wants to wire Slack delivery, validate a Notify profile, start or recover a watcher loop, or debug a Notify operator workflow in this repo. Do not use for generic Slack administration, non-Notify scheduler orchestration, or code changes with no Notify workflow scope.
+description: Operate dnadesign Notify setup, profile validation, watcher loops, and spool recovery. Use for Slack delivery or USR .events.log watches. Do not use for Slack admin, scheduler submits, or code changes.
 metadata:
-  version: 0.1.0
+  version: 0.1.1
   category: workflow-automation
   tags: [notify, usr, operations, slack, dnadesign]
 ---

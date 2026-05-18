@@ -48,6 +48,8 @@ Each checked-in live study keeps these artifacts:
 - `ops.study.yaml`: required OPS-facing lifecycle/track contract; optional
   `ops_surfaces` only when the study owns concrete status/preflight providers
 - `routes.md`: optional one-hop handoff map for current owner surfaces
+- `routes/`: optional focused route-detail pages when one owner surface would
+  otherwise turn `routes.md` into a workflow encyclopedia
 - `pipeline.yaml`: optional machine-readable runtime context for exact command
   groups or automation bootstrap
 - `audits/`: optional machine-readable sync/readiness evidence
@@ -67,6 +69,7 @@ docs/studies/<study-id>/
   status.md
   ops.study.yaml
   routes.md      # optional, preferred once the study spans owner surfaces
+  routes/        # optional, focused route details for bulky owner surfaces
   pipeline.yaml  # optional, for exact command groups/runtime context
   audits/
 ```

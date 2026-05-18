@@ -1,8 +1,8 @@
 ---
 name: stress-ethanol-cipro-growth-status
-description: Report record-backed status for the concrete stress_ethanol_cipro_growth study. Use when the user asks where this study stands, which checked-in files are authoritative, what current datasets or phase are active, or what study-owned handoff should be opened next. Do not use for another study or for family-level routing; create that study's own skill/status provider only when needed.
+description: Report record-backed status for stress_ethanol_cipro_growth. Use for current phase, active datasets, preflight, or LatentDNA/OPAL handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 1.0.0
+  version: 1.0.2
   category: workflow-automation
   tags: [studies, stress-ethanol-cipro-growth, status, routes, preflight]
 ---
@@ -20,7 +20,8 @@ In scope:
 - `docs/studies/stress_ethanol_cipro_growth/`
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
-- one-hop routing through `docs/studies/stress_ethanol_cipro_growth/routes.md`
+- one-hop routing through `docs/studies/stress_ethanol_cipro_growth/routes.md`,
+  with OPAL and LatentDNA detail under `docs/studies/stress_ethanol_cipro_growth/routes/`
 
 Out of scope:
 - family-level or cross-study status routing
@@ -35,7 +36,9 @@ Out of scope:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Run the preflight command only for blocker or next-run readiness:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`.
-4. Route downstream work through `routes.md` or the owning tool docs.
+4. Route downstream work through `routes.md`. Open `routes/opal.md` or
+   `routes/latentdna.md` only after the one-hop route selects that owner
+   surface.
 
 ## Guardrails
 
@@ -53,3 +56,10 @@ Out of scope:
 - downstream posture for LatentDNA, Cluster, and OPAL when present in status evidence
 - preflight blockers only when preflight was requested
 - exact missing-record or mismatch errors when the record is incomplete
+
+## References
+
+- [route-matrix.md](references/route-matrix.md)
+- [refresh-loop.md](references/refresh-loop.md)
+- [study-surfaces.md](references/study-surfaces.md)
+- [external-sources.md](references/external-sources.md)

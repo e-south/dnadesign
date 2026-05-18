@@ -184,6 +184,8 @@ AGENTS_ROOT_FILENAMES = {
 }
 AGENTS_PATH_LITERAL_EXCEPTIONS = {"./scripts/agent-verify", "scripts/agent-verify"}
 AGENTS_NEGATIVE_LINE_MARKERS = ("do not add", "does not ship", "does not exist")
+REPO_LOCAL_SKILLS_DIR = ".agents/skills"
+REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS = 220
 DENSEGEN_DOC_LANGUAGE_PATHS = (
     "src/dnadesign/densegen/README.md",
     "src/dnadesign/densegen/AGENTS.md",
@@ -234,10 +236,16 @@ STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
     "docs/studies/study-status-ops-surfaces.md",
     "docs/studies/stress_ethanol_cipro_growth/status-contract.md",
     "docs/studies/stress_ethanol_cipro_growth/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/opal.md",
     "docs/studies/retron_hairpin_design/status-contract.md",
     "docs/studies/retron_hairpin_design/preflight.md",
 )
 LEGACY_STUDY_STATUS_SURFACE_TERMS = (
+    "Study status adapters",
+    "study-status adapter",
+    "status adapter policy",
     "study-family policy",
     "family routing resolves",
     "src/dnadesign/studies/families/",
@@ -1597,9 +1605,44 @@ def _find_study_status_surface_semantics_issues(repo_root: Path) -> list[str]:
                 continue
             line_no = content[: content.index(term)].count("\n") + 1
             issues.append(
-                f"{path}:{line_no}: stale study-status family ontology term {term!r} is not allowed; "
+                f"{path}:{line_no}: stale study-status ontology term {term!r} is not allowed; "
                 "route studies through concrete study-owned providers only when those providers exist."
             )
+    return issues
+
+
+def _find_repo_local_skill_frontmatter_issues(repo_root: Path) -> list[str]:
+    skills_root = repo_root / REPO_LOCAL_SKILLS_DIR
+    if not skills_root.exists():
+        return []
+
+    issues: list[str] = []
+    for skill_file in sorted(skills_root.glob("*/SKILL.md")):
+        text = skill_file.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            issues.append(f"{skill_file}: missing YAML frontmatter.")
+            continue
+        try:
+            raw_frontmatter = text.split("---", 2)[1]
+            payload = yaml.safe_load(raw_frontmatter)
+        except (IndexError, yaml.YAMLError) as exc:
+            issues.append(f"{skill_file}: unable to parse YAML frontmatter ({exc}).")
+            continue
+        if not isinstance(payload, dict):
+            issues.append(f"{skill_file}: YAML frontmatter must be a mapping.")
+            continue
+
+        description = payload.get("description")
+        if not isinstance(description, str) or not description.strip():
+            issues.append(f"{skill_file}: frontmatter description must be a non-empty string.")
+            continue
+        description_length = len(description)
+        if description_length > REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS:
+            issues.append(
+                f"{skill_file}: frontmatter description length {description_length}/"
+                f"{REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS}; keep repo-local skill discovery compact."
+            )
+
     return issues
 
 
@@ -2450,6 +2493,13 @@ def main(argv: list[str] | None = None) -> int:
     if study_status_surface_semantics_issues:
         print("Study status surface semantics check failed:")
         for issue in study_status_surface_semantics_issues:
+            print(f" - {issue}")
+        return 1
+
+    repo_local_skill_frontmatter_issues = _find_repo_local_skill_frontmatter_issues(repo_root)
+    if repo_local_skill_frontmatter_issues:
+        print("Repo-local skill frontmatter check failed:")
+        for issue in repo_local_skill_frontmatter_issues:
             print(f" - {issue}")
         return 1
 

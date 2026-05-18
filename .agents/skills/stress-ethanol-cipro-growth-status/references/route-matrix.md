@@ -10,7 +10,9 @@ surface but belongs somewhere else.
 | Which DenseGen plots, LatentDNA deliverables, notebooks, or Cluster artifact paths are available? | `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`, then inspect `evidence.analysis_surfaces` | The status snapshot now carries one route inventory for exploratory-analysis discovery without turning the skill into a tool-local walkthrough. |
 | What blocks execution here? | `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json` | Command-level readiness on the current host. |
 | Which tool or doc should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff by owner surface. |
-| How do I check OPAL campaign status or open OPAL plots? | `docs/studies/<study-id>/routes.md`, then the OPAL route's `opal status`, `opal plot`, and `opal notebook generate/run` commands | The study route owns campaign config paths and keeps OPAL notebook generation as the campaign-specific artifact viewer without expanding this skill into an OPAL walkthrough. |
+| How do I check OPAL campaign status or open OPAL plots? | `docs/studies/<study-id>/routes.md`, then `docs/studies/<study-id>/routes/opal.md` | The one-hop route selects OPAL; the OPAL detail owns campaign config paths and notebook/status/plot commands without expanding this skill into an OPAL walkthrough. |
+| What is blocking OPAL batch 0? | `docs/studies/<study-id>/routes/opal.md`, then `opal validate` for the stress configs | The shared dense-plan `records.parquet` candidate table is materialized; OPAL is now pre-assay, with labels and campaign state still pending. |
+| Where did this OPAL candidate ID come from? | `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batch0.provenance --config src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml --id <candidate_id>` | Per-ID lineage is study-owned because it joins OPAL records to DenseGen sidecars, Construct views, Infer aliases, and LatentDNA rows. |
 | Which study files are authoritative? | `campaign.yaml`, `datasets.yaml`, `status.md`, `ops.study.yaml`, plus `routes.md` and `pipeline.yaml` when present | The checked-in record stays authoritative. |
 | Which dataset sync posture is current? | `datasets.yaml` plus `usr.data-plane.hpc-sync` evidence | Sync posture belongs to the dataset registry, not to this router. |
 | Is the study still source-phase or already downstream? | Snapshot plus `status.md` | Use record-backed `source/handoff mode` language until a canonical feature dataset exists. |
@@ -24,4 +26,5 @@ Status-first routing boundary:
 - Use `stress-ethanol-cipro-growth-preflight` for blockers and default notify-enabled Infer
   presets.
 - Use `routes.md` for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL
-  handoff.
+  handoff. Use `routes/opal.md` or `routes/latentdna.md` only after the
+  one-hop map selects that owner surface.

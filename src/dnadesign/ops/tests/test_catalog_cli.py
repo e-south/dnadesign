@@ -411,7 +411,7 @@ def test_cli_catalog_list_supports_related_to_filter_for_stress_ethanol_cipro_gr
         "studies.stress-ethanol-cipro-growth.preflight",
         "usr.data-plane.multi-source-source-of-truth",
         "usr.data-plane.construct-infer-source-of-truth",
-        "usr.data-plane.promoter-feature-matrix",
+        "opal.downstream.usr-infer-x-active-learning",
     }
     assert "tool_sources" not in payload
 

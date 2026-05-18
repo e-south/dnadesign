@@ -14,8 +14,34 @@ candidate_feature_table:
     view_id: intermediate_embedding_7b_context_anchor_mean_bidir_concat
     rows_path: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/views/intermediate_embedding_7b_context_anchor_mean_bidir_concat/rows.parquet
     matrix_path: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/views/intermediate_embedding_7b_context_anchor_mean_bidir_concat/matrix.npy
-    meaning: fixed-length Fwd+RC 1 kb context-anchor Evo2 7B intermediate embedding vector
+    meaning: fixed-length block-normalized Fwd+RC 1 kb context-anchor Evo2 7B intermediate embedding vector
     not: ["UMAP coordinate", "centroid distance", "assay label", "phenotype claim"]
+  materialization:
+    source_records_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/records.parquet
+    densegen_sidecar_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/densegen.parquet
+    densegen_sidecar_columns:
+      - densegen__plan
+      - densegen__run_id
+      - densegen__sampling_library_hash
+    view_row_id_column: construct__anchor_id
+    include_source_class: ["densegen"]
+    allowed_design_families: ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin"]
+    exclude_non_null_columns: ["sfxi_ref__collection_id"]
+    expected_rows_note: roughly 157k current generated promoter rows; excludes reference, native, archive SFXI, and control rows in the broader LatentDNA view
+
+provenance:
+  densegen_source_records_path: src/dnadesign/usr/datasets/densegen_prom_eth_cip_source/records.parquet
+  densegen_source_sidecar_path: src/dnadesign/usr/datasets/densegen_prom_eth_cip_source/_derived/densegen.parquet
+  anchor_densegen_sidecar_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/densegen.parquet
+  construct_sequence_views_path: src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_views/sequence_views.parquet
+  infer_feature_aliases_path: src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer/feature_aliases.parquet
+  infer_feature_vectors_path: src/dnadesign/usr/datasets/construct_prom_eth_cip_context/_derived/infer/feature_vectors.parquet
+  infer_alias_filter:
+    provider: evo2
+    model_name: evo2_7b
+    layer_name: block26_mlp_out
+    representation_kind: intermediate_embedding
+    pooling_operation: anchor_mean
 
 source_artifacts:
   latentdna_margins: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/scalars/balanced_design_family_margins_intermediate_embedding_7b_context_anchor_mean_bidir_concat/table.parquet
@@ -25,6 +51,7 @@ source_artifacts:
 filters:
   require_positive_target_margin: true
   include_source_class: ["densegen"]
+  exclude_non_null_columns: ["sfxi_ref__collection_id"]
   allowed_sigma35_variants: ["f", "e", "d", "c"]
   preferred_sigma35_variants: ["f", "e"]
   exploratory_sigma35_variants: ["d", "c"]
@@ -47,7 +74,6 @@ campaigns:
   - slug: stress_eth_cip_ethanol_rf_sfxi_topn
     name: Stress ethanol/ciprofloxacin ethanol-factor RF SFXI top-n
     objective: ethanol_factor
-    label_hist_column: opal__stress_eth_cip_ethanol_rf_sfxi_topn__label_hist
     setpoint_vector: [0, 1, 0, 1]
     target_margin_column: synthetic_margin_ethanol_vs_background
     off_target_margin_columns:
@@ -70,7 +96,6 @@ campaigns:
   - slug: stress_eth_cip_cipro_rf_sfxi_topn
     name: Stress ethanol/ciprofloxacin cipro-factor RF SFXI top-n
     objective: cipro_factor
-    label_hist_column: opal__stress_eth_cip_cipro_rf_sfxi_topn__label_hist
     setpoint_vector: [0, 0, 1, 1]
     target_margin_column: synthetic_margin_cipro_vs_background
     off_target_margin_columns:
@@ -93,7 +118,6 @@ campaigns:
   - slug: stress_eth_cip_and_rf_sfxi_topn
     name: Stress ethanol/ciprofloxacin AND RF SFXI top-n
     objective: and
-    label_hist_column: opal__stress_eth_cip_and_rf_sfxi_topn__label_hist
     setpoint_vector: [0, 0, 0, 1]
     target_margin_column: synthetic_margin_dual_vs_background
     off_target_margin_columns:

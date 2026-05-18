@@ -23,7 +23,8 @@
 - RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar populated with 3426 rows; BioCyc GO sidecars populated for 203/205 interacting regulators)
 - RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 sequence rows; 3180 unambiguous parent-resolved rows feed the TF-axis audit after one duplicate core60 sequence collapses two NhaR-only native parents)
 - OPAL candidate feature table: `usr_prom_eth_cip_opal_candidates`
-  (`planned`; role `opal_candidate_feature_table`)
+  (`present`, 157160 rows; role `opal_candidate_feature_table`; dense
+  generated promoter subset from the broader 160460-row LatentDNA view)
 - Logical reference feature entry: `infer_prom_eth_cip_reference_views_7b` (`planned`, not separately materialized; current payloads live in dataset-local `_derived/infer/` sidecars)
 
 ### Current Phase
@@ -74,13 +75,14 @@ Completed 7B sidecar lanes:
 ### Current Downstream Posture
 
 - DenseGen analysis surface: `attention`; the source dataset is ready, but the operator-visible plot inventory contains stale artifacts and should be refreshed before relying on DenseGen plots as current.
-- LatentDNA: `current`; the native TF-axis route is configured as a first-class appendix overlay over the existing study context view, and local view rows/plots/notebook outputs have been regenerated after the lineage-metadata config change.
+- LatentDNA: `attention`; the native TF-axis route is configured as a first-class appendix overlay over the existing study context view, and local view rows/plots/notebook outputs have been regenerated, but `design_structure_summary` and `sigma35_ordinal_audit` remain pending before the full primary review path is current.
 - LatentDNA native TF-axis overlay: `current`; the deliverable renders over the existing context-anchor bidirectional view after RegulonDB native core60 rows were appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions were populated, and matching 7B feature sidecars were filled.
 - RegulonDB functional annotation sidecars: `current`; `usr_regulondb_native_promoters/_relations/` now carries BioCyc KB 29.6 regulator GO terms, promoter-regulator-GO term rows, and regulator coverage rows. LatentDNA now has a separate BioCyc GO biological-process appendix plot that reuses the native plan-margin tail tables for interpretation. These are source-backed annotation sidecars, not OPAL inputs or mechanistic labels.
 - Cluster: `planned`; use `routes.md` for the current exploratory-clustering handoff.
-- OPAL: `configured_pending_candidate_table`; batch-0 campaign configs exist
-  for ethanol factor, ciprofloxacin factor, and AND objectives, but the
-  generated candidate feature table has not been materialized.
+- OPAL: `candidate_table_materialized_pre_assay`; batch-0 campaign configs
+  exist for ethanol factor, ciprofloxacin factor, and AND objectives, and the
+  shared candidate feature table is materialized. The observed-label sidecar
+  and campaign state remain absent until round-0 assay labels are ingested.
 
 Current LatentDNA decision surfaces:
 
@@ -156,11 +158,13 @@ is not a native bidirectional Evo2 state or hidden state.
 
 ### Next Actions
 
-- Materialize the OPAL candidate feature table
-  `usr_prom_eth_cip_opal_candidates` only when ready to create generated USR
-  data. The table must carry
-  `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its fixed-length
-  vector-valued X column plus per-campaign OPAL label history after ingest.
+- Validate the three OPAL campaign configs against
+  `usr_prom_eth_cip_opal_candidates`, then ingest round-0 SFXI labels into the
+  shared `_opal/observed_labels.parquet` sidecar once assay data exist. The
+  candidate table is already materialized as the dense generated promoter
+  subset from `background_only`, `ethanol`, `ciprofloxacin`, and
+  `ethanol_ciprofloxacin`, excluding archive SFXI/reference/control rows, with
+  `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its fixed-length X.
 - Use the candidate-X scorecard as the current pre-assay representation triage surface: bidirectional context-anchor mean is the working `X`, anchor-source insert mean is the DenseGen-plan baseline, and forward context anchor mean is the strength-standard lens.
 - Keep reference-to-plan behavior as a landmark sanity check, not a phenotype claim.
 - Keep `native_tf_axis_orientation_audit` as an appendix axis-orientation audit: the current generated test supports the LexA/cipro direction and does not support the BaeR/CpxR ethanol direction.

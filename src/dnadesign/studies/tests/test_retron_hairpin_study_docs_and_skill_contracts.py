@@ -85,7 +85,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.5"
+    assert metadata["version"] == "0.7.6"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -104,7 +104,7 @@ def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract(
 
     for phrase in (
         "Use for MSD IDs",
-        "single-unit MSD sequence bundles",
+        "sequence bundles",
         "design catalogs",
         "GenBank/native-structure PNG",
         "missing MSD parts",

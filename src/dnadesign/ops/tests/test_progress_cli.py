@@ -1056,6 +1056,47 @@ def _write_relative_opal_campaign(config_path: Path, *, rounds: list[dict[str, o
     (campaign_root / "state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _write_opal_usr_campaign_without_records(config_path: Path) -> None:
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "campaign": {"workdir": "."},
+                "data": {
+                    "location": {
+                        "kind": "usr",
+                        "path": "usr/datasets",
+                        "dataset": "demo_candidates",
+                    },
+                    "x_column_name": "X",
+                    "y_column_name": "Y",
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_opal_usr_campaign_with_records(config_path: Path) -> Path:
+    _write_opal_usr_campaign_without_records(config_path)
+    records_path = config_path.parent.parent / "usr" / "datasets" / "demo_candidates" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["a", "b"],
+                "bio_type": ["dna", "dna"],
+                "sequence": ["AAAA", "CCCC"],
+                "alphabet": ["dna_4", "dna_4"],
+                "X": [[0.1, 0.2], [0.3, 0.4]],
+            }
+        ),
+        records_path,
+    )
+    return records_path
+
+
 def test_cli_progress_show_reports_ops_audit_surface() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -2689,6 +2730,66 @@ def test_cli_progress_show_resolves_opal_workdir_relative_to_campaign_root() -> 
         payload = json.loads(result.output)
         assert payload["evidence"]["opal_workdir"].endswith("demo_campaign")
         assert payload["evidence"]["state_path"].endswith("demo_campaign/state.json")
+
+
+def test_cli_progress_show_reports_missing_opal_candidate_records_before_state_json() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        config_path = Path("demo_campaign") / "configs" / "campaign.yaml"
+        _write_opal_usr_campaign_without_records(config_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "opal.downstream.usr-infer-x-active-learning",
+                "--repo-root",
+                str(_repo_root()),
+                "--opal-config",
+                str(config_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status_kind"] == "opal-campaign-state"
+        assert payload["state"] == "missing"
+        assert payload["summary"] == "OPAL candidate records.parquet not found"
+        assert payload["evidence"]["records_path"].endswith("usr/datasets/demo_candidates/records.parquet")
+        assert payload["evidence"]["dataset"] == "demo_candidates"
+
+
+def test_cli_progress_show_reports_ready_opal_candidate_records_before_state_json() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        config_path = Path("demo_campaign") / "configs" / "campaign.yaml"
+        records_path = _write_opal_usr_campaign_with_records(config_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "opal.downstream.usr-infer-x-active-learning",
+                "--repo-root",
+                str(_repo_root()),
+                "--opal-config",
+                str(config_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status_kind"] == "opal-campaign-state"
+        assert payload["state"] == "missing"
+        assert payload["summary"] == "OPAL state.json not found; candidate records.parquet exists"
+        assert payload["evidence"]["records_path"] == str(records_path.resolve())
+        assert payload["evidence"]["records_present"] is True
+        assert payload["evidence"]["records_row_count"] == 2
+        assert payload["evidence"]["dataset"] == "demo_candidates"
 
 
 def test_cli_progress_show_reports_missing_artifact_state_without_exiting() -> None:
