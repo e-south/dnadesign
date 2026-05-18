@@ -19,7 +19,7 @@ record and the study-owned OPS status provider.
 In scope:
 - `docs/studies/stress_ethanol_cipro_growth/`
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
-- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`
 - one-hop routing through `docs/studies/stress_ethanol_cipro_growth/routes.md`,
   with OPAL and LatentDNA detail under `docs/studies/stress_ethanol_cipro_growth/routes/`
 
@@ -35,7 +35,7 @@ Out of scope:
 2. Run the status command for record posture:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Run the preflight command only for blocker or next-run readiness:
-   `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`.
+   `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`.
 4. Route downstream work through `routes.md`. Open `routes/opal.md` or
    `routes/latentdna.md` only after the one-hop route selects that owner
    surface.

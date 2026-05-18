@@ -79,7 +79,7 @@ Use this only after the top-level `routes.md` selects the OPAL campaign surface.
 - Campaign config validation: `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
 - Pre-run campaign viewer generation (writes notebook): `uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force`
 - Campaign notebook run: `uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
-- Post-run status command: `uv run opal status -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --with-ledger`
+- Post-run status command (machine-readable): `uv run opal status -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --with-ledger --json`
 - Post-run plot command: `uv run opal plot -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
 
 ### Boundaries

@@ -160,7 +160,8 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
     if uses_campaign_history and getattr(rep, "manual_attach_count", 0):
         raise OpalError(
             f"Detected {rep.manual_attach_count} labels in '{store.y_col}' without label_hist. "
-            "Run `opal ingest-y` (preferred) or `opal label-hist attach-from-y` for legacy Y columns."
+            "Run `opal ingest-y` (preferred) or explicitly reconcile the current Y column with "
+            "`opal label-hist attach-from-y`."
         )
     label_source.validate(df)
 

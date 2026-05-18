@@ -32,7 +32,8 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
     if uses_campaign_history and rep.manual_attach_count:
         raise OpalError(
             f"Detected {rep.manual_attach_count} labels in '{store.y_col}' without label_hist. "
-            "Run `opal ingest-y` (preferred) or `opal label-hist attach-from-y` for legacy Y columns."
+            "Run `opal ingest-y` (preferred) or explicitly reconcile the current Y column with "
+            "`opal label-hist attach-from-y`."
         )
     label_source.validate(df)
 

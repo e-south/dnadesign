@@ -683,6 +683,39 @@ def test_find_review_surface_private_imports_allows_public_cross_tool_review_imp
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_studies_to_opal_public_api(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "studies" / "demo" / "opal_handoff.py",
+        "from dnadesign.opal import validate_x_parquet_column\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "__init__.py",
+        "def validate_x_parquet_column():\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_studies_to_opal_private_api(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "studies" / "demo" / "opal_handoff.py",
+        "from dnadesign.opal.src.storage.x_contracts import validate_x_parquet_column\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "src" / "storage" / "x_contracts.py",
+        "def validate_x_parquet_column():\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "studies"
+    assert violations[0].imported_tool == "opal"
+    assert violations[0].import_target == "dnadesign.opal.src.storage.x_contracts"
+
+
 def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "def run():\n    return 1\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")

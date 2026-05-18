@@ -20,8 +20,9 @@ OPAL is assertive by default and fails fast on inconsistent inputs.
   `ledger_only` keeps run predictions out of the shared candidate table.
 - `usr_sidecar` appends are serialized by a local sidecar path lock; this
   protects local multi-campaign ingest, not distributed multi-host writes.
-- Labels in Y but missing from `label_hist` are rejected for legacy
-  `campaign_history` runs.
+- Labels in Y but missing from `label_hist` are rejected for
+  `campaign_history` runs; operators must ingest labels or explicitly attach
+  the current Y column to label history.
 - Ledger writes are strict: unknown columns are errors (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 - Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (`error|keep_first|keep_last`).
 - `verify-outputs` is strict: selection IDs must be unique and must exist in the target run ledger predictions.
@@ -40,9 +41,8 @@ Required columns in `records.parquet`:
 X and Y representation:
 
 - X: Arrow `list<float>` or JSON array string; fixed length across used rows
-- Y: Arrow `list<float>` when using legacy/current-Y columns. Training labels
-  may instead come from a shared sidecar when `labels.source.kind:
-  usr_sidecar`.
+- Y: Arrow `list<float>` when using a current-Y column. Training labels may
+  instead come from a shared sidecar when `labels.source.kind: usr_sidecar`.
 
 When `records.parquet` is generated from a larger representation artifact, it
 may be an ordered subset of that artifact. It must not silently include
@@ -74,7 +74,7 @@ file.
 
 | column | type | purpose |
 | --- | --- | --- |
-| `opal__<slug>__label_hist` | list<struct> | Append-only per-record observed labels for legacy `campaign_history` campaigns and run-aware predictions only when `writeback.prediction_records: label_history`. |
+| `opal__<slug>__label_hist` | list<struct> | Append-only per-record observed labels for `campaign_history` campaigns and run-aware predictions only when `writeback.prediction_records: label_history`. |
 
 Prediction entries store objective channel metadata and selected metrics (`score_ref`, `uncertainty_ref`) so readers can reconstruct selection behavior without implicit defaults.
 

@@ -56,6 +56,24 @@ def _write_fixed_x_records(path: Path, data: dict[str, list[object]], *, x_col: 
     pq.write_table(pa.table(columns), path)
 
 
+def _candidate_provenance(
+    row_count: int,
+    *,
+    source_classes: list[str] | None = None,
+    design_families: list[str] | None = None,
+) -> dict[str, list[object]]:
+    return {
+        "opal_candidate__role": ["opal_candidate_feature_table"] * row_count,
+        "opal_candidate__x_source_view_id": ["bidir"] * row_count,
+        "opal_candidate__source_class": source_classes or ["densegen"] * row_count,
+        "opal_candidate__design_family": design_families or ["ethanol"] * row_count,
+        "opal_candidate__sfxi_ref__collection_id": [None] * row_count,
+        "densegen__plan": [f"plan-{idx}" for idx in range(row_count)],
+        "densegen__run_id": ["study_stress_ethanol_cipro"] * row_count,
+        "densegen__sampling_library_hash": [f"hash-{idx}" for idx in range(row_count)],
+    }
+
+
 def _row(
     row_id: str,
     *,
@@ -318,7 +336,7 @@ def test_candidate_feature_table_validation_requires_fixed_length_x_and_view_ali
             "sequence": ["AAAA", "CCCC"],
             "alphabet": ["dna_4", "dna_4"],
             x_col: [[0.1, 0.2], [0.3, 0.4]],
-            "densegen__plan": ["ethanol__sig35=f", "ciprofloxacin__sig35=e"],
+            **_candidate_provenance(2, design_families=["ethanol", "ciprofloxacin"]),
         },
         x_col=x_col,
     )
@@ -341,6 +359,7 @@ def test_candidate_feature_table_validation_requires_fixed_length_x_and_view_ali
             "sequence": ["AAAA", "CCCC"],
             "alphabet": ["dna_4", "dna_4"],
             x_col: [[0.1, 0.2], [0.3, 0.4, 0.5]],
+            **_candidate_provenance(2, design_families=["ethanol", "ciprofloxacin"]),
         }
     ).to_parquet(records)
 
@@ -363,6 +382,7 @@ def test_candidate_feature_table_validation_does_not_pandas_load_x(
             "sequence": ["AAAA", "CCCC"],
             "alphabet": ["dna_4", "dna_4"],
             x_col: [[0.1, 0.2], [0.3, 0.4]],
+            **_candidate_provenance(2, design_families=["ethanol", "ciprofloxacin"]),
         },
         x_col=x_col,
     )
@@ -387,7 +407,23 @@ def test_candidate_feature_table_validation_does_not_pandas_load_x(
     )
 
     assert report == {"row_count": 2, "x_dim": 2}
-    assert calls == [("id", "bio_type", "sequence", "alphabet"), ("construct__anchor_id",)]
+    assert calls == [
+        (
+            "id",
+            "bio_type",
+            "sequence",
+            "alphabet",
+            "opal_candidate__role",
+            "opal_candidate__x_source_view_id",
+            "opal_candidate__source_class",
+            "opal_candidate__design_family",
+            "opal_candidate__sfxi_ref__collection_id",
+            "densegen__plan",
+            "densegen__run_id",
+            "densegen__sampling_library_hash",
+        ),
+        ("construct__anchor_id",),
+    ]
 
 
 def test_candidate_feature_table_validation_allows_ordered_latentdna_view_subset(tmp_path: Path) -> None:
@@ -403,6 +439,7 @@ def test_candidate_feature_table_validation_allows_ordered_latentdna_view_subset
             "sequence": ["AAAA", "CCCC"],
             "alphabet": ["dna_4", "dna_4"],
             x_col: [[0.1, 0.2], [0.3, 0.4]],
+            **_candidate_provenance(2, design_families=["ethanol", "ciprofloxacin"]),
         },
         x_col=x_col,
     )
@@ -435,11 +472,53 @@ def test_candidate_feature_table_validation_rejects_null_required_opal_values(tm
             "sequence": ["AAAA", ""],
             "alphabet": ["dna_4", "dna_4"],
             x_col: [[0.1, 0.2], [0.3, 0.4]],
+            **_candidate_provenance(2, design_families=["ethanol", "ciprofloxacin"]),
         },
         x_col=x_col,
     )
 
     with pytest.raises(ValueError, match="required column 'bio_type' has null/blank values"):
+        validate_candidate_feature_table(records_path=records, x_column=x_col)
+
+
+def test_candidate_feature_table_validation_requires_study_provenance_columns(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+    _write_fixed_x_records(
+        records,
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAAA"],
+            "alphabet": ["dna_4"],
+            x_col: [[0.1, 0.2]],
+        },
+        x_col=x_col,
+    )
+
+    with pytest.raises(ValueError, match="opal_candidate__role"):
+        validate_candidate_feature_table(records_path=records, x_column=x_col)
+
+
+def test_candidate_feature_table_validation_rejects_blank_densegen_provenance(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+    provenance = _candidate_provenance(1)
+    provenance["densegen__sampling_library_hash"] = [""]
+    _write_fixed_x_records(
+        records,
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAAA"],
+            "alphabet": ["dna_4"],
+            x_col: [[0.1, 0.2]],
+            **provenance,
+        },
+        x_col=x_col,
+    )
+
+    with pytest.raises(ValueError, match="densegen__sampling_library_hash"):
         validate_candidate_feature_table(records_path=records, x_column=x_col)
 
 
@@ -457,6 +536,7 @@ def test_configured_candidate_feature_table_validation_resolves_repo_paths(tmp_p
             "sequence": ["AAAA"],
             "alphabet": ["dna_4"],
             x_col: [[0.1, 0.2]],
+            **_candidate_provenance(1),
         },
         x_col=x_col,
     )
@@ -489,6 +569,7 @@ def test_batch0_preview_fails_fast_when_candidate_table_view_rows_drift(tmp_path
             "sequence": ["AAAA", "CCCC"],
             "alphabet": ["dna_4", "dna_4"],
             x_col: [[0.1, 0.2], [0.3, 0.4]],
+            **_candidate_provenance(2, design_families=["ethanol", "ciprofloxacin"]),
         },
         x_col=x_col,
     )

@@ -30,6 +30,21 @@ DENSEGEN_KEY_COLUMNS: tuple[str, ...] = (
     "densegen__run_id",
     "densegen__sampling_library_hash",
 )
+REQUIRED_CANDIDATE_PROVENANCE_COLUMNS: tuple[str, ...] = (
+    "opal_candidate__role",
+    "opal_candidate__x_source_view_id",
+    "opal_candidate__source_class",
+    "opal_candidate__design_family",
+    "opal_candidate__sfxi_ref__collection_id",
+    *DENSEGEN_KEY_COLUMNS,
+)
+REQUIRED_NON_NULL_CANDIDATE_PROVENANCE_COLUMNS: tuple[str, ...] = (
+    "opal_candidate__role",
+    "opal_candidate__x_source_view_id",
+    "opal_candidate__source_class",
+    "opal_candidate__design_family",
+    *DENSEGEN_KEY_COLUMNS,
+)
 
 
 def _repo_root_from(path: Path) -> Path:
@@ -134,6 +149,24 @@ def _validate_required_opal_values(records: pd.DataFrame, *, label: str) -> None
             raise ValueError(f"{label} required column {column!r} has null/blank values (sample_ids={sample_ids})")
 
 
+def _validate_candidate_provenance_values(records: pd.DataFrame) -> None:
+    for column in REQUIRED_NON_NULL_CANDIDATE_PROVENANCE_COLUMNS:
+        missing_mask = records[column].map(lambda value: not _normal_text(value))
+        if missing_mask.any():
+            sample_ids = records.loc[missing_mask, "id"].astype(str).tolist()[:5]
+            raise ValueError(
+                f"candidate feature table provenance column {column!r} has null/blank values (sample_ids={sample_ids})"
+            )
+
+    bad_role = records["opal_candidate__role"].astype(str) != "opal_candidate_feature_table"
+    if bad_role.any():
+        sample_ids = records.loc[bad_role, "id"].astype(str).tolist()[:5]
+        raise ValueError(
+            "candidate feature table provenance column 'opal_candidate__role' must be "
+            f"'opal_candidate_feature_table' (sample_ids={sample_ids})"
+        )
+
+
 def _validate_required_opal_table_values(table: pa.Table, *, label: str) -> None:
     missing = [column for column in REQUIRED_OPAL_COLUMNS if column not in table.column_names]
     if missing:
@@ -158,16 +191,18 @@ def validate_candidate_feature_table(
     except Exception as exc:
         raise ValueError(f"failed to read candidate feature table schema at {parquet_path}: {exc}") from exc
 
-    missing = [column for column in (*REQUIRED_OPAL_COLUMNS, x_column) if column not in schema_names]
+    required_columns = (*REQUIRED_OPAL_COLUMNS, *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS, x_column)
+    missing = [column for column in required_columns if column not in schema_names]
     if missing:
         raise ValueError(f"candidate feature table missing required columns: {missing}")
 
     records = _read_required_parquet(
         parquet_path,
         label="candidate feature table records_path",
-        columns=list(REQUIRED_OPAL_COLUMNS),
+        columns=[*REQUIRED_OPAL_COLUMNS, *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS],
     )
     _validate_required_opal_values(records, label="candidate feature table")
+    _validate_candidate_provenance_values(records)
     ids = records["id"].astype(str)
     if ids.duplicated().any():
         sample = ids[ids.duplicated()].unique().tolist()[:5]

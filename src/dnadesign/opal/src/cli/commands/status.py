@@ -113,13 +113,16 @@ def cmd_status(
             st = _preinit_status(cfg, ws, store)
         else:
             round_k = resolve_round_index_from_state(ws.state_path, round) if round is not None else None
-            st = build_status(
-                ws.state_path,
-                round_k=round_k,
-                show_all=all,
-                ledger_reader=ledger_reader,
-                include_ledger=with_ledger,
-            )
+            try:
+                st = build_status(
+                    ws.state_path,
+                    round_k=round_k,
+                    show_all=all,
+                    ledger_reader=ledger_reader,
+                    include_ledger=with_ledger,
+                )
+            except ValueError as exc:
+                raise OpalError(f"Failed to load state.json at {ws.state_path}: {exc}", ExitCodes.BAD_ARGS) from exc
             if "error" in st:
                 raise OpalError(str(st["error"]))
         if store.records_path.exists():

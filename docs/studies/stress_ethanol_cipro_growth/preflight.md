@@ -19,7 +19,7 @@ next-run readiness for `stress_ethanol_cipro_growth`.
 ### Direct Commands
 
 ```bash
-uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json
+uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30
 ```
 
 ```bash
@@ -27,7 +27,8 @@ uv run ops progress show studies.stress-ethanol-cipro-growth.preflight \
   --repo-root <repo-root> \
   --study-dir docs/studies/stress_ethanol_cipro_growth \
   --scope next \
-  --json
+  --json \
+  --command-timeout-seconds 30
 ```
 
 ### Contract

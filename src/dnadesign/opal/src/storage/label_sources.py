@@ -408,17 +408,17 @@ def label_source_status(
         }
         if hist_col not in df.columns:
             return out
-        try:
-            store.validate_label_hist(df, require=False)
-        except OpalError as exc:
-            if strict:
-                raise
-            out.update({"valid": False, "error": str(exc)})
-            return out
-
+        bad: list[dict[str, str]] = []
         counts: dict[int, int] = {}
-        for cell in df[hist_col].tolist():
-            for entry in store._normalize_hist_cell(cell):
+        for row_id, cell in df[["id", hist_col]].itertuples(index=False, name=None):
+            try:
+                entries = store._parse_hist_cell_strict(cell)
+            except Exception as exc:
+                bad.append({"id": str(row_id), "error": str(exc)})
+                if len(bad) >= 5:
+                    break
+                continue
+            for entry in entries:
                 if entry.get("kind") != "label":
                     continue
                 try:
@@ -426,6 +426,12 @@ def label_source_status(
                 except Exception:
                     continue
                 counts[observed_round] = counts.get(observed_round, 0) + 1
+        if bad:
+            error = f"label_hist validation failed (sample={bad})."
+            if strict:
+                raise OpalError(error)
+            out.update({"valid": False, "error": error})
+            return out
         out.update(
             {
                 "valid": True,

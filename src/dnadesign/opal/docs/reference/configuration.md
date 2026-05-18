@@ -13,8 +13,8 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 
 - `campaign`: `name`, `slug`, `workdir`
 - `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
-- `labels`: optional training-label source contract; defaults to legacy
-  campaign history
+- `labels`: optional training-label source contract; defaults to
+  campaign-scoped label history
 - `transforms_x`: `{ name, params }` (raw X -> model-ready X)
 - `transforms_y`: `{ name, params }` (table -> model-ready Y; CSV/Parquet/XLSX)
 - `model`: `{ name, params }`
@@ -50,9 +50,8 @@ If an optional block is omitted, OPAL supplies conservative defaults:
   `labels.batch_column`: `batch_id`; `labels.dedup_policy`: `latest_by_round`
 - `ingest.duplicate_policy`: `error`
 - `scoring.score_batch_size`: `10000`
-- `writeback.prediction_records`: `label_history` for legacy
-  `campaign_history` campaigns; shared `usr_sidecar` campaigns must declare
-  this explicitly
+- `writeback.prediction_records`: `label_history` for `campaign_history`
+  campaigns; shared `usr_sidecar` campaigns must declare this explicitly
 - `training.policy`: `{}` and `training.y_ops`: `[]`
 - `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
   conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true, accept_x_mismatch=false

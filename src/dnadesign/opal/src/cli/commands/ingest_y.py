@@ -472,7 +472,7 @@ def cmd_ingest_y(
                 print_stdout("Aborted.")
                 return
 
-        # Ensure rows exist for legacy campaign-history ingest; shared sidecars keep a fixed candidate universe.
+        # Ensure rows exist for campaign-history ingest; shared sidecars keep a fixed candidate universe.
         with CampaignLock(Path(cfg.campaign.workdir)):
             row_count_before = int(len(df))
             df = store.ensure_rows_exist(

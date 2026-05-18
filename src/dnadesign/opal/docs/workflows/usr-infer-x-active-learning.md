@@ -64,7 +64,7 @@ campaign-local `records.parquet` and point the campaign at
 - OPAL consumes one explicit `X` column; it does not decide which infer job or model lane produced that column
 - `data.location.kind: usr` is the contract for reading the USR dataset directly
 - no hidden orchestration exists between `infer` and `opal`; the handoff is a deliberate choice of dataset plus `x_column_name`
-- legacy campaign-history labels and round state stay under OPAL namespaces;
+- campaign-history labels and round state stay under OPAL namespaces;
   shared-label campaigns keep primary labels in the sidecar and write
   campaign-derived state to ledgers
 - for shared-label multi-campaign studies, observed assay labels should be

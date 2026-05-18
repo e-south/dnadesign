@@ -94,7 +94,7 @@ params stay in each campaign config.
 4. Update ingest:
    - `opal ingest-y` writes once to the shared label source when
      `labels.source.kind: usr_sidecar`.
-   - keep campaign-local label history as an explicit legacy/local mode, not an
+   - keep campaign-local label history as an explicit campaign-scoped mode, not an
      implicit fallback from shared labels.
    - default unknown IDs should fail or drop by explicit flag; no silent row
      creation for fixed shared candidate universes.
@@ -167,7 +167,7 @@ migration/cleanup safety checks remain as future hardening.
 ### Risk Handling
 
 The main risk is accidental backcompat ambiguity. Handle it by making label
-source mode explicit: `campaign_history` for old/local campaigns and
+source mode explicit: `campaign_history` for campaign-scoped labels and
 `usr_sidecar` for shared-label campaigns. Do not silently fall back from a
 configured shared label source to slug-local label history.
 

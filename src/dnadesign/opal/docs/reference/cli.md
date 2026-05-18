@@ -119,7 +119,7 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
 * **Strict preflights**: schema checks, completeness.
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error | keep_first | keep_last).
-* **New IDs** are allowed only for legacy/local candidate-history flows when
+* **New IDs** are allowed only for campaign-history flows when
   your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the
   configured X column. Shared `usr_sidecar` label sources use a fixed candidate
   universe and reject unknown IDs unless `--unknown-sequences drop` is used.

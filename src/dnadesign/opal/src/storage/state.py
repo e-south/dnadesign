@@ -11,9 +11,51 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
 from ..core.utils import now_iso, read_json, write_json
+
+STATE_SCHEMA_VERSION = 2
+_STATE_REQUIRED_KEYS = (
+    "version",
+    "campaign_slug",
+    "campaign_name",
+    "workdir",
+    "data_location",
+    "x_column_name",
+    "y_column_name",
+    "created_at",
+    "updated_at",
+    "representation_vector_dimension",
+    "representation_transform",
+    "training_policy",
+    "performance",
+    "rounds",
+    "backlog",
+)
+_ROUND_REQUIRED_KEYS = (
+    "round_index",
+    "run_id",
+    "round_name",
+    "round_dir",
+    "labels_used_rounds",
+    "number_of_training_examples_used_in_round",
+    "number_of_candidates_scored_in_round",
+    "selection_top_k_requested",
+    "selection_top_k_effective_after_ties",
+    "model",
+    "metrics",
+    "durations_sec",
+    "seeds",
+    "artifacts",
+    "writebacks",
+    "warnings",
+    "status",
+)
+
+
+def _missing_required_keys(payload: Mapping[str, Any], required: tuple[str, ...]) -> list[str]:
+    return [key for key in required if key not in payload or payload[key] in (None, "")]
 
 
 # ----------------------------
@@ -68,15 +110,6 @@ class CampaignState:
         default_factory=lambda: {"number_of_selected_but_not_yet_labeled_candidates_total": 0}
     )
 
-    # ---- Back-compat aliases (old field names) ----
-    @property
-    def representation_column_name(self) -> str:
-        return self.x_column_name
-
-    @property
-    def label_column_name(self) -> str:
-        return self.y_column_name
-
     # ---- persistence ----
     def to_dict(self) -> Dict[str, Any]:
         """Serialize only declared dataclass fields (ignore ad-hoc attrs)."""
@@ -91,34 +124,55 @@ class CampaignState:
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
         raw = read_json(Path(path))
-        # Opinionated: required keys must be present and non-empty.
-        required = [
-            "campaign_slug",
-            "campaign_name",
-            "workdir",
-            "data_location",
-            "x_column_name",
-            "y_column_name",
-        ]
-        missing = [k for k in required if k not in raw or raw[k] in (None, "")]
+        version = raw.get("version")
+        if version != STATE_SCHEMA_VERSION:
+            raise ValueError(
+                f"state.json version must be {STATE_SCHEMA_VERSION}; observed {version!r}. "
+                "Run `opal init` or rerun the campaign to regenerate state."
+            )
+
+        missing = _missing_required_keys(raw, _STATE_REQUIRED_KEYS)
         if missing:
             raise ValueError(
                 f"state.json is missing required keys: {missing}. Run `opal init` or regenerate the state."
             )
 
-        # Fill sensible defaults if absent (non-breaking for forward fields).
-        raw.setdefault("version", 2)
-        raw.setdefault("created_at", now_iso())
-        raw.setdefault("updated_at", now_iso())
-        raw.setdefault("representation_vector_dimension", 0)
-        raw.setdefault("representation_transform", {})
-        raw.setdefault("training_policy", {})
-        raw.setdefault("performance", {})
-        raw.setdefault("rounds", [])
-        raw.setdefault(
-            "backlog",
-            {"number_of_selected_but_not_yet_labeled_candidates_total": 0},
-        )
+        rounds_raw = raw["rounds"]
+        if not isinstance(rounds_raw, list):
+            raise ValueError("state.json key 'rounds' must be a list.")
+        rounds: list[RoundEntry] = []
+        for index, round_payload in enumerate(rounds_raw):
+            if not isinstance(round_payload, dict):
+                raise ValueError(f"state.json round {index} must be an object.")
+            round_missing = _missing_required_keys(round_payload, _ROUND_REQUIRED_KEYS)
+            if round_missing:
+                raise ValueError(
+                    f"state.json round {index} is missing required keys: {round_missing}. "
+                    "Rerun the round to regenerate state."
+                )
+            rounds.append(
+                RoundEntry(
+                    run_id=str(round_payload["run_id"]),
+                    round_index=int(round_payload["round_index"]),
+                    round_name=str(round_payload["round_name"]),
+                    round_dir=str(round_payload["round_dir"]),
+                    labels_used_rounds=list(round_payload["labels_used_rounds"]),
+                    number_of_training_examples_used_in_round=int(
+                        round_payload["number_of_training_examples_used_in_round"]
+                    ),
+                    number_of_candidates_scored_in_round=int(round_payload["number_of_candidates_scored_in_round"]),
+                    selection_top_k_requested=int(round_payload["selection_top_k_requested"]),
+                    selection_top_k_effective_after_ties=int(round_payload["selection_top_k_effective_after_ties"]),
+                    model=dict(round_payload["model"]),
+                    metrics=dict(round_payload["metrics"]),
+                    durations_sec=dict(round_payload["durations_sec"]),
+                    seeds=dict(round_payload["seeds"]),
+                    artifacts=dict(round_payload["artifacts"]),
+                    writebacks=dict(round_payload["writebacks"]),
+                    warnings=list(round_payload["warnings"]),
+                    status=str(round_payload["status"]),
+                )
+            )
 
         st = cls(
             campaign_slug=raw["campaign_slug"],
@@ -134,30 +188,7 @@ class CampaignState:
             representation_transform=raw["representation_transform"],
             training_policy=raw["training_policy"],
             performance=raw["performance"],
-            rounds=[
-                RoundEntry(
-                    run_id=str(r.get("run_id", "")),
-                    round_index=int(r.get("round_index", -1)),
-                    round_name=str(r.get("round_name", "")),
-                    round_dir=str(r.get("round_dir", "")),
-                    labels_used_rounds=list(r.get("labels_used_rounds", [])),
-                    number_of_training_examples_used_in_round=int(
-                        r.get("number_of_training_examples_used_in_round", 0)
-                    ),
-                    number_of_candidates_scored_in_round=int(r.get("number_of_candidates_scored_in_round", 0)),
-                    selection_top_k_requested=int(r.get("selection_top_k_requested", 0)),
-                    selection_top_k_effective_after_ties=int(r.get("selection_top_k_effective_after_ties", 0)),
-                    model=dict(r.get("model", {})),
-                    metrics=dict(r.get("metrics", {})),
-                    durations_sec=dict(r.get("durations_sec", {})),
-                    seeds=dict(r.get("seeds", {})),
-                    artifacts=dict(r.get("artifacts", {})),
-                    writebacks=dict(r.get("writebacks", {})),
-                    warnings=list(r.get("warnings", [])),
-                    status=str(r.get("status", "completed")),
-                )
-                for r in raw.get("rounds", [])
-            ],
+            rounds=rounds,
             backlog=raw["backlog"],
         )
         return st
