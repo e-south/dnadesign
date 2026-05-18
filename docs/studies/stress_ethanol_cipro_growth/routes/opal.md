@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-05-17
 
-Use this only after the top-level `routes.md` selects the OPAL campaign surface.
+Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Surface
 

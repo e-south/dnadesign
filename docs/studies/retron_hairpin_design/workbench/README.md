@@ -24,14 +24,24 @@ Do not use it for:
 
 ```text
 workbench/
-  directions.yaml
+  ontology/
+    directions.yaml
   design_sets/
     scar_nick_profile_panel_v1.yaml
-  compiler_runs/
-    2026-05-18-msd-177-194.compile.yaml
-  materializations/
-    2026-05-18-msd-177-194.single-unit.yaml
+  provenance/
+    compiler_runs/
+      2026-05-18-msd-177-194.compile.yaml
+    materializations/
+      2026-05-18-msd-177-194.single-unit.yaml
 ```
+
+### Route By Question
+
+| Need | Open |
+| --- | --- |
+| Direction and effect vocabulary | [ontology/](ontology/README.md) |
+| Authoritative cohort membership | [design_sets/](design_sets/README.md) |
+| Compiler and materialization run records | [provenance/](provenance/README.md) |
 
 ### Boundary
 

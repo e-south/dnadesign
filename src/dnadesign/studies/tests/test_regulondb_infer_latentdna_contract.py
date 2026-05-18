@@ -54,7 +54,7 @@ def test_regulondb_infer_lanes_request_vector_and_scalar_bundle() -> None:
 def test_regulondb_latentdna_binding_declares_native_and_core60_bundle_sources() -> None:
     repo_root = _repo_root()
     binding = yaml.safe_load(
-        (repo_root / "docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml").read_text(encoding="utf-8")
+        (repo_root / "docs/studies/regulondb_native_promoter_panel/bindings/latentdna.yaml").read_text(encoding="utf-8")
     )
 
     expected_sources = {
@@ -81,7 +81,7 @@ def test_regulondb_latentdna_binding_declares_native_and_core60_bundle_sources()
 def test_regulondb_latentdna_binding_decision_deliverables_match_workspace_ladder() -> None:
     repo_root = _repo_root()
     binding = yaml.safe_load(
-        (repo_root / "docs/studies/regulondb_native_promoter_panel/latentdna_binding.yaml").read_text(encoding="utf-8")
+        (repo_root / "docs/studies/regulondb_native_promoter_panel/bindings/latentdna.yaml").read_text(encoding="utf-8")
     )
     snapshot = json.loads(
         (

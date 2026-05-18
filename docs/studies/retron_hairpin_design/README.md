@@ -3,23 +3,34 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-This study keeps entrypoints at the root and pushes durable detail into typed
+This study keeps only the ontology router at the root. Durable record,
+operation, route, compiler, context, and workbench surfaces live in typed
 subdirectories.
 
 ### Directory Ontology
 
 ```text
 retron_hairpin_design/
-  status.md                 # current state and concise next actions
-  routes.md                 # one-hop router across owner surfaces
-  ops.study.yaml            # Ops lifecycle and artifact contract
-  pipeline.yaml             # machine-readable command groups
+  README.md                 # this directory ontology
+  record/                   # factual study record
+    campaign.yaml
+    datasets.yaml
+    status.md
+  operations/               # machine-readable operating contracts
+    ops.study.yaml
+    pipeline.yaml
+  routes/                   # one-hop router plus focused route details
+    README.md
+  contracts/                # status/preflight contracts and registry sidecars
   compiler/                 # study compiler inputs and normalization metadata
   contexts/                 # long-form rationale and handoff notes
-  routes/                   # focused route details for owner surfaces
-  workbench/                # hypotheses, design sets, and run provenance
+  workbench/                # durable experimental meaning
+    ontology/               # directions and effect tags
+    design_sets/            # authoritative cohorts
+    provenance/             # compiler/materialization run records
 ```
 
-Use `routes.md` first for task routing. Use `workbench/` when the question is
-why a cohort exists or what experimental direction it tests. Use `compiler/`
-when the task is Retron MSD label normalization or catalog compilation.
+Use `routes/README.md` first for task routing. Use `record/status.md` only for
+current state, `operations/` only for Ops/pipeline contracts, `workbench/` when
+the question is why a cohort exists or what experimental direction it tests,
+and `compiler/` for Retron MSD label normalization or catalog compilation.

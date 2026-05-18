@@ -5,7 +5,7 @@
 
 Four-base stem bases, Type IIS scar choice, `scar_nick` terminal nick geometry,
 and profile-diverse `S0=M` scar coverage live here. Command routing stays in
-`routes.md`.
+`../routes/README.md`.
 
 ### Coordinate Convention
 

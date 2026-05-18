@@ -333,6 +333,7 @@ def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() ->
         / "studies"
         / "regulondb_native_promoter_panel"
         / "deliverables"
+        / "appendix"
         / "sigma_umap_panel.md"
     ).read_text(encoding="utf-8")
 
@@ -676,19 +677,19 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert all(getattr(plot, "semantics_ref", None) for plot in context.config.plots.values())
 
     assert context.config.deliverables["representation_health_summary"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/representation_health_summary"
+        "study:stress_ethanol_cipro_growth/deliverables/gates/representation_health_summary"
     ]
     assert context.config.deliverables["design_structure_summary"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/design_structure_summary"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/design_structure_summary"
     ]
     assert context.config.deliverables["sigma35_ordinal_audit"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/sigma35_ordinal_audit"
     ]
     assert context.config.deliverables["context_robustness_summary"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/context_robustness_summary"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/context_robustness_summary"
     ]
     assert context.config.deliverables["candidate_decision_frontier"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/candidate_decision_frontier"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/candidate_decision_frontier"
     ]
     assert context.config.deliverables["design_structure_summary"].outputs["plots"] == [
         "design_structure_summary",
@@ -1057,6 +1058,7 @@ def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() 
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
+        / "appendix"
         / "appendix_geometry_review.md"
     ).read_text(encoding="utf-8")
     appendix_umap_doc = (
@@ -1067,6 +1069,7 @@ def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() 
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
+        / "appendix"
         / "appendix_umap_gallery.md"
     ).read_text(encoding="utf-8")
 
@@ -1088,6 +1091,7 @@ def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfac
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
+        / "primary"
         / "sigma35_ordinal_audit.md"
     ).read_text(encoding="utf-8")
     context_doc = (
@@ -1098,6 +1102,7 @@ def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfac
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
+        / "primary"
         / "context_robustness_summary.md"
     ).read_text(encoding="utf-8")
     frontier_doc = (
@@ -1108,6 +1113,7 @@ def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfac
         / "studies"
         / "stress_ethanol_cipro_growth"
         / "deliverables"
+        / "primary"
         / "candidate_decision_frontier.md"
     ).read_text(encoding="utf-8")
 

@@ -4,7 +4,7 @@
 **Last verified:** 2026-05-14
 **Status:** Construct tracer bullet, BaseRender component-span QA, uv-managed ViennaRNA folding, and ViennaRNA-native annotated structure SVG implemented
 **Generic authority:** [Construct linear ssDNA composition reference](../../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
-**Dev spec:** [generic linear ssDNA composition](../../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
+**Dev spec:** [generic linear ssDNA composition](../../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 **Implementation record:** [completed checklist](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 
 Retron Hairpin study questions shift here when the work moves from solving
@@ -292,10 +292,10 @@ When returning to this work:
 
 1. Read this page for the study-specific boundary.
 2. Open the full dev spec:
-   [generic linear ssDNA composition](../../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md).
+   [generic linear ssDNA composition](../../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md).
 3. Use the completed implementation record for historical evidence:
    [generic linear ssDNA composition plan](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md).
-4. Use `routes.md` for the existing Snapback, scar-nick, and YIU command
+4. Use `../routes/README.md` for the existing Snapback, scar-nick, and YIU command
    routes.
 5. Rerun current Cruncher outputs before making exact-hit or PaqCI-capacity
    claims.
@@ -342,9 +342,9 @@ When returning to this work:
 
 ### Links
 
-- [Retron routes](../routes.md)
-- [Retron status](../status.md)
+- [Retron routes](../routes/README.md)
+- [Retron status](../record/status.md)
 - [Scar-nick base-junction context](scar-nick-base-junction.md)
-- [Generic linear ssDNA composition dev spec](../../../dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md)
+- [Generic linear ssDNA composition dev spec](../../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 - [Generic linear ssDNA composition implementation record](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 - [Linear ssDNA composition hardening follow-ups](../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)

@@ -1193,9 +1193,10 @@ def test_load_workspace_config_rejects_docs_ref_path_traversal(tmp_path) -> None
     workspace_dir.mkdir()
     record_root = tmp_path / "docs" / "studies" / "demo_study"
     record_root.mkdir(parents=True)
-    for file_name in ("campaign.yaml", "datasets.yaml", "ops.study.yaml"):
+    for file_name in ("record/campaign.yaml", "record/datasets.yaml", "operations/ops.study.yaml"):
+        (record_root / file_name).parent.mkdir(parents=True, exist_ok=True)
         (record_root / file_name).write_text("version: 1\n", encoding="utf-8")
-    (record_root / "status.md").write_text("## Demo\n", encoding="utf-8")
+    (record_root / "record" / "status.md").write_text("## Demo\n", encoding="utf-8")
     deliverable_docs_root = tmp_path / "study_docs"
     deliverable_docs_root.mkdir()
     (deliverable_docs_root / "study.yaml").write_text("study_id: demo_study\n", encoding="utf-8")

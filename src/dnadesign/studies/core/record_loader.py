@@ -51,7 +51,7 @@ _OPS_SURFACES_KEYS = {"status_kind", "preflight_kind"}
 def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     resolved_study_root = study_root.expanduser().resolve()
     repo_root = _discover_repo_root(resolved_study_root)
-    contract_path = resolved_study_root / "ops.study.yaml"
+    contract_path = resolved_study_root / "operations" / "ops.study.yaml"
     if not contract_path.exists():
         raise ValueError(f"study record missing ops.study.yaml: {contract_path}")
     payload = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}

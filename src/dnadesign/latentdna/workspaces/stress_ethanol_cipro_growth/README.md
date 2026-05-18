@@ -3,7 +3,7 @@
 This workspace holds the LatentDNA comparison surfaces for the active stress / ethanol / ciprofloxacin promoter study. It compares candidate Evo2 spaces to help choose a downstream `X` before assays.
 
 - Workspace id: `stress_ethanol_cipro_growth`
-- Study binding: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
+- Study binding: `docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml`
 - Snapshot artifact: `outputs/status/workspace_snapshot.json`
 - Read-only snapshot inspection: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run`
 - Gate: `representation_health_summary`

@@ -14,7 +14,7 @@ entries:
         manifest_key: study_dir
         cli_flag: --study-dir
         placeholder: docs/studies/<study-id>
-        summary: Checked-in stress_ethanol_cipro_growth study directory containing campaign.yaml, datasets.yaml, status.md, and ops.study.yaml.
+        summary: Checked-in stress_ethanol_cipro_growth study directory containing record/campaign.yaml, record/datasets.yaml, record/status.md, and operations/ops.study.yaml.
         type: path
         required: false
         path_base: repo
@@ -33,7 +33,7 @@ entries:
         manifest_key: study_dir
         cli_flag: --study-dir
         placeholder: docs/studies/<study-id>
-        summary: Checked-in stress_ethanol_cipro_growth study directory containing campaign.yaml, datasets.yaml, status.md, and ops.study.yaml.
+        summary: Checked-in stress_ethanol_cipro_growth study directory containing record/campaign.yaml, record/datasets.yaml, record/status.md, and operations/ops.study.yaml.
         type: path
         required: false
         path_base: repo

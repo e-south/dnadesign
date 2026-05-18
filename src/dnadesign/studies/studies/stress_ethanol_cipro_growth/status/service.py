@@ -94,7 +94,8 @@ class StressEthanolCiproGrowthStatusService(StudyStatusService):
         contract = study_context.ops_contract
         if contract is None:
             raise ValueError(
-                f"study record missing ops.study.yaml: {study_context.resolved_study_dir / 'ops.study.yaml'}"
+                "study record missing ops.study.yaml: "
+                f"{study_context.resolved_study_dir / 'operations' / 'ops.study.yaml'}"
             )
         if contract.status_kind != self.status_kind:
             raise ValueError(
@@ -114,7 +115,7 @@ class StressEthanolCiproGrowthStatusService(StudyStatusService):
         if contract.study_id != self.study_id:
             raise ValueError(
                 f"{self.status_kind} only serves study_id {self.study_id!r}; "
-                f"found {contract.study_id!r} in {study_context.resolved_study_dir / 'ops.study.yaml'}"
+                f"found {contract.study_id!r} in {study_context.resolved_study_dir / 'operations' / 'ops.study.yaml'}"
             )
         if study_context.study_repo_root is None:
             raise ValueError("stress_ethanol_cipro_growth context requires a resolved study_repo_root")

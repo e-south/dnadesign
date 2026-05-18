@@ -20,7 +20,7 @@ In scope:
 - `docs/studies/stress_ethanol_cipro_growth/`
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`
-- one-hop routing through `docs/studies/stress_ethanol_cipro_growth/routes.md`,
+- one-hop routing through `docs/studies/stress_ethanol_cipro_growth/routes/README.md`,
   with OPAL and LatentDNA detail under `docs/studies/stress_ethanol_cipro_growth/routes/`
 
 Out of scope:
@@ -30,13 +30,13 @@ Out of scope:
 
 ## Workflow
 
-1. Read `docs/studies/stress_ethanol_cipro_growth/ops.study.yaml`,
-   `datasets.yaml`, `pipeline.yaml`, `status.md`, and `routes.md`.
+1. Read `docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml`,
+   `record/datasets.yaml`, `operations/pipeline.yaml`, `record/status.md`, and `routes/README.md`.
 2. Run the status command for record posture:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Run the preflight command only for blocker or next-run readiness:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`.
-4. Route downstream work through `routes.md`. Open `routes/opal.md` or
+4. Route downstream work through `routes/README.md`. Open `routes/opal.md` or
    `routes/latentdna.md` only after the one-hop route selects that owner
    surface.
 

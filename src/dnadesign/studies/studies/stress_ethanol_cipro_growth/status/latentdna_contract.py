@@ -65,7 +65,7 @@ def latentdna_binding_path(study_context: StressEthanolCiproGrowthResolvedContex
         configured = _string_or_none(latentdna_config.get("binding"))
         if configured is not None:
             return (repo_root / configured).resolve()
-    return (repo_root / "docs" / "studies" / study_context.study_id / "latentdna_binding.yaml").resolve()
+    return (repo_root / "docs" / "studies" / study_context.study_id / "bindings" / "latentdna.yaml").resolve()
 
 
 def load_latentdna_binding(

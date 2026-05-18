@@ -3670,7 +3670,7 @@ deliverables:
     outputs:
       plots: [dataset_overview]
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/dataset_overview
+      - study:stress_ethanol_cipro_growth/deliverables/primary/dataset_overview
     acceptance_checks: []
   representation_health_summary:
     title: Representation health summary
@@ -3689,7 +3689,7 @@ deliverables:
     outputs:
       plots: [representation_health_summary]
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/representation_health_summary
+      - study:stress_ethanol_cipro_growth/deliverables/gates/representation_health_summary
     acceptance_checks: []
   design_structure_summary:
     title: Design-structure summary
@@ -3704,7 +3704,7 @@ deliverables:
         - design_structure_summary
         - balanced_design_family_margin_gallery
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/design_structure_summary
+      - study:stress_ethanol_cipro_growth/deliverables/primary/design_structure_summary
     acceptance_checks: []
   sigma35_ordinal_audit:
     title: Sigma-35 ordinal audit
@@ -3721,7 +3721,7 @@ deliverables:
         - sigma35_stress_margin_gallery
         - sigma35_centroid_distance_gallery
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit
+      - study:stress_ethanol_cipro_growth/deliverables/primary/sigma35_ordinal_audit
     acceptance_checks: []
   context_robustness_summary:
     title: Context robustness summary
@@ -3737,7 +3737,7 @@ deliverables:
         - context_robustness_summary
         - context_pair_summary
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/context_robustness_summary
+      - study:stress_ethanol_cipro_growth/deliverables/primary/context_robustness_summary
     acceptance_checks: []
   candidate_decision_frontier:
     title: Representation tradeoff
@@ -3752,7 +3752,7 @@ deliverables:
     outputs:
       plots: [candidate_decision_frontier]
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/candidate_decision_frontier
+      - study:stress_ethanol_cipro_growth/deliverables/primary/candidate_decision_frontier
     acceptance_checks: []
   candidate_x_selection_scorecard:
     title: Candidate X selection scorecard
@@ -3771,7 +3771,7 @@ deliverables:
         - reference_to_plan_centroid_heatmap
         - reference_standard_strength_audit
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/candidate_x_selection_scorecard
+      - study:stress_ethanol_cipro_growth/deliverables/primary/candidate_x_selection_scorecard
     acceptance_checks: []
   native_tf_axis_orientation_audit:
     title: Native TF-axis orientation audit
@@ -3791,7 +3791,7 @@ deliverables:
       plots:
         - native_tf_axis_orientation_audit
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/native_tf_axis_orientation_audit
+      - study:stress_ethanol_cipro_growth/deliverables/native-reference/native_tf_axis_orientation_audit
     acceptance_checks: []
   native_regulator_plan_margin_enrichment:
     title: Native regulator plan-margin enrichment
@@ -3810,7 +3810,7 @@ deliverables:
         - native_regulator_plan_margin_enrichment
         - native_regulator_go_bp_plan_margin_enrichment
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/native_regulator_plan_margin_enrichment
+      - study:stress_ethanol_cipro_growth/deliverables/native-reference/native_regulator_plan_margin_enrichment
     acceptance_checks: []
   appendix_geometry_review:
     title: Appendix geometry review
@@ -3826,7 +3826,7 @@ deliverables:
         - reference_alignment_summary
         - representation_scree_diagnostic
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/appendix_geometry_review
+      - study:stress_ethanol_cipro_growth/deliverables/appendix/appendix_geometry_review
     acceptance_checks: []
   appendix_umap_gallery:
     title: UMAP gallery
@@ -3843,7 +3843,7 @@ deliverables:
         - reference_core60_pca_scree
       notebooks: [latent_geometry_browser]
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/appendix_umap_gallery
+      - study:stress_ethanol_cipro_growth/deliverables/appendix/appendix_umap_gallery
     acceptance_checks: []
 study_binding:
   study_id: stress_ethanol_cipro_growth

@@ -14,7 +14,7 @@ entries:
         manifest_key: study_dir
         cli_flag: --study-dir
         placeholder: docs/studies/retron_hairpin_design
-        summary: Checked-in retron_hairpin_design record directory containing campaign.yaml, datasets.yaml, status.md, ops.study.yaml, routes.md, and pipeline.yaml.
+        summary: Checked-in retron_hairpin_design record directory containing record/campaign.yaml, record/datasets.yaml, record/status.md, operations/ops.study.yaml, routes/README.md, and operations/pipeline.yaml.
         type: path
         required: false
         path_base: repo
@@ -34,7 +34,7 @@ entries:
         manifest_key: study_dir
         cli_flag: --study-dir
         placeholder: docs/studies/retron_hairpin_design
-        summary: Checked-in retron_hairpin_design record directory containing campaign.yaml, datasets.yaml, status.md, ops.study.yaml, routes.md, and pipeline.yaml.
+        summary: Checked-in retron_hairpin_design record directory containing record/campaign.yaml, record/datasets.yaml, record/status.md, operations/ops.study.yaml, routes/README.md, and operations/pipeline.yaml.
         type: path
         required: false
         path_base: repo

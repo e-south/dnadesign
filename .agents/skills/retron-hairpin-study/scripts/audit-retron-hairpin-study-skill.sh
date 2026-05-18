@@ -102,8 +102,8 @@ require_file "$SKILL_FILE"
 require_file "$ROOT_AGENTS"
 require_file "$CRUNCHER_AGENTS"
 require_file "$REPO_ROOT/docs/studies/README.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/status.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/routes.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/record/status.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/routes/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contexts/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/routes/msd-design-references.md"
@@ -116,17 +116,22 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contexts/linear-ssdn
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/README.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/directions.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/README.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/compiler_runs/2026-05-18-msd-177-194.compile.yaml"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/materializations/2026-05-18-msd-177-194.single-unit.yaml"
-require_file "$REPO_ROOT/docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/README.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/README.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/materializations/README.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml"
+require_file "$REPO_ROOT/docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md"
 require_file "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md"
 require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/pipeline.yaml"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/ops.study.yaml"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/status-contract.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/preflight.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/pipeline.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/ops.study.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contracts/status.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contracts/preflight.md"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/msd_ids.py"
@@ -163,9 +168,9 @@ done < <(find "$REFERENCE_DIR" -maxdepth 1 -type f -name '*.md' | sort)
   printf '\n'
   cat "$REPO_ROOT/docs/studies/README.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/status.md"
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/record/status.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/routes.md"
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/routes/README.md"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/README.md"
   printf '\n'
@@ -183,21 +188,27 @@ done < <(find "$REFERENCE_DIR" -maxdepth 1 -type f -name '*.md' | sort)
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/README.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/directions.yaml"
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/README.md"
+  printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml"
+  printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/README.md"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
   printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/README.md"
+  printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md"
+  cat "$REPO_ROOT/docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md"
   printf '\n'
   cat "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md"
   printf '\n'
   cat "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/pipeline.yaml"
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/pipeline.yaml"
   printf '\n'
-  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/ops.study.yaml"
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/ops.study.yaml"
 } >> "$TMP_COMBINED"
 
 require_section "## Scope"
@@ -237,19 +248,21 @@ else
 fi
 
 require_pattern 'docs/studies/README\.md' "skill routes through study records docs"
-require_pattern 'docs/studies/retron_hairpin_design/status\.md' "skill references pinned study status"
-require_pattern 'docs/studies/retron_hairpin_design/routes\.md' "skill references pinned study routes"
+require_pattern 'docs/studies/retron_hairpin_design/record/status\.md' "skill references pinned study status"
+require_pattern 'docs/studies/retron_hairpin_design/routes/README\.md' "skill references pinned study routes"
 require_pattern 'docs/studies/retron_hairpin_design/routes/msd-design-references\.md' "skill references MSD route detail"
 require_pattern 'docs/studies/retron_hairpin_design/workbench/README\.md' "skill references workbench entrypoint"
+require_pattern 'workbench/ontology' "skill references workbench ontology lane"
+require_pattern 'workbench/provenance' "skill references workbench provenance lane"
 require_pattern 'scar_nick_profile_panel_v1\.yaml' "skill references workbench design set"
 require_pattern 'docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction\.md' "skill references scar-nick base-junction context"
 require_pattern 'docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition\.md' "skill references linear ssDNA composition handoff"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/msd_design_registry\.yaml' "skill references MSD design registry"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels\.txt' "skill references MSD selected labels"
-require_pattern 'docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec\.md' "skill references linear ssDNA dev spec"
+require_pattern 'docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md' "skill references linear ssDNA dev spec"
 require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition\.md' "skill references linear ssDNA implementation record"
 require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
-require_pattern 'docs/studies/retron_hairpin_design/pipeline\.yaml' "skill references pinned study pipeline"
+require_pattern 'docs/studies/retron_hairpin_design/operations/pipeline\.yaml' "skill references pinned study pipeline"
 require_pattern 'references/test-matrix\.md' "skill references test matrix for validation"
 require_pattern 'composition_payload\.py' "skill routes composition payload source separately"
 require_pattern 'output_guards\.py' "skill routes output guard source separately"

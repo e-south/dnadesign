@@ -12,7 +12,7 @@ Cruncher workspaces.
 - Study-owned MSD ID compiler:
   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli`
 - Consolidated context note:
-  `src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md`
+  `src/dnadesign/cruncher/docs/dev/audits/2026-04-19-retron-p4-hairpin-variant.md`
 
 Open source modules by responsibility:
 

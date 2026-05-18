@@ -60,7 +60,7 @@ Implemented schema slices:
   definition, metric family, evidence tier, unit, direction, aggregation level,
   and optional task id. Workspaces use this for study-facing metric vocabulary
   that is not part of the LatentDNA global registry.
-- Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the promoter-study status record under `docs/studies/<study-id>` and must contain `campaign.yaml`, `datasets.yaml`, `ops.study.yaml`, and `status.md`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
+- Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the study directory under `docs/studies/<study-id>` and must contain `record/campaign.yaml`, `record/datasets.yaml`, `record/status.md`, and `operations/ops.study.yaml`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
 - Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
 Current runtime limits:

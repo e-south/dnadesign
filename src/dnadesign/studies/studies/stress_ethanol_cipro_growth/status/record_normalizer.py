@@ -120,7 +120,7 @@ def resolve_stress_ethanol_cipro_growth_context(
             active_study=None,
             required_paths={},
             missing_required_files=(),
-            pipeline_path=resolved_study_dir / "pipeline.yaml",
+            pipeline_path=resolved_study_dir / "operations" / "pipeline.yaml",
             pipeline_present=False,
             datasets_entries=(),
             study_pipeline={},
@@ -168,19 +168,19 @@ def resolve_stress_ethanol_cipro_growth_context(
         registry_path = (study_repo_root / "docs" / "studies" / "index.yaml").resolve()
 
     required_paths = {
-        "campaign.yaml": resolved_study_dir / "campaign.yaml",
-        "datasets.yaml": resolved_study_dir / "datasets.yaml",
-        "ops.study.yaml": resolved_study_dir / "ops.study.yaml",
-        "status.md": resolved_study_dir / "status.md",
+        "record/campaign.yaml": resolved_study_dir / "record" / "campaign.yaml",
+        "record/datasets.yaml": resolved_study_dir / "record" / "datasets.yaml",
+        "record/status.md": resolved_study_dir / "record" / "status.md",
+        "operations/ops.study.yaml": resolved_study_dir / "operations" / "ops.study.yaml",
     }
     missing_required_files = tuple(name for name, path in required_paths.items() if not path.exists())
-    pipeline_path = resolved_study_dir / "pipeline.yaml"
+    pipeline_path = resolved_study_dir / "operations" / "pipeline.yaml"
     evidence: dict[str, object] = {
         "requested_study_dir": requested_study_dir,
         "study_dir": str(resolved_study_dir),
         "repo_root": str(study_repo_root),
         "study_id": resolved_study_dir.name,
-        "ops_study_contract_path": str(required_paths["ops.study.yaml"]),
+        "ops_study_contract_path": str(required_paths["operations/ops.study.yaml"]),
         "study_selection_source": selection_source,
         "active_study_registry_path": str(registry_path),
         "required_files": {name: str(path) for name, path in required_paths.items()},
@@ -237,10 +237,10 @@ def resolve_stress_ethanol_cipro_growth_context(
         )
 
     ops_contract = load_study_ops_contract(resolved_study_dir)
-    datasets_payload = dependencies.load_yaml_mapping(required_paths["datasets.yaml"], label="datasets.yaml")
+    datasets_payload = dependencies.load_yaml_mapping(required_paths["record/datasets.yaml"], label="datasets.yaml")
     datasets_entries = datasets_payload.get("datasets") or []
     if not isinstance(datasets_entries, list):
-        raise ValueError(f"datasets.yaml must define a 'datasets' list: {required_paths['datasets.yaml']}")
+        raise ValueError(f"datasets.yaml must define a 'datasets' list: {required_paths['record/datasets.yaml']}")
 
     pipeline_payload = (
         dependencies.load_yaml_mapping(pipeline_path, label="pipeline.yaml") if pipeline_path.exists() else {}
@@ -280,11 +280,11 @@ def resolve_stress_ethanol_cipro_growth_context(
     dataset_index: dict[str, dict[str, object]] = {}
     for entry in datasets_entries:
         if not isinstance(entry, dict):
-            raise ValueError(f"dataset entry must be a mapping: {required_paths['datasets.yaml']}")
+            raise ValueError(f"dataset entry must be a mapping: {required_paths['record/datasets.yaml']}")
         dataset_id = dependencies.required_metadata_text(
             entry.get("dataset"),
             label="dataset id",
-            source=required_paths["datasets.yaml"],
+            source=required_paths["record/datasets.yaml"],
         )
         role = dependencies.string_or_none(entry.get("role")) or dataset_id
         declared_status = dependencies.string_or_none(entry.get("status")) or "unknown"

@@ -6,7 +6,7 @@ title: Scar-nick profile panel v1
 authority: persistent study workbench design cohort
 label_count: 18
 source_refs:
-  directions: docs/studies/retron_hairpin_design/workbench/directions.yaml
+  directions: docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml
   convenience_label_input: docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt
   registry: docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml
   compiler_module: src/dnadesign/studies/studies/retron_hairpin_design/cli.py

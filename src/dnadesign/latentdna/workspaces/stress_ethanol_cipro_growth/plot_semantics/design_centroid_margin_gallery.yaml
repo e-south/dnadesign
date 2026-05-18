@@ -36,4 +36,4 @@ plot_details_md: |
 limitations_md: Two-dimensional margins are still a projection of higher-dimensional geometry and cannot substitute for the summary metrics.
 failure_modes_md: Extreme density can visually hide small subcohorts, and centroid leakage would still bias rows if leave-one-out handling regressed.
 docs_refs:
-  - src/dnadesign/studies/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md
+  - src/dnadesign/studies/studies/stress_ethanol_cipro_growth/notes/rationale/2026-05-10-candidate-x-story-surfaces.md

@@ -61,7 +61,7 @@ class RetronHairpinDesignStatusService(StudyStatusService):
         if contract.study_id != self.study_id:
             raise ValueError(
                 f"{self.status_kind} only serves study_id {self.study_id!r}; "
-                f"found {contract.study_id!r} in {study_context.resolved_study_dir / 'ops.study.yaml'}"
+                f"found {contract.study_id!r} in {study_context.resolved_study_dir / 'operations' / 'ops.study.yaml'}"
             )
         return StudyStatusContext(
             repo_root=study_context.study_repo_root,

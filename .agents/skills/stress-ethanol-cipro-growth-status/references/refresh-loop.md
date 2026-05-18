@@ -10,21 +10,21 @@ surface that answers the question.
 3. Escalate to
    `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
    only for blocker or next-run readiness questions.
-4. Open `docs/studies/<study-id>/routes.md` only after the record or blocker
-   question is answered. Open `routes/opal.md` or `routes/latentdna.md` only
-   after that owner surface is selected.
+4. Open `docs/studies/<study-id>/routes/README.md` only after the record or
+   blocker question is answered. Open `routes/opal.md` or
+   `routes/latentdna.md` only after that owner surface is selected.
 
 ## Required record inputs
 
 - `docs/studies/README.md`
 - `docs/studies/index.yaml`
-- `docs/studies/<study-id>/campaign.yaml`
-- `docs/studies/<study-id>/datasets.yaml`
-- `docs/studies/<study-id>/status.md`
-- `docs/studies/<study-id>/ops.study.yaml`
-- `docs/studies/<study-id>/routes.md` when present
+- `docs/studies/<study-id>/record/campaign.yaml`
+- `docs/studies/<study-id>/record/datasets.yaml`
+- `docs/studies/<study-id>/record/status.md`
+- `docs/studies/<study-id>/operations/ops.study.yaml`
+- `docs/studies/<study-id>/routes/README.md` when present
 - `docs/studies/<study-id>/routes/` detail files only after route selection
-- `docs/studies/<study-id>/pipeline.yaml` when present
+- `docs/studies/<study-id>/operations/pipeline.yaml` when present
 
 ## Snapshot-first refresh
 
@@ -43,19 +43,19 @@ surface that answers the question.
 | Question | Primary surface | Minimum evidence | Fail visibly when |
 | --- | --- | --- | --- |
 | Where is the study now? | `studies.stress-ethanol-cipro-growth.status` | study id, current phase, dataset ids, row counts, downstream posture, next surface | selector fields or required record files are missing |
-| Which exploratory-analysis artifacts are available? | `studies.stress-ethanol-cipro-growth.status` plus `routes.md` | `analysis_surfaces.densegen`, `analysis_surfaces.latentdna`, or `analysis_surfaces.cluster` with ids, commands, and artifact paths | route inventory is missing for the owning tool or the study omits the needed workspace/doc binding |
-| What blocks execution here? | `studies.stress-ethanol-cipro-growth.preflight --scope next` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `ops.study.yaml` or declared execution surfaces are missing |
-| Which dataset sync posture is current? | `datasets.yaml` plus `usr.data-plane.hpc-sync` | dataset id, remote profile, audit JSON path, explicit drift summary | sync-enabled dataset entries or audit evidence are missing |
-| Which owner surface should I open next? | `docs/studies/<study-id>/routes.md` | owner tool, entry artifact, primary doc or workspace, first command | the study spans owner surfaces but no route map is checked in |
+| Which exploratory-analysis artifacts are available? | `studies.stress-ethanol-cipro-growth.status` plus `routes/README.md` | `analysis_surfaces.densegen`, `analysis_surfaces.latentdna`, or `analysis_surfaces.cluster` with ids, commands, and artifact paths | route inventory is missing for the owning tool or the study omits the needed workspace/doc binding |
+| What blocks execution here? | `studies.stress-ethanol-cipro-growth.preflight --scope next` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `operations/ops.study.yaml` or declared execution surfaces are missing |
+| Which dataset sync posture is current? | `record/datasets.yaml` plus `usr.data-plane.hpc-sync` | dataset id, remote profile, audit JSON path, explicit drift summary | sync-enabled dataset entries or audit evidence are missing |
+| Which owner surface should I open next? | `docs/studies/<study-id>/routes/README.md` | owner tool, entry artifact, primary doc or workspace, first command | the study spans owner surfaces but no route map is checked in |
 
 ## Record refresh helpers
 
-- `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml`
+- `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/record/campaign.yaml`
 - Use this when the checked-in campaign manifest needs a fresh summary.
 
 ## Affiliated dataset sync posture
 
-- Keep sync posture in `datasets.yaml`, not in the top-level skill.
+- Keep sync posture in `record/datasets.yaml`, not in the top-level skill.
 - Use `usr.data-plane.hpc-sync` when a sync-enabled dataset needs explicit audit
   evidence.
 - Preserve `onboard_mode: existing_remote` plus `strict_bootstrap_id: true`
@@ -69,7 +69,7 @@ surface that answers the question.
   `studies.stress-ethanol-cipro-growth.preflight --scope next` and summarize the
   blocker with `kind`, `surface_id`, and `artifact_id`.
 - Missing sync posture: refresh the explicit `usr diff --audit-json-out` audit
-  named by `datasets.yaml`, then summarize it through `usr.data-plane.hpc-sync`.
+  named by `record/datasets.yaml`, then summarize it through `usr.data-plane.hpc-sync`.
 - Missing downstream handoff or stale source growth: report the checked-in
   `source/handoff mode` instead of inventing a downstream-ready state.
 
@@ -79,6 +79,6 @@ surface that answers the question.
   still planned.
 - Do not invent feature-matrix or downstream campaign readiness when the
   checked-in study record does not declare it.
-- If `ops.study.yaml` declares default notify-enabled Infer presets as the
+- If `operations/ops.study.yaml` declares default notify-enabled Infer presets as the
   submit-readiness contract, keep those environment, profile, and plan blockers
   explicit.

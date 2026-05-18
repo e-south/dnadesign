@@ -8,7 +8,7 @@ question is explicitly about progress, history, or blockers.
 1. Parse what the user supplied: label, payload, cap, left base, right base,
    profile, sequence subcomponents, requested outputs.
 2. Open the Study route for MSD design references in
-   `docs/studies/retron_hairpin_design/routes.md`.
+   `docs/studies/retron_hairpin_design/routes/README.md`.
 3. If the question is persistent provenance, open
    `docs/studies/retron_hairpin_design/workbench/README.md` and the design set
    before compiler outputs.
@@ -18,7 +18,7 @@ question is explicitly about progress, history, or blockers.
    posture.
 6. Open `linear-ssdna-composition.md` only when the requested output needs
    sequence assembly, visual QA, or GenBank sidecars.
-7. Open `pipeline.yaml` only when a machine-readable command group is needed.
+7. Open `operations/pipeline.yaml` only when a machine-readable command group is needed.
 
 ## Minimum Evidence By Question
 

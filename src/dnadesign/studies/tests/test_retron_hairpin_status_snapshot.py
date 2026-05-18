@@ -39,8 +39,16 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
     )
     (yiu_workspace / "configs" / "yiu" / "tetr_teto2_wt_direct.yiu.yaml").write_text("yiu: {}\n", encoding="utf-8")
     retron_note = (
-        repo_root / "src" / "dnadesign" / "cruncher" / "docs" / "dev" / "2026-04-19-retron-p4-hairpin-variant-audit.md"
+        repo_root
+        / "src"
+        / "dnadesign"
+        / "cruncher"
+        / "docs"
+        / "dev"
+        / "audits"
+        / "2026-04-19-retron-p4-hairpin-variant.md"
     )
+    retron_note.parent.mkdir(parents=True, exist_ok=True)
     retron_note.write_text(
         "# retron\n",
         encoding="utf-8",
@@ -58,8 +66,10 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
     )
 
     study_root = repo_root / "docs" / "studies" / "retron_hairpin_design"
-    study_root.mkdir(parents=True, exist_ok=True)
-    (study_root / "status.md").write_text(
+    (study_root / "record").mkdir(parents=True, exist_ok=True)
+    (study_root / "operations").mkdir(parents=True, exist_ok=True)
+    (study_root / "routes").mkdir(parents=True, exist_ok=True)
+    (study_root / "record" / "status.md").write_text(
         (
             "# Retron hairpin design\n\n"
             "**Owner:** dnadesign-maintainers\n"
@@ -75,9 +85,12 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    (study_root / "routes.md").write_text("# Routes\n", encoding="utf-8")
-    (study_root / "datasets.yaml").write_text("study_id: retron_hairpin_design\ndatasets: []\n", encoding="utf-8")
-    (study_root / "campaign.yaml").write_text(
+    (study_root / "routes" / "README.md").write_text("# Routes\n", encoding="utf-8")
+    (study_root / "record" / "datasets.yaml").write_text(
+        "study_id: retron_hairpin_design\ndatasets: []\n",
+        encoding="utf-8",
+    )
+    (study_root / "record" / "campaign.yaml").write_text(
         yaml.safe_dump(
             {
                 "version": 2,
@@ -95,7 +108,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    (study_root / "pipeline.yaml").write_text(
+    (study_root / "operations" / "pipeline.yaml").write_text(
         yaml.safe_dump(
             {
                 "version": 1,
@@ -105,7 +118,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                     "primary_lane": "released-product snapback",
                     "operator_question": "Can released-product Snapback own the compact post-release object?",
                     "context_refs": [
-                        "repo:src/dnadesign/cruncher/docs/dev/2026-04-19-retron-p4-hairpin-variant-audit.md",
+                        "repo:src/dnadesign/cruncher/docs/dev/audits/2026-04-19-retron-p4-hairpin-variant.md",
                         "repo:src/dnadesign/cruncher/docs/dev/2026-04-19-yiu-retron-mismatch-bulge-audit.md",
                     ],
                     "decision_refs": [
@@ -155,9 +168,9 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                 "native_agent_bootstrap": {
                     "open_first": [
                         "repo:.agents/skills/retron-hairpin-study/SKILL.md",
-                        "manifest:status.md",
-                        "manifest:routes.md",
-                        "manifest:pipeline.yaml",
+                        "manifest:record/status.md",
+                        "manifest:routes/README.md",
+                        "manifest:operations/pipeline.yaml",
                     ],
                     "pair_with": [
                         "harness-engineering",
@@ -173,7 +186,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    (study_root / "ops.study.yaml").write_text(
+    (study_root / "operations" / "ops.study.yaml").write_text(
         yaml.safe_dump(
             {
                 "version": 2,
@@ -184,11 +197,11 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                 },
                 "title": "Demo Retron hairpin design",
                 "record_sources": {
-                    "narrative_ref": "manifest:status.md",
-                    "datasets_ref": "manifest:datasets.yaml",
-                    "pipeline_ref": "manifest:pipeline.yaml",
-                    "campaign_ref": "manifest:campaign.yaml",
-                    "routes_ref": "manifest:routes.md",
+                    "narrative_ref": "manifest:record/status.md",
+                    "datasets_ref": "manifest:record/datasets.yaml",
+                    "pipeline_ref": "manifest:operations/pipeline.yaml",
+                    "campaign_ref": "manifest:record/campaign.yaml",
+                    "routes_ref": "manifest:routes/README.md",
                 },
                 "lifecycle": {
                     "phase_order": [
@@ -206,12 +219,12 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                     {
                         "id": "context_consolidation",
                         "status": "complete",
-                        "next_surface": "manifest:status.md",
+                        "next_surface": "manifest:record/status.md",
                     },
                     {
                         "id": "snapback_released_probe",
                         "status": "complete",
-                        "next_surface": "manifest:routes.md",
+                        "next_surface": "manifest:routes/README.md",
                     },
                     {
                         "id": "snapback_released_solve",
@@ -227,11 +240,11 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                 "artifacts": {
                     "routes_doc": {
                         "artifact_type": "file",
-                        "ref": "manifest:routes.md",
+                        "ref": "manifest:routes/README.md",
                     },
                     "pipeline_doc": {
                         "artifact_type": "file",
-                        "ref": "manifest:pipeline.yaml",
+                        "ref": "manifest:operations/pipeline.yaml",
                     },
                     "snapback_released_spec": {
                         "artifact_type": "file",
@@ -419,9 +432,9 @@ def test_provide_retron_hairpin_design_status_exposes_command_groups_and_agent_b
     ]
     assert evidence["native_agent_bootstrap"]["open_first"] == [
         str(tmp_path / ".agents" / "skills" / "retron-hairpin-study" / "SKILL.md"),
-        str(study_root / "status.md"),
-        str(study_root / "routes.md"),
-        str(study_root / "pipeline.yaml"),
+        str(study_root / "record" / "status.md"),
+        str(study_root / "routes" / "README.md"),
+        str(study_root / "operations" / "pipeline.yaml"),
     ]
     assert evidence["native_agent_bootstrap"]["pair_with"] == [
         "harness-engineering",
@@ -439,7 +452,7 @@ def test_provide_retron_hairpin_design_status_exposes_command_groups_and_agent_b
 
 def test_provide_retron_hairpin_design_status_uses_track_language_for_nonsequential_records(tmp_path: Path) -> None:
     study_root = _write_retron_hairpin_design_record(tmp_path)
-    contract_path = study_root / "ops.study.yaml"
+    contract_path = study_root / "operations" / "ops.study.yaml"
     payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
     payload["lifecycle"] = {
@@ -491,11 +504,11 @@ def test_provide_retron_hairpin_design_status_uses_track_language_for_nonsequent
 
 def test_retron_hairpin_design_snapshot_reports_missing_required_record_files(tmp_path: Path) -> None:
     study_root = _write_retron_hairpin_design_record(tmp_path)
-    (study_root / "routes.md").unlink()
+    (study_root / "routes" / "README.md").unlink()
 
     context = STUDY_STATUS_SERVICE.load_context(repo_root=tmp_path, study_root=study_root)
     state, summary, evidence = STUDY_STATUS_SERVICE.build_snapshot(context)
 
     assert state == "missing"
-    assert "routes.md" in summary
-    assert evidence["missing_required_files"] == ["routes.md"]
+    assert "routes/README.md" in summary
+    assert evidence["missing_required_files"] == ["routes/README.md"]

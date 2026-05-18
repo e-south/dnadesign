@@ -154,7 +154,7 @@ def resolve_active_study_dir(*, repo_root: Path) -> Path:
 
 
 def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) -> tuple[Path, ...]:
-    ops_study_path = study_dir / "ops.study.yaml"
+    ops_study_path = study_dir / "operations" / "ops.study.yaml"
     payload = _read_yaml_mapping(ops_study_path)
     surfaces = payload.get("execution_surfaces") or {}
     if not isinstance(surfaces, Mapping):

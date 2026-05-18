@@ -1044,7 +1044,7 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
 
     repo_root = tmp_path
     study_dir = repo_root / "docs" / "studies" / "demo"
-    study_dir.mkdir(parents=True)
+    (study_dir / "operations").mkdir(parents=True)
     workspace_root = repo_root / "workspace"
     _write_sequence_view_infer_config(workspace_root / "config.yaml")
     runbook_path = repo_root / "runbooks" / "infer.yaml"
@@ -1053,7 +1053,7 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
         yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_sequence_view")),
         encoding="utf-8",
     )
-    (study_dir / "ops.study.yaml").write_text(
+    (study_dir / "operations" / "ops.study.yaml").write_text(
         yaml.safe_dump(
             {
                 "execution_surfaces": {

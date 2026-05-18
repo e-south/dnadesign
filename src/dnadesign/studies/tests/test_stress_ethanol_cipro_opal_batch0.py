@@ -857,12 +857,12 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     docs = "\n".join(
         path.read_text(encoding="utf-8")
         for path in [
-            STUDY_DOCS / "campaign.yaml",
-            STUDY_DOCS / "datasets.yaml",
-            STUDY_DOCS / "ops.study.yaml",
-            STUDY_DOCS / "routes.md",
+            STUDY_DOCS / "record" / "campaign.yaml",
+            STUDY_DOCS / "record" / "datasets.yaml",
+            STUDY_DOCS / "operations" / "ops.study.yaml",
+            STUDY_DOCS / "routes" / "README.md",
             STUDY_DOCS / "routes" / "opal.md",
-            STUDY_DOCS / "status.md",
+            STUDY_DOCS / "record" / "status.md",
             BATCH0_README,
         ]
     )
@@ -884,9 +884,9 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
 
 
 def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None:
-    routes = (STUDY_DOCS / "routes.md").read_text(encoding="utf-8")
+    routes = (STUDY_DOCS / "routes" / "README.md").read_text(encoding="utf-8")
     opal_route = (STUDY_DOCS / "routes" / "opal.md").read_text(encoding="utf-8")
-    pipeline = yaml.safe_load((STUDY_DOCS / "pipeline.yaml").read_text(encoding="utf-8"))
+    pipeline = yaml.safe_load((STUDY_DOCS / "operations" / "pipeline.yaml").read_text(encoding="utf-8"))
     opal_notebook = pipeline["study_pipeline"]["opal"]["notebook"]
 
     assert "routes/opal.md" in routes
@@ -896,7 +896,7 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert "Post-run status command" in opal_route
     assert "campaign-specific artifact viewer" in opal_route
     assert "Per-ID provenance trace" in opal_route
-    assert "opal_batch0.provenance" in routes
+    assert "opal_batch0.provenance" in opal_route
     assert "studies.stress-ethanol-cipro-growth.status" in routes
     assert opal_notebook["role"] == "campaign_specific_artifact_viewer"
     assert opal_notebook["pre_run_execution_safe"] is True
@@ -904,7 +904,7 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
 
 
 def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_matrix() -> None:
-    registry = yaml.safe_load((STUDY_DOCS / "status-contract.registry.yaml").read_text(encoding="utf-8"))
+    registry = yaml.safe_load((STUDY_DOCS / "contracts" / "status.registry.yaml").read_text(encoding="utf-8"))
     relation_targets = {relation["target"] for relation in registry["relations"]}
 
     assert "opal.downstream.usr-infer-x-active-learning" in relation_targets
@@ -912,7 +912,7 @@ def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_mat
 
 
 def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() -> None:
-    routes_path = STUDY_DOCS / "routes.md"
+    routes_path = STUDY_DOCS / "routes" / "README.md"
     routes = routes_path.read_text(encoding="utf-8")
     opal_route = (STUDY_DOCS / "routes" / "opal.md").read_text(encoding="utf-8")
     latentdna_route = (STUDY_DOCS / "routes" / "latentdna.md").read_text(encoding="utf-8")

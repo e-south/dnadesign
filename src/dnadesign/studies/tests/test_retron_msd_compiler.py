@@ -1397,10 +1397,13 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
     source_root = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
     budgets = {
         "compiler.py": 450,
-        "composition_payload.py": 450,
-        "output_guards.py": 450,
-        "materialized_outputs.py": 450,
-        "manifests.py": 450,
+        "catalog/compiler_spec.py": 450,
+        "catalog/msd_ids.py": 450,
+        "catalog/registry.py": 450,
+        "outputs/composition_payload.py": 450,
+        "outputs/output_guards.py": 450,
+        "outputs/materialized_outputs.py": 450,
+        "outputs/manifests.py": 450,
     }
 
     for filename, max_lines in budgets.items():

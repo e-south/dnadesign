@@ -21,7 +21,7 @@ primitives to composing a whole sequence artifact from selected parts.
 
 - Study handoff: `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`
 - Generic authority: `src/dnadesign/construct/docs/reference/linear-ssdna-composition.md`
-- Dev spec: `docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md`
+- Dev spec: `docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md`
 - Implementation record: `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
 - Follow-ups: `docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md`
 

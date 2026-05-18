@@ -1,0 +1,7 @@
+version: 2
+path_base: repo
+campaign_id: regulondb_native_promoter_panel
+steps: []
+notes:
+  - No study-owned OPS status or preflight provider is registered for this study.
+  - Use ../operations/ops.study.yaml, ../routes/README.md, and the owner tool commands for operational handoff.

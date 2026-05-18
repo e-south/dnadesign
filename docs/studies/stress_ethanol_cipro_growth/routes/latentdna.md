@@ -2,8 +2,8 @@
 
 **Last verified:** 2026-05-17
 
-Use this only after the top-level `routes.md` selects the LatentDNA comparison
-surface. Keep status questions in `status.md` or `ops progress`.
+Use this only after `routes/README.md` selects the LatentDNA comparison
+surface. Keep status questions in `../record/status.md` or `ops progress`.
 
 ### Surface
 
@@ -15,7 +15,7 @@ surface. Keep status questions in `status.md` or `ops progress`.
   and candidate-X scorecard are available, but `design_structure_summary` and
   `sigma35_ordinal_audit` remain pending before the full primary review path is
   current.
-- Binding file: `docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml`
+- Binding file: `docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
 - Workspace: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md`
 - Read-only snapshot command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run`
@@ -25,7 +25,7 @@ surface. Keep status questions in `status.md` or `ops progress`.
 ### Review Order
 
 - Gate: `representation_health_summary`
-- Primary path:
+- Primary review path:
   1. `dataset_overview`
   2. `design_structure_summary`
   3. `sigma35_ordinal_audit`
@@ -53,8 +53,10 @@ surface. Keep status questions in `status.md` or `ops progress`.
 - Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
 - Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
 - Preferred infer family: `evo2_7b`
+- The preferred infer family is now `evo2_7b`; 20B is a comparison lane, not the default browser gate.
 - Sigma-35 ordinal interpretation follows the reverse-alphabetical promoter
   ladder on the active subset: `f > e > d > c > b`.
+- Snapshot attention surfaces: `design_structure_summary`, `sigma35_ordinal_audit`
 
 ### Appendix Boundaries
 
@@ -71,10 +73,15 @@ surface. Keep status questions in `status.md` or `ops progress`.
 
 - The notebook is a plot-first review surface for pre-assay representation
   triage; it is not the authoritative study-status surface.
+- 7B-first sidecar-backed browser posture is intentional for the current
+  review loop.
+- Prefer available 7B sequence-view sidecar geometries when reviewing the
+  current browser.
 - Do not choose `X` by UMAP aesthetics.
 - Do not compare absolute UMAP coordinates across population refreshes.
 - Do not read anchor-local mechanism out of pooled full-sequence vectors.
 - Describe `seq_mean`, `anchor_mean`, and `core60_mean` as token-position
   means over causal Evo2 states in the emitted orientation.
+- Treat bidirectional forward/RC context concat as an aggregation strategy, not as native bidirectional encodings.
 - Reference hues are workspace-configured and cohort-gated. Do not hardcode a
   generic promoter browser ontology.

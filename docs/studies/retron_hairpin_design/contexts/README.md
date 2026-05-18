@@ -13,5 +13,5 @@ too detailed for the root router.
 - `snapback-phenomenology-dev-spec.md`: retained context for Snapback
   phenomenology and prior design framing.
 
-Do not put current task routing here. Route decisions belong in `../routes.md`
+Do not put current task routing here. Route decisions belong in `../routes/README.md`
 and focused command detail belongs in `../routes/`.

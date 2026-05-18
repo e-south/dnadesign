@@ -4,21 +4,22 @@ Keep ownership boundaries clear.
 
 ## Checked-in study surfaces
 
-- `docs/studies/<study-id>/status.md`: factual current datasets, current phase,
-  current row counts, downstream posture, and concise next actions
-- `docs/studies/<study-id>/routes.md`: one-hop study handoff page for DenseGen,
-  Construct, Infer, LatentDNA, Cluster, and OPAL
+- `docs/studies/<study-id>/record/status.md`: factual current datasets,
+  current phase, current row counts, downstream posture, and concise next
+  actions
+- `docs/studies/<study-id>/routes/README.md`: one-hop study handoff page for
+  DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL
 - `docs/studies/<study-id>/routes/`: focused route details for owner surfaces
   that would otherwise make the one-hop map monolithic
-- `docs/studies/<study-id>/datasets.yaml`: affiliated dataset registry, root
-  semantics, and sync posture
-- `docs/studies/<study-id>/ops.study.yaml`: lifecycle order, snapshot scope,
-  execution surfaces, and next-scope preflight grouping
-- `docs/studies/<study-id>/pipeline.yaml`: structural workspace, config, and
-  downstream surface bindings that complement `ops.study.yaml`, including any
-  study-bound exploratory-analysis route inventory surfaced through snapshot
-  `analysis_surfaces`
-- `docs/studies/<study-id>/campaign.yaml`: tracked procedure set for
+- `docs/studies/<study-id>/record/datasets.yaml`: affiliated dataset registry,
+  root semantics, and sync posture
+- `docs/studies/<study-id>/operations/ops.study.yaml`: lifecycle order,
+  snapshot scope, execution surfaces, and next-scope preflight grouping
+- `docs/studies/<study-id>/operations/pipeline.yaml`: structural workspace,
+  config, and downstream surface bindings that complement
+  `operations/ops.study.yaml`, including any study-bound exploratory-analysis
+  route inventory surfaced through snapshot `analysis_surfaces`
+- `docs/studies/<study-id>/record/campaign.yaml`: tracked procedure set for
   `ops progress campaign`
 
 ## Tool-owned operational detail
@@ -32,7 +33,7 @@ Keep ownership boundaries clear.
   workflow doc.
 - Cluster and OPAL detail stays in their tool-owned workflow docs until the
   study owns a concrete results root or campaign config.
-- OPAL campaign notebook viewing is routed through the study `routes.md` OPAL
+- OPAL campaign notebook viewing is routed through the study `routes/README.md` OPAL
   section, then the study-owned OPAL route-detail page; this skill should not
   grow a parallel OPAL command walkthrough.
 - OPAL batch-0 candidate-table creation is study-owned generated data. The

@@ -39,13 +39,16 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
         repo_root / "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md"
     ).read_text(encoding="utf-8")
     latentdna_binding = yaml.safe_load(
-        (repo_root / "docs/studies/stress_ethanol_cipro_growth/latentdna_binding.yaml").read_text(encoding="utf-8")
+        (repo_root / "docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml").read_text(encoding="utf-8")
     )
     study_pipeline = yaml.safe_load(
-        (repo_root / "docs/studies/stress_ethanol_cipro_growth/pipeline.yaml").read_text(encoding="utf-8")
+        (repo_root / "docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml").read_text(encoding="utf-8")
     )
-    study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes.md").read_text(encoding="utf-8")
-    study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/status.md").read_text(encoding="utf-8")
+    study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/README.md").read_text(encoding="utf-8")
+    study_latentdna_route = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md").read_text(
+        encoding="utf-8"
+    )
+    study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/record/status.md").read_text(encoding="utf-8")
 
     assert "LatentDNA compares learned sequence representations" in readme
     assert "comparison layer for `dnadesign`" not in readme
@@ -121,46 +124,46 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Artifact naming grammar" in reference_index
     assert "ops/status.registry.yaml" in operations
 
-    assert "latentdna_binding.yaml" in workspace_readme
+    assert "bindings/latentdna.yaml" in workspace_readme
     assert "workspace_snapshot.json" in workspace_readme
     assert "UMAP role: appendix orientation only" in workspace_readme
     assert "Reference metadata sources:" in workspace_readme
     assert "causal and prefix-conditioned" in workspace_readme
 
-    assert "Gate:" in study_routes
-    assert "representation_health_summary" in study_routes
-    assert "Primary review path:" in study_routes
-    assert "sigma35_ordinal_audit" in study_routes
-    assert "appendix_umap_gallery" in study_routes
-    assert "Snapshot attention surfaces:" in study_routes
-    assert "dataset_overview" in study_routes
-    assert "design_structure_summary" in study_routes
-    assert "context_robustness_summary" in study_routes
-    assert "candidate_decision_frontier" in study_routes
-    assert "candidate_x_selection_scorecard" in study_routes
-    assert "balanced_design_family_margin_gallery" in study_routes
-    assert "sigma35_margin_ladder_gallery" in study_routes
-    assert "sigma35_centroid_distance_gallery" in study_routes
-    assert "sigma35_stress_margin_gallery" in study_routes
-    assert "context_pair_summary" in study_routes
-    assert "Snapshot attention surfaces: `design_structure_summary`, `sigma35_ordinal_audit`" in study_routes
-    assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_routes
-    assert "Plane: `data-plane`" in study_routes
-    assert "Plane: `control-plane`" in study_routes
-    assert "Surface role: `producer`" in study_routes
-    assert "Surface role: `operator`" in study_routes
-    assert "Surface role: `downstream-analysis`" in study_routes
-    assert "Surface role: `decision`" in study_routes
-    assert "Plane: `producer-analysis`" not in study_routes
-    assert "Plane: `execution-surface`" not in study_routes
-    assert "Plane: `downstream-analysis`" not in study_routes
-    assert "Plane: `downstream-tool`" not in study_routes
-    assert "7B-first sidecar-backed browser posture" in study_routes
-    assert "available 7B sequence-view sidecar geometries" in study_routes
-    assert "preferred infer family is now `evo2_7b`" in study_routes
-    assert "token-position" in study_routes
-    assert "not as native bidirectional encodings" in study_routes
-    assert "eight canonical 7B+20B" not in study_routes
+    assert "routes/latentdna.md" in study_routes
+    assert "Gate:" in study_latentdna_route
+    assert "representation_health_summary" in study_latentdna_route
+    assert "Primary review path:" in study_latentdna_route
+    assert "sigma35_ordinal_audit" in study_latentdna_route
+    assert "appendix_umap_gallery" in study_latentdna_route
+    assert "Snapshot attention surfaces:" in study_latentdna_route
+    assert "dataset_overview" in study_latentdna_route
+    assert "design_structure_summary" in study_latentdna_route
+    assert "context_robustness_summary" in study_latentdna_route
+    assert "candidate_decision_frontier" in study_latentdna_route
+    assert "candidate_x_selection_scorecard" in study_latentdna_route
+    assert "balanced_design_family_margin_gallery" in study_latentdna_route
+    assert "sigma35_margin_ladder_gallery" in study_latentdna_route
+    assert "sigma35_centroid_distance_gallery" in study_latentdna_route
+    assert "sigma35_stress_margin_gallery" in study_latentdna_route
+    assert "context_pair_summary" in study_latentdna_route
+    assert "Snapshot attention surfaces: `design_structure_summary`, `sigma35_ordinal_audit`" in study_latentdna_route
+    assert (
+        "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`"
+        in study_latentdna_route
+    )
+    assert "Plane: `data-plane`" in study_latentdna_route
+    assert "Surface role: `downstream-analysis`" in study_latentdna_route
+    assert "Plane: `producer-analysis`" not in study_latentdna_route
+    assert "Plane: `execution-surface`" not in study_latentdna_route
+    assert "Plane: `downstream-analysis`" not in study_latentdna_route
+    assert "Plane: `downstream-tool`" not in study_latentdna_route
+    assert "7B-first sidecar-backed browser posture" in study_latentdna_route
+    assert "available 7B sequence-view sidecar geometries" in study_latentdna_route
+    assert "preferred infer family is now `evo2_7b`" in study_latentdna_route
+    assert "token-position" in study_latentdna_route
+    assert "not as native bidirectional encodings" in study_latentdna_route
+    assert "eight canonical 7B+20B" not in study_latentdna_route
 
     assert "The study phase is `infer_batch_preparation`" in study_status
     assert "Current LatentDNA decision surfaces:" in study_status

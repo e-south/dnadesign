@@ -73,7 +73,7 @@ Out of scope:
   explicit payload/cap sequences.
 - Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in
-  `docs/studies/retron_hairpin_design/routes.md`.
+  `docs/studies/retron_hairpin_design/routes/README.md`.
 - Missing left/right base feasibility, terminal-nick route, nickase, or
   `S3/S2/S1/S0` profile: route to scar-nick.
 - Mismatch-only display or boundary contrast: route to YIU; it is not the
@@ -83,12 +83,12 @@ Out of scope:
   `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`.
 
 2. Load only the needed surfaces.
-- Compiler route: `docs/studies/retron_hairpin_design/routes.md`, then
+- Compiler route: `docs/studies/retron_hairpin_design/routes/README.md`, then
   `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`, then
   `references/msd-design-references.md`.
 - Whole-product context: `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`,
   then the active exec plan.
-- Machine-readable command groups: `docs/studies/retron_hairpin_design/pipeline.yaml`.
+- Machine-readable command groups: `docs/studies/retron_hairpin_design/operations/pipeline.yaml`.
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
 3. Execute or report the route.

@@ -24,8 +24,8 @@ def _write_repo(tmp_path: Path) -> Path:
     repo_root = tmp_path
     (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
     study_root = repo_root / "docs" / "studies" / "demo_study"
-    study_root.mkdir(parents=True, exist_ok=True)
-    (study_root / "ops.study.yaml").write_text(
+    (study_root / "operations").mkdir(parents=True, exist_ok=True)
+    (study_root / "operations" / "ops.study.yaml").write_text(
         "version: 2\n"
         "study_id: demo_study\n"
         "ops_surfaces:\n"

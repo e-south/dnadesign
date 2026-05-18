@@ -69,6 +69,16 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _write_required_study_record_files(study_root: Path) -> None:
+    for required_name in (
+        "record/campaign.yaml",
+        "record/datasets.yaml",
+        "record/status.md",
+        "operations/ops.study.yaml",
+    ):
+        _write(study_root / required_name, "placeholder\n")
+
+
 def _git_init(repo_root: Path) -> None:
     subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
 
@@ -268,10 +278,10 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
         tmp_path / "docs" / "studies" / "README.md",
         "\n".join(
             [
-                "`campaign.yaml`",
-                "`datasets.yaml`",
-                "`status.md`",
-                "`ops.study.yaml`",
+                "`record/campaign.yaml`",
+                "`record/datasets.yaml`",
+                "`record/status.md`",
+                "`operations/ops.study.yaml`",
                 "legacy path: docs/studies/promoter/demo_study/status.md",
             ]
         )
@@ -293,8 +303,7 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
             sort_keys=False,
         ),
     )
-    for required_name in ("campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"):
-        _write(tmp_path / "docs" / "studies" / "demo_study" / required_name, "placeholder\n")
+    _write_required_study_record_files(tmp_path / "docs" / "studies" / "demo_study")
     _write(tmp_path / "AGENTS.md", "- Promoter study active-study registry: `docs/studies/promoter/index.yaml`\n")
     _write(
         tmp_path / "src" / "dnadesign" / "usr" / "AGENTS.md",
@@ -330,10 +339,10 @@ def test_find_study_record_doc_issues_accepts_code_span_required_file_references
         tmp_path / "docs" / "studies" / "README.md",
         "\n".join(
             [
-                "- `campaign.yaml`",
-                "- `datasets.yaml`",
-                "- `status.md`",
-                "- `ops.study.yaml`",
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
             ]
         )
         + "\n",
@@ -349,10 +358,10 @@ def test_find_study_record_doc_issues_rejects_record_root_outside_study_records(
         tmp_path / "docs" / "studies" / "README.md",
         "\n".join(
             [
-                "- `campaign.yaml`",
-                "- `datasets.yaml`",
-                "- `status.md`",
-                "- `ops.study.yaml`",
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
             ]
         )
         + "\n",
@@ -373,8 +382,7 @@ def test_find_study_record_doc_issues_rejects_record_root_outside_study_records(
             sort_keys=False,
         ),
     )
-    for required_name in ("campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"):
-        _write(tmp_path / "docs" / "other" / "demo_study" / required_name, "placeholder\n")
+    _write_required_study_record_files(tmp_path / "docs" / "other" / "demo_study")
 
     issues = _find_study_record_doc_issues(tmp_path)
 
@@ -393,7 +401,7 @@ def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms
         "Verify the active study selector, `family`, and `record_root` in the study index.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "status-contract.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "contracts" / "status.md",
         "The selected study entry must declare `family` and `record_root`.\n",
     )
 
@@ -447,7 +455,7 @@ def _write_active_study_datasets(tmp_path: Path, datasets: list[dict[str, object
         ),
     )
     _write(
-        tmp_path / "docs" / "studies" / "demo_study" / "datasets.yaml",
+        tmp_path / "docs" / "studies" / "demo_study" / "record" / "datasets.yaml",
         yaml.safe_dump({"datasets": datasets}, sort_keys=False),
     )
 
@@ -898,7 +906,7 @@ def test_deprecated_docs_entrypoint_check_flags_start_here_links(tmp_path: Path)
 
 
 def test_entrypoint_local_path_link_check_flags_local_literal_paths(tmp_path: Path) -> None:
-    _write(tmp_path / "docs" / "installation.md", "## Installation\n")
+    _write(tmp_path / "docs" / "setup" / "installation.md", "## Installation\n")
     _write(
         tmp_path / "README.md",
         "\n".join(
@@ -907,7 +915,7 @@ def test_entrypoint_local_path_link_check_flags_local_literal_paths(tmp_path: Pa
                 "",
                 "[Docs index](docs/README.md)",
                 "",
-                "Read `docs/installation.md` before running commands.",
+                "Read `docs/setup/installation.md` before running commands.",
                 "",
             ]
         ),
@@ -915,7 +923,7 @@ def test_entrypoint_local_path_link_check_flags_local_literal_paths(tmp_path: Pa
 
     issues = _find_entrypoint_local_path_literal_issues(tmp_path)
 
-    assert any("local path literal" in issue and "docs/installation.md" in issue for issue in issues)
+    assert any("local path literal" in issue and "docs/setup/installation.md" in issue for issue in issues)
 
 
 def test_entrypoint_local_path_link_check_allows_hyperlinked_local_paths(tmp_path: Path) -> None:
@@ -927,7 +935,7 @@ def test_entrypoint_local_path_link_check_allows_hyperlinked_local_paths(tmp_pat
                 "",
                 "[Docs index](docs/README.md)",
                 "",
-                "Read [installation guide](docs/installation.md) before running commands.",
+                "Read [installation guide](docs/setup/installation.md) before running commands.",
                 "",
             ]
         ),
@@ -1134,7 +1142,7 @@ def test_main_fails_when_docs_index_last_verified_is_stale(tmp_path: Path) -> No
 def test_main_fails_when_selected_runbook_missing_required_metadata(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(
-        tmp_path / "docs" / "installation.md",
+        tmp_path / "docs" / "setup" / "installation.md",
         "## Installation\n\nRun setup.\n",
     )
     _write(
@@ -1149,7 +1157,7 @@ def test_main_fails_when_selected_runbook_missing_required_metadata(tmp_path: Pa
 def test_main_fails_when_selected_runbook_last_verified_is_stale(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(
-        tmp_path / "docs" / "installation.md",
+        tmp_path / "docs" / "setup" / "installation.md",
         "## Installation\n\n**Owner:** maintainers\n**Last verified:** 2020-01-01\n",
     )
     _write(
@@ -1164,7 +1172,7 @@ def test_main_fails_when_selected_runbook_last_verified_is_stale(tmp_path: Path)
 def test_main_passes_when_selected_runbook_has_required_metadata(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(
-        tmp_path / "docs" / "installation.md",
+        tmp_path / "docs" / "setup" / "installation.md",
         f"## Installation\n\n**Owner:** maintainers\n**Last verified:** {today}\n",
     )
     _write(
@@ -1183,7 +1191,7 @@ def test_main_fails_when_operations_runbook_docs_missing_required_metadata(tmp_p
         "## Ops orchestration index\n\nMissing metadata.\n",
     )
     _write(
-        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        tmp_path / "docs" / "operations" / "orchestration/runbooks.md",
         "## Orchestration runbooks\n\nMissing metadata.\n",
     )
     _write(
@@ -1481,7 +1489,7 @@ def test_main_fails_when_repo_root_contains_transient_operational_dir(tmp_path: 
 
 def test_find_stale_overlay_guard_term_issues_flags_old_ops_guard_terms(tmp_path: Path) -> None:
     _write(
-        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        tmp_path / "docs" / "operations" / "orchestration/runbooks.md",
         "\n".join(
             [
                 "## Orchestration runbooks",
@@ -1504,7 +1512,7 @@ def test_find_stale_overlay_guard_term_issues_flags_old_ops_guard_terms(tmp_path
 
 def test_find_stale_overlay_guard_term_issues_accepts_usr_overlay_guard_terms(tmp_path: Path) -> None:
     _write(
-        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        tmp_path / "docs" / "operations" / "orchestration/runbooks.md",
         "\n".join(
             [
                 "## Orchestration runbooks",
@@ -2615,7 +2623,7 @@ def test_cross_tool_doc_metadata_check_flags_missing_semantic_fields(tmp_path: P
 
 def test_cross_tool_doc_metadata_check_flags_missing_registry_fields(tmp_path: Path) -> None:
     _write(
-        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        tmp_path / "docs" / "operations" / "orchestration/runbooks.md",
         "\n".join(
             [
                 "## Orchestration runbooks",
@@ -2666,7 +2674,7 @@ def test_cross_tool_doc_metadata_check_accepts_expected_contract_values(tmp_path
 
 def test_cross_tool_doc_metadata_check_accepts_registry_fields_for_runbook_docs(tmp_path: Path) -> None:
     _write(
-        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        tmp_path / "docs" / "operations" / "orchestration/runbooks.md",
         "\n".join(
             [
                 "## Orchestration runbooks",
@@ -2694,7 +2702,7 @@ def test_cross_tool_doc_metadata_check_accepts_registry_fields_for_runbook_docs(
 
 def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     _write(
         orchestration_doc,
         "\n".join(
@@ -2729,7 +2737,7 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
         execution_kind="executable",
         status_kind="ops-audit-json",
     )
-    hpc_sync_doc = tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "hpc-agent-sync-flow.md"
+    hpc_sync_doc = tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "sync" / "hpc-agent-flow.md"
     _write(
         hpc_sync_doc,
         "\n".join(
@@ -2759,12 +2767,12 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
     issues = _find_runbook_catalog_issues(tmp_path)
 
     assert any("missing registry metadata sidecar" in issue for issue in issues)
-    assert any("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.registry.yaml" in issue for issue in issues)
+    assert any("src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.registry.yaml" in issue for issue in issues)
 
 
 def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     _write(
         orchestration_doc,
         "\n".join(
@@ -2807,7 +2815,7 @@ def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_
     issues = _find_runbook_catalog_issues(tmp_path)
 
     assert any(
-        "Summary for docs/operations/orchestration-runbooks.md must match owner-local metadata" in issue
+        "Summary for docs/operations/orchestration/runbooks.md must match owner-local metadata" in issue
         for issue in issues
     )
 
@@ -2815,7 +2823,7 @@ def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_
 def test_runbook_catalog_check_accepts_matching_owner_local_metadata(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     summary = "Deterministic control-plane runbook contract."
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     _write(
         orchestration_doc,
         "\n".join(
@@ -2862,7 +2870,7 @@ def test_runbook_catalog_check_accepts_matching_owner_local_metadata(tmp_path: P
 
 def test_runbook_catalog_check_flags_stale_generated_procedure_section(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     _write(
         orchestration_doc,
         "\n".join(
@@ -2911,7 +2919,7 @@ def test_runbook_catalog_check_flags_stale_generated_procedure_section(tmp_path:
 
 def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     ops_docs = tmp_path / "src" / "dnadesign" / "ops" / "docs" / "README.md"
     _write(
         orchestration_doc,
@@ -2986,7 +2994,7 @@ def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_pat
 
 def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     _write(
         orchestration_doc,
         "\n".join(
@@ -3033,7 +3041,7 @@ def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp
 
 def test_runbook_catalog_check_uses_status_registry_inventory_for_glossary(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
-    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration/runbooks.md"
     _write(
         orchestration_doc,
         "\n".join(
@@ -3118,7 +3126,7 @@ def test_runbook_catalog_check_uses_status_registry_inventory_for_glossary(tmp_p
 
 def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> None:
     _write(
-        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        tmp_path / "docs" / "operations" / "orchestration/runbooks.md",
         "\n".join(
             [
                 "## Ops runbook",
@@ -3135,7 +3143,7 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
         "Use infer_local_runtime and notify_profile_doctor in ops.study.yaml.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "preflight.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "contracts" / "preflight.md",
         "Read notify.profile.*.details.setup_command after infer_validate_config.\n",
     )
 
@@ -3154,7 +3162,7 @@ def test_study_execution_source_drift_check_flags_pipeline_only_claims(tmp_path:
         "Use pipeline.yaml as the only source for real Construct, Infer, and runbook paths.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "preflight.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "contracts" / "preflight.md",
         "pipeline.yaml remains the only valid source for exact execution surfaces.\n",
     )
 

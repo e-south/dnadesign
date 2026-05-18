@@ -484,10 +484,15 @@ def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_templa
     usr_root = tmp_path / "usr_root"
     study_dir = tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth"
     study_dir.mkdir(parents=True)
-    (study_dir / "campaign.yaml").write_text("version: 1\nsteps: []\n", encoding="utf-8")
-    (study_dir / "status.md").write_text("## test study\n", encoding="utf-8")
-    (study_dir / "ops.study.yaml").write_text("version: 2\nstudy_id: stress_ethanol_cipro_growth\n", encoding="utf-8")
-    (study_dir / "datasets.yaml").write_text(
+    (study_dir / "record").mkdir()
+    (study_dir / "operations").mkdir()
+    (study_dir / "record" / "campaign.yaml").write_text("version: 1\nsteps: []\n", encoding="utf-8")
+    (study_dir / "record" / "status.md").write_text("## test study\n", encoding="utf-8")
+    (study_dir / "operations" / "ops.study.yaml").write_text(
+        "version: 2\nstudy_id: stress_ethanol_cipro_growth\n",
+        encoding="utf-8",
+    )
+    (study_dir / "record" / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
                 "study_id": "stress_ethanol_cipro_growth",
@@ -901,10 +906,15 @@ def test_workspace_init_promoter_reference_margin_template_validates_with_realis
     usr_root = _build_committee_usr_sources(tmp_path)
     study_dir = tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth"
     study_dir.mkdir(parents=True)
-    (study_dir / "campaign.yaml").write_text("version: 1\nsteps: []\n", encoding="utf-8")
-    (study_dir / "status.md").write_text("## test study\n", encoding="utf-8")
-    (study_dir / "ops.study.yaml").write_text("version: 2\nstudy_id: stress_ethanol_cipro_growth\n", encoding="utf-8")
-    (study_dir / "datasets.yaml").write_text(
+    (study_dir / "record").mkdir()
+    (study_dir / "operations").mkdir()
+    (study_dir / "record" / "campaign.yaml").write_text("version: 1\nsteps: []\n", encoding="utf-8")
+    (study_dir / "record" / "status.md").write_text("## test study\n", encoding="utf-8")
+    (study_dir / "operations" / "ops.study.yaml").write_text(
+        "version: 2\nstudy_id: stress_ethanol_cipro_growth\n",
+        encoding="utf-8",
+    )
+    (study_dir / "record" / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
                 "study_id": "stress_ethanol_cipro_growth",

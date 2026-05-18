@@ -23,20 +23,26 @@ from .paths import builtin_templates_dir, resolve_repo_path
 
 
 def _read_study_datasets(study_dir: Path) -> dict[str, dict[str, Any]]:
-    required_files = ["campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"]
+    required_files = [
+        "record/campaign.yaml",
+        "record/datasets.yaml",
+        "record/status.md",
+        "operations/ops.study.yaml",
+    ]
     missing = [name for name in required_files if not (study_dir / name).exists()]
     if missing:
         raise WorkspaceValidationError(
             f"study record is missing required files in {study_dir}: {', '.join(sorted(missing))}"
         )
-    payload = yaml.safe_load((study_dir / "datasets.yaml").read_text(encoding="utf-8")) or {}
+    datasets_path = study_dir / "record" / "datasets.yaml"
+    payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8")) or {}
     datasets = payload.get("datasets")
     if not isinstance(datasets, list) or not datasets:
-        raise WorkspaceValidationError(f"study datasets registry is empty: {study_dir / 'datasets.yaml'}")
+        raise WorkspaceValidationError(f"study datasets registry is empty: {datasets_path}")
     by_role: dict[str, dict[str, Any]] = {}
     for entry in datasets:
         if not isinstance(entry, dict):
-            raise WorkspaceValidationError(f"study dataset entries must be mappings: {study_dir / 'datasets.yaml'}")
+            raise WorkspaceValidationError(f"study dataset entries must be mappings: {datasets_path}")
         role = entry.get("role")
         if not isinstance(role, str) or not role:
             raise WorkspaceValidationError(f"study dataset entry is missing role: {entry!r}")

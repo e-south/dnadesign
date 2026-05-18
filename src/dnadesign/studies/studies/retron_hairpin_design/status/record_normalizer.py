@@ -23,14 +23,14 @@ from dnadesign.studies.core.models import StudyOpsContract
 from dnadesign.studies.core.record_loader import load_study_ops_contract
 from dnadesign.studies.core.record_locator import discover_active_study_selection
 
-_REQUIRED_RECORD_FILES = (
-    "campaign.yaml",
-    "datasets.yaml",
-    "status.md",
-    "ops.study.yaml",
-    "routes.md",
-    "pipeline.yaml",
-)
+_REQUIRED_RECORD_FILES = {
+    "campaign.yaml": "record/campaign.yaml",
+    "datasets.yaml": "record/datasets.yaml",
+    "status.md": "record/status.md",
+    "ops.study.yaml": "operations/ops.study.yaml",
+    "routes.md": "routes/README.md",
+    "pipeline.yaml": "operations/pipeline.yaml",
+}
 _BLOCKED_PHASE_STATUSES = frozenset({"blocked", "blocked_gpu"})
 _RUNTIME_PHASE_STATUSES = frozenset({"ready", "planned", "in_progress"})
 
@@ -115,8 +115,10 @@ def resolve_retron_hairpin_design_context(
                 active_study_id = _string_or_none(payload.get("active_study_id"))
 
     ops_contract = load_study_ops_contract(resolved_study_dir)
-    record_paths = {name: resolved_study_dir / name for name in _REQUIRED_RECORD_FILES}
-    missing_required_files = tuple(name for name, path in record_paths.items() if not path.exists())
+    record_paths = {name: resolved_study_dir / relative_path for name, relative_path in _REQUIRED_RECORD_FILES.items()}
+    missing_required_files = tuple(
+        _REQUIRED_RECORD_FILES[name] for name, path in record_paths.items() if not path.exists()
+    )
     status_excerpt = _load_status_excerpt(record_paths["status.md"])
     pipeline_payload = _load_yaml_mapping(record_paths["pipeline.yaml"], label="study pipeline")
     command_groups = _load_command_groups(
@@ -279,23 +281,24 @@ def _load_command_groups(
     study_root: Path,
     label: str,
 ) -> tuple[RetronHairpinDesignCommandGroup, ...]:
+    pipeline_path = study_root / "operations" / "pipeline.yaml"
     if payload is None:
         return ()
     if not isinstance(payload, list):
-        raise ValueError(f"{label} must be a list: {study_root / 'pipeline.yaml'}")
+        raise ValueError(f"{label} must be a list: {pipeline_path}")
     groups: list[RetronHairpinDesignCommandGroup] = []
     seen_group_ids: set[str] = set()
     for index, item in enumerate(payload, start=1):
         if not isinstance(item, dict):
-            raise ValueError(f"{label} entry {index} must be a mapping: {study_root / 'pipeline.yaml'}")
-        group_id = _required_text(item.get("id"), label=f"{label}[{index}].id", source=study_root / "pipeline.yaml")
+            raise ValueError(f"{label} entry {index} must be a mapping: {pipeline_path}")
+        group_id = _required_text(item.get("id"), label=f"{label}[{index}].id", source=pipeline_path)
         if group_id in seen_group_ids:
-            raise ValueError(f"{label} must not duplicate id {group_id!r}: {study_root / 'pipeline.yaml'}")
+            raise ValueError(f"{label} must not duplicate id {group_id!r}: {pipeline_path}")
         seen_group_ids.add(group_id)
         commands = _string_sequence(
             item.get("commands"),
             label=f"{label}[{group_id}].commands",
-            source=study_root / "pipeline.yaml",
+            source=pipeline_path,
         )
         raw_workspace_ref = _string_or_none(item.get("workspace_ref"))
         workspace_root = (
@@ -328,10 +331,11 @@ def _normalized_intent_payload(
     repo_root: Path,
     study_root: Path,
 ) -> dict[str, object]:
+    pipeline_path = study_root / "operations" / "pipeline.yaml"
     if payload is None:
         return {}
     if not isinstance(payload, dict):
-        raise ValueError(f"pipeline.yaml intent must be a mapping: {study_root / 'pipeline.yaml'}")
+        raise ValueError(f"pipeline.yaml intent must be a mapping: {pipeline_path}")
     normalized = dict(payload)
     normalized["context_refs"] = _resolve_path_ref_sequence(
         payload.get("context_refs"),
@@ -354,10 +358,11 @@ def _normalized_native_agent_bootstrap(
     repo_root: Path,
     study_root: Path,
 ) -> dict[str, object]:
+    pipeline_path = study_root / "operations" / "pipeline.yaml"
     if payload is None:
         return {}
     if not isinstance(payload, dict):
-        raise ValueError(f"pipeline.yaml native_agent_bootstrap must be a mapping: {study_root / 'pipeline.yaml'}")
+        raise ValueError(f"pipeline.yaml native_agent_bootstrap must be a mapping: {pipeline_path}")
     normalized = dict(payload)
     normalized["open_first"] = _resolve_path_ref_sequence(
         payload.get("open_first"),
@@ -369,7 +374,7 @@ def _normalized_native_agent_bootstrap(
         _string_sequence(
             payload.get("must_preserve") or [],
             label="pipeline.yaml native_agent_bootstrap.must_preserve",
-            source=study_root / "pipeline.yaml",
+            source=pipeline_path,
             allow_empty=True,
         )
     )
@@ -385,7 +390,12 @@ def _resolve_path_ref_sequence(
 ) -> list[str]:
     if payload is None:
         return []
-    values = _string_sequence(payload, label=label, source=study_root / "pipeline.yaml", allow_empty=True)
+    values = _string_sequence(
+        payload,
+        label=label,
+        source=study_root / "operations" / "pipeline.yaml",
+        allow_empty=True,
+    )
     return [
         str(
             resolve_path_ref(

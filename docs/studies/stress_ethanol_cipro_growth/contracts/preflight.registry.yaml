@@ -1,0 +1,32 @@
+schema_version: 1
+catalog_order: 56
+registry_id: studies.stress-ethanol-cipro-growth.preflight
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: "`docs/studies/stress_ethanol_cipro_growth/` plus the study-owned execution surfaces declared in `operations/ops.study.yaml`"
+exit_artifact: a read-only command-level readiness summary for this study
+summary: Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+execution_kind: iterative
+status_kind: stress-ethanol-cipro-growth-preflight
+keywords:
+  - stress ethanol ciprofloxacin
+  - preflight
+  - densegen
+  - construct
+  - infer
+  - notify
+  - ops
+related_tools:
+  - densegen
+  - construct
+  - infer
+  - notify
+  - ops
+relations:
+  - type: execution-support
+    target: studies.stress-ethanol-cipro-growth.status
+  - type: execution-support
+    target: usr.data-plane.multi-source-source-of-truth
+  - type: execution-support
+    target: usr.data-plane.construct-infer-source-of-truth

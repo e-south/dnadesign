@@ -30,10 +30,10 @@ def _base_payload() -> dict[str, object]:
         },
         "title": "Demo study",
         "record_sources": {
-            "narrative_ref": "manifest:status.md",
-            "datasets_ref": "manifest:datasets.yaml",
-            "pipeline_ref": "manifest:pipeline.yaml",
-            "campaign_ref": "manifest:campaign.yaml",
+            "narrative_ref": "manifest:record/status.md",
+            "datasets_ref": "manifest:record/datasets.yaml",
+            "pipeline_ref": "manifest:operations/pipeline.yaml",
+            "campaign_ref": "manifest:record/campaign.yaml",
         },
         "lifecycle": {
             "current_phase": {
@@ -113,8 +113,8 @@ def _write_contract(tmp_path: Path, payload: dict[str, object]) -> Path:
     repo_root = tmp_path
     (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
     study_root = repo_root / "docs" / "studies" / "demo_study"
-    study_root.mkdir(parents=True, exist_ok=True)
-    (study_root / "ops.study.yaml").write_text(
+    (study_root / "operations").mkdir(parents=True, exist_ok=True)
+    (study_root / "operations" / "ops.study.yaml").write_text(
         yaml.safe_dump(payload, sort_keys=False),
         encoding="utf-8",
     )

@@ -102,6 +102,6 @@ under `runtime/construct/`.
 ### Workbench Provenance
 
 Use `workbench/design_sets/` for persistent cohort meaning and
-`workbench/compiler_runs/` for the statement that the study compiler was run on
+`workbench/provenance/compiler_runs/` for the statement that the study compiler was run on
 that cohort. Do not treat generated transient compiler output as the
 authoritative experimental notebook.

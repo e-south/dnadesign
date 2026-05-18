@@ -90,6 +90,8 @@ SOR_MARKDOWN_FILES = (
 )
 INDEX_MARKDOWN_FILES = (
     "docs/README.md",
+    "docs/setup/README.md",
+    "docs/notebooks/README.md",
     "docs/runbooks/README.md",
     "docs/architecture/README.md",
     "docs/architecture/decisions/README.md",
@@ -101,17 +103,18 @@ INDEX_MARKDOWN_FILES = (
     "docs/dev/README.md",
     "docs/bu-scc/README.md",
     "docs/notify/README.md",
+    "docs/studies/reference/README.md",
 )
 RUNBOOK_MARKDOWN_FILES = (
-    "docs/installation.md",
-    "docs/dependencies.md",
-    "docs/notebooks.md",
-    "docs/marimo-reference.md",
+    "docs/setup/installation.md",
+    "docs/setup/dependencies.md",
+    "docs/notebooks/README.md",
+    "docs/notebooks/marimo-reference.md",
     "docs/operations/README.md",
-    "docs/operations/orchestration-runbooks.md",
-    "docs/bu-scc/quickstart.md",
-    "docs/bu-scc/install.md",
-    "docs/bu-scc/batch-notify.md",
+    "docs/operations/orchestration/runbooks.md",
+    "docs/bu-scc/setup/quickstart.md",
+    "docs/bu-scc/setup/install.md",
+    "docs/bu-scc/runbooks/batch-notify.md",
     "docs/notify/usr-events.md",
 )
 OWNER_PATTERN = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -219,10 +222,10 @@ LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
     re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
 )
 STUDY_RECORD_REQUIRED_FILES = (
-    "campaign.yaml",
-    "datasets.yaml",
-    "status.md",
-    "ops.study.yaml",
+    "record/campaign.yaml",
+    "record/datasets.yaml",
+    "record/status.md",
+    "operations/ops.study.yaml",
 )
 STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
 STUDY_RECORD_ROUTER_FILES = (
@@ -233,14 +236,14 @@ STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
     "ARCHITECTURE.md",
     "docs/README.md",
     "docs/studies/README.md",
-    "docs/studies/study-status-ops-surfaces.md",
-    "docs/studies/stress_ethanol_cipro_growth/status-contract.md",
-    "docs/studies/stress_ethanol_cipro_growth/preflight.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes.md",
+    "docs/studies/reference/study-status-ops-surfaces.md",
+    "docs/studies/stress_ethanol_cipro_growth/contracts/status.md",
+    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/README.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/opal.md",
-    "docs/studies/retron_hairpin_design/status-contract.md",
-    "docs/studies/retron_hairpin_design/preflight.md",
+    "docs/studies/retron_hairpin_design/contracts/status.md",
+    "docs/studies/retron_hairpin_design/contracts/preflight.md",
 )
 LEGACY_STUDY_STATUS_SURFACE_TERMS = (
     "Study status adapters",
@@ -283,7 +286,7 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "control-plane",
         "owner_boundary": "ops",
     },
-    "docs/operations/orchestration-runbooks.md": {
+    "docs/operations/orchestration/runbooks.md": {
         "type": "runbook",
         "plane": "control-plane",
         "owner_boundary": "ops",
@@ -293,57 +296,57 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/workflow-map.md": {
+    "src/dnadesign/usr/docs/operations/routes/workflow-map.md": {
         "type": "route",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/sync.md": {
+    "src/dnadesign/usr/docs/operations/sync/README.md": {
         "type": "route",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md": {
+    "src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md": {
+    "src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md": {
+    "src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md": {
+    "src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md": {
+    "src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "docs/studies/stress_ethanol_cipro_growth/status-contract.md": {
+    "docs/studies/stress_ethanol_cipro_growth/contracts/status.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/stress_ethanol_cipro_growth/preflight.md": {
+    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/retron_hairpin_design/status-contract.md": {
+    "docs/studies/retron_hairpin_design/contracts/status.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/retron_hairpin_design/preflight.md": {
+    "docs/studies/retron_hairpin_design/contracts/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
@@ -377,21 +380,21 @@ OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (
 TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 DISALLOWED_SHARED_UTILS_PATHS = (Path("src/dnadesign/utils"),)
 OVERLAY_GUARD_DOC_PATHS = (
-    "docs/operations/orchestration-runbooks.md",
+    "docs/operations/orchestration/runbooks.md",
     "docs/bu-scc/jobs/README.md",
     "src/dnadesign/ops/README.md",
 )
 OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/operations/README.md",
-    "docs/operations/orchestration-runbooks.md",
+    "docs/operations/orchestration/runbooks.md",
     "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/status.md",
+    "docs/studies/stress_ethanol_cipro_growth/record/status.md",
     "src/dnadesign/ops/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
 )
 STUDY_EXECUTION_SOURCE_DOC_PATHS = (
     "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -1651,11 +1654,13 @@ def _collect_markdown_reference_names(text: str) -> set[str]:
     for code_span in re.findall(r"`([^`\n]+)`", text):
         normalized = code_span.strip()
         if normalized:
+            references.add(normalized)
             references.add(Path(normalized).name)
     for raw in LINK_PATTERN.findall(text):
         link = raw.strip().split()[0]
         target_rel = link.split("#", 1)[0].strip()
         if target_rel:
+            references.add(target_rel)
             references.add(Path(target_rel).name)
     return references
 
@@ -1696,7 +1701,7 @@ def _find_active_shared_usr_dataset_id_issues(repo_root: Path) -> list[str]:
     if study_root is None:
         return issues
 
-    datasets_path = study_root / "datasets.yaml"
+    datasets_path = study_root / "record" / "datasets.yaml"
     if not datasets_path.exists():
         return issues
 
