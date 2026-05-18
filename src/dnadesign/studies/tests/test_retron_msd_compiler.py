@@ -25,15 +25,15 @@ from Bio.Seq import Seq
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-from dnadesign.studies.studies.retron_hairpin_design.cli import app
-from dnadesign.studies.studies.retron_hairpin_design.compiler_spec import RankedPrimitiveSelectorSpec
-from dnadesign.studies.studies.retron_hairpin_design.msd_ids import (
+from dnadesign.studies.studies.retron_hairpin_design.catalog.compiler_spec import RankedPrimitiveSelectorSpec
+from dnadesign.studies.studies.retron_hairpin_design.catalog.msd_ids import (
     MsdDesignPartInput,
     MsdIdError,
     compute_scar_nick_profile,
     parse_msd_construct_label,
     parse_msd_design_parts,
 )
+from dnadesign.studies.studies.retron_hairpin_design.cli import app
 
 _RUNNER = CliRunner()
 
@@ -107,8 +107,9 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
 
 def _write_registry(tmp_path: Path) -> Path:
     study_dir = tmp_path / "study"
-    study_dir.mkdir()
-    (study_dir / "msd_design_registry.yaml").write_text(
+    compiler_dir = study_dir / "compiler"
+    compiler_dir.mkdir(parents=True)
+    (compiler_dir / "msd_design_registry.yaml").write_text(
         """
 contract: retron_msd_design_registry_v1
 schema_version: 1
@@ -772,8 +773,9 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
 
 def test_retron_msd_materialize_requires_snapback_topology_for_cap_subsection(tmp_path: Path) -> None:
     study_dir = tmp_path / "study"
-    study_dir.mkdir()
-    (study_dir / "msd_design_registry.yaml").write_text(
+    compiler_dir = study_dir / "compiler"
+    compiler_dir.mkdir(parents=True)
+    (compiler_dir / "msd_design_registry.yaml").write_text(
         """
 contract: retron_msd_design_registry_v1
 schema_version: 1
@@ -1307,7 +1309,7 @@ def test_retron_msd_materialize_refuses_stale_variant_sequence_outputs(tmp_path:
 def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[4]
     study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
-    input_file = study_dir / "msd_design_hit_labels.txt"
+    input_file = study_dir / "compiler" / "msd_design_hit_labels.txt"
     out_dir = tmp_path / "compiled"
 
     result = _RUNNER.invoke(

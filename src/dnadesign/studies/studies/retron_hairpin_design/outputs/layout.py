@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/layout.py
+src/dnadesign/studies/studies/retron_hairpin_design/outputs/layout.py
 
 Filesystem layout constants for Retron MSD compiler outputs.
 

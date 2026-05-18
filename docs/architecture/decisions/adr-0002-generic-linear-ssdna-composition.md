@@ -86,7 +86,7 @@ does not run folding or assemble sequences.
 - Implementation record:
   `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
 - Study handoff:
-  `docs/studies/retron_hairpin_design/linear-ssdna-composition.md`
+  `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`
 - Implementation:
   `src/dnadesign/construct/src/composition.py`
   `src/dnadesign/folding/`

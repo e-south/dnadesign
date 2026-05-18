@@ -219,7 +219,7 @@ that agents need before opening the full spec:
 - Construct owns generic `linear_ssdna_composition_v1` execution.
 - Retron study records own selected variants and rationale.
 - The Retron study owns MSD shorthand parsing and selected-hit metadata through
-  `docs/studies/retron_hairpin_design/msd_design_registry.yaml` and the
+  `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml` and the
   study-local module
   `dnadesign.studies.studies.retron_hairpin_design.cli`. Do not expose this as a
   top-level `retron-msd` tool.

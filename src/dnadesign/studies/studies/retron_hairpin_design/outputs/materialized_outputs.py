@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/materialized_outputs.py
+src/dnadesign/studies/studies/retron_hairpin_design/outputs/materialized_outputs.py
 
 Retron MSD materialized artifact publication and SVG rasterization.
 
@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Sequence
 
-from .errors import RetronMsdCompilerError
+from ..errors import RetronMsdCompilerError
 from .layout import (
     BASERENDER_CONTRACT_KIND,
     VARIANT_MANIFEST_COMPOSITION_DIRNAME,

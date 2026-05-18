@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/composition_payload.py
+src/dnadesign/studies/studies/retron_hairpin_design/outputs/composition_payload.py
 
 Retron MSD single-unit composition payload construction.
 
@@ -16,7 +16,7 @@ from typing import Mapping, Sequence
 
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
-from .errors import RetronMsdCompilerError
+from ..errors import RetronMsdCompilerError
 from .layout import MSD_UNIT_REPEAT_COUNT, SNAPBACK_FOLDBACK_SEGMENT_ID
 
 

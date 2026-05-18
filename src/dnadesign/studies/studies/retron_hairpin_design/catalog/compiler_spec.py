@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/compiler_spec.py
+src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py
 
 Typed Retron MSD compiler-spec boundary.
 

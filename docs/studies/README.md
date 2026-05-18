@@ -50,6 +50,12 @@ Each checked-in live study keeps these artifacts:
 - `routes.md`: optional one-hop handoff map for current owner surfaces
 - `routes/`: optional focused route-detail pages when one owner surface would
   otherwise turn `routes.md` into a workflow encyclopedia
+- `contexts/`: optional long-form study rationale or handoff notes that are not
+  current task routers
+- `compiler/`: optional study-owned compiler input/config records when a study
+  has a narrow compiler surface
+- `workbench/`: optional study-specific experimental workbench for hypotheses,
+  design sets, and run provenance that should outlive transient tool outputs
 - `pipeline.yaml`: optional machine-readable runtime context for exact command
   groups or automation bootstrap
 - `audits/`: optional machine-readable sync/readiness evidence
@@ -70,6 +76,9 @@ docs/studies/<study-id>/
   ops.study.yaml
   routes.md      # optional, preferred once the study spans owner surfaces
   routes/        # optional, focused route details for bulky owner surfaces
+  contexts/      # optional, long-form rationale and handoff notes
+  compiler/      # optional, study-owned compiler inputs/config
+  workbench/     # optional, durable design-set and run-provenance records
   pipeline.yaml  # optional, for exact command groups/runtime context
   audits/
 ```

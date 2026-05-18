@@ -10,7 +10,7 @@ unless you need the full rationale.
 **Primary study:** `retron_hairpin_design`
 **Current generic authority:** [Construct linear ssDNA composition reference](../../../../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md)
 **Architecture decision:** [ADR 0002](../../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
-**Study handoff:** [Retron linear ssDNA composition handoff](../../../studies/retron_hairpin_design/linear-ssdna-composition.md)
+**Study handoff:** [Retron linear ssDNA composition handoff](../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
 **Implementation record:** [Generic linear ssDNA composition](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 **Follow-up plan:** [Linear ssDNA composition hardening follow-ups](../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 
@@ -160,7 +160,7 @@ The Retron study-local compiler will:
 - fail fast if a provided profile drifts, if `S0` is not ligatable, or if the
   payload/cap is absent from the study registry;
 - join route metadata from
-  `docs/studies/retron_hairpin_design/msd_design_registry.yaml`;
+  `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`;
 - emit frozen `msd_design_reference_v1` records and batch
   `msd_design_catalog_v1` files into an explicit caller-chosen directory;
 - leave artifact paths and sequence digests nullable until a later
@@ -1293,9 +1293,9 @@ Open questions:
 
 ### Links
 
-- Study handoff: [linear ssDNA composition](../../../studies/retron_hairpin_design/linear-ssdna-composition.md)
+- Study handoff: [linear ssDNA composition](../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
 - Study routes: [Retron Hairpin routes](../../../studies/retron_hairpin_design/routes.md)
-- Scar-nick context: [scar-nick base-junction](../../../studies/retron_hairpin_design/scar-nick-base-junction.md)
+- Scar-nick context: [scar-nick base-junction](../../../studies/retron_hairpin_design/contexts/scar-nick-base-junction.md)
 - Implementation record: [generic linear ssDNA composition](../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
 - Follow-up plan: [linear ssDNA composition hardening follow-ups](../../../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
 - Planning lifecycle: [PLANS](../../../../PLANS.md)

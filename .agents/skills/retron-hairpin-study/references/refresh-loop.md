@@ -9,13 +9,16 @@ question is explicitly about progress, history, or blockers.
    profile, sequence subcomponents, requested outputs.
 2. Open the Study route for MSD design references in
    `docs/studies/retron_hairpin_design/routes.md`.
-3. Open `docs/studies/retron_hairpin_design/msd_design_registry.yaml` for
+3. If the question is persistent provenance, open
+   `docs/studies/retron_hairpin_design/workbench/README.md` and the design set
+   before compiler outputs.
+4. Open `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml` for
    payload/cap/route metadata.
-4. Use `msd-design-references.md` for lint/compile commands and output
+5. Use `msd-design-references.md` for lint/compile commands and output
    posture.
-5. Open `linear-ssdna-composition.md` only when the requested output needs
+6. Open `linear-ssdna-composition.md` only when the requested output needs
    sequence assembly, visual QA, or GenBank sidecars.
-6. Open `pipeline.yaml` only when a machine-readable command group is needed.
+7. Open `pipeline.yaml` only when a machine-readable command group is needed.
 
 ## Minimum Evidence By Question
 
@@ -24,6 +27,7 @@ question is explicitly about progress, history, or blockers.
 | Can this ID compile? | normalized `msd_design_id`, profile, route metadata | label syntax, profile, `S0`, or registry lookup fails |
 | What is missing? | missing payload/cap/base/profile/sequence/artifact fields | unknown fields are silently guessed |
 | Which primitive should solve a missing part? | Snapback, scar-nick, or YIU route plus reason | the compiler tries to solve primitive search internally |
+| Why this variant set? | workbench design-set record plus direction/effect tags | rationale is inferred from generated output or registry notes alone |
 | Where did outputs go? | explicit out-dir and contract filenames | outputs are hidden in a new workspace |
 | What is the old study status? | status command output | progress posture is mixed into a compile answer |
 

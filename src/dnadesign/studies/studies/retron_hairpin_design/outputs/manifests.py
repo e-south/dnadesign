@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/manifests.py
+src/dnadesign/studies/studies/retron_hairpin_design/outputs/manifests.py
 
 Retron MSD catalog, sequence index, and manifest writers.
 

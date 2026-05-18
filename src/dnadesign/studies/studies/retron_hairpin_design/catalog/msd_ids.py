@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/msd_ids.py
+src/dnadesign/studies/studies/retron_hairpin_design/catalog/msd_ids.py
 
 Parser and static lint helpers for Retron MSD construct labels.
 

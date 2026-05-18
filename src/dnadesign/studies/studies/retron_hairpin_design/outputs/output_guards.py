@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/output_guards.py
+src/dnadesign/studies/studies/retron_hairpin_design/outputs/output_guards.py
 
 Fail-fast output-layout guards for Retron MSD compiler bundles.
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .errors import RetronMsdCompilerError
+from ..errors import RetronMsdCompilerError
 from .layout import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,

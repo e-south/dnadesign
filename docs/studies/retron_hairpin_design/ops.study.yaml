@@ -36,7 +36,7 @@ tracks:
     next_surface: manifest:routes.md
   - id: scar_nick_base_junction_context
     status: complete
-    next_surface: manifest:scar-nick-base-junction.md
+    next_surface: manifest:contexts/scar-nick-base-junction.md
   - id: snapback_released_probe
     status: complete
     next_surface: manifest:routes.md
@@ -57,21 +57,51 @@ artifacts:
   routes_doc:
     artifact_type: file
     ref: manifest:routes.md
+  route_msd_design_references:
+    artifact_type: file
+    ref: manifest:routes/msd-design-references.md
+  route_released_product_snapback:
+    artifact_type: file
+    ref: manifest:routes/released-product-snapback.md
+  route_scar_nick_base_junction:
+    artifact_type: file
+    ref: manifest:routes/scar-nick-base-junction.md
+  route_linear_ssdna_composition:
+    artifact_type: file
+    ref: manifest:routes/linear-ssdna-composition.md
+  route_yiu_boundary_check:
+    artifact_type: file
+    ref: manifest:routes/yiu-boundary-check.md
   pipeline_doc:
     artifact_type: file
     ref: manifest:pipeline.yaml
   scar_nick_base_junction_note:
     artifact_type: file
-    ref: manifest:scar-nick-base-junction.md
+    ref: manifest:contexts/scar-nick-base-junction.md
   linear_ssdna_composition_note:
     artifact_type: file
-    ref: manifest:linear-ssdna-composition.md
+    ref: manifest:contexts/linear-ssdna-composition.md
   msd_design_registry:
     artifact_type: file
-    ref: manifest:msd_design_registry.yaml
+    ref: manifest:compiler/msd_design_registry.yaml
   msd_design_hit_labels:
     artifact_type: file
-    ref: manifest:msd_design_hit_labels.txt
+    ref: manifest:compiler/msd_design_hit_labels.txt
+  workbench_readme:
+    artifact_type: file
+    ref: manifest:workbench/README.md
+  workbench_directions:
+    artifact_type: file
+    ref: manifest:workbench/directions.yaml
+  workbench_scar_nick_profile_panel:
+    artifact_type: file
+    ref: manifest:workbench/design_sets/scar_nick_profile_panel_v1.yaml
+  workbench_msd_177_194_compile_run:
+    artifact_type: file
+    ref: manifest:workbench/compiler_runs/2026-05-18-msd-177-194.compile.yaml
+  workbench_msd_177_194_materialization_record:
+    artifact_type: file
+    ref: manifest:workbench/materializations/2026-05-18-msd-177-194.single-unit.yaml
   linear_ssdna_composition_dev_spec:
     artifact_type: file
     ref: repo:docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md
@@ -158,7 +188,7 @@ execution_surfaces:
       - dnadesign.studies.studies.retron_hairpin_design.cli
       - compile
       - --input
-      - docs/studies/retron_hairpin_design/msd_design_hit_labels.txt
+      - docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt
       - --out-dir
       - /tmp/dnadesign_retron_msd_design_references
       - --format
@@ -196,6 +226,36 @@ preflight:
         required: true
         artifact: routes_doc
       - kind: path_exists
+        check_id: study.route_msd_design_references.present
+        check_group: study_record
+        summary: MSD design-reference route detail is present.
+        required: true
+        artifact: route_msd_design_references
+      - kind: path_exists
+        check_id: study.route_released_product_snapback.present
+        check_group: study_record
+        summary: Released-product Snapback route detail is present.
+        required: true
+        artifact: route_released_product_snapback
+      - kind: path_exists
+        check_id: study.route_scar_nick_base_junction.present
+        check_group: study_record
+        summary: Scar-nick route detail is present.
+        required: true
+        artifact: route_scar_nick_base_junction
+      - kind: path_exists
+        check_id: study.route_linear_ssdna_composition.present
+        check_group: study_record
+        summary: Linear ssDNA composition route detail is present.
+        required: true
+        artifact: route_linear_ssdna_composition
+      - kind: path_exists
+        check_id: study.route_yiu_boundary_check.present
+        check_group: study_record
+        summary: YIU boundary route detail is present.
+        required: true
+        artifact: route_yiu_boundary_check
+      - kind: path_exists
         check_id: study.pipeline.present
         check_group: study_record
         summary: Study pipeline context is present.
@@ -231,6 +291,36 @@ preflight:
         summary: Study-selected MSD design labels are present.
         required: true
         artifact: msd_design_hit_labels
+      - kind: path_exists
+        check_id: study.workbench_readme.present
+        check_group: study_record
+        summary: Study workbench entrypoint is present.
+        required: true
+        artifact: workbench_readme
+      - kind: path_exists
+        check_id: study.workbench_directions.present
+        check_group: study_record
+        summary: Study workbench directions are present.
+        required: true
+        artifact: workbench_directions
+      - kind: path_exists
+        check_id: study.workbench_scar_nick_profile_panel.present
+        check_group: study_record
+        summary: Study workbench design-set record is present.
+        required: true
+        artifact: workbench_scar_nick_profile_panel
+      - kind: path_exists
+        check_id: study.workbench_compile_run.present
+        check_group: study_record
+        summary: Study workbench compiler-run provenance is present.
+        required: true
+        artifact: workbench_msd_177_194_compile_run
+      - kind: path_exists
+        check_id: study.workbench_materialization_record.present
+        check_group: study_record
+        summary: Study workbench materialization provenance is present.
+        required: true
+        artifact: workbench_msd_177_194_materialization_record
       - kind: path_exists
         check_id: study.linear_ssdna_composition_dev_spec.present
         check_group: study_record

@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD compiler work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.6
+  version: 0.7.7
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -18,7 +18,7 @@ Route Retron MSD work as a genetic compiler: compile a reference, materialize on
 In scope:
 - Retron MSD shorthand IDs and explicit part sets.
 - Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, and selected public primitive sources.
-- Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation.
+- Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
 - Routing mismatch-display questions to YIU as contrast only.
@@ -52,8 +52,8 @@ Out of scope:
   from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
 - GenBank/CSV output uses display labels, keeps raw ids in machine qualifiers, and avoids duplicate full component spans as same-span annotations.
-- Outputs go to explicit transient or caller-owned directories; no workspace
-  sprawl.
+- Persistent hypotheses/design-set meaning lives in `workbench/`; generated
+  outputs go to explicit transient or caller-owned directories.
 - Contracts fail fast on profile drift, non-ligatable `S0=M` violations, unknown registry
   parts, or missing artifacts.
 - Status/preflight commands are optional progress tools, not default answer
@@ -62,8 +62,7 @@ Out of scope:
 ## Workflow
 
 1. Classify the request.
-- Complete MSD label or complete parts: use
-  [msd-design-references.md](references/msd-design-references.md).
+- Complete MSD label or complete parts: use [msd-design-references.md](references/msd-design-references.md).
 - Complete MSD labels plus "outputs", "deliverables", "exports", "plots",
   "GenBank", or "open in Finder": materialize, not compile-only.
 - Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
@@ -72,6 +71,7 @@ Out of scope:
 - Need sequence, visual, or GenBank from selected parts: compile a reference
   first, then materialize a single-unit sequence bundle with `--spec` or
   explicit payload/cap sequences.
+- Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in
   `docs/studies/retron_hairpin_design/routes.md`.
 - Missing left/right base feasibility, terminal-nick route, nickase, or
@@ -84,9 +84,9 @@ Out of scope:
 
 2. Load only the needed surfaces.
 - Compiler route: `docs/studies/retron_hairpin_design/routes.md`, then
-  `docs/studies/retron_hairpin_design/msd_design_registry.yaml`, then
+  `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`, then
   `references/msd-design-references.md`.
-- Whole-product context: `docs/studies/retron_hairpin_design/linear-ssdna-composition.md`,
+- Whole-product context: `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`,
   then the active exec plan.
 - Machine-readable command groups: `docs/studies/retron_hairpin_design/pipeline.yaml`.
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).

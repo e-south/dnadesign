@@ -20,14 +20,16 @@ import yaml
 from dnadesign.construct import run_linear_ssdna_composition
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
-from .composition_payload import (
+from .catalog.msd_ids import parse_msd_construct_label
+from .catalog.registry import load_retron_msd_registry
+from .errors import RetronMsdCompilerError
+from .outputs.composition_payload import (
     composition_config_payload,
     normalize_render_formats,
     render_formats_for_review,
     require_sequence_subcomponents,
 )
-from .errors import RetronMsdCompilerError
-from .layout import (
+from .outputs.layout import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,
     CATALOG_FILENAME,
@@ -47,7 +49,7 @@ from .layout import (
     VARIANT_DIRNAME,
     VARIANT_RUNTIME_DIRNAME,
 )
-from .manifests import (
+from .outputs.manifests import (
     record_with_sequence_artifacts,
     reference_bundle_filename,
     reference_index_row,
@@ -58,10 +60,8 @@ from .manifests import (
     write_sequence_index,
     write_sequence_manifest,
 )
-from .materialized_outputs import publish_variant_outputs, run_baserender_jobs
-from .msd_ids import parse_msd_construct_label
-from .output_guards import guard_catalog_output_layout, guard_materialize_output_layout
-from .registry import load_retron_msd_registry
+from .outputs.materialized_outputs import publish_variant_outputs, run_baserender_jobs
+from .outputs.output_guards import guard_catalog_output_layout, guard_materialize_output_layout
 
 
 @dataclass(frozen=True)

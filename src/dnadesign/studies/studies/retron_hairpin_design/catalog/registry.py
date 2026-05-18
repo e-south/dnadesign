@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/registry.py
+src/dnadesign/studies/studies/retron_hairpin_design/catalog/registry.py
 
 Study registry loading for Retron MSD design references.
 
@@ -21,7 +21,7 @@ from dnadesign.contracts.sequence import MsdDesignReferenceV1
 
 from .msd_ids import ParsedMsdConstructLabel
 
-_REGISTRY_FILENAME = "msd_design_registry.yaml"
+_REGISTRY_RELATIVE_PATH = Path("compiler") / "msd_design_registry.yaml"
 
 
 class RetronMsdRegistryError(ValueError):
@@ -116,7 +116,7 @@ class RetronMsdRegistry:
 
 def load_retron_msd_registry(study_dir: str | Path) -> RetronMsdRegistry:
     study_path = Path(study_dir).expanduser().resolve()
-    registry_path = study_path / _REGISTRY_FILENAME
+    registry_path = study_path / _REGISTRY_RELATIVE_PATH
     if not registry_path.is_file():
         raise RetronMsdRegistryError(f"Retron MSD registry not found: {registry_path}")
     try:

@@ -8,7 +8,7 @@ Cruncher workspaces.
 - Study record root: `docs/studies/retron_hairpin_design`
 - Primary workspace: `src/dnadesign/cruncher/workspaces/de033`
 - Supporting workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`
-- MSD design registry: `docs/studies/retron_hairpin_design/msd_design_registry.yaml`
+- MSD compiler inputs: `docs/studies/retron_hairpin_design/compiler/`
 - Study-owned MSD ID compiler:
   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli`
 - Consolidated context note:
@@ -17,12 +17,11 @@ Cruncher workspaces.
 Open source modules by responsibility:
 
 - `compiler.py`: compile/materialize orchestration API.
-- `compiler_spec.py`: typed `retron_msd_compiler_spec_v1` parsing and selector checks.
-- `composition_payload.py`: single-unit linear-ssDNA composition payload construction.
-- `output_guards.py`: fail-fast output-layout and stale-artifact guards.
-- `materialized_outputs.py`: GenBank/plot/manifest artifact publication.
-- `manifests.py`: catalog, index, manifest, and bundle README writers.
-- `layout.py`: output-layout constants.
+- `catalog/`: label parsing, typed `retron_msd_compiler_spec_v1` parsing,
+  primitive selectors, and registry loading.
+- `outputs/`: single-unit sequence payloads, output-layout constants,
+  stale-artifact guards, manifests, GenBank/plot publication, and rasterization.
+- `status/`: study status and preflight provider implementation.
 - `errors.py`: fail-fast compiler exception type.
 
 The MSD ID compiler is intentionally not a top-level project script. It belongs

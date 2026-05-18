@@ -18,15 +18,17 @@ from typing import Any
 
 import typer
 
+from .catalog.compiler_spec import MsdCompilerSpecError, load_msd_compiler_spec
+from .catalog.msd_ids import MsdIdError
+from .catalog.registry import RetronMsdRegistryError
 from .compiler import (
     build_msd_design_reference,
     compile_msd_design_catalog,
     materialize_msd_design_artifacts,
     write_msd_design_catalog,
 )
-from .compiler_spec import MsdCompilerSpecError, load_msd_compiler_spec
 from .errors import RetronMsdCompilerError
-from .layout import (
+from .outputs.layout import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,
     CATALOG_FILENAME,
@@ -40,8 +42,6 @@ from .layout import (
     REFERENCE_INDEX_FILENAME,
     VARIANT_DIRNAME,
 )
-from .msd_ids import MsdIdError
-from .registry import RetronMsdRegistryError
 
 _DEFAULT_STUDY_DIR = Path("docs/studies/retron_hairpin_design")
 
@@ -130,13 +130,15 @@ def _next_step_for_error(exc: Exception) -> str:
     if "Unknown cap" in message:
         return (
             "Route missing cap or shortening constraints to Snapback, "
-            "or add the validated cap to msd_design_registry.yaml."
+            "or add the validated cap to compiler/msd_design_registry.yaml."
         )
     if "Unknown payload" in message:
-        return "Add the validated payload to msd_design_registry.yaml before compiling a frozen design reference."
+        return (
+            "Add the validated payload to compiler/msd_design_registry.yaml before compiling a frozen design reference."
+        )
     if "registry" in message:
         return (
-            "Open docs/studies/retron_hairpin_design/msd_design_registry.yaml "
+            "Open docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml "
             "and fix the registry before rerunning lint."
         )
     if "Duplicate construct label" in message:

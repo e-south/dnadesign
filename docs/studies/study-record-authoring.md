@@ -16,6 +16,10 @@ docs/studies/<study-id>/
   status.md
   ops.study.yaml
   routes.md      # optional, preferred once the study spans owner surfaces
+  routes/        # optional, focused route details for bulky owner surfaces
+  contexts/      # optional, long-form rationale and handoff notes
+  compiler/      # optional, study-owned compiler inputs/config
+  workbench/     # optional, durable design-set and run-provenance records
   pipeline.yaml  # optional, for exact command groups/runtime context
   audits/
 ```
@@ -28,6 +32,15 @@ docs/studies/<study-id>/
 - `ops.study.yaml` is the OPS-facing contract for lifecycle ordering or track
   maps, record sources, artifacts, execution surfaces, and preflight planning.
 - `routes.md`, when present, is the study-owned one-hop handoff page.
+- `routes/`, when present, keeps focused owner-surface details out of the
+  one-hop router.
+- `contexts/`, when present, stores long-form rationale or handoff notes that
+  should not crowd the router.
+- `compiler/`, when present, stores study-owned compiler input/config records
+  such as registries or convenience label lists.
+- `workbench/`, when present, stores study-specific hypotheses, design sets,
+  compiler runs, and materialization provenance that should outlive transient
+  tool outputs.
 - `pipeline.yaml`, when present, records exact command groups or runtime
   context that should not be reconstructed from generic tool docs.
 - `audits/` stores machine-readable sync audit JSON files referenced from
@@ -54,9 +67,17 @@ implementation.
 8. Edit the checked-in `index.yaml`, `datasets.yaml`, `status.md`, and
    `ops.study.yaml` so they point at real ids, paths, and commands.
 9. Add `routes.md` when the study spans several owner surfaces.
-10. Add `pipeline.yaml` when the study has exact Construct, Infer, batch, or
+10. Add `routes/` detail pages when route detail would otherwise bloat the
+    one-hop router.
+11. Add `contexts/` when long-form rationale or handoff notes need a durable
+    home outside the router.
+12. Add `compiler/` when the study owns narrow compiler inputs or normalization
+    metadata.
+13. Add `workbench/` when hypotheses, design sets, and run provenance need a
+    durable study-owned home.
+14. Add `pipeline.yaml` when the study has exact Construct, Infer, batch, or
     Notify command groups.
-11. Refresh evidence with:
+15. Refresh evidence with:
     `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml`
 
 ### Dataset registry contract

@@ -98,15 +98,25 @@ def test_released_snapback_docs_publish_route_and_geometry_literals() -> None:
 def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit() -> None:
     status = _read_repo("docs/studies/retron_hairpin_design/status.md")
     routes = _read_repo("docs/studies/retron_hairpin_design/routes.md")
+    snapback_route = _read_repo("docs/studies/retron_hairpin_design/routes/released-product-snapback.md")
+    scar_nick_route = _read_repo("docs/studies/retron_hairpin_design/routes/scar-nick-base-junction.md")
+    yiu_route = _read_repo("docs/studies/retron_hairpin_design/routes/yiu-boundary-check.md")
     skill = _read_repo(".agents/skills/retron-hairpin-study/SKILL.md")
 
     assert "This study now routes Retron MSD product work as a genetic compiler" in status
     assert "Released-product Snapback in `de033` remains the primitive owner" in status
     assert "Scar-nick through the `scar_nick` subpackage remains the primitive owner" in status
-    assert "### Primary route: released-product Snapback" in routes
-    assert "### Context route: scar-nick base-junction" in routes
-    assert "This is the active study lane." in routes
-    assert "### Contrast route: YIU boundary check" in routes
+    assert "### Quick Route" in routes
+    assert "[Released-product Snapback](routes/released-product-snapback.md)" in routes
+    assert "[Scar-nick base-junction](routes/scar-nick-base-junction.md)" in routes
+    assert "[YIU boundary check](routes/yiu-boundary-check.md)" in routes
+    assert "Keep this page as a one-hop route map" in routes
+    assert "## Released-Product Snapback Route" in snapback_route
+    assert "Surface role: `primary-execution`" in snapback_route
+    assert "## Scar-Nick Base-Junction Route" in scar_nick_route
+    assert "Surface role: `base-junction-context`" in scar_nick_route
+    assert "## YIU Boundary Check Route" in yiu_route
+    assert "Surface role: `contrast-check`" in yiu_route
     assert 'Do not say "snapshot posture" or lead with current phase' in skill
     assert "Routing missing stem-base or terminal-nick constraints to scar-nick" in skill
     assert "YIU as contrast only" in skill

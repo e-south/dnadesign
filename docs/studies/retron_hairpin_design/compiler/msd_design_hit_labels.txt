@@ -1,4 +1,6 @@
-# Study-selected Retron MSD design labels for catalog compilation.
+# Convenience Retron MSD label input for catalog compilation.
+# Authoritative cohort provenance lives in:
+# docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
 # One lab-facing construct label per non-comment line.
 pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
 pES-retron-178-msd[TetR]; C26-LCAAG-RCTCG-MXMM

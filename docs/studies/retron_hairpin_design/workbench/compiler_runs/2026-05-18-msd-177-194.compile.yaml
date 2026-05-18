@@ -1,0 +1,46 @@
+contract: retron_msd_compiler_run_record_v1
+schema_version: 1
+study_id: retron_hairpin_design
+run_id: 2026-05-18-msd-177-194.compile
+run_kind: compile
+status: verified
+verified_at: "2026-05-18"
+git_revision: f6602324f400b0d1eecd8b011e823eef2bcb1a5d # pragma: allowlist secret
+design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
+command:
+  cwd: repo:.
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.studies.studies.retron_hairpin_design.cli
+    - compile
+    - --input
+    - docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt
+    - --out-dir
+    - /tmp/dnadesign_retron_msd_design_references
+    - --format
+    - json
+inputs:
+  label_input:
+    path: docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt
+    sha256: 8e01026027bbc9faf116f96e21f7be96182f7ceff23904b2e7a760b308f898ca # pragma: allowlist secret
+    role: convenience compiler input mirrored from the workbench design set
+  registry:
+    path: docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml
+    sha256: 74dae5b4360515044b84d1cc9b7b4fa8b75c4d6c3cf98bc0c54a60af1d52b664 # pragma: allowlist secret
+    role: part and normalization metadata
+observed_output:
+  output_policy: transient_not_checked_in
+  audit_out_dir: /private/tmp/dnadesign_retron_workbench_compile_20260518 # pragma: allowlist secret
+  record_count: 18
+  catalog_contract: msd_design_catalog_v1
+  bundle_contract: msd_design_catalog_bundle_v1
+  catalog_sha256: 7db1e5d4ff8dc7a6f8378eb05c3f8a9e5bdafa2208080f65eb22923985a74c7b # pragma: allowlist secret
+  reference_index_sha256: 3454f1249e2968c5086a9791065b7a96ca735be1792d0c107a1c6c8da6133ffd # pragma: allowlist secret
+  top_level_layout: [README.md, manifest.json, msd_design_catalog_v1.json, reference_index.tsv, references]
+handoff_policy:
+  persistent_meaning: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
+  generated_catalogs: explicit transient directory or owning Reader experiment inputs/designs directory
+  do_not_commit_generated_artifacts_by_default: true

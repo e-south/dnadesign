@@ -1,0 +1,61 @@
+contract: retron_workbench_directions_v1
+schema_version: 1
+study_id: retron_hairpin_design
+title: Retron hairpin experimental directions
+direction_order:
+  - cap_permissiveness
+  - base_failure_probe
+  - s2_hard_comparator
+  - wobble_rescue
+  - double_hard_challenge
+  - mxmm_route_replicate
+  - top_nick_comparator
+directions:
+  - id: cap_permissiveness
+    label: Cap permissiveness
+    question: Does a 172-cap context tolerate a 26-derived basal base route?
+    effect_tags: [cap_crossover, cap_172, base_26_derived]
+  - id: base_failure_probe
+    label: Base failure probe
+    question: Does a 43-like basal base route drive failure even with the 26 cap?
+    effect_tags: [cap_26, base_43_like, failure_probe]
+  - id: s2_hard_comparator
+    label: S2 hard comparator
+    question: How does the 43-like S2-hard comparator behave in the resolved bottom-nick route?
+    effect_tags: [s2_hard, bottom_nick]
+  - id: wobble_rescue
+    label: G:T wobble rescue and controls
+    question: Which S3/S2/S1 hard or wobble combinations preserve useful scar-nick-compatible profiles?
+    effect_tags: [s3_hard, s2_hard, s1_hard, s2_gt_wobble, s1_gt_wobble, double_wobble, single_wobble_control]
+  - id: double_hard_challenge
+    label: Double-hard challenge
+    question: Which edge double-hard mismatch profiles remain useful under strict S0=M scar-nick constraints?
+    effect_tags: [double_hard, s3_s2_double_hard, s3_s1_double_hard]
+  - id: mxmm_route_replicate
+    label: MXMM route replicate
+    question: How reproducible are resolved MXMM comparator routes across basal sequence and nickase choices?
+    effect_tags: [mxmm_replicate, bottom_nick]
+  - id: top_nick_comparator
+    label: Top-nick comparator
+    question: Do top-nick Nt.BsmAI routes preserve the same MXMM design-reference posture?
+    effect_tags: [mxmm_replicate, top_nick]
+effect_tags:
+  base_26_derived: 26-derived basal base context.
+  base_43_like: 43-like basal base context.
+  bottom_nick: Resolved through a bottom-nick scar-nick route.
+  cap_26: Uses the C26 cap family.
+  cap_172: Uses the C172 cap family.
+  cap_crossover: Crosses basal base family and cap family.
+  double_hard: Two hard mismatch positions in the S3/S2/S1 window.
+  double_wobble: Two G:T wobble positions in the S3/S2/S1 window.
+  failure_probe: Tests whether the basal route, rather than the cap, drives failure.
+  mxmm_replicate: Comparator replicate of an MXMM profile route.
+  s1_gt_wobble: G:T wobble at S1.
+  s1_hard: Hard mismatch at S1.
+  s2_gt_wobble: G:T wobble at S2.
+  s2_hard: Hard mismatch at S2.
+  s3_hard: Hard mismatch at S3.
+  s3_s1_double_hard: S3/S1 double-hard profile.
+  s3_s2_double_hard: S3/S2 double-hard profile.
+  single_wobble_control: Single G:T wobble control.
+  top_nick: Resolved through a top-nick scar-nick route.
