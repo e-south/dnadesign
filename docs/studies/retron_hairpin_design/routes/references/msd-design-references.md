@@ -19,7 +19,7 @@ design-set provenance.
   `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`
 - Convenience label input:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`
-- Public module: `src/dnadesign/studies/studies/retron_hairpin_design/cli.py`
+- Public module: `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py`
 - Typed compiler spec: `retron_msd_compiler_spec_v1`
 
 ### Commands
@@ -27,14 +27,14 @@ design-set provenance.
 Lint one label:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
   --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
 ```
 
 Lint a typed spec:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
   --spec path/to/retron_msd_compiler_spec.yaml \
   --format json
 ```
@@ -42,7 +42,7 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
 Compile the current workbench-backed label input:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --out-dir /tmp/dnadesign_retron_msd_design_references \
   --format json
@@ -52,7 +52,7 @@ Materialize single-unit sequence artifacts after concrete sequences are
 available:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --out-dir /tmp/dnadesign_retron_msd_sequences \
   --payload-sequence TetR=<payload-sequence> \

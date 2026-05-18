@@ -21,7 +21,7 @@ route_yiu_boundary_check:
   ref: manifest:routes/quality/yiu-boundary-check.md
 pipeline_doc:
   artifact_type: file
-  ref: manifest:operations/runtime/pipeline.yaml
+  ref: manifest:operations/runtime/command-groups/pipeline.yaml
 scar_nick_base_junction_note:
   artifact_type: file
   ref: manifest:contexts/cruncher/scar-nick-base-junction.md

@@ -36,7 +36,7 @@ Pair with `harness-engineering` for study-surface hardening and
 - If a part is missing, route to the smallest primitive owner: Snapback for
   cap/shortening, scar-nick for base-junction feasibility, or YIU for contrast
   rendering only.
-- Open `../operations/runtime/pipeline.yaml` only when the task needs
+- Open `../operations/runtime/command-groups/pipeline.yaml` only when the task needs
   machine-readable command-group or automation bootstrap metadata.
 - Open `../operations/ops.study.yaml` only when the task needs lifecycle or
   preflight declarations.
@@ -54,28 +54,6 @@ Pair with `harness-engineering` for study-surface hardening and
   window; it is not the shortening topology engine here.
 - `retron context` means biological framing from checked-in audit notes, not
   scoring hooks or implicit solver relaxations.
-
-### Context Surfaces
-
-- Study note: `docs/studies/retron_hairpin_design/record/status.md`
-- Workbench entrypoint: `docs/studies/retron_hairpin_design/workbench/README.md`
-- Workbench ontology:
-  `docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml`
-- Workbench design set:
-  `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`
-- Workbench provenance:
-  `docs/studies/retron_hairpin_design/workbench/provenance/README.md`
-- MSD route detail:
-  `docs/studies/retron_hairpin_design/routes/references/msd-design-references.md`
-- Study command ladder: `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`
-- Study lifecycle and preflight contract:
-  `docs/studies/retron_hairpin_design/operations/ops.study.yaml`
-- Legacy context note retained for detailed scar-nick rationale:
-  `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`
-- Context note index: `docs/studies/retron_hairpin_design/contexts/README.md`
-- Compiler input index: `docs/studies/retron_hairpin_design/compiler/README.md`
-- Linear ssDNA composition handoff:
-  `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`
 
 Keep this page as a one-hop route map. Move command-heavy or rationale-heavy
 detail into `routes/`, `contexts/`, `compiler/`, or `workbench/`.

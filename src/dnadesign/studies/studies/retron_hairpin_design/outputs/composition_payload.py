@@ -16,7 +16,7 @@ from typing import Mapping, Sequence
 
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
-from ..errors import RetronMsdCompilerError
+from ..compiler.exceptions import RetronMsdCompilerError
 from .layout import MSD_UNIT_REPEAT_COUNT, SNAPBACK_FOLDBACK_SEGMENT_ID
 
 

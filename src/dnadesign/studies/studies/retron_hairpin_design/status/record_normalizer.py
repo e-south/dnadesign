@@ -115,7 +115,9 @@ def resolve_retron_hairpin_design_context(
 
     ops_contract = load_study_ops_contract(resolved_study_dir)
     record_paths = {name: resolved_study_dir / relative_path for name, relative_path in _REQUIRED_RECORD_FILES.items()}
-    pipeline_ref = ops_contract.record_sources.get("pipeline_ref") or "manifest:operations/runtime/pipeline.yaml"
+    pipeline_ref = (
+        ops_contract.record_sources.get("pipeline_ref") or "manifest:operations/runtime/command-groups/pipeline.yaml"
+    )
     pipeline_path = _resolve_pipeline_path(
         pipeline_ref=pipeline_ref,
         repo_root=resolved_repo_root,
@@ -440,7 +442,7 @@ def _resolve_pipeline_path(*, pipeline_ref: str, repo_root: Path, study_root: Pa
 
 def _record_source_label(path_ref: str) -> str:
     text = str(path_ref or "").strip()
-    return text.removeprefix("manifest:") or text or "operations/runtime/pipeline.yaml"
+    return text.removeprefix("manifest:") or text or "operations/runtime/command-groups/pipeline.yaml"
 
 
 def _resolve_execution_surface_index(

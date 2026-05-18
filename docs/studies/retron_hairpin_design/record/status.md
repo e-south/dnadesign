@@ -32,9 +32,9 @@
 ### Quick route
 
 - Compiler/product route:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - GenBank/native-structure-PNG/review-PNG route after concrete subcomponents are available:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Status route for explicit progress/history questions only:
   `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight route for explicit blocker/readiness questions only:
@@ -130,89 +130,19 @@
   hidden scoring hooks or silent solver relaxations.
 - Keep the route ladder explicit: label/parts first for compiler requests,
   primitive solver only when a constraint is missing, and status/preflight only
-  for explicit progress or blocker questions. Use `../operations/runtime/pipeline.yaml` and
+  for explicit progress or blocker questions. Use `../operations/runtime/command-groups/pipeline.yaml` and
   `../operations/ops.study.yaml` only when machine-readable command grouping or preflight
   declarations are the real need.
 
 ### Evidence ladder
 
-- Study route map:
-  `docs/studies/retron_hairpin_design/routes/README.md` for one-hop product and
-  primitive handoff, with focused detail under `docs/studies/retron_hairpin_design/routes/`
-- Study workbench:
-  `docs/studies/retron_hairpin_design/workbench/README.md`,
-  `docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml`, and
-  `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`
-- Regenerable released-product solve bundle:
-  `src/dnadesign/cruncher/workspaces/de033/outputs/released_solve`
-  with a solve report, hit table, and materialized per-hit triptych plots when
-  produced by the runbook. Generated outputs are ignored and may be absent after
-  workspace cleanup.
-- Explicit MSD-HOPV5 visual comparison:
-  `src/dnadesign/cruncher/workspaces/msd-HOPV5_snapback` renders the prior
-  `Nt.Bpu10I` MSD-HOPV5 example without treating it as a released-product solve result.
-- Study command ladder:
-  `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml` for machine-readable
-  command groups and bootstrap support
-- Scar-nick base-junction context:
-  `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`
-- Regenerable scar-nick profile-panel bundles:
-  `src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf`
-  and
-  `src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_paqci_core_panel`.
-  These outputs are generated from same-workspace configs; current BbsI-HF plus
-  PaqCI coverage reaches 13/14 active profile buckets, with `WMWM` still
-  uncovered under the strict catalog policy.
-- Linear ssDNA composition handoff:
-  `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`
-- Study-owned MSD design registry:
-  `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`
-- Study-selected MSD label list:
-  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`
-- Generic linear ssDNA composition dev spec:
-  `docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md`
-- Generic linear ssDNA composition execution plan:
-  `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
-- Construct dogfood config:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
-- Generated Construct/BaseRender local bundle:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
-  with `visual/sequence_evidence_map_v1.json` and
-  `baserender_jobs/component_span_qa_svg.yaml` after running the config, plus
-  `folding/secondary_structure_prediction_request_v1.yaml`,
-  `folding/folding_preflight.json`, and
-  `folding/secondary_structure_prediction_v1.json` when folding is enabled.
-  The local dogfood route uses the uv-managed ViennaRNA Python API
-  (`viennarna`, imported as `RNA`) and currently records `status=ok`;
-  `RNAfold` CLI remains an optional fallback and is not on the local PATH. The
-  `outputs/` tree is generated and should not be committed unless explicitly
-  requested.
-- Generated ViennaRNA-native plot artifacts are opt-in through
-  `visual.emit: [viennarna_secondary_structure_svg_v1]` and may also be
-  republished with `uv run folding plot`. Current dogfood folding QA records
-  `predicted_pair_count=259`, `cross_copy_pair_count=259`, and
-  `intended_missed_count=8` for the declared intra-copy payload pairings.
-- Study-owned MSD design-reference compilation is available through
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli`. It consumes
-  user-provided labels plus study registry metadata, emits a shallow
-  design-reference bundle with `README.md`, `manifest.json`,
-  `reference_index.tsv`, `msd_design_catalog_v1.json`, and flat per-design
-  `msd_design_reference_v1` records under `references/` into an explicit
-  caller-chosen transient directory, and is intentionally not a top-level
-  `retron-msd` script or persistent workspace family.
-- Released-product workflow:
-  `src/dnadesign/cruncher/docs/guides/snapback_released_workflow.md`
-- Released-product artifact reference:
-  `src/dnadesign/cruncher/docs/reference/released_snapback_artifacts.md`
-- YIU workflow:
-  `src/dnadesign/cruncher/docs/guides/yiu_workflow.md`
-- Consolidated retron/P4 and YIU note:
-  `src/dnadesign/cruncher/docs/dev/audits/2026-04-19-retron-p4-hairpin-variant.md`
+Durable evidence pointers live in `evidence/design-evidence.md`. Keep this
+status note focused on current route, settled boundaries, and next actions.
 
 ### Next actions
 
 1. For a lab-facing ID or complete part set, lint or compile through
-   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli`.
+   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app`.
 2. For missing parts, open `docs/studies/retron_hairpin_design/routes/README.md` and
    route to the smallest primitive owner: Snapback, scar-nick, or YIU contrast.
 3. For provenance questions, open `docs/studies/retron_hairpin_design/workbench/`.

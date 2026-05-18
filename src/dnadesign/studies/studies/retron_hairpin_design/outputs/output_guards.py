@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..errors import RetronMsdCompilerError
+from ..compiler.exceptions import RetronMsdCompilerError
 from .layout import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,

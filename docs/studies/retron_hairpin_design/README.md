@@ -18,12 +18,17 @@ retron_hairpin_design/
     status.md
   operations/               # machine-readable operating contracts
     ops.study.yaml
+    catalog/                # OPS status/preflight catalog docs
     contract/
+      lifecycle/
+      surfaces/
+      status/
+      readiness/
     runtime/
-      pipeline.yaml
+      command-groups/
+        pipeline.yaml
   routes/                   # one-hop router plus focused route details
     README.md
-  contracts/                # status/preflight contracts and registry sidecars
   compiler/                 # study compiler inputs and normalization metadata
   contexts/                 # long-form rationale and handoff notes
   workbench/                # durable experimental meaning
@@ -34,6 +39,6 @@ retron_hairpin_design/
 
 Use `routes/README.md` first for task routing. Use `record/status.md` only for
 current state, `operations/ops.study.yaml` for lifecycle/preflight declarations,
-`operations/runtime/pipeline.yaml` for command groups, `workbench/` when the
+`operations/runtime/command-groups/pipeline.yaml` for command groups, `workbench/` when the
 question is why a cohort exists or what experimental direction it tests, and
 `compiler/` for Retron MSD label normalization or catalog compilation.

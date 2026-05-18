@@ -11,11 +11,12 @@
 **Status-kind:** retron-hairpin-design-status
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-21
+**Last verified:** 2026-05-18
 
 Use this only for `retron_hairpin_design`. The provider lives in the study
 package and rejects other `study_id` values. Cruncher is an owner tool this
-study routes to; it is not the owner of the study-status implementation.
+study routes to; it is not the owner of the study-status implementation. The
+public invocation is the OPS registry id below, not a top-level project command.
 
 ### Quick route
 
@@ -28,7 +29,7 @@ study routes to; it is not the owner of the study-status implementation.
 
 - `docs/studies/retron_hairpin_design/record/status.md`
 - `docs/studies/retron_hairpin_design/routes/README.md`
-- `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`
+- `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`
 - `docs/studies/retron_hairpin_design/operations/ops.study.yaml`
 
 ### When to use it

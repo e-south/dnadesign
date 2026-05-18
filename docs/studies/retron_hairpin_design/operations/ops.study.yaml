@@ -7,13 +7,13 @@ ops_surfaces:
 record_sources:
   narrative_ref: manifest:record/status.md
   datasets_ref: manifest:record/datasets.yaml
-  pipeline_ref: manifest:operations/runtime/pipeline.yaml
+  pipeline_ref: manifest:operations/runtime/command-groups/pipeline.yaml
   campaign_ref: manifest:record/campaign.yaml
   routes_ref: manifest:routes/README.md
 parts:
-  lifecycle: contract/lifecycle.yaml
-  tracks: contract/tracks.yaml
-  artifacts: contract/artifacts.yaml
-  execution_surfaces: contract/execution_surfaces.yaml
-  snapshot: contract/snapshot.yaml
-  preflight: contract/preflight.yaml
+  lifecycle: contract/lifecycle/mode.yaml
+  tracks: contract/lifecycle/tracks.yaml
+  artifacts: contract/surfaces/artifacts.yaml
+  execution_surfaces: contract/surfaces/execution_surfaces.yaml
+  snapshot: contract/status/snapshot.yaml
+  preflight: contract/readiness/preflight.yaml

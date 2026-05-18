@@ -103,6 +103,7 @@ require_file "$ROOT_AGENTS"
 require_file "$CRUNCHER_AGENTS"
 require_file "$REPO_ROOT/docs/studies/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/record/status.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/record/evidence/design-evidence.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/routes/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contexts/README.md"
@@ -128,11 +129,18 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance
 require_file "$REPO_ROOT/docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md"
 require_file "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md"
 require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/ops.study.yaml"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contracts/status.md"
-require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/contracts/preflight.md"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler.py"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/status.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/preflight.md"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/references.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/catalog_bundle.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/materialization.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/inputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/io.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/messages.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/registry.py"
@@ -141,13 +149,20 @@ require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/out
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/materialized_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/manifests.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/layout.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/errors.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
 require_file "$REFERENCE_DIR/msd-design-references.md"
 require_file "$REFERENCE_DIR/test-matrix.md"
 require_file "$REFERENCE_DIR/external-sources.md"
+
+for stale_surface in cli.py compiler.py errors.py; do
+  if [[ -e "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/$stale_surface" ]]; then
+    fail "root Retron study Python surface removed: $stale_surface"
+  else
+    pass "root Retron study Python surface removed: $stale_surface"
+  fi
+done
 
 if [[ -e "$OLD_SKILL_DIR" ]]; then
   fail "old skill directory removed"
@@ -169,6 +184,8 @@ done < <(find "$REFERENCE_DIR" -maxdepth 1 -type f -name '*.md' | sort)
   cat "$REPO_ROOT/docs/studies/README.md"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/record/status.md"
+  printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/record/evidence/design-evidence.md"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/routes/README.md"
   printf '\n'
@@ -206,7 +223,7 @@ done < <(find "$REFERENCE_DIR" -maxdepth 1 -type f -name '*.md' | sort)
   printf '\n'
   cat "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
   printf '\n'
-  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml"
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/ops.study.yaml"
 } >> "$TMP_COMBINED"
@@ -226,7 +243,14 @@ import sys
 
 source_root = Path(sys.argv[1])
 budgets = {
-    "compiler.py": 450,
+    "compiler/references.py": 180,
+    "compiler/catalog_bundle.py": 220,
+    "compiler/materialization.py": 260,
+    "compiler/exceptions.py": 60,
+    "interfaces/cli/app.py": 360,
+    "interfaces/cli/inputs.py": 140,
+    "interfaces/cli/io.py": 140,
+    "interfaces/cli/messages.py": 180,
     "outputs/composition_payload.py": 450,
     "outputs/output_guards.py": 450,
     "outputs/materialized_outputs.py": 450,
@@ -250,7 +274,7 @@ fi
 require_pattern 'docs/studies/README\.md' "skill routes through study records docs"
 require_pattern 'docs/studies/retron_hairpin_design/record/status\.md' "skill references pinned study status"
 require_pattern 'docs/studies/retron_hairpin_design/routes/README\.md' "skill references pinned study routes"
-require_pattern 'docs/studies/retron_hairpin_design/routes/references/msd-design-references\.md' "skill references MSD route detail"
+require_pattern 'references/msd-design-references\.md' "skill references MSD route detail"
 require_pattern 'docs/studies/retron_hairpin_design/workbench/README\.md' "skill references workbench entrypoint"
 require_pattern 'workbench/ontology' "skill references workbench ontology lane"
 require_pattern 'workbench/provenance' "skill references workbench provenance lane"
@@ -262,7 +286,7 @@ require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_h
 require_pattern 'docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md' "skill references linear ssDNA dev spec"
 require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition\.md' "skill references linear ssDNA implementation record"
 require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
-require_pattern 'docs/studies/retron_hairpin_design/operations/runtime/pipeline\.yaml' "skill references pinned study pipeline"
+require_pattern 'docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline\.yaml' "skill references pinned study pipeline"
 require_pattern 'references/test-matrix\.md' "skill references test matrix for validation"
 require_pattern 'composition_payload\.py' "skill routes composition payload source separately"
 require_pattern 'output_guards\.py' "skill routes output guard source separately"

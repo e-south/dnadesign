@@ -88,11 +88,11 @@ Out of scope:
   `references/msd-design-references.md`.
 - Whole-product context: `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`,
   then the active exec plan.
-- Machine-readable command groups: `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`.
+- Machine-readable command groups: `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`.
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
 3. Execute or report the route.
-- For complete reference inputs, run `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint|compile`.
+- For complete reference inputs, run `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint|compile`.
 - For GenBank/structure-review output, run the same module's `materialize` command with
   `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
 - If the user asked to open outputs in Finder, do not stop after `compile`;

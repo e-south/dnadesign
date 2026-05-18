@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/errors.py
+src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py
 
 Fail-fast Retron MSD compiler exceptions.
 

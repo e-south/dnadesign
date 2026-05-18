@@ -18,7 +18,7 @@ question is explicitly about progress, history, or blockers.
    posture.
 6. Open `linear-ssdna-composition.md` only when the requested output needs
    sequence assembly, visual QA, or GenBank sidecars.
-7. Open `operations/runtime/pipeline.yaml` only when a machine-readable command group is needed.
+7. Open `operations/runtime/command-groups/pipeline.yaml` only when a machine-readable command group is needed.
 
 ## Minimum Evidence By Question
 

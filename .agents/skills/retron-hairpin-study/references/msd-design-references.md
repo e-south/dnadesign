@@ -58,7 +58,7 @@ catalog.
 Lint one label:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
   --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM" \
   --format json
 ```
@@ -66,7 +66,7 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
 Lint a typed compiler spec:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
   --spec path/to/retron_msd_compiler_spec.yaml \
   --format json
 ```
@@ -74,7 +74,7 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli lint \
 Compile the selected hit list:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --out-dir /tmp/dnadesign_retron_msd_design_references \
   --format json
@@ -84,7 +84,7 @@ Materialize single-unit GenBank/structure-review outputs after concrete sequence
 subcomponents are available:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize \
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --out-dir /tmp/dnadesign_retron_msd_sequences \
   --payload-sequence TetR=<payload-sequence> \

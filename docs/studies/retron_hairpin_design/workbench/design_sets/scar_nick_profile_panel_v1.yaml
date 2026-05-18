@@ -9,7 +9,7 @@ source_refs:
   directions: docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml
   convenience_label_input: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
   registry: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
-  compiler_module: src/dnadesign/studies/studies/retron_hairpin_design/cli.py
+  compiler_module: src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py
 input_hashes:
   convenience_label_input_sha256: 8e01026027bbc9faf116f96e21f7be96182f7ceff23904b2e7a760b308f898ca # pragma: allowlist secret
   registry_sha256: 74dae5b4360515044b84d1cc9b7b4fa8b75c4d6c3cf98bc0c54a60af1d52b664 # pragma: allowlist secret

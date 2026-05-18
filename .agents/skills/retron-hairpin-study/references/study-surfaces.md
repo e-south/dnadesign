@@ -37,7 +37,7 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`:
   convenience lab-facing MSD labels for compiler input; workbench design sets
   are authoritative for persistent cohort meaning
-- `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`: the exact command
+- `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need
 - `docs/studies/retron_hairpin_design/operations/ops.study.yaml`: nonsequential track map,
@@ -69,8 +69,14 @@ base-junction scar-nick work.
   owns the completed implementation checklist and validation evidence.
 - `docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md`
   owns remaining USR/source-ref/module-split follow-up work.
-- `src/dnadesign/studies/studies/retron_hairpin_design/compiler.py` owns the
-  study-local compile/materialize orchestration API only.
+- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/references.py` owns
+  label-to-reference compilation.
+- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/catalog_bundle.py` owns
+  catalog/reference bundle writing.
+- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/materialization.py` owns
+  Construct-backed sequence-bundle orchestration.
+- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py` owns
+  the fail-fast compiler exception type.
 - `src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py` owns typed
   `retron_msd_compiler_spec_v1` parsing, explicit part normalization, and
   public primitive-source selector checks.
@@ -84,9 +90,7 @@ base-junction scar-nick work.
 - `src/dnadesign/studies/studies/retron_hairpin_design/outputs/manifests.py` owns
   catalog, index, manifest, and bundle README writers for that shallow
   output-bundle layout.
-- `src/dnadesign/studies/studies/retron_hairpin_design/outputs/layout.py` owns
-  output-layout constants, and `errors.py` owns the fail-fast exception type.
-- `src/dnadesign/studies/studies/retron_hairpin_design/cli.py` is the thin Typer
+- `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py` is the thin Typer
   command service for `msd_design_reference_v1` / `msd_design_catalog_v1`
   records plus the `materialize` GenBank/native-structure-PNG/review-PNG
   route.
@@ -107,6 +111,6 @@ reference, use the Study route for MSD design references in `routes/README.md`, 
 When the next question asks why variants were selected or how the cohort maps to
 hypotheses/effects, open `workbench/README.md` and the relevant design set.
 When the next question needs machine-readable command groups or bootstrap
-metadata, open `operations/runtime/pipeline.yaml`.
+metadata, open `operations/runtime/command-groups/pipeline.yaml`.
 When the next question needs harness or contract hardening, leave the study
 surface and pair with the owning companion skill.

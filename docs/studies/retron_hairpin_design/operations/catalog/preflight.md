@@ -11,10 +11,11 @@
 **Status-kind:** retron-hairpin-design-preflight
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-21
+**Last verified:** 2026-05-18
 
 Read-only command readiness follows the cheaper study snapshot and focuses the
-current actionable route, track, or phase declared by the study contract.
+current actionable route or track declared by the split study contract. The
+public invocation is the OPS registry id below, not a top-level project command.
 
 ### Quick route
 
@@ -25,7 +26,7 @@ current actionable route, track, or phase declared by the study contract.
 
 ### What this route checks
 
-- study-owned record files such as `routes/README.md` and `operations/runtime/pipeline.yaml`
+- study-owned record files such as `routes/README.md` and `operations/runtime/command-groups/pipeline.yaml`
 - declared workspace roots
 - declared read-only validation commands such as `released-target-search` and `yiu validate`
 

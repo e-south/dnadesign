@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Sequence
 
-from ..errors import RetronMsdCompilerError
+from ..compiler.exceptions import RetronMsdCompilerError
 from .layout import (
     BASERENDER_CONTRACT_KIND,
     VARIANT_MANIFEST_COMPOSITION_DIRNAME,

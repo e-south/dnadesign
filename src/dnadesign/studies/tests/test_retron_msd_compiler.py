@@ -33,7 +33,7 @@ from dnadesign.studies.studies.retron_hairpin_design.catalog.msd_ids import (
     parse_msd_construct_label,
     parse_msd_design_parts,
 )
-from dnadesign.studies.studies.retron_hairpin_design.cli import app
+from dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app import app
 
 _RUNNER = CliRunner()
 
@@ -107,7 +107,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
 
 def _write_registry(tmp_path: Path) -> Path:
     study_dir = tmp_path / "study"
-    compiler_dir = study_dir / "compiler"
+    compiler_dir = study_dir / "compiler" / "catalog"
     compiler_dir.mkdir(parents=True)
     (compiler_dir / "msd_design_registry.yaml").write_text(
         """
@@ -773,7 +773,7 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
 
 def test_retron_msd_materialize_requires_snapback_topology_for_cap_subsection(tmp_path: Path) -> None:
     study_dir = tmp_path / "study"
-    compiler_dir = study_dir / "compiler"
+    compiler_dir = study_dir / "compiler" / "catalog"
     compiler_dir.mkdir(parents=True)
     (compiler_dir / "msd_design_registry.yaml").write_text(
         """
@@ -1309,7 +1309,7 @@ def test_retron_msd_materialize_refuses_stale_variant_sequence_outputs(tmp_path:
 def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[4]
     study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
-    input_file = study_dir / "compiler" / "msd_design_hit_labels.txt"
+    input_file = study_dir / "compiler" / "inputs" / "msd_design_hit_labels.txt"
     out_dir = tmp_path / "compiled"
 
     result = _RUNNER.invoke(
@@ -1360,13 +1360,13 @@ def test_retron_msd_compiler_is_not_exposed_as_top_level_project_script() -> Non
     scripts = pyproject["project"]["scripts"]
 
     assert "retron-msd" not in scripts
-    assert all("retron_hairpin_design.cli" not in target for target in scripts.values())
+    assert all("retron_hairpin_design.interfaces.cli" not in target for target in scripts.values())
 
 
 def test_retron_msd_study_uses_public_tool_apis_only() -> None:
     repo_root = Path(__file__).resolve().parents[4]
     study_source = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
-    study_paths = sorted(study_source.glob("*.py"))
+    study_paths = sorted(path for path in study_source.rglob("*.py") if "__pycache__" not in path.parts)
     imports: set[str] = set()
     for path in study_paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -1385,8 +1385,12 @@ def test_retron_msd_study_uses_public_tool_apis_only() -> None:
 
 def test_retron_msd_materialize_does_not_shell_out_to_inkscape() -> None:
     repo_root = Path(__file__).resolve().parents[4]
-    compiler_path = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design" / "compiler.py"
-    compiler_source = compiler_path.read_text(encoding="utf-8")
+    source_root = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
+    compiler_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(source_root.rglob("*.py"))
+        if "__pycache__" not in path.parts
+    )
 
     assert "inkscape" not in compiler_source.lower()
     assert "subprocess.run" not in compiler_source
@@ -1396,7 +1400,14 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
     repo_root = Path(__file__).resolve().parents[4]
     source_root = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
     budgets = {
-        "compiler.py": 450,
+        "compiler/references.py": 180,
+        "compiler/catalog_bundle.py": 220,
+        "compiler/materialization.py": 260,
+        "compiler/exceptions.py": 60,
+        "interfaces/cli/app.py": 360,
+        "interfaces/cli/inputs.py": 140,
+        "interfaces/cli/io.py": 140,
+        "interfaces/cli/messages.py": 180,
         "catalog/compiler_spec.py": 450,
         "catalog/msd_ids.py": 450,
         "catalog/registry.py": 450,
@@ -1411,3 +1422,15 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         assert path.is_file(), filename
         line_count = len(path.read_text(encoding="utf-8").splitlines())
         assert line_count <= max_lines, f"{filename} has {line_count} lines > {max_lines}"
+
+
+def test_retron_msd_study_root_has_no_python_surface_modules() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    source_root = repo_root / "src" / "dnadesign" / "studies" / "studies" / "retron_hairpin_design"
+
+    top_level_py = sorted(path.name for path in source_root.glob("*.py"))
+
+    assert top_level_py == ["__init__.py"]
+    assert not (source_root / "cli.py").exists()
+    assert not (source_root / "compiler.py").exists()
+    assert not (source_root / "errors.py").exists()

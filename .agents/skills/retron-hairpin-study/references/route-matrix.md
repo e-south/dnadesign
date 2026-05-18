@@ -32,7 +32,7 @@ study-phase reporting.
 - If primitive sources select multiple ranks, fail fast unless a future
   expansion contract is explicit; the preferred product surface is one selected
   cap rank plus one selected stem-base rank per design.
-- Use `operations/runtime/pipeline.yaml` only when a machine-readable command group is needed.
+- Use `operations/runtime/command-groups/pipeline.yaml` only when a machine-readable command group is needed.
 - Use `workbench/` when the question is persistent provenance rather than
   transient output generation.
 - Do not reconstruct compiler behavior from generic Cruncher docs.

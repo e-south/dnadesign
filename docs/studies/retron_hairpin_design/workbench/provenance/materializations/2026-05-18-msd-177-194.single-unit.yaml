@@ -14,7 +14,7 @@ command_template:
     - run
     - python
     - -m
-    - dnadesign.studies.studies.retron_hairpin_design.cli
+    - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
     - materialize
     - --input
     - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
