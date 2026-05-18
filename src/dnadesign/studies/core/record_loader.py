@@ -397,19 +397,80 @@ def _expand_ops_study_parts(payload: Mapping[str, object], *, contract_path: Pat
             raise ValueError(f"ops.study.yaml parts keys must be non-empty: {contract_path}")
         if section in expanded:
             raise ValueError(f"ops.study.yaml parts.{section} duplicates an inline {section} section: {contract_path}")
-        part_path = _resolve_ops_study_part_path(
+        part_paths = _resolve_ops_study_part_paths(
             raw_ref,
             contract_path=contract_path,
             label=f"ops.study.yaml parts.{section}",
         )
-        part_payload = yaml.safe_load(part_path.read_text(encoding="utf-8")) or {}
         if section in {"phases", "tracks"}:
-            if not isinstance(part_payload, list):
-                raise ValueError(f"ops.study.yaml parts.{section} must load a list: {part_path}")
-        elif not isinstance(part_payload, dict):
-            raise ValueError(f"ops.study.yaml parts.{section} must load a mapping: {part_path}")
-        expanded[section] = part_payload
+            merged_sequence: list[object] = []
+            for part_path in part_paths:
+                part_payload = yaml.safe_load(part_path.read_text(encoding="utf-8")) or []
+                if not isinstance(part_payload, list):
+                    raise ValueError(f"ops.study.yaml parts.{section} must load a list: {part_path}")
+                merged_sequence.extend(part_payload)
+            expanded[section] = merged_sequence
+            continue
+
+        merged_mapping: dict[str, object] = {}
+        for part_path in part_paths:
+            part_payload = yaml.safe_load(part_path.read_text(encoding="utf-8")) or {}
+            if not isinstance(part_payload, dict):
+                raise ValueError(f"ops.study.yaml parts.{section} must load a mapping: {part_path}")
+            _merge_ops_study_part_mapping(
+                merged_mapping,
+                part_payload,
+                label=f"ops.study.yaml parts.{section}",
+                part_path=part_path,
+            )
+        expanded[section] = merged_mapping
     return expanded
+
+
+def _merge_ops_study_part_mapping(
+    target: dict[str, object],
+    source: Mapping[str, object],
+    *,
+    label: str,
+    part_path: Path,
+) -> None:
+    for raw_key, value in source.items():
+        key = str(raw_key or "").strip()
+        if not key:
+            raise ValueError(f"{label} loaded an empty key: {part_path}")
+        if key not in target:
+            target[key] = value
+            continue
+        existing = target[key]
+        if isinstance(existing, dict) and isinstance(value, Mapping):
+            _merge_ops_study_part_mapping(
+                existing,
+                value,
+                label=f"{label}.{key}",
+                part_path=part_path,
+            )
+            continue
+        if isinstance(existing, list) and isinstance(value, list):
+            existing.extend(value)
+            continue
+        raise ValueError(f"{label}.{key} is defined by multiple incompatible part files: {part_path}")
+
+
+def _resolve_ops_study_part_paths(raw_value: object, *, contract_path: Path, label: str) -> tuple[Path, ...]:
+    if isinstance(raw_value, list):
+        if not raw_value:
+            raise ValueError(f"{label} must list at least one path: {contract_path}")
+        return tuple(
+            _resolve_ops_study_part_path(item, contract_path=contract_path, label=f"{label}[{index}]")
+            for index, item in enumerate(raw_value)
+        )
+    return (
+        _resolve_ops_study_part_path(
+            raw_value,
+            contract_path=contract_path,
+            label=label,
+        ),
+    )
 
 
 def _resolve_ops_study_part_path(raw_value: object, *, contract_path: Path, label: str) -> Path:

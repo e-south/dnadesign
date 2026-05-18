@@ -237,6 +237,14 @@ STUDY_OPS_CONTRACT_PART_KEYS = {
     "preflight",
 }
 STUDY_OPS_CONTRACT_PARTS_DIR = "contract"
+STUDY_OPS_CONTRACT_PART_MAX_LINES = 180
+STUDY_README_FRONTMATTER_REQUIRED_KEYS = {
+    "doc_id",
+    "surface",
+    "study_id",
+    "owner",
+    "last_verified",
+}
 STUDY_RUNTIME_PIPELINE_REF = "manifest:operations/runtime/command-groups/pipeline.yaml"
 STUDY_LEGACY_PIPELINE_REFS = {
     "manifest:operations/pipeline.yaml",
@@ -254,13 +262,13 @@ STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
     "docs/README.md",
     "docs/studies/README.md",
     "docs/studies/reference/study-status-ops-surfaces.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/README.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md",
-    "docs/studies/retron_hairpin_design/operations/catalog/status.md",
-    "docs/studies/retron_hairpin_design/operations/catalog/preflight.md",
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md",
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md",
 )
 LEGACY_STUDY_STATUS_SURFACE_TERMS = (
     "Study status adapters",
@@ -348,22 +356,22 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md": {
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md": {
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/retron_hairpin_design/operations/catalog/status.md": {
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/retron_hairpin_design/operations/catalog/preflight.md": {
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
@@ -407,11 +415,11 @@ OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/studies/README.md",
     "docs/studies/stress_ethanol_cipro_growth/record/status.md",
     "src/dnadesign/ops/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
 )
 STUDY_EXECUTION_SOURCE_DOC_PATHS = (
     "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -1590,6 +1598,7 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
         entries_by_id[study_id] = resolved_path
 
     for study_id, study_root in sorted(entries_by_id.items()):
+        issues.extend(_find_study_readme_frontmatter_issues(study_root=study_root, study_id=study_id))
         issues.extend(_find_study_ops_contract_layout_issues(study_root=study_root, study_id=study_id))
 
     active_study_text = str(active_study or "").strip() or None
@@ -1666,26 +1675,80 @@ def _find_study_ops_contract_layout_issues(*, study_root: Path, study_id: str) -
         section = str(raw_section or "").strip()
         if section in payload:
             issues.append(f"{ops_path}: parts.{section} duplicates an inline {section} section.")
-        ref = str(raw_ref or "").strip()
-        if not ref:
-            issues.append(f"{ops_path}: parts.{section} must be a non-empty operations-relative path.")
+        if isinstance(raw_ref, list):
+            raw_refs = raw_ref
+            if not raw_refs:
+                issues.append(f"{ops_path}: parts.{section} must list at least one operations-relative path.")
+                continue
+        else:
+            raw_refs = [raw_ref]
+        for index, raw_part_ref in enumerate(raw_refs):
+            ref_label = f"parts.{section}" if len(raw_refs) == 1 else f"parts.{section}[{index}]"
+            ref = str(raw_part_ref or "").strip()
+            if not ref:
+                issues.append(f"{ops_path}: {ref_label} must be a non-empty operations-relative path.")
+                continue
+            if ref.startswith(("repo:", "manifest:")):
+                issues.append(f"{ops_path}: {ref_label} must be operations-relative, not a path ref.")
+                continue
+            part_rel = Path(ref)
+            if part_rel.is_absolute() or ".." in part_rel.parts:
+                issues.append(f"{ops_path}: {ref_label} must stay inside the operations directory.")
+                continue
+            if not part_rel.parts or part_rel.parts[0] != STUDY_OPS_CONTRACT_PARTS_DIR:
+                issues.append(
+                    f"{ops_path}: {ref_label} must live under operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/ "
+                    "to keep the root OPS record as a one-hop index."
+                )
+            part_path = operations_root / part_rel
+            if not part_path.exists():
+                issues.append(f"{ops_path}: {ref_label} references missing file {part_path}.")
+                continue
+            if part_path.suffix in {".yaml", ".yml"}:
+                line_count = len(part_path.read_text(encoding="utf-8").splitlines())
+                if line_count > STUDY_OPS_CONTRACT_PART_MAX_LINES:
+                    issues.append(
+                        f"{part_path}: ops contract part has {line_count} lines; split bulky owner lanes into "
+                        f"semantic fragments below operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/."
+                    )
             continue
-        if ref.startswith(("repo:", "manifest:")):
-            issues.append(f"{ops_path}: parts.{section} must be operations-relative, not a path ref.")
-            continue
-        part_rel = Path(ref)
-        if part_rel.is_absolute() or ".." in part_rel.parts:
-            issues.append(f"{ops_path}: parts.{section} must stay inside the operations directory.")
-            continue
-        if not part_rel.parts or part_rel.parts[0] != STUDY_OPS_CONTRACT_PARTS_DIR:
-            issues.append(
-                f"{ops_path}: parts.{section} must live under operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/ "
-                "to keep the root OPS record as a one-hop index."
-            )
-        part_path = operations_root / part_rel
-        if not part_path.exists():
-            issues.append(f"{ops_path}: parts.{section} references missing file {part_path}.")
 
+    return issues
+
+
+def _find_study_readme_frontmatter_issues(*, study_root: Path, study_id: str) -> list[str]:
+    issues: list[str] = []
+    for relative_name, expected_surface, extra_key in (
+        ("README.md", "study-root", "first_hop"),
+        ("routes/README.md", "study-route-map", "entrypoint"),
+    ):
+        path = study_root / relative_name
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            issues.append(f"{path}: study navigation docs must start with YAML frontmatter.")
+            continue
+        try:
+            raw_frontmatter = text.split("---", 2)[1]
+            payload = yaml.safe_load(raw_frontmatter)
+        except (IndexError, yaml.YAMLError) as exc:
+            issues.append(f"{path}: unable to parse YAML frontmatter ({exc}).")
+            continue
+        if not isinstance(payload, dict):
+            issues.append(f"{path}: YAML frontmatter must be a mapping.")
+            continue
+        missing = sorted(
+            key
+            for key in (*STUDY_README_FRONTMATTER_REQUIRED_KEYS, extra_key)
+            if not str(payload.get(key) or "").strip()
+        )
+        if missing:
+            issues.append(f"{path}: missing study navigation frontmatter key(s): {', '.join(missing)}.")
+        if str(payload.get("study_id") or "").strip() != study_id:
+            issues.append(f"{path}: frontmatter study_id must be {study_id!r}.")
+        if str(payload.get("surface") or "").strip() != expected_surface:
+            issues.append(f"{path}: frontmatter surface must be {expected_surface!r}.")
     return issues
 
 

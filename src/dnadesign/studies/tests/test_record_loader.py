@@ -180,6 +180,74 @@ def test_load_study_ops_contract_accepts_split_parts(tmp_path: Path) -> None:
     assert contract.execution_surfaces["densegen_batch"]["surface_type"] == "runbook"
 
 
+def test_load_study_ops_contract_accepts_multi_file_split_parts(tmp_path: Path) -> None:
+    payload = _base_payload()
+    split_keys = ("execution_surfaces", "preflight")
+    root_payload = {key: value for key, value in payload.items() if key not in split_keys}
+    root_payload["parts"] = {
+        "execution_surfaces": [
+            "contract/surfaces/execution/runbooks.yaml",
+            "contract/surfaces/execution/commands.yaml",
+        ],
+        "preflight": [
+            "contract/readiness/scope.yaml",
+            "contract/readiness/groups.yaml",
+            "contract/readiness/checks/densegen.yaml",
+            "contract/readiness/checks/notify.yaml",
+        ],
+    }
+    study_root = _write_contract(tmp_path, root_payload)
+    operations_root = study_root / "operations"
+    split_payloads = {
+        "contract/surfaces/execution/runbooks.yaml": {
+            "densegen_batch": payload["execution_surfaces"]["densegen_batch"],
+        },
+        "contract/surfaces/execution/commands.yaml": {
+            "notify_profile_doctor": {
+                "surface_type": "command",
+                "argv": ["uv", "run", "notify", "profile", "doctor"],
+            },
+        },
+        "contract/readiness/scope.yaml": {
+            "default_scope": payload["preflight"]["default_scope"],
+            "scopes": payload["preflight"]["scopes"],
+        },
+        "contract/readiness/groups.yaml": {
+            "group_phase_bindings": payload["preflight"]["group_phase_bindings"],
+            "next_scope": payload["preflight"]["next_scope"],
+        },
+        "contract/readiness/checks/densegen.yaml": {
+            "checks": {"densegen_growth": payload["preflight"]["checks"]["densegen_growth"]},
+        },
+        "contract/readiness/checks/notify.yaml": {
+            "checks": {
+                "infer_batch_preparation": [
+                    *payload["preflight"]["checks"]["infer_batch_preparation"],
+                    {
+                        "kind": "command",
+                        "check_id": "notify.profile.doctor",
+                        "check_group": "notify_environment",
+                        "summary": "Notify profile doctor runs.",
+                        "required": False,
+                        "surface": "notify_profile_doctor",
+                    },
+                ]
+            },
+        },
+    }
+    for rel_path, part_payload in split_payloads.items():
+        part_path = operations_root / rel_path
+        part_path.parent.mkdir(parents=True, exist_ok=True)
+        part_path.write_text(yaml.safe_dump(part_payload, sort_keys=False), encoding="utf-8")
+
+    contract = load_study_ops_contract(study_root)
+
+    assert contract.execution_surfaces["densegen_batch"]["surface_type"] == "runbook"
+    assert contract.execution_surfaces["notify_profile_doctor"]["surface_type"] == "command"
+    assert len(contract.preflight.check_specs["infer_batch_preparation"]) == 2
+    assert contract.preflight.check_specs["infer_batch_preparation"][1]["check_id"] == "notify.profile.doctor"
+
+
 def test_load_study_ops_contract_rejects_split_part_that_duplicates_inline_section(tmp_path: Path) -> None:
     payload = _base_payload()
     payload["parts"] = {"preflight": "contract/readiness/preflight.yaml"}

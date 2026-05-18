@@ -448,6 +448,143 @@ def test_find_study_record_doc_issues_accepts_split_ops_contract_layout(tmp_path
     assert not any("ops.study.yaml" in issue for issue in issues)
 
 
+def test_find_study_record_doc_issues_accepts_study_navigation_frontmatter(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [{"study_id": "demo_study", "record_root": "docs/studies/demo_study"}],
+            },
+            sort_keys=False,
+        ),
+    )
+    study_root = tmp_path / "docs" / "studies" / "demo_study"
+    _write_required_study_record_files(study_root)
+    _write(
+        study_root / "README.md",
+        "---\n"
+        "doc_id: study-demo\n"
+        "surface: study-root\n"
+        "study_id: demo_study\n"
+        "owner: demo\n"
+        "last_verified: 2026-05-18\n"
+        "first_hop: routes/README.md\n"
+        "---\n\n"
+        "## Demo\n",
+    )
+    _write(
+        study_root / "routes" / "README.md",
+        "---\n"
+        "doc_id: study-demo-routes\n"
+        "surface: study-route-map\n"
+        "study_id: demo_study\n"
+        "owner: demo\n"
+        "last_verified: 2026-05-18\n"
+        "entrypoint: self\n"
+        "---\n\n"
+        "## Demo Routes\n",
+    )
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert not any("frontmatter" in issue for issue in issues)
+
+
+def test_find_study_record_doc_issues_rejects_missing_study_navigation_frontmatter(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [{"study_id": "demo_study", "record_root": "docs/studies/demo_study"}],
+            },
+            sort_keys=False,
+        ),
+    )
+    study_root = tmp_path / "docs" / "studies" / "demo_study"
+    _write_required_study_record_files(study_root)
+    _write(study_root / "README.md", "## Demo\n")
+    _write(study_root / "routes" / "README.md", "## Demo Routes\n")
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert any("YAML frontmatter" in issue for issue in issues)
+
+
+def test_find_study_record_doc_issues_rejects_oversized_ops_contract_part(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [{"study_id": "demo_study", "record_root": "docs/studies/demo_study"}],
+            },
+            sort_keys=False,
+        ),
+    )
+    study_root = tmp_path / "docs" / "studies" / "demo_study"
+    for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
+        _write(study_root / required_name, "placeholder\n")
+    _write(
+        study_root / "operations" / "ops.study.yaml",
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "study_id": "demo_study",
+                "parts": {
+                    "preflight": "contract/readiness/oversized.yaml",
+                },
+            },
+            sort_keys=False,
+        ),
+    )
+    _write(study_root / "operations" / "contract" / "readiness" / "oversized.yaml", "x:\n" * 181)
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert any("split bulky owner lanes" in issue for issue in issues)
+
+
 def test_find_study_record_doc_issues_rejects_flat_ops_contract_sprawl(tmp_path: Path) -> None:
     _write(
         tmp_path / "docs" / "studies" / "README.md",
@@ -519,7 +656,14 @@ def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms
         "Verify the active study selector, `family`, and `record_root` in the study index.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "operations" / "catalog" / "status.md",
+        tmp_path
+        / "docs"
+        / "studies"
+        / "stress_ethanol_cipro_growth"
+        / "operations"
+        / "catalog"
+        / "contracts"
+        / "status.md",
         "The selected study entry must declare `family` and `record_root`.\n",
     )
 
@@ -3261,7 +3405,14 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
         "Use infer_local_runtime and notify_profile_doctor in ops.study.yaml.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "operations" / "catalog" / "preflight.md",
+        tmp_path
+        / "docs"
+        / "studies"
+        / "stress_ethanol_cipro_growth"
+        / "operations"
+        / "catalog"
+        / "contracts"
+        / "preflight.md",
         "Read notify.profile.*.details.setup_command after infer_validate_config.\n",
     )
 
@@ -3280,7 +3431,14 @@ def test_study_execution_source_drift_check_flags_pipeline_only_claims(tmp_path:
         "Use pipeline.yaml as the only source for real Construct, Infer, and runbook paths.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "operations" / "catalog" / "preflight.md",
+        tmp_path
+        / "docs"
+        / "studies"
+        / "stress_ethanol_cipro_growth"
+        / "operations"
+        / "catalog"
+        / "contracts"
+        / "preflight.md",
         "pipeline.yaml remains the only valid source for exact execution surfaces.\n",
     )
 
