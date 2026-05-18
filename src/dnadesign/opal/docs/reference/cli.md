@@ -1,7 +1,7 @@
 ## OPAL Command Line Interface
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-17
 
 
 The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
@@ -36,7 +36,9 @@ opal guide next --config <yaml> [--observed-round <r>] [--labels-as-of <r>] [--j
 **Notes**
 
 * `guide` is read-only. It summarizes plugin wiring, lifecycle steps, round semantics, and deep-dive docs/source pointers.
-* `guide next` inspects campaign state + label history and prints the recommended next command sequence.
+* `guide next` inspects the candidate table, campaign state, and label source,
+  then prints the recommended next command sequence. If `records.parquet` is
+  missing, it reports `stage=candidate_table` before suggesting ingest or run.
 * Prefer `guide next` in agent/automation loops for state-aware progression.
 
 ---
@@ -76,14 +78,16 @@ opal init --config <yaml> [--json]
 **Notes**
 
 * Ensures the campaign `workdir` has `outputs/`.
-* Ensures the label history column exists in `records.parquet`.
+* Ensures the label history column exists in `records.parquet` only when
+  `writeback.prediction_records: label_history`.
 * Writes/updates `state.json` with campaign identity, data location, and settings.
 
 ---
 
 ### `ingest-y`
 
-Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and append to label history.
+Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and
+append to the configured label source.
 
 **Usage**
 
@@ -105,7 +109,7 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
   unknown sequences when required columns are missing or when you want a strict in‑place update.
 * `--infer-missing-required`: Auto-fill missing required columns for new sequences (`bio_type`, `alphabet`)
   using the most common values found in `records.parquet`.
-* `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
+* `--if-exists`: Behavior if `(id, round)` already exists in the configured label source (`fail`/`skip`/`replace`).
 * `--apply`: Apply ingest without interactive confirmation.
 * `--json`: Output as machine-readable JSON (default output is plain text).
 
@@ -115,25 +119,33 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
 * **Strict preflights**: schema checks, completeness.
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error | keep_first | keep_last).
-* **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
+* **New IDs** are allowed only for legacy/local candidate-history flows when
+  your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the
+  configured X column. Shared `usr_sidecar` label sources use a fixed candidate
+  universe and reject unknown IDs unless `--unknown-sequences drop` is used.
 * If new sequences are missing required columns, OPAL will prompt to infer defaults for `bio_type`/`alphabet`
   (or use `--infer-missing-required` for non-interactive runs). For other missing columns, use
   `--unknown-sequences drop` or provide the columns.
 * If `records.parquet` contains duplicate sequences, `ingest-y` requires an explicit `id` column for all rows
   to avoid ambiguous sequence → id mapping.
-* When unknown sequences are missing **X** data, `ingest-y` drops those rows automatically (unless you pass
-  `--unknown-sequences error`). This avoids creating partial records without X.
+* When unknown sequences are missing **X** data, `ingest-y --unknown-sequences create` fails fast.
+  Provide X values for new rows or pass `--unknown-sequences drop` to skip unknown rows explicitly.
 * If adding **new sequences** and X is list-valued, prefer **Parquet** input so the X column remains list-typed
   (CSV will coerce lists to strings).
-* Appends to `opal__<slug>__label_hist` and writes the current Y column.
+* For `labels.source.kind: campaign_history`, appends to
+  `opal__<slug>__label_hist` and writes the current Y column.
+* For `labels.source.kind: usr_sidecar`, appends observed labels to the shared
+  sidecar such as `_opal/observed_labels.parquet`; it does not duplicate assay
+  truth into campaign label-history columns.
 * Emits `label` events into `outputs/ledger/labels.parquet`.
 
 ---
 
 ### `run`
 
-Train on labels with **`observed_round ≤ R`** (where `R` comes from `--labels-as-of`), score the candidate universe,
-apply the objective, select top-k, write artifacts, and append run-aware label history entries.
+Train on labels with **`observed_round ≤ R`** (where `R` comes from
+`--labels-as-of`), score the candidate universe, apply the objective, select
+top-k, and write campaign artifacts/ledgers.
 
 **Usage**
 
@@ -194,9 +206,13 @@ If you rerun a round that already exists in `state.json`, OPAL will prompt befor
 contexts (e.g., CI), the prompt cannot be shown and the command will exit with a message instructing you to
 re‑run with `--resume`.
 
-**Write-backs to `records.parquet` (primary label history)**
+**Write-backs to `records.parquet`**
 
-* `opal__<slug>__label_hist` — append-only per-record history of observed labels and run-aware predictions.
+* With `writeback.prediction_records: label_history`, OPAL appends run-aware
+  predictions to `opal__<slug>__label_hist`.
+* With `writeback.prediction_records: ledger_only`, OPAL keeps predictions,
+  scores, and selections in campaign ledgers and does not mutate
+  `records.parquet` during `run`.
 
 ---
 
@@ -407,7 +423,9 @@ vector dimension, and any preflight warnings.
 
 ### `status`
 
-Dashboard from `state.json`.
+Dashboard from config, `records.parquet`, label source, and `state.json`.
+Before initialization it still reports the records path, whether it exists, and
+the configured label-source path.
 
 **Usage**
 
@@ -469,7 +487,7 @@ opal log --config <yaml> [--round <k|latest>] [--json]
 
 ### `validate`
 
-End-to-end table checks (essentials present; X present).
+End-to-end table checks (essentials present; X non-null, finite, and fixed-length).
 
 **Usage**
 

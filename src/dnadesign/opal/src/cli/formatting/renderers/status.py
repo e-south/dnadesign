@@ -32,10 +32,44 @@ def render_status_text(st: Mapping[str, Any]) -> str:
                 "X column": st.get("x_column_name"),
                 "Y column": st.get("y_column_name"),
                 "num_rounds": st.get("num_rounds"),
+                "prediction records": (st.get("writeback") or {}).get("prediction_records"),
             },
         )
         if head is not None:
             blocks.append(head)
+
+        data = st.get("data") or {}
+        if data:
+            data_block = kv_table(
+                "Data",
+                {
+                    "records": data.get("records_path"),
+                    "records exists": data.get("records_exists"),
+                    "rows": data.get("row_count"),
+                    "location": data.get("location_kind"),
+                },
+            )
+            if data_block is not None:
+                blocks.append(data_block)
+
+        label_source = st.get("label_source") or {}
+        if label_source:
+            label_kv = {
+                "kind": label_source.get("kind"),
+                "exists": label_source.get("exists"),
+                "valid": label_source.get("valid"),
+                "label_count": label_source.get("label_count"),
+                "available_rounds": ", ".join(map(str, label_source.get("available_rounds") or [])) or "(none)",
+            }
+            if label_source.get("path"):
+                label_kv["path"] = label_source.get("path")
+            if label_source.get("column"):
+                label_kv["column"] = label_source.get("column")
+            if label_source.get("error"):
+                label_kv["error"] = label_source.get("error")
+            label_block = kv_table("Label source", label_kv)
+            if label_block is not None:
+                blocks.append(label_block)
 
         latest = st.get("latest_round") or {}
         if not latest:
@@ -91,12 +125,42 @@ def render_status_text(st: Mapping[str, Any]) -> str:
             "X column": st.get("x_column_name"),
             "Y column": st.get("y_column_name"),
             "num_rounds": st.get("num_rounds"),
+            "prediction records": (st.get("writeback") or {}).get("prediction_records"),
         },
     )
+    data = st.get("data") or {}
+    data_block = ""
+    if data:
+        data_block = "\n\n" + kv_block(
+            "Data",
+            {
+                "records": data.get("records_path"),
+                "records exists": data.get("records_exists"),
+                "rows": data.get("row_count"),
+                "location": data.get("location_kind"),
+            },
+        )
+    label_source = st.get("label_source") or {}
+    label_block = ""
+    if label_source:
+        label_kv = {
+            "kind": label_source.get("kind"),
+            "exists": label_source.get("exists"),
+            "valid": label_source.get("valid"),
+            "label_count": label_source.get("label_count"),
+            "available_rounds": ", ".join(map(str, label_source.get("available_rounds") or [])) or "(none)",
+        }
+        if label_source.get("path"):
+            label_kv["path"] = label_source.get("path")
+        if label_source.get("column"):
+            label_kv["column"] = label_source.get("column")
+        if label_source.get("error"):
+            label_kv["error"] = label_source.get("error")
+        label_block = "\n\n" + kv_block("Label source", label_kv)
 
     latest = st.get("latest_round") or {}
     if not latest:
-        return head + "\n\n" + _dim("No completed rounds.")
+        return head + data_block + label_block + "\n\n" + _dim("No completed rounds.")
 
     def _round_block(label: str, round_info: Mapping[str, Any], ledger_info: Mapping[str, Any]) -> list[str]:
         run_id = round_info.get("run_id") or ledger_info.get("run_id")
@@ -128,6 +192,10 @@ def render_status_text(st: Mapping[str, Any]) -> str:
         return blocks
 
     parts = [head]
+    if data_block:
+        parts.append(data_block.lstrip())
+    if label_block:
+        parts.append(label_block.lstrip())
     latest_blocks = _round_block("Latest round", latest, st.get("latest_round_ledger") or {})
     for b in latest_blocks:
         parts.extend(["", b])

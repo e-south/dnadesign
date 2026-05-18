@@ -14,6 +14,20 @@ data:
   y_column_name: "opal__stress_eth_cip_ethanol_rf_sfxi_topn__y"
   y_expected_length: 8
 
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: usr_prom_eth_cip_opal_candidates
+    path: "_opal/observed_labels.parquet"
+  y_space: sfxi_vec8
+  id_column: id
+  round_column: observed_round
+  batch_column: batch_id
+  dedup_policy: latest_by_round
+
+writeback:
+  prediction_records: ledger_only
+
 ingest:
   duplicate_policy: "error"
 

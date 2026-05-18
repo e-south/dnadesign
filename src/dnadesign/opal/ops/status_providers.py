@@ -15,6 +15,8 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 
+import pyarrow.parquet as pq
+
 from dnadesign.ops.status.artifacts import load_yaml_mapping
 from dnadesign.ops.status.paths import required_path
 
@@ -57,15 +59,34 @@ def _opal_campaign_state_status(
     workdir, config_path = _resolve_opal_workdir(opal_config=opal_config, opal_workdir=opal_workdir)
     state_path = workdir / "state.json"
     ledger_runs_path = workdir / "outputs" / "ledger" / "runs.parquet"
-    if not state_path.exists():
+    candidate_records = _resolve_opal_candidate_records_path(config_path)
+    if candidate_records is not None and not candidate_records["records_path"].exists():
         return (
             "missing",
-            "OPAL state.json not found",
+            "OPAL candidate records.parquet not found",
             {
                 "opal_workdir": str(workdir),
                 "opal_config": str(config_path) if config_path is not None else None,
                 "state_path": str(state_path),
                 "ledger_runs_path": str(ledger_runs_path),
+                "records_path": str(candidate_records["records_path"]),
+                "data_location_kind": candidate_records["kind"],
+                "dataset": candidate_records.get("dataset"),
+            },
+        )
+    candidate_evidence = _opal_candidate_records_evidence(candidate_records)
+    if not state_path.exists():
+        return (
+            "missing",
+            "OPAL state.json not found; candidate records.parquet exists"
+            if candidate_evidence
+            else "OPAL state.json not found",
+            {
+                "opal_workdir": str(workdir),
+                "opal_config": str(config_path) if config_path is not None else None,
+                "state_path": str(state_path),
+                "ledger_runs_path": str(ledger_runs_path),
+                **candidate_evidence,
             },
         )
 
@@ -92,6 +113,7 @@ def _opal_campaign_state_status(
             "state_path": str(state_path),
             "ledger_runs_path": str(ledger_runs_path),
             "ledger_runs_present": ledger_runs_path.exists(),
+            **candidate_evidence,
             "campaign_slug": campaign_slug,
             "campaign_name": payload.get("campaign_name") or payload.get("name"),
             "x_column_name": payload.get("x_column_name"),
@@ -108,6 +130,25 @@ def _opal_campaign_state_status(
             else None,
         },
     )
+
+
+def _opal_candidate_records_evidence(candidate_records: dict[str, object] | None) -> dict[str, object]:
+    if candidate_records is None:
+        return {}
+    records_path = candidate_records["records_path"]
+    if not isinstance(records_path, Path) or not records_path.exists():
+        return {}
+    try:
+        row_count: int | None = int(pq.ParquetFile(records_path).metadata.num_rows)
+    except Exception:
+        row_count = None
+    return {
+        "records_path": str(records_path),
+        "records_present": True,
+        "records_row_count": row_count,
+        "data_location_kind": candidate_records["kind"],
+        "dataset": candidate_records.get("dataset"),
+    }
 
 
 def _resolve_opal_workdir(*, opal_config: Path | None, opal_workdir: Path | None) -> tuple[Path, Path | None]:
@@ -137,6 +178,46 @@ def _resolve_opal_config_workdir(*, config_path: Path, workdir: str) -> Path:
         return workdir_path.resolve()
     campaign_root = _resolve_opal_campaign_root(config_path)
     return (campaign_root / workdir_path).resolve()
+
+
+def _resolve_opal_candidate_records_path(config_path: Path | None) -> dict[str, object] | None:
+    if config_path is None:
+        return None
+    payload = load_yaml_mapping(config_path, label="OPAL config")
+    data_payload = payload.get("data")
+    if not isinstance(data_payload, Mapping):
+        return None
+    location = data_payload.get("location")
+    if not isinstance(location, Mapping):
+        return None
+
+    kind = str(location.get("kind") or "").strip()
+    raw_path = str(location.get("path") or "").strip()
+    if not kind or not raw_path:
+        return None
+    base_path = _resolve_opal_config_path_like(config_path=config_path, raw_path=raw_path)
+    if kind == "usr":
+        dataset = str(location.get("dataset") or "").strip()
+        if not dataset:
+            return None
+        return {
+            "kind": kind,
+            "dataset": dataset,
+            "records_path": base_path / dataset / "records.parquet",
+        }
+    if kind == "local":
+        return {
+            "kind": kind,
+            "records_path": base_path,
+        }
+    return None
+
+
+def _resolve_opal_config_path_like(*, config_path: Path, raw_path: str) -> Path:
+    path = Path(raw_path).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    return (_resolve_opal_campaign_root(config_path) / path).resolve()
 
 
 def _resolve_opal_campaign_root(config_path: Path) -> Path:

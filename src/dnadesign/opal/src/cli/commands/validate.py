@@ -19,6 +19,8 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...registries.models import get_model
 from ...registries.objectives import get_objective_declared_channels
 from ...storage.data_access import ESSENTIAL_COLS
+from ...storage.label_sources import label_source_status
+from ...storage.x_contracts import validate_x_parquet_column
 from ..formatting import kv_block
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
@@ -110,7 +112,7 @@ def _validate_selection_channel_refs(cfg) -> None:
             )
 
 
-@cli_command("validate", help="End-to-end table checks (essentials present; X column present).")
+@cli_command("validate", help="End-to-end table checks (essentials present; X column finite and fixed-length).")
 def cmd_validate(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
@@ -119,7 +121,8 @@ def cmd_validate(
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
-        df = store.load()
+        schema_columns = store.schema_columns()
+        row_count = store.row_count()
 
         # Always print absolute context so there's no ambiguity
         cfg_abs = str(Path(cfg_path).resolve())
@@ -133,14 +136,23 @@ def cmd_validate(
                 "Records": rec_abs,
                 "X (YAML)": cfg.data.x_column_name,
                 "Y (YAML)": cfg.data.y_column_name,
-                "Table shape": f"{df.shape[0]} rows × {df.shape[1]} cols",
+                "Table shape": f"{row_count} rows × {len(schema_columns)} cols",
             },
         )
         print_stdout(ctx)
 
-        missing = [c for c in ESSENTIAL_COLS if c not in df.columns]
+        missing = [c for c in ESSENTIAL_COLS if c not in schema_columns]
         if missing:
             raise OpalError(f"Missing essential columns: {missing}")
+
+        label_hist_col = store.label_hist_col()
+        scalar_columns = [*ESSENTIAL_COLS]
+        if cfg.data.y_column_name in schema_columns:
+            scalar_columns.append(cfg.data.y_column_name)
+        if label_hist_col in schema_columns:
+            scalar_columns.append(label_hist_col)
+        df = store.load_columns(scalar_columns)
+
         # Enforce unique ids
         ids = df["id"].astype(str)
         if ids.duplicated().any():
@@ -152,10 +164,10 @@ def cmd_validate(
                 if df[col].isna().any():
                     bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
                     raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
-        if cfg.data.x_column_name not in df.columns:
+        if cfg.data.x_column_name not in schema_columns:
             # Helpful hints: case-only match and fuzzy suggestions
             target = cfg.data.x_column_name
-            cols = list(map(str, df.columns))
+            cols = list(map(str, schema_columns))
             case_only = [c for c in cols if c.lower() == target.lower()]
             fuzzy = get_close_matches(target, cols, n=5, cutoff=0.6)
             hint_lines = []
@@ -165,6 +177,20 @@ def cmd_validate(
                 hint_lines.append("Similar columns: " + ", ".join(repr(c) for c in fuzzy))
             hint = (" " + " | ".join(hint_lines)) if hint_lines else ""
             raise OpalError(f"Missing X column: {target}.{hint}")
+        x_report = validate_x_parquet_column(
+            store.records_path,
+            x_column=cfg.data.x_column_name,
+            id_column="id",
+        )
+        print_stdout(
+            kv_block(
+                "X contract",
+                {
+                    "Rows": x_report.row_count,
+                    "X dim": x_report.x_dim,
+                },
+            )
+        )
         # If Y exists, enforce vector length (sampled) and that labeled rows have X
         ycol = cfg.data.y_column_name
         if ycol in df.columns:
@@ -248,6 +274,24 @@ def cmd_validate(
             store.validate_label_hist(df, require=False)
         except OpalError as e:
             raise OpalError(f"label_hist validation failed: {e}")
+
+        labels_status = label_source_status(cfg, store, df, strict=False)
+        if labels_status.get("exists") and labels_status.get("valid") is False:
+            raise OpalError(f"label source validation failed: {labels_status.get('error')}")
+        label_rows = {
+            "kind": labels_status.get("kind"),
+            "exists": labels_status.get("exists"),
+            "valid": labels_status.get("valid"),
+            "label_count": labels_status.get("label_count"),
+            "available_rounds": ",".join(map(str, labels_status.get("available_rounds") or [])) or "(none)",
+            "prediction_records": cfg.writeback.prediction_records,
+        }
+        if labels_status.get("kind") == "usr_sidecar":
+            label_rows["path"] = labels_status.get("path")
+            label_rows["y_space"] = labels_status.get("y_space")
+        else:
+            label_rows["column"] = labels_status.get("column")
+        print_stdout(kv_block("Label source", label_rows))
 
         _validate_selection_channel_refs(cfg)
 

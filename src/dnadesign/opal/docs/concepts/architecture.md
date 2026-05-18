@@ -9,7 +9,9 @@ This page describes how OPAL executes one round and how config keys map to runti
 ### Round lifecycle
 
 1. Load `configs/campaign.yaml` and validate schema + plugin names.
-2. Resolve labels up to `--labels-as-of` from `opal__<slug>__label_hist`.
+2. Resolve labels up to `--labels-as-of` from the configured `labels` source.
+   Legacy/local campaigns use `opal__<slug>__label_hist`; shared USR
+   campaigns can use a sidecar such as `_opal/observed_labels.parquet`.
 3. Build feature matrices with `transforms_x`.
 4. Fit `model` and predict `y_pred` (and optional predictive std-dev).
 5. Apply `training.y_ops` inversion to both mean and std-dev when configured.
@@ -19,7 +21,9 @@ This page describes how OPAL executes one round and how config keys map to runti
 ### Runtime surfaces
 
 - Source records: `records.parquet`
-- Label history column: `opal__<slug>__label_hist`
+- Label source: `labels.source.kind`, either `campaign_history` or
+  `usr_sidecar`
+- Legacy label history column: `opal__<slug>__label_hist`
 - Round artifacts: `outputs/rounds/round_<k>/...`
 - Ledger sinks:
   - `outputs/ledger/labels.parquet`
@@ -29,6 +33,7 @@ This page describes how OPAL executes one round and how config keys map to runti
 ### Config to stage mapping
 
 - `campaign`, `data`: workspace and dataset resolution.
+- `labels`: training-label source resolution and batch/round label semantics.
 - `transforms_y`: ingest-only label construction.
 - `transforms_x`: feature matrix for training/scoring.
 - `training.y_ops`: fit-time Y transforms and inference-time inversion.
@@ -53,3 +58,6 @@ OPAL is fail-fast by design:
 - unresolved score/uncertainty refs fail before selection
 - non-finite/invalid model/objective/selection outputs fail before writeback
 - ledger schema violations fail at write time
+- a configured shared label sidecar fails rather than falling back to
+  campaign-local label history when it is missing, malformed, or points at
+  unknown candidate IDs

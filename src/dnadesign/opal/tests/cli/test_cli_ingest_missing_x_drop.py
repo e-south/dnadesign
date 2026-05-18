@@ -31,7 +31,7 @@ def _test_reorder_reset(df_tidy: pd.DataFrame, params: dict, *, ctx=None) -> pd.
     )
 
 
-def test_ingest_y_drops_unknown_missing_x_by_sequence(tmp_path: Path) -> None:
+def test_ingest_y_rejects_unknown_missing_x_without_explicit_drop(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
@@ -77,9 +77,10 @@ def test_ingest_y_drops_unknown_missing_x_by_sequence(tmp_path: Path) -> None:
             "--apply",
         ],
     )
-    assert res.exit_code == 0, res.stdout
+    assert res.exit_code != 0, res.stdout
+    assert "missing required X column 'X'" in res.output
 
     out_df = pd.read_parquet(records)
     sequences = set(out_df["sequence"].astype(str).tolist())
-    assert "DDD" in sequences
+    assert "DDD" not in sequences
     assert "CCC" not in sequences

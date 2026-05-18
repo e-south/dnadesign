@@ -276,7 +276,7 @@ def cli_handoff_lines(config_path: Path | str) -> list[str]:
     return [
         "### Canonical OPAL inspection commands",
         "",
-        "Pre-run-safe campaign viewer:",
+        "Pre-run campaign viewer generation (writes notebook):",
         "",
         "```bash",
         f"uv run opal validate -c {config_text}",

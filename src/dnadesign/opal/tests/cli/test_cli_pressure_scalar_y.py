@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -20,16 +22,21 @@ from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 
 def _write_records(path: Path) -> None:
-    df = pd.DataFrame(
-        {
-            "id": ["a", "b", "c", "d"],
-            "sequence": ["AAA", "BBB", "CCC", "DDD"],
-            "bio_type": ["dna", "dna", "dna", "dna"],
-            "alphabet": ["dna_4", "dna_4", "dna_4", "dna_4"],
-            "X": [[0.1, 0.2], [0.2, 0.3], [0.3, 0.4], [0.4, 0.5]],
-        }
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["a", "b", "c", "d"], type=pa.string()),
+                "sequence": pa.array(["AAA", "BBB", "CCC", "DDD"], type=pa.string()),
+                "bio_type": pa.array(["dna", "dna", "dna", "dna"], type=pa.string()),
+                "alphabet": pa.array(["dna_4", "dna_4", "dna_4", "dna_4"], type=pa.string()),
+                "X": pa.array(
+                    [[0.1, 0.2], [0.2, 0.3], [0.3, 0.4], [0.4, 0.5]],
+                    type=pa.list_(pa.float32(), list_size=2),
+                ),
+            }
+        ),
+        path,
     )
-    df.to_parquet(path, index=False)
 
 
 def _write_labels(path: Path, *, seqs: list[str], ys: list[float]) -> None:

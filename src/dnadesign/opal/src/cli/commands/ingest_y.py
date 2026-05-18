@@ -4,7 +4,7 @@
 src/dnadesign/opal/src/cli/commands/ingest_y.py
 
 CLI command to ingest labels into OPAL campaigns. Validates inputs, applies
-transforms, and writes label history.
+transforms, and writes the configured label source.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -24,6 +24,7 @@ from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...registries.transforms_y import get_transform_y
 from ...runtime.ingest import run_ingest
 from ...storage.data_access import RecordsStore
+from ...storage.label_sources import SharedObservedLabelSource, label_source_from_config
 from ...storage.ledger import LedgerWriter
 from ...storage.locks import CampaignLock
 from ...storage.parquet_io import read_parquet_df
@@ -52,7 +53,7 @@ from ._common import (
 
 @cli_command(
     "ingest-y",
-    help="Ingest tidy CSV → Y (strict checks), update label_hist, and emit label events.",
+    help="Ingest tidy CSV -> Y (strict checks), update the configured label source, and emit label events.",
 )
 def cmd_ingest_y(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
@@ -61,7 +62,7 @@ def cmd_ingest_y(
         "--round",
         "-r",
         "--observed-round",
-        help="Observed round stamp for these labels (writes to label history).",
+        help="Observed round stamp for these labels.",
     ),
     csv: Path = typer.Option(..., "--csv", "--in", help="CSV/Parquet with raw reads"),
     transform: str = typer.Option(None, "--transform", help="Override YAML transform name"),
@@ -81,7 +82,7 @@ def cmd_ingest_y(
     if_exists: str = typer.Option(
         "fail",
         "--if-exists",
-        help="Behavior if (id, round) already exists in label history: 'fail' (default), 'skip', or 'replace'.",
+        help="Behavior if (id, round) already exists in the configured label source: fail, skip, or replace.",
         case_sensitive=False,
     ),
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
@@ -93,6 +94,7 @@ def cmd_ingest_y(
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         store: RecordsStore = store_from_cfg(cfg)
+        label_source = label_source_from_config(cfg, store)
         df = store.load()
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
@@ -167,6 +169,18 @@ def cmd_ingest_y(
         # Preview
         if preview.unknown_sequences:
             preview_warnings = list(preview.warnings or [])
+            if isinstance(label_source, SharedObservedLabelSource):
+                preview_warnings = [
+                    w
+                    for w in preview_warnings
+                    if "new rows will be created" not in w.lower()
+                    and "created for new sequences" not in w.lower()
+                    and "create deterministic ids" not in w.lower()
+                ]
+                preview_warnings.append(
+                    "shared usr_sidecar label sources use a fixed candidate universe; "
+                    "unknown labels cannot create records."
+                )
             if unknown_sequences in {"drop", "error"}:
                 preview_warnings = [
                     w
@@ -217,6 +231,12 @@ def cmd_ingest_y(
 
         unknown_mask = _build_unknown_mask(labels_df)
         unknown_count = int(unknown_mask.sum())
+        if isinstance(label_source, SharedObservedLabelSource) and unknown_count > 0 and unknown_sequences == "create":
+            raise OpalError(
+                "Shared usr_sidecar label sources use a fixed candidate universe; "
+                "unknown labels cannot create records. Use --unknown-sequences error to fail explicitly "
+                "or --unknown-sequences drop to skip them."
+            )
 
         # Missing required columns for new rows (only relevant if unknown rows exist and we intend to create)
         missing_required = [c for c in required_cols if c not in csv_df.columns]
@@ -236,7 +256,7 @@ def cmd_ingest_y(
         def _col_has_str(series: pd.Series) -> bool:
             return any(isinstance(v, str) for v in series.head(20).tolist())
 
-        if preview.unknown_sequences and cfg.data.x_column_name in required_cols:
+        if preview.unknown_sequences and unknown_sequences == "create" and cfg.data.x_column_name in required_cols:
             x_col = cfg.data.x_column_name
             if x_col in df.columns and x_col in csv_df.columns:
                 if _col_is_listlike(df[x_col]) and _col_has_str(csv_df[x_col]):
@@ -272,7 +292,7 @@ def cmd_ingest_y(
                     f"{unknown_count} sequences not found in records. "
                     "Use --unknown-sequences drop to skip them or provide required columns to create new rows."
                 )
-            if unknown_sequences in {"create", "drop"} and cfg.data.x_column_name in required_cols:
+            if unknown_sequences == "create" and cfg.data.x_column_name in required_cols:
                 x_col = cfg.data.x_column_name
                 missing_x_mask = pd.Series(False, index=labels_df.index)
                 if x_col not in csv_df.columns:
@@ -302,10 +322,10 @@ def cmd_ingest_y(
                         missing_x_mask = ~(seq_has_x | id_has_x) & unknown_mask
                 missing_x_count = int(missing_x_mask.sum())
                 if missing_x_count > 0:
-                    labels_df = labels_df.loc[~missing_x_mask].copy()
-                    dropped_missing_x = missing_x_count
-                    unknown_mask = _build_unknown_mask(labels_df)
-                    unknown_count = int(unknown_mask.sum())
+                    raise OpalError(
+                        f"{missing_x_count} unknown sequences are missing required X column '{x_col}'. "
+                        "Provide X values for new rows or use --unknown-sequences drop to skip unknown rows."
+                    )
             if unknown_count == 0:
                 pass
             elif unknown_sequences == "create":
@@ -452,8 +472,9 @@ def cmd_ingest_y(
                 print_stdout("Aborted.")
                 return
 
-        # Ensure rows exist; append to label_hist
+        # Ensure rows exist for legacy campaign-history ingest; shared sidecars keep a fixed candidate universe.
         with CampaignLock(Path(cfg.campaign.workdir)):
+            row_count_before = int(len(df))
             df = store.ensure_rows_exist(
                 df,
                 labels_df,
@@ -503,18 +524,33 @@ def cmd_ingest_y(
             else:
                 labels_effective = labels_df
 
-            # 1) append to immutable label history (SSoT)
-            df2 = store.append_labels_from_df(
-                df,
-                labels_effective[["id", "y"]],  # ids are now concrete
-                r=int(round),
-                src="ingest_y",
-                fail_if_any_existing_labels=(str(if_exists).lower().strip() == "fail"),
-                if_exists=str(if_exists).lower().strip(),
-            )
-            # 2) mirror "current y" into configured y_column_name for convenience
-            df3 = store.upsert_current_y_column(df2, labels_effective[["id", "y"]], cfg.data.y_column_name)
-            store.save_atomic(df3)
+            y_column_updated = cfg.data.y_column_name
+            if isinstance(label_source, SharedObservedLabelSource):
+                if int(len(df)) != row_count_before:
+                    store.save_atomic(df)
+                labels_effective = label_source.store.append_labels(
+                    labels_effective[["id", "y"]],
+                    observed_round=int(round),
+                    batch_id=f"round_{int(round)}",
+                    src="ingest_y",
+                    if_exists=str(if_exists).lower().strip(),
+                    known_ids=set(df["id"].astype(str).tolist()),
+                )
+                df2 = df
+                y_column_updated = f"label_source:{label_source.store.path}"
+            else:
+                # 1) append to immutable label history (SSoT)
+                df2 = store.append_labels_from_df(
+                    df,
+                    labels_effective[["id", "y"]],  # ids are now concrete
+                    r=int(round),
+                    src="ingest_y",
+                    fail_if_any_existing_labels=(str(if_exists).lower().strip() == "fail"),
+                    if_exists=str(if_exists).lower().strip(),
+                )
+                # 2) mirror "current y" into configured y_column_name for convenience
+                df3 = store.upsert_current_y_column(df2, labels_effective[["id", "y"]], cfg.data.y_column_name)
+                store.save_atomic(df3)
 
             # Emit label events (canonical SSoT)
             seq_map = df2.set_index("id")["sequence"].to_dict() if "sequence" in df2.columns else {}
@@ -535,7 +571,7 @@ def cmd_ingest_y(
             "round": int(round),
             "labels_appended": int(len(labels_effective)),
             "labels_skipped": int(len(labels_df) - len(labels_effective)),
-            "y_column_updated": cfg.data.y_column_name,
+            "y_column_updated": y_column_updated,
         }
 
         if json:

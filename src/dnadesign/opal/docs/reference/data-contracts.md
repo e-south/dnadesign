@@ -1,18 +1,27 @@
 ## OPAL Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-17
 
 
-This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, label history, and append-only ledger sinks.
+This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, shared label sidecars, label history, and append-only ledger sinks.
 
 ### Safety and validation
 
 OPAL is assertive by default and fails fast on inconsistent inputs.
 
-- `opal validate` checks essentials + X presence; if Y exists it must be finite and expected length.
-- `label_hist` is required input for `run`/`explain` and the main dashboard source.
-- Labels in Y but missing from `label_hist` are rejected.
+- `opal validate` checks essentials plus a non-null, finite, fixed-length X column; if Y exists it must be finite and expected length.
+- `campaign_history` label sources require `label_hist` for `run`/`explain`.
+- `usr_sidecar` label sources require the configured sidecar to exist for
+  `run`/`explain` and contain only candidate IDs present in `records.parquet`.
+  `opal validate` reports a missing pre-ingest sidecar as
+  `label_source.exists=false` and validates schema once the file exists.
+- `usr_sidecar` campaigns require explicit `writeback.prediction_records`;
+  `ledger_only` keeps run predictions out of the shared candidate table.
+- `usr_sidecar` appends are serialized by a local sidecar path lock; this
+  protects local multi-campaign ingest, not distributed multi-host writes.
+- Labels in Y but missing from `label_hist` are rejected for legacy
+  `campaign_history` runs.
 - Ledger writes are strict: unknown columns are errors (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 - Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (`error|keep_first|keep_last`).
 - `verify-outputs` is strict: selection IDs must be unique and must exist in the target run ledger predictions.
@@ -31,15 +40,48 @@ Required columns in `records.parquet`:
 X and Y representation:
 
 - X: Arrow `list<float>` or JSON array string; fixed length across used rows
-- Y: Arrow `list<float>`; label history stored in `opal__<campaign>__label_hist`
+- Y: Arrow `list<float>` when using legacy/current-Y columns. Training labels
+  may instead come from a shared sidecar when `labels.source.kind:
+  usr_sidecar`.
+
+When `records.parquet` is generated from a larger representation artifact, it
+may be an ordered subset of that artifact. It must not silently include
+reference/control rows that are outside the declared OPAL candidate universe.
+
+### Shared observed-label sidecar
+
+`usr_sidecar` label sources are dataset-local Parquet tables such as
+`_opal/observed_labels.parquet`.
+
+Required columns:
+
+| column | type | purpose |
+| --- | --- | --- |
+| `id` | string | Candidate ID matching `records.parquet` |
+| `observed_round` | int | Round or batch index at which the assay label became available |
+| `batch_id` | string | Operator/study batch identifier |
+| `y_space` | string | Label space such as `sfxi_vec8` |
+| `y_obs` | list<float> | Observed assay vector |
+
+Optional provenance columns include `src`, `ts`, schema metadata, and assay
+artifact references. A configured shared sidecar is fail-fast: OPAL does not
+fall back to campaign-local label history when the file is missing, malformed,
+or contains unknown candidate IDs. Appends lock the sidecar path while OPAL
+loads existing labels, applies the duplicate policy, and replaces the Parquet
+file.
 
 ### Records label history (OPAL-managed)
 
 | column | type | purpose |
 | --- | --- | --- |
-| `opal__<slug>__label_hist` | list<struct> | Append-only per-record history of observed labels and run-aware predictions. |
+| `opal__<slug>__label_hist` | list<struct> | Append-only per-record observed labels for legacy `campaign_history` campaigns and run-aware predictions only when `writeback.prediction_records: label_history`. |
 
 Prediction entries store objective channel metadata and selected metrics (`score_ref`, `uncertainty_ref`) so readers can reconstruct selection behavior without implicit defaults.
+
+Shared-label campaigns should use `writeback.prediction_records: ledger_only`
+unless mutating the shared `records.parquet` with campaign prediction history is
+an explicit operator choice. In `ledger_only` mode, `run_pred` and `run_meta`
+ledgers are the prediction/selection truth.
 
 ### Ledger output schema (append-only)
 

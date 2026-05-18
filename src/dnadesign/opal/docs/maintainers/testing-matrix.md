@@ -12,7 +12,7 @@ This page is for maintainers and CI-style validation. New users should start at:
 
 Runs each demo campaign end-to-end in an isolated temp copy:
 
-- `init -> validate -> ingest-y -> run -> verify-outputs`
+- `validate -> init -> ingest-y -> run -> verify-outputs`
 - `ctx audit -> explain -> record-show -> predict -> plot`
 
 ### Matrix script (round 0)
@@ -31,8 +31,8 @@ for flow in demo_rf_sfxi_topn demo_gp_topn demo_gp_ei; do
   cp src/dnadesign/opal/campaigns/demo/records.parquet "${dst}/records.parquet"
 
   uv run opal campaign-reset -c "${dst}/configs/campaign.yaml" --apply --no-backup
-  uv run opal init -c "${dst}/configs/campaign.yaml"
   uv run opal validate -c "${dst}/configs/campaign.yaml"
+  uv run opal init -c "${dst}/configs/campaign.yaml"
 
   uv run opal ingest-y -c "${dst}/configs/campaign.yaml" \
     --observed-round 0 \

@@ -1,7 +1,7 @@
 ## OPAL Configuration (v2)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-17
 
 
 This page documents the `campaign.yaml` configuration contract used by OPAL runtime and CLI commands.
@@ -13,6 +13,8 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 
 - `campaign`: `name`, `slug`, `workdir`
 - `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
+- `labels`: optional training-label source contract; defaults to legacy
+  campaign history
 - `transforms_x`: `{ name, params }` (raw X -> model-ready X)
 - `transforms_y`: `{ name, params }` (table -> model-ready Y; CSV/Parquet/XLSX)
 - `model`: `{ name, params }`
@@ -22,6 +24,7 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 - `training.y_ops`: list of `{ name, params }`
 - `ingest`: duplicate handling for label CSVs
 - `scoring`: batch sizing
+- `writeback`: prediction writeback policy
 - `safety`: preflight/data guards
 - `plot_config`: optional path to a separate plots YAML
 - `plot_defaults`, `plot_presets`, `plots`: optional plot-only keys when using inline plot config
@@ -42,8 +45,14 @@ Built-in schemas currently provide defaults for `top_k`, `objective_mode`, and `
 
 If an optional block is omitted, OPAL supplies conservative defaults:
 
+- `labels.source.kind`: `campaign_history`
+- `labels.id_column`: `id`; `labels.round_column`: `observed_round`;
+  `labels.batch_column`: `batch_id`; `labels.dedup_policy`: `latest_by_round`
 - `ingest.duplicate_policy`: `error`
 - `scoring.score_batch_size`: `10000`
+- `writeback.prediction_records`: `label_history` for legacy
+  `campaign_history` campaigns; shared `usr_sidecar` campaigns must declare
+  this explicitly
 - `training.policy`: `{}` and `training.y_ops`: `[]`
 - `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
   conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true, accept_x_mismatch=false
@@ -55,11 +64,42 @@ Analytical `sfxi_v1` uncertainty requires `logic_exponent_beta=1` and `intensity
 
 ### Semantic wiring (model → objective → selection)
 
-1. `model` predicts `y_hat` (and, for GP, predictive standard deviation).
-2. Each objective emits named score channels (and optional uncertainty channels).
-3. `selection.params.score_ref` chooses the score channel used for ranking.
-4. `selection.params.uncertainty_ref` (EI only) chooses the uncertainty standard deviation channel.
-5. `selection.params.objective_mode` must match the selected score channel mode.
+1. The configured label source supplies training `Y` through the requested
+   `--labels-as-of` round.
+2. `model` predicts `y_hat` (and, for GP, predictive standard deviation).
+3. Each objective emits named score channels (and optional uncertainty channels).
+4. `selection.params.score_ref` chooses the score channel used for ranking.
+5. `selection.params.uncertainty_ref` (EI only) chooses the uncertainty standard deviation channel.
+6. `selection.params.objective_mode` must match the selected score channel mode.
+
+### Shared label source example
+
+Use this when multiple campaigns share candidate identity, `X`, and observed
+assay labels, but differ in objective/setpoint/selection settings.
+
+```yaml
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: my_dataset
+    path: _opal/observed_labels.parquet
+  y_space: sfxi_vec8
+  id_column: id
+  round_column: observed_round
+  batch_column: batch_id
+  dedup_policy: latest_by_round
+writeback:
+  prediction_records: ledger_only
+```
+
+`usr_sidecar` label sources must point at the same dataset as
+`data.location.dataset` and must explicitly declare
+`writeback.prediction_records`. Use `ledger_only` when the shared
+`records.parquet` should remain a candidate/X table and prediction outputs
+should live in campaign ledgers. OPAL fails fast rather than falling back to
+campaign-local label history when a configured shared sidecar is missing or
+malformed during `run`/`explain`; `opal validate` reports missing pre-ingest
+sidecars and validates schema when the file exists.
 
 ### Minimal baseline example (RF + top_n)
 

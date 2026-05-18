@@ -53,3 +53,4 @@ These pages are maintainer-focused notes and validation runbooks.
 - [Development journal](./maintainers/journal.md): maintainer investigations and decision records.
 - [History](./maintainers/history.md): chronology of major design and behavior changes.
 - [Workflow pressure-test matrix](./maintainers/testing-matrix.md): repeatable validation matrix for workflow hardening.
+- [Shared label source plan](./maintainers/shared-label-source-plan.md): implementation plan for shared observed labels across multiple OPAL campaigns.

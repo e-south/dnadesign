@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
@@ -23,7 +24,7 @@ from ..formatting.renderers.guide import (
     render_guide_text,
     render_next_text,
 )
-from ..guidance import build_guidance_report, build_next_guidance
+from ..guidance import build_guidance_report, build_missing_records_guidance, build_next_guidance
 from ..registry import cli_group
 from ._common import (
     internal_error,
@@ -88,15 +89,27 @@ def cmd_guide_next(
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
-        df = store.load()
-        report = build_next_guidance(
-            cfg_path,
-            cfg,
-            store,
-            df,
-            labels_as_of=labels_as_of,
-            observed_round=observed_round,
-        )
+        if not store.records_path.exists():
+            report = build_missing_records_guidance(
+                cfg_path,
+                cfg,
+                store.records_path,
+                labels_as_of=labels_as_of,
+                observed_round=observed_round,
+            )
+        else:
+            from ...storage.workspace import CampaignWorkspace
+
+            ws = CampaignWorkspace.from_config(cfg, cfg_path)
+            df = store.load_label_status_frame() if ws.state_path.exists() else pd.DataFrame(columns=["id"])
+            report = build_next_guidance(
+                cfg_path,
+                cfg,
+                store,
+                df,
+                labels_as_of=labels_as_of,
+                observed_round=observed_round,
+            )
         if json:
             json_out(report)
         else:

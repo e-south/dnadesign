@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from ..storage.data_access import RecordsStore
+from ..storage.label_sources import CampaignHistoryLabelSource, TrainingLabelSource
 
 
 @dataclass(frozen=True)
@@ -38,13 +39,15 @@ def plan_round(
     as_of_round: int,
     *,
     warnings: Optional[List[str]] = None,
+    label_source: TrainingLabelSource | None = None,
 ) -> RoundPlan:
     policy = cfg.training.policy or {}
     cumulative_training = bool(policy.get("cumulative_training", True))
     dedup_policy = str(policy.get("label_cross_round_deduplication_policy", "latest_only"))
     allow_resuggest = bool(policy.get("allow_resuggesting_candidates_until_labeled", True))
+    source = label_source or CampaignHistoryLabelSource(store=store)
 
-    train_df = store.training_labels_with_round(
+    train_df = source.training_labels(
         df,
         int(as_of_round),
         cumulative_training=cumulative_training,
@@ -58,9 +61,9 @@ def plan_round(
     exclude_already_labeled = bool(sel_params.get("exclude_already_labeled", True))
     if exclude_already_labeled:
         labeled_ids = (
-            store.labeled_id_set_leq_round(df, int(as_of_round))
+            source.labeled_id_set_leq_round(df, int(as_of_round))
             if allow_resuggest
-            else store.labeled_id_set_any_round(df)
+            else source.labeled_id_set_any_round(df)
         )
         if labeled_ids:
             cand_df = cand_df.loc[~cand_df["id"].astype(str).isin(labeled_ids)].copy()

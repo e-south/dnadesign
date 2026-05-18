@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
@@ -35,20 +37,54 @@ def write_records(
     include_opal_cols: bool = False,
     slug: str = "demo",
 ) -> pd.DataFrame:
-    df = pd.DataFrame(
+    table_columns = {
+        "id": pa.array(["a", "b"], type=pa.string()),
+        "sequence": pa.array(["AAA", "BBB"], type=pa.string()),
+        "bio_type": pa.array(["dna", "dna"], type=pa.string()),
+        "alphabet": pa.array(["dna_4", "dna_4"], type=pa.string()),
+        "X": pa.FixedSizeListArray.from_arrays(
+            pa.array([0.1, 0.2, 0.2, 0.3], type=pa.float32()),
+            2,
+        ),
+    }
+    if include_opal_cols:
+        table_columns[f"opal__{slug}__label_hist"] = pa.array([[], []])
+        table_columns["Y"] = pa.array([None, None], type=pa.null())
+    table = pa.table(table_columns)
+    pq.write_table(table, path)
+    return pd.read_parquet(path)
+
+
+def write_records_with_x_values(
+    path: Path,
+    *,
+    values: list[list[float] | None],
+    ids: list[str] | None = None,
+    include_opal_cols: bool = True,
+    slug: str = "demo",
+) -> pd.DataFrame:
+    row_ids = ids or [chr(ord("a") + index) for index in range(len(values))]
+    table_columns = {
+        "id": pa.array(row_ids, type=pa.string()),
+        "sequence": pa.array(["AAA"] * len(row_ids), type=pa.string()),
+        "bio_type": pa.array(["dna"] * len(row_ids), type=pa.string()),
+        "alphabet": pa.array(["dna_4"] * len(row_ids), type=pa.string()),
+        "X": pa.array(values, type=pa.list_(pa.float32(), list_size=2)),
+    }
+    if include_opal_cols:
+        table_columns[f"opal__{slug}__label_hist"] = pa.array([[] for _ in row_ids])
+        table_columns["Y"] = pa.array([None for _ in row_ids], type=pa.null())
+    table = pa.table(table_columns)
+    pq.write_table(table, path)
+    return pd.DataFrame(
         {
-            "id": ["a", "b"],
-            "sequence": ["AAA", "BBB"],
-            "bio_type": ["dna", "dna"],
-            "alphabet": ["dna_4", "dna_4"],
-            "X": [[0.1, 0.2], [0.2, 0.3]],
+            "id": row_ids,
+            "sequence": ["AAA"] * len(row_ids),
+            "bio_type": ["dna"] * len(row_ids),
+            "alphabet": ["dna_4"] * len(row_ids),
+            "X": values,
         }
     )
-    if include_opal_cols:
-        df[f"opal__{slug}__label_hist"] = [[], []]
-        df["Y"] = [None, None]
-    df.to_parquet(path, index=False)
-    return df
 
 
 def write_campaign_yaml(

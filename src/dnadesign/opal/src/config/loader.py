@@ -27,6 +27,9 @@ from .types import (
     CampaignBlock,
     DataBlock,
     IngestBlock,
+    LabelsBlock,
+    LabelSourceCampaignHistory,
+    LabelSourceUSRSidecar,
     LocationLocal,
     LocationUSR,
     ObjectivesBlock,
@@ -36,6 +39,7 @@ from .types import (
     ScoringBlock,
     SelectionBlock,
     TrainingBlock,
+    WritebackBlock,
 )
 
 
@@ -101,6 +105,31 @@ class PData(BaseModel):
     y_expected_length: Optional[int] = None
 
 
+class PLabelSourceCampaignHistory(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["campaign_history"] = "campaign_history"
+
+
+class PLabelSourceUSRSidecar(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["usr_sidecar"]
+    dataset: Optional[str] = None
+    path: str = "_opal/observed_labels.parquet"
+
+
+PLabelSource = Union[PLabelSourceCampaignHistory, PLabelSourceUSRSidecar]
+
+
+class PLabels(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: PLabelSource = Field(default_factory=PLabelSourceCampaignHistory)
+    y_space: Optional[str] = None
+    id_column: str = "id"
+    round_column: str = "observed_round"
+    batch_column: str = "batch_id"
+    dedup_policy: Literal["latest_by_round", "all_events", "error_on_duplicate"] = "latest_by_round"
+
+
 class PCampaign(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -128,6 +157,11 @@ class PScoring(BaseModel):
     score_batch_size: int = 10_000
 
 
+class PWriteback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prediction_records: Literal["label_history", "ledger_only"] = "label_history"
+
+
 class PIngest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     duplicate_policy: Literal["error", "keep_first", "keep_last"] = "error"
@@ -151,6 +185,8 @@ class PRoot(BaseModel):
     model: PPluginRef
     objectives: List[PPluginRef]
     selection: PPluginRef
+    labels: PLabels = Field(default_factory=PLabels)
+    writeback: Optional[PWriteback] = None
     training: PTraining = Field(default_factory=PTraining)
     ingest: PIngest = Field(default_factory=PIngest)
     scoring: PScoring = Field(default_factory=PScoring)
@@ -276,6 +312,41 @@ def load_config(path: Path | str) -> RootConfig:
         transforms_y=PluginRef(ty.name, ty_params),
     )
 
+    if isinstance(pyd.labels.source, PLabelSourceUSRSidecar):
+        if not isinstance(pyd.data.location, PLocationUSR):
+            raise ConfigError("Invalid campaign.yaml: labels.source.kind=usr_sidecar requires data.location.kind=usr.")
+        if pyd.writeback is None:
+            raise ConfigError(
+                "Invalid campaign.yaml: labels.source.kind=usr_sidecar requires explicit "
+                "writeback.prediction_records (use ledger_only unless records label-history prediction "
+                "writeback is intentional)."
+            )
+        label_dataset = pyd.labels.source.dataset or pyd.data.location.dataset
+        if label_dataset != pyd.data.location.dataset:
+            raise ConfigError(
+                "Invalid campaign.yaml: labels.source.dataset must target the same dataset as data.location.dataset."
+            )
+        if not pyd.labels.y_space or not str(pyd.labels.y_space).strip():
+            raise ConfigError("Invalid campaign.yaml: labels.y_space is required for labels.source.kind=usr_sidecar.")
+        if Path(str(pyd.labels.source.path)).is_absolute():
+            raise ConfigError("Invalid campaign.yaml: labels.source.path must be relative to the USR dataset root.")
+        label_source = LabelSourceUSRSidecar(
+            kind="usr_sidecar",
+            dataset=label_dataset,
+            path=str(pyd.labels.source.path),
+        )
+    else:
+        label_source = LabelSourceCampaignHistory()
+
+    labels_dc = LabelsBlock(
+        source=label_source,
+        y_space=(str(pyd.labels.y_space).strip() if pyd.labels.y_space else None),
+        id_column=str(pyd.labels.id_column),
+        round_column=str(pyd.labels.round_column),
+        batch_column=str(pyd.labels.batch_column),
+        dedup_policy=str(pyd.labels.dedup_policy),
+    )
+
     selection_dc = SelectionBlock(selection=PluginRef(sel.name, sel_params))
     objectives_dc = ObjectivesBlock(objectives=obj_refs)
     training_dc = TrainingBlock(
@@ -284,6 +355,9 @@ def load_config(path: Path | str) -> RootConfig:
     )
     ingest_dc = IngestBlock(duplicate_policy=pyd.ingest.duplicate_policy)
     scoring_dc = ScoringBlock(score_batch_size=int(pyd.scoring.score_batch_size))
+    writeback_dc = WritebackBlock(
+        prediction_records=(pyd.writeback.prediction_records if pyd.writeback else "label_history")
+    )
     safety_dc = SafetyBlock(
         fail_on_mixed_biotype_or_alphabet=pyd.safety.fail_on_mixed_biotype_or_alphabet,
         require_biotype_and_alphabet_on_init=pyd.safety.require_biotype_and_alphabet_on_init,
@@ -306,6 +380,8 @@ def load_config(path: Path | str) -> RootConfig:
         ingest=ingest_dc,
         scoring=scoring_dc,
         safety=safety_dc,
+        labels=labels_dc,
+        writeback=writeback_dc,
         plot_config=(_abs(pyd.plot_config) if pyd.plot_config else None),
     )
     return root

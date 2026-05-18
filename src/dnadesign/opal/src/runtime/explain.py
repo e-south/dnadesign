@@ -12,11 +12,14 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from ..core.utils import OpalError
+from ..storage.label_sources import CampaignHistoryLabelSource, label_source_from_config
 from .preflight import preflight_run
 from .round_plan import plan_round
 
 
 def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
+    label_source = label_source_from_config(cfg, store)
+    uses_campaign_history = isinstance(label_source, CampaignHistoryLabelSource)
     # Preflight: no writes/backfill during explain
     rep = preflight_run(
         store,
@@ -24,16 +27,17 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         round_k,
         cfg.safety.fail_on_mixed_biotype_or_alphabet,
         auto_backfill=False,
+        check_manual_attach=uses_campaign_history,
     )
-    if rep.manual_attach_count:
+    if uses_campaign_history and rep.manual_attach_count:
         raise OpalError(
             f"Detected {rep.manual_attach_count} labels in '{store.y_col}' without label_hist. "
             "Run `opal ingest-y` (preferred) or `opal label-hist attach-from-y` for legacy Y columns."
         )
-    store.validate_label_hist(df, require=True)
+    label_source.validate(df)
 
     # Derive counts the same way 'run' does
-    plan = plan_round(store, df, cfg, round_k, warnings=list(rep.warnings or []))
+    plan = plan_round(store, df, cfg, round_k, warnings=list(rep.warnings or []), label_source=label_source)
     round_counts: Dict[int, int] = {}
     if "r" in plan.training_df.columns:
         counts = plan.training_df["r"].value_counts(dropna=True).to_dict()
@@ -61,6 +65,7 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "round_index": round_k,
         "x_column_name": cfg.data.x_column_name,
         "y_column_name": cfg.data.y_column_name,
+        "label_source": {"kind": label_source.kind},
         "representation_vector_dimension": rep.x_dim,
         "model": {"name": cfg.model.name, "params": cfg.model.params},
         "training_policy": cfg.training.policy,

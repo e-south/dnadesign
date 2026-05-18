@@ -17,7 +17,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
-from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records, write_records_with_x_values
 
 
 def _setup_workspace(tmp_path: Path, *, include_opal_cols: bool = False) -> tuple[Path, Path, Path]:
@@ -52,6 +52,90 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert out["round_index"] == 0
+
+
+def test_init_does_not_materialize_candidate_x_when_label_history_exists(tmp_path: Path, monkeypatch) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    from dnadesign.opal.src.storage import records_io
+
+    calls: list[tuple[str, ...] | None] = []
+    original = records_io.read_parquet_df
+
+    def spy_read_parquet_df(path, *, columns=None, dtype_backend=None):
+        calls.append(tuple(columns) if columns is not None else None)
+        assert columns is not None
+        assert "X" not in columns
+        return original(path, columns=columns, dtype_backend=dtype_backend)
+
+    monkeypatch.setattr(records_io, "read_parquet_df", spy_read_parquet_df)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign), "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    assert calls == [("id", "bio_type", "alphabet")]
+    state = json.loads((workdir / "state.json").read_text())
+    assert "records_sha256" not in state["data_location"]
+    assert state["data_location"]["records_fingerprint_kind"] == "file_metadata"
+    assert state["data_location"]["records_size_bytes"] > 0
+
+
+def test_validate_does_not_materialize_candidate_x_in_pandas(tmp_path: Path, monkeypatch) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    from dnadesign.opal.src.storage import records_io
+
+    calls: list[tuple[str, ...] | None] = []
+    original = records_io.read_parquet_df
+
+    def spy_read_parquet_df(path, *, columns=None, dtype_backend=None):
+        calls.append(tuple(columns) if columns is not None else None)
+        assert columns is not None
+        assert "X" not in columns
+        return original(path, columns=columns, dtype_backend=dtype_backend)
+
+    monkeypatch.setattr(records_io, "read_parquet_df", spy_read_parquet_df)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+
+    assert res.exit_code == 0, res.stdout
+    assert calls == [("id", "bio_type", "sequence", "alphabet", "Y", "opal__demo__label_hist")]
+
+
+def test_validate_rejects_inconsistent_x_lengths(tmp_path: Path) -> None:
+    _, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
+    pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "sequence": ["AAA", "BBB"],
+            "bio_type": ["dna", "dna"],
+            "alphabet": ["dna_4", "dna_4"],
+            "X": [[0.1, 0.2], [0.2, 0.3, 0.4]],
+            "opal__demo__label_hist": [[], []],
+            "Y": [None, None],
+        }
+    ).to_parquet(records, index=False)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+
+    assert res.exit_code != 0
+    assert "fixed_size_list" in res.output
+
+
+def test_validate_rejects_null_x_values(tmp_path: Path) -> None:
+    _, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
+    write_records_with_x_values(records, values=[[0.1, 0.2], None], include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+
+    assert res.exit_code != 0
+    assert "null or ragged fixed-size-list rows" in res.output
 
 
 def test_validate_rejects_unknown_plugin_names(tmp_path: Path) -> None:

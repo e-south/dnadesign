@@ -371,6 +371,7 @@ def update_campaign_state(
     store: RecordsStore,
     total_duration: float,
     fit_duration: float,
+    records_label_hist_updated: bool = True,
 ) -> None:
     st = CampaignState.load(ws.state_path)
     if getattr(req, "allow_resume", False):
@@ -442,9 +443,10 @@ def update_campaign_state(
                 "round_log_jsonl": str(apaths.round_log_jsonl.resolve()),
             },
             writebacks={
-                "records_label_hist_updated": [
-                    "opal__<slug>__label_hist",
-                ]
+                "prediction_records": cfg.writeback.prediction_records,
+                "records_label_hist_updated": (
+                    [f"opal__{cfg.campaign.slug}__label_hist"] if records_label_hist_updated else []
+                ),
             },
             warnings=[],
         )

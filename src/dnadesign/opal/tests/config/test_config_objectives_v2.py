@@ -80,6 +80,116 @@ selection:
     assert cfg.objectives.objectives[0].params["uncertainty_method"] == "analytical"
 
 
+def test_load_config_accepts_usr_sidecar_label_source(tmp_path: Path) -> None:
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: usr, path: "./usr/datasets", dataset: demo_candidates }
+  x_column_name: "X"
+  y_column_name: "opal__demo__y"
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: demo_candidates
+    path: _opal/observed_labels.parquet
+  y_space: sfxi_vec8
+  id_column: id
+  round_column: observed_round
+  batch_column: batch_id
+  dedup_policy: latest_by_round
+writeback:
+  prediction_records: ledger_only
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: scalar_identity_v1, params: {} }
+selection:
+  name: top_n
+  params: { top_k: 2, score_ref: "scalar_identity_v1/scalar", objective_mode: maximize, tie_handling: competition_rank }
+""".strip(),
+    )
+
+    cfg = load_config(cfg_path)
+    assert cfg.labels.source.kind == "usr_sidecar"
+    assert cfg.labels.source.dataset == "demo_candidates"
+    assert cfg.labels.y_space == "sfxi_vec8"
+    assert cfg.writeback.prediction_records == "ledger_only"
+
+
+def test_load_config_rejects_usr_sidecar_without_explicit_prediction_writeback(tmp_path: Path) -> None:
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: usr, path: "./usr/datasets", dataset: demo_candidates }
+  x_column_name: "X"
+  y_column_name: "opal__demo__y"
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: demo_candidates
+    path: _opal/observed_labels.parquet
+  y_space: sfxi_vec8
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: scalar_identity_v1, params: {} }
+selection:
+  name: top_n
+  params: { top_k: 2, score_ref: "scalar_identity_v1/scalar", objective_mode: maximize, tie_handling: competition_rank }
+""".strip(),
+    )
+
+    with pytest.raises(ConfigError, match="writeback.prediction_records"):
+        _ = load_config(cfg_path)
+
+
+def test_load_config_rejects_usr_sidecar_label_source_for_different_dataset(tmp_path: Path) -> None:
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: usr, path: "./usr/datasets", dataset: demo_candidates }
+  x_column_name: "X"
+  y_column_name: "opal__demo__y"
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: other_candidates
+    path: _opal/observed_labels.parquet
+  y_space: sfxi_vec8
+writeback:
+  prediction_records: ledger_only
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: scalar_identity_v1, params: {} }
+selection:
+  name: top_n
+  params: { top_k: 2, score_ref: "scalar_identity_v1/scalar", objective_mode: maximize, tie_handling: competition_rank }
+""".strip(),
+    )
+
+    with pytest.raises(ConfigError, match="same dataset"):
+        _ = load_config(cfg_path)
+
+
 def test_load_config_rejects_sfxi_analytical_with_non_unit_exponents(tmp_path: Path) -> None:
     cfg_path = _write_config(
         tmp_path / "campaign.yaml",

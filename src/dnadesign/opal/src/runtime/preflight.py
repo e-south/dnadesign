@@ -42,6 +42,7 @@ def preflight_run(
     as_of_round: int,
     fail_on_mixed_biotype_or_alphabet: bool,
     auto_backfill: bool = True,
+    check_manual_attach: bool = True,
 ) -> PreflightReport:
     rep = PreflightReport(
         manual_attach_ids=[],
@@ -63,11 +64,14 @@ def preflight_run(
 
     # Manual attach detection:
     # Current y_col non-null AND not present in label_hist at ANY round → record as manual_attach at current as_of_round
-    lh = store.label_hist_col()
-    if lh not in df.columns:
-        df[lh] = None
-    ycol = store.y_col
-    if ycol in df.columns:
+    if check_manual_attach:
+        lh = store.label_hist_col()
+        if lh not in df.columns:
+            df[lh] = None
+        ycol = store.y_col
+    else:
+        ycol = None
+    if ycol and ycol in df.columns:
         to_attach: List[Tuple[str, List[float]]] = []
         for _, row in df.iterrows():
             _id = str(row["id"])

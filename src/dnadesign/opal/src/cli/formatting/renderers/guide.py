@@ -28,6 +28,10 @@ def render_guide_text(report: GuidanceReport) -> str:
     lines.append(f"Workflow: {report.workflow_key}")
     lines.append(f"Config: {report.campaign['config_path']}")
     lines.append(f"Workdir: {report.campaign['workdir']}")
+    lines.append(f"Records: {report.campaign['records_path']}")
+    label_source = report.campaign.get("label_source") or {}
+    label_source_ref = label_source.get("path") or label_source.get("column") or "(unknown)"
+    lines.append(f"Label source: {label_source.get('kind')} ({label_source_ref})")
     lines.append("")
     lines.append("Plugin wiring")
     lines.append(f"- model: {report.plugins['model']['name']}")
@@ -63,6 +67,10 @@ def render_guide_markdown(report: GuidanceReport) -> str:
     lines.append(f"- **Campaign:** `{report.campaign['name']}` (`{report.campaign['slug']}`)")
     lines.append(f"- **Workflow key:** `{report.workflow_key}`")
     lines.append(f"- **Config:** `{report.campaign['config_path']}`")
+    lines.append(f"- **Records:** `{report.campaign['records_path']}`")
+    label_source = report.campaign.get("label_source") or {}
+    label_source_ref = label_source.get("path") or label_source.get("column") or "(unknown)"
+    lines.append(f"- **Label source:** `{label_source.get('kind')}` (`{label_source_ref}`)")
     lines.append("")
     lines.append("### Plugin Wiring")
     lines.append("")
@@ -113,6 +121,12 @@ def render_next_text(next_report: NextGuidance) -> str:
         f"observed_round={next_report.observed_round}, "
         f"labels_in_observed_round={next_report.labels_in_observed_round}"
     )
+    if next_report.records_path:
+        lines.append(f"records: {next_report.records_path} (exists={next_report.records_exists})")
+    if next_report.label_source:
+        source = next_report.label_source
+        source_ref = source.get("path") or source.get("column") or "(unknown)"
+        lines.append(f"label source: {source.get('kind')} ({source_ref})")
     lines.append("")
     lines.append("Next commands")
     lines.extend([f"- {cmd}" for cmd in next_report.next_commands])

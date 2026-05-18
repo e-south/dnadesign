@@ -124,7 +124,7 @@ def test_optional_table_reports_unavailable_without_raising() -> None:
 def test_cli_handoff_lines_keep_notebook_generation_in_canonical_path() -> None:
     text = "\n".join(cli_handoff_lines("campaign.yaml"))
 
-    assert "Pre-run-safe campaign viewer" in text
+    assert "Pre-run campaign viewer generation (writes notebook)" in text
     assert "Post-run ledger inspection" in text
     assert "uv run opal validate -c campaign.yaml" in text
     assert "uv run opal status -c campaign.yaml --with-ledger" in text

@@ -50,8 +50,23 @@ class RecordsStore:
     def load(self) -> pd.DataFrame:
         return self._io.load()
 
+    def load_columns(self, columns: Iterable[str]) -> pd.DataFrame:
+        return self._io.load_columns(list(columns))
+
+    def load_label_status_frame(self) -> pd.DataFrame:
+        return self.load_columns(["id", self.label_hist_col()])
+
+    def row_count(self) -> int:
+        return self._io.row_count()
+
+    def schema_columns(self) -> list[str]:
+        return self._io.schema_columns()
+
     def save_atomic(self, df: pd.DataFrame) -> None:
         self._io.save_atomic(df)
+
+    def append_null_column_atomic(self, column_name: str, *, batch_size: int = 512) -> bool:
+        return self._io.append_null_column_atomic(column_name, batch_size=batch_size)
 
     def assert_unique_ids(self, df: pd.DataFrame) -> None:
         if "id" not in df.columns:
@@ -320,9 +335,11 @@ class RecordsStore:
         # a) rows WITH a real id → ensure that id exists (attach sequence if provided)
         if have_id_col:
             rows_with_id = labels_df.loc[labels_df["id"].notna()]
-            for _id, seq in rows_with_id[["id", "sequence"]].itertuples(index=False, name=None):
-                _id = str(_id)
-                seq_val = None if not have_seq_col else (None if pd.isna(seq) else str(seq))
+            row_cols = ["id", "sequence"] if have_seq_col else ["id"]
+            for row_values in rows_with_id[row_cols].itertuples(index=False, name=None):
+                _id = str(row_values[0])
+                seq = row_values[1] if have_seq_col else None
+                seq_val = None if seq is None or pd.isna(seq) else str(seq)
                 if _id in known_ids:
                     row = out.loc[out["id"].astype(str) == _id].iloc[0]
                     csv_row = _csv_row_for(_id, seq_val) if (csv_by_id or csv_by_seq) else {}

@@ -30,6 +30,22 @@ class LocationLocal:
 DataLocation = Union[LocationUSR, LocationLocal]
 
 
+# ---- Label sources ----
+@dataclass
+class LabelSourceCampaignHistory:
+    kind: str = "campaign_history"
+
+
+@dataclass
+class LabelSourceUSRSidecar:
+    kind: str
+    dataset: str
+    path: str
+
+
+LabelSource = Union[LabelSourceCampaignHistory, LabelSourceUSRSidecar]
+
+
 # ---- Generic plugin refs (name + params) ----
 @dataclass
 class PluginRef:
@@ -66,6 +82,16 @@ class TrainingBlock:
 
 
 @dataclass
+class LabelsBlock:
+    source: LabelSource = field(default_factory=LabelSourceCampaignHistory)
+    y_space: Optional[str] = None
+    id_column: str = "id"
+    round_column: str = "observed_round"
+    batch_column: str = "batch_id"
+    dedup_policy: str = "latest_by_round"
+
+
+@dataclass
 class IngestBlock:
     duplicate_policy: str = "error"  # error | keep_first | keep_last
 
@@ -73,6 +99,12 @@ class IngestBlock:
 @dataclass
 class ScoringBlock:
     score_batch_size: int = 10_000
+
+
+@dataclass
+class WritebackBlock:
+    # label_history | ledger_only
+    prediction_records: str = "label_history"
 
 
 @dataclass
@@ -102,4 +134,6 @@ class RootConfig:
     ingest: IngestBlock
     scoring: ScoringBlock
     safety: SafetyBlock
+    labels: LabelsBlock = field(default_factory=LabelsBlock)
+    writeback: WritebackBlock = field(default_factory=WritebackBlock)
     plot_config: Optional[str] = None

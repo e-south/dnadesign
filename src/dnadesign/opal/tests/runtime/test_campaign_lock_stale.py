@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.opal.src.core.utils import OpalError
-from dnadesign.opal.src.storage.locks import CampaignLock
+from dnadesign.opal.src.storage.locks import CampaignLock, PathLock
 
 
 def test_campaign_lock_detects_stale_pid(tmp_path: Path) -> None:
@@ -26,4 +26,14 @@ def test_campaign_lock_detects_stale_pid(tmp_path: Path) -> None:
 
     with pytest.raises(OpalError, match="stale lock"):
         with CampaignLock(workdir):
+            raise AssertionError("lock should not be acquired")
+
+
+def test_path_lock_detects_stale_pid(tmp_path: Path) -> None:
+    target = tmp_path / "observed_labels.parquet"
+    lock_path = target.with_name(".observed_labels.parquet.lock")
+    lock_path.write_text(json.dumps({"pid": 999999, "ts": "2026-01-01T00:00:00Z"}), encoding="utf-8")
+
+    with pytest.raises(OpalError, match="stale lock for Observed label source"):
+        with PathLock(target, lock_name="Observed label source"):
             raise AssertionError("lock should not be acquired")

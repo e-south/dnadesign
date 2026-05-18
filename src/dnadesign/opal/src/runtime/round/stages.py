@@ -31,6 +31,7 @@ from ...registries.objectives import get_objective
 from ...registries.selection import get_selection, normalize_selection_result, validate_selection_result
 from ...registries.transforms_y import get_y_op, run_y_ops_pipeline
 from ...storage.artifacts import append_round_log_event, write_objective_meta
+from ...storage.label_sources import CampaignHistoryLabelSource, label_source_from_config
 from ..preflight import preflight_run
 from ..round_plan import plan_round
 from .contracts import RoundInputs, ScoreBundle, TrainingBundle, XBundle
@@ -145,6 +146,8 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
     req = inputs.req
     store = inputs.store
     df = inputs.df
+    label_source = label_source_from_config(cfg, store)
+    uses_campaign_history = isinstance(label_source, CampaignHistoryLabelSource)
 
     rep = preflight_run(
         store,
@@ -152,15 +155,23 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
         int(req.as_of_round),
         cfg.safety.fail_on_mixed_biotype_or_alphabet,
         auto_backfill=False,
+        check_manual_attach=uses_campaign_history,
     )
-    if getattr(rep, "manual_attach_count", 0):
+    if uses_campaign_history and getattr(rep, "manual_attach_count", 0):
         raise OpalError(
             f"Detected {rep.manual_attach_count} labels in '{store.y_col}' without label_hist. "
             "Run `opal ingest-y` (preferred) or `opal label-hist attach-from-y` for legacy Y columns."
         )
-    store.validate_label_hist(df, require=True)
+    label_source.validate(df)
 
-    plan = plan_round(store, df, cfg, int(req.as_of_round), warnings=list(rep.warnings or []))
+    plan = plan_round(
+        store,
+        df,
+        cfg,
+        int(req.as_of_round),
+        warnings=list(rep.warnings or []),
+        label_source=label_source,
+    )
     train_df = plan.training_df
     if train_df.empty:
         raise OpalError(f"No labels ≤ round {req.as_of_round} for training.")

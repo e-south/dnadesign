@@ -162,7 +162,8 @@ def run_ingest(
     # Build a stable key (prefer id if present; else sequence)
     if "id" in labels.columns and labels["id"].notna().any():
         key = labels["id"].astype("string")
-        key = key.fillna(labels["sequence"].astype("string"))
+        if key.isna().any() and "sequence" in labels.columns:
+            key = key.fillna(labels["sequence"].astype("string"))
         key_name = "id"
     else:
         key = labels["sequence"].astype("string")
@@ -245,6 +246,6 @@ def run_ingest(
         warnings=warnings,
     )
 
-    # 5) Return labels (sequence, id?, y) and the preview
-    cols = ["sequence", "id", "y"] if "id" in labels.columns else ["sequence", "y"]
+    # 5) Return available identity columns plus y.
+    cols = [col for col in ("sequence", "id", "y") if col in labels.columns]
     return labels[cols], preview

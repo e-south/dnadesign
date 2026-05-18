@@ -105,6 +105,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "data": {
                 "x_column": cfg.data.x_column_name,
                 "y_column": cfg.data.y_column_name,
+                "label_source": getattr(cfg.labels.source, "kind", "campaign_history"),
             },
             "plugins": {
                 "transform_x": {
@@ -222,19 +223,24 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     }
     if isinstance(score.obj_params, dict) and score.obj_params:
         objective_meta["params"] = score.obj_params
-    _ = write_prediction_label_hist(
-        store=store,
-        df=df,
-        ids=list(map(str, xbundle.id_order_pool)),
-        y_hat=score.Y_hat,
-        as_of_round=int(req.as_of_round),
-        run_id=run_id,
-        objective=objective_meta,
-        metrics_by_name=metrics_by_name,
-        selection_rank=score.ranks_competition,
-        selection_top_k=score.selected_bool,
-        verbose=req.verbose,
-    )
+    records_label_hist_updated = False
+    if cfg.writeback.prediction_records == "label_history":
+        _ = write_prediction_label_hist(
+            store=store,
+            df=df,
+            ids=list(map(str, xbundle.id_order_pool)),
+            y_hat=score.Y_hat,
+            as_of_round=int(req.as_of_round),
+            run_id=run_id,
+            objective=objective_meta,
+            metrics_by_name=metrics_by_name,
+            selection_rank=score.ranks_competition,
+            selection_top_k=score.selected_bool,
+            verbose=req.verbose,
+        )
+        records_label_hist_updated = True
+    else:
+        _log(req.verbose, "[writeback] records label_hist skipped; prediction_records=ledger_only.")
 
     total_duration = time.perf_counter() - t0
     update_campaign_state(
@@ -253,6 +259,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         store=store,
         total_duration=total_duration,
         fit_duration=score.fit_duration,
+        records_label_hist_updated=records_label_hist_updated,
     )
 
     append_round_log_event(
