@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-construct-native-core60-context
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: construct
+surface_role: derivation
+current_state: local_validated
+entry_artifact: usr_regulondb_native_promoters
+exit_artifact: usr_regulondb_native_promoter_core60
+---
+
 ## Construct Native/Core60/Context Route Detail
 
 **Owner:** dnadesign-maintainers

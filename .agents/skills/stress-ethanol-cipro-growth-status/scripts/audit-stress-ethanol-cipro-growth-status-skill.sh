@@ -107,6 +107,12 @@ require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decisio
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/candidate-table.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/densegen.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/infer.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/latentdna.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/cluster.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/opal.yaml"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/ops/status.registry.yaml"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/snapshot.py"
@@ -133,6 +139,7 @@ require_pattern 'status/probes/' "skill reference exposes probe subpackage" "$RE
 require_pattern '^## References$' "skill exposes progressive-disclosure references"
 require_pattern 'routes/decision/opal/README\.md' "skill routes OPAL detail after one-hop map"
 require_pattern 'routes/analysis/latentdna\.md' "skill routes LatentDNA detail after one-hop map"
+require_pattern 'command-groups/README\.md' "skill routes runtime command groups through progressive map"
 
 require_absent 'promoter-study-status' "skill has no old status kind"
 require_absent 'promoter-study-preflight' "skill has no old preflight kind"
@@ -166,6 +173,12 @@ require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/de
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md" 120 "LatentDNA route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/sequence-views.yaml" 120 "Infer sequence-view readiness fragment stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/notify.yaml" 100 "Infer Notify readiness fragment stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md" 70 "runtime command-group map stays one-hop"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/densegen.yaml" 40 "DenseGen runtime lane stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/infer.yaml" 45 "Infer runtime lane stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/latentdna.yaml" 40 "LatentDNA runtime lane stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/cluster.yaml" 40 "Cluster runtime lane stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/opal.yaml" 40 "OPAL runtime lane stays bounded"
 
 if [[ $failures -eq 0 ]]; then
   printf 'Audit finished with no failures.\n'

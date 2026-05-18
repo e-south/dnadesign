@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-infer-fill-remaining-infer
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: control-plane
+owner_boundary: ops
+surface_role: batch-ergonomics
+current_state: plan_ready
+entry_artifact: study_infer_runbooks
+exit_artifact: fill_infer_plan_and_audit_json
+---
+
 ## Fill Remaining Infer Route Detail
 
 **Owner:** dnadesign-maintainers

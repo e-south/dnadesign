@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-source-source-intake
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: cruncher
+surface_role: producer
+current_state: local_validated
+entry_artifact: regulondb_ecocyc_source_payloads
+exit_artifact: cruncher_promoter_export
+---
+
 ## Source Intake Route Detail
 
 **Owner:** dnadesign-maintainers

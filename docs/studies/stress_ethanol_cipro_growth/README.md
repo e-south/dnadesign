@@ -41,7 +41,9 @@ stress_ethanol_cipro_growth/
         checks/
     runtime/
       command-groups/
+        README.md
         pipeline.yaml
+        lanes/
   routes/          # one-hop router plus focused route details
     README.md
   contexts/        # durable cross-tool context
@@ -55,7 +57,10 @@ stress_ethanol_cipro_growth/
 Use `routes/README.md` first for owner-surface navigation. Use
 `record/status.md` only for factual current state, `operations/ops.study.yaml`
 as the one-hop contract index, and `operations/runtime/command-groups/pipeline.yaml`
-for command groups. Split execution and readiness fragments under
+for machine-loaded command groups. Use
+`operations/runtime/command-groups/README.md` when a human or naive agent needs
+the progressive-disclosure lane map before opening the full pipeline. Split
+execution and readiness fragments under
 `operations/contract/` by owner lane; do not flatten them back into one YAML
 shelf. Use `operations/catalog/` when the task is status or readiness,
 `contexts/latentdna/` when LatentDNA needs durable study context, and

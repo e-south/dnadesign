@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-infer-infer-core60-tss-upstream-7b
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: control-plane
+owner_boundary: infer
+surface_role: feature-extraction
+current_state: local_complete
+entry_artifact: usr_regulondb_native_promoter_core60
+exit_artifact: core60_infer_sidecars
+---
+
 ## Infer Core60 TSS-Upstream 7B Route Detail
 
 **Owner:** dnadesign-maintainers

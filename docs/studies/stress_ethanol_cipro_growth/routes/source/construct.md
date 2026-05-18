@@ -1,3 +1,19 @@
+---
+doc_id: study-stress-ethanol-cipro-growth-route-source-construct
+surface: study-route-detail
+study_id: stress_ethanol_cipro_growth
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: usr-plus-construct
+surface_role: consolidation
+current_state: complete
+entry_artifact: densegen_and_reference_source_records
+exit_artifact: anchor_core60_and_context_datasets
+---
+
 ## Construct Anchor/Context Refresh Route Detail
 
 **Owner:** dnadesign-maintainers

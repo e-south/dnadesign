@@ -1,3 +1,19 @@
+---
+doc_id: study-stress-ethanol-cipro-growth-route-analysis-latentdna
+surface: study-route-detail
+study_id: stress_ethanol_cipro_growth
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: latentdna
+surface_role: downstream-analysis
+current_state: attention
+entry_artifact: infer_sequence_view_sidecars
+exit_artifact: latentdna_reference_normalization_audit_surfaces
+---
+
 ## LatentDNA Route Detail
 
 **Last verified:** 2026-05-17
@@ -7,7 +23,7 @@ surface. Keep status questions in `../../record/status.md` or `ops progress`.
 
 ### Surface
 
-- Type: `route-detail`
+- Type: `route`
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`

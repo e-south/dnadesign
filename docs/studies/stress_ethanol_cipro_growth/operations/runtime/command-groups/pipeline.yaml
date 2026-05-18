@@ -1,6 +1,14 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
   last_verified: 2026-05-08
+  navigation:
+    command_group_map: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md
+    lane_sidecars:
+      densegen: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/densegen.yaml
+      infer: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/infer.yaml
+      latentdna: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/latentdna.yaml
+      cluster: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/cluster.yaml
+      opal: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/opal.yaml
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
   densegen:

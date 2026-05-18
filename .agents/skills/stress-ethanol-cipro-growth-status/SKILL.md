@@ -2,7 +2,7 @@
 name: stress-ethanol-cipro-growth-status
 description: Report record-backed status for stress_ethanol_cipro_growth. Use for current phase, active datasets, preflight, or LatentDNA/OPAL handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 1.0.3
+  version: 1.0.4
   category: workflow-automation
   tags: [studies, stress-ethanol-cipro-growth, status, routes, preflight]
 ---
@@ -31,7 +31,9 @@ Out of scope:
 ## Workflow
 
 1. Read `docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml`,
-   `record/datasets.yaml`, `operations/runtime/command-groups/pipeline.yaml`, `record/status.md`, and `routes/README.md`.
+   `record/datasets.yaml`, `operations/runtime/command-groups/README.md`,
+   `operations/runtime/command-groups/pipeline.yaml`, `record/status.md`, and
+   `routes/README.md`.
 2. Run the status command for record posture:
    `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Run the preflight command only for blocker or next-run readiness:

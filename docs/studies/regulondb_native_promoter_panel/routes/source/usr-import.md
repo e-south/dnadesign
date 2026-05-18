@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-source-usr-import
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: usr
+surface_role: curated-dataset
+current_state: local_validated
+entry_artifact: cruncher_promoter_export
+exit_artifact: usr_regulondb_native_promoters
+---
+
 ## USR Import Route Detail
 
 **Owner:** dnadesign-maintainers

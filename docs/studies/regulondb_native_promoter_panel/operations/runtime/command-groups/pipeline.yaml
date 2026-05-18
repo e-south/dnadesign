@@ -1,5 +1,13 @@
 version: 1
 study_id: regulondb_native_promoter_panel
+navigation:
+  command_group_map: docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/README.md
+  lane_sidecars:
+    source_intake: docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/lanes/source-intake.yaml
+    usr_import: docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/lanes/usr-import.yaml
+    construct: docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/lanes/construct.yaml
+    infer: docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/lanes/infer.yaml
+    latentdna: docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/lanes/latentdna.yaml
 
 intent:
   primary_goal: Build one provenance-qualified native RegulonDB promoter USR dataset with one canonical sequence row per deduplicated promoter sequence and relation sidecars for source-specific metadata.

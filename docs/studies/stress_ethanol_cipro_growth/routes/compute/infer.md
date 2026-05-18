@@ -1,3 +1,19 @@
+---
+doc_id: study-stress-ethanol-cipro-growth-route-compute-infer
+surface: study-route-detail
+study_id: stress_ethanol_cipro_growth
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: control-plane
+owner_boundary: infer
+surface_role: operator
+current_state: complete-for-evo2-7b-sequence-view-sidecars
+entry_artifact: anchor_context_and_reference_sequence_views
+exit_artifact: dataset_local_infer_sidecars
+---
+
 ## Infer Lanes Route Detail
 
 **Owner:** dnadesign-maintainers

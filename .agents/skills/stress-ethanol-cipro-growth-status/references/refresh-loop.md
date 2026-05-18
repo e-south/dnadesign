@@ -24,6 +24,8 @@ surface that answers the question.
 - `docs/studies/<study-id>/operations/ops.study.yaml`
 - `docs/studies/<study-id>/routes/README.md` when present
 - `docs/studies/<study-id>/routes/` detail files only after route selection
+- `docs/studies/<study-id>/operations/runtime/command-groups/README.md` when
+  runtime command-group navigation is needed
 - `docs/studies/<study-id>/operations/runtime/command-groups/pipeline.yaml` when present
 
 ## Snapshot-first refresh

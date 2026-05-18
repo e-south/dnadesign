@@ -13,7 +13,7 @@ surface but belongs somewhere else.
 | How do I check OPAL campaign status or open OPAL plots? | `docs/studies/<study-id>/routes/README.md`, then `docs/studies/<study-id>/routes/decision/opal/README.md` and `campaign-commands.md` | The one-hop route selects OPAL; command detail stays in the campaign command subpage instead of expanding this skill into an OPAL walkthrough. |
 | What is blocking OPAL batch 0? | `docs/studies/<study-id>/routes/decision/opal/README.md`, then `opal validate` for the stress configs | The shared dense-plan `records.parquet` candidate table is materialized; OPAL is now pre-assay, with labels and campaign state still pending. |
 | Where did this OPAL candidate ID come from? | `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batch0.provenance --config src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml --id <candidate_id>` | Per-ID lineage is study-owned because it joins OPAL records to DenseGen sidecars, Construct views, Infer aliases, and LatentDNA rows. |
-| Which study files are authoritative? | `record/campaign.yaml`, `record/datasets.yaml`, `record/status.md`, `operations/ops.study.yaml`, plus `routes/README.md` and `operations/runtime/command-groups/pipeline.yaml` when present | The checked-in record stays authoritative. |
+| Which study files are authoritative? | `record/campaign.yaml`, `record/datasets.yaml`, `record/status.md`, `operations/ops.study.yaml`, plus `routes/README.md`, `operations/runtime/command-groups/README.md`, and `operations/runtime/command-groups/pipeline.yaml` when present | The checked-in record stays authoritative; the command-group README is only the lane index, while `pipeline.yaml` stays the compatibility payload. |
 | Which dataset sync posture is current? | `record/datasets.yaml` plus `usr.data-plane.hpc-sync` evidence | Sync posture belongs to the dataset registry, not to this router. |
 | Is the study still source-phase or already downstream? | Snapshot plus `record/status.md` | Use record-backed `source/handoff mode` language until a canonical feature dataset exists. |
 | The study record is missing or inconsistent. | `docs/studies/README.md` plus `operations/catalog/contracts/status.md` | Fail visibly, repair the selector or record, then rerun status. |
@@ -28,3 +28,5 @@ Status-first routing boundary:
 - Use `routes/README.md` for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL
   handoff. Use `routes/decision/opal/README.md` or `routes/analysis/latentdna.md` only after the
   one-hop map selects that owner surface.
+- Use `operations/runtime/command-groups/README.md` before the full pipeline
+  when the question is command-group navigation rather than machine parsing.

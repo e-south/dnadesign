@@ -32,4 +32,4 @@
   next_surface: repo:src/dnadesign/infer/docs/reference/feature-schema.md
 - id: latentdna_native_audit
   status: in_progress
-  next_surface: repo:src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
+  next_surface: repo:docs/studies/regulondb_native_promoter_panel/routes/analysis/latentdna-native-audit.md

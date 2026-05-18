@@ -15,10 +15,15 @@ Keep ownership boundaries clear.
   root semantics, and sync posture
 - `docs/studies/<study-id>/operations/ops.study.yaml`: lifecycle order,
   snapshot scope, execution surfaces, and next-scope preflight grouping
+- `docs/studies/<study-id>/operations/runtime/command-groups/README.md`:
+  progressive-disclosure lane map for command-group navigation
+- `docs/studies/<study-id>/operations/runtime/command-groups/lanes/`: bounded
+  owner-lane sidecars for DenseGen, Infer, LatentDNA, Cluster, and OPAL
 - `docs/studies/<study-id>/operations/runtime/command-groups/pipeline.yaml`: structural workspace,
   config, and downstream surface bindings that complement
   `operations/ops.study.yaml`, including any study-bound exploratory-analysis
-  route inventory surfaced through snapshot `analysis_surfaces`
+  route inventory surfaced through snapshot `analysis_surfaces`; keep this as
+  the compatibility payload loaded by status and docs-contract checks
 - `docs/studies/<study-id>/record/campaign.yaml`: tracked procedure set for
   `ops progress campaign`
 

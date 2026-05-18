@@ -41,7 +41,9 @@ regulondb_native_promoter_panel/
         checks/
     runtime/
       command-groups/
+        README.md
         pipeline.yaml
+        lanes/
   routes/          # one-hop router
     README.md
   contexts/        # durable cross-tool context
@@ -54,7 +56,9 @@ regulondb_native_promoter_panel/
 Use `routes/README.md` first for owner-surface navigation. Use
 `record/status.md` only for factual current state, `operations/ops.study.yaml`
 as the one-hop contract index, and `operations/runtime/command-groups/pipeline.yaml`
-for command groups. Split execution and readiness fragments under
+for machine-loaded command groups. Use
+`operations/runtime/command-groups/README.md` for the owner-lane map before
+opening the full pipeline. Split execution and readiness fragments under
 `operations/contract/` by owner lane; do not flatten them back into one YAML
 shelf. This study has no registered OPS status/preflight provider today, so
 use checked-in record files and the route map for status. Use

@@ -1,3 +1,19 @@
+---
+doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
+surface: study-route-detail
+study_id: stress_ethanol_cipro_growth
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../../README.md
+type: route
+plane: control-plane
+owner_boundary: opal
+surface_role: decision
+current_state: candidate_table_materialized_pre_assay
+entry_artifact: usr_prom_eth_cip_opal_candidates
+exit_artifact: opal_campaign_records_and_ledgers
+---
+
 ## OPAL Route Detail
 
 **Last verified:** 2026-05-18
@@ -6,7 +22,7 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Surface
 
-- Type: `route-detail`
+- Type: `route`
 - Plane: `control-plane`
 - Surface role: `decision`
 - Owner-boundary: `opal`

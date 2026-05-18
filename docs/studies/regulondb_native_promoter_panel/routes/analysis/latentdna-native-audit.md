@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-analysis-latentdna-native-audit
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: data-plane
+owner_boundary: latentdna
+surface_role: downstream-analysis
+current_state: local_feature_review_ready
+entry_artifact: native_full_and_core60_infer_sidecars
+exit_artifact: latentdna_native_audit_review
+---
+
 ## LatentDNA Native Audit Route Detail
 
 **Owner:** dnadesign-maintainers

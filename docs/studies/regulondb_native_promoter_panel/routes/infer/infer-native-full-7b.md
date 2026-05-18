@@ -1,3 +1,19 @@
+---
+doc_id: study-regulondb-native-promoter-panel-route-infer-infer-native-full-7b
+surface: study-route-detail
+study_id: regulondb_native_promoter_panel
+owner: dnadesign-maintainers
+last_verified: 2026-05-18
+parent_route: ../README.md
+type: route
+plane: control-plane
+owner_boundary: infer
+surface_role: feature-extraction
+current_state: local_complete
+entry_artifact: usr_regulondb_native_promoters
+exit_artifact: native_full_infer_sidecars
+---
+
 ## Infer Native/Full 7B Route Detail
 
 **Owner:** dnadesign-maintainers
