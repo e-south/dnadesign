@@ -50,5 +50,5 @@ experimental directions they test. The study compiler owns validation and
 transient catalog/materialization output. Sibling tools own their primitive or
 artifact-service behavior.
 
-`../compiler/msd_design_hit_labels.txt` remains a convenience compiler input.
+`../compiler/inputs/msd_design_hit_labels.txt` remains a convenience compiler input.
 The design set under `design_sets/` is the authoritative cohort record.

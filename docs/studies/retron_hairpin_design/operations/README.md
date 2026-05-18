@@ -6,8 +6,10 @@
 This lane stores machine-readable operating declarations for the Retron hairpin
 design study.
 
-- `ops.study.yaml`: Ops lifecycle, status, preflight, and execution-surface contract
-- `pipeline.yaml`: command groups and automation bootstrap metadata
+- `ops.study.yaml`: thin Ops contract router with part paths.
+- `contract/`: lifecycle, track, artifact, execution-surface, snapshot, and
+  preflight declarations.
+- `runtime/pipeline.yaml`: command groups and automation bootstrap metadata.
 
 Keep factual current state in `../record/status.md` and user-facing routing in
 `../routes/README.md`.

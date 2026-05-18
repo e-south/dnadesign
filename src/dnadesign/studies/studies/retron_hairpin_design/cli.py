@@ -130,15 +130,16 @@ def _next_step_for_error(exc: Exception) -> str:
     if "Unknown cap" in message:
         return (
             "Route missing cap or shortening constraints to Snapback, "
-            "or add the validated cap to compiler/msd_design_registry.yaml."
+            "or add the validated cap to compiler/catalog/msd_design_registry.yaml."
         )
     if "Unknown payload" in message:
         return (
-            "Add the validated payload to compiler/msd_design_registry.yaml before compiling a frozen design reference."
+            "Add the validated payload to compiler/catalog/msd_design_registry.yaml before compiling "
+            "a frozen design reference."
         )
     if "registry" in message:
         return (
-            "Open docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml "
+            "Open docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml "
             "and fix the registry before rerunning lint."
         )
     if "Duplicate construct label" in message:

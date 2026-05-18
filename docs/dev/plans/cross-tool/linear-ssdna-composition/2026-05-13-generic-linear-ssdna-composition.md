@@ -23,7 +23,7 @@ history without starting from the full source spec.
   current generic assembly contract and bundle layout.
 - [ADR 0002](../../../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md):
   accepted architecture decision and ownership boundary.
-- [Retron linear ssDNA composition handoff](../../../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md):
+- [Retron linear ssDNA composition handoff](../../../../studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md):
   Retron-specific study choices and caveats.
 - [Folding docs](../../../../../src/dnadesign/folding/docs/README.md):
   secondary-structure prediction commands, bundle mode, and backend policy.

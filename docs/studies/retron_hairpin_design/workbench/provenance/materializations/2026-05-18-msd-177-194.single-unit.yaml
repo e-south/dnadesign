@@ -17,7 +17,7 @@ command_template:
     - dnadesign.studies.studies.retron_hairpin_design.cli
     - materialize
     - --input
-    - docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt
+    - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
     - --out-dir
     - /tmp/dnadesign_retron_msd_sequences
     - --payload-sequence

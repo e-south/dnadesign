@@ -42,12 +42,14 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
         (repo_root / "docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml").read_text(encoding="utf-8")
     )
     study_pipeline = yaml.safe_load(
-        (repo_root / "docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml").read_text(encoding="utf-8")
+        (repo_root / "docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml").read_text(
+            encoding="utf-8"
+        )
     )
     study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/README.md").read_text(encoding="utf-8")
-    study_latentdna_route = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md").read_text(
-        encoding="utf-8"
-    )
+    study_latentdna_route = (
+        repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md"
+    ).read_text(encoding="utf-8")
     study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/record/status.md").read_text(encoding="utf-8")
 
     assert "LatentDNA compares learned sequence representations" in readme
@@ -130,7 +132,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Reference metadata sources:" in workspace_readme
     assert "causal and prefix-conditioned" in workspace_readme
 
-    assert "routes/latentdna.md" in study_routes
+    assert "routes/analysis/latentdna.md" in study_routes
     assert "Gate:" in study_latentdna_route
     assert "representation_health_summary" in study_latentdna_route
     assert "Primary review path:" in study_latentdna_route

@@ -21,7 +21,7 @@ from dnadesign.contracts.sequence import MsdDesignReferenceV1
 
 from .msd_ids import ParsedMsdConstructLabel
 
-_REGISTRY_RELATIVE_PATH = Path("compiler") / "msd_design_registry.yaml"
+_REGISTRY_RELATIVE_PATH = Path("compiler") / "catalog" / "msd_design_registry.yaml"
 
 
 class RetronMsdRegistryError(ValueError):

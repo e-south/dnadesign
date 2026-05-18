@@ -50,8 +50,12 @@ Each checked-in live study keeps these artifacts:
 - `operations/`: operational declarations read by tooling
   - `operations/ops.study.yaml`: required OPS-facing lifecycle/track contract;
     optional `ops_surfaces` only when the study owns concrete status/preflight
-    providers
-  - `operations/pipeline.yaml`: optional machine-readable runtime context for
+    providers. When the contract is split, this file stays as the entrypoint
+    and lists `parts` under `operations/contract/`.
+  - `operations/contract/`: optional split lifecycle, artifact,
+    execution-surface, snapshot, and preflight declarations loaded by
+    `ops.study.yaml`
+  - `operations/runtime/pipeline.yaml`: optional machine-readable runtime context for
     exact command groups or automation bootstrap
 - `routes/README.md`: optional one-hop handoff map for current owner surfaces
 - `routes/`: optional focused route-detail pages when one owner surface would
@@ -86,7 +90,15 @@ docs/studies/<study-id>/
     status.md
   operations/
     ops.study.yaml
-    pipeline.yaml
+    contract/
+      lifecycle.yaml
+      phases.yaml
+      artifacts.yaml
+      execution_surfaces.yaml
+      snapshot.yaml
+      preflight.yaml
+    runtime/
+      pipeline.yaml
   routes/
     README.md    # optional, preferred once the study spans owner surfaces
     ...          # optional focused route details for bulky owner surfaces

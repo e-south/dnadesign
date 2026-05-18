@@ -526,11 +526,11 @@ Read these files first:
 - Dev spec:
   [generic linear ssDNA composition spec](../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 - Study handoff:
-  [Retron linear ssDNA composition](../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
+  [Retron linear ssDNA composition](../../studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md)
 - Study routes:
   [Retron Hairpin routes](../../studies/retron_hairpin_design/routes/README.md)
 - Scar-nick context:
-  [scar-nick base-junction](../../studies/retron_hairpin_design/contexts/scar-nick-base-junction.md)
+  [scar-nick base-junction](../../studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md)
 - Planning lifecycle:
   [PLANS](../../../PLANS.md)
 
@@ -675,7 +675,7 @@ Repo acceptance:
 - Proposal:
   [generic linear ssDNA composition spec](../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 - Study handoff:
-  [Retron linear ssDNA composition](../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
+  [Retron linear ssDNA composition](../../studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md)
 - PR: https://github.com/e-south/dnadesign/pull/47
 - ADR:
   [ADR 0002: Generic linear ssDNA composition in Construct](../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)

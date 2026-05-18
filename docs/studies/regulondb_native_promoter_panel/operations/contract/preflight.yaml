@@ -1,0 +1,234 @@
+default_scope: next
+scopes:
+  next:
+    include_phases:
+    - current_phase
+  full:
+    include_phases:
+    - all
+group_phase_bindings:
+  study_record: regulondb_source_inventory
+  cruncher_contract: regulondb_source_inventory
+  usr_import_contract: regulondb_source_inventory
+  usr_validation: metadata_overlay_validation
+  construct: core60_view_definition
+  infer: native_full_infer_7b
+  notify: native_full_infer_7b
+  latentdna: latentdna_native_audit
+checks:
+  regulondb_source_inventory:
+  - kind: path_exists
+    check_id: study.status.present
+    check_group: study_record
+    summary: Draft study status note is present.
+    required: true
+    artifact: status_note
+  - kind: path_exists
+    check_id: study.routes.present
+    check_group: study_record
+    summary: Draft route map is present.
+    required: true
+    artifact: routes_doc
+  - kind: path_exists
+    check_id: cruncher.promoter.contract.present
+    check_group: cruncher_contract
+    summary: Cruncher promoter export contract is present.
+    required: true
+    artifact: cruncher_promoter_contract
+  - kind: path_exists
+    check_id: usr.import.script.present
+    check_group: usr_import_contract
+    summary: USR native promoter import script is present.
+    required: true
+    artifact: usr_import_script
+  - kind: path_exists
+    check_id: usr.regulondb.registry.present
+    check_group: usr_import_contract
+    summary: USR registry declares the regulondb overlay namespace.
+    required: true
+    artifact: usr_registry
+  metadata_overlay_validation:
+  - kind: path_exists
+    check_id: usr.native.dataset.present
+    check_group: usr_validation
+    summary: Native RegulonDB promoter USR dataset is present in the canonical USR
+      root.
+    required: true
+    artifact: native_promoter_dataset
+  - kind: command
+    check_id: usr.native.validation.command.declared
+    check_group: usr_validation
+    summary: Native dataset validation command is declared for after committed import.
+    required: true
+    surface: usr_validate_native_dataset
+  native_full_infer_7b:
+  - kind: path_exists
+    check_id: infer.workspace.layout
+    check_group: infer
+    summary: RegulonDB Infer workspace root is present.
+    required: true
+    artifact: infer_workspace_root
+  - kind: path_exists
+    check_id: infer.config.native_full_7b.present
+    check_group: infer
+    summary: Native/full 7B Infer sequence-view config is present.
+    required: true
+    artifact: infer_native_full_config_7b
+  - kind: path_exists
+    check_id: infer.runbook.native_full_7b.present
+    check_group: infer
+    summary: Native/full 7B Infer batch runbook is present.
+    required: true
+    artifact: infer_native_full_runbook_7b
+  - kind: command
+    check_id: infer.config.native_full_7b.validates
+    check_group: infer
+    summary: Native/full 7B Infer config validates without loading Evo2.
+    required: true
+    surface: infer_validate_native_full_7b
+  - kind: command
+    check_id: infer.native_full_7b.completion.inventory
+    check_group: infer
+    summary: Native/full 7B sequence-view completion inventory is inspectable and
+      resumable.
+    required: true
+    surface: infer_completion_native_full_7b
+  - kind: command
+    check_id: notify.events.native_full_7b.resolve
+    check_group: notify
+    summary: Notify can resolve the native/full 7B Infer event path from the config.
+    required: true
+    surface: notify_resolve_events_native_full_7b
+  core60_infer_7b:
+  - kind: path_exists
+    check_id: infer.config.core60_7b.present
+    check_group: infer
+    summary: Core60 TSS-upstream 7B Infer sequence-view config is present.
+    required: true
+    artifact: infer_core60_config_7b
+  - kind: path_exists
+    check_id: infer.runbook.core60_7b.present
+    check_group: infer
+    summary: Core60 TSS-upstream 7B Infer batch runbook is present.
+    required: true
+    artifact: infer_core60_runbook_7b
+  - kind: command
+    check_id: infer.config.core60_7b.validates
+    check_group: infer
+    summary: Core60 TSS-upstream 7B Infer config validates without loading Evo2.
+    required: true
+    surface: infer_validate_core60_7b
+  - kind: command
+    check_id: infer.core60_7b.completion.inventory
+    check_group: infer
+    summary: Core60 TSS-upstream 7B sequence-view completion inventory is inspectable
+      after Construct materializes the dataset.
+    required: false
+    surface: infer_completion_core60_7b
+  - kind: command
+    check_id: notify.events.core60_7b.resolve
+    check_group: notify
+    summary: Notify can resolve the core60 7B Infer event path after the core60 dataset
+      exists.
+    required: false
+    surface: notify_resolve_events_core60_7b
+  core60_view_definition:
+  - kind: path_exists
+    check_id: construct.workspace.layout
+    check_group: construct
+    summary: RegulonDB Construct workspace root is present.
+    required: true
+    artifact: construct_workspace_root
+  - kind: path_exists
+    check_id: construct.core60.config.present
+    check_group: construct
+    summary: Native promoter TSS-upstream core60 Construct config is present.
+    required: true
+    artifact: construct_core60_config
+  - kind: command
+    check_id: construct.workspace.doctor
+    check_group: construct
+    summary: RegulonDB Construct workspace registry and config are aligned.
+    required: true
+    surface: construct_workspace_doctor
+  - kind: command
+    check_id: construct.core60.contract.validates
+    check_group: construct
+    summary: TSS-upstream core60 project validates before generated dataset materialization.
+    required: true
+    surface: construct_validate_core60
+  - kind: path_exists
+    check_id: construct.core60.dataset.present
+    check_group: construct
+    summary: Native promoter TSS-upstream core60 derived dataset is present after
+      Construct run.
+    required: false
+    artifact: construct_core60_dataset
+  latentdna_native_audit:
+  - kind: path_exists
+    check_id: latentdna.binding.present
+    check_group: latentdna
+    summary: RegulonDB LatentDNA study binding is present.
+    required: true
+    artifact: latentdna_binding
+  - kind: path_exists
+    check_id: latentdna.workspace.layout
+    check_group: latentdna
+    summary: RegulonDB LatentDNA workspace root is present.
+    required: true
+    artifact: latentdna_workspace_root
+  - kind: path_exists
+    check_id: latentdna.input.native_full_7b.present
+    check_group: latentdna
+    summary: Native/full 7B Infer sidecar features are present for LatentDNA after
+      batch execution.
+    required: false
+    artifact: infer_native_full_dataset_7b
+  - kind: path_exists
+    check_id: latentdna.input.core60_7b.present
+    check_group: latentdna
+    summary: Core60 7B Infer sidecar features are present for LatentDNA after Construct
+      and batch execution.
+    required: false
+    artifact: infer_core60_dataset_7b
+  - kind: command
+    check_id: latentdna.workspace.deep.validates
+    check_group: latentdna
+    summary: RegulonDB LatentDNA workspace validates against sidecar-backed native/full
+      and core60 feature views.
+    required: true
+    surface: latentdna_validate_workspace
+next_scope:
+  target_phase_groups:
+    regulondb_source_inventory:
+    - study_record
+    - cruncher_contract
+    - usr_import_contract
+    cruncher_promoter_export:
+    - study_record
+    - cruncher_contract
+    usr_ingest_dry_run:
+    - study_record
+    - usr_import_contract
+    usr_native_promoter_import:
+    - study_record
+    - usr_import_contract
+    metadata_overlay_validation:
+    - study_record
+    - usr_validation
+    native_full_infer_7b:
+    - study_record
+    - infer
+    - notify
+    core60_view_definition:
+    - study_record
+    - construct
+    core60_infer_7b:
+    - study_record
+    - infer
+    - notify
+    latentdna_native_audit:
+    - study_record
+    - latentdna
+  runtime_phase_groups: []
+  runtime_shared_groups: []

@@ -4,7 +4,7 @@
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
-- Study execution map: `../operations/pipeline.yaml`
+- Study execution map: `../operations/runtime/pipeline.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Lifecycle posture: inactive source-intake lane; local native USR and TSS-upstream core60 datasets are materialized, the standard local Evo2 7B Infer sidecars are complete for the native/full and derived core60 lanes, and the current checked-in phase is the LatentDNA native/core60 audit
 

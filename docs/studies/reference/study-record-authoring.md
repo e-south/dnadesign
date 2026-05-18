@@ -18,7 +18,9 @@ docs/studies/<study-id>/
     status.md
   operations/
     ops.study.yaml
-    pipeline.yaml  # optional exact command groups/runtime context
+    contract/      # optional split parts loaded by ops.study.yaml
+    runtime/
+      pipeline.yaml  # optional exact command groups/runtime context
   routes/
     README.md      # optional, preferred once the study spans owner surfaces
     ...            # optional focused route details for bulky owner surfaces
@@ -40,7 +42,11 @@ docs/studies/<study-id>/
 - `operations/ops.study.yaml` is the OPS-facing contract for lifecycle ordering
   or track maps, record sources, artifacts, execution surfaces, and preflight
   planning.
-- `operations/pipeline.yaml`, when present, records exact command groups or
+- `operations/contract/`, when present, stores split YAML sections referenced
+  by `operations/ops.study.yaml` `parts`. Use it when lifecycle, artifact,
+  execution-surface, or preflight declarations would make the entrypoint hard
+  to scan.
+- `operations/runtime/pipeline.yaml`, when present, records exact command groups or
   runtime context that should not be reconstructed from generic tool docs.
 - `routes/README.md`, when present, is the study-owned one-hop handoff page.
 - `routes/`, when present, keeps focused owner-surface details out of the
@@ -77,8 +83,10 @@ implementation.
    `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root> > docs/studies/<study-id>/record/campaign.yaml`
 5. Create `record/datasets.yaml` from real affiliated dataset ids and sync posture.
 6. Create `record/status.md` from the current study facts rather than a status-provider template.
-7. Create `operations/ops.study.yaml` with lifecycle and execution surfaces. Add
-   `ops_surfaces` only after this study owns concrete status/preflight providers.
+7. Create `operations/ops.study.yaml` with lifecycle and execution surfaces.
+   If it grows beyond a short entrypoint, keep the entrypoint thin and place
+   section bodies under `operations/contract/`. Add `ops_surfaces` only after
+   this study owns concrete status/preflight providers.
 8. Create the audit directory:
    `mkdir -p docs/studies/<study-id>/audits`
 9. Edit the checked-in `index.yaml`, `record/datasets.yaml`,
@@ -98,7 +106,7 @@ implementation.
     durable study-owned home; split it into `ontology/`, `design_sets/`, and
     `provenance/` when the records would otherwise flatten at the workbench
     root.
-17. Add `operations/pipeline.yaml` when the study has exact Construct, Infer,
+17. Add `operations/runtime/pipeline.yaml` when the study has exact Construct, Infer,
     batch, or Notify command groups.
 18. Refresh evidence with:
     `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/record/campaign.yaml`

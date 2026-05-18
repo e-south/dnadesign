@@ -1,0 +1,71 @@
+de033_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
+demo_monotypic_tetr_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr
+snapback_released_target_search:
+  surface_type: command
+  cwd_ref: repo:src/dnadesign/cruncher/workspaces/de033
+  argv:
+  - uv
+  - run
+  - cruncher
+  - snapback
+  - released-target-search
+  - --workspace-root
+  - .
+  - --nick-preset
+  - neb_nicking_v1
+  - --nick-additional-preset
+  - thermo_nicking_v1
+  - --release-preset
+  - type_iis_release_v1
+  - --nick-boundary
+  - '0'
+  - --paired-bp
+  - '3'
+  - --cap-nt
+  - '3'
+  - --json
+yiu_direct_validate:
+  surface_type: command
+  cwd_ref: repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr
+  argv:
+  - uv
+  - run
+  - cruncher
+  - yiu
+  - validate
+  - --spec
+  - configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+msd_design_reference_lint:
+  surface_type: command
+  cwd_ref: repo:.
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.retron_hairpin_design.cli
+  - lint
+  - --id
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+  - --format
+  - json
+msd_design_reference_compile:
+  surface_type: command
+  cwd_ref: repo:.
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.retron_hairpin_design.cli
+  - compile
+  - --input
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+  - --out-dir
+  - /tmp/dnadesign_retron_msd_design_references
+  - --format
+  - json

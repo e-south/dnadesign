@@ -18,7 +18,9 @@ regulondb_native_promoter_panel/
     status.md
   operations/      # machine-readable operating contracts
     ops.study.yaml
-    pipeline.yaml
+    contract/
+    runtime/
+      pipeline.yaml
   routes/          # one-hop router
     README.md
   bindings/        # cross-tool study bindings
@@ -27,6 +29,7 @@ regulondb_native_promoter_panel/
 ```
 
 Use `routes/README.md` first for owner-surface navigation. Use
-`record/status.md` only for factual current state and `operations/` only for
-Ops/pipeline declarations. Use `bindings/` when a tool needs durable study
-context and `audits/usr-sync/` for machine-readable sync payloads.
+`record/status.md` only for factual current state, `operations/ops.study.yaml`
+for lifecycle/preflight declarations, and `operations/runtime/pipeline.yaml`
+for command groups. Use `bindings/` when a tool needs durable study context and
+`audits/usr-sync/` for machine-readable sync payloads.

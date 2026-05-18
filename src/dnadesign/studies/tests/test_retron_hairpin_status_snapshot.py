@@ -68,6 +68,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
     study_root = repo_root / "docs" / "studies" / "retron_hairpin_design"
     (study_root / "record").mkdir(parents=True, exist_ok=True)
     (study_root / "operations").mkdir(parents=True, exist_ok=True)
+    (study_root / "operations" / "runtime").mkdir(parents=True, exist_ok=True)
     (study_root / "routes").mkdir(parents=True, exist_ok=True)
     (study_root / "record" / "status.md").write_text(
         (
@@ -108,7 +109,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    (study_root / "operations" / "pipeline.yaml").write_text(
+    (study_root / "operations" / "runtime" / "pipeline.yaml").write_text(
         yaml.safe_dump(
             {
                 "version": 1,
@@ -170,7 +171,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                         "repo:.agents/skills/retron-hairpin-study/SKILL.md",
                         "manifest:record/status.md",
                         "manifest:routes/README.md",
-                        "manifest:operations/pipeline.yaml",
+                        "manifest:operations/runtime/pipeline.yaml",
                     ],
                     "pair_with": [
                         "harness-engineering",
@@ -199,7 +200,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                 "record_sources": {
                     "narrative_ref": "manifest:record/status.md",
                     "datasets_ref": "manifest:record/datasets.yaml",
-                    "pipeline_ref": "manifest:operations/pipeline.yaml",
+                    "pipeline_ref": "manifest:operations/runtime/pipeline.yaml",
                     "campaign_ref": "manifest:record/campaign.yaml",
                     "routes_ref": "manifest:routes/README.md",
                 },
@@ -244,7 +245,7 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
                     },
                     "pipeline_doc": {
                         "artifact_type": "file",
-                        "ref": "manifest:operations/pipeline.yaml",
+                        "ref": "manifest:operations/runtime/pipeline.yaml",
                     },
                     "snapback_released_spec": {
                         "artifact_type": "file",
@@ -434,7 +435,7 @@ def test_provide_retron_hairpin_design_status_exposes_command_groups_and_agent_b
         str(tmp_path / ".agents" / "skills" / "retron-hairpin-study" / "SKILL.md"),
         str(study_root / "record" / "status.md"),
         str(study_root / "routes" / "README.md"),
-        str(study_root / "operations" / "pipeline.yaml"),
+        str(study_root / "operations" / "runtime" / "pipeline.yaml"),
     ]
     assert evidence["native_agent_bootstrap"]["pair_with"] == [
         "harness-engineering",

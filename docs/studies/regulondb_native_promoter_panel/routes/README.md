@@ -11,10 +11,10 @@ Use this page as the checked-in one-hop route record for this study. No study-ow
 
 | Surface | Owner | State | Detail |
 | --- | --- | --- | --- |
-| Source Intake | `cruncher` | `local_validated` | [source-intake.md](source-intake.md) |
-| USR Import | `usr` | `local_validated` | [usr-import.md](usr-import.md) |
-| Infer Native/Full 7B | `infer` | `local_complete` | [infer-native-full-7b.md](infer-native-full-7b.md) |
-| Construct Native/Core60/Context | `construct` | `local_validated` | [construct-native-core60-context.md](construct-native-core60-context.md) |
-| Infer Core60 TSS-Upstream 7B | `infer` | `local_complete` | [infer-core60-tss-upstream-7b.md](infer-core60-tss-upstream-7b.md) |
-| Fill Remaining Infer | `ops` | `plan_ready` | [fill-remaining-infer.md](fill-remaining-infer.md) |
-| LatentDNA Native Audit | `latentdna` | `local_feature_review_ready` | [latentdna-native-audit.md](latentdna-native-audit.md) |
+| Source Intake | `cruncher` | `local_validated` | [Source intake](source/source-intake.md) |
+| USR Import | `usr` | `local_validated` | [USR import](source/usr-import.md) |
+| Infer Native/Full 7B | `infer` | `local_complete` | [Native/full Infer](infer/infer-native-full-7b.md) |
+| Construct Native/Core60/Context | `construct` | `local_validated` | [Core60 Construct](construct/construct-native-core60-context.md) |
+| Infer Core60 TSS-Upstream 7B | `infer` | `local_complete` | [Core60 Infer](infer/infer-core60-tss-upstream-7b.md) |
+| Fill Remaining Infer | `ops` | `plan_ready` | [Fill remaining Infer](infer/fill-remaining-infer.md) |
+| LatentDNA Native Audit | `latentdna` | `local_feature_review_ready` | [LatentDNA native audit](analysis/latentdna-native-audit.md) |

@@ -1,0 +1,69 @@
+status_note:
+  artifact_type: file
+  ref: manifest:record/status.md
+routes_doc:
+  artifact_type: file
+  ref: manifest:routes/README.md
+route_msd_design_references:
+  artifact_type: file
+  ref: manifest:routes/references/msd-design-references.md
+route_released_product_snapback:
+  artifact_type: file
+  ref: manifest:routes/product/released-product-snapback.md
+route_scar_nick_base_junction:
+  artifact_type: file
+  ref: manifest:routes/product/scar-nick-base-junction.md
+route_linear_ssdna_composition:
+  artifact_type: file
+  ref: manifest:routes/composition/linear-ssdna-composition.md
+route_yiu_boundary_check:
+  artifact_type: file
+  ref: manifest:routes/quality/yiu-boundary-check.md
+pipeline_doc:
+  artifact_type: file
+  ref: manifest:operations/runtime/pipeline.yaml
+scar_nick_base_junction_note:
+  artifact_type: file
+  ref: manifest:contexts/cruncher/scar-nick-base-junction.md
+linear_ssdna_composition_note:
+  artifact_type: file
+  ref: manifest:contexts/composition/linear-ssdna-composition.md
+msd_design_registry:
+  artifact_type: file
+  ref: manifest:compiler/catalog/msd_design_registry.yaml
+msd_design_hit_labels:
+  artifact_type: file
+  ref: manifest:compiler/inputs/msd_design_hit_labels.txt
+workbench_readme:
+  artifact_type: file
+  ref: manifest:workbench/README.md
+workbench_directions:
+  artifact_type: file
+  ref: manifest:workbench/ontology/directions.yaml
+workbench_scar_nick_profile_panel:
+  artifact_type: file
+  ref: manifest:workbench/design_sets/scar_nick_profile_panel_v1.yaml
+workbench_msd_177_194_compile_run:
+  artifact_type: file
+  ref: manifest:workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml
+workbench_msd_177_194_materialization_record:
+  artifact_type: file
+  ref: manifest:workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml
+linear_ssdna_composition_dev_spec:
+  artifact_type: file
+  ref: repo:docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md
+linear_ssdna_composition_exec_plan:
+  artifact_type: file
+  ref: repo:docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md
+snapback_released_runbook:
+  artifact_type: file
+  ref: repo:src/dnadesign/cruncher/workspaces/de033/runbook.md
+yiu_direct_spec:
+  artifact_type: file
+  ref: repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+retron_context_note:
+  artifact_type: file
+  ref: repo:src/dnadesign/cruncher/docs/dev/audits/2026-04-19-retron-p4-hairpin-variant.md
+yiu_boundary_note:
+  artifact_type: file
+  ref: repo:src/dnadesign/cruncher/docs/dev/audits/2026-04-19-retron-p4-hairpin-variant.md

@@ -1,0 +1,67 @@
+status_note:
+  artifact_type: file
+  ref: manifest:record/status.md
+routes_doc:
+  artifact_type: file
+  ref: manifest:routes/README.md
+datasets_registry:
+  artifact_type: file
+  ref: manifest:record/datasets.yaml
+cruncher_promoter_contract:
+  artifact_type: file
+  ref: repo:src/dnadesign/cruncher/src/ingest/promoters.py
+usr_import_script:
+  artifact_type: file
+  ref: repo:src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
+usr_registry:
+  artifact_type: file
+  ref: repo:src/dnadesign/usr/datasets/registry.yaml
+native_promoter_dataset:
+  artifact_type: dataset
+  dataset_id: usr_regulondb_native_promoters
+  ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoters
+construct_workspace_root:
+  artifact_type: file
+  ref: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
+construct_core60_config:
+  artifact_type: file
+  ref: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel/config.core60.yaml
+construct_core60_dataset:
+  artifact_type: dataset
+  dataset_id: usr_regulondb_native_promoter_core60
+  ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoter_core60
+infer_native_full_config_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+infer_native_full_runbook_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
+infer_core60_config_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+infer_core60_runbook_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml
+infer_native_full_dataset_7b:
+  artifact_type: dataset
+  dataset_id: infer_regulondb_native_promoter_views_7b
+  ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoters/_derived/infer
+infer_core60_dataset_7b:
+  artifact_type: dataset
+  dataset_id: infer_regulondb_native_promoter_core60_views_7b
+  ref: repo:src/dnadesign/usr/datasets/usr_regulondb_native_promoter_core60/_derived/infer
+infer_workspace_root:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
+notify_native_full_profile_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/native_full_7b/profile.json
+notify_core60_profile_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/outputs/notify/infer/sequence_views_core60_tss_upstream_7b/profile.json
+latentdna_binding:
+  artifact_type: file
+  ref: manifest:bindings/latentdna.yaml
+latentdna_workspace_root:
+  artifact_type: file
+  ref: repo:src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel

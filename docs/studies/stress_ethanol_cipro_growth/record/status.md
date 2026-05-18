@@ -4,7 +4,7 @@
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
-- Study execution map: `../operations/pipeline.yaml`
+- Study execution map: `../operations/runtime/pipeline.yaml`
 - LatentDNA binding: `bindings/latentdna.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Snapshot posture: current after local pull from BU SCC `cluster`

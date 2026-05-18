@@ -19,7 +19,7 @@ same shared datasets skips already-present output ids, appends missing Construct
 contexts, and writes sequence-view rows for already-existing semantic variants.
 The supporting study record lives under:
 
-- `docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml`
 - `docs/studies/stress_ethanol_cipro_growth/record/status.md`
 
 Validate and preview before any write:

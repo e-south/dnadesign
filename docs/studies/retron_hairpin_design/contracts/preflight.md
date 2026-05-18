@@ -25,7 +25,7 @@ current actionable route, track, or phase declared by the study contract.
 
 ### What this route checks
 
-- study-owned record files such as `routes/README.md` and `operations/pipeline.yaml`
+- study-owned record files such as `routes/README.md` and `operations/runtime/pipeline.yaml`
 - declared workspace roots
 - declared read-only validation commands such as `released-target-search` and `yiu validate`
 

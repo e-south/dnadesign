@@ -32,9 +32,9 @@
 ### Quick route
 
 - Compiler/product route:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - GenBank/native-structure-PNG/review-PNG route after concrete subcomponents are available:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.cli materialize --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_sequences --payload-sequence TetR=<payload-sequence> --cap-sequence C26=<cap-sequence> --cap-sequence C172=<cap-sequence> --render-format png --format json`
 - Status route for explicit progress/history questions only:
   `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight route for explicit blocker/readiness questions only:
@@ -50,7 +50,7 @@
   and optional profile code; it recomputes `S3/S2/S1/S0` and fails fast on
   profile drift or non-ligatable `S0`.
 - The selected 177-194 scar-nick labels compile into one catalog from
-  `docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt`.
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`.
 - Persistent experimental meaning for the 177-194 cohort now lives in
   `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml`;
   `msd_design_hit_labels.txt` is a convenience compiler input.
@@ -94,9 +94,9 @@
 - Compiler module:
   `src/dnadesign/studies/studies/retron_hairpin_design/`
 - Compiler registry:
-  `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`
 - Study-selected labels:
-  `docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt`
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`
 - Study workbench:
   `docs/studies/retron_hairpin_design/workbench/`
 - Compiler outputs:
@@ -108,7 +108,7 @@
 - Snapback primitive runbook:
   `src/dnadesign/cruncher/workspaces/de033/runbook.md`
 - Base-junction context note:
-  `docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md`
+  `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`
 - Scar-nick workspace:
   `src/dnadesign/cruncher/workspaces/scar_nick_teto`
 - Scar-nick workspace runbook:
@@ -130,7 +130,7 @@
   hidden scoring hooks or silent solver relaxations.
 - Keep the route ladder explicit: label/parts first for compiler requests,
   primitive solver only when a constraint is missing, and status/preflight only
-  for explicit progress or blocker questions. Use `../operations/pipeline.yaml` and
+  for explicit progress or blocker questions. Use `../operations/runtime/pipeline.yaml` and
   `../operations/ops.study.yaml` only when machine-readable command grouping or preflight
   declarations are the real need.
 
@@ -152,10 +152,10 @@
   `src/dnadesign/cruncher/workspaces/msd-HOPV5_snapback` renders the prior
   `Nt.Bpu10I` MSD-HOPV5 example without treating it as a released-product solve result.
 - Study command ladder:
-  `docs/studies/retron_hairpin_design/operations/pipeline.yaml` for machine-readable
+  `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml` for machine-readable
   command groups and bootstrap support
 - Scar-nick base-junction context:
-  `docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md`
+  `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`
 - Regenerable scar-nick profile-panel bundles:
   `src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf`
   and
@@ -164,11 +164,11 @@
   PaqCI coverage reaches 13/14 active profile buckets, with `WMWM` still
   uncovered under the strict catalog policy.
 - Linear ssDNA composition handoff:
-  `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`
+  `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`
 - Study-owned MSD design registry:
-  `docs/studies/retron_hairpin_design/compiler/msd_design_registry.yaml`
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`
 - Study-selected MSD label list:
-  `docs/studies/retron_hairpin_design/compiler/msd_design_hit_labels.txt`
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`
 - Generic linear ssDNA composition dev spec:
   `docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md`
 - Generic linear ssDNA composition execution plan:
@@ -217,7 +217,7 @@
    route to the smallest primitive owner: Snapback, scar-nick, or YIU contrast.
 3. For provenance questions, open `docs/studies/retron_hairpin_design/workbench/`.
 4. When the question shifts from solving primitives to composing sequence
-   artifacts, open `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`.
+   artifacts, open `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`.
    The compiler materializes one MSD unit per design; the older manual x8
    Construct dogfood remains a separate fixture.
 5. Run the pinned study preflight only when the real question is blocker or

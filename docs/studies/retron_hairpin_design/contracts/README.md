@@ -9,4 +9,5 @@ readiness surfaces.
 
 - [Status contract](status.md): read-only study snapshot.
 - [Preflight contract](preflight.md): read-only command and path readiness.
-- `*.registry.yaml`: runbook-catalog sidecars for the adjacent contract docs.
+- `registry/*.registry.yaml`: runbook-catalog sidecars for the adjacent
+  contract docs.

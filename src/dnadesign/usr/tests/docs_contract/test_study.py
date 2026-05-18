@@ -20,8 +20,13 @@ from .helpers import assert_markdown_links_resolve, load_yaml, read_text, repo_r
 def test_promoter_study_registry_and_snapshot_surfaces_have_expected_structure() -> None:
     studies_index = load_yaml("docs/studies/index.yaml")
     datasets = load_yaml("docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml")
-    pipeline = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml")
+    pipeline = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml")
     ops_study = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml")
+    ops_snapshot = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/contract/snapshot.yaml")
+    ops_preflight = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/contract/preflight.yaml")
+    ops_execution_surfaces = load_yaml(
+        "docs/studies/stress_ethanol_cipro_growth/operations/contract/execution_surfaces.yaml"
+    )
     by_id = {row["study_id"]: row for row in studies_index["studies"]}
 
     assert studies_index["active_study_id"] == "stress_ethanol_cipro_growth"
@@ -39,9 +44,10 @@ def test_promoter_study_registry_and_snapshot_surfaces_have_expected_structure()
     assert "opal" in study_pipeline
 
     assert ops_study["version"] == 2
-    assert ops_study["snapshot"]["summary_scope"] == "repo"
-    assert "checks" in ops_study["preflight"]
-    assert "execution_surfaces" in ops_study
+    assert ops_study["parts"]["snapshot"] == "contract/snapshot.yaml"
+    assert ops_snapshot["summary_scope"] == "repo"
+    assert "checks" in ops_preflight
+    assert "construct_workspace" in ops_execution_surfaces
 
 
 def test_promoter_study_docs_link_and_reference_owner_surfaces() -> None:
@@ -55,16 +61,16 @@ def test_promoter_study_docs_link_and_reference_owner_surfaces() -> None:
     journey = read_text("src/dnadesign/usr/docs/operations/promoter/evo2-journey.md")
     status = read_text("docs/studies/stress_ethanol_cipro_growth/record/status.md")
     routes = read_text("docs/studies/stress_ethanol_cipro_growth/routes/README.md")
-    densegen_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/densegen.md")
-    infer_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/infer.md")
-    latentdna_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md")
+    densegen_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/source/densegen.md")
+    infer_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md")
+    latentdna_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md")
 
     assert "assembly/multi-source-shared-dataset.md" in journey
     assert "construct-infer-shared-dataset-runbook.md" in journey
     assert "contracts/status.md" in journey
     assert "usr-infer-x-active-learning.md" in journey
     assert "Route map: `../routes/README.md`" in status
-    assert "Study execution map: `../operations/pipeline.yaml`" in status
+    assert "Study execution map: `../operations/runtime/pipeline.yaml`" in status
     assert "| DenseGen EDA |" in routes
     assert "## DenseGen EDA Route Detail" in densegen_route
     assert "## Infer Lanes Route Detail" in infer_route

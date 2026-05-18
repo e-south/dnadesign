@@ -50,7 +50,7 @@ Read these first:
 
 - [Generic linear ssDNA composition spec](../../dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
 - [Completed implementation record](../completed/2026-05-13-generic-linear-ssdna-composition.md)
-- [Retron linear ssDNA handoff](../../studies/retron_hairpin_design/contexts/linear-ssdna-composition.md)
+- [Retron linear ssDNA handoff](../../studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md)
 - [ADR 0002](../../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
 
 ### Plan of Work

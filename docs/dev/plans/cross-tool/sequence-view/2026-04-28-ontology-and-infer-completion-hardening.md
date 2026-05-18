@@ -547,7 +547,7 @@ Inputs:
 
 - `docs/studies/stress_ethanol_cipro_growth/record/status.md`
 - `docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml`
-- `docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml`
 - Construct, USR, and Infer reference docs.
 
 Assertions:

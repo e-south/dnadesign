@@ -1,0 +1,13 @@
+phase_order:
+- regulondb_source_inventory
+- cruncher_promoter_export
+- usr_ingest_dry_run
+- usr_native_promoter_import
+- metadata_overlay_validation
+- core60_view_definition
+- native_full_infer_7b
+- core60_infer_7b
+- latentdna_native_audit
+current_phase:
+  strategy: explicit
+  id: latentdna_native_audit

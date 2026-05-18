@@ -98,9 +98,9 @@ def test_released_snapback_docs_publish_route_and_geometry_literals() -> None:
 def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit() -> None:
     status = _read_repo("docs/studies/retron_hairpin_design/record/status.md")
     routes = _read_repo("docs/studies/retron_hairpin_design/routes/README.md")
-    snapback_route = _read_repo("docs/studies/retron_hairpin_design/routes/released-product-snapback.md")
-    scar_nick_route = _read_repo("docs/studies/retron_hairpin_design/routes/scar-nick-base-junction.md")
-    yiu_route = _read_repo("docs/studies/retron_hairpin_design/routes/yiu-boundary-check.md")
+    snapback_route = _read_repo("docs/studies/retron_hairpin_design/routes/product/released-product-snapback.md")
+    scar_nick_route = _read_repo("docs/studies/retron_hairpin_design/routes/product/scar-nick-base-junction.md")
+    yiu_route = _read_repo("docs/studies/retron_hairpin_design/routes/quality/yiu-boundary-check.md")
     skill = _read_repo(".agents/skills/retron-hairpin-study/SKILL.md")
 
     assert "This study now routes Retron MSD product work as a genetic compiler" in status

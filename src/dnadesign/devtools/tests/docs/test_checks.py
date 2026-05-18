@@ -389,6 +389,124 @@ def test_find_study_record_doc_issues_rejects_record_root_outside_study_records(
     assert any("record_root must live under docs/studies/<study-id>" in issue for issue in issues)
 
 
+def test_find_study_record_doc_issues_accepts_split_ops_contract_layout(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [
+                    {
+                        "study_id": "demo_study",
+                        "record_root": "docs/studies/demo_study",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+    )
+    study_root = tmp_path / "docs" / "studies" / "demo_study"
+    for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
+        _write(study_root / required_name, "placeholder\n")
+    _write(study_root / "operations" / "runtime" / "pipeline.yaml", "version: 1\n")
+    _write(
+        study_root / "operations" / "ops.study.yaml",
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "study_id": "demo_study",
+                "record_sources": {
+                    "pipeline_ref": "manifest:operations/runtime/pipeline.yaml",
+                },
+                "parts": {
+                    "lifecycle": "contract/lifecycle.yaml",
+                    "phases": "contract/phases.yaml",
+                    "preflight": "contract/preflight.yaml",
+                },
+            },
+            sort_keys=False,
+        ),
+    )
+    for part_name in ("lifecycle.yaml", "phases.yaml", "preflight.yaml"):
+        _write(study_root / "operations" / "contract" / part_name, "{}\n")
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert not any("ops.study.yaml" in issue for issue in issues)
+
+
+def test_find_study_record_doc_issues_rejects_flat_ops_contract_sprawl(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "- `record/campaign.yaml`",
+                "- `record/datasets.yaml`",
+                "- `record/status.md`",
+                "- `operations/ops.study.yaml`",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [
+                    {
+                        "study_id": "demo_study",
+                        "record_root": "docs/studies/demo_study",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+    )
+    study_root = tmp_path / "docs" / "studies" / "demo_study"
+    for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
+        _write(study_root / required_name, "placeholder\n")
+    _write(study_root / "operations" / "pipeline.yaml", "version: 1\n")
+    _write(
+        study_root / "operations" / "ops.study.yaml",
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "study_id": "demo_study",
+                "record_sources": {
+                    "pipeline_ref": "manifest:operations/pipeline.yaml",
+                },
+                "lifecycle": {},
+                "parts": {
+                    "lifecycle": "lifecycle.yaml",
+                },
+            },
+            sort_keys=False,
+        ),
+    )
+    _write(study_root / "operations" / "lifecycle.yaml", "{}\n")
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert any("operations/runtime/pipeline.yaml" in issue for issue in issues)
+    assert any("parts.lifecycle duplicates an inline lifecycle section" in issue for issue in issues)
+    assert any("operations/contract/" in issue for issue in issues)
+
+
 def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms(tmp_path: Path) -> None:
     _write(
         tmp_path / "ARCHITECTURE.md",

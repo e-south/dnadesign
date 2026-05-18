@@ -12,12 +12,12 @@ Use this page after the checked-in study status tells you where the record stand
 
 | Surface | Owner | State | Detail |
 | --- | --- | --- | --- |
-| DenseGen EDA | `densegen` | `attention` | [routes/densegen.md](densegen.md) |
-| Infer lanes | `infer` | `complete` for supported Evo2 7B sidecars | [routes/infer.md](infer.md) |
-| Construct anchor/context refresh | `usr` plus `construct` | `complete` | [routes/construct.md](construct.md) |
-| LatentDNA comparison surface | `latentdna` | `attention` | [routes/latentdna.md](latentdna.md) |
-| Cluster exploration | `cluster` | `planned` | [routes/cluster.md](cluster.md) |
-| OPAL campaigns | `opal` | `candidate_table_materialized_pre_assay` | [routes/opal.md](opal.md) |
+| DenseGen EDA | `densegen` | `attention` | [DenseGen](source/densegen.md) |
+| Infer lanes | `infer` | `complete` for supported Evo2 7B sidecars | [Infer](compute/infer.md) |
+| Construct anchor/context refresh | `usr` plus `construct` | `complete` | [Construct](source/construct.md) |
+| LatentDNA comparison surface | `latentdna` | `attention` | [LatentDNA](analysis/latentdna.md) (`routes/analysis/latentdna.md`) |
+| Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
+| OPAL campaigns | `opal` | `candidate_table_materialized_pre_assay` | [OPAL](decision/opal.md) (`routes/decision/opal.md`) |
 
 ### Terminology Guardrails
 

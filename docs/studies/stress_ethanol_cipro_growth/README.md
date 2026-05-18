@@ -18,7 +18,9 @@ stress_ethanol_cipro_growth/
     status.md
   operations/      # machine-readable operating contracts
     ops.study.yaml
-    pipeline.yaml
+    contract/
+    runtime/
+      pipeline.yaml
   routes/          # one-hop router plus focused route details
     README.md
   contracts/       # status/preflight contracts and registry sidecars
@@ -29,7 +31,8 @@ stress_ethanol_cipro_growth/
 ```
 
 Use `routes/README.md` first for owner-surface navigation. Use
-`record/status.md` only for factual current state and `operations/` only for
-Ops/pipeline declarations. Use `contracts/` when the task is status or
-readiness, `bindings/` when a tool needs durable study context, and
-`audits/readiness/` or `audits/usr-sync/` for evidence payloads.
+`record/status.md` only for factual current state, `operations/ops.study.yaml`
+for lifecycle/preflight declarations, and `operations/runtime/pipeline.yaml`
+for command groups. Use `contracts/` when the task is status or readiness,
+`bindings/` when a tool needs durable study context, and `audits/readiness/` or
+`audits/usr-sync/` for evidence payloads.

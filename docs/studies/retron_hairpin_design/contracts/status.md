@@ -28,7 +28,7 @@ study routes to; it is not the owner of the study-status implementation.
 
 - `docs/studies/retron_hairpin_design/record/status.md`
 - `docs/studies/retron_hairpin_design/routes/README.md`
-- `docs/studies/retron_hairpin_design/operations/pipeline.yaml`
+- `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`
 - `docs/studies/retron_hairpin_design/operations/ops.study.yaml`
 
 ### When to use it

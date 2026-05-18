@@ -860,8 +860,9 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
             STUDY_DOCS / "record" / "campaign.yaml",
             STUDY_DOCS / "record" / "datasets.yaml",
             STUDY_DOCS / "operations" / "ops.study.yaml",
+            STUDY_DOCS / "operations" / "contract" / "artifacts.yaml",
             STUDY_DOCS / "routes" / "README.md",
-            STUDY_DOCS / "routes" / "opal.md",
+            STUDY_DOCS / "routes" / "decision" / "opal.md",
             STUDY_DOCS / "record" / "status.md",
             BATCH0_README,
         ]
@@ -885,11 +886,11 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
 
 def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None:
     routes = (STUDY_DOCS / "routes" / "README.md").read_text(encoding="utf-8")
-    opal_route = (STUDY_DOCS / "routes" / "opal.md").read_text(encoding="utf-8")
-    pipeline = yaml.safe_load((STUDY_DOCS / "operations" / "pipeline.yaml").read_text(encoding="utf-8"))
+    opal_route = (STUDY_DOCS / "routes" / "decision" / "opal.md").read_text(encoding="utf-8")
+    pipeline = yaml.safe_load((STUDY_DOCS / "operations" / "runtime" / "pipeline.yaml").read_text(encoding="utf-8"))
     opal_notebook = pipeline["study_pipeline"]["opal"]["notebook"]
 
-    assert "routes/opal.md" in routes
+    assert "routes/decision/opal.md" in routes
     assert "Pre-run campaign viewer generation (writes notebook)" in opal_route
     assert "uv run opal notebook generate" in opal_route
     assert "uv run opal notebook run" in opal_route
@@ -904,7 +905,9 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
 
 
 def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_matrix() -> None:
-    registry = yaml.safe_load((STUDY_DOCS / "contracts" / "status.registry.yaml").read_text(encoding="utf-8"))
+    registry = yaml.safe_load(
+        (STUDY_DOCS / "contracts" / "registry" / "status.registry.yaml").read_text(encoding="utf-8")
+    )
     relation_targets = {relation["target"] for relation in registry["relations"]}
 
     assert "opal.downstream.usr-infer-x-active-learning" in relation_targets
@@ -914,11 +917,11 @@ def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_mat
 def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() -> None:
     routes_path = STUDY_DOCS / "routes" / "README.md"
     routes = routes_path.read_text(encoding="utf-8")
-    opal_route = (STUDY_DOCS / "routes" / "opal.md").read_text(encoding="utf-8")
-    latentdna_route = (STUDY_DOCS / "routes" / "latentdna.md").read_text(encoding="utf-8")
+    opal_route = (STUDY_DOCS / "routes" / "decision" / "opal.md").read_text(encoding="utf-8")
+    latentdna_route = (STUDY_DOCS / "routes" / "analysis" / "latentdna.md").read_text(encoding="utf-8")
 
     assert len(routes.splitlines()) <= 140
-    assert "routes/opal.md" in routes
-    assert "routes/latentdna.md" in routes
+    assert "routes/decision/opal.md" in routes
+    assert "routes/analysis/latentdna.md" in routes
     assert "candidate_table_materialized_pre_assay" in opal_route
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

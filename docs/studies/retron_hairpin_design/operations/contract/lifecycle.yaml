@@ -1,0 +1,12 @@
+mode: tracks
+track_order:
+- context_consolidation
+- msd_design_reference_catalog
+- scar_nick_base_junction_context
+- snapback_released_probe
+- snapback_released_solve
+- yiu_boundary_check
+- sequence_trace_followup
+current_track:
+  strategy: explicit
+  id: msd_design_reference_catalog

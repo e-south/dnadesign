@@ -1,0 +1,23 @@
+phase_order:
+- densegen_growth
+- merged_anchor_set
+- construct_context_expansion
+- infer_batch_preparation
+- infer_sequence_views_anchor_construct_insert_7b
+- infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+- infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+- genbank_reference_import
+- reference_annotation_overlay
+- reference_core60_normalization
+- reference_context_forward
+- reference_context_reverse_complement
+- infer_reference_analysis_window_core60_7b
+- infer_reference_context_forward_seq_and_anchor_mean_7b
+- infer_reference_context_reverse_complement_seq_and_anchor_mean_7b
+- infer_reference_views_7b
+- latentdna_reference_normalization_audit
+- infer_anchor_only_20b
+- infer_anchor_plus_template_20b
+current_phase:
+  strategy: explicit
+  id: latentdna_reference_normalization_audit

@@ -227,6 +227,21 @@ STUDY_RECORD_REQUIRED_FILES = (
     "record/status.md",
     "operations/ops.study.yaml",
 )
+STUDY_OPS_CONTRACT_PART_KEYS = {
+    "lifecycle",
+    "phases",
+    "tracks",
+    "artifacts",
+    "execution_surfaces",
+    "snapshot",
+    "preflight",
+}
+STUDY_OPS_CONTRACT_PARTS_DIR = "contract"
+STUDY_RUNTIME_PIPELINE_REF = "manifest:operations/runtime/pipeline.yaml"
+STUDY_LEGACY_PIPELINE_REFS = {
+    "manifest:operations/pipeline.yaml",
+    "operations/pipeline.yaml",
+}
 STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
 STUDY_RECORD_ROUTER_FILES = (
     "AGENTS.md",
@@ -240,8 +255,8 @@ STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
     "docs/studies/stress_ethanol_cipro_growth/contracts/status.md",
     "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes/opal.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/decision/opal.md",
     "docs/studies/retron_hairpin_design/contracts/status.md",
     "docs/studies/retron_hairpin_design/contracts/preflight.md",
 )
@@ -1572,6 +1587,9 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             continue
         entries_by_id[study_id] = resolved_path
 
+    for study_id, study_root in sorted(entries_by_id.items()):
+        issues.extend(_find_study_ops_contract_layout_issues(study_root=study_root, study_id=study_id))
+
     active_study_text = str(active_study or "").strip() or None
     if active_study_text is None:
         issues.append(f"{index_path}: active_study_id must be a non-empty study id.")
@@ -1591,6 +1609,75 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
                 f"{index_path}: active study {active_study_text!r} is missing "
                 f"required file {required_name}: {required_path}"
             )
+
+    return issues
+
+
+def _find_study_ops_contract_layout_issues(*, study_root: Path, study_id: str) -> list[str]:
+    issues: list[str] = []
+    operations_root = study_root / "operations"
+    ops_path = operations_root / "ops.study.yaml"
+    if not ops_path.exists():
+        return issues
+
+    try:
+        payload = yaml.safe_load(ops_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        return [f"{ops_path}: unable to parse ops.study.yaml ({exc})."]
+    if not isinstance(payload, dict):
+        return [f"{ops_path}: ops.study.yaml for study {study_id!r} must be a mapping."]
+
+    legacy_pipeline_path = operations_root / "pipeline.yaml"
+    if legacy_pipeline_path.exists():
+        issues.append(
+            f"{legacy_pipeline_path}: study pipeline belongs under operations/runtime/pipeline.yaml "
+            "so OPS contracts, runtime plans, and contract fragments stay separate."
+        )
+
+    record_sources = payload.get("record_sources") or {}
+    if record_sources and not isinstance(record_sources, dict):
+        issues.append(f"{ops_path}: record_sources must be a mapping.")
+    elif isinstance(record_sources, dict):
+        pipeline_ref = str(record_sources.get("pipeline_ref") or "").strip()
+        if pipeline_ref in STUDY_LEGACY_PIPELINE_REFS:
+            issues.append(
+                f"{ops_path}: record_sources.pipeline_ref must use {STUDY_RUNTIME_PIPELINE_REF!r}, "
+                "not the legacy flat operations/pipeline.yaml path."
+            )
+
+    parts = payload.get("parts")
+    if parts is None:
+        return issues
+    if not isinstance(parts, dict):
+        return [*issues, f"{ops_path}: parts must be a mapping."]
+
+    unknown_parts = sorted(str(key) for key in parts if str(key) not in STUDY_OPS_CONTRACT_PART_KEYS)
+    if unknown_parts:
+        issues.append(f"{ops_path}: parts contains unknown section(s): {', '.join(unknown_parts)}.")
+
+    for raw_section, raw_ref in parts.items():
+        section = str(raw_section or "").strip()
+        if section in payload:
+            issues.append(f"{ops_path}: parts.{section} duplicates an inline {section} section.")
+        ref = str(raw_ref or "").strip()
+        if not ref:
+            issues.append(f"{ops_path}: parts.{section} must be a non-empty operations-relative path.")
+            continue
+        if ref.startswith(("repo:", "manifest:")):
+            issues.append(f"{ops_path}: parts.{section} must be operations-relative, not a path ref.")
+            continue
+        part_rel = Path(ref)
+        if part_rel.is_absolute() or ".." in part_rel.parts:
+            issues.append(f"{ops_path}: parts.{section} must stay inside the operations directory.")
+            continue
+        if not part_rel.parts or part_rel.parts[0] != STUDY_OPS_CONTRACT_PARTS_DIR:
+            issues.append(
+                f"{ops_path}: parts.{section} must live under operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/ "
+                "to keep the root OPS record as a one-hop index."
+            )
+        part_path = operations_root / part_rel
+        if not part_path.exists():
+            issues.append(f"{ops_path}: parts.{section} references missing file {part_path}.")
 
     return issues
 

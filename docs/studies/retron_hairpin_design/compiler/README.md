@@ -6,9 +6,9 @@
 This directory holds study-owned inputs for the narrow Retron MSD compiler.
 These are not generated outputs and not experimental rationale.
 
-- `msd_design_registry.yaml`: payload, cap, and construct normalization
+- `catalog/msd_design_registry.yaml`: payload, cap, and construct normalization
   metadata used by the compiler.
-- `msd_design_hit_labels.txt`: convenience lab-facing label input mirrored from
+- `inputs/msd_design_hit_labels.txt`: convenience lab-facing label input mirrored from
   the workbench design-set record.
 
 Persistent cohort meaning belongs in `../workbench/design_sets/`. Generated

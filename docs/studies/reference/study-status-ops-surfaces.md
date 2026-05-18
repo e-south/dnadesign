@@ -55,6 +55,6 @@ For Retron compiler/product requests, start from
   registry before asking agents for live study status.
 - If `routes/README.md` exists, treat it as the study-owned cross-tool handoff
   page rather than expanding the status note into a workflow encyclopedia.
-- If `operations/pipeline.yaml` exists, treat it as supplemental runtime
+- If `operations/runtime/pipeline.yaml` exists, treat it as supplemental runtime
   context for exact command groups; do not reconstruct those paths from generic
   workspace docs.

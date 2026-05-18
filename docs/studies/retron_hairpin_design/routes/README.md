@@ -11,12 +11,12 @@ progress or blocker questions.
 
 | Need | Open |
 | --- | --- |
-| MSD label, complete parts, design catalog, GenBank, plots, or Reader join | [MSD design references](msd-design-references.md) |
+| MSD label, complete parts, design catalog, GenBank, plots, or Reader join | [MSD design references](references/msd-design-references.md) |
 | Persistent hypotheses, effect tags, design-set membership, or compiler/materialization provenance | [Experimental workbench](../workbench/README.md) |
-| Missing cap or shortening geometry | [Released-product Snapback](released-product-snapback.md) |
-| Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile | [Scar-nick base-junction](scar-nick-base-junction.md) |
-| Whole-product sequence composition boundary | [Linear ssDNA composition](linear-ssdna-composition.md) |
-| Mismatch/boundary contrast only | [YIU boundary check](yiu-boundary-check.md) |
+| Missing cap or shortening geometry | [Released-product Snapback](product/released-product-snapback.md) |
+| Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile | [Scar-nick base-junction](product/scar-nick-base-junction.md) |
+| Whole-product sequence composition boundary | [Linear ssDNA composition](composition/linear-ssdna-composition.md) |
+| Mismatch/boundary contrast only | [YIU boundary check](quality/yiu-boundary-check.md) |
 | Explicit status/history question | `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` |
 | Explicit blocker/readiness question | `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` |
 
@@ -36,7 +36,7 @@ Pair with `harness-engineering` for study-surface hardening and
 - If a part is missing, route to the smallest primitive owner: Snapback for
   cap/shortening, scar-nick for base-junction feasibility, or YIU for contrast
   rendering only.
-- Open `../operations/pipeline.yaml` only when the task needs
+- Open `../operations/runtime/pipeline.yaml` only when the task needs
   machine-readable command-group or automation bootstrap metadata.
 - Open `../operations/ops.study.yaml` only when the task needs lifecycle or
   preflight declarations.
@@ -66,16 +66,16 @@ Pair with `harness-engineering` for study-surface hardening and
 - Workbench provenance:
   `docs/studies/retron_hairpin_design/workbench/provenance/README.md`
 - MSD route detail:
-  `docs/studies/retron_hairpin_design/routes/msd-design-references.md`
-- Study command ladder: `docs/studies/retron_hairpin_design/operations/pipeline.yaml`
+  `docs/studies/retron_hairpin_design/routes/references/msd-design-references.md`
+- Study command ladder: `docs/studies/retron_hairpin_design/operations/runtime/pipeline.yaml`
 - Study lifecycle and preflight contract:
   `docs/studies/retron_hairpin_design/operations/ops.study.yaml`
 - Legacy context note retained for detailed scar-nick rationale:
-  `docs/studies/retron_hairpin_design/contexts/scar-nick-base-junction.md`
+  `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`
 - Context note index: `docs/studies/retron_hairpin_design/contexts/README.md`
 - Compiler input index: `docs/studies/retron_hairpin_design/compiler/README.md`
 - Linear ssDNA composition handoff:
-  `docs/studies/retron_hairpin_design/contexts/linear-ssdna-composition.md`
+  `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`
 
 Keep this page as a one-hop route map. Move command-heavy or rationale-heavy
 detail into `routes/`, `contexts/`, `compiler/`, or `workbench/`.

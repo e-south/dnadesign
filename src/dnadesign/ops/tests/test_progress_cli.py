@@ -652,7 +652,7 @@ def _write_promoter_ops_contract(
                 "record_sources": {
                     "narrative_ref": "manifest:record/status.md",
                     "datasets_ref": "manifest:record/datasets.yaml",
-                    "pipeline_ref": "manifest:operations/pipeline.yaml",
+                    "pipeline_ref": "manifest:operations/runtime/pipeline.yaml",
                     "campaign_ref": "manifest:record/campaign.yaml",
                 },
                 "artifacts": artifacts,
@@ -691,6 +691,7 @@ def _write_stress_ethanol_cipro_growth_record(study_dir: Path, *, densegen_rows:
     repo_root = study_dir.parents[2]
     (study_dir / "record").mkdir(parents=True, exist_ok=True)
     (study_dir / "operations").mkdir(parents=True, exist_ok=True)
+    (study_dir / "operations" / "runtime").mkdir(parents=True, exist_ok=True)
     (study_dir / "record" / "campaign.yaml").write_text(
         "campaign_id: stress_ethanol_cipro_growth\nsteps: []\n",
         encoding="utf-8",
@@ -722,7 +723,7 @@ def _write_stress_ethanol_cipro_growth_record(study_dir: Path, *, densegen_rows:
         ),
         encoding="utf-8",
     )
-    (study_dir / "operations" / "pipeline.yaml").write_text(
+    (study_dir / "operations" / "runtime" / "pipeline.yaml").write_text(
         yaml.safe_dump(
             {
                 "study_pipeline": {
@@ -806,6 +807,7 @@ def _write_stress_ethanol_cipro_growth_preflight_record(
     repo_root = study_dir.parents[2]
     (study_dir / "record").mkdir(parents=True, exist_ok=True)
     (study_dir / "operations").mkdir(parents=True, exist_ok=True)
+    (study_dir / "operations" / "runtime").mkdir(parents=True, exist_ok=True)
     (study_dir / "record" / "campaign.yaml").write_text(
         "campaign_id: stress_ethanol_cipro_growth\nsteps: []\n", encoding="utf-8"
     )
@@ -854,7 +856,7 @@ def _write_stress_ethanol_cipro_growth_preflight_record(
         ),
         encoding="utf-8",
     )
-    (study_dir / "operations" / "pipeline.yaml").write_text(
+    (study_dir / "operations" / "runtime" / "pipeline.yaml").write_text(
         yaml.safe_dump(
             {
                 "study_pipeline": {
@@ -1362,7 +1364,7 @@ def test_stress_ethanol_cipro_study_progress_demotes_source_gate_once_handoffs_e
         _write_study_index(study_index)
         _write_stress_ethanol_cipro_growth_preflight_record(study_dir, densegen_rows=2, anchor_rows=7, construct_rows=7)
 
-        pipeline_path = study_dir / "operations" / "pipeline.yaml"
+        pipeline_path = study_dir / "operations" / "runtime" / "pipeline.yaml"
         pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
         pipeline_payload["study_pipeline"]["row_targets"] = {
             "densegen_anchor_minimum_before_first_full_lane_infer": 5,
@@ -3500,7 +3502,7 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
             "summary": (
                 "Checked-in retron_hairpin_design record directory containing record/campaign.yaml, "
                 "record/datasets.yaml, record/status.md, operations/ops.study.yaml, routes/README.md, "
-                "and operations/pipeline.yaml."
+                "and operations/runtime/pipeline.yaml."
             ),
         },
         {
