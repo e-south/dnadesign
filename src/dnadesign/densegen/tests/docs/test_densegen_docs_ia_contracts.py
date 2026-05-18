@@ -155,7 +155,7 @@ def test_densegen_docs_entry_has_ordered_documentation_map() -> None:
             "tutorials/study_constitutive_sigma_panel.md",
             "tutorials/study_stress_ethanol_cipro.md",
             "tutorials/demo_usr_notify.md",
-            "concepts/quick-checklist.md",
+            "concepts/checklists/quick-checklist.md",
             "reference/outputs.md",
             "reference/cli.md",
             "reference/config.md",

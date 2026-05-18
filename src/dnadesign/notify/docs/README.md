@@ -41,7 +41,7 @@ Use this page for Notify command contracts and maintainer docs. If you need to s
 
 #### Shared watcher and scheduler docs
 - [DenseGen -> USR -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): shared tutorial for one local cross-tool path.
-- [BU SCC batch + notify runbook](../../../../docs/bu-scc/batch-notify.md): shared scheduler-oriented workflow.
+- [BU SCC batch + notify runbook](../../../../docs/bu-scc/runbooks/batch-notify.md): shared scheduler-oriented workflow.
 
 #### Extend and debug internals
 - [Maintainer architecture map](dev/architecture.md): module boundaries and extension seams.

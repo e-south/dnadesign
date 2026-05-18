@@ -142,6 +142,6 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 
 ### Related docs
 
-- [Sampling concept](../concepts/sampling.md)
+- [Sampling concept](../concepts/generation/sampling.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

@@ -20,8 +20,8 @@ def test_sync_docs_use_positional_remote_contract() -> None:
     combined = "\n".join(
         [
             read_text("src/dnadesign/usr/README.md"),
-            read_text("src/dnadesign/usr/docs/operations/sync.md"),
-            read_text("docs/bu-scc/batch-notify.md"),
+            read_text("src/dnadesign/usr/docs/operations/sync/README.md"),
+            read_text("docs/bu-scc/runbooks/batch-notify.md"),
         ]
     )
     stale = re.compile(r"usr\s+(?:pull|push|diff|status)\s+[^\n]*--remote\b")
@@ -30,9 +30,9 @@ def test_sync_docs_use_positional_remote_contract() -> None:
 
 def test_sync_router_and_ops_indexes_have_resolving_links_and_route_metadata() -> None:
     assert_markdown_links_resolve("src/dnadesign/usr/docs/operations/README.md")
-    assert_markdown_links_resolve("src/dnadesign/usr/docs/operations/sync.md")
+    assert_markdown_links_resolve("src/dnadesign/usr/docs/operations/sync/README.md")
 
-    route_metadata = metadata("src/dnadesign/usr/docs/operations/sync.md")
+    route_metadata = metadata("src/dnadesign/usr/docs/operations/sync/README.md")
     assert route_metadata["Type"] == "route"
     assert route_metadata["Plane"] == "data-plane"
     assert route_metadata["Owner-boundary"] == "usr"
@@ -41,7 +41,7 @@ def test_sync_router_and_ops_indexes_have_resolving_links_and_route_metadata() -
 
 
 def test_workflow_map_and_harness_document_stable_sync_drill_entrypoint() -> None:
-    workflow_map = read_text("src/dnadesign/usr/docs/operations/workflow-map.md")
+    workflow_map = read_text("src/dnadesign/usr/docs/operations/routes/workflow-map.md")
     ops_index = read_text("src/dnadesign/usr/docs/operations/README.md")
     harness = read_text("src/dnadesign/usr/scripts/run_usr_harness_cycle.sh")
 
@@ -56,11 +56,11 @@ def test_workflow_map_and_harness_document_stable_sync_drill_entrypoint() -> Non
 
 
 def test_sync_runbooks_keep_hash_and_auxiliary_contract_terms() -> None:
-    sync_router = read_text("src/dnadesign/usr/docs/operations/sync.md")
-    quickstart = read_text("src/dnadesign/usr/docs/operations/sync-quickstart.md")
-    hpc = read_text("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md")
-    chained = read_text("src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md")
-    fidelity = read_text("src/dnadesign/usr/docs/operations/sync-fidelity-drills.md")
+    sync_router = read_text("src/dnadesign/usr/docs/operations/sync/README.md")
+    quickstart = read_text("src/dnadesign/usr/docs/operations/sync/quickstart.md")
+    hpc = read_text("src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md")
+    chained = read_text("src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md")
+    fidelity = read_text("src/dnadesign/usr/docs/operations/sync/fidelity-drills.md")
 
     for text in (sync_router, quickstart, hpc, chained, fidelity):
         assert "_auxiliary" in text
@@ -77,10 +77,10 @@ def test_sync_docs_avoid_agent_or_human_labeling_language() -> None:
     combined = "\n".join(
         [
             read_text("src/dnadesign/usr/docs/README.md"),
-            read_text("src/dnadesign/usr/docs/operations/sync.md"),
-            read_text("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md"),
-            read_text("src/dnadesign/usr/docs/operations/sync-audit-loop.md"),
-            read_text("src/dnadesign/usr/docs/operations/sync-fidelity-drills.md"),
+            read_text("src/dnadesign/usr/docs/operations/sync/README.md"),
+            read_text("src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md"),
+            read_text("src/dnadesign/usr/docs/operations/sync/audit-loop.md"),
+            read_text("src/dnadesign/usr/docs/operations/sync/fidelity-drills.md"),
         ]
     ).lower()
     for token in ("agent-oriented", "agent runbook", "agent checklist", "agentic", "for agents", "for humans"):
@@ -88,7 +88,7 @@ def test_sync_docs_avoid_agent_or_human_labeling_language() -> None:
 
 
 def test_hpc_sync_runbook_covers_bootstrap_from_either_side() -> None:
-    runbook = read_text("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md")
+    runbook = read_text("src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md")
     assert "Bootstrap from either side" in runbook
     assert "HPC has dataset, local does not" in runbook
     assert "Local has dataset, HPC does not" in runbook

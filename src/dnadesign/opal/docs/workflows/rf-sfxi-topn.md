@@ -11,8 +11,8 @@ Campaign: `src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/`
 **Reference docs:**
 
 - [Configuration](../reference/configuration.md)
-- [SFXI behavior and math](../plugins/objective-sfxi.md)
-- [Selection plugins](../plugins/selection.md)
+- [SFXI behavior and math](../plugins/objectives/sfxi.md)
+- [Selection plugins](../plugins/selection/README.md)
 - [CLI reference](../reference/cli.md)
 - [Architecture and data flow](../concepts/architecture.md)
 - [RoundCtx and contract auditing](../concepts/roundctx.md)

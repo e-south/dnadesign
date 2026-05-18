@@ -23,15 +23,15 @@ These guides are the primary user path and show complete command sequences for e
 ### Plugin docs
 
 These pages define plugin-level contracts, channel semantics, and model/objective/selection behavior.
-- [Models](./plugins/models.md): model plugin contracts and configuration surface.
-- [Gaussian Process behavior and math](./plugins/model-gaussian-process.md): GP assumptions, fitting behavior, and outputs.
-- [Selection](./plugins/selection.md): selection-plugin contracts and channel requirements.
-- [Expected Improvement behavior and math](./plugins/selection-expected-improvement.md): EI formulation and selection semantics.
-- [Objectives and channel refs](./plugins/objectives.md): objective plugin contracts and channel naming rules.
-- [SFXI behavior and math](./plugins/objective-sfxi.md): SFXI objective mechanics and output interpretation.
-- [SPOP objective draft](./plugins/objective-spop.md): draft objective behavior and current constraints.
-- [X transforms](./plugins/transforms-x.md): input transform contracts for feature generation.
-- [Y transforms and Y-ops](./plugins/transforms-y.md): target transform contracts and label operations.
+- [Models](./plugins/models/README.md): model plugin contracts and configuration surface.
+- [Gaussian Process behavior and math](./plugins/models/gaussian-process.md): GP assumptions, fitting behavior, and outputs.
+- [Selection](./plugins/selection/README.md): selection-plugin contracts and channel requirements.
+- [Expected Improvement behavior and math](./plugins/selection/expected-improvement.md): EI formulation and selection semantics.
+- [Objectives and channel refs](./plugins/objectives/README.md): objective plugin contracts and channel naming rules.
+- [SFXI behavior and math](./plugins/objectives/sfxi.md): SFXI objective mechanics and output interpretation.
+- [SPOP objective draft](./plugins/objectives/spop.md): draft objective behavior and current constraints.
+- [X transforms](./plugins/transforms/x.md): input transform contracts for feature generation.
+- [Y transforms and Y-ops](./plugins/transforms/y.md): target transform contracts and label operations.
 
 ### Concepts
 

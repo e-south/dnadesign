@@ -23,7 +23,7 @@ module used by the uv-managed default backend.
 
 ### Related Design Docs
 
-- [Linear ssDNA composition handoff](../../../../docs/dev/plans/2026-05-13-generic-linear-ssdna-composition-spec.md):
+- [Linear ssDNA composition handoff](../../../../docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md):
   Construct, Folding, and BaseRender contract boundaries.
 - [Construct composition reference](../../construct/docs/reference/linear-ssdna-composition.md):
   current generic assembly contract and bundle layout.

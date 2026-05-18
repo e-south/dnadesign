@@ -88,5 +88,5 @@ uv run usr validate usr_demo_cli_examples --registry-mode namespace-current
 
 ## Next steps
 
-- Remote and iterative batch workflows: [../operations/workflow-map.md](../operations/workflow-map.md)
+- Remote and iterative batch workflows: [USR workflow map](../operations/routes/workflow-map.md)
 - Schema and overlay contracts: [../reference/README.md](../reference/README.md)

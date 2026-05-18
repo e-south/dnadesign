@@ -17,7 +17,7 @@ import typer
 
 _ROOT_HELP = (
     "USR datasets CLI.\n\n"
-    "Task-first runbook: src/dnadesign/usr/docs/operations/workflow-map.md\n"
+    "Task-first runbook: src/dnadesign/usr/docs/operations/routes/workflow-map.md\n"
     "Sync contract: pull/push default to verify=hash with strict sidecar checks."
 )
 

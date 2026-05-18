@@ -53,4 +53,4 @@ def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> No
     assert "data.location.kind: usr" in workflow
     assert "x_column_name" in workflow
     assert "infer-derived `X` column" in workflow
-    assert "../../../usr/docs/operations/promoter-characterization-feature-matrix.md" in workflow
+    assert "../../../usr/docs/operations/promoter/characterization-feature-matrix.md" in workflow

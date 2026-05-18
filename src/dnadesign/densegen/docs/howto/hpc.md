@@ -96,4 +96,4 @@ Durability knobs for interruption tolerance:
 ### Notify event wiring
 This section points to the event-boundary docs instead of duplicating event semantics.
 
-Notify must consume USR `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/observability_and_events.md)** plus the **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.
+Notify must consume USR `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/runtime/observability-and-events.md)** plus the **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.

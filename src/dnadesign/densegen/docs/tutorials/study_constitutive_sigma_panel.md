@@ -144,6 +144,6 @@ uv run cruncher catalog export-densegen --set 1 --densegen-workspace "$PWD" -c "
 
 ### Related docs
 
-- [Generation concept](../concepts/generation.md)
+- [Generation concept](../concepts/generation/model.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

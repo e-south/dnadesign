@@ -79,4 +79,4 @@ print(ds.head(3))
 ## Next steps
 
 - Schema and registry contracts: [schema-contract.md](schema-contract.md), [overlay-and-registry.md](overlay-and-registry.md)
-- Sync for cross-machine loops: [../operations/sync.md](../operations/sync.md)
+- Sync for cross-machine loops: [USR sync operations](../operations/sync/README.md)

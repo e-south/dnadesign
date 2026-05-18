@@ -39,5 +39,5 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 
 - [Runbook catalog](../../../../docs/runbooks/README.md): repo-wide command index for procedures and tool docs.
 - [Ops orchestration index](../../../../docs/operations/README.md): choose the right lifecycle route for init, plan, execute, and verification.
-- [Orchestration runbooks](../../../../docs/operations/orchestration-runbooks.md): runbook schema, command order, and contract rules.
+- [Orchestration runbooks](../../../../docs/operations/orchestration/runbooks.md): runbook schema, command order, and contract rules.
 - [Packaged runbook presets](../runbooks/presets): checked-in starting points for common orchestration routes.

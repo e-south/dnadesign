@@ -33,7 +33,7 @@ sidecars instead of reusing old vectors.
 Use the current cross-tool promoter-study workflow only when the task is about
 that specific checked-in study:
 
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
 
 ### Common path
 

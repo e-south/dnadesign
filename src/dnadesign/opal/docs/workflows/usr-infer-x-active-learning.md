@@ -89,7 +89,7 @@ campaign-local `records.parquet` and point the campaign at
 
 For the upstream shared-dataset and infer matrix assembly, use:
 
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
 
 ### Ordered procedure
 
@@ -216,7 +216,7 @@ The infer-to-OPAL handoff contract does not change across those choices. Only `x
 ## Related docs
 
 - Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
-- Upstream shared-dataset and infer matrix assembly: [../../../usr/docs/operations/promoter-characterization-feature-matrix.md](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- Upstream shared-dataset and infer matrix assembly: [../../../usr/docs/operations/promoter/characterization-feature-matrix.md](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
 - OPAL docs index: [../index.md](../index.md)
 - OPAL configuration contract: [../reference/configuration.md](../reference/configuration.md)
 - OPAL CLI reference: [../reference/cli.md](../reference/cli.md)

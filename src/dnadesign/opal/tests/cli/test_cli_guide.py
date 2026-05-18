@@ -99,7 +99,7 @@ def test_guide_json_includes_campaign_plugins_steps_and_doc_pointers(tmp_path: P
     assert "opal validate -c" in out["steps"][0]["command"]
     assert out["steps"][1]["title"] == "Initialize campaign workspace"
     assert "opal init -c" in out["steps"][1]["command"]
-    assert "docs/plugins/objective-sfxi.md" in out["learn_more"]["docs"]
+    assert "docs/plugins/objectives/sfxi.md" in out["learn_more"]["docs"]
     assert "src/dnadesign/opal/src/models/random_forest.py" in out["learn_more"]["source"]
     assert "src/dnadesign/opal/src/runtime/round/stages.py" in out["learn_more"]["source"]
 

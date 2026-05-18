@@ -168,5 +168,5 @@ uv run usr export densegen_demo --fmt csv --out /tmp/usr_exports
 
 ## Next steps
 
-- End-to-end command chains: [../operations/workflow-map.md](../operations/workflow-map.md)
+- End-to-end command chains: [USR workflow map](../operations/routes/workflow-map.md)
 - Quickstart path: [../getting-started/cli-quickstart.md](../getting-started/cli-quickstart.md)

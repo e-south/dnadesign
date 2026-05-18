@@ -221,7 +221,7 @@
 - Updated docs (demo, sampling guide, config reference, architecture) to reflect PT-only language, TFBS-core MMR behavior, and sequences column naming.
 - Removed sample.budget.restarts from schema/config/code to eliminate PT-only fallback overrides; updated tests, docs, and demo configs accordingly.
 - Added an in-memory LRU cache for PWM log-odds -> p-value lookup tables (core/pvalue.py) to reuse DP results across auto-opt pilots; added a minimal cache-hit test.
-- Added audit design doc for Cruncher end-to-end review (docs/plans/2026-02-05-cruncher-audit-design.md), emphasizing PT-only, fixed-length invariants, MMR standard selection, and doc/workspace alignment over test bloat.
+- Added audit design doc for Cruncher end-to-end review (docs/plans/tools/cruncher/2026-02-05-audit.md), emphasizing PT-only, fixed-length invariants, MMR standard selection, and doc/workspace alignment over test bloat.
 - Recorded p-value cache hit/miss stats in run manifests and surfaced them in diagnostics metrics for transparency.
 - Hardened bidirectional logp correction (counts both strands) and codified deterministic best-hit tie-breaking.
 - Added atomic artifact writes (status/manifest/config, parquet, analysis summaries) and retry-on-read for run status with clear CLI errors.

@@ -102,5 +102,5 @@ uv run usr --root "$PWD/outputs/usr_datasets" head anchor_template_shared_datase
 
 For the infer and downstream handoff that continues from this workspace, use the shared runbooks:
 
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)

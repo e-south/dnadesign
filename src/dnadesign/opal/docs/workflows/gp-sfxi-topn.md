@@ -11,9 +11,9 @@ Campaign: `src/dnadesign/opal/campaigns/demo_gp_topn/`
 **Reference docs:**
 
 * [Configuration](../reference/configuration.md)
-* [Gaussian Process behavior and math](../plugins/model-gaussian-process.md)
-* [SFXI behavior and math](../plugins/objective-sfxi.md)
-* [Selection plugins](../plugins/selection.md)
+* [Gaussian Process behavior and math](../plugins/models/gaussian-process.md)
+* [SFXI behavior and math](../plugins/objectives/sfxi.md)
+* [Selection plugins](../plugins/selection/README.md)
 * [CLI reference](../reference/cli.md)
 
 **What this doc is meant to accomplish**

@@ -54,6 +54,6 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 
 - [Construct docs](README.md)
 - [Workspaces guide](../workspaces/README.md)
-- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
 - [Config reference](reference/config.md)
 - [Workspace registry reference](reference/workspace-registry.md)

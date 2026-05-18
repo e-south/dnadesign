@@ -123,6 +123,6 @@ uv run dense notebook run -c "$PWD/config.yaml"
 
 ### Related docs
 
-- [Pipeline lifecycle](../concepts/pipeline-lifecycle.md)
+- [Pipeline lifecycle](../concepts/runtime/pipeline-lifecycle.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

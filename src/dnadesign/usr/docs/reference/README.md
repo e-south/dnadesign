@@ -19,5 +19,5 @@ Reference pages define stable contracts for dataset shape, overlays, registry, e
 
 ## Related runbooks
 
-- Task-first workflows: [../operations/workflow-map.md](../operations/workflow-map.md)
-- Sync mechanics: [../operations/sync.md](../operations/sync.md)
+- Task-first workflows: [USR workflow map](../operations/routes/workflow-map.md)
+- Sync mechanics: [USR sync operations](../operations/sync/README.md)

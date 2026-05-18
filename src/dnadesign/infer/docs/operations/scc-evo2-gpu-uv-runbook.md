@@ -5,7 +5,7 @@
 
 Use this page when you need a deterministic SCC GPU environment build for infer.
 
-For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/install.md).
+For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/setup/install.md).
 
 ### DNA input contract
 
@@ -464,4 +464,4 @@ export OMP_NUM_THREADS=1 # Limit OpenMP thread usage.
 
 - For scheduler-managed pressure tests, continue with:
   - [Agnostic model + USR pressure test](pressure-test-agnostic-models.md)
-  - [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/batch-notify.md)
+  - [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/runbooks/batch-notify.md)

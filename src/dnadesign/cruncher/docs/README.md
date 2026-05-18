@@ -36,7 +36,7 @@ and docs surfaces.
 
 ### Related study records
 
-- [Retron hairpin study route map](../../../../docs/studies/retron_hairpin_design/routes.md): use when a named study task needs Cruncher primitives. Use [Retron Hairpin Design Status](../../../../docs/studies/retron_hairpin_design/status-contract.md) and [Retron Hairpin Design Preflight](../../../../docs/studies/retron_hairpin_design/preflight.md) only for explicit status or readiness questions.
+- [Retron hairpin study route map](../../../../docs/studies/retron_hairpin_design/routes/README.md): use when a named study task needs Cruncher primitives. Use [Retron Hairpin Design Status](../../../../docs/studies/retron_hairpin_design/contracts/status.md) and [Retron Hairpin Design Preflight](../../../../docs/studies/retron_hairpin_design/contracts/preflight.md) only for explicit status or readiness questions.
 
 <!-- docs:toc:off -->
 

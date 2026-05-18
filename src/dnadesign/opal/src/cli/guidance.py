@@ -95,18 +95,18 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     selection_name = str(cfg.selection.selection.name)
     objective_names = [str(o.name) for o in cfg.objectives.objectives]
     if model_name == "gaussian_process":
-        docs.append("docs/plugins/model-gaussian-process.md")
+        docs.append("docs/plugins/models/gaussian-process.md")
         source.append(f"{src_root}/models/gaussian_process.py")
     else:
-        docs.append("docs/plugins/models.md")
+        docs.append("docs/plugins/models/README.md")
         source.append(f"{src_root}/models/random_forest.py")
     if "sfxi_v1" in objective_names:
-        docs.append("docs/plugins/objective-sfxi.md")
+        docs.append("docs/plugins/objectives/sfxi.md")
         source.append(f"{src_root}/objectives/sfxi_v1.py")
     if selection_name == "expected_improvement":
-        docs.append("docs/plugins/selection-expected-improvement.md")
+        docs.append("docs/plugins/selection/expected-improvement.md")
         source.append(f"{src_root}/selection/expected_improvement.py")
-    docs.append("docs/plugins/selection.md")
+    docs.append("docs/plugins/selection/README.md")
     if workflow_key == "rf_sfxi_topn":
         docs.append("docs/workflows/rf-sfxi-topn.md")
     elif workflow_key == "gp_sfxi_topn":
@@ -351,7 +351,7 @@ def build_next_guidance(
                     labels_file="<labels.xlsx>",
                 ),
             ],
-            learn_more=["docs/reference/cli.md", "docs/plugins/objective-sfxi.md"],
+            learn_more=["docs/reference/cli.md", "docs/plugins/objectives/sfxi.md"],
         )
 
     if not run_exists:

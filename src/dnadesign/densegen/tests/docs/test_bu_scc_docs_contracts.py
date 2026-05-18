@@ -19,7 +19,11 @@ DENSEGEN_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[5]
 DENSEGEN_TUTORIALS = DENSEGEN_ROOT / "docs" / "tutorials"
 BU_SCC_DOCS = REPO_ROOT / "docs" / "bu-scc"
+BU_SCC_REFERENCE_DOCS = BU_SCC_DOCS / "reference"
+BU_SCC_RUNBOOK_DOCS = BU_SCC_DOCS / "runbooks"
+BU_SCC_SETUP_DOCS = BU_SCC_DOCS / "setup"
 NOTIFY_DOCS = REPO_ROOT / "docs" / "notify"
+REPO_SETUP_DOCS = REPO_ROOT / "docs" / "setup"
 SGE_SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "sge-hpc-ops"
 TOP_LEVEL_SYSTEM_DOCS = (
     REPO_ROOT / "README.md",
@@ -46,7 +50,7 @@ def test_stress_tutorial_links_to_bu_scc_operational_docs() -> None:
 
 
 def test_bu_scc_quickstart_contains_status_first_submission_gate() -> None:
-    text = _read(BU_SCC_DOCS / "quickstart.md")
+    text = _read(BU_SCC_SETUP_DOCS / "quickstart.md")
     assert "running_jobs > 3" in text
     assert 'qstat -u "$USER"' in text
     assert "-hold_jid" in text
@@ -86,7 +90,7 @@ def test_bu_scc_readme_routes_to_optional_repo_local_skill_overlay() -> None:
 
 
 def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
-    batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")
+    batch_notify = _read(BU_SCC_RUNBOOK_DOCS / "batch-notify.md")
     jobs_readme = _read(BU_SCC_DOCS / "jobs" / "README.md")
     docs_bundle = "\n".join((batch_notify, jobs_readme))
 
@@ -130,7 +134,7 @@ def test_evo2_qsub_template_requires_infer_config_and_runs_infer_cli() -> None:
 
 
 def test_bu_scc_install_doc_includes_infer_transient_path_policy_and_model_support() -> None:
-    install_doc = _read(BU_SCC_DOCS / "install.md")
+    install_doc = _read(BU_SCC_SETUP_DOCS / "install.md")
     assert "### 3a) Infer runtime transient paths" in install_doc
     assert "export TMPDIR=" in install_doc
     assert "export TORCH_EXTENSIONS_DIR=" in install_doc
@@ -147,8 +151,8 @@ def test_bu_scc_install_doc_includes_infer_transient_path_policy_and_model_suppo
 
 
 def test_bu_scc_docs_define_canonical_repo_venv_and_model_cache_split_policy() -> None:
-    install_doc = _read(BU_SCC_DOCS / "install.md")
-    quickstart_doc = _read(BU_SCC_DOCS / "quickstart.md")
+    install_doc = _read(BU_SCC_SETUP_DOCS / "install.md")
+    quickstart_doc = _read(BU_SCC_SETUP_DOCS / "quickstart.md")
     bundle = "\n".join((install_doc, quickstart_doc))
 
     assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in bundle
@@ -165,7 +169,7 @@ def test_bu_scc_docs_define_canonical_repo_venv_and_model_cache_split_policy() -
 
 
 def test_bu_scc_install_doc_includes_deterministic_flash_attn_source_build_controls() -> None:
-    install_doc = _read(BU_SCC_DOCS / "install.md")
+    install_doc = _read(BU_SCC_SETUP_DOCS / "install.md")
     assert "### GPU setup and verification runbook" in install_doc
     assert "FLASH_ATTENTION_FORCE_BUILD" in install_doc
     assert "FLASH_ATTN_CUDA_ARCHS" in install_doc
@@ -177,9 +181,9 @@ def test_bu_scc_install_doc_includes_deterministic_flash_attn_source_build_contr
 
 
 def test_status_first_queue_fair_guidance_present_in_bu_scc_docs_bundle() -> None:
-    quickstart = _read(BU_SCC_DOCS / "quickstart.md")
-    batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")
-    submission_reference = _read(BU_SCC_DOCS / "submission-reference.md")
+    quickstart = _read(BU_SCC_SETUP_DOCS / "quickstart.md")
+    batch_notify = _read(BU_SCC_RUNBOOK_DOCS / "batch-notify.md")
+    submission_reference = _read(BU_SCC_REFERENCE_DOCS / "submission.md")
     docs_bundle = "\n".join((quickstart, batch_notify, submission_reference)).lower()
 
     assert "running_jobs > 3" in docs_bundle
@@ -189,8 +193,8 @@ def test_status_first_queue_fair_guidance_present_in_bu_scc_docs_bundle() -> Non
 
 
 def test_bu_scc_notify_webhook_examples_require_owner_only_secret_file_permissions() -> None:
-    quickstart = _read(BU_SCC_DOCS / "quickstart.md")
-    batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")
+    quickstart = _read(BU_SCC_SETUP_DOCS / "quickstart.md")
+    batch_notify = _read(BU_SCC_RUNBOOK_DOCS / "batch-notify.md")
     jobs_readme = _read(BU_SCC_DOCS / "jobs" / "README.md")
     docs_bundle = "\n".join((quickstart, batch_notify, jobs_readme))
 
@@ -206,7 +210,7 @@ def test_top_level_docs_do_not_reference_removed_repo_local_sge_skill_path() -> 
 
 
 def test_top_level_install_doc_describes_uv_model_and_links_gpu_path() -> None:
-    install_doc = _read(REPO_ROOT / "docs" / "installation.md")
+    install_doc = _read(REPO_SETUP_DOCS / "installation.md")
     assert "### 2a) UV dependency model" in install_doc
     assert "default-groups = []" in install_doc
     assert "uv sync --locked --group dev" in install_doc
@@ -218,10 +222,10 @@ def test_top_level_install_doc_describes_uv_model_and_links_gpu_path() -> None:
 
 
 def test_installation_docs_use_direct_wording_without_lane_or_agent_labels() -> None:
-    install_doc = _read(REPO_ROOT / "docs" / "installation.md")
-    bu_install_doc = _read(BU_SCC_DOCS / "install.md")
+    install_doc = _read(REPO_SETUP_DOCS / "installation.md")
+    bu_install_doc = _read(BU_SCC_SETUP_DOCS / "install.md")
     bu_index_doc = _read(BU_SCC_DOCS / "README.md")
-    bu_quickstart_doc = _read(BU_SCC_DOCS / "quickstart.md")
+    bu_quickstart_doc = _read(BU_SCC_SETUP_DOCS / "quickstart.md")
     infer_docs_readme = _read(REPO_ROOT / "src" / "dnadesign" / "infer" / "docs" / "README.md")
     infer_pressure_doc = _read(
         REPO_ROOT / "src" / "dnadesign" / "infer" / "docs" / "operations" / "pressure-test-agnostic-models.md"

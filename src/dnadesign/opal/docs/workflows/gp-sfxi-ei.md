@@ -10,10 +10,10 @@ Campaign: `src/dnadesign/opal/campaigns/demo_gp_ei/`
 
 **Reference docs:**
 
-* [Gaussian Process behavior and math](../plugins/model-gaussian-process.md)
-* [Expected Improvement behavior and math](../plugins/selection-expected-improvement.md)
-* [SFXI behavior and math](../plugins/objective-sfxi.md)
-* [Selection plugins](../plugins/selection.md)
+* [Gaussian Process behavior and math](../plugins/models/gaussian-process.md)
+* [Expected Improvement behavior and math](../plugins/selection/expected-improvement.md)
+* [SFXI behavior and math](../plugins/objectives/sfxi.md)
+* [Selection plugins](../plugins/selection/README.md)
 * [CLI reference](../reference/cli.md)
 
 **What this doc is meant to accomplish**

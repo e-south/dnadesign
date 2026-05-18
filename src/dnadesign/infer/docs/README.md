@@ -49,9 +49,9 @@
 
 ### Shared dataset handoffs into infer
 
-- [Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
-- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/construct-infer-shared-dataset-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): study-specific feature-dataset assembly before downstream cluster or OPAL use.
+- [Multi-source shared dataset assembly](../../usr/docs/operations/assembly/multi-source-shared-dataset.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
+- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md): study-specific feature-dataset assembly before downstream cluster or OPAL use.
 
 ### Documentation by type
 

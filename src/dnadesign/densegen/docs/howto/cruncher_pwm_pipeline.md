@@ -17,7 +17,7 @@ This section clarifies what DenseGen expects from upstream Cruncher outputs.
 
 DenseGen consumes PWM artifacts as explicit per-input files. Do not assume a single aggregated set contract unless your workspace schema explicitly defines one.
 
-For exact JSON field requirements, use **[motif artifact JSON contract](../reference/motif_artifacts.md)**. For sampling behavior after ingest, use **[sampling model](../concepts/sampling.md)**.
+For exact JSON field requirements, use **[motif artifact JSON contract](../reference/motif_artifacts.md)**. For sampling behavior after ingest, use **[sampling model](../concepts/generation/sampling.md)**.
 
 For packaged workspace refresh from Cruncher:
 

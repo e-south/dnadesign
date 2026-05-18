@@ -14,29 +14,29 @@
 
 #### Run with Notify
 - [DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md): run event-producing flow across DenseGen, USR, and Notify.
-- [Observability and events](concepts/observability_and_events.md): interpret run events, status transitions, and emitted metadata.
+- [Observability and events](concepts/runtime/observability-and-events.md): interpret run events, status transitions, and emitted metadata.
 
 #### Continue into shared downstream data-plane flows
-- [Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md): treat DenseGen outputs as one upstream USR source when construct and infer should share one downstream dataset.
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): treat DenseGen outputs as one upstream source when downstream clustering or active learning should consume infer-derived feature columns.
+- [Multi-source shared dataset assembly](../../usr/docs/operations/assembly/multi-source-shared-dataset.md): treat DenseGen outputs as one upstream USR source when construct and infer should share one downstream dataset.
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md): treat DenseGen outputs as one upstream source when downstream clustering or active learning should consume infer-derived feature columns.
 
 #### Debug a run
-1. [Quick checklist](concepts/quick-checklist.md): run preflight checks before executing jobs.
-2. [Pipeline lifecycle](concepts/pipeline-lifecycle.md): locate a failing stage and expected transitions.
-3. [Outputs and metadata](concepts/outputs-and-metadata.md): verify expected artifacts and metadata surfaces.
+1. [Quick checklist](concepts/checklists/quick-checklist.md): run preflight checks before executing jobs.
+2. [Pipeline lifecycle](concepts/runtime/pipeline-lifecycle.md): locate a failing stage and expected transitions.
+3. [Outputs and metadata](concepts/artifacts/outputs-and-metadata.md): verify expected artifacts and metadata surfaces.
 4. [Outputs reference](reference/outputs.md): inspect exact artifact paths and data contracts.
 5. [CLI reference](reference/cli.md): confirm command contracts and failure semantics.
 
 #### Tune sampling and generation
-- [Sampling](concepts/sampling.md): tune sampling behavior and candidate-pool construction.
-- [Inputs](concepts/inputs.md): validate source inputs and required normalization rules.
-- [Generation](concepts/generation.md): understand generation-stage behavior and constraints.
+- [Sampling](concepts/generation/sampling.md): tune sampling behavior and candidate-pool construction.
+- [Inputs](concepts/inputs/source-inputs.md): validate source inputs and required normalization rules.
+- [Generation](concepts/generation/model.md): understand generation-stage behavior and constraints.
 - [Config reference](reference/config.md): map config keys to runtime behavior.
 
 #### HPC and BU SCC
 - [DenseGen HPC runbook](howto/hpc.md): run DenseGen on remote compute with explicit preflight and verify steps.
 - [DenseGen on BU SCC](howto/bu-scc.md): BU SCC-specific submission and execution sequence.
-- [Repository BU SCC quickstart](../../../../docs/bu-scc/quickstart.md): cluster-level setup and shared operational baseline.
+- [Repository BU SCC quickstart](../../../../docs/bu-scc/setup/quickstart.md): cluster-level setup and shared operational baseline.
 
 ### Workspace documentation
 - [DenseGen workspaces directory](../workspaces/README.md): workspace layout and package-local expectations.
@@ -45,7 +45,7 @@
 - [docs index](index.md): type-based index for concept, how-to, tutorial, and reference docs.
 - [tutorials/](tutorials/): executable end-to-end walkthroughs.
 - [howto/](howto/): operational runbooks for environment-specific execution.
-- [concepts/](concepts/): behavioral models and lifecycle explanations.
+- [concepts/](concepts/README.md): behavioral models and lifecycle explanations.
 - [reference/](reference/): stable schema, CLI, and artifact contracts.
 - [dev/](dev/): maintainer architecture notes and journal entries.
 - [Architecture notes](dev/architecture.md): internal lifecycle and package boundaries.

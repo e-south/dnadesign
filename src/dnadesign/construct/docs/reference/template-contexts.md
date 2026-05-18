@@ -63,5 +63,5 @@ That keeps template choice explicit as workspace/config state instead of hiding 
 
 Use one of these next steps after construct materializes template-backed contexts:
 
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md): promoter-study branch for feature extraction, cluster, and OPAL prep.
+- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md): promoter-study branch for feature extraction, cluster, and OPAL prep.

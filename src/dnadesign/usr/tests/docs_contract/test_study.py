@@ -19,9 +19,9 @@ from .helpers import assert_markdown_links_resolve, load_yaml, read_text, repo_r
 
 def test_promoter_study_registry_and_snapshot_surfaces_have_expected_structure() -> None:
     studies_index = load_yaml("docs/studies/index.yaml")
-    datasets = load_yaml("docs/studies/stress_ethanol_cipro_growth/datasets.yaml")
-    pipeline = load_yaml("docs/studies/stress_ethanol_cipro_growth/pipeline.yaml")
-    ops_study = load_yaml("docs/studies/stress_ethanol_cipro_growth/ops.study.yaml")
+    datasets = load_yaml("docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml")
+    pipeline = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/pipeline.yaml")
+    ops_study = load_yaml("docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml")
     by_id = {row["study_id"]: row for row in studies_index["studies"]}
 
     assert studies_index["active_study_id"] == "stress_ethanol_cipro_growth"
@@ -47,29 +47,33 @@ def test_promoter_study_registry_and_snapshot_surfaces_have_expected_structure()
 def test_promoter_study_docs_link_and_reference_owner_surfaces() -> None:
     for rel_path in (
         "docs/studies/README.md",
-        "src/dnadesign/usr/docs/operations/promoter-evo2-journey.md",
-        "docs/studies/stress_ethanol_cipro_growth/status-contract.md",
+        "src/dnadesign/usr/docs/operations/promoter/evo2-journey.md",
+        "docs/studies/stress_ethanol_cipro_growth/contracts/status.md",
     ):
         assert_markdown_links_resolve(rel_path)
 
-    journey = read_text("src/dnadesign/usr/docs/operations/promoter-evo2-journey.md")
-    status = read_text("docs/studies/stress_ethanol_cipro_growth/status.md")
-    routes = read_text("docs/studies/stress_ethanol_cipro_growth/routes.md")
+    journey = read_text("src/dnadesign/usr/docs/operations/promoter/evo2-journey.md")
+    status = read_text("docs/studies/stress_ethanol_cipro_growth/record/status.md")
+    routes = read_text("docs/studies/stress_ethanol_cipro_growth/routes/README.md")
+    densegen_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/densegen.md")
+    infer_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/infer.md")
+    latentdna_route = read_text("docs/studies/stress_ethanol_cipro_growth/routes/latentdna.md")
 
-    assert "multi-source-shared-dataset-assembly.md" in journey
+    assert "assembly/multi-source-shared-dataset.md" in journey
     assert "construct-infer-shared-dataset-runbook.md" in journey
-    assert "status-contract.md" in journey
+    assert "contracts/status.md" in journey
     assert "usr-infer-x-active-learning.md" in journey
-    assert "Route map: `routes.md`" in status
-    assert "Study execution map: `pipeline.yaml`" in status
-    assert "### DenseGen EDA" in routes
-    assert "### Infer lanes" in routes
-    assert "### LatentDNA comparison surface" in routes
+    assert "Route map: `../routes/README.md`" in status
+    assert "Study execution map: `../operations/pipeline.yaml`" in status
+    assert "| DenseGen EDA |" in routes
+    assert "## DenseGen EDA Route Detail" in densegen_route
+    assert "## Infer Lanes Route Detail" in infer_route
+    assert "## LatentDNA Route Detail" in latentdna_route
 
 
 def test_stress_ethanol_cipro_contract_avoids_family_templates() -> None:
-    contract = read_text("docs/studies/stress_ethanol_cipro_growth/status-contract.md")
-    preflight = read_text("docs/studies/stress_ethanol_cipro_growth/preflight.md")
+    contract = read_text("docs/studies/stress_ethanol_cipro_growth/contracts/status.md")
+    preflight = read_text("docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md")
     templates_index = read_text("docs/templates/README.md")
 
     assert "stress_ethanol_cipro_growth" in contract

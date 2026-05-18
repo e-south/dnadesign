@@ -62,6 +62,6 @@ uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
 ### Related docs
 
-- [Generation concept](../concepts/generation.md)
+- [Generation concept](../concepts/generation/model.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

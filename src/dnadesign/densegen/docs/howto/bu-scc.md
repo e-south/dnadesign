@@ -30,12 +30,12 @@ uv run dense validate-config --probe-solver -c /abs/path/to/workspace/config.yam
 ### BU SCC reference docs
 This section points to BU SCC repo-level docs so this page stays concise and non-duplicative.
 
-- Use the **[BU SCC quickstart](../../../../../docs/bu-scc/quickstart.md)** for login-to-first-job flow.
-- Use the **[BU SCC install guide](../../../../../docs/bu-scc/install.md)** for environment bootstrap.
-- Use the **[BU SCC batch plus Notify runbook](../../../../../docs/bu-scc/batch-notify.md)** for watcher deployment patterns.
+- Use the **[BU SCC quickstart](../../../../../docs/bu-scc/setup/quickstart.md)** for login-to-first-job flow.
+- Use the **[BU SCC install guide](../../../../../docs/bu-scc/setup/install.md)** for environment bootstrap.
+- Use the **[BU SCC batch plus Notify runbook](../../../../../docs/bu-scc/runbooks/batch-notify.md)** for watcher deployment patterns.
 - Use the **[BU SCC job templates](../../../../../docs/bu-scc/jobs/README.md)** for submit-ready scripts.
 
 ### Event boundary reminder
 This section links to the event-boundary doc to avoid semantic drift.
 
-For DenseGen diagnostics versus USR mutation event boundaries, read **[observability and events](../concepts/observability_and_events.md)**.
+For DenseGen diagnostics versus USR mutation event boundaries, read **[observability and events](../concepts/runtime/observability-and-events.md)**.
